@@ -428,7 +428,7 @@ export default function OpportunityPostingPage() {
                                                         ...prev,
                                                         location: {
                                                             ...prev.location,
-                                                            venue: loc.address,
+                                                            venue: loc.address || "",
                                                             pin: `${loc.lat},${loc.lng}`
                                                         }
                                                     }));
