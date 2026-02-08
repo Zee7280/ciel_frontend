@@ -65,17 +65,18 @@ const MOCK_APPLICANTS = [
     }
 ];
 
-export async function POST(request: Request, { params }: { params: { id: string } }) {
+export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
     // Simulate delay
     await new Promise(resolve => setTimeout(resolve, 800));
 
     try {
+        const routeParams = await params;
         const body = await request.json();
         const { id, applicantId, status } = body;
 
         // If applicantId and status are provided, this is a status update request
         if (applicantId && status) {
-            console.log(`Updating applicant ${applicantId} status to ${status} for opportunity ${id || params.id}`);
+            console.log(`Updating applicant ${applicantId} status to ${status} for opportunity ${id || routeParams.id}`);
 
             return NextResponse.json({
                 success: true,
@@ -84,7 +85,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
         }
 
         // Otherwise, this is a fetch request
-        console.log("Fetching applicants for opportunity ID:", id || params.id);
+        console.log("Fetching applicants for opportunity ID:", id || routeParams.id);
 
         return NextResponse.json({
             success: true,

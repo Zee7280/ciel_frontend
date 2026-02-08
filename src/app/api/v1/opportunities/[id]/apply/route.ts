@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 
-export async function POST(request: Request, { params }: { params: { id: string } }) {
+export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
     try {
         const authHeader = request.headers.get("Authorization");
-        const id = params.id;
+        const { id } = await params;
 
         const response = await fetch(`${process.env.NEXT_PUBLIC_APP_API_BASE_URL}/opportunities/${id}/apply`, {
             method: "POST",

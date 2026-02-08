@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 
 export async function PUT(
     req: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
+    const { id } = await params;
     try {
         const authHeader = req.headers.get("authorization");
         if (!authHeader || !authHeader.startsWith("Bearer ")) {
@@ -17,7 +18,7 @@ export async function PUT(
         const body = await req.json();
 
         const response = await fetch(
-            `${process.env.NEXT_PUBLIC_APP_API_BASE_URL}/partners/reports/${params.id}`,
+            `${process.env.NEXT_PUBLIC_APP_API_BASE_URL}/partners/reports/${id}`,
             {
                 method: "PUT",
                 headers: {
@@ -49,8 +50,9 @@ export async function PUT(
 
 export async function DELETE(
     req: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
+    const { id } = await params;
     try {
         const authHeader = req.headers.get("authorization");
         if (!authHeader || !authHeader.startsWith("Bearer ")) {
@@ -63,7 +65,7 @@ export async function DELETE(
         const token = authHeader.split(" ")[1];
 
         const response = await fetch(
-            `${process.env.NEXT_PUBLIC_APP_API_BASE_URL}/partners/reports/${params.id}`,
+            `${process.env.NEXT_PUBLIC_APP_API_BASE_URL}/partners/reports/${id}`,
             {
                 method: "DELETE",
                 headers: {

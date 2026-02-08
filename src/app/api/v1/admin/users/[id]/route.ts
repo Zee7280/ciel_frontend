@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 
-export async function POST(request: Request, { params }: { params: { id: string } }) {
+export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
     try {
-        const id = params.id;
+        const { id } = await params;
         const body = await request.json();
         const authHeader = request.headers.get("Authorization");
 
-        const response = await fetch(`http://localhost:3000/api/v1/admin/users/${id}`, {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_APP_API_BASE_URL}/admin/users/${id}`, {
             method: "POST",
             headers: {
                 "Authorization": authHeader || "",
@@ -24,12 +24,12 @@ export async function POST(request: Request, { params }: { params: { id: string 
     }
 }
 
-export async function DELETE(request: Request, { params }: { params: { id: string } }) {
+export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
     try {
-        const id = params.id;
+        const { id } = await params;
         const authHeader = request.headers.get("Authorization");
 
-        const response = await fetch(`http://localhost:3000/api/v1/admin/users/${id}`, {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_APP_API_BASE_URL}/admin/users/${id}`, {
             method: "DELETE",
             headers: {
                 "Authorization": authHeader || "",
