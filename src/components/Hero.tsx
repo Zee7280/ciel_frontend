@@ -7,15 +7,21 @@ import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
 import { useCounter } from "@/hooks/useCounter";
 
 // Stat Hook Helper (re-implemented inline for simplicity if needed, or imported)
-function StatItem({ label, value, icon: Icon, delay }: { label: string, value: number, icon: any, delay: number }) {
+function StatItem({ label, value, icon, delay }: { label: string, value: number, icon: any | string, delay: number }) {
     const count = useCounter(value, 2000);
     const formattedValue = count.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+
+    const isImagePath = typeof icon === 'string';
 
     return (
         <div className="flex flex-col items-center sm:items-start text-center sm:text-left gap-1 animate-fade-in-up" style={{ animationDelay: `${delay}ms` }}>
             <div className="flex items-center gap-3 mb-1">
-                <div className="p-2 bg-slate-100 rounded-full text-slate-700">
-                    <Icon className="w-6 h-6" strokeWidth={2} />
+                <div className="p-2 bg-slate-100 rounded-full text-slate-700 flex items-center justify-center">
+                    {isImagePath ? (
+                        <Image src={icon} alt={label} width={24} height={24} className="w-6 h-6 object-contain" />
+                    ) : (
+                        (() => { const Icon = icon; return <Icon className="w-6 h-6" strokeWidth={2} />; })()
+                    )}
                 </div>
                 <h3 className="text-2xl lg:text-3xl font-black text-slate-800 tracking-tight leading-none">
                     {formattedValue}
@@ -166,10 +172,10 @@ export default function Hero() {
 
                     {/* Stats Grid - Moved inside Hero */}
                     <div className="grid grid-cols-2 gap-x-8 gap-y-8 w-full max-w-md mx-auto">
-                        <StatItem label="Students Engaged" value={8540} icon={Users} delay={100} />
-                        <StatItem label="Hours Served" value={124000} icon={Clock} delay={200} />
-                        <StatItem label="NGOs Supported" value={8540} icon={Building2} delay={300} />
-                        <StatItem label="SDGs Impacted" value={17} icon={Globe} delay={400} />
+                        <StatItem label="Students Engaged" value={8540} icon="/icon-planting.jpg" delay={100} />
+                        <StatItem label="Hours Served" value={124000} icon="/icon-globe.jpg" delay={200} />
+                        <StatItem label="NGOs Supported" value={8540} icon="/icon-gears.jpg" delay={300} />
+                        <StatItem label="SDGs Impacted" value={17} icon="/icon-graph.jpg" delay={400} />
                     </div>
 
                 </div>

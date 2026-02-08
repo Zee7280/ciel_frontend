@@ -54,7 +54,7 @@ export default function Sidebar() {
             { label: "Organizations", href: "/dashboard/admin/organizations", icon: Building2 },
             { label: "Approvals", href: "/dashboard/admin/approvals", icon: CheckCircle },
             { label: "Projects", href: "/dashboard/admin/projects", icon: Briefcase },
-            { label: "Reports", href: "/dashboard/admin/reports", icon: FileText },
+            { label: "Student Reports", href: "/dashboard/admin/reports/verify", icon: FileText },
             { label: "Impact", href: "/dashboard/admin/impact", icon: FileBarChart },
             { label: "Audit Logs", href: "/dashboard/admin/audit-logs", icon: ShieldAlert },
         ] : []),

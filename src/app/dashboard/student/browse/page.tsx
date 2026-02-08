@@ -4,10 +4,22 @@ import { useEffect, useState } from "react";
 import { Button } from "../report/components/ui/button";
 import { Badge } from "../report/components/ui/badge";
 import { authenticatedFetch } from "@/utils/api";
-import { Loader2, MapPin, Calendar, Clock, Globe, ArrowRight, CheckCircle2, LayoutGrid, List } from "lucide-react";
+import { Loader2, MapPin, Calendar, Clock, Globe, ArrowRight, CheckCircle2, LayoutGrid, List, Users, Mail, Phone, GraduationCap } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import ApplicationDialog from "./components/ApplicationDialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "../report/components/ui/dialog";
+
+interface TeamMember {
+    name: string;
+    role: string;
+    cnic: string;
+    email?: string;
+    mobile?: string;
+    university?: string;
+    program?: string;
+    is_verified?: boolean;
+}
 
 export default function StudentBrowseOpportunitiesPage() {
     const [opportunities, setOpportunities] = useState<any[]>([]);
@@ -15,6 +27,10 @@ export default function StudentBrowseOpportunitiesPage() {
     const [applyingId, setApplyingId] = useState<string | null>(null);
     const [applyingTitle, setApplyingTitle] = useState<string | undefined>(undefined);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
+
+    // Team Dialog
+    const [selectedTeamOpp, setSelectedTeamOpp] = useState<any | null>(null);
+    const [isTeamDialogOpen, setIsTeamDialogOpen] = useState(false);
 
     // Filters & View State
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
@@ -75,6 +91,7 @@ export default function StudentBrowseOpportunitiesPage() {
             if (res && res.ok) {
                 const data = await res.json();
                 if (data.success) {
+                    console.log("Browse API Response:", data.data); // DEBUG: Check if teamMembers and status are present
                     const mappedOps = (data.data || []).map((op: any) => ({
                         ...op,
                         hasApplied: op.status === 'applied' || op.hasApplied
@@ -116,6 +133,11 @@ export default function StudentBrowseOpportunitiesPage() {
         } finally {
             setApplyingId(null);
         }
+    };
+
+    const openTeamDialog = (opportunity: any) => {
+        setSelectedTeamOpp(opportunity);
+        setIsTeamDialogOpen(true);
     };
 
     if (isLoading) {
@@ -236,9 +258,27 @@ export default function StudentBrowseOpportunitiesPage() {
                                         View Details
                                     </Link>
                                     {op.hasApplied ? (
-                                        <Button size="sm" variant="ghost" className="text-green-600 hover:text-green-700 hover:bg-green-50 pointer-events-none">
-                                            <CheckCircle2 className="w-4 h-4 mr-1" /> Applied
-                                        </Button>
+                                        <div className="flex items-center gap-2">
+                                            {/* Report Button */}
+                                            {['active', 'pending', 'pending_approval', 'completed', 'applied', 'accepted'].includes(op.status) && (
+                                                <Link href={`/dashboard/student/report?projectId=${op.id}`}>
+                                                    <Button size="sm" variant="outline" className="text-xs h-8">
+                                                        Submit Report
+                                                    </Button>
+                                                </Link>
+                                            )}
+
+                                            {/* Team Button */}
+                                            {op.teamMembers && op.teamMembers.length > 0 && (
+                                                <Button size="sm" variant="outline" className="text-xs h-8" onClick={() => openTeamDialog(op)}>
+                                                    <Users className="w-3.5 h-3.5 mr-1" /> Team
+                                                </Button>
+                                            )}
+
+                                            <Button size="sm" variant="ghost" className="text-green-600 hover:text-green-700 hover:bg-green-50 pointer-events-none">
+                                                <CheckCircle2 className="w-4 h-4 mr-1" /> Applied
+                                            </Button>
+                                        </div>
                                     ) : (
                                         <Button
                                             size="sm"
@@ -281,9 +321,27 @@ export default function StudentBrowseOpportunitiesPage() {
                                         <Button variant="outline" className="w-full">Details</Button>
                                     </Link>
                                     {op.hasApplied ? (
-                                        <Button variant="ghost" className="text-green-600 bg-green-50 pointer-events-none flex-1 md:flex-none">
-                                            <CheckCircle2 className="w-4 h-4 mr-2" /> Applied
-                                        </Button>
+                                        <div className="flex items-center gap-2 flex-1 md:flex-none justify-end">
+                                            {/* Report Button */}
+                                            {['active', 'pending', 'pending_approval', 'completed', 'applied', 'accepted'].includes(op.status) && (
+                                                <Link href={`/dashboard/student/report?projectId=${op.id}`}>
+                                                    <Button size="sm" variant="outline" className="text-xs h-9">
+                                                        Submit Report
+                                                    </Button>
+                                                </Link>
+                                            )}
+
+                                            {/* Team Button */}
+                                            {op.teamMembers && op.teamMembers.length > 0 && (
+                                                <Button size="sm" variant="outline" className="text-xs h-9" onClick={() => openTeamDialog(op)}>
+                                                    <Users className="w-3.5 h-3.5 mr-1" /> Team
+                                                </Button>
+                                            )}
+
+                                            <Button variant="ghost" className="text-green-600 bg-green-50 pointer-events-none">
+                                                <CheckCircle2 className="w-4 h-4 mr-2" /> Applied
+                                            </Button>
+                                        </div>
                                     ) : (
                                         <Button
                                             className="bg-slate-900 hover:bg-blue-600 text-white transition-colors flex-1 md:flex-none"
@@ -313,6 +371,112 @@ export default function StudentBrowseOpportunitiesPage() {
                 }}
                 onSuccess={handleSuccess}
             />
+
+            {/* Team Details Dialog */}
+            <Dialog open={isTeamDialogOpen} onOpenChange={setIsTeamDialogOpen}>
+                <DialogContent className="max-w-4xl p-0 overflow-hidden gap-0">
+                    <DialogHeader className="p-6 bg-slate-50/50 border-b border-slate-100">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600 border border-indigo-100">
+                                <Users className="w-5 h-5" />
+                            </div>
+                            <div>
+                                <DialogTitle className="text-xl text-slate-900">
+                                    Project Team
+                                </DialogTitle>
+                                <DialogDescription className="text-slate-500 mt-1">
+                                    Collaborators for <span className="font-medium text-slate-700">{selectedTeamOpp?.title}</span>
+                                </DialogDescription>
+                            </div>
+                        </div>
+                    </DialogHeader>
+
+                    <div className="p-6">
+                        <div className="rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+                            <table className="w-full text-left text-sm">
+                                <thead className="bg-slate-50 border-b border-slate-200">
+                                    <tr>
+                                        <th className="px-6 py-4 font-semibold text-slate-700">Team Member</th>
+                                        <th className="px-6 py-4 font-semibold text-slate-700">Role</th>
+                                        <th className="px-6 py-4 font-semibold text-slate-700">Contact Info</th>
+                                        <th className="px-6 py-4 font-semibold text-slate-700">Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100 bg-white">
+                                    {selectedTeamOpp?.teamMembers?.map((member: TeamMember, idx: number) => (
+                                        <tr key={idx} className="hover:bg-slate-50/80 transition-colors">
+                                            <td className="px-6 py-4">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 font-bold text-sm ring-2 ring-white border border-slate-200">
+                                                        {member.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
+                                                    </div>
+                                                    <div>
+                                                        <div className="font-semibold text-slate-900">{member.name}</div>
+                                                        <div className="text-xs text-slate-400 font-mono mt-0.5">{member.cnic}</div>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium border ${member.role === 'Leader'
+                                                    ? 'bg-indigo-50 text-indigo-700 border-indigo-100'
+                                                    : 'bg-slate-50 text-slate-600 border-slate-100'
+                                                    }`}>
+                                                    {member.role === 'Leader' && <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 mr-1.5 animate-pulse" />}
+                                                    {member.role}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <div className="flex flex-col gap-1">
+                                                    {member.email && (
+                                                        <div className="flex items-center gap-2 text-slate-600 text-xs">
+                                                            <Mail className="w-3 h-3 text-slate-400" />
+                                                            {member.email}
+                                                        </div>
+                                                    )}
+                                                    {member.mobile && (
+                                                        <div className="flex items-center gap-2 text-slate-600 text-xs">
+                                                            <Phone className="w-3 h-3 text-slate-400" />
+                                                            {member.mobile}
+                                                        </div>
+                                                    )}
+                                                    {member.university && (
+                                                        <div className="flex items-center gap-2 text-slate-600 text-xs">
+                                                            <GraduationCap className="w-3 h-3 text-slate-400" />
+                                                            {member.university}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <span className={`inline-flex items-center px-2 py-1 rounded-full text-[10px] font-bold uppercase ${member.is_verified
+                                                    ? 'bg-green-100 text-green-700'
+                                                    : 'bg-amber-100 text-amber-700'
+                                                    }`}>
+                                                    {member.is_verified ? 'Verified' : 'Pending'}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                    {(!selectedTeamOpp?.teamMembers || selectedTeamOpp.teamMembers.length === 0) && (
+                                        <tr>
+                                            <td colSpan={4} className="px-6 py-8 text-center text-slate-500 italic">
+                                                No team members added to this project.
+                                            </td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <DialogFooter className="p-6 pt-0">
+                        <Button onClick={() => setIsTeamDialogOpen(false)} className="w-full sm:w-auto bg-slate-900 text-white hover:bg-slate-800">
+                            Close
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
         </div>
     );
 }

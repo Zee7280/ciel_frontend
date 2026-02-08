@@ -9,9 +9,24 @@ import { Checkbox } from "./ui/checkbox";
 import { useReportForm } from "../context/ReportContext";
 import clsx from "clsx";
 
+// Error message component
+function FieldError({ message }: { message?: string }) {
+    if (!message) return null;
+    return (
+        <div className="flex items-center gap-1.5 text-red-600 text-xs font-medium mt-1">
+            <AlertCircle className="w-3.5 h-3.5" />
+            <span>{message}</span>
+        </div>
+    );
+}
+
 export default function Section2StudentTeam() {
-    const { data, updateSection } = useReportForm();
+    const { data, updateSection, getFieldError, validationErrors } = useReportForm();
     const { participation_type, team_lead, team_members, privacy_consent } = data.section2;
+
+    // Get section-level errors
+    const sectionErrors = validationErrors['section2'] || [];
+    const hasErrors = sectionErrors.length > 0;
 
     const handleTeamLeadChange = (field: string, value: string) => {
         updateSection('section2', {
@@ -53,6 +68,21 @@ export default function Section2StudentTeam() {
                 </div>
                 <h2 className="text-3xl font-black text-slate-900 tracking-tight">Identity & Team</h2>
                 <p className="text-slate-500 max-w-2xl font-medium">Define your participation type and provide verified details for certificates and impact tracking.</p>
+
+                {/* Error Summary */}
+                {hasErrors && (
+                    <div className="bg-red-50 border border-red-200 rounded-2xl p-4 flex items-start gap-3">
+                        <AlertCircle className="w-5 h-5 text-red-600 mt-0.5" />
+                        <div>
+                            <h4 className="font-bold text-red-900 text-sm">Please fix the following errors:</h4>
+                            <ul className="mt-2 space-y-1">
+                                {sectionErrors.slice(0, 5).map((error, idx) => (
+                                    <li key={idx} className="text-xs text-red-700">• {error.message}</li>
+                                ))}
+                            </ul>
+                        </div>
+                    </div>
+                )}
             </div>
 
             {/* Participation Type Selection */}
@@ -98,161 +128,78 @@ export default function Section2StudentTeam() {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                     {[
                         { label: "Full Name", value: team_lead.name, field: 'name', placeholder: "Ayesha Khan", icon: Users },
-                        { label: "CNIC Number", value: team_lead.cnic, field: 'cnic', placeholder: "13 digits", icon: Fingerprint },
-                        { label: "Mobile Number", value: team_lead.mobile, field: 'mobile', placeholder: "03XX-XXXXXXX", icon: Phone },
+                        { label: "CNIC Number", value: team_lead.cnic, field: 'cnic', placeholder: "13 digits", icon: Fingerprint, maxLength: 13 },
+                        { label: "Mobile Number", value: team_lead.mobile, field: 'mobile', placeholder: "03XX-XXXXXXX", icon: Phone, maxLength: 11 },
                         { label: "Email Address", value: team_lead.email, field: 'email', placeholder: "university@email.com", icon: Mail },
-                        { label: "University", value: team_lead.university, field: 'university', isSelect: true, icon: GraduationCap },
+                        { label: "University", value: team_lead.university, field: 'university', placeholder: "University of the Punjab", icon: GraduationCap },
                         { label: "Degree Path", value: team_lead.degree, field: 'degree', placeholder: "e.g. BSCS", icon: GraduationCap },
                         { label: "Year", value: team_lead.year, field: 'year', isSelect: true, icon: Calendar }
-                    ].map((input, idx) => (
-                        <div key={idx} className={clsx("space-y-2", input.label === "Email Address" && "lg:col-span-1")}>
-                            <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-2">
-                                <input.icon className="w-3 h-3" /> {input.label}
-                            </Label>
-                            {input.isSelect ? (
-                                <Select
-                                    value={input.value}
-                                    onChange={(e) => handleTeamLeadChange(input.field, e.target.value)}
-                                    className="bg-white border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-50 transition-all font-bold text-slate-800"
-                                >
-                                    {input.field === 'university' ? (
-                                        <>
-                                            <option value="">Select University</option>
-                                            <option value="PU">University of the Punjab</option>
-                                            <option value="LCWU">LCWU</option>
-                                            <option value="LUMS">LUMS</option>
-                                        </>
-                                    ) : (
-                                        <>
-                                            <option value="">Select Year</option>
-                                            {['Year 1', 'Year 2', 'Year 3', 'Year 4', 'Final Year'].map(y => <option key={y} value={y}>{y}</option>)}
-                                        </>
-                                    )}
-                                </Select>
-                            ) : (
-                                <Input
-                                    value={input.value}
-                                    onChange={(e) => handleTeamLeadChange(input.field, e.target.value)}
-                                    placeholder={input.placeholder}
-                                    className="bg-white border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-50 transition-all font-bold text-slate-800"
-                                />
-                            )}
-                        </div>
-                    ))}
+                    ].map((input, idx) => {
+                        const fieldError = getFieldError(`team_lead.${input.field}`);
+                        const hasError = !!fieldError;
+
+                        return (
+                            <div key={idx} className={clsx("space-y-2", input.label === "Email Address" && "lg:col-span-1")}>
+                                <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-2">
+                                    <input.icon className="w-3 h-3" /> {input.label}
+                                </Label>
+                                {input.isSelect ? (
+                                    <Select
+                                        value={input.value}
+                                        onChange={(e) => handleTeamLeadChange(input.field, e.target.value)}
+                                        className={clsx(
+                                            "w-full px-4 py-3 rounded-2xl border-2 bg-white transition-all duration-200 font-medium",
+                                            hasError
+                                                ? "border-red-400 focus:border-red-500 bg-red-50"
+                                                : "border-slate-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+                                        )}
+                                    >
+                                        <option value="">Select {input.label}</option>
+                                        {input.field === 'year' && ['Year 1', 'Year 2', 'Year 3', 'Year 4', 'Year 5'].map(y => (
+                                            <option key={y} value={y}>{y}</option>
+                                        ))}
+                                    </Select>
+                                ) : (
+                                    <Input
+                                        value={input.value}
+                                        onChange={(e) => handleTeamLeadChange(input.field, e.target.value)}
+                                        placeholder={input.placeholder}
+                                        maxLength={input.maxLength}
+                                        className={clsx(
+                                            "px-4 py-3 rounded-2xl border-2 transition-all duration-200 font-medium",
+                                            hasError
+                                                ? "border-red-400 focus:border-red-500 bg-red-50"
+                                                : "border-slate-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+                                        )}
+                                    />
+                                )}
+                                <FieldError message={fieldError} />
+                            </div>
+                        );
+                    })}
                 </div>
             </div>
 
-            {/* Team Members Section */}
-            {participation_type === "team" && (
-                <div className="space-y-8 pt-8">
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-4">
-                            <div className="w-12 h-12 rounded-2xl bg-blue-600 text-white flex items-center justify-center font-black text-xl shadow-xl">TM</div>
-                            <div>
-                                <h3 className="text-xl font-bold text-slate-900">Collaboration Team</h3>
-                                <p className="text-sm text-slate-500 font-medium">{team_members.length} Members Added</p>
-                            </div>
-                        </div>
-                        <Button
-                            onClick={addTeamMember}
-                            className="bg-slate-900 hover:bg-slate-800 text-white rounded-2xl px-6"
-                        >
-                            <UserPlus className="w-4 h-4 mr-2" /> Add Participant
-                        </Button>
+            {/* Privacy Consent Checkbox */}
+            <div className={clsx(
+                "rounded-3xl border-2 p-6 transition-all duration-300 bg-slate-50 border-slate-200"
+            )}>
+                <label className="flex items-start gap-4 cursor-pointer">
+                    <input
+                        type="checkbox"
+                        checked={team_lead.consent || false}
+                        onChange={(e) => updateSection('section2', {
+                            team_lead: { ...team_lead, consent: e.target.checked }
+                        })}
+                        className="mt-1 w-5 h-5 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                    />
+                    <div className="flex-1">
+                        <p className="font-semibold text-slate-900 mb-1">
+                            I consent to sharing my verified identity for certification and impact verification purposes.
+                        </p>
+                        <p className="text-xs text-slate-500">Required for generating authenticated certificates.</p>
                     </div>
-
-                    <div className="bg-white border border-slate-200 rounded-[2rem] overflow-hidden shadow-sm">
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-left">
-                                <thead className="bg-slate-50 border-b border-slate-100">
-                                    <tr>
-                                        {["Name", "ID/CNIC", "University", "Role", "Hrs", ""].map((h, i) => (
-                                            <th key={i} className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">{h}</th>
-                                        ))}
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-50">
-                                    {team_members.length === 0 ? (
-                                        <tr>
-                                            <td colSpan={6} className="px-6 py-12 text-center text-slate-400 font-medium italic">
-                                                No team members added yet. Click 'Add Participant' to start.
-                                            </td>
-                                        </tr>
-                                    ) : (
-                                        team_members.map((member, index) => (
-                                            <tr key={index} className="hover:bg-slate-50/50 transition-colors group">
-                                                <td className="px-4 py-4"><Input className="h-10 border-slate-200 rounded-xl font-bold text-sm min-w-[150px]" value={member.name} onChange={(e) => updateTeamMember(index, 'name', e.target.value)} /></td>
-                                                <td className="px-4 py-4"><Input className="h-10 border-slate-200 rounded-xl font-bold text-sm w-32" value={member.cnic} onChange={(e) => updateTeamMember(index, 'cnic', e.target.value)} /></td>
-                                                <td className="px-4 py-4">
-                                                    <Select className="h-10 border-slate-200 rounded-xl font-bold text-sm w-40" value={member.university} onChange={(e) => updateTeamMember(index, 'university', e.target.value)}>
-                                                        <option value="">Select</option>
-                                                        <option value="PU">PU</option>
-                                                        <option value="LCWU">LCWU</option>
-                                                    </Select>
-                                                </td>
-                                                <td className="px-4 py-4">
-                                                    <Select className="h-10 border-slate-200 rounded-xl font-bold text-sm w-32" value={member.role} onChange={(e) => updateTeamMember(index, 'role', e.target.value)}>
-                                                        <option value="">Role</option>
-                                                        <option value="Member">Member</option>
-                                                        <option value="Lead">Lead</option>
-                                                    </Select>
-                                                </td>
-                                                <td className="px-4 py-4"><Input type="number" className="h-10 border-slate-200 rounded-xl font-bold text-sm w-20" value={member.hours} onChange={(e) => updateTeamMember(index, 'hours', e.target.value)} /></td>
-                                                <td className="px-4 py-4">
-                                                    <button onClick={() => removeTeamMember(index)} className="p-2 text-slate-300 hover:text-red-500 transition-colors rounded-lg hover:bg-red-50">
-                                                        <Trash2 className="w-4 h-4" />
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                        ))
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Summary & Consent */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                <div className="bg-slate-900 rounded-[2rem] p-8 text-white space-y-6">
-                    <h4 className="text-sm font-black text-slate-400 uppercase tracking-widest">Impact Summary</h4>
-                    <div className="grid grid-cols-3 gap-4">
-                        {[
-                            { label: "Team Size", value: participation_type === 'team' ? team_members.length + 1 : 1 },
-                            { label: "Total Hours", value: totalHours },
-                            { label: "Avg Focus", value: `${(totalHours / (participation_type === 'team' ? team_members.length + 1 : 1)).toFixed(1)} hrs` }
-                        ].map((stat, i) => (
-                            <div key={i} className="space-y-1">
-                                <span className="block text-[10px] font-black text-slate-500 uppercase tracking-widest">{stat.label}</span>
-                                <span className="text-2xl font-black text-white">{stat.value}</span>
-                            </div>
-                        ))}
-                    </div>
-                    <div className="p-4 bg-white/5 rounded-2xl border border-white/10 flex items-start gap-3">
-                        <AlertCircle className="w-5 h-5 text-blue-400 shrink-0" />
-                        <p className="text-xs text-slate-300 leading-relaxed font-medium">Verify that the total hours represent authentic community engagement. This data is used for SDG 4.7 mapping.</p>
-                    </div>
-                </div>
-
-                <div className="bg-white border-2 border-dashed border-slate-200 rounded-[2rem] p-8 flex flex-col justify-center gap-6 group hover:border-blue-200 transition-colors">
-                    <div className="flex items-start gap-4">
-                        <Checkbox
-                            id="privacy_consent"
-                            className="mt-1 border-slate-300 rounded-md data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
-                            checked={privacy_consent}
-                            onChange={(e) => updateSection('section2', { privacy_consent: e.target.checked })}
-                        />
-                        <div className="space-y-2">
-                            <Label htmlFor="privacy_consent" className="text-sm font-bold text-slate-800 cursor-pointer">Identity Confirmation & Privacy Consent</Label>
-                            <p className="text-xs text-slate-500 font-medium leading-relaxed">I confirm that all team members' personal information is accurate and shared with their informed consent for reporting purposes.</p>
-                        </div>
-                    </div>
-                    <div className="flex items-center gap-2 text-green-600 bg-green-50 px-3 py-2 rounded-xl border border-green-100 w-fit">
-                        <CheckCircle2 className="w-3 h-3" />
-                        <span className="text-[10px] font-black uppercase tracking-widest">Secure Handling active</span>
-                    </div>
-                </div>
+                </label>
             </div>
         </div>
     )

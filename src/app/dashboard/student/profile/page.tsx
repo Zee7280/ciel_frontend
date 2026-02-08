@@ -36,6 +36,7 @@ export default function StudentProfilePage() {
 
     const fetchProfile = async () => {
         try {
+            // Load from local storage first for speed
             const storedUserStr = localStorage.getItem("ciel_user") || localStorage.getItem("user");
 
             if (storedUserStr) {
@@ -45,21 +46,21 @@ export default function StudentProfilePage() {
                     setFormData({
                         name: parsedUser.name || "",
                         email: parsedUser.email || "",
-                        contact: parsedUser.contact || "",
-                        institution: parsedUser.institution || "",
+                        contact: parsedUser.contact || parsedUser.phone || "",
+                        institution: parsedUser.institution || parsedUser.university || "",
                         city: parsedUser.city || "",
                         bio: parsedUser.bio || ""
                     });
-                    if (parsedUser.image) {
-                        setImagePreview(parsedUser.image);
+                    if (parsedUser.image || parsedUser.avatar_url) {
+                        setImagePreview(parsedUser.image || parsedUser.avatar_url);
                     }
                 } catch (e) {
                     console.error("Failed to parse user from local storage");
-                    toast.error("Error loading profile data");
                 }
-            } else {
-                console.warn("No user data found in storage");
             }
+
+            // API fetch removed per request
+
         } catch (error) {
             console.error("Error loading profile", error);
         } finally {
@@ -105,15 +106,23 @@ export default function StudentProfilePage() {
         try {
             // Create FormData
             const payload = new FormData();
-            payload.append("userId", userId);
+            // payload.append("userId", userId); // Not needed for /users/me
             payload.append("name", formData.name);
+
+            // Send both for compatibility
             payload.append("institution", formData.institution);
+            payload.append("university", formData.institution);
+
             payload.append("city", formData.city);
+
             payload.append("contact", formData.contact);
+            payload.append("phone", formData.contact);
+
             payload.append("bio", formData.bio);
 
             if (selectedImage) {
                 payload.append("image", selectedImage);
+                payload.append("avatar", selectedImage); // Try both keys
             }
 
             // Note: Content-Type header is NOT set manually so browser can set boundary

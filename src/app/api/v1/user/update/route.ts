@@ -1,14 +1,6 @@
 import { NextResponse } from "next/server";
 
-export async function GET(request: Request) {
-    return proxyRequest(request, "GET");
-}
-
-export async function PATCH(request: Request) {
-    return proxyRequest(request, "PATCH");
-}
-
-async function proxyRequest(request: Request, method: string) {
+export async function POST(request: Request) {
     try {
         const authHeader = request.headers.get("Authorization");
         const contentType = request.headers.get("Content-Type");
@@ -21,10 +13,11 @@ async function proxyRequest(request: Request, method: string) {
             headers["Content-Type"] = contentType;
         }
 
-        const body = method !== "GET" ? await request.arrayBuffer() : undefined;
+        const body = await request.arrayBuffer();
 
-        const response = await fetch(`${process.env.NEXT_PUBLIC_APP_API_BASE_URL}/users/me`, {
-            method: method,
+        // Proxy to backend user/update
+        const response = await fetch(`${process.env.NEXT_PUBLIC_APP_API_BASE_URL}/user/update`, {
+            method: "POST",
             headers: headers,
             body: body,
         });
@@ -41,7 +34,7 @@ async function proxyRequest(request: Request, method: string) {
         return NextResponse.json(data);
 
     } catch (error) {
-        console.error(`Error in users/me ${method} proxy:`, error);
+        console.error("Error in user/update proxy:", error);
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }
 }

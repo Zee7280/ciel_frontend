@@ -1,6 +1,7 @@
 "use client"
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { ValidationError, validateSection2, validateSection3, validateSection4, validateSection5, validateSection8, validateSection12 } from '../utils/validation';
 
 // Define the shape of the report data matches the 12 sections
 export interface ReportData {
@@ -20,6 +21,7 @@ export interface ReportData {
             university: string;
             degree: string;
             year: string;
+            consent?: boolean;
         };
         team_members: Array<{
             name: string;
@@ -142,6 +144,13 @@ interface ReportContextType {
     nextStep: () => void;
     prevStep: () => void;
     setStep: (step: number) => void;
+    validationErrors: Record<string, ValidationError[]>;
+    validateCurrentSection: () => boolean;
+    clearValidationErrors: (section: string) => void;
+    getFieldError: (fieldPath: string) => string | undefined;
+    setFullData: (data: ReportData) => void;
+    isReadOnly: boolean;
+    setReadOnly: (readonly: boolean) => void;
 }
 
 const ReportContext = createContext<ReportContextType | undefined>(undefined);
@@ -149,17 +158,87 @@ const ReportContext = createContext<ReportContextType | undefined>(undefined);
 export function ReportProvider({ children }: { children: React.ReactNode }) {
     const [data, setData] = useState<ReportData>(defaultReportData);
     const [activeStep, setActiveStep] = useState(1);
+    const [validationErrors, setValidationErrors] = useState<Record<string, ValidationError[]>>({});
+    const [isReadOnly, setReadOnly] = useState(false);
 
     const updateSection = (section: keyof Omit<ReportData, 'project_id'>, payload: any) => {
+        if (isReadOnly) return; // Prevent updates via updateSection in read-only mode
+
         setData(prev => ({
             ...prev,
             [section]: { ...(prev[section] as object), ...payload }
         }));
+
+        // Clear validation errors for this section when data changes
+        clearValidationErrors(section);
+    };
+
+    const setFullData = (newData: ReportData) => {
+        setData(newData);
     };
 
     const setProjectId = (id: string) => {
         setData(prev => ({ ...prev, project_id: id }));
     }
+
+    const clearValidationErrors = (section: string) => {
+        setValidationErrors(prev => ({
+            ...prev,
+            [section]: []
+        }));
+    };
+
+    const validateCurrentSection = (): boolean => {
+        // Validation implicitly passes in read-only mode to allow navigation without errors
+        if (isReadOnly) return true;
+
+        let validationResult;
+        const sectionKey = `section${activeStep}`;
+
+        // Map step numbers to validation functions
+        switch (activeStep) {
+            case 2:
+                validationResult = validateSection2(data.section2);
+                break;
+            case 3:
+                validationResult = validateSection3(data.section3);
+                break;
+            case 4:
+                validationResult = validateSection4(data.section4);
+                break;
+            case 5:
+                validationResult = validateSection5(data.section5);
+                break;
+            case 8:
+                validationResult = validateSection8(data.section8);
+                break;
+            case 12:
+                validationResult = validateSection12(data.section12);
+                break;
+            default:
+                // Sections without validation always pass
+                return true;
+        }
+
+        if (!validationResult.isValid) {
+            setValidationErrors(prev => ({
+                ...prev,
+                [sectionKey]: validationResult.errors
+            }));
+            return false;
+        }
+
+        // Clear errors if validation passed
+        clearValidationErrors(sectionKey);
+        return true;
+    };
+
+    const getFieldError = (fieldPath: string): string | undefined => {
+        const sectionKey = `section${activeStep}`;
+        const errors = validationErrors[sectionKey] || [];
+        const error = errors.find(e => e.field === fieldPath || e.field.endsWith(`.${fieldPath}`));
+        return error?.message;
+    };
 
     const nextStep = () => setActiveStep(prev => Math.min(prev + 1, 12));
     const prevStep = () => setActiveStep(prev => Math.max(prev - 1, 1));
@@ -173,7 +252,14 @@ export function ReportProvider({ children }: { children: React.ReactNode }) {
             activeStep,
             nextStep,
             prevStep,
-            setStep
+            setStep,
+            validationErrors,
+            validateCurrentSection,
+            clearValidationErrors,
+            getFieldError,
+            setFullData,
+            isReadOnly,
+            setReadOnly
         }}>
             {children}
         </ReportContext.Provider>

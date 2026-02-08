@@ -106,9 +106,18 @@ export default function OpportunityDetailsPage() {
                     </button>
 
                     {opportunity.hasApplied ? (
-                        <Button className="flex items-center gap-2 px-6 py-2 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg shadow-none cursor-default font-medium hover:bg-emerald-50">
-                            <CheckCircle2 className="w-4 h-4" /> Applied
-                        </Button>
+                        <div className="flex items-center gap-2">
+                            {['active', 'pending', 'pending_approval', 'completed', 'applied', 'accepted'].includes(opportunity.status) && (
+                                <Link href={`/dashboard/student/report?projectId=${id}`}>
+                                    <Button className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 font-medium">
+                                        Submit Report
+                                    </Button>
+                                </Link>
+                            )}
+                            <Button className="flex items-center gap-2 px-6 py-2 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg shadow-none cursor-default font-medium hover:bg-emerald-50">
+                                <CheckCircle2 className="w-4 h-4" /> Applied
+                            </Button>
+                        </div>
                     ) : (
                         <Button
                             onClick={handleApply}

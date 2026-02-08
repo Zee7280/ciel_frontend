@@ -27,6 +27,9 @@ interface Project {
     submitted_at: string;
     description: string;
     teamMembers?: TeamMember[];
+    report_status?: 'none' | 'draft' | 'submitted' | 'verified' | 'rejected';
+    report_id?: string;
+    report_feedback?: string;
 }
 
 export default function MyProjectsPage() {
@@ -54,7 +57,46 @@ export default function MyProjectsPage() {
                 if (res && res.ok) {
                     const data = await res.json();
                     if (data.success) {
-                        setProjects(data.data || []);
+                        const projectsData = data.data || [];
+
+                        // 🚀 OPTIMIZATION: Fetch all report statuses at once
+                        let reportsMap = new Map<string, any>();
+
+                        try {
+                            const reportsRes = await authenticatedFetch(
+                                `${process.env.NEXT_PUBLIC_APP_API_BASE_URL}/students/reports/check?studentId=${studentId}`
+                            );
+
+                            if (reportsRes && reportsRes.ok) {
+                                const reportsData = await reportsRes.json();
+                                console.log('📊 Bulk report statuses:', reportsData);
+
+                                if (reportsData.success && Array.isArray(reportsData.data)) {
+                                    reportsData.data.forEach((report: any) => {
+                                        // The backend returns opportunityId or project_title (which is ID)
+                                        const key = report.opportunityId || report.opportunity_id || report.projectId || report.project_id || report.project_title;
+                                        if (key) {
+                                            reportsMap.set(key, report);
+                                        }
+                                    });
+                                }
+                            }
+                        } catch (error) {
+                            console.error("Failed to fetch bulk reports", error);
+                        }
+
+                        // Map statuses to projects
+                        const projectsWithReportStatus = projectsData.map((project: Project) => {
+                            const report = reportsMap.get(project.id);
+                            return {
+                                ...project,
+                                report_status: report ? (report.status || 'none') : 'none',
+                                report_id: report ? (report.report_id || report.id) : undefined,
+                                report_feedback: report ? report.feedback : undefined
+                            };
+                        });
+
+                        setProjects(projectsWithReportStatus);
                     }
                 }
             } catch (error) {
@@ -101,7 +143,7 @@ export default function MyProjectsPage() {
                                     {(project.title || "P").substring(0, 2).toUpperCase()}
                                 </div>
                                 <div className="space-y-1">
-                                    <div className="flex items-center gap-2">
+                                    <div className="flex items-center gap-2 flex-wrap">
                                         <h3 className="font-bold text-lg text-slate-800">{project.title}</h3>
                                         <Badge className={`
                                             ${project.status === 'active' ? 'bg-green-100 text-green-700' :
@@ -110,11 +152,47 @@ export default function MyProjectsPage() {
                                         `}>
                                             {project.status?.replace('_', ' ') || "Active"}
                                         </Badge>
+
+                                        {/* Report Status Badge */}
+                                        {project.report_status && project.report_status !== 'none' && (
+                                            <Badge className={`
+                                                ${project.report_status === 'draft' ? 'bg-slate-100 text-slate-700' :
+                                                    project.report_status === 'submitted' ? 'bg-yellow-100 text-yellow-700' :
+                                                        project.report_status === 'verified' ? 'bg-green-100 text-green-700' :
+                                                            'bg-red-100 text-red-700'}
+                                            `}>
+                                                Report: {project.report_status.charAt(0).toUpperCase() + project.report_status.slice(1)}
+                                            </Badge>
+                                        )}
                                     </div>
                                     <p className="text-sm text-slate-500">{project.category || "Social Impact"} • {project.submitted_at ? new Date(project.submitted_at).toLocaleDateString() : "Just now"}</p>
                                     <p className="text-sm text-slate-600 max-w-2xl">
                                         {project.description || "No description provided."}
                                     </p>
+
+                                    {/* Verification Feedback */}
+                                    {project.report_status === 'verified' && (
+                                        <div className="mt-2 p-3 bg-green-50 border border-green-200 rounded-lg">
+                                            <p className="text-sm font-bold text-green-800">✅ Report Verified!</p>
+                                            {project.report_feedback && (
+                                                <p className="text-sm text-green-700 mt-1">{project.report_feedback}</p>
+                                            )}
+                                        </div>
+                                    )}
+                                    {project.report_status === 'rejected' && (
+                                        <div className="mt-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+                                            <p className="text-sm font-bold text-red-800">❌ Report Needs Revision</p>
+                                            {project.report_feedback && (
+                                                <p className="text-sm text-red-700 mt-1">{project.report_feedback}</p>
+                                            )}
+                                        </div>
+                                    )}
+                                    {project.report_status === 'submitted' && (
+                                        <div className="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                                            <p className="text-sm font-bold text-yellow-800">⏳ Report Under Review</p>
+                                            <p className="text-sm text-yellow-700">Your report is being reviewed by the organization</p>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                             <div className="flex items-center gap-3 w-full md:w-auto">
@@ -123,12 +201,38 @@ export default function MyProjectsPage() {
                                         <Users className="w-4 h-4" /> View Team
                                     </Button>
                                 )}
-                                {project.status === 'active' && (
-                                    <Link href={`/dashboard/student/report?projectId=${project.id}`} className="w-full md:w-auto">
-                                        <Button className="w-full md:w-auto">Submit Report</Button>
-                                    </Link>
+
+                                {/* Conditional Report Button */}
+                                {['active', 'pending', 'pending_approval', 'completed', 'applied', 'accepted'].includes(project.status) && (
+                                    <>
+                                        {project.report_status === 'none' || project.report_status === 'draft' ? (
+                                            <Link href={`/dashboard/student/report?projectId=${project.id}`} className="w-full md:w-auto">
+                                                <Button className="w-full md:w-auto">
+                                                    {project.report_status === 'draft' ? 'Continue Report' : 'Submit Report'}
+                                                </Button>
+                                            </Link>
+                                        ) : project.report_status === 'rejected' ? (
+                                            <Link href={`/dashboard/student/report?projectId=${project.id}`} className="w-full md:w-auto">
+                                                <Button variant="destructive" className="w-full md:w-auto">
+                                                    Revise Report
+                                                </Button>
+                                            </Link>
+                                        ) : project.report_status === 'submitted' ? (
+                                            <Button variant="outline" disabled className="w-full md:w-auto">
+                                                Under Review
+                                            </Button>
+                                        ) : null}
+                                    </>
                                 )}
-                                <Button variant="outline" className="w-full md:w-auto">View Details</Button>
+
+                                <Link
+                                    href={project.report_status === 'verified'
+                                        ? `/dashboard/student/report?projectId=${project.id}`
+                                        : `/dashboard/student/browse/${project.id}`}
+                                    className="w-full md:w-auto"
+                                >
+                                    <Button variant="outline" className="w-full md:w-auto">View Details</Button>
+                                </Link>
                             </div>
                         </div>
                     ))}

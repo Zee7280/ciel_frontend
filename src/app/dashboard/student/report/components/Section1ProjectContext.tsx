@@ -1,4 +1,4 @@
-import { Globe, Building, Calendar, AlertCircle, CheckCircle2, XCircle } from "lucide-react";
+import { Globe, Building, Users, AlertCircle, CheckCircle2, XCircle } from "lucide-react";
 import { Card, CardContent } from "./ui/card";
 import { Label } from "./ui/label";
 import { Textarea } from "./ui/textarea";
@@ -39,9 +39,24 @@ export default function Section1ProjectContext({ projectData }: Section1Props) {
             {/* Premium Info Grid */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {[
-                    { icon: Globe, label: "Project Title", value: projectData?.title || "Loading...", color: "blue" },
-                    { icon: Building, label: "Partner Org", value: projectData?.partner_name || "Self-Initiated", color: "purple" },
-                    { icon: Calendar, label: "Duration", value: `${formatDate(projectData?.dates?.start)} - ${formatDate(projectData?.dates?.end)}`, color: "amber" }
+                    {
+                        icon: Globe,
+                        label: "Project Title",
+                        value: projectData?.title || projectData?.name || projectData?.opportunity_title || "Untitled Project",
+                        color: "blue"
+                    },
+                    {
+                        icon: Building,
+                        label: "Partner Org",
+                        value: projectData?.organization || projectData?.organization_name || projectData?.org_name || projectData?.partner_name || projectData?.organization?.name || "Self-Initiated",
+                        color: "purple"
+                    },
+                    {
+                        icon: Users,
+                        label: "Volunteers Needed",
+                        value: projectData?.volunteersNeeded || projectData?.volunteers_needed || "Not specified",
+                        color: "amber"
+                    }
                 ].map((item, idx) => (
                     <div key={idx} className="bg-slate-50 rounded-3xl p-6 border border-slate-100 flex flex-col gap-3 group hover:bg-white hover:shadow-xl hover:shadow-slate-200/50 transition-all duration-300">
                         <div className={`w-10 h-10 rounded-xl flex items-center justify-center bg-white shadow-sm border border-slate-100 text-${item.color}-600 group-hover:scale-110 transition-transform`}>
