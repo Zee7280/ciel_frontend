@@ -98,8 +98,11 @@ export function validateSection2(data: any): ValidationResult {
 export function validateSection3(data: any): ValidationResult {
     const errors: ValidationError[] = [];
 
-    if (!data.primary_sdg_explanation || data.primary_sdg_explanation.trim().length < 50) {
-        errors.push({ field: 'primary_sdg_explanation', message: 'Primary SDG explanation must be at least 50 characters' });
+    // Check if primary_sdg_explanation exists and has content
+    if (!data.primary_sdg_explanation || !data.primary_sdg_explanation.trim()) {
+        errors.push({ field: 'primary_sdg_explanation', message: 'Primary SDG explanation is required' });
+    } else if (data.primary_sdg_explanation.trim().length < 50) {
+        errors.push({ field: 'primary_sdg_explanation', message: 'Primary SDG explanation must be at least 50 characters (currently ' + data.primary_sdg_explanation.trim().length + ')' });
     }
 
     // Secondary SDGs are optional, but if they exist, validate them

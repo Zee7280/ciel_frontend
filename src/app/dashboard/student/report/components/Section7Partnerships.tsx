@@ -1,11 +1,9 @@
 import { Handshake, Users2, Plus, Trash2, ShieldCheck, Mail, Building2, School, Landmark } from "lucide-react";
-import { Card, CardContent } from "./ui/card";
 import { Label } from "./ui/label";
 import { Input } from "./ui/input";
 import { Select } from "./ui/select";
 import { RadioGroup, RadioGroupItem } from "./ui/radio-group";
 import { FileUpload } from "./ui/file-upload";
-import { Checkbox } from "./ui/checkbox";
 import { Button } from "./ui/button";
 import { useReportForm } from "../context/ReportContext";
 import clsx from "clsx";
@@ -49,162 +47,162 @@ export default function Section7Partnerships() {
     ];
 
     return (
-        <div className="space-y-12">
+        <div className="space-y-8">
             {/* Section Header */}
-            <div className="space-y-4">
-                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-100 border border-slate-200 text-slate-500">
-                    <Handshake className="w-4 h-4" />
-                    <span className="text-[10px] font-black uppercase tracking-widest">Collaborative Network</span>
-                </div>
-                <h2 className="text-3xl font-black text-slate-900 tracking-tight">Partnerships & Collaboration</h2>
-                <p className="text-slate-500 max-w-2xl font-medium">Identify the external organizations and stakeholders that amplified your project's reach.</p>
+            <div className="space-y-2">
+                <h2 className="text-2xl font-bold text-slate-900">Partnerships & Collaboration</h2>
+                <p className="text-slate-600 text-sm">Identify the external organizations and stakeholders that amplified your project's reach.</p>
             </div>
 
             {/* Participation Toggle */}
-            <div className="space-y-8">
-                <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-                    <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-2xl bg-slate-900 text-white flex items-center justify-center font-black text-xl shadow-xl italic font-serif">P</div>
-                        <h3 className="text-xl font-bold text-slate-900">Stakeholder Inclusion</h3>
+            <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold text-sm">1</div>
+                        <h3 className="text-lg font-bold text-slate-900">Stakeholder Inclusion</h3>
                     </div>
                     <RadioGroup
                         value={has_partners}
-                        onValueChange={(val) => updateSection('section7', { has_partners: val as 'yes' | 'no' })}
-                        className="flex items-center gap-6"
+                        onValueChange={(val) => {
+                            const isNo = val === 'no';
+                            updateSection('section7', {
+                                has_partners: val as 'yes' | 'no',
+                                partners: isNo ? [] : partners,
+                                formalization: isNo ? [] : formalization
+                            });
+                        }}
+                        className="flex items-center gap-4"
                     >
                         <div className="flex items-center space-x-2">
-                            <RadioGroupItem value="no" id="no-partners" className="border-slate-300" />
-                            <Label htmlFor="no-partners" className="text-xs font-bold text-slate-500 cursor-pointer">Independent</Label>
+                            <RadioGroupItem value="no" id="no-partners" />
+                            <Label htmlFor="no-partners" className="text-sm font-medium cursor-pointer">Independent</Label>
                         </div>
                         <div className="flex items-center space-x-2">
-                            <RadioGroupItem value="yes" id="yes-partners" className="border-slate-300" />
-                            <Label htmlFor="yes-partners" className="text-xs font-bold text-slate-500 cursor-pointer">Collaborative</Label>
+                            <RadioGroupItem value="yes" id="yes-partners" />
+                            <Label htmlFor="yes-partners" className="text-sm font-medium cursor-pointer">Collaborative</Label>
                         </div>
                     </RadioGroup>
                 </div>
 
                 {has_partners === "yes" && (
-                    <div className="space-y-10 animate-fade-in-up">
-                        <div className="bg-white border border-slate-200 rounded-[2.5rem] overflow-hidden shadow-sm">
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-left">
-                                    <thead className="bg-slate-50 border-b border-slate-100">
-                                        <tr>
-                                            {["Organization Name", "Entity Type", "Core Role", "Contribution Details", ""].map((h, i) => (
-                                                <th key={i} className="px-8 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">{h}</th>
-                                            ))}
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-50">
-                                        {partners.map((p, idx) => (
-                                            <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
-                                                <td className="px-6 py-6 border-r border-slate-50">
-                                                    <Input
-                                                        placeholder="e.g. Hope Foundation"
-                                                        className="h-10 border-slate-200 rounded-xl font-bold text-sm bg-white"
-                                                        value={p.name}
-                                                        onChange={(e) => updatePartner(idx, 'name', e.target.value)}
-                                                    />
-                                                </td>
-                                                <td className="px-6 py-6 font-medium">
-                                                    <Select
-                                                        value={p.type}
-                                                        onChange={(e) => updatePartner(idx, 'type', e.target.value)}
-                                                        className="h-10 border-slate-200 rounded-xl text-sm"
-                                                    >
-                                                        <option value="">Select Category</option>
-                                                        <option value="NGO">NGO / NPO</option>
-                                                        <option value="School">Educational Inst.</option>
-                                                        <option value="Govt Body">Government</option>
-                                                        <option value="Private Company">Private Sector</option>
-                                                    </Select>
-                                                </td>
-                                                <td className="px-6 py-6">
-                                                    <Input
-                                                        placeholder="e.g. Hosting Partner"
-                                                        className="h-10 border-slate-200 rounded-xl text-sm"
-                                                        value={p.role}
-                                                        onChange={(e) => updatePartner(idx, 'role', e.target.value)}
-                                                    />
-                                                </td>
-                                                <td className="px-6 py-6">
-                                                    <Input
-                                                        placeholder="Venue for sessions..."
-                                                        className="h-10 border-slate-200 rounded-xl text-sm min-w-[150px]"
-                                                        value={p.contribution}
-                                                        onChange={(e) => updatePartner(idx, 'contribution', e.target.value)}
-                                                    />
-                                                </td>
-                                                <td className="px-6 py-6">
-                                                    <button onClick={() => removePartner(idx)} className="p-2 text-slate-300 hover:text-red-500 transition-colors">
-                                                        <Trash2 className="w-4 h-4" />
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
+                    <div className="space-y-6">
+                        <div className="flex items-center justify-between">
+                            <Label className="text-sm font-semibold text-slate-700">Partners Directory</Label>
+                            <Button
+                                onClick={addPartner}
+                                className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-4 py-2 text-sm font-medium"
+                            >
+                                <Plus className="w-4 h-4 mr-2" /> Add Partner
+                            </Button>
+                        </div>
+
+                        {partners.length === 0 ? (
+                            <div className="bg-slate-50 rounded-xl p-8 text-center border border-slate-200">
+                                <Handshake className="w-12 h-12 text-slate-400 mx-auto mb-3" />
+                                <p className="text-slate-600 font-medium">No partners registered yet</p>
+                                <p className="text-sm text-slate-500 mt-1">Click "Add Partner" to document collaborations</p>
                             </div>
-                            <div className="p-6 bg-slate-50/80 border-t border-slate-100 text-center">
-                                <Button
-                                    onClick={addPartner}
-                                    variant="outline"
-                                    className="px-8 border-dashed border-slate-300 rounded-2xl hover:border-slate-900 hover:bg-slate-900 hover:text-white transition-all font-black text-[10px] uppercase tracking-widest"
-                                >
-                                    <Plus className="w-3 h-3 mr-2" /> Register New Partner
-                                </Button>
+                        ) : (
+                            <div className="space-y-4">
+                                {partners.map((p, idx) => (
+                                    <div key={idx} className="bg-white rounded-xl border border-slate-200 p-4">
+                                        <div className="flex items-center justify-between mb-3">
+                                            <div className="flex items-center gap-2">
+                                                <div className="w-8 h-8 rounded-lg bg-slate-900 text-white flex items-center justify-center font-bold text-sm">
+                                                    {idx + 1}
+                                                </div>
+                                                <span className="text-sm font-semibold text-slate-700">Partner {idx + 1}</span>
+                                            </div>
+                                            <button onClick={() => removePartner(idx)} className="text-red-500 hover:text-red-700 p-2 hover:bg-red-50 rounded-lg transition-colors">
+                                                <Trash2 className="w-4 h-4" />
+                                            </button>
+                                        </div>
+
+                                        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                                            <div className="space-y-1">
+                                                <Label className="text-xs font-semibold text-slate-600">Org Name</Label>
+                                                <Input
+                                                    placeholder="NGO name"
+                                                    className="h-10 text-sm border-slate-200 rounded-lg"
+                                                    value={p.name || ''}
+                                                    onChange={(e) => updatePartner(idx, 'name', e.target.value)}
+                                                />
+                                            </div>
+                                            <div className="space-y-1">
+                                                <Label className="text-xs font-semibold text-slate-600">Type</Label>
+                                                <Select
+                                                    value={p.type || ''}
+                                                    onChange={(e) => updatePartner(idx, 'type', e.target.value)}
+                                                    className="h-10 text-sm border-slate-200 rounded-lg"
+                                                >
+                                                    <option value="">Category</option>
+                                                    <option value="NGO">NGO / NPO</option>
+                                                    <option value="School">Educational Inst.</option>
+                                                    <option value="Govt Body">Government</option>
+                                                    <option value="Private Company">Private Sector</option>
+                                                </Select>
+                                            </div>
+                                            <div className="space-y-1">
+                                                <Label className="text-xs font-semibold text-slate-600">Core Role</Label>
+                                                <Input
+                                                    placeholder="Role..."
+                                                    className="h-10 text-sm border-slate-200 rounded-lg"
+                                                    value={p.role || ''}
+                                                    onChange={(e) => updatePartner(idx, 'role', e.target.value)}
+                                                />
+                                            </div>
+                                            <div className="space-y-1">
+                                                <Label className="text-xs font-semibold text-slate-600">Contribution</Label>
+                                                <Input
+                                                    placeholder="Details..."
+                                                    className="h-10 text-sm border-slate-200 rounded-lg"
+                                                    value={p.contribution || ''}
+                                                    onChange={(e) => updatePartner(idx, 'contribution', e.target.value)}
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
+                        <div className="space-y-4">
+                            <Label className="text-sm font-semibold text-slate-700">Formalization Status</Label>
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                {formalizationOptions.map((opt) => (
+                                    <button
+                                        key={opt.id}
+                                        onClick={() => handleFormalizationChange(opt.id, !formalization.includes(opt.id))}
+                                        className={clsx(
+                                            "flex items-center gap-2 p-3 rounded-lg border text-xs font-medium transition-all text-left",
+                                            formalization.includes(opt.id)
+                                                ? "bg-slate-900 border-slate-900 text-white"
+                                                : "bg-white border-slate-200 text-slate-600 hover:border-slate-300"
+                                        )}
+                                    >
+                                        <div className={clsx(
+                                            "w-4 h-4 rounded-md border flex items-center justify-center shrink-0",
+                                            formalization.includes(opt.id) ? "bg-blue-600 border-blue-600" : "border-slate-300"
+                                        )}>
+                                            {formalization.includes(opt.id) && <Plus className="w-3 h-3 text-white rotate-45" />}
+                                        </div>
+                                        {opt.label}
+                                    </button>
+                                ))}
                             </div>
                         </div>
 
-                        {/* Formalization Area */}
-                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
-                            <div className="lg:col-span-2 space-y-6">
-                                <div className="flex items-center gap-4">
-                                    <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600 border border-blue-100">
-                                        <ShieldCheck className="w-5 h-5" />
-                                    </div>
-                                    <h4 className="text-xl font-bold text-slate-900">Formalization Status</h4>
+                        <div className="bg-slate-50 rounded-2xl p-6 border border-slate-200 space-y-4">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-blue-600">
+                                    <ShieldCheck className="w-5 h-5" />
                                 </div>
-
-                                <div className="grid grid-cols-2 gap-3">
-                                    {formalizationOptions.map((opt) => (
-                                        <button
-                                            key={opt.id}
-                                            onClick={() => handleFormalizationChange(opt.id, !formalization.includes(opt.id))}
-                                            className={clsx(
-                                                "flex items-center justify-between p-4 rounded-3xl border transition-all text-left group",
-                                                formalization.includes(opt.id)
-                                                    ? "bg-slate-900 border-slate-900 text-white shadow-xl shadow-slate-200"
-                                                    : "bg-white border-slate-100 text-slate-600 hover:border-slate-200"
-                                            )}
-                                        >
-                                            <span className="text-xs font-black uppercase tracking-wider">{opt.label}</span>
-                                            <div className={clsx(
-                                                "w-5 h-5 rounded-full border flex items-center justify-center transition-colors",
-                                                formalization.includes(opt.id)
-                                                    ? "bg-blue-500 border-blue-500"
-                                                    : "border-slate-200 group-hover:border-slate-300"
-                                            )}>
-                                                {formalization.includes(opt.id) && <Plus className="w-3 h-3 text-white rotate-45" />}
-                                            </div>
-                                        </button>
-                                    ))}
+                                <div>
+                                    <h4 className="text-lg font-bold">Document Verification</h4>
+                                    <p className="text-slate-600 text-sm">Upload signed MOUs or official letters.</p>
                                 </div>
                             </div>
-
-                            <div className="space-y-6">
-                                <div className="bg-slate-50 rounded-[2.5rem] p-8 border border-slate-100 space-y-6">
-                                    <div className="space-y-2">
-                                        <h5 className="text-xs font-black text-slate-400 uppercase tracking-widest">Document Upload</h5>
-                                        <p className="text-[10px] text-slate-500 font-medium">Upload signed MOUs or official correspondence.</p>
-                                    </div>
-                                    <FileUpload label="Attach legal documents" />
-                                    <div className="p-4 bg-white rounded-2xl border border-slate-100 flex items-start gap-3 shadow-sm">
-                                        <Mail className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />
-                                        <p className="text-[10px] text-slate-400 font-medium leading-relaxed italic">Email confirmations are also accepted as valid proof of collaboration.</p>
-                                    </div>
-                                </div>
-                            </div>
+                            <FileUpload label="Attach legal documents" />
                         </div>
                     </div>
                 )}

@@ -115,114 +115,128 @@ export default function LoginPage() {
     };
 
     return (
-        <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6 font-sans">
-            <div className="w-full max-w-5xl grid grid-cols-1 lg:grid-cols-2 bg-white rounded-[2rem] shadow-2xl overflow-hidden border border-slate-100 min-h-[600px]">
+        <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4 md:p-8 font-sans antialiased">
+            <div className="w-full max-w-5xl grid grid-cols-1 lg:grid-cols-2 bg-white rounded-[2.5rem] shadow-[0_32px_64px_-16px_rgba(0,0,0,0.15)] overflow-hidden border border-slate-200/50">
 
-                {/* Left: Brand / Visual */}
-                <div className="bg-slate-900 p-12 text-white relative overflow-hidden flex flex-col justify-between order-2 lg:order-1">
+                {/* Left side: Premium Branding */}
+                <div className="relative bg-[#0F172A] p-12 text-white flex flex-col justify-between overflow-hidden">
+                    {/* Abstract background elements */}
+                    <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-blue-600/20 rounded-full blur-[120px] -mr-48 -mt-48 transition-opacity duration-700"></div>
+                    <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-emerald-500/10 rounded-full blur-[100px] -ml-40 -mb-40"></div>
+
                     <div className="relative z-10">
-                        <div className="flex items-center gap-3 mb-8">
-                            <div className="relative w-12 h-12 rounded-full overflow-hidden bg-white/10 ring-2 ring-white/20">
-                                <Image src="/ciel-logo-v2.png" alt="CIEL Logo" fill className="object-cover" />
+                        <Link href="/" className="inline-flex items-center gap-3 transition-transform hover:scale-105 duration-300">
+                            <div className="relative w-14 h-14 rounded-2xl overflow-hidden bg-white/5 p-2 backdrop-blur-md border border-white/10 shadow-inner">
+                                <Image src="/ciel-logo-v2.png" alt="CIEL Logo" fill className="object-contain p-2" />
                             </div>
-                            <span className="text-xl font-bold tracking-tight">CIEL <span className="text-slate-400">PK</span></span>
-                        </div>
-                        <h1 className="text-4xl font-bold leading-tight mb-4">Empowering Communities Through Education</h1>
-                        <p className="text-slate-400 text-lg">Join the platform where youth, universities, and communities create measurable impact.</p>
+                            <div>
+                                <h1 className="text-2xl font-black tracking-tight leading-none italic">CIEL <span className="text-blue-400 not-italic">PK</span></h1>
+                                <p className="text-[10px] uppercase font-bold tracking-[0.2em] text-slate-400 mt-1">Impact Verified</p>
+                            </div>
+                        </Link>
                     </div>
 
-                    {/* Decorative Background */}
-                    <div className="absolute top-0 right-0 w-96 h-96 bg-blue-600 rounded-full blur-[100px] opacity-20 -mr-20 -mt-20"></div>
-                    <div className="absolute bottom-0 left-0 w-80 h-80 bg-amber-500 rounded-full blur-[100px] opacity-10 -ml-20 -mb-20"></div>
+                    <div className="relative z-10 py-12">
+                        <h2 className="text-5xl font-extrabold leading-[1.1] tracking-tight mb-8">
+                            Empowering <br />
+                            <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">
+                                Global Youth
+                            </span>
+                        </h2>
+                        <p className="text-slate-400 text-lg font-medium leading-relaxed max-w-sm">
+                            Join Pakistan's premier platform for university-led community impact and measurable SDG growth.
+                        </p>
+                    </div>
 
-                    <div className="relative z-10 text-xs text-slate-500 mt-12">
-                        © 2026 CIEL Pakistan. All rights reserved.
+                    <div className="relative z-10 flex items-center justify-between pt-8 border-t border-white/5">
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">© 2026 CIEL Pakistan</p>
+                        <div className="flex gap-4">
+                            <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></div>
+                            <div className="w-1.5 h-1.5 rounded-full bg-blue-500/40"></div>
+                            <div className="w-1.5 h-1.5 rounded-full bg-blue-500/20"></div>
+                        </div>
                     </div>
                 </div>
 
-                {/* Right: Login Form */}
-                <div className="p-12 flex flex-col justify-center order-1 lg:order-2 relative">
-                    <Link
-                        href="/"
-                        className="absolute top-8 left-12 inline-flex items-center gap-2 text-sm font-bold text-slate-400 hover:text-blue-600 transition-colors"
-                    >
-                        <ArrowLeft className="w-4 h-4" /> Back to Home
-                    </Link>
-
-                    <div className="mb-8 mt-8">
-                        <h2 className="text-3xl font-bold text-slate-900 mb-2">Welcome Back</h2>
-                        <p className="text-slate-500">Sign in to access your dashboard.</p>
-                    </div>
-
-                    <form onSubmit={handleLogin} className="space-y-6">
-                        <div className="space-y-2">
-                            <label className="text-sm font-bold text-slate-700">Email Address</label>
-                            <div className="relative">
-                                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-                                <input
-                                    type="email"
-                                    required
-                                    placeholder="name@example.com"
-                                    value={email}
-                                    onChange={(e) => setEmail(e.target.value)}
-                                    className="w-full pl-12 pr-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all font-medium text-slate-800 placeholder:text-slate-400"
-                                />
-                            </div>
-                        </div>
-
-                        <div className="space-y-2">
-                            <div className="flex items-center justify-between">
-                                <label className="text-sm font-bold text-slate-700">Password</label>
-                                <a href="#" className="text-xs font-bold text-blue-600 hover:text-blue-700">Forgot Password?</a>
-                            </div>
-                            <div className="relative">
-                                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-                                <input
-                                    type="password"
-                                    required
-                                    placeholder="••••••••"
-                                    value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
-                                    className="w-full pl-12 pr-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all font-medium text-slate-800 placeholder:text-slate-400"
-                                />
-                            </div>
-                        </div>
-
-                        {error && (
-                            <div className="flex items-center gap-2 p-3 rounded-lg bg-red-50 text-red-600 text-sm font-medium animate-shake">
-                                <AlertCircle className="w-4 h-4" />
-                                {error}
-                            </div>
-                        )}
-
-                        <button
-                            type="submit"
-                            disabled={isLoading}
-                            className="w-full py-4 rounded-xl font-bold text-white bg-blue-600 hover:bg-blue-700 hover:shadow-lg hover:shadow-blue-500/30 hover:-translate-y-0.5 transition-all disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                {/* Right side: Modern Form */}
+                <div className="p-10 md:p-16 flex flex-col justify-center bg-white">
+                    <div className="w-full max-w-sm mx-auto">
+                        <Link
+                            href="/"
+                            className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-widest text-slate-400 hover:text-blue-600 transition-all mb-12 hover:-translate-x-1"
                         >
-                            {isLoading ? (
-                                <>
-                                    <Loader2 className="w-5 h-5 animate-spin" />
-                                    Signing In...
-                                </>
-                            ) : (
-                                <>
-                                    Sign In <ArrowRight className="w-5 h-5" />
-                                </>
-                            )}
-                        </button>
-                    </form>
+                            <ArrowLeft className="w-3 h-3" /> Back to Portal
+                        </Link>
 
-                    <div className="mt-8 text-center">
-                        <p className="text-slate-500 text-sm">
-                            Don't have an account? <Link href="/signup" className="font-bold text-blue-600 hover:text-blue-700">Create New Account</Link>
-                        </p>
-                        <div className="mt-4 p-4 rounded-lg bg-blue-50 text-xs text-blue-700 text-left">
-                            <p className="font-bold mb-1">Demo Credentials:</p>
-                            <p>Student: student@ciel.pk / demo</p>
-                            <p>Partner: partner@ciel.pk / demo</p>
-                            <p>Faculty: faculty@ciel.pk / demo</p>
-                            <p>Admin: admin@ciel.pk / demo</p>
+                        <div className="mb-10 text-center lg:text-left">
+                            <h3 className="text-4xl font-black text-slate-900 tracking-tight mb-3 italic">Welcome Back</h3>
+                            <p className="text-slate-500 font-medium">Please enter your details to sign in.</p>
+                        </div>
+
+                        <form onSubmit={handleLogin} className="space-y-6">
+                            <div className="space-y-1.5">
+                                <label className="text-[11px] font-black uppercase tracking-widest text-slate-400 ml-1">Email Provider</label>
+                                <div className="group relative">
+                                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-blue-600 transition-colors" />
+                                    <input
+                                        type="email"
+                                        required
+                                        placeholder="e.g. name@ciel.pk"
+                                        value={email}
+                                        onChange={(e) => setEmail(e.target.value)}
+                                        className="w-full pl-12 pr-4 py-4 rounded-2xl border-2 border-slate-100 bg-slate-50/50 focus:bg-white focus:border-blue-600 outline-none transition-all font-bold text-slate-800 placeholder:text-slate-300 placeholder:font-medium"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="space-y-1.5">
+                                <div className="flex items-center justify-between ml-1">
+                                    <label className="text-[11px] font-black uppercase tracking-widest text-slate-400">Security Key</label>
+                                    <a href="#" className="text-[10px] font-black uppercase tracking-wider text-blue-600 hover:text-blue-700">Lost Key?</a>
+                                </div>
+                                <div className="group relative">
+                                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-blue-600 transition-colors" />
+                                    <input
+                                        type="password"
+                                        required
+                                        placeholder="••••••••"
+                                        value={password}
+                                        onChange={(e) => setPassword(e.target.value)}
+                                        className="w-full pl-12 pr-4 py-4 rounded-2xl border-2 border-slate-100 bg-slate-50/50 focus:bg-white focus:border-blue-600 outline-none transition-all font-bold text-slate-800 placeholder:text-slate-300 placeholder:font-medium"
+                                    />
+                                </div>
+                            </div>
+
+                            {error && (
+                                <div className="flex items-start gap-3 p-4 rounded-2xl bg-red-50 text-red-600 text-xs font-bold border border-red-100">
+                                    <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                                    <span>{error}</span>
+                                </div>
+                            )}
+
+                            <button
+                                type="submit"
+                                disabled={isLoading}
+                                className="w-full py-5 rounded-[1.25rem] font-black uppercase tracking-widest text-xs text-white bg-slate-900 border-b-4 border-slate-700 active:border-b-0 active:translate-y-1 hover:bg-slate-800 hover:shadow-2xl hover:shadow-slate-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3 group"
+                            >
+                                {isLoading ? (
+                                    <>
+                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                        Authenticating...
+                                    </>
+                                ) : (
+                                    <>
+                                        Sign In Now <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                                    </>
+                                )}
+                            </button>
+                        </form>
+
+                        <div className="mt-12 text-center">
+                            <p className="text-slate-400 text-[11px] font-bold uppercase tracking-widest">
+                                New to the platform? <br />
+                                <Link href="/signup" className="mt-2 inline-block text-blue-600 hover:text-blue-700 font-black border-b-2 border-blue-100 hover:border-blue-600 transition-all">Create Professional Account</Link>
+                            </p>
                         </div>
                     </div>
                 </div>

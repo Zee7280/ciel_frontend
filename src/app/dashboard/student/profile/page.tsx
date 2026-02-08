@@ -137,12 +137,22 @@ export default function StudentProfilePage() {
                     toast.success("Profile updated successfully!");
                     setUser(data.data); // Update local user preview
 
-                    // Update local storage
+                    // Update local storage with all fields
                     const storedUserStr = localStorage.getItem("user");
                     if (storedUserStr) {
                         const storedUser = JSON.parse(storedUserStr);
+                        // Update all profile fields
                         storedUser.name = data.data.name;
-                        if (data.data.image) storedUser.image = data.data.image;
+                        storedUser.city = data.data.city;
+                        storedUser.bio = data.data.bio;
+                        storedUser.phone = data.data.phone;
+                        storedUser.contact = data.data.phone;
+                        storedUser.university = data.data.university;
+                        storedUser.institution = data.data.university;
+                        if (data.data.image || data.data.avatar_url) {
+                            storedUser.image = data.data.image || data.data.avatar_url;
+                            storedUser.avatar_url = data.data.image || data.data.avatar_url;
+                        }
                         localStorage.setItem("user", JSON.stringify(storedUser));
                         localStorage.setItem("ciel_user", JSON.stringify(storedUser));
                     }
@@ -217,20 +227,23 @@ export default function StudentProfilePage() {
                         </div>
 
                         <div className="px-6 pb-6 pt-2">
-                            <div className="grid grid-cols-3 gap-4 border-t border-slate-50 pt-6">
-                                <div className="text-center">
-                                    <div className="text-2xl font-bold text-slate-900">1,250</div>
-                                    <div className="text-xs text-slate-500 font-medium uppercase tracking-wider mt-1">Impact</div>
+                            {/* Stats section - can be populated from API later */}
+                            {user?.stats && (
+                                <div className="grid grid-cols-3 gap-4 border-t border-slate-50 pt-6">
+                                    <div className="text-center">
+                                        <div className="text-2xl font-bold text-slate-900">{user.stats.impact || 0}</div>
+                                        <div className="text-xs text-slate-500 font-medium uppercase tracking-wider mt-1">Impact</div>
+                                    </div>
+                                    <div className="text-center border-l border-slate-100">
+                                        <div className="text-2xl font-bold text-slate-900">{user.stats.projects || 0}</div>
+                                        <div className="text-xs text-slate-500 font-medium uppercase tracking-wider mt-1">Projects</div>
+                                    </div>
+                                    <div className="text-center border-l border-slate-100">
+                                        <div className="text-2xl font-bold text-slate-900">{user.stats.hours || 0}</div>
+                                        <div className="text-xs text-slate-500 font-medium uppercase tracking-wider mt-1">Hours</div>
+                                    </div>
                                 </div>
-                                <div className="text-center border-l border-slate-100">
-                                    <div className="text-2xl font-bold text-slate-900">12</div>
-                                    <div className="text-xs text-slate-500 font-medium uppercase tracking-wider mt-1">Projects</div>
-                                </div>
-                                <div className="text-center border-l border-slate-100">
-                                    <div className="text-2xl font-bold text-slate-900">48</div>
-                                    <div className="text-xs text-slate-500 font-medium uppercase tracking-wider mt-1">Hours</div>
-                                </div>
-                            </div>
+                            )}
                         </div>
                     </div>
                 </div>

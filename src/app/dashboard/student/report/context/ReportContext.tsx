@@ -21,6 +21,8 @@ export interface ReportData {
             university: string;
             degree: string;
             year: string;
+            role: string;
+            hours: string;
             consent?: boolean;
         };
         team_members: Array<{
@@ -104,7 +106,7 @@ const defaultReportData: ReportData = {
     section1: { problem_statement: '' },
     section2: {
         participation_type: 'individual',
-        team_lead: { name: '', cnic: '', mobile: '', email: '', university: '', degree: '', year: '' },
+        team_lead: { name: '', cnic: '', mobile: '', email: '', university: '', degree: '', year: '', role: '', hours: '' },
         team_members: [],
         privacy_consent: false
     },

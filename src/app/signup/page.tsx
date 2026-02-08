@@ -162,470 +162,320 @@ export default function SignUpPage() {
             : "Choose how you want to engage with CIEL’s Community Impact Education Lab.";
 
     return (
-        <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6 font-sans">
-            <div className="w-full max-w-5xl grid grid-cols-1 lg:grid-cols-2 bg-white rounded-[2rem] shadow-2xl overflow-hidden border border-slate-100 min-h-[600px]">
-                <div className="bg-slate-900 p-12 text-white relative overflow-hidden flex flex-col justify-between order-2 lg:order-1">
-                    <div className="relative z-10 space-y-4">
-                        <Link href="/" className="flex items-center gap-3 mb-8 hover:opacity-80 transition-opacity w-fit">
-                            <div className="relative w-14 h-14 flex items-center justify-center">
-                                <Image src="/ciel-logo-v2.png" alt="CIEL Logo" width={56} height={56} className="object-contain" />
+        <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4 md:p-8 font-sans antialiased text-slate-900">
+            <div className="w-full max-w-6xl grid grid-cols-1 lg:grid-cols-2 bg-white rounded-[2.5rem] shadow-[0_32px_64px_-16px_rgba(0,0,0,0.15)] overflow-hidden border border-slate-200/50 min-h-[700px]">
+
+                {/* Left side: Premium Branding & Dynamic Context */}
+                <div className="relative bg-[#0F172A] p-12 text-white flex flex-col justify-between overflow-hidden order-2 lg:order-1">
+                    {/* Abstract background elements */}
+                    <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-blue-600/20 rounded-full blur-[120px] -mr-48 -mt-48 transition-opacity duration-700"></div>
+                    <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-emerald-500/10 rounded-full blur-[100px] -ml-40 -mb-40"></div>
+
+                    <div className="relative z-10">
+                        <Link href="/" className="inline-flex items-center gap-3 transition-transform hover:scale-105 duration-300">
+                            <div className="relative w-14 h-14 rounded-2xl overflow-hidden bg-white/5 p-2 backdrop-blur-md border border-white/10 shadow-inner">
+                                <Image src="/ciel-logo-v2.png" alt="CIEL Logo" fill className="object-contain p-2" />
                             </div>
-                            <div className="flex flex-col">
-                                <span className="text-2xl font-black tracking-tight text-white leading-none">
-                                    CIEL <span className="text-blue-500">PK</span>
-                                </span>
-                                <span className="text-xs font-bold text-slate-400 uppercase tracking-[0.2em] mt-1">
-                                    Education Lab
-                                </span>
+                            <div>
+                                <h1 className="text-2xl font-black tracking-tight leading-none italic">CIEL <span className="text-blue-400 not-italic">PK</span></h1>
+                                <p className="text-[10px] uppercase font-bold tracking-[0.2em] text-slate-400 mt-1">Impact Verified</p>
                             </div>
                         </Link>
+                    </div>
 
-                        <div className="space-y-4 animate-in fade-in slide-in-from-left-4 duration-300" key={displayTitle}>
-                            <h1 className="text-4xl font-bold leading-tight">
-                                {displayTitle}
-                            </h1>
-                            <p className="text-slate-400 text-lg leading-relaxed">
+                    <div className="relative z-10 py-12">
+                        <div className="space-y-6 animate-in fade-in slide-in-from-left-4 duration-500" key={displayTitle}>
+                            <h2 className="text-5xl font-extrabold leading-[1.1] tracking-tight mb-8">
+                                {step === 'role' ? (
+                                    <>Join the <br /><span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">Movement.</span></>
+                                ) : (
+                                    <>Verify <br /><span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">Identity.</span></>
+                                )}
+                            </h2>
+                            <h3 className="text-2xl font-bold tracking-tight text-white mb-2">{displayTitle}</h3>
+                            <p className="text-slate-400 text-lg font-medium leading-relaxed max-w-sm">
                                 {displayText}
                             </p>
                         </div>
                     </div>
 
-                    <div className="absolute top-0 right-0 w-96 h-96 bg-indigo-600 rounded-full blur-[100px] opacity-20 -mr-20 -mt-20"></div>
-                    <div className="absolute bottom-0 left-0 w-80 h-80 bg-blue-500 rounded-full blur-[100px] opacity-10 -ml-20 -mb-20"></div>
+                    <div className="relative z-10 flex flex-col gap-8">
+                        {step === "form" && (
+                            <button
+                                onClick={() => setStep("role")}
+                                className="group flex items-center gap-3 text-xs font-black uppercase tracking-widest text-slate-400 hover:text-white transition-all w-fit"
+                            >
+                                <div className="w-8 h-8 rounded-full border border-white/10 flex items-center justify-center group-hover:border-white/40 transition-colors">
+                                    <ArrowLeft className="w-3 h-3 group-hover:-translate-x-0.5 transition-transform" />
+                                </div>
+                                Back to Selection
+                            </button>
+                        )}
 
-                    {step === "form" && (
-                        <button
-                            onClick={() => setStep("role")}
-                            className="relative z-10 flex items-center gap-2 text-slate-400 hover:text-white transition-colors mt-auto"
-                        >
-                            <ArrowLeft className="w-4 h-4" /> Back to Role Selection
-                        </button>
-                    )}
-                </div>
-
-                <div className="p-12 flex flex-col justify-center order-1 lg:order-2 relative">
-                    {step === "role" && (
-                        <div className="space-y-6 animate-in fade-in slide-in-from-right-8 duration-500">
-                            <div>
-                                <h2 className="text-2xl font-bold text-slate-900 mb-2">Create an Account</h2>
-                                <p className="text-slate-500">Choose how you want to engage with CIEL’s Community Impact Education Lab.</p>
-                            </div>
-
-                            <div className="grid gap-4">
-                                {roles.map((r) => (
-                                    <button
-                                        key={r.id}
-                                        onClick={() => handleRoleSelect(r.id)}
-                                        onMouseEnter={() => setHoveredRole(r.id)}
-                                        onMouseLeave={() => setHoveredRole(null)}
-                                        className="flex items-center gap-4 p-5 rounded-xl border border-slate-200 hover:border-blue-500 hover:bg-blue-50/30 transition-all group text-left"
-                                    >
-                                        <div className={`w-12 h-12 rounded-full bg-${r.color}-50 flex items-center justify-center text-${r.color}-600 group-hover:scale-110 transition-transform`}>
-                                            <r.icon className="w-6 h-6" />
-                                        </div>
-                                        <div>
-                                            <h3 className="font-bold text-slate-800 group-hover:text-blue-700 transition-colors">{r.label}</h3>
-                                            <p className="text-sm text-slate-500 lg:hidden">{r.desc}</p>
-                                        </div>
-                                        <ArrowRight className="ml-auto w-5 h-5 text-slate-300 group-hover:text-blue-500 transition-colors" />
-                                    </button>
-                                ))}
-                            </div>
-
-                            <div className="text-center pt-4">
-                                <p className="text-slate-500 text-sm">
-                                    Already have an account? <Link href="/login" className="font-bold text-blue-600 hover:text-blue-700">Log in</Link>
-                                </p>
+                        <div className="flex items-center justify-between pt-8 border-t border-white/5">
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 italic">© 2026 CIEL Pakistan</p>
+                            <div className="flex gap-4 items-center">
+                                <div className={clsx("w-1.5 h-1.5 rounded-full transition-all", step === 'role' ? "bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.8)] scale-125" : "bg-white/20")}></div>
+                                <div className={clsx("w-1.5 h-1.5 rounded-full transition-all", step === 'form' ? "bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.8)] scale-125" : "bg-white/20")}></div>
                             </div>
                         </div>
-                    )}
+                    </div>
+                </div>
 
-                    {step === "form" && (
-                        <form onSubmit={handleSubmit} className="space-y-5 animate-in fade-in slide-in-from-right-8 duration-500">
-                            {['university', 'ngo', 'corporate'].includes(role || "") ? (
-                                <div className="space-y-4">
-                                    <div>
-                                        <label className="text-sm font-bold text-slate-700">
-                                            {role === 'university' ? "Institution Name" :
-                                                role === 'corporate' ? "Company Name" :
-                                                    "Organization Name"}
-                                        </label>
-                                        <input
-                                            type="text"
-                                            value={formData.orgName}
-                                            onChange={(e) => handleGenericChange("orgName", e.target.value)}
-                                            className={clsx(
-                                                "w-full mt-1 px-4 py-3 rounded-xl border bg-slate-50 focus:bg-white focus:outline-none transition-all",
-                                                errors.orgName ? "border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-500/20" : "border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
-                                            )}
-                                            placeholder="e.g. Al-Khidmat Foundation"
-                                        />
-                                        {errors.orgName && <p className="text-xs text-red-500 mt-1 font-medium">{errors.orgName}</p>}
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div>
-                                            <label className="text-sm font-bold text-slate-700">Org Type</label>
-                                            <select
-                                                value={formData.orgType}
-                                                onChange={(e) => setFormData({ ...formData, orgType: e.target.value })}
-                                                className="w-full mt-1 px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white outline-none"
-                                                disabled // Auto-selected based on role
-                                            >
-                                                <option value="ngo">NGO / Non-Profit</option>
-                                                <option value="university">University / College</option>
-                                                <option value="corporate">Corporate / Private Sector</option>
-                                            </select>
+                {/* Right side: Interactive Form / Selection */}
+                <div className="p-10 md:p-16 flex flex-col justify-center order-1 lg:order-2 bg-white">
+                    <div className="w-full max-w-md mx-auto">
+
+                        {step === "role" && (
+                            <div className="space-y-8 animate-in fade-in slide-in-from-right-8 duration-500">
+                                <div className="text-center lg:text-left">
+                                    <h3 className="text-4xl font-black text-slate-900 tracking-tight mb-3 italic">Account Type</h3>
+                                    <p className="text-slate-500 font-medium">Select your professional category to proceed.</p>
+                                </div>
+
+                                <div className="grid gap-3">
+                                    {roles.map((r) => (
+                                        <button
+                                            key={r.id}
+                                            onClick={() => handleRoleSelect(r.id)}
+                                            onMouseEnter={() => setHoveredRole(r.id)}
+                                            onMouseLeave={() => setHoveredRole(null)}
+                                            className="group relative flex items-center gap-4 p-5 rounded-2xl border-2 border-slate-100 hover:border-blue-600 hover:bg-slate-50 transition-all text-left overflow-hidden"
+                                        >
+                                            <div className={clsx(
+                                                "w-12 h-12 rounded-xl flex items-center justify-center transition-all duration-300 group-hover:scale-110 shadow-sm border",
+                                                r.id === "student" ? "bg-blue-50 text-blue-600 border-blue-100" :
+                                                    r.id === "faculty" ? "bg-amber-50 text-amber-600 border-amber-100" :
+                                                        r.id === "university" ? "bg-indigo-50 text-indigo-600 border-indigo-100" :
+                                                            r.id === "ngo" ? "bg-emerald-50 text-emerald-600 border-emerald-100" :
+                                                                "bg-slate-50 text-slate-600 border-slate-200"
+                                            )}>
+                                                <r.icon className="w-6 h-6" />
+                                            </div>
+                                            <div className="flex-1">
+                                                <h4 className="text-sm font-black uppercase tracking-widest text-slate-900 mb-0.5">{r.label}</h4>
+                                                <p className="text-[10px] font-bold text-slate-400 group-hover:text-slate-600 transition-colors">Start impacting today</p>
+                                            </div>
+                                            <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center opacity-0 group-hover:opacity-100 -translate-x-4 group-hover:translate-x-0 transition-all duration-300">
+                                                <ArrowRight className="w-4 h-4 text-blue-600" />
+                                            </div>
+                                        </button>
+                                    ))}
+                                </div>
+
+                                <div className="text-center pt-4">
+                                    <p className="text-slate-400 text-[11px] font-bold uppercase tracking-widest">
+                                        Already a member? <br />
+                                        <Link href="/login" className="mt-2 inline-block text-blue-600 hover:text-blue-700 font-black border-b-2 border-blue-100 hover:border-blue-600 transition-all">Sign In to Dashboard</Link>
+                                    </p>
+                                </div>
+                            </div>
+                        )}
+
+                        {step === "form" && (
+                            <form onSubmit={handleSubmit} className="space-y-6 animate-in fade-in slide-in-from-right-8 duration-500">
+                                <div className="mb-8 text-center lg:text-left">
+                                    <h3 className="text-4xl font-black text-slate-900 tracking-tight mb-2 italic">Credentials</h3>
+                                    <p className="text-slate-500 font-medium text-sm">Verify your details as <span className="text-blue-600 font-bold">{roles.find(r => r.id === role)?.label}</span></p>
+                                </div>
+
+                                <div className="max-h-[500px] overflow-y-auto pr-2 space-y-6 scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent">
+                                    {['university', 'ngo', 'corporate'].includes(role || "") ? (
+                                        <div className="space-y-5">
+                                            <div className="space-y-1.5">
+                                                <label className="text-[11px] font-black uppercase tracking-widest text-slate-400 ml-1">
+                                                    {role === 'university' ? "Institution Name" : role === 'corporate' ? "Company Name" : "Organization Name"}
+                                                </label>
+                                                <input
+                                                    type="text"
+                                                    value={formData.orgName}
+                                                    onChange={(e) => handleGenericChange("orgName", e.target.value)}
+                                                    className={clsx(
+                                                        "w-full px-5 py-4 rounded-2xl border-2 bg-slate-50/50 focus:bg-white outline-none transition-all font-bold text-slate-800 placeholder:text-slate-300",
+                                                        errors.orgName ? "border-red-500 focus:border-red-500" : "border-slate-100 focus:border-blue-600"
+                                                    )}
+                                                    placeholder="e.g. Hope Foundation"
+                                                />
+                                                {errors.orgName && <p className="text-[10px] text-red-500 font-black uppercase tracking-widest ml-1">{errors.orgName}</p>}
+                                            </div>
+
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div className="space-y-1.5">
+                                                    <label className="text-[11px] font-black uppercase tracking-widest text-slate-400 ml-1">Org Category</label>
+                                                    <select
+                                                        value={formData.orgType}
+                                                        onChange={(e) => setFormData({ ...formData, orgType: e.target.value })}
+                                                        className="w-full px-5 py-4 rounded-2xl border-2 border-slate-100 bg-slate-50/30 font-bold text-slate-400 cursor-not-allowed outline-none"
+                                                        disabled
+                                                    >
+                                                        <option value="ngo">NGO</option>
+                                                        <option value="university">University</option>
+                                                        <option value="corporate">Private Sector</option>
+                                                    </select>
+                                                </div>
+                                                <div className="space-y-1.5">
+                                                    <label className="text-[11px] font-black uppercase tracking-widest text-slate-400 ml-1">Lead Official</label>
+                                                    <input
+                                                        type="text"
+                                                        value={formData.contactPerson}
+                                                        onChange={(e) => handleGenericChange("contactPerson", e.target.value)}
+                                                        className={clsx(
+                                                            "w-full px-5 py-4 rounded-2xl border-2 bg-slate-50/50 focus:bg-white outline-none transition-all font-bold text-slate-800 placeholder:text-slate-300",
+                                                            errors.contactPerson ? "border-red-500 focus:border-red-500" : "border-slate-100 focus:border-blue-600"
+                                                        )}
+                                                        placeholder="Full Name"
+                                                    />
+                                                    {errors.contactPerson && <p className="text-[10px] text-red-500 font-black uppercase tracking-widest ml-1">{errors.contactPerson}</p>}
+                                                </div>
+                                            </div>
                                         </div>
-                                        <div>
-                                            <label className="text-sm font-bold text-slate-700">Contact Person</label>
+                                    ) : (
+                                        <div className="space-y-1.5">
+                                            <label className="text-[11px] font-black uppercase tracking-widest text-slate-400 ml-1">Individual Identity</label>
                                             <input
                                                 type="text"
-                                                value={formData.contactPerson}
-                                                onChange={(e) => handleGenericChange("contactPerson", e.target.value)}
+                                                value={formData.name}
+                                                onChange={(e) => handleGenericChange("name", e.target.value)}
                                                 className={clsx(
-                                                    "w-full mt-1 px-4 py-3 rounded-xl border bg-slate-50 focus:bg-white focus:outline-none transition-all",
-                                                    errors.contactPerson ? "border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-500/20" : "border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                                                    "w-full px-5 py-4 rounded-2xl border-2 bg-slate-50/50 focus:bg-white outline-none transition-all font-bold text-slate-800 placeholder:text-slate-300",
+                                                    errors.name ? "border-red-500 focus:border-red-500" : "border-slate-100 focus:border-blue-600"
                                                 )}
                                                 placeholder="Full Name"
                                             />
-                                            {errors.contactPerson && <p className="text-xs text-red-500 mt-1 font-medium">{errors.contactPerson}</p>}
+                                            {errors.name && <p className="text-[10px] text-red-500 font-black uppercase tracking-widest ml-1">{errors.name}</p>}
                                         </div>
-                                    </div>
-                                </div>
-                            ) : (
-                                <div>
-                                    <label className="text-sm font-bold text-slate-700">Full Name</label>
-                                    <input
-                                        type="text"
-                                        value={formData.name}
-                                        onChange={(e) => handleGenericChange("name", e.target.value)}
-                                        className={clsx(
-                                            "w-full mt-1 px-4 py-3 rounded-xl border bg-slate-50 focus:bg-white focus:outline-none transition-all",
-                                            errors.name ? "border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-500/20" : "border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
-                                        )}
-                                        placeholder="John Doe"
-                                    />
-                                    {errors.name && <p className="text-xs text-red-500 mt-1 font-medium">{errors.name}</p>}
-                                </div>
-                            )}
-
-                            {(role === "student" || role === "faculty") && (
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="text-sm font-bold text-slate-700">Institution</label>
-                                        <input
-                                            type="text"
-                                            value={formData.institution}
-                                            onChange={(e) => handleGenericChange("institution", e.target.value)}
-                                            className={clsx(
-                                                "w-full mt-1 px-4 py-3 rounded-xl border bg-slate-50 focus:bg-white focus:outline-none transition-all",
-                                                errors.institution ? "border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-500/20" : "border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
-                                            )}
-                                            placeholder="NUST"
-                                        />
-                                        {errors.institution && <p className="text-xs text-red-500 mt-1 font-medium">{errors.institution}</p>}
-                                    </div>
-                                    <div>
-                                        <label className="text-sm font-bold text-slate-700">{role === "student" ? "Degree Program" : "Department"}</label>
-                                        <input
-                                            type="text"
-                                            value={formData.department}
-                                            onChange={(e) => handleGenericChange("department", e.target.value)}
-                                            className={clsx(
-                                                "w-full mt-1 px-4 py-3 rounded-xl border bg-slate-50 focus:bg-white focus:outline-none transition-all",
-                                                errors.department ? "border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-500/20" : "border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
-                                            )}
-                                            placeholder={role === "student" ? "BS CS" : "Computer Science"}
-                                        />
-                                        {errors.department && <p className="text-xs text-red-500 mt-1 font-medium">{errors.department}</p>}
-                                    </div>
-                                </div>
-                            )}
-
-                            <div>
-                                <label className="text-sm font-bold text-slate-700">Phone Number</label>
-                                <div className="flex gap-2 mt-1">
-                                    <div className="relative w-28">
-                                        <Globe className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                                        <select
-                                            value={formData.countryCode}
-                                            onChange={(e) => setFormData({ ...formData, countryCode: e.target.value })}
-                                            className="w-full pl-9 pr-2 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-blue-500 outline-none text-sm"
-                                        >
-                                            <option value="+93">🇦🇫 +93 Afghanistan</option>
-                                            <option value="+355">🇦🇱 +355 Albania</option>
-                                            <option value="+213">🇩🇿 +213 Algeria</option>
-                                            <option value="+376">🇦🇩 +376 Andorra</option>
-                                            <option value="+244">🇦🇴 +244 Angola</option>
-                                            <option value="+54">🇦🇷 +54 Argentina</option>
-                                            <option value="+374">🇦🇲 +374 Armenia</option>
-                                            <option value="+61">🇦🇺 +61 Australia</option>
-                                            <option value="+43">🇦🇹 +43 Austria</option>
-                                            <option value="+994">🇦🇿 +994 Azerbaijan</option>
-                                            <option value="+973">🇧🇭 +973 Bahrain</option>
-                                            <option value="+880">🇧🇩 +880 Bangladesh</option>
-                                            <option value="+375">🇧🇾 +375 Belarus</option>
-                                            <option value="+32">🇧🇪 +32 Belgium</option>
-                                            <option value="+501">🇧🇿 +501 Belize</option>
-                                            <option value="+229">🇧🇯 +229 Benin</option>
-                                            <option value="+975">🇧🇹 +975 Bhutan</option>
-                                            <option value="+591">🇧🇴 +591 Bolivia</option>
-                                            <option value="+387">🇧🇦 +387 Bosnia</option>
-                                            <option value="+267">🇧🇼 +267 Botswana</option>
-                                            <option value="+55">🇧🇷 +55 Brazil</option>
-                                            <option value="+673">🇧🇳 +673 Brunei</option>
-                                            <option value="+359">🇧🇬 +359 Bulgaria</option>
-                                            <option value="+226">🇧🇫 +226 Burkina Faso</option>
-                                            <option value="+257">🇧🇮 +257 Burundi</option>
-                                            <option value="+855">🇰🇭 +855 Cambodia</option>
-                                            <option value="+237">🇨🇲 +237 Cameroon</option>
-                                            <option value="+1">🇨🇦 +1 Canada</option>
-                                            <option value="+238">🇨🇻 +238 Cape Verde</option>
-                                            <option value="+236">🇨🇫 +236 Central African Republic</option>
-                                            <option value="+235">🇹🇩 +235 Chad</option>
-                                            <option value="+56">🇨🇱 +56 Chile</option>
-                                            <option value="+86">🇨🇳 +86 China</option>
-                                            <option value="+57">🇨🇴 +57 Colombia</option>
-                                            <option value="+269">🇰🇲 +269 Comoros</option>
-                                            <option value="+242">🇨🇬 +242 Congo</option>
-                                            <option value="+506">🇨🇷 +506 Costa Rica</option>
-                                            <option value="+385">🇭🇷 +385 Croatia</option>
-                                            <option value="+53">🇨🇺 +53 Cuba</option>
-                                            <option value="+357">🇨🇾 +357 Cyprus</option>
-                                            <option value="+420">🇨🇿 +420 Czech Republic</option>
-                                            <option value="+45">🇩🇰 +45 Denmark</option>
-                                            <option value="+253">🇩🇯 +253 Djibouti</option>
-                                            <option value="+593">🇪🇨 +593 Ecuador</option>
-                                            <option value="+20">🇪🇬 +20 Egypt</option>
-                                            <option value="+503">🇸🇻 +503 El Salvador</option>
-                                            <option value="+240">🇬🇶 +240 Equatorial Guinea</option>
-                                            <option value="+291">🇪🇷 +291 Eritrea</option>
-                                            <option value="+372">🇪🇪 +372 Estonia</option>
-                                            <option value="+251">🇪🇹 +251 Ethiopia</option>
-                                            <option value="+679">🇫🇯 +679 Fiji</option>
-                                            <option value="+358">🇫🇮 +358 Finland</option>
-                                            <option value="+33">🇫🇷 +33 France</option>
-                                            <option value="+241">🇬🇦 +241 Gabon</option>
-                                            <option value="+220">🇬🇲 +220 Gambia</option>
-                                            <option value="+995">🇬🇪 +995 Georgia</option>
-                                            <option value="+49">🇩🇪 +49 Germany</option>
-                                            <option value="+233">🇬🇭 +233 Ghana</option>
-                                            <option value="+30">🇬🇷 +30 Greece</option>
-                                            <option value="+502">🇬🇹 +502 Guatemala</option>
-                                            <option value="+224">🇬🇳 +224 Guinea</option>
-                                            <option value="+245">🇬🇼 +245 Guinea-Bissau</option>
-                                            <option value="+592">🇬🇾 +592 Guyana</option>
-                                            <option value="+509">🇭🇹 +509 Haiti</option>
-                                            <option value="+504">🇭🇳 +504 Honduras</option>
-                                            <option value="+852">🇭🇰 +852 Hong Kong</option>
-                                            <option value="+36">🇭🇺 +36 Hungary</option>
-                                            <option value="+354">🇮🇸 +354 Iceland</option>
-                                            <option value="+91">🇮🇳 +91 India</option>
-                                            <option value="+62">🇮🇩 +62 Indonesia</option>
-                                            <option value="+98">🇮🇷 +98 Iran</option>
-                                            <option value="+964">🇮🇶 +964 Iraq</option>
-                                            <option value="+353">🇮🇪 +353 Ireland</option>
-                                            <option value="+972">🇮🇱 +972 Israel</option>
-                                            <option value="+39">🇮🇹 +39 Italy</option>
-                                            <option value="+225">🇨🇮 +225 Ivory Coast</option>
-                                            <option value="+81">🇯🇵 +81 Japan</option>
-                                            <option value="+962">🇯🇴 +962 Jordan</option>
-                                            <option value="+7">🇰🇿 +7 Kazakhstan</option>
-                                            <option value="+254">🇰🇪 +254 Kenya</option>
-                                            <option value="+965">🇰🇼 +965 Kuwait</option>
-                                            <option value="+996">🇰🇬 +996 Kyrgyzstan</option>
-                                            <option value="+856">🇱🇦 +856 Laos</option>
-                                            <option value="+371">🇱🇻 +371 Latvia</option>
-                                            <option value="+961">🇱🇧 +961 Lebanon</option>
-                                            <option value="+266">🇱🇸 +266 Lesotho</option>
-                                            <option value="+231">🇱🇷 +231 Liberia</option>
-                                            <option value="+218">🇱🇾 +218 Libya</option>
-                                            <option value="+423">🇱🇮 +423 Liechtenstein</option>
-                                            <option value="+370">🇱🇹 +370 Lithuania</option>
-                                            <option value="+352">🇱🇺 +352 Luxembourg</option>
-                                            <option value="+853">🇲🇴 +853 Macau</option>
-                                            <option value="+389">🇲🇰 +389 Macedonia</option>
-                                            <option value="+261">🇲🇬 +261 Madagascar</option>
-                                            <option value="+265">🇲🇼 +265 Malawi</option>
-                                            <option value="+60">🇲🇾 +60 Malaysia</option>
-                                            <option value="+960">🇲🇻 +960 Maldives</option>
-                                            <option value="+223">🇲🇱 +223 Mali</option>
-                                            <option value="+356">🇲🇹 +356 Malta</option>
-                                            <option value="+222">🇲🇷 +222 Mauritania</option>
-                                            <option value="+230">🇲🇺 +230 Mauritius</option>
-                                            <option value="+52">🇲🇽 +52 Mexico</option>
-                                            <option value="+373">🇲🇩 +373 Moldova</option>
-                                            <option value="+377">🇲🇨 +377 Monaco</option>
-                                            <option value="+976">🇲🇳 +976 Mongolia</option>
-                                            <option value="+382">🇲🇪 +382 Montenegro</option>
-                                            <option value="+212">🇲🇦 +212 Morocco</option>
-                                            <option value="+258">🇲🇿 +258 Mozambique</option>
-                                            <option value="+95">🇲🇲 +95 Myanmar</option>
-                                            <option value="+264">🇳🇦 +264 Namibia</option>
-                                            <option value="+977">🇳🇵 +977 Nepal</option>
-                                            <option value="+31">🇳🇱 +31 Netherlands</option>
-                                            <option value="+64">🇳🇿 +64 New Zealand</option>
-                                            <option value="+505">🇳🇮 +505 Nicaragua</option>
-                                            <option value="+227">🇳🇪 +227 Niger</option>
-                                            <option value="+234">🇳🇬 +234 Nigeria</option>
-                                            <option value="+850">🇰🇵 +850 North Korea</option>
-                                            <option value="+47">🇳🇴 +47 Norway</option>
-                                            <option value="+968">🇴🇲 +968 Oman</option>
-                                            <option value="+92">🇵🇰 +92 Pakistan</option>
-                                            <option value="+970">🇵🇸 +970 Palestine</option>
-                                            <option value="+507">🇵🇦 +507 Panama</option>
-                                            <option value="+675">🇵🇬 +675 Papua New Guinea</option>
-                                            <option value="+595">🇵🇾 +595 Paraguay</option>
-                                            <option value="+51">🇵🇪 +51 Peru</option>
-                                            <option value="+63">🇵🇭 +63 Philippines</option>
-                                            <option value="+48">🇵🇱 +48 Poland</option>
-                                            <option value="+351">🇵🇹 +351 Portugal</option>
-                                            <option value="+974">🇶🇦 +974 Qatar</option>
-                                            <option value="+40">🇷🇴 +40 Romania</option>
-                                            <option value="+7">🇷🇺 +7 Russia</option>
-                                            <option value="+250">🇷🇼 +250 Rwanda</option>
-                                            <option value="+966">🇸🇦 +966 Saudi Arabia</option>
-                                            <option value="+221">🇸🇳 +221 Senegal</option>
-                                            <option value="+381">🇷🇸 +381 Serbia</option>
-                                            <option value="+248">🇸🇨 +248 Seychelles</option>
-                                            <option value="+232">🇸🇱 +232 Sierra Leone</option>
-                                            <option value="+65">🇸🇬 +65 Singapore</option>
-                                            <option value="+421">🇸🇰 +421 Slovakia</option>
-                                            <option value="+386">🇸🇮 +386 Slovenia</option>
-                                            <option value="+252">🇸🇴 +252 Somalia</option>
-                                            <option value="+27">🇿🇦 +27 South Africa</option>
-                                            <option value="+82">🇰🇷 +82 South Korea</option>
-                                            <option value="+211">🇸🇸 +211 South Sudan</option>
-                                            <option value="+34">🇪🇸 +34 Spain</option>
-                                            <option value="+94">🇱🇰 +94 Sri Lanka</option>
-                                            <option value="+249">🇸🇩 +249 Sudan</option>
-                                            <option value="+597">🇸🇷 +597 Suriname</option>
-                                            <option value="+46">🇸🇪 +46 Sweden</option>
-                                            <option value="+41">🇨🇭 +41 Switzerland</option>
-                                            <option value="+963">🇸🇾 +963 Syria</option>
-                                            <option value="+886">🇹🇼 +886 Taiwan</option>
-                                            <option value="+992">🇹🇯 +992 Tajikistan</option>
-                                            <option value="+255">🇹🇿 +255 Tanzania</option>
-                                            <option value="+66">🇹🇭 +66 Thailand</option>
-                                            <option value="+228">🇹🇬 +228 Togo</option>
-                                            <option value="+676">🇹🇴 +676 Tonga</option>
-                                            <option value="+216">🇹🇳 +216 Tunisia</option>
-                                            <option value="+90">🇹🇷 +90 Turkey</option>
-                                            <option value="+993">🇹🇲 +993 Turkmenistan</option>
-                                            <option value="+256">🇺🇬 +256 Uganda</option>
-                                            <option value="+380">🇺🇦 +380 Ukraine</option>
-                                            <option value="+971">🇦🇪 +971 UAE</option>
-                                            <option value="+44">🇬🇧 +44 United Kingdom</option>
-                                            <option value="+1">🇺🇸 +1 United States</option>
-                                            <option value="+598">🇺🇾 +598 Uruguay</option>
-                                            <option value="+998">🇺🇿 +998 Uzbekistan</option>
-                                            <option value="+678">🇻🇺 +678 Vanuatu</option>
-                                            <option value="+58">🇻🇪 +58 Venezuela</option>
-                                            <option value="+84">🇻🇳 +84 Vietnam</option>
-                                            <option value="+967">🇾🇪 +967 Yemen</option>
-                                            <option value="+260">🇿🇲 +260 Zambia</option>
-                                            <option value="+263">🇿🇼 +263 Zimbabwe</option>
-                                        </select>
-                                    </div>
-                                    <div className="relative flex-1">
-                                        <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-                                        <input
-                                            type="tel"
-                                            value={formData.phone}
-                                            onChange={handlePhoneChange}
-                                            className={clsx(
-                                                "w-full pl-12 pr-4 py-3 rounded-xl border bg-slate-50 focus:bg-white focus:outline-none transition-all",
-                                                errors.phone ? "border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-500/20" : "border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
-                                            )}
-                                            placeholder="3001234567"
-                                        />
-                                    </div>
-                                </div>
-                                {errors.phone && <p className="text-xs text-red-500 mt-1 font-medium">{errors.phone}</p>}
-                            </div>
-
-                            <div>
-                                <label className="text-sm font-bold text-slate-700">
-                                    CNIC / National ID <span className="text-slate-400 font-normal">(Optional for international users)</span>
-                                </label>
-                                <input
-                                    type="text"
-                                    value={formData.cnic}
-                                    onChange={handleCnicChange}
-                                    className={clsx(
-                                        "w-full mt-1 px-4 py-3 rounded-xl border bg-slate-50 focus:bg-white focus:outline-none transition-all",
-                                        errors.cnic ? "border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-500/20" : "border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
                                     )}
-                                    placeholder="12345-1234567-1"
-                                />
-                                {errors.cnic && <p className="text-xs text-red-500 mt-1 font-medium">{errors.cnic}</p>}
-                            </div>
 
-                            <div>
-                                <label className="text-sm font-bold text-slate-700">Email Address</label>
-                                <div className="relative mt-1">
-                                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-                                    <input
-                                        type="email"
-                                        value={formData.email}
-                                        onChange={(e) => handleGenericChange("email", e.target.value)}
-                                        className={clsx(
-                                            "w-full pl-12 pr-4 py-3 rounded-xl border bg-slate-50 focus:bg-white focus:outline-none transition-all",
-                                            errors.email ? "border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-500/20" : "border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
-                                        )}
-                                        placeholder="you@example.com"
-                                    />
-                                </div>
-                                {errors.email && <p className="text-xs text-red-500 mt-1 font-medium">{errors.email}</p>}
-                            </div>
-                            <div>
-                                <label className="text-sm font-bold text-slate-700">Password</label>
-                                <div className="relative mt-1">
-                                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-                                    <input
-                                        type="password"
-                                        value={formData.password}
-                                        onChange={(e) => handleGenericChange("password", e.target.value)}
-                                        className={clsx(
-                                            "w-full pl-12 pr-4 py-3 rounded-xl border bg-slate-50 focus:bg-white focus:outline-none transition-all",
-                                            errors.password ? "border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-500/20" : "border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
-                                        )}
-                                        placeholder="••••••••"
-                                    />
-                                </div>
-                                {errors.password && <p className="text-xs text-red-500 mt-1 font-medium">{errors.password}</p>}
-                            </div>
+                                    {(role === "student" || role === "faculty") && (
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div className="space-y-1.5">
+                                                <label className="text-[11px] font-black uppercase tracking-widest text-slate-400 ml-1">Institution</label>
+                                                <input
+                                                    type="text"
+                                                    value={formData.institution}
+                                                    onChange={(e) => handleGenericChange("institution", e.target.value)}
+                                                    className={clsx(
+                                                        "w-full px-5 py-4 rounded-2xl border-2 bg-slate-50/50 focus:bg-white outline-none transition-all font-bold text-slate-800 placeholder:text-slate-300",
+                                                        errors.institution ? "border-red-500 focus:border-red-500" : "border-slate-100 focus:border-blue-600"
+                                                    )}
+                                                    placeholder="e.g. NUST"
+                                                />
+                                                {errors.institution && <p className="text-[10px] text-red-500 font-black uppercase tracking-widest ml-1">{errors.institution}</p>}
+                                            </div>
+                                            <div className="space-y-1.5">
+                                                <label className="text-[11px] font-black uppercase tracking-widest text-slate-400 ml-1">{role === "student" ? "Program" : "Dept"}</label>
+                                                <input
+                                                    type="text"
+                                                    value={formData.department}
+                                                    onChange={(e) => handleGenericChange("department", e.target.value)}
+                                                    className={clsx(
+                                                        "w-full px-5 py-4 rounded-2xl border-2 bg-slate-50/50 focus:bg-white outline-none transition-all font-bold text-slate-800 placeholder:text-slate-300",
+                                                        errors.department ? "border-red-500 focus:border-red-500" : "border-slate-100 focus:border-blue-600"
+                                                    )}
+                                                    placeholder={role === "student" ? "BS CS" : "Admin"}
+                                                />
+                                                {errors.department && <p className="text-[10px] text-red-500 font-black uppercase tracking-widest ml-1">{errors.department}</p>}
+                                            </div>
+                                        </div>
+                                    )}
 
-                            {formError && (
-                                <div className="p-3 rounded-xl bg-red-50 text-red-600 border border-red-100 flex items-center gap-3 text-sm font-medium animate-in fade-in slide-in-from-bottom-2">
-                                    <AlertCircle className="w-5 h-5 shrink-0" />
-                                    {formError}
-                                </div>
-                            )}
+                                    <div className="space-y-1.5">
+                                        <label className="text-[11px] font-black uppercase tracking-widest text-slate-400 ml-1">Phone Connectivity</label>
+                                        <div className="flex gap-2">
+                                            <select
+                                                value={formData.countryCode}
+                                                onChange={(e) => setFormData({ ...formData, countryCode: e.target.value })}
+                                                className="w-32 px-3 py-4 rounded-2xl border-2 border-slate-100 bg-slate-50/50 font-bold text-xs outline-none focus:border-blue-600"
+                                            >
+                                                <option value="+92">PK +92</option>
+                                                <option value="+1">US +1</option>
+                                                <option value="+44">UK +44</option>
+                                                <option value="+971">UAE +971</option>
+                                                <option value="+966">SA +966</option>
+                                            </select>
+                                            <input
+                                                type="tel"
+                                                value={formData.phone}
+                                                onChange={handlePhoneChange}
+                                                className={clsx(
+                                                    "flex-1 px-5 py-4 rounded-2xl border-2 bg-slate-50/50 focus:bg-white outline-none transition-all font-bold text-slate-800 placeholder:text-slate-300",
+                                                    errors.phone ? "border-red-500 focus:border-red-500" : "border-slate-100 focus:border-blue-600"
+                                                )}
+                                                placeholder="3001234567"
+                                            />
+                                        </div>
+                                        {errors.phone && <p className="text-[10px] text-red-500 font-black uppercase tracking-widest ml-1">{errors.phone}</p>}
+                                    </div>
 
-                            <button
-                                type="submit"
-                                disabled={isLoading}
-                                className="w-full py-4 rounded-xl font-bold text-white bg-blue-600 hover:bg-blue-700 hover:shadow-lg hover:shadow-blue-500/30 hover:-translate-y-0.5 transition-all disabled:opacity-70 flex items-center justify-center gap-2 mt-2"
-                            >
-                                {isLoading ? (
-                                    <>
-                                        <Loader2 className="w-5 h-5 animate-spin" />
-                                        Creating Account...
-                                    </>
-                                ) : (
-                                    <>
-                                        Complete Registration <CheckCircle className="w-5 h-5" />
-                                    </>
+                                    <div className="space-y-1.5">
+                                        <label className="text-[11px] font-black uppercase tracking-widest text-slate-400 ml-1">Verification Route (Email)</label>
+                                        <div className="group relative">
+                                            <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-blue-600 transition-colors" />
+                                            <input
+                                                type="email"
+                                                value={formData.email}
+                                                onChange={(e) => handleGenericChange("email", e.target.value)}
+                                                className={clsx(
+                                                    "w-full pl-12 pr-5 py-4 rounded-2xl border-2 bg-slate-50/50 focus:bg-white outline-none transition-all font-bold text-slate-800 placeholder:text-slate-300",
+                                                    errors.email ? "border-red-500 focus:border-red-500" : "border-slate-100 focus:border-blue-600"
+                                                )}
+                                                placeholder="you@domain.pk"
+                                            />
+                                        </div>
+                                        {errors.email && <p className="text-[10px] text-red-500 font-black uppercase tracking-widest ml-1">{errors.email}</p>}
+                                    </div>
+
+                                    <div className="space-y-1.5">
+                                        <label className="text-[11px] font-black uppercase tracking-widest text-slate-400 ml-1">Secure Passphrase</label>
+                                        <div className="group relative">
+                                            <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-blue-600 transition-colors" />
+                                            <input
+                                                type="password"
+                                                value={formData.password}
+                                                onChange={(e) => handleGenericChange("password", e.target.value)}
+                                                className={clsx(
+                                                    "w-full pl-12 pr-5 py-4 rounded-2xl border-2 bg-slate-50/50 focus:bg-white outline-none transition-all font-bold text-slate-800 placeholder:text-slate-300",
+                                                    errors.password ? "border-red-500 focus:border-red-500" : "border-slate-100 focus:border-blue-600"
+                                                )}
+                                                placeholder="••••••••"
+                                            />
+                                        </div>
+                                        {errors.password && <p className="text-[10px] text-red-500 font-black uppercase tracking-widest ml-1">{errors.password}</p>}
+                                    </div>
+                                </div>
+
+                                {formError && (
+                                    <div className="p-4 rounded-2xl bg-red-50 text-red-600 text-xs font-bold border border-red-100 flex items-start gap-3">
+                                        <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                                        <span>{formError}</span>
+                                    </div>
                                 )}
-                            </button>
 
-                            <p className="text-center text-xs text-slate-400 mt-4">
-                                By continuing, you agree to CIEL's Term of Service and Privacy Policy.
-                            </p>
-                        </form>
-                    )}
+                                <button
+                                    type="submit"
+                                    disabled={isLoading}
+                                    className="w-full py-5 rounded-[1.25rem] font-black uppercase tracking-widest text-xs text-white bg-slate-900 border-b-4 border-slate-700 active:border-b-0 active:translate-y-1 hover:bg-slate-800 hover:shadow-2xl hover:shadow-slate-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3 group px-4"
+                                >
+                                    {isLoading ? (
+                                        <>
+                                            <Loader2 className="w-4 h-4 animate-spin" />
+                                            Provisioning Account...
+                                        </>
+                                    ) : (
+                                        <>
+                                            Register Account <CheckCircle className="w-4 h-4 group-hover:scale-110 transition-transform" />
+                                        </>
+                                    )}
+                                </button>
 
+                                <p className="text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-relaxed">
+                                    By registering, you comply with <br />
+                                    <span className="text-slate-900">CIEL’s Global Governance Protocols.</span>
+                                </p>
+                            </form>
+                        )}
+
+                    </div>
                 </div>
             </div>
         </div>
