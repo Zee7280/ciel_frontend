@@ -22,14 +22,14 @@ export default function Navbar() {
                 {/* Logo */}
                 <Link href="/" className="flex items-center gap-3 group cursor-pointer">
                     <div className="relative w-14 h-14 flex items-center justify-center group-hover:scale-105 transition-all duration-300">
-                        <Image src="/ciel-logo-v2.png" alt="CIEL Logo" width={56} height={56} className="object-contain" />
+                        <Image src="/ciel-logo-final.png" alt="CIEL Logo" width={126} height={126} className="object-contain" />
                     </div>
                     <div className="flex flex-col">
-                        <span className="text-2xl font-black tracking-tight text-slate-900 leading-none">
-                            CIEL <span className="text-emerald-500">PK</span>
+                        <span className="text-lg font-bold tracking-tight text-slate-900 leading-none">
+                            Community Impact Education Lab
                         </span>
-                        <span className="text-xs font-bold text-slate-400 uppercase tracking-[0.2em] mt-1">
-                            Education Lab
+                        <span className="text-sm text-emerald-600 font-[family-name:var(--font-dancing)] mt-0.5">
+                            Youth Empowered Community Impact
                         </span>
                     </div>
                 </Link>

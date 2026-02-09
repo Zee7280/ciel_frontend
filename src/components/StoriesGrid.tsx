@@ -51,9 +51,9 @@ const projects = [
 
 export default function StoriesGrid() {
     return (
-        <section className="py-24 px-6 max-w-7xl mx-auto bg-slate-50/0">
+        <section className="pt-12 pb-4 px-6 max-w-7xl mx-auto bg-slate-50/0">
             {/* Header */}
-            <div className="text-center mb-16">
+            <div className="text-center mb-8">
                 <h2 className="text-4xl md:text-5xl font-black text-orange-500 mb-4 tracking-tight">
                     Recent Impact Projects
                 </h2>
@@ -63,7 +63,7 @@ export default function StoriesGrid() {
             </div>
 
             {/* Project Cards Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-16">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-2">
                 {projects.map((project) => {
                     const Icon = project.icon;
                     return (

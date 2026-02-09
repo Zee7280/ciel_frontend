@@ -3,6 +3,7 @@
 import Navbar from "@/components/Navbar";
 import PartnersFooter from "@/components/PartnersFooter";
 import FooterBanner from "@/components/FooterBanner";
+import Footer from "@/components/Footer";
 import { Search, MapPin, Users, Calendar, ArrowRight, Filter } from "lucide-react";
 import { useState } from "react";
 import Link from "next/link";
@@ -174,6 +175,7 @@ export default function ProjectsPage() {
 
             <PartnersFooter />
             <FooterBanner />
+            <Footer />
         </main>
     );
 }

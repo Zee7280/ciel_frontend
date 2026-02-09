@@ -1,6 +1,7 @@
 import Navbar from "@/components/Navbar";
 import PartnersFooter from "@/components/PartnersFooter";
 import FooterBanner from "@/components/FooterBanner";
+import Footer from "@/components/Footer";
 import Image from "next/image";
 import { Target, Lightbulb, Users } from "lucide-react";
 
@@ -72,6 +73,7 @@ export default function AboutPage() {
 
             <PartnersFooter />
             <FooterBanner />
+            <Footer />
         </main>
     );
 }

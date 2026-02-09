@@ -6,7 +6,7 @@ import { ArrowRight, Send, Facebook, Instagram, Twitter, Youtube } from "lucide-
 
 export default function Footer() {
     return (
-        <footer className="bg-white pt-20 pb-10 border-t border-slate-100">
+        <footer className="bg-white pt-8 pb-10 border-t border-slate-100">
             <div className="max-w-7xl mx-auto px-6">
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-24 mb-16">
                     {/* Left Column: Brand & Newsletter */}

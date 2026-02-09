@@ -55,14 +55,13 @@ export default function Hero() {
                 <div className="flex-1 max-w-2xl text-center lg:text-left">
                     <div className="space-y-6 mb-10">
                         <h1 className="text-4xl lg:text-6xl font-extrabold text-emerald-600 leading-[1.1] tracking-tight max-w-[700px] mx-auto lg:mx-0">
-                            Where Youth, Universities & Communities Create <br className="hidden lg:block" />
-                            <span className="text-orange-500">Measurable Impact</span>
+                            Where Learning Becomes Measurable  <br className="hidden lg:block" />
+                            <span className="text-orange-500">Community Impact</span>
                         </h1>
 
                         <div className="space-y-4 max-w-lg mx-auto lg:mx-0">
-                            <p className="text-xl text-slate-700 font-semibold leading-[1.6]">
-                                Community Impact Education Lab <br />
-                                (CIEL Pakistan)
+                            <p className="text-lg md:text-xl text-slate-700 font-medium leading-[1.6]">
+                                <span className="font-bold text-slate-900">CIEL Pakistan</span> is a <span className="font-bold text-emerald-600">Community Impact Education Lab</span> turning learning into <span className="font-bold text-orange-500">measurable community change</span> and actionable impact intelligence.
                             </p>
                         </div>
                     </div>

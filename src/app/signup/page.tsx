@@ -166,35 +166,42 @@ export default function SignUpPage() {
             <div className="w-full max-w-6xl grid grid-cols-1 lg:grid-cols-2 bg-white rounded-[2.5rem] shadow-[0_32px_64px_-16px_rgba(0,0,0,0.15)] overflow-hidden border border-slate-200/50 min-h-[700px]">
 
                 {/* Left side: Premium Branding & Dynamic Context */}
-                <div className="relative bg-[#0F172A] p-12 text-white flex flex-col justify-between overflow-hidden order-2 lg:order-1">
+                <div className="relative bg-slate-800 p-12 text-white flex flex-col justify-between overflow-hidden order-2 lg:order-1">
                     {/* Abstract background elements */}
-                    <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-blue-600/20 rounded-full blur-[120px] -mr-48 -mt-48 transition-opacity duration-700"></div>
-                    <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-emerald-500/10 rounded-full blur-[100px] -ml-40 -mb-40"></div>
+                    <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-emerald-600/20 rounded-full blur-[120px] -mr-48 -mt-48 transition-opacity duration-700"></div>
+                    <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-orange-500/10 rounded-full blur-[100px] -ml-40 -mb-40"></div>
 
                     <div className="relative z-10">
-                        <Link href="/" className="inline-flex items-center gap-3 transition-transform hover:scale-105 duration-300">
-                            <div className="relative w-14 h-14 rounded-2xl overflow-hidden bg-white/5 p-2 backdrop-blur-md border border-white/10 shadow-inner">
-                                <Image src="/ciel-logo-v2.png" alt="CIEL Logo" fill className="object-contain p-2" />
+                        <Link href="/" className="inline-flex items-center gap-4 transition-transform hover:scale-105 duration-300">
+                            <div className="relative w-24 h-24 p-2 bg-white rounded-full flex items-center justify-center">
+                                <Image src="/ciel-logo-final.png" alt="CIEL Logo" width={200} height={200} className="object-contain" />
                             </div>
-                            <div>
-                                <h1 className="text-2xl font-black tracking-tight leading-none italic">CIEL <span className="text-blue-400 not-italic">PK</span></h1>
-                                <p className="text-[10px] uppercase font-bold tracking-[0.2em] text-slate-400 mt-1">Impact Verified</p>
+                            <div className="flex flex-col">
+                                <span className="text-2xl font-bold tracking-tight text-white leading-none">
+                                    Community Impact <br /> Education Lab
+                                </span>
+                                <span className="text-sm text-emerald-400 font-[family-name:var(--font-dancing)] mt-1 tracking-wide">
+                                    Youth Empowered Community Impact
+                                </span>
                             </div>
                         </Link>
                     </div>
 
                     <div className="relative z-10 py-12">
                         <div className="space-y-6 animate-in fade-in slide-in-from-left-4 duration-500" key={displayTitle}>
-                            <h2 className="text-5xl font-extrabold leading-[1.1] tracking-tight mb-8">
+                            <h2 className="text-4xl md:text-5xl font-extrabold leading-[1.1] tracking-tight mb-8">
                                 {step === 'role' ? (
-                                    <>Join the <br /><span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">Movement.</span></>
+                                    <>Empowering <br /><span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-orange-400">Pakistan's Youth</span><br />for Measurable Impact</>
                                 ) : (
-                                    <>Verify <br /><span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">Identity.</span></>
+                                    <>Verify <br /><span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-orange-400">Identity.</span></>
                                 )}
                             </h2>
                             <h3 className="text-2xl font-bold tracking-tight text-white mb-2">{displayTitle}</h3>
                             <p className="text-slate-400 text-lg font-medium leading-relaxed max-w-sm">
-                                {displayText}
+                                {step === 'role'
+                                    ? "Join Pakistan's leading platform for university-led community impact and SDG-aligned growth."
+                                    : displayText
+                                }
                             </p>
                         </div>
                     </div>
@@ -215,8 +222,8 @@ export default function SignUpPage() {
                         <div className="flex items-center justify-between pt-8 border-t border-white/5">
                             <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 italic">© 2026 CIEL Pakistan</p>
                             <div className="flex gap-4 items-center">
-                                <div className={clsx("w-1.5 h-1.5 rounded-full transition-all", step === 'role' ? "bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.8)] scale-125" : "bg-white/20")}></div>
-                                <div className={clsx("w-1.5 h-1.5 rounded-full transition-all", step === 'form' ? "bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.8)] scale-125" : "bg-white/20")}></div>
+                                <div className={clsx("w-1.5 h-1.5 rounded-full transition-all", step === 'role' ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)] scale-125" : "bg-white/20")}></div>
+                                <div className={clsx("w-1.5 h-1.5 rounded-full transition-all", step === 'form' ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)] scale-125" : "bg-white/20")}></div>
                             </div>
                         </div>
                     </div>
@@ -240,7 +247,7 @@ export default function SignUpPage() {
                                             onClick={() => handleRoleSelect(r.id)}
                                             onMouseEnter={() => setHoveredRole(r.id)}
                                             onMouseLeave={() => setHoveredRole(null)}
-                                            className="group relative flex items-center gap-4 p-5 rounded-2xl border-2 border-slate-100 hover:border-blue-600 hover:bg-slate-50 transition-all text-left overflow-hidden"
+                                            className="group relative flex items-center gap-4 p-5 rounded-2xl border-2 border-slate-100 hover:border-emerald-500 hover:bg-emerald-50 transition-all text-left overflow-hidden"
                                         >
                                             <div className={clsx(
                                                 "w-12 h-12 rounded-xl flex items-center justify-center transition-all duration-300 group-hover:scale-110 shadow-sm border",
@@ -257,7 +264,7 @@ export default function SignUpPage() {
                                                 <p className="text-[10px] font-bold text-slate-400 group-hover:text-slate-600 transition-colors">Start impacting today</p>
                                             </div>
                                             <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center opacity-0 group-hover:opacity-100 -translate-x-4 group-hover:translate-x-0 transition-all duration-300">
-                                                <ArrowRight className="w-4 h-4 text-blue-600" />
+                                                <ArrowRight className="w-4 h-4 text-emerald-600" />
                                             </div>
                                         </button>
                                     ))}
@@ -266,7 +273,7 @@ export default function SignUpPage() {
                                 <div className="text-center pt-4">
                                     <p className="text-slate-400 text-[11px] font-bold uppercase tracking-widest">
                                         Already a member? <br />
-                                        <Link href="/login" className="mt-2 inline-block text-blue-600 hover:text-blue-700 font-black border-b-2 border-blue-100 hover:border-blue-600 transition-all">Sign In to Dashboard</Link>
+                                        <Link href="/login" className="mt-2 inline-block text-emerald-600 hover:text-emerald-700 font-black border-b-2 border-emerald-100 hover:border-emerald-600 transition-all">Sign In to Dashboard</Link>
                                     </p>
                                 </div>
                             </div>
@@ -276,7 +283,7 @@ export default function SignUpPage() {
                             <form onSubmit={handleSubmit} className="space-y-6 animate-in fade-in slide-in-from-right-8 duration-500">
                                 <div className="mb-8 text-center lg:text-left">
                                     <h3 className="text-4xl font-black text-slate-900 tracking-tight mb-2 italic">Credentials</h3>
-                                    <p className="text-slate-500 font-medium text-sm">Verify your details as <span className="text-blue-600 font-bold">{roles.find(r => r.id === role)?.label}</span></p>
+                                    <p className="text-slate-500 font-medium text-sm">Verify your details as <span className="text-emerald-600 font-bold">{roles.find(r => r.id === role)?.label}</span></p>
                                 </div>
 
                                 <div className="max-h-[500px] overflow-y-auto pr-2 space-y-6 scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent">
@@ -292,7 +299,7 @@ export default function SignUpPage() {
                                                     onChange={(e) => handleGenericChange("orgName", e.target.value)}
                                                     className={clsx(
                                                         "w-full px-5 py-4 rounded-2xl border-2 bg-slate-50/50 focus:bg-white outline-none transition-all font-bold text-slate-800 placeholder:text-slate-300",
-                                                        errors.orgName ? "border-red-500 focus:border-red-500" : "border-slate-100 focus:border-blue-600"
+                                                        errors.orgName ? "border-red-500 focus:border-red-500" : "border-slate-100 focus:border-emerald-600"
                                                     )}
                                                     placeholder="e.g. Hope Foundation"
                                                 />
@@ -321,7 +328,7 @@ export default function SignUpPage() {
                                                         onChange={(e) => handleGenericChange("contactPerson", e.target.value)}
                                                         className={clsx(
                                                             "w-full px-5 py-4 rounded-2xl border-2 bg-slate-50/50 focus:bg-white outline-none transition-all font-bold text-slate-800 placeholder:text-slate-300",
-                                                            errors.contactPerson ? "border-red-500 focus:border-red-500" : "border-slate-100 focus:border-blue-600"
+                                                            errors.contactPerson ? "border-red-500 focus:border-red-500" : "border-slate-100 focus:border-emerald-600"
                                                         )}
                                                         placeholder="Full Name"
                                                     />
@@ -338,7 +345,7 @@ export default function SignUpPage() {
                                                 onChange={(e) => handleGenericChange("name", e.target.value)}
                                                 className={clsx(
                                                     "w-full px-5 py-4 rounded-2xl border-2 bg-slate-50/50 focus:bg-white outline-none transition-all font-bold text-slate-800 placeholder:text-slate-300",
-                                                    errors.name ? "border-red-500 focus:border-red-500" : "border-slate-100 focus:border-blue-600"
+                                                    errors.name ? "border-red-500 focus:border-red-500" : "border-slate-100 focus:border-emerald-600"
                                                 )}
                                                 placeholder="Full Name"
                                             />
@@ -356,7 +363,7 @@ export default function SignUpPage() {
                                                     onChange={(e) => handleGenericChange("institution", e.target.value)}
                                                     className={clsx(
                                                         "w-full px-5 py-4 rounded-2xl border-2 bg-slate-50/50 focus:bg-white outline-none transition-all font-bold text-slate-800 placeholder:text-slate-300",
-                                                        errors.institution ? "border-red-500 focus:border-red-500" : "border-slate-100 focus:border-blue-600"
+                                                        errors.institution ? "border-red-500 focus:border-red-500" : "border-slate-100 focus:border-emerald-600"
                                                     )}
                                                     placeholder="e.g. NUST"
                                                 />
@@ -370,7 +377,7 @@ export default function SignUpPage() {
                                                     onChange={(e) => handleGenericChange("department", e.target.value)}
                                                     className={clsx(
                                                         "w-full px-5 py-4 rounded-2xl border-2 bg-slate-50/50 focus:bg-white outline-none transition-all font-bold text-slate-800 placeholder:text-slate-300",
-                                                        errors.department ? "border-red-500 focus:border-red-500" : "border-slate-100 focus:border-blue-600"
+                                                        errors.department ? "border-red-500 focus:border-red-500" : "border-slate-100 focus:border-emerald-600"
                                                     )}
                                                     placeholder={role === "student" ? "BS CS" : "Admin"}
                                                 />
@@ -385,7 +392,7 @@ export default function SignUpPage() {
                                             <select
                                                 value={formData.countryCode}
                                                 onChange={(e) => setFormData({ ...formData, countryCode: e.target.value })}
-                                                className="w-32 px-3 py-4 rounded-2xl border-2 border-slate-100 bg-slate-50/50 font-bold text-xs outline-none focus:border-blue-600"
+                                                className="w-32 px-3 py-4 rounded-2xl border-2 border-slate-100 bg-slate-50/50 font-bold text-xs outline-none focus:border-emerald-600"
                                             >
                                                 <option value="+92">PK +92</option>
                                                 <option value="+1">US +1</option>
@@ -399,7 +406,7 @@ export default function SignUpPage() {
                                                 onChange={handlePhoneChange}
                                                 className={clsx(
                                                     "flex-1 px-5 py-4 rounded-2xl border-2 bg-slate-50/50 focus:bg-white outline-none transition-all font-bold text-slate-800 placeholder:text-slate-300",
-                                                    errors.phone ? "border-red-500 focus:border-red-500" : "border-slate-100 focus:border-blue-600"
+                                                    errors.phone ? "border-red-500 focus:border-red-500" : "border-slate-100 focus:border-emerald-600"
                                                 )}
                                                 placeholder="3001234567"
                                             />
@@ -410,14 +417,14 @@ export default function SignUpPage() {
                                     <div className="space-y-1.5">
                                         <label className="text-[11px] font-black uppercase tracking-widest text-slate-400 ml-1">Verification Route (Email)</label>
                                         <div className="group relative">
-                                            <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-blue-600 transition-colors" />
+                                            <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-emerald-600 transition-colors" />
                                             <input
                                                 type="email"
                                                 value={formData.email}
                                                 onChange={(e) => handleGenericChange("email", e.target.value)}
                                                 className={clsx(
                                                     "w-full pl-12 pr-5 py-4 rounded-2xl border-2 bg-slate-50/50 focus:bg-white outline-none transition-all font-bold text-slate-800 placeholder:text-slate-300",
-                                                    errors.email ? "border-red-500 focus:border-red-500" : "border-slate-100 focus:border-blue-600"
+                                                    errors.email ? "border-red-500 focus:border-red-500" : "border-slate-100 focus:border-emerald-600"
                                                 )}
                                                 placeholder="you@domain.pk"
                                             />
@@ -428,14 +435,14 @@ export default function SignUpPage() {
                                     <div className="space-y-1.5">
                                         <label className="text-[11px] font-black uppercase tracking-widest text-slate-400 ml-1">Secure Passphrase</label>
                                         <div className="group relative">
-                                            <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-blue-600 transition-colors" />
+                                            <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-emerald-600 transition-colors" />
                                             <input
                                                 type="password"
                                                 value={formData.password}
                                                 onChange={(e) => handleGenericChange("password", e.target.value)}
                                                 className={clsx(
                                                     "w-full pl-12 pr-5 py-4 rounded-2xl border-2 bg-slate-50/50 focus:bg-white outline-none transition-all font-bold text-slate-800 placeholder:text-slate-300",
-                                                    errors.password ? "border-red-500 focus:border-red-500" : "border-slate-100 focus:border-blue-600"
+                                                    errors.password ? "border-red-500 focus:border-red-500" : "border-slate-100 focus:border-emerald-600"
                                                 )}
                                                 placeholder="••••••••"
                                             />
