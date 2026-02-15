@@ -55,10 +55,10 @@ export default function StoriesGrid() {
             {/* Header */}
             <div className="text-center mb-8">
                 <h2 className="text-4xl md:text-5xl font-black text-orange-500 mb-4 tracking-tight">
-                    Recent Impact Projects
+                    Verified Community Impact
                 </h2>
                 <p className="text-xl text-slate-800 font-bold max-w-2xl mx-auto">
-                    Driving Measurable Changes <span className="text-slate-800">Across Communities</span>
+                    Projects that turned learning into <span className="text-emerald-600">measurable community impact.</span>
                 </p>
             </div>
 

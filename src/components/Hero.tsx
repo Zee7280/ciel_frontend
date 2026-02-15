@@ -2,14 +2,19 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight, Users, Clock, Building2, Globe, Lightbulb, Sprout, Heart, Settings, GraduationCap, BookOpen } from "lucide-react";
+import { ArrowRight, Users, Clock, Building2, Globe, Lightbulb, Sprout, Heart, Settings, GraduationCap, BookOpen, User, Briefcase, School } from "lucide-react";
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
 import { useCounter } from "@/hooks/useCounter";
+import { useState } from "react";
+import clsx from "clsx";
 
-// Stat Hook Helper (re-implemented inline for simplicity if needed, or imported)
-function StatItem({ label, value, icon, delay }: { label: string, value: number, icon: any | string, delay: number }) {
-    const count = useCounter(value, 2000);
-    const formattedValue = count.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+// Stat Hook Helper (modified to handle string values for "Pilot")
+function StatItem({ label, value, icon, delay }: { label: string, value: number | string, icon: any | string, delay: number }) {
+    const isNumber = typeof value === 'number';
+    const count = useCounter(isNumber ? value as number : 0, 2000);
+    const formattedValue = isNumber
+        ? count.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",") + (label.includes("Student") ? "+" : "")
+        : value;
 
     const isImagePath = typeof icon === 'string';
 
@@ -23,8 +28,8 @@ function StatItem({ label, value, icon, delay }: { label: string, value: number,
                         (() => { const Icon = icon; return <Icon className="w-6 h-6" strokeWidth={2} />; })()
                     )}
                 </div>
-                <h3 className="text-2xl lg:text-3xl font-black text-slate-800 tracking-tight leading-none">
-                    {formattedValue}
+                <h3 className={clsx("font-black text-slate-800 tracking-tight leading-none", typeof value === 'string' ? "text-xl lg:text-2xl" : "text-2xl lg:text-3xl")}>
+                    {isNumber ? formattedValue : value}
                 </h3>
             </div>
             <p className="text-xs font-bold text-slate-500 uppercase tracking-wide pl-1">{label}</p>
@@ -33,6 +38,8 @@ function StatItem({ label, value, icon, delay }: { label: string, value: number,
 }
 
 export default function Hero() {
+    const [activeRole, setActiveRole] = useState<'student' | 'faculty' | 'partner'>('student');
+
     const sdgData = Array(17).fill(0).map((_, i) => ({ name: `SDG ${i + 1}`, value: 1 }));
 
     // Approximate SDG Colors
@@ -42,6 +49,24 @@ export default function Hero() {
         '#FD9D24', '#BF8B2E', '#3F7E44', '#0A97D9', '#56C02B',
         '#00689D', '#19486A'
     ];
+
+    const roleContent = {
+        student: {
+            text: "Build your portfolio with verified social impact projects.",
+            cta: "Explore Projects",
+            link: "/projects"
+        },
+        faculty: {
+            text: "Integrate community learning into your curriculum seamlessly.",
+            cta: "View Framework",
+            link: "/about"
+        },
+        partner: {
+            text: "Connect with students to drive your social impact goals.",
+            cta: "Post Opportunity",
+            link: "/contact"
+        }
+    };
 
     return (
         <section className="relative max-w-7xl mx-auto px-6 pt-32 pb-12 lg:pt-40 lg:pb-24 overflow-visible">
@@ -53,26 +78,60 @@ export default function Hero() {
 
                 {/* LEFT CONTENT */}
                 <div className="flex-1 max-w-2xl text-center lg:text-left">
+
+                    {/* Role Switcher */}
+                    <div className="flex justify-center lg:justify-start gap-2 mb-8">
+                        {[
+                            { id: 'student', label: 'I am a Student', icon: GraduationCap },
+                            { id: 'faculty', label: 'I am Faculty', icon: School },
+                            { id: 'partner', label: 'I am a Partner', icon: HandshakeIcon }
+                        ].map((role) => {
+                            const Icon = role.icon;
+                            const isActive = activeRole === role.id;
+                            return (
+                                <button
+                                    key={role.id}
+                                    onClick={() => setActiveRole(role.id as any)}
+                                    className={clsx(
+                                        "flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold transition-all duration-300",
+                                        isActive
+                                            ? "bg-emerald-100 text-emerald-700 shadow-sm ring-1 ring-emerald-200"
+                                            : "bg-white text-slate-500 hover:bg-slate-50 border border-slate-100"
+                                    )}
+                                >
+                                    <Icon className="w-3 h-3" />
+                                    {role.label}
+                                </button>
+                            );
+                        })}
+                    </div>
+
                     <div className="space-y-6 mb-10">
                         <h1 className="text-4xl lg:text-6xl font-extrabold text-emerald-600 leading-[1.1] tracking-tight max-w-[700px] mx-auto lg:mx-0">
-                            Where Learning Becomes Measurable  <br className="hidden lg:block" />
-                            <span className="text-orange-500">Community Impact</span>
+                            Where Learning Becomes Real World <br className="hidden lg:block" />
+                            <span className="text-orange-500">Impact</span>
                         </h1>
 
                         <div className="space-y-4 max-w-lg mx-auto lg:mx-0">
                             <p className="text-lg md:text-xl text-slate-700 font-medium leading-[1.6]">
-                                <span className="font-bold text-slate-900">CIEL Pakistan</span> is a <span className="font-bold text-emerald-600">Community Impact Education Lab</span> turning learning into <span className="font-bold text-orange-500">measurable community change</span> and actionable impact intelligence.
+                                Explore opportunities, participate in projects, submit verified engagement, and generate impact intelligence aligned with SDGs.
+                            </p>
+                            <p className="text-sm font-medium text-emerald-600 bg-emerald-50 inline-block px-3 py-1 rounded-lg">
+                                {roleContent[activeRole].text}
                             </p>
                         </div>
                     </div>
 
                     <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4">
-                        <button className="w-full sm:w-auto px-10 py-4 bg-orange-500 hover:bg-orange-600 text-white rounded-full font-bold text-lg shadow-[0_10px_20px_-10px_rgba(249,115,22,0.5)] hover:shadow-[0_20px_40px_-10px_rgba(249,115,22,0.6)] hover:-translate-y-1 transition-all duration-300">
-                            View Impact
-                        </button>
-                        <button className="w-full sm:w-auto px-10 py-4 bg-slate-200 text-slate-700 rounded-full font-bold text-lg hover:bg-slate-300 shadow-sm hover:shadow-md transition-all duration-300">
-                            Partner With Us
-                        </button>
+                        <Link href="/projects" className="w-full sm:w-auto px-8 py-4 bg-orange-500 hover:bg-orange-600 text-white rounded-full font-bold text-lg shadow-[0_10px_20px_-10px_rgba(249,115,22,0.5)] hover:shadow-[0_20px_40px_-10px_rgba(249,115,22,0.6)] hover:-translate-y-1 transition-all duration-300 text-center">
+                            Explore Projects
+                        </Link>
+                        <Link href="/contact" className="w-full sm:w-auto px-8 py-4 bg-slate-800 text-white rounded-full font-bold text-lg hover:bg-slate-900 shadow-md hover:shadow-lg transition-all duration-300 text-center">
+                            Post an Opportunity
+                        </Link>
+                        <Link href="/login" className="w-full sm:w-auto px-6 py-4 text-emerald-600 font-bold text-lg hover:text-emerald-700 hover:underline underline-offset-4 transition-all duration-300 text-center flex items-center justify-center gap-2">
+                            Log Hours / Submit Report <ArrowRight className="w-4 h-4" />
+                        </Link>
                     </div>
                 </div>
 
@@ -171,9 +230,9 @@ export default function Hero() {
 
                     {/* Stats Grid - Moved inside Hero */}
                     <div className="grid grid-cols-2 gap-x-8 gap-y-8 w-full max-w-md mx-auto">
-                        <StatItem label="Students Engaged" value={8540} icon="/icon-planting.jpg" delay={100} />
-                        <StatItem label="Hours Served" value={124000} icon="/icon-globe.jpg" delay={200} />
-                        <StatItem label="NGOs Supported" value={8540} icon="/icon-gears.jpg" delay={300} />
+                        <StatItem label="Contributors" value={50} icon="/icon-planting.jpg" delay={100} />
+                        <StatItem label="Impact Hours" value="Launching Pilot" icon="/icon-globe.jpg" delay={200} />
+                        <StatItem label="Universities" value={24} icon="/icon-gears.jpg" delay={300} />
                         <StatItem label="SDGs Impacted" value={17} icon="/icon-graph.jpg" delay={400} />
                     </div>
 
@@ -182,4 +241,28 @@ export default function Hero() {
             </div>
         </section>
     );
+}
+
+function HandshakeIcon(props: any) {
+    return (
+        <svg
+            {...props}
+            xmlns="http://www.w3.org/2000/svg"
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+        >
+            <path d="m11 17 2 2a1 1 0 1 0 3-3" />
+            <path d="m22 22-5-10-5 10" />
+            <path d="M14 11.22V5c0-1.1.9-2 2-2h3.5a1 1 0 0 1 1 1v2.5" />
+            <path d="M9 11.22V5c0-1.1-.9-2-2-2H3.5a1 1 0 0 0-1 1v2.5" />
+            <path d="m2 22 5-10 5 10" />
+            <path d="m19 19-3-3" />
+        </svg>
+    )
 }

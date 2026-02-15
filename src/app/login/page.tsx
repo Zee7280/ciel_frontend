@@ -180,7 +180,7 @@ export default function LoginPage() {
 
                         <form onSubmit={handleLogin} className="space-y-6">
                             <div className="space-y-1.5">
-                                <label className="text-[11px] font-black uppercase tracking-widest text-slate-400 ml-1">Email Provider</label>
+                                <label className="text-[11px] font-black uppercase tracking-widest text-slate-400 ml-1">Email Address</label>
                                 <div className="group relative">
                                     <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-emerald-600 transition-colors" />
                                     <input
@@ -196,8 +196,8 @@ export default function LoginPage() {
 
                             <div className="space-y-1.5">
                                 <div className="flex items-center justify-between ml-1">
-                                    <label className="text-[11px] font-black uppercase tracking-widest text-slate-400">Security Key</label>
-                                    <a href="#" className="text-[10px] font-black uppercase tracking-wider text-emerald-600 hover:text-emerald-700">Lost Key?</a>
+                                    <label className="text-[11px] font-black uppercase tracking-widest text-slate-400">Password</label>
+                                    <a href="#" className="text-[10px] font-black uppercase tracking-wider text-emerald-600 hover:text-emerald-700">Forgot Password?</a>
                                 </div>
                                 <div className="group relative">
                                     <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-emerald-600 transition-colors" />

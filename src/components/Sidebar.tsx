@@ -76,12 +76,19 @@ export default function Sidebar() {
 
     return (
         <aside className="w-64 bg-slate-900 text-white min-h-screen fixed left-0 top-0 flex flex-col z-40">
-            <div className="h-20 flex items-center px-6 border-b border-slate-800">
+            <div className="h-24 flex items-center px-4 border-b border-slate-800">
                 <Link href="/" className="flex items-center gap-3">
-                    <div className="relative w-10 h-10 rounded-full overflow-hidden bg-white/10">
-                        <Image src="/ciel-logo-v2.png" alt="CIEL Logo" fill className="object-cover" />
+                    <div className="relative w-16 h-16 rounded-xl overflow-hidden flex items-center justify-center shrink-0">
+                        <Image src="/logo-1.png" alt="CIEL Logo" width={64} height={64} className="object-contain" />
                     </div>
-                    <span className="text-xl font-bold tracking-tight">CIEL <span className="text-blue-500">PK</span></span>
+                    <div className="flex flex-col ml-1">
+                        <span className="text-xs font-bold tracking-tight text-white leading-tight">
+                            Community Impact <br /> Education Lab
+                        </span>
+                        <span className="text-[8px] text-emerald-400 font-[family-name:var(--font-dancing)] tracking-wide mt-0.5">
+                            Youth Empowered Community Impact
+                        </span>
+                    </div>
                 </Link>
             </div>
 

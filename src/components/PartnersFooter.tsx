@@ -8,10 +8,10 @@ export default function PartnersFooter() {
                     <Handshake className="w-6 h-6" />
                 </div>
                 <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-1">
-                    Trusted By Leading Universities & Organizations
+                    Proudly Collaborating With Universities & Organizations
                 </h3>
                 <p className="text-xs md:text-sm text-emerald-600 font-semibold uppercase tracking-wide">
-                    Piloting with leading institutions (details available upon request)
+                    Partner institutions currently piloting CIEL (full list on request)
                 </p>
             </div>
         </section>
