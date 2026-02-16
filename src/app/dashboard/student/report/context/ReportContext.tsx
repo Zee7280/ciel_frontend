@@ -1,17 +1,13 @@
 "use client"
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { ValidationError, validateSection2, validateSection3, validateSection4, validateSection5, validateSection8, validateSection12 } from '../utils/validation';
+import { ValidationError, validateSection1, validateSection2, validateSection3, validateSection4, validateSection5, validateSection6, validateSection7, validateSection8, validateSection9, validateSection10 } from '../utils/validation';
 
-// Define the shape of the report data matches the 12 sections
+// Define the shape of the report data matches the 11 sections (plus summary)
 export interface ReportData {
     project_id: string;
-    // Section 1
+    // Section 1: Participation (Was Section 2)
     section1: {
-        problem_statement: string;
-    };
-    // Section 2
-    section2: {
         participation_type: 'individual' | 'team';
         team_lead: {
             name: string;
@@ -35,8 +31,15 @@ export interface ReportData {
             hours: string;
         }>;
         privacy_consent: boolean;
+        engagement_score?: number; // Calculated
     };
-    // Section 3
+    // Section 2: Project Context (Was Section 1)
+    section2: {
+        problem_statement: string;
+        discipline: string;
+        baseline_evidence: string;
+    };
+    // Section 3: SDG Mapping (Unchanged)
     section3: {
         primary_sdg_explanation: string;
         secondary_sdgs: Array<{
@@ -47,95 +50,161 @@ export interface ReportData {
             evidence_files: File[];
         }>;
     };
-    // Section 4
+    // Section 4: Activities (Expanded)
     section4: {
-        activity_description: string;
-        has_financial_resources: 'yes' | 'no';
-        personal_funds: string; // stored as string to handle empty/partial inputs
-        personal_funds_purpose: string[];
-        raised_funds: string;
-        raised_funds_source: string[];
-        evidence_files: File[];
+        activity_type: string;
+        delivery_mode: string;
+        total_sessions: string;
+        duration_val: string;
+        duration_unit: string;
+        total_beneficiaries: string;
+        // Individual contributions (if team)
+        my_role: string;
+        my_hours: string;
+        my_sessions: string;
+        my_beneficiaries: string;
+        my_output: string;
+        beneficiary_categories: string[]; // Multi-select
     };
-    // Section 5
+    // Section 5: Outcomes (Detailed Metrics)
     section5: {
         observed_change: string;
-        metrics: Array<{ metric: string; baseline: string; endline: string; unit: string }>;
+        outcome_area: string;
+        metric: string;
+        baseline: string;
+        endline: string;
+        unit: string;
+        confidence_level: string;
+        challenges: string;
     };
-    // Section 6
+    // Section 6: Resources (Structured Table)
     section6: {
-        used_resources: 'yes' | 'no';
-        resources: Array<{ type: string; amount: string; source: string; purpose: string }>;
+        use_resources: 'yes' | 'no';
+        resources: Array<{
+            type: string;
+            amount: string;
+            unit: string;
+            source: string;
+            purpose: string;
+            verification: string;
+        }>;
         evidence_files: File[];
     };
-    // Section 7
+    // Section 7: Partnerships (Structured Table)
     section7: {
         has_partners: 'yes' | 'no';
-        partners: Array<{ name: string; type: string; role: string; contribution: string }>;
-        formalization: string[]; // MOU, Letter, etc.
+        partners: Array<{
+            name: string;
+            type: string;
+            role: string;
+            contribution: string[]; // Multi-select
+            verification: string;
+        }>;
+        formalization_status: string[]; // MOU, Letter, etc.
         formalization_files: File[];
     };
-    // Section 8
+    // Section 8: Evidence (Expanded)
     section8: {
         evidence_types: string[];
         evidence_files: File[];
         description: string;
-        media_usage: 'public' | 'limited' | 'internal';
-        consent_authentic: boolean;
-        consent_informed: boolean;
-        consent_no_harm: boolean;
-        partner_verified: boolean;
-        partner_verification_files: File[];
-    };
-    // Section 10
-    section10: {
-        personal_learning: string;
-        sustainability_status: 'yes' | 'partially' | 'no';
-        sustainability_plan: string; // continuation or improvement plan
-    };
-    // Section 12
-    section12: {
-        student_declaration: boolean;
+        ethical_compliance: {
+            authentic: boolean;
+            informed_consent: boolean;
+            no_harm: boolean;
+            privacy_respected: boolean;
+        };
+        media_visible: 'public' | 'limited' | 'internal';
         partner_verification: boolean;
         partner_verification_files: File[];
     };
+    // Section 9: Reflection (New)
+    section9: {
+        academic_integration: string;
+        personal_learning: string;
+        academic_application: string;
+        sustainability_reflection: string;
+        competency_scores: {
+            cognitive: number;
+            practical: number;
+            social: number;
+            transformative: number;
+        };
+        strongest_competency: string;
+    };
+    // Section 10: Sustainability (Renamed from Section 10 Reflection)
+    section10: {
+        continuation_status: 'yes' | 'partially' | 'no';
+        continuation_details: string; // Explanation based on status
+        mechanisms: string[];
+        scaling_potential: string;
+        policy_influence: string;
+    };
+    // Section 11: Summary (Intelligence Layer - mostly read-only/calculated, strictly strictly read-only so maybe empty here or just status)
+    section11: {};
 }
 
 const defaultReportData: ReportData = {
     project_id: '',
-    section1: { problem_statement: '' },
-    section2: {
+    section1: {
         participation_type: 'individual',
         team_lead: { name: '', cnic: '', mobile: '', email: '', university: '', degree: '', year: '', role: '', hours: '' },
         team_members: [],
         privacy_consent: false
     },
+    section2: { problem_statement: '', discipline: '', baseline_evidence: '' },
     section3: { primary_sdg_explanation: '', secondary_sdgs: [] },
     section4: {
-        activity_description: '',
-        has_financial_resources: 'no',
-        personal_funds: '',
-        personal_funds_purpose: [],
-        raised_funds: '',
-        raised_funds_source: [],
-        evidence_files: []
+        activity_type: '',
+        delivery_mode: '',
+        total_sessions: '',
+        duration_val: '',
+        duration_unit: 'Hours',
+        total_beneficiaries: '',
+        my_role: '',
+        my_hours: '',
+        my_sessions: '',
+        my_beneficiaries: '',
+        my_output: '',
+        beneficiary_categories: []
     },
-    section5: { observed_change: '', metrics: [{ metric: '', baseline: '', endline: '', unit: '#' }] },
-    section6: { used_resources: 'no', resources: [], evidence_files: [] },
-    section7: { has_partners: 'no', partners: [], formalization: [], formalization_files: [] },
+    section5: {
+        observed_change: '',
+        outcome_area: '',
+        metric: '',
+        baseline: '',
+        endline: '',
+        unit: '#',
+        confidence_level: '',
+        challenges: ''
+    },
+    section6: { use_resources: 'no', resources: [], evidence_files: [] },
+    section7: { has_partners: 'no', partners: [], formalization_status: [], formalization_files: [] },
     section8: {
         evidence_types: [],
         evidence_files: [],
         description: '',
-        media_usage: 'public',
-        consent_authentic: false,
-        consent_informed: false,
-        consent_no_harm: false,
-        partner_verified: false,
+        ethical_compliance: { authentic: false, informed_consent: false, no_harm: false, privacy_respected: false },
+        media_visible: 'public',
+        partner_verification: false,
         partner_verification_files: []
     },
-    section10: { personal_learning: '', sustainability_status: 'yes', sustainability_plan: '' },
-    section12: { student_declaration: false, partner_verification: false, partner_verification_files: [] }
+    section9: {
+        academic_integration: '',
+        personal_learning: '',
+        academic_application: '',
+        sustainability_reflection: '',
+        competency_scores: { cognitive: 0, practical: 0, social: 0, transformative: 0 },
+        strongest_competency: ''
+    },
+    section10: {
+        continuation_status: 'yes',
+        continuation_details: '',
+        mechanisms: [],
+        scaling_potential: '',
+        policy_influence: 'No'
+    },
+    section11: {}
 };
 
 interface ReportContextType {
@@ -194,33 +263,52 @@ export function ReportProvider({ children }: { children: React.ReactNode }) {
         // Validation implicitly passes in read-only mode to allow navigation without errors
         if (isReadOnly) return true;
 
-        let validationResult;
+        let validationResult: { isValid: boolean; errors: ValidationError[] } = { isValid: true, errors: [] };
         const sectionKey = `section${activeStep}`;
 
-        // Map step numbers to validation functions
+        // Map step numbers to validation functions - Update as per new structure
+        // Note: You will need to import and map the new validation functions appropriately
+        // For now, defaulting to basic check or existing placeholders where ID matches
         switch (activeStep) {
-            case 2:
+            case 1: // Participation - Updated to validateSection1
+                validationResult = validateSection1(data.section1);
+                break;
+            case 2: // Context - Updated to validateSection2
                 validationResult = validateSection2(data.section2);
                 break;
-            case 3:
+            case 3: // SDG - Updated to validateSection3
                 validationResult = validateSection3(data.section3);
                 break;
-            case 4:
+            case 4: // Activities - Updated to validateSection4
                 validationResult = validateSection4(data.section4);
                 break;
-            case 5:
+            case 5: // Outcomes - Updated to validateSection5
                 validationResult = validateSection5(data.section5);
                 break;
-            case 8:
+            case 6: // Resources - New validateSection6
+                validationResult = validateSection6(data.section6);
+                break;
+            case 7: // Partnerships - New validateSection7
+                validationResult = validateSection7(data.section7);
+                break;
+            case 8: // Evidence - Updated validateSection8
                 validationResult = validateSection8(data.section8);
                 break;
-            case 12:
-                validationResult = validateSection12(data.section12);
+            case 9: // Reflection - New validateSection9
+                validationResult = validateSection9(data.section9);
                 break;
+            case 10: // Sustainability - New validateSection10
+                validationResult = validateSection10(data.section10);
+                break;
+            case 11: // Summary - No validation
+                return true;
             default:
-                // Sections without validation always pass
                 return true;
         }
+
+        /* 
+           TODO: Re-enable validation once util functions are updated to match new schema 
+        */
 
         if (!validationResult.isValid) {
             setValidationErrors(prev => ({
@@ -242,7 +330,7 @@ export function ReportProvider({ children }: { children: React.ReactNode }) {
         return error?.message;
     };
 
-    const nextStep = () => setActiveStep(prev => Math.min(prev + 1, 12));
+    const nextStep = () => setActiveStep(prev => Math.min(prev + 1, 11)); // Max 11 steps
     const prevStep = () => setActiveStep(prev => Math.max(prev - 1, 1));
     const setStep = (step: number) => setActiveStep(step);
 

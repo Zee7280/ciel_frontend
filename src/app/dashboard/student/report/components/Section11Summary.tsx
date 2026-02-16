@@ -1,114 +1,110 @@
-import { LayoutGrid, CheckCircle2, AlertCircle, Target } from "lucide-react";
+import { CheckCircle, Clock, Users, Target, ShieldCheck, Download, Award, TrendingUp } from "lucide-react";
+import { Button } from "./ui/button";
 import { useReportForm } from "../context/ReportContext";
+import clsx from "clsx";
 
 export default function Section11Summary() {
     const { data } = useReportForm();
-    const { secondary_sdgs } = data.section3;
-    const { metrics } = data.section5;
-    const { evidence_types } = data.section8;
+    const { section1, section2, section3, section4, section5, section8, section10 } = data;
+
+    // Derived Metrics
+    const isTeam = section1.participation_type === 'team';
+    const totalHours = isTeam
+        ? (parseFloat(section4.my_hours) || 0)
+        : (parseFloat(section4.duration_val) || 0); // Simplified logic
+
+    const beneficiaries = section4.total_beneficiaries || 0;
+    const engagementScore = section1.engagement_score || 0; // Assuming this is calculated in Section 1 or context
+    const impactLevel = parseInt(section5.endline) > parseInt(section5.baseline) ? "Positive" : "Neutral";
 
     return (
         <div className="space-y-8">
             <div className="space-y-2">
-                <h2 className="text-2xl font-bold text-slate-900">Cross SDG Overview</h2>
-                <p className="text-slate-600">An automatically generated summary linking your SDG objectives with outcomes.</p>
+                <div className="flex items-center gap-2 text-blue-600 mb-2">
+                    <span className="text-sm font-bold">🔹 SECTION 11</span>
+                </div>
+                <h2 className="text-2xl font-bold text-slate-900">Report Summary & Intelligence</h2>
+                <p className="text-slate-600 text-sm">Review your generated impact profile before submission.</p>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Stats Table */}
-                <div className="lg:col-span-2">
-                    <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-                        <table className="w-full text-left">
-                            <thead className="bg-slate-50 border-b border-slate-200">
-                                <tr>
-                                    <th className="px-6 py-3 text-xs font-semibold text-slate-600">SDG Category</th>
-                                    <th className="px-6 py-3 text-xs font-semibold text-slate-600">Metric Status</th>
-                                    <th className="px-6 py-3 text-xs font-semibold text-slate-600">Evidence</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100">
-                                {/* Primary SDG Row */}
-                                <tr>
-                                    <td className="px-6 py-4">
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white">
-                                                <Target className="w-4 h-4" />
-                                            </div>
-                                            <div>
-                                                <div className="text-sm font-semibold text-slate-900">Primary SDG</div>
-                                                <div className="text-xs text-slate-500">Core Mission</div>
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        <div className="text-sm font-semibold text-slate-900">
-                                            {metrics.filter((m: any) => m.metric).length} Indicators
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        {evidence_types.length > 0 ? (
-                                            <div className="inline-flex items-center gap-2 px-3 py-1 bg-green-50 text-green-700 rounded-lg text-xs font-medium">
-                                                <CheckCircle2 className="w-3 h-3" />
-                                                Verified ({evidence_types.length})
-                                            </div>
-                                        ) : (
-                                            <div className="inline-flex items-center gap-2 px-3 py-1 bg-amber-50 text-amber-700 rounded-lg text-xs font-medium">
-                                                <AlertCircle className="w-3 h-3" />
-                                                Missing
-                                            </div>
-                                        )}
-                                    </td>
-                                </tr>
+            {/* Top Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="bg-blue-600 text-white p-4 rounded-xl">
+                    <div className="flex items-center gap-2 mb-2 opacity-80">
+                        <Clock className="w-4 h-4" />
+                        <span className="text-xs font-semibold">Verified Hours</span>
+                    </div>
+                    <p className="text-2xl font-bold">{totalHours} hrs</p>
+                </div>
+                <div className="bg-slate-900 text-white p-4 rounded-xl">
+                    <div className="flex items-center gap-2 mb-2 opacity-80">
+                        <Users className="w-4 h-4" />
+                        <span className="text-xs font-semibold">Beneficiaries</span>
+                    </div>
+                    <p className="text-2xl font-bold">{beneficiaries}</p>
+                </div>
+                <div className="bg-white border border-slate-200 p-4 rounded-xl">
+                    <div className="flex items-center gap-2 mb-2 text-slate-500">
+                        <Target className="w-4 h-4" />
+                        <span className="text-xs font-semibold">Primary Goal</span>
+                    </div>
+                    <p className="text-xl font-bold text-slate-900">SDG {data.section3?.primary_sdg_explanation ? (data as any).project_id /* Mock for now */ : "1"}</p>
+                </div>
+                <div className="bg-white border border-slate-200 p-4 rounded-xl">
+                    <div className="flex items-center gap-2 mb-2 text-slate-500">
+                        <Award className="w-4 h-4" />
+                        <span className="text-xs font-semibold">Engagement Score</span>
+                    </div>
+                    <p className="text-xl font-bold text-slate-900">{engagementScore}/100</p>
+                </div>
+            </div>
 
-                                {/* Secondary SDGs */}
-                                {secondary_sdgs.map((sdg, idx) => (
-                                    <tr key={idx}>
-                                        <td className="px-6 py-4">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-8 h-8 rounded-lg bg-slate-900 flex items-center justify-center text-white">
-                                                    <LayoutGrid className="w-4 h-4" />
-                                                </div>
-                                                <div>
-                                                    <div className="text-sm font-semibold text-slate-900">Secondary SDG {sdg.sdg_id}</div>
-                                                    <div className="text-xs text-slate-500">Impact Multiplier</div>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <div className="text-xs text-slate-600">
-                                                {sdg.justification ? 'Documented' : 'Pending'}
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <span className="px-2 py-1 bg-slate-100 text-slate-600 rounded text-xs font-medium">
-                                                Cross-cutting
-                                            </span>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
+            {/* Impact Narrative */}
+            <div className="bg-white border border-slate-200 rounded-2xl p-6 space-y-4">
+                <h3 className="font-bold text-slate-900">Impact Narrative Generated</h3>
+                <div className="p-4 bg-slate-50 rounded-xl text-sm text-slate-700 leading-relaxed italic">
+                    "{section2.problem_statement ? `Addressing the need where '${section2.problem_statement.substring(0, 50)}...', ` : ''}
+                    {isTeam ? 'the team' : 'the student'} implemented {section4.activity_type} activities.
+                    This resulted in {section5.observed_change ? section5.observed_change : 'measurable social change'},
+                    contributing directly to SDG targets.
+                    Sustainability is rated as '{section10.continuation_status}' with {section10.mechanisms?.length || 0} support mechanisms identified."
+                </div>
+            </div>
+
+            {/* Verification Status */}
+            <div className="bg-white border border-slate-200 rounded-2xl p-6">
+                <h3 className="font-bold text-slate-900 mb-4">Verification Audit</h3>
+                <div className="space-y-3">
+                    <div className="flex items-center justify-between p-3 rounded-lg border border-slate-100">
+                        <div className="flex items-center gap-3">
+                            <ShieldCheck className={clsx("w-5 h-5", section8.partner_verification ? "text-green-600" : "text-slate-300")} />
+                            <span className="text-sm font-medium text-slate-700">Partner Verification Letter</span>
+                        </div>
+                        <span className={clsx("text-xs font-bold px-2 py-1 rounded", section8.partner_verification ? "bg-green-100 text-green-700" : "bg-slate-100 text-slate-500")}>
+                            {section8.partner_verification ? "VERIFIED" : "PENDING"}
+                        </span>
+                    </div>
+                    <div className="flex items-center justify-between p-3 rounded-lg border border-slate-100">
+                        <div className="flex items-center gap-3">
+                            <CheckCircle className={clsx("w-5 h-5", section8.ethical_compliance.informed_consent ? "text-green-600" : "text-amber-500")} />
+                            <span className="text-sm font-medium text-slate-700">Ethical Compliance</span>
+                        </div>
+                        <span className="text-xs font-bold px-2 py-1 rounded bg-slate-100 text-slate-600">SELF-DECLARED</span>
+                    </div>
+                    <div className="flex items-center justify-between p-3 rounded-lg border border-slate-100">
+                        <div className="flex items-center gap-3">
+                            <TrendingUp className="w-5 h-5 text-blue-600" />
+                            <span className="text-sm font-medium text-slate-700">Data Connectivity</span>
+                        </div>
+                        <span className="text-xs font-bold px-2 py-1 rounded bg-blue-50 text-blue-700">READY</span>
                     </div>
                 </div>
+            </div>
 
-                {/* Summary Card */}
-                <div className="bg-white border border-slate-200 rounded-2xl p-6 space-y-6">
-                    <div>
-                        <h4 className="text-lg font-bold text-slate-900 mb-2">Insight Summary</h4>
-                        <p className="text-sm text-slate-600">Your project has effectively targeted multimodal developmental goals.</p>
-                    </div>
-
-                    <div className="space-y-3">
-                        <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-                            <span className="text-xs font-semibold text-slate-600">Total Impacts</span>
-                            <span className="text-lg font-bold text-blue-600">{1 + secondary_sdgs.length} Goals</span>
-                        </div>
-                        <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-                            <span className="text-xs font-semibold text-slate-600">Evidence Score</span>
-                            <span className="text-lg font-bold text-green-600">{evidence_types.length > 0 ? 'High' : 'None'}</span>
-                        </div>
-                    </div>
-                </div>
+            <div className="flex justify-center pt-4">
+                <Button variant="outline" className="gap-2">
+                    <Download className="w-4 h-4" /> Preview PDF Report
+                </Button>
             </div>
         </div>
     )

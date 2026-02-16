@@ -51,42 +51,54 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
 
     return (
         <div className="space-y-8">
+            {/* Section Header */}
+            <div className="space-y-2">
+                <div className="flex items-center gap-2 text-blue-600 mb-2">
+                    <span className="text-sm font-bold">🔹 SECTION 3</span>
+                </div>
+                <h2 className="text-2xl font-bold text-slate-900">SDG Contribution Mapping</h2>
+                <p className="text-slate-600 text-sm">How your project contributed to the Sustainable Development Goals</p>
+                <div className="p-3 bg-blue-50 rounded-lg border border-blue-100 mt-4">
+                    <p className="text-xs text-blue-800">
+                        <strong>Purpose:</strong> You are not claiming to solve an SDG. You are explaining how your work contributed toward progress under a specific target.
+                    </p>
+                </div>
+            </div>
+
             {/* Primary SDG */}
             <div className="space-y-4">
-                <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold text-lg">1</div>
-                    <h3 className="text-xl font-bold text-slate-900">Primary Impact Goal</h3>
+                <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold text-sm">3.1</div>
+                    <h3 className="text-lg font-bold text-slate-900">Primary SDG (Auto-Selected)</h3>
                 </div>
 
                 <div className="bg-white rounded-2xl p-6 border border-slate-200 space-y-6">
                     {/* Assigned SDG Display */}
                     <div className="flex items-center gap-4 p-4 bg-slate-50 rounded-xl">
-                        <div className="w-16 h-16 rounded-xl bg-slate-900 flex items-center justify-center text-2xl font-bold text-white">
+                        <div className="w-16 h-16 rounded-xl bg-slate-900 flex items-center justify-center text-2xl font-bold text-white shrink-0">
                             {projectData?.sdg || "1"}
                         </div>
                         <div>
-                            <p className="text-xs text-slate-500 uppercase font-semibold">Assigned SDG</p>
-                            <h4 className="text-lg font-bold text-slate-900">Assigned Goal</h4>
+                            <p className="text-xs text-slate-500 uppercase font-semibold">Primary Goal</p>
+                            <h4 className="text-lg font-bold text-slate-900">Assigned SDG Goal</h4>
                             <p className="text-sm text-slate-600">Indicator: {projectData?.indicator || "Standard Framework"}</p>
                         </div>
                     </div>
 
-                    <div className="p-3 bg-blue-50 rounded-xl flex items-start gap-2">
-                        <Info className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
-                        <p className="text-xs text-blue-800">This goal is automatically inherited from the NGO/Partner opportunity and cannot be changed.</p>
-                    </div>
-
                     {/* Explanation Textarea */}
                     <div className="space-y-2">
-                        <Label className="text-sm font-semibold text-slate-700">Write your Contribution Explanation</Label>
+                        <Label className="text-sm font-semibold text-slate-700">3.2 Contribution Explanation (Mandatory)</Label>
+                        <p className="text-xs text-slate-500">
+                            Explain: What activity did you conduct? What measurable output occurred? What change was observed?
+                        </p>
                         <Textarea
-                            placeholder="State how your activities achieved the targets of this SDG..."
+                            placeholder="e.g. Our team conducted four hygiene awareness sessions for 60 students... This contributed to the SDG target by..."
                             className="min-h-[140px] rounded-xl border-slate-200 p-4 text-slate-700"
                             value={primary_sdg_explanation || ''}
                             onChange={(e) => updateSection('section3', { primary_sdg_explanation: e.target.value })}
                         />
                         <div className="flex justify-between text-xs text-slate-500 px-1">
-                            <span>Guide: 80 - 120 Words</span>
+                            <span>Target: 80 - 120 Words</span>
                             <span className={clsx(primary_sdg_explanation.length > 500 ? "text-red-500" : "text-slate-500")}>
                                 {primary_sdg_explanation.length} chars
                             </span>
@@ -98,9 +110,9 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
             {/* Secondary SDGs */}
             <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold text-lg">2</div>
-                        <h3 className="text-xl font-bold text-slate-900">Multi-Dimensional Impact</h3>
+                    <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold text-sm">3.3</div>
+                        <h3 className="text-lg font-bold text-slate-900">Secondary SDGs (Optional)</h3>
                     </div>
                     <RadioGroup value={hasSecondarySDG} onValueChange={handleToggleSecondary} className="flex items-center gap-4">
                         <div className="flex items-center space-x-2">
@@ -112,6 +124,12 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
                             <Label htmlFor="yes-sec-sdg" className="text-sm font-medium">Add Secondary</Label>
                         </div>
                     </RadioGroup>
+                </div>
+
+                <div className="p-3 bg-amber-50 rounded-lg border border-amber-100">
+                    <p className="text-xs text-amber-800">
+                        Only add secondary SDGs if the project made a clear additional contribution supported by evidence.
+                    </p>
                 </div>
 
                 {hasSecondarySDG === "yes" && (
@@ -134,14 +152,13 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
                                             className="h-10 border-slate-200 rounded-lg"
                                         >
                                             <option value="">Choose Goal...</option>
-                                            <option value="1">SDG 1: No Poverty</option>
-                                            <option value="4">SDG 4: Quality Education</option>
-                                            <option value="5">SDG 5: Gender Equality</option>
-                                            <option value="13">SDG 13: Climate Action</option>
+                                            {[...Array(17)].map((_, i) => (
+                                                <option key={i + 1} value={`${i + 1}`}>SDG {i + 1}</option>
+                                            ))}
                                         </Select>
                                     </div>
                                     <div className="md:col-span-2 space-y-2">
-                                        <Label className="text-xs font-semibold text-slate-600">Justification</Label>
+                                        <Label className="text-xs font-semibold text-slate-600">Justification (50-80 words)</Label>
                                         <Input
                                             placeholder="Why does this goal apply to your project?"
                                             value={sdg.justification || ''}

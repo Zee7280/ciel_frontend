@@ -1,175 +1,148 @@
-import { PackageOpen, Boxes, Plus, Trash2, Info, FileSearch, ShieldCheck, Wallet } from "lucide-react";
+import { Package, Plus, Trash2, FileText } from "lucide-react";
 import { Label } from "./ui/label";
 import { Input } from "./ui/input";
 import { Select } from "./ui/select";
+import { Button } from "./ui/button";
 import { RadioGroup, RadioGroupItem } from "./ui/radio-group";
 import { FileUpload } from "./ui/file-upload";
-import { Button } from "./ui/button";
 import { useReportForm } from "../context/ReportContext";
 import clsx from "clsx";
 
 export default function Section6Resources() {
     const { data, updateSection } = useReportForm();
-    const { used_resources, resources } = data.section6;
+    const { use_resources, resources, evidence_files } = data.section6;
+
+    const handleUpdate = (field: string, value: any) => {
+        updateSection('section6', { [field]: value });
+    };
 
     const addResource = () => {
-        updateSection('section6', {
-            resources: [...resources, { type: '', amount: '', source: '', purpose: '' }]
-        });
+        handleUpdate('resources', [...resources, { type: '', amount: '', unit: '', source: '', purpose: '', verification: '' }]);
+    };
+
+    const updateResourceRow = (index: number, field: string, value: string) => {
+        const newRes = [...resources];
+        newRes[index] = { ...newRes[index], [field]: value };
+        handleUpdate('resources', newRes);
     };
 
     const removeResource = (index: number) => {
-        const newResources = [...resources];
-        newResources.splice(index, 1);
-        updateSection('section6', { resources: newResources });
-    };
-
-    const updateResource = (index: number, field: string, value: string) => {
-        const newResources = [...resources];
-        newResources[index] = { ...newResources[index], [field]: value };
-        updateSection('section6', { resources: newResources });
+        const newRes = [...resources];
+        newRes.splice(index, 1);
+        handleUpdate('resources', newRes);
     };
 
     return (
         <div className="space-y-8">
-            {/* Section Header */}
+            {/* Header */}
             <div className="space-y-2">
-                <h2 className="text-2xl font-bold text-slate-900">Project Resources</h2>
-                <p className="text-slate-600 text-sm">Document the tangible and intangible assets used during the implementation phase.</p>
+                <div className="flex items-center gap-2 text-blue-600 mb-2">
+                    <span className="text-sm font-bold">🔹 SECTION 6</span>
+                </div>
+                <h2 className="text-2xl font-bold text-slate-900">Resource Inventory</h2>
+                <p className="text-slate-600 text-sm">Did you utilize any physical, financial, or human resources?</p>
             </div>
 
-            {/* Participation Toggle */}
-            <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold text-sm">1</div>
-                        <h3 className="text-lg font-bold text-slate-900">Resource Declaration</h3>
+            {/* Toggle */}
+            <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 flex items-center justify-between">
+                <span className="font-semibold text-slate-900">Did you use tangible resources?</span>
+                <RadioGroup
+                    value={use_resources}
+                    onValueChange={(val) => handleUpdate('use_resources', val)}
+                    className="flex gap-4"
+                >
+                    <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="no" id="no-res" />
+                        <Label htmlFor="no-res">No, Time Only</Label>
                     </div>
-                    <RadioGroup
-                        value={used_resources}
-                        onValueChange={(val) => {
-                            const isNo = val === 'no';
-                            updateSection('section6', {
-                                used_resources: val as 'yes' | 'no',
-                                resources: isNo ? [] : resources
-                            });
-                        }}
-                        className="flex items-center gap-4"
-                    >
-                        <div className="flex items-center space-x-2">
-                            <RadioGroupItem value="no" id="no-resources" />
-                            <Label htmlFor="no-resources" className="text-sm font-medium cursor-pointer">Time Only</Label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                            <RadioGroupItem value="yes" id="yes-resources" />
-                            <Label htmlFor="yes-resources" className="text-sm font-medium cursor-pointer">Physical/Financial</Label>
-                        </div>
-                    </RadioGroup>
-                </div>
+                    <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="yes" id="yes-res" />
+                        <Label htmlFor="yes-res">Yes</Label>
+                    </div>
+                </RadioGroup>
+            </div>
 
-                {used_resources === "yes" && (
-                    <div className="space-y-6">
-                        <div className="flex items-center justify-between">
-                            <Label className="text-sm font-semibold text-slate-700">Resources Inventory</Label>
-                            <Button
-                                onClick={addResource}
-                                className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-4 py-2 text-sm font-medium"
-                            >
-                                <Plus className="w-4 h-4 mr-2" /> Add Resource Row
-                            </Button>
-                        </div>
-
-                        {resources.length === 0 ? (
-                            <div className="bg-slate-50 rounded-xl p-8 text-center border border-slate-200">
-                                <Boxes className="w-12 h-12 text-slate-400 mx-auto mb-3" />
-                                <p className="text-slate-600 font-medium">No resources added yet</p>
-                                <p className="text-sm text-slate-500 mt-1">Click "Add Resource Row" to document assets</p>
-                            </div>
-                        ) : (
-                            <div className="space-y-4">
-                                {resources.map((res, idx) => (
-                                    <div key={idx} className="bg-white rounded-xl border border-slate-200 p-4">
-                                        <div className="flex items-center justify-between mb-3">
-                                            <div className="flex items-center gap-2">
-                                                <div className="w-8 h-8 rounded-lg bg-slate-900 text-white flex items-center justify-center font-bold text-sm">
-                                                    {idx + 1}
-                                                </div>
-                                                <span className="text-sm font-semibold text-slate-700">Resource {idx + 1}</span>
-                                            </div>
-                                            <button onClick={() => removeResource(idx)} className="text-red-500 hover:text-red-700 p-2 hover:bg-red-50 rounded-lg transition-colors">
-                                                <Trash2 className="w-4 h-4" />
-                                            </button>
-                                        </div>
-
-                                        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                                            <div className="space-y-1">
-                                                <Label className="text-xs font-semibold text-slate-600">Type</Label>
-                                                <Select
-                                                    value={res.type || ''}
-                                                    onChange={(e) => updateResource(idx, 'type', e.target.value)}
-                                                    className="h-10 text-sm border-slate-200 rounded-lg"
-                                                >
-                                                    <option value="">Select Category</option>
-                                                    <option value="Financial">Financial</option>
-                                                    <option value="In-kind">In-kind</option>
-                                                    <option value="Human Resources">Human Resources</option>
-                                                    <option value="Infrastructure">Infrastructure</option>
-                                                </Select>
-                                            </div>
-                                            <div className="space-y-1">
-                                                <Label className="text-xs font-semibold text-slate-600">Amount / Vol</Label>
-                                                <Input
-                                                    placeholder="e.g. 50 kits"
-                                                    className="h-10 text-sm border-slate-200 rounded-lg"
-                                                    value={res.amount || ''}
-                                                    onChange={(e) => updateResource(idx, 'amount', e.target.value)}
-                                                />
-                                            </div>
-                                            <div className="space-y-1">
-                                                <Label className="text-xs font-semibold text-slate-600">Source</Label>
-                                                <Select
-                                                    value={res.source || ''}
-                                                    onChange={(e) => updateResource(idx, 'source', e.target.value)}
-                                                    className="h-10 text-sm border-slate-200 rounded-lg"
-                                                >
-                                                    <option value="">Choose Source</option>
-                                                    <option value="Partner NGO">Partner NGO</option>
-                                                    <option value="University">University</option>
-                                                    <option value="Personal">Personal</option>
-                                                    <option value="Other">Other</option>
-                                                </Select>
-                                            </div>
-                                            <div className="space-y-1">
-                                                <Label className="text-xs font-semibold text-slate-600">Purpose</Label>
-                                                <Input
-                                                    placeholder="Explain usage..."
-                                                    className="h-10 text-sm border-slate-200 rounded-lg"
-                                                    value={res.purpose || ''}
-                                                    onChange={(e) => updateResource(idx, 'purpose', e.target.value)}
-                                                />
-                                            </div>
+            {use_resources === 'yes' && (
+                <div className="space-y-6">
+                    {/* Resource Table */}
+                    <div className="space-y-4">
+                        {resources.map((res, idx) => (
+                            <div key={idx} className="bg-white rounded-xl border border-slate-200 p-4 relative">
+                                <button
+                                    onClick={() => removeResource(idx)}
+                                    className="absolute top-4 right-4 text-slate-400 hover:text-red-500"
+                                >
+                                    <Trash2 className="w-4 h-4" />
+                                </button>
+                                <h4 className="font-bold text-sm text-slate-500 mb-3">Resource #{idx + 1}</h4>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    <div className="space-y-1">
+                                        <Label className="text-xs">Type</Label>
+                                        <Select
+                                            value={res.type}
+                                            onChange={(e) => updateResourceRow(idx, 'type', e.target.value)}
+                                        >
+                                            <option value="">Select Type</option>
+                                            <option value="Financial">Financial (Cash)</option>
+                                            <option value="In-Kind">In-Kind (Goods)</option>
+                                            <option value="Infrastructure">Infrastructure</option>
+                                            <option value="Human Capital">Human Capital</option>
+                                        </Select>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <Label className="text-xs">Amount</Label>
+                                        <div className="flex gap-2">
+                                            <Input
+                                                placeholder="0"
+                                                value={res.amount}
+                                                onChange={(e) => updateResourceRow(idx, 'amount', e.target.value)}
+                                            />
+                                            <Input
+                                                placeholder="Unit"
+                                                className="w-20"
+                                                value={res.unit}
+                                                onChange={(e) => updateResourceRow(idx, 'unit', e.target.value)}
+                                            />
                                         </div>
                                     </div>
-                                ))}
-                            </div>
-                        )}
-
-                        {/* Resource Evidence Card */}
-                        <div className="bg-slate-50 rounded-2xl p-6 border border-slate-200 space-y-4">
-                            <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-blue-600">
-                                    <FileSearch className="w-5 h-5" />
+                                    <div className="space-y-1">
+                                        <Label className="text-xs">Source</Label>
+                                        <Input
+                                            placeholder="e.g. Personal, NGO"
+                                            value={res.source}
+                                            onChange={(e) => updateResourceRow(idx, 'source', e.target.value)}
+                                        />
+                                    </div>
+                                    <div className="md:col-span-3 space-y-1">
+                                        <Label className="text-xs">Purpose & Visualization</Label>
+                                        <Input
+                                            placeholder="How was this used?"
+                                            value={res.purpose}
+                                            onChange={(e) => updateResourceRow(idx, 'purpose', e.target.value)}
+                                        />
+                                    </div>
                                 </div>
-                                <div>
-                                    <h4 className="text-lg font-bold">Material Verification</h4>
-                                    <p className="text-slate-600 text-sm">Upload photos or receipts to verify resources.</p>
-                                </div>
                             </div>
-                            <FileUpload label="Upload resource evidence" />
-                        </div>
+                        ))}
+                        <Button onClick={addResource} variant="outline" className="w-full">
+                            <Plus className="w-4 h-4 mr-2" /> Add Resource
+                        </Button>
                     </div>
-                )}
-            </div>
+
+                    {/* Evidence Upload */}
+                    <div className="bg-white rounded-2xl p-6 border border-slate-200 space-y-4">
+                        <Label className="font-semibold">Resource Verification (Receipts/Photos)</Label>
+                        <FileUpload
+                            label="Upload proofs"
+                            onChange={(e) => {
+                                if (e.target.files) {
+                                    handleUpdate('evidence_files', [...(evidence_files || []), ...Array.from(e.target.files)]);
+                                }
+                            }}
+                        />
+                    </div>
+                </div>
+            )}
         </div>
     )
 }

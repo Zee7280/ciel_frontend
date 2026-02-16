@@ -9,209 +9,176 @@ import clsx from "clsx";
 
 export default function Section8Evidence() {
     const { data, updateSection } = useReportForm();
-    const {
-        evidence_types,
-        evidence_files,
-        description,
-        media_usage,
-        consent_authentic,
-        consent_informed,
-        consent_no_harm
-    } = data.section8;
+    const { section8 } = data;
 
-    const removeFile = (index: number) => {
-        const newFiles = [...(evidence_files || [])];
-        newFiles.splice(index, 1);
-        updateSection('section8', { evidence_files: newFiles });
+    const handleUpdate = (field: string, value: any) => {
+        updateSection('section8', { [field]: value });
     };
 
-    const handleEvidenceTypeChange = (item: string, checked: boolean) => {
-        const current = [...evidence_types];
-        if (checked) {
-            updateSection('section8', { evidence_types: [...current, item] });
+    const handleEthicalUpdate = (field: string, value: boolean) => {
+        handleUpdate('ethical_compliance', { ...section8.ethical_compliance, [field]: value });
+    };
+
+    const toggleEvidenceType = (type: string) => {
+        const current = section8.evidence_types || [];
+        if (current.includes(type)) {
+            handleUpdate('evidence_types', current.filter(t => t !== type));
         } else {
-            updateSection('section8', { evidence_types: current.filter(i => i !== item) });
+            handleUpdate('evidence_types', [...current, type]);
         }
     };
 
     const evidenceOptions = [
-        { id: 'Photos', icon: Camera, label: 'Photos' },
-        { id: 'Videos', icon: Camera, label: 'Videos' },
-        { id: 'Attendance', icon: CheckSquare, label: 'Attendance' },
-        { id: 'Materials', icon: FileUp, label: 'Materials' },
-        { id: 'Partner Letter', icon: ShieldCheck, label: 'Partner Letter' },
-        { id: 'Survey Data', icon: Info, label: 'Survey Data' },
-        { id: 'Media', icon: Camera, label: 'Media' }
+        "Photos", "Videos", "Attendance Sheets", "Feedback Forms",
+        "Material Samples", "Social Media Links", "Reports/Publications"
     ];
 
     return (
         <div className="space-y-8">
-            {/* Section Header */}
             <div className="space-y-2">
-                <h2 className="text-2xl font-bold text-slate-900">Evidence & Verification</h2>
-                <p className="text-slate-600 text-sm">Provide visual and documented proof of your project's implementation and impact.</p>
-            </div>
-
-            {/* Evidence Selection */}
-            <div className="space-y-4">
-                <Label className="text-sm font-semibold text-slate-700">Evidence Portfolio</Label>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    {evidenceOptions.map((opt) => (
-                        <button
-                            key={opt.id}
-                            onClick={() => handleEvidenceTypeChange(opt.id, !evidence_types.includes(opt.id))}
-                            className={clsx(
-                                "flex flex-col items-center justify-center gap-2 p-4 rounded-xl border transition-all",
-                                evidence_types.includes(opt.id)
-                                    ? "bg-blue-600 border-blue-600 text-white shadow-md"
-                                    : "bg-white border-slate-200 text-slate-600 hover:border-blue-300"
-                            )}
-                        >
-                            <opt.icon className="w-5 h-5" />
-                            <span className="text-xs font-semibold text-center">{opt.label}</span>
-                        </button>
-                    ))}
+                <div className="flex items-center gap-2 text-blue-600 mb-2">
+                    <span className="text-sm font-bold">🔹 SECTION 8</span>
                 </div>
+                <h2 className="text-2xl font-bold text-slate-900">Evidence & Verification</h2>
+                <p className="text-slate-600 text-sm">Provide proofs to validate your reported activities.</p>
             </div>
 
-            {/* File Upload */}
-            <div className="bg-blue-600 rounded-2xl p-8 text-white">
-                <div className="space-y-4">
-                    <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-lg bg-white/20 flex items-center justify-center">
-                            <Upload className="w-5 h-5" />
-                        </div>
-                        <div>
-                            <h4 className="text-lg font-bold">Project Evidence</h4>
-                            <p className="text-blue-100 text-sm">MANDATORY: Submit visual or documented proof of execution</p>
-                        </div>
-                    </div>
-                    <FileUpload
-                        label="Drop verification files"
-                        multiple
-                        onChange={(e) => {
-                            if (e.target.files) {
-                                const newFiles = Array.from(e.target.files);
-                                updateSection('section8', {
-                                    evidence_files: [...(evidence_files || []), ...newFiles]
-                                });
-                            }
-                        }}
-                    />
+            {/* Evidence Types & Upload */}
+            <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold text-sm">8.1</div>
+                    <h3 className="text-lg font-bold text-slate-900">Evidence Upload</h3>
+                </div>
 
-                    {evidence_files && evidence_files.length > 0 && (
-                        <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-                            {evidence_files.map((file, idx) => (
-                                <div key={idx} className="flex items-center justify-between p-2 bg-white/10 rounded-lg group">
-                                    <div className="flex items-center gap-3 overflow-hidden">
-                                        <div className="p-1.5 bg-white/10 rounded">
-                                            <FileUp className="w-3.5 h-3.5" />
-                                        </div>
-                                        <div className="overflow-hidden">
-                                            <p className="text-xs font-medium truncate">{file.name}</p>
-                                            <p className="text-[10px] text-blue-200/60 lowercase">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
-                                        </div>
-                                    </div>
-                                    <button
-                                        onClick={() => removeFile(idx)}
-                                        className="p-1.5 hover:bg-red-500 rounded text-blue-100 hover:text-white transition-colors"
-                                    >
-                                        <Trash2 className="w-3.5 h-3.5" />
-                                    </button>
-                                </div>
+                <div className="bg-white rounded-2xl p-6 border border-slate-200 space-y-6">
+                    <div className="space-y-2">
+                        <Label className="text-sm font-semibold text-slate-700">What evidence are you submitting?</Label>
+                        <div className="flex flex-wrap gap-2">
+                            {evidenceOptions.map(opt => (
+                                <button
+                                    key={opt}
+                                    onClick={() => toggleEvidenceType(opt)}
+                                    className={clsx(
+                                        "px-3 py-1.5 rounded-full text-xs font-medium border transition-all",
+                                        (section8.evidence_types || []).includes(opt)
+                                            ? "bg-blue-600 text-white border-blue-600"
+                                            : "bg-white text-slate-600 border-slate-200 hover:border-slate-300"
+                                    )}
+                                >
+                                    {opt}
+                                </button>
                             ))}
                         </div>
-                    )}
-                    <p className="text-xs text-blue-200 text-center">Supported formats: JPG, PNG, PDF (Max 10MB per file)</p>
-                </div>
-            </div>
+                    </div>
 
-            {/* Contextual Narrative */}
-            <div className="space-y-4">
-                <Label className="text-sm font-semibold text-slate-700">Contextual Narrative</Label>
-                <Textarea
-                    placeholder="Briefly explain what the uploaded evidence shows and how it validates your activities..."
-                    className="min-h-[120px] rounded-lg border-slate-200 text-slate-700"
-                    value={description || ''}
-                    onChange={(e) => updateSection('section8', { description: e.target.value })}
-                />
-            </div>
-
-            {/* Privacy & Visibility */}
-            <div className="bg-white border border-slate-200 rounded-2xl p-6 space-y-4">
-                <div className="flex items-center gap-2">
-                    <Lock className="w-5 h-5 text-slate-600" />
-                    <h4 className="font-bold text-slate-900">Privacy & Visibility</h4>
-                </div>
-                <RadioGroup
-                    value={media_usage}
-                    onValueChange={(val) => updateSection('section8', { media_usage: val as 'public' | 'limited' | 'internal' })}
-                    className="grid grid-cols-3 gap-3"
-                >
-                    {[
-                        { id: 'public', label: 'Public Content' },
-                        { id: 'limited', label: 'Limited Access' },
-                        { id: 'internal', label: 'University Only' }
-                    ].map((opt) => (
-                        <div key={opt.id}>
-                            <RadioGroupItem value={opt.id} id={opt.id} className="sr-only" />
-                            <Label
-                                htmlFor={opt.id}
-                                className={clsx(
-                                    "flex items-center justify-center p-3 rounded-lg border text-xs font-semibold cursor-pointer transition-all",
-                                    media_usage === opt.id
-                                        ? "bg-blue-50 border-blue-200 text-blue-700"
-                                        : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
-                                )}
-                            >
-                                {opt.label}
-                            </Label>
+                    <div className="space-y-2">
+                        <Label className="text-sm font-semibold text-slate-700">Files</Label>
+                        <FileUpload
+                            label="Drag and drop evidence files"
+                            multiple
+                            onChange={(e) => {
+                                if (e.target.files) {
+                                    handleUpdate('evidence_files', [...(section8.evidence_files || []), ...Array.from(e.target.files)]);
+                                }
+                            }}
+                        />
+                        <div className="text-xs text-slate-500">
+                            {section8.evidence_files?.length || 0} files selected
                         </div>
-                    ))}
-                </RadioGroup>
+                    </div>
+
+                    <div className="space-y-2">
+                        <Label className="text-sm font-semibold text-slate-700">Description</Label>
+                        <Textarea
+                            placeholder="Briefly describe what these files demonstrate..."
+                            value={section8.description}
+                            onChange={(e) => handleUpdate('description', e.target.value)}
+                        />
+                    </div>
+                </div>
             </div>
 
             {/* Ethical Compliance */}
-            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-6 space-y-6">
-                <div className="flex items-center gap-2 text-amber-700">
-                    <AlertTriangle className="w-5 h-5" />
-                    <h4 className="text-lg font-bold">Ethical Compliance</h4>
+            <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold text-sm">8.2</div>
+                    <h3 className="text-lg font-bold text-slate-900">Ethical Declarations</h3>
                 </div>
-                <p className="text-sm text-amber-800">Verify that all data collection and media capture followed university guidelines.</p>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-6 space-y-4">
+                    <div className="flex items-center gap-2 text-amber-800 font-semibold mb-2">
+                        <ShieldCheck className="w-5 h-5" />
+                        <span>Mandatory Checks</span>
+                    </div>
+
                     {[
-                        { id: 'auth', label: 'Authentic Evidence', sub: 'I confirm the uploaded material is original and unaltered.', state: consent_authentic, field: 'consent_authentic' },
-                        { id: 'consent', label: 'Informed Consent', sub: 'I verify that participants agreed to be recorded or photographed.', state: consent_informed, field: 'consent_informed' },
-                        { id: 'harm', label: 'Zero Harm Policy', sub: 'No exploitation or misrepresentation of vulnerable groups.', state: consent_no_harm, field: 'consent_no_harm' }
-                    ].map((item) => (
-                        <div
-                            key={item.id}
-                            className={clsx(
-                                "p-4 rounded-xl border transition-all cursor-pointer",
-                                item.state
-                                    ? "bg-white border-green-300 shadow-sm"
-                                    : "bg-white border-amber-200 hover:border-amber-300"
-                            )}
-                            onClick={() => updateSection('section8', { [item.field]: !item.state })}
-                        >
-                            <div className="flex items-center justify-between mb-3">
-                                <div className={clsx(
-                                    "w-8 h-8 rounded-lg flex items-center justify-center",
-                                    item.state ? "bg-green-100 text-green-600" : "bg-amber-100 text-amber-600"
-                                )}>
-                                    <ShieldCheck className="w-4 h-4" />
-                                </div>
-                                <Checkbox
-                                    checked={item.state}
-                                    onChange={(e) => updateSection('section8', { [item.field]: e.target.checked })}
-                                    className="rounded-md w-5 h-5"
-                                />
-                            </div>
-                            <h5 className="font-bold text-slate-900 text-sm mb-1">{item.label}</h5>
-                            <p className="text-xs text-slate-600 leading-relaxed">{item.sub}</p>
+                        { key: 'authentic', label: 'I certify that all evidence provided is authentic and un-altered.' },
+                        { key: 'informed_consent', label: 'I confirm that informed consent was obtained from all participants filmed or photographed.' },
+                        { key: 'no_harm', label: 'I confirm that these activities caused no harm to the community or environment.' },
+                        { key: 'privacy_respected', label: 'I confirm that the privacy and dignity of beneficiaries has been respected.' }
+                    ].map(item => (
+                        <div key={item.key} className="flex items-start gap-3">
+                            <Checkbox
+                                id={item.key}
+                                checked={section8.ethical_compliance?.[item.key as keyof typeof section8.ethical_compliance]}
+                                onChange={(e) => handleEthicalUpdate(item.key, e.target.checked)}
+                                className="mt-1"
+                            />
+                            <Label htmlFor={item.key} className="text-sm text-slate-700 font-normal leading-relaxed cursor-pointer">
+                                {item.label}
+                            </Label>
                         </div>
                     ))}
+                </div>
+            </div>
+
+            {/* Partner Verification */}
+            <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold text-sm">8.3</div>
+                    <h3 className="text-lg font-bold text-slate-900">Partner Verification</h3>
+                </div>
+
+                <div className="bg-white rounded-2xl p-6 border border-slate-200">
+                    <div className="flex items-center justify-between mb-4">
+                        <Label className="text-sm font-semibold text-slate-700">Do you have a verification letter from a partner?</Label>
+                        <div className="flex gap-4">
+                            <div className="flex items-center gap-2">
+                                <RadioGroupItem
+                                    value="yes"
+                                    id="pv-yes"
+                                    checked={section8.partner_verification}
+                                    onClick={() => handleUpdate('partner_verification', true)}
+                                    className="border-slate-300 text-blue-600"
+                                />
+                                <Label htmlFor="pv-yes">Yes</Label>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <RadioGroupItem
+                                    value="no"
+                                    id="pv-no"
+                                    checked={!section8.partner_verification}
+                                    onClick={() => handleUpdate('partner_verification', false)}
+                                    className="border-slate-300 text-blue-600"
+                                />
+                                <Label htmlFor="pv-no">No</Label>
+                            </div>
+                        </div>
+                    </div>
+
+                    {section8.partner_verification && (
+                        <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
+                            <Label className="text-xs font-semibold text-slate-600">Upload Letter / Evaluation Form</Label>
+                            <FileUpload
+                                label="Upload Partner Verification"
+                                onChange={(e) => {
+                                    if (e.target.files) {
+                                        handleUpdate('partner_verification_files', [...(section8.partner_verification_files || []), ...Array.from(e.target.files)]);
+                                    }
+                                }}
+                            />
+                        </div>
+                    )}
                 </div>
             </div>
         </div>

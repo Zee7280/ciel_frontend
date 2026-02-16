@@ -107,9 +107,9 @@ export default function Hero() {
                     </div>
 
                     <div className="space-y-6 mb-10">
-                        <h1 className="text-4xl lg:text-6xl font-extrabold text-emerald-600 leading-[1.1] tracking-tight max-w-[700px] mx-auto lg:mx-0">
-                            Where Learning Becomes Real World <br className="hidden lg:block" />
-                            <span className="text-orange-500">Impact</span>
+                        <h1 className="text-4xl lg:text-4xl font-extrabold text-emerald-600 leading-[1.1] tracking-tight max-w-[700px] mx-auto lg:mx-0">
+                            Where Learning Becomes Measurable  <br className="hidden lg:block" />
+                            <span className="text-orange-500">Community Impact</span>
                         </h1>
 
                         <div className="space-y-4 max-w-lg mx-auto lg:mx-0">

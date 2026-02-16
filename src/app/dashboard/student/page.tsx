@@ -94,9 +94,9 @@ export default function StudentDashboard() {
                                     </div>
                                     <div className="flex items-center gap-3">
                                         <span className="px-3 py-1 rounded-full bg-blue-50 text-blue-600 text-xs font-bold">{project.status}</span>
-                                        <Link href={`/dashboard/student/report?projectId=${project.id}`}>
+                                        <Link href="/dashboard/student/projects">
                                             <Button size="sm" variant="outline">
-                                                Submit Report
+                                                View Projects
                                             </Button>
                                         </Link>
                                     </div>
@@ -139,6 +139,6 @@ export default function StudentDashboard() {
                     )}
                 </div>
             </div>
-        </div>
+        </div >
     );
 }
