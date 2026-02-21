@@ -32,38 +32,52 @@ export default function LoginPage() {
             });
 
             console.log("Response Status:", response.status, response.statusText);
+            console.log("Response Type:", response.type);
+
             const textRaw = await response.text();
             console.log("Response Raw:", textRaw);
 
-            let data;
+            let jsonResponse;
             try {
-                data = JSON.parse(textRaw);
+                jsonResponse = textRaw ? JSON.parse(textRaw) : {};
             } catch (e) {
                 console.error("Failed to parse JSON", e);
-                data = {};
+                jsonResponse = {};
             }
 
-            console.log("Login API Response Data:", data); // Debugging
+            console.log("Login API Response Data:", jsonResponse); // Debugging
 
-            if (!response.ok || data.error) {
-                console.error("Login failed response:", data);
-                setError(data.message || data.error || "Login failed");
+            // Handle standard response format { success: boolean, data: ... }
+            // or legacy format which might return data directly
+            const isStandardResponse = jsonResponse.success !== undefined;
+
+            if (!response.ok || (isStandardResponse && !jsonResponse.success) || jsonResponse.error) {
+                console.error("Login failed response:", jsonResponse);
+                setError(jsonResponse.message || jsonResponse.error || "Login failed");
                 return;
             }
 
-            // Extract role from response (support both data.role and data.user.role)
-            const role = data.role || data.user?.role;
+            // Extract payload (the actual data object)
+            // If response is { success: true, data: { ... } }, payload is jsonResponse.data
+            // If response is flat (legacy), payload is jsonResponse itself
+            const payload = (isStandardResponse && jsonResponse.data) ? jsonResponse.data : jsonResponse;
+
+            // Extract role from response (support both payload.role and payload.user.role)
+            // Debugging: explicitly log what we are looking for
+            console.log("Extracting role from payload:", payload);
+            const role = payload.role || payload.user?.role;
+            console.log("Extracted role:", role);
 
             // Redirect based on role
             if (!role) {
-                console.error("Missing role in response:", data);
-                setError("Login failed: Missing role information.");
+                console.error("Missing role in response:", payload);
+                setError("Login failed: Missing role information. Please check console for details.");
                 return;
             }
 
             // Store token if available (for future API calls)
-            if (data.access_token || data.token) {
-                const token = data.access_token || data.token;
+            if (payload.access_token || payload.token) {
+                const token = payload.access_token || payload.token;
                 localStorage.setItem("ciel_token", token);
 
                 // Fetch full user profile immediately to cache it
@@ -74,30 +88,30 @@ export default function LoginPage() {
                             "Content-Type": "application/json",
                             "Authorization": `Bearer ${token}`
                         },
-                        body: JSON.stringify({ userId: data.user?.id || data.id })
+                        body: JSON.stringify({ userId: payload.user?.id || payload.id })
                     });
 
                     if (profileRes.ok) {
                         const profileData = await profileRes.json();
                         if (profileData.success) {
-                            const fullUser = { ...data.user, ...profileData.data, role };
+                            const fullUser = { ...payload.user, ...profileData.data, role };
                             localStorage.setItem("ciel_user", JSON.stringify(fullUser));
                             localStorage.setItem("user", JSON.stringify(fullUser)); // Keep legacy sync
                         } else {
                             // Fallback to basic data
-                            localStorage.setItem("ciel_user", JSON.stringify(data.user || { role }));
-                            localStorage.setItem("user", JSON.stringify(data.user || { role }));
+                            localStorage.setItem("ciel_user", JSON.stringify(payload.user || { role }));
+                            localStorage.setItem("user", JSON.stringify(payload.user || { role }));
                         }
                     } else {
                         // Fallback to basic data
-                        localStorage.setItem("ciel_user", JSON.stringify(data.user || { role }));
-                        localStorage.setItem("user", JSON.stringify(data.user || { role }));
+                        localStorage.setItem("ciel_user", JSON.stringify(payload.user || { role }));
+                        localStorage.setItem("user", JSON.stringify(payload.user || { role }));
                     }
                 } catch (e) {
                     console.error("Failed to pre-fetch profile", e);
                     // Fallback to basic data
-                    localStorage.setItem("ciel_user", JSON.stringify(data.user || { role }));
-                    localStorage.setItem("user", JSON.stringify(data.user || { role }));
+                    localStorage.setItem("ciel_user", JSON.stringify(payload.user || { role }));
+                    localStorage.setItem("user", JSON.stringify(payload.user || { role }));
                 }
             }
 
