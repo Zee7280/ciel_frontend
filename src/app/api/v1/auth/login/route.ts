@@ -4,7 +4,7 @@ export async function POST(request: Request) {
     try {
         const body = await request.json();
 
-        const backendUrl = `${process.env.BACKEND_API_URL}/auth/login`;
+        const backendUrl = `${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/auth/login`;
 
         const response = await fetch(backendUrl, {
             method: "POST",

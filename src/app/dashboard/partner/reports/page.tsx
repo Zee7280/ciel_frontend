@@ -34,9 +34,10 @@ export default function PartnerReportsPage() {
 
     const fetchReports = async () => {
         try {
+            const baseUrl = '/api/v1';
             const url = statusFilter === "All"
-                ? `/api/v1/partner/reports`
-                : `/api/v1/partner/reports?status=${statusFilter.toLowerCase()}`;
+                ? `${baseUrl}/partner/reports`
+                : `${baseUrl}/partner/reports?status=${statusFilter.toLowerCase()}`;
 
             const res = await authenticatedFetch(url);
             if (res && res.ok) {

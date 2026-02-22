@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
         const token = authHeader.split(" ")[1];
 
         const response = await fetch(
-            `${process.env.BACKEND_API_URL}/partners/funding/applications`,
+            `${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/partners/funding/applications`,
             {
                 method: "GET",
                 headers: {
@@ -56,7 +56,7 @@ export async function POST(req: NextRequest) {
         const body = await req.json();
 
         const response = await fetch(
-            `${process.env.BACKEND_API_URL}/partners/funding/applications`,
+            `${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/partners/funding/applications`,
             {
                 method: "POST",
                 headers: {

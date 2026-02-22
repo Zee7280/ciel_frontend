@@ -6,7 +6,7 @@ export async function POST(request: Request) {
         const body = await request.json();
 
         // Proxy to Real Backend
-        const response = await fetch(`${process.env.BACKEND_API_URL}/admin/organizations/create`, {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/admin/organizations/create`, {
             method: "POST",
             headers: {
                 "Authorization": authHeader || "",

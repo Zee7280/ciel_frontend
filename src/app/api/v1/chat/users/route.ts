@@ -10,7 +10,7 @@ export async function GET(req: NextRequest) {
         const { searchParams } = new URL(req.url);
         const search = searchParams.get("search") || "";
 
-        const backendUrl = `${process.env.BACKEND_API_URL}/chat/users?search=${encodeURIComponent(search)}`;
+        const backendUrl = `${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/chat/users?search=${encodeURIComponent(search)}`;
 
         const response = await fetch(backendUrl, {
             method: "GET",

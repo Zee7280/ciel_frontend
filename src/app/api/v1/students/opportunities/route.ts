@@ -8,7 +8,7 @@ export async function POST(request: Request) {
 
         // Proxy request to backend API
         // Append status to the backend URL
-        const backendUrl = `${process.env.BACKEND_API_URL}/students/opportunities?status=${status}`;
+        const backendUrl = `${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/students/opportunities?status=${status}`;
 
         const response = await fetch(backendUrl, {
             method: "POST",

@@ -7,7 +7,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 
         const authHeader = req.headers.get("Authorization");
 
-        const response = await fetch(`${process.env.BACKEND_API_URL}/admin/opportunities/${id}/status`, {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/admin/opportunities/${id}/status`, {
             method: "PUT",
             headers: {
                 "Authorization": authHeader || "",

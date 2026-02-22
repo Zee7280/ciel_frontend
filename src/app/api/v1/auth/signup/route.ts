@@ -16,7 +16,7 @@ export async function POST(request: Request) {
 
         // Proxy request to backend API
         // This connects to the external backend service
-        const response = await fetch(`${process.env.BACKEND_API_URL}/auth/signup`, {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/auth/signup`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(body),

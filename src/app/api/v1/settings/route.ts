@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
         const token = authHeader.split(" ")[1];
 
         const response = await fetch(
-            `${process.env.BACKEND_API_URL}/settings`,
+            `${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/settings`,
             {
                 method: "GET",
                 headers: {
@@ -56,7 +56,7 @@ export async function PUT(req: NextRequest) {
         const body = await req.json();
 
         const response = await fetch(
-            `${process.env.BACKEND_API_URL}/settings`,
+            `${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/settings`,
             {
                 method: "PUT",
                 headers: {

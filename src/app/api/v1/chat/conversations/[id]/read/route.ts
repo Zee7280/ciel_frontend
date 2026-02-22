@@ -11,7 +11,7 @@ export async function PATCH(
             return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
         }
 
-        const backendUrl = `${process.env.BACKEND_API_URL}/chat/conversations/${id}/read`;
+        const backendUrl = `${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/chat/conversations/${id}/read`;
 
         const response = await fetch(backendUrl, {
             method: "PATCH",

@@ -30,12 +30,12 @@ export async function POST(request: Request) {
 
         if (applicantId && status) {
             // Status update request
-            externalApiUrl = `${process.env.BACKEND_API_URL}/partners/opportunities/applicants/update`;
+            externalApiUrl = `${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/partners/opportunities/applicants/update`;
             requestBody = { id, applicantId, status };
             console.log(`Proxying status update for applicant ${applicantId} to ${status}`);
         } else {
             // Fetch applicants request
-            externalApiUrl = `${process.env.BACKEND_API_URL}/partners/opportunities/applicants`;
+            externalApiUrl = `${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/partners/opportunities/applicants`;
             requestBody = { id };
             console.log(`Proxying fetch applicants request for opportunity ${id}`);
         }

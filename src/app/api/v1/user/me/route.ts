@@ -4,7 +4,7 @@ export async function POST(request: NextRequest) {
     try {
         const authHeader = request.headers.get("Authorization");
 
-        const response = await fetch(`${process.env.BACKEND_API_URL}/user/me`, {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/user/me`, {
             method: "GET",
             headers: {
                 "Authorization": authHeader || "",

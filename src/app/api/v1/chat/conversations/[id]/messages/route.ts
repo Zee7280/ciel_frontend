@@ -11,7 +11,7 @@ export async function GET(
             return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
         }
 
-        const backendUrl = `${process.env.BACKEND_API_URL}/chat/conversations/${id}/messages`;
+        const backendUrl = `${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/chat/conversations/${id}/messages`;
 
         const response = await fetch(backendUrl, {
             method: "GET",

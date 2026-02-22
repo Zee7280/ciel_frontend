@@ -6,7 +6,7 @@ export async function POST(request: Request) {
         const authHeader = request.headers.get("Authorization");
 
         // Proxy request to backend API
-        const response = await fetch(`${process.env.BACKEND_API_URL}/org/me`, {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/org/me`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",

@@ -8,7 +8,7 @@ export async function POST(req: NextRequest) {
         }
 
         const body = await req.json();
-        const backendUrl = `${process.env.BACKEND_API_URL}/chat/messages`;
+        const backendUrl = `${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/chat/messages`;
 
         const response = await fetch(backendUrl, {
             method: "POST",

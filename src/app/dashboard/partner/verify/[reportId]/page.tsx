@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import clsx from 'clsx';
+import ReportPrintView from '../../../student/report/components/ReportPrintView';
 
 interface ReportDetail {
     id: string;
@@ -34,8 +35,9 @@ interface ReportDetail {
     section6: any;
     section7: any;
     section8: any;
+    section9: any;
     section10: any;
-    section12: any;
+    section11: any;
     evidence_urls: string[];
 }
 
@@ -121,16 +123,25 @@ export default function ReportDetailPage() {
     };
 
     const sections = [
-        { id: 'section1', label: 'Project Context', icon: FileText },
-        { id: 'section2', label: 'Team Information', icon: Users },
+        { id: 'section1', label: 'Participation Profile', icon: Users },
+        { id: 'section2', label: 'Project Context', icon: FileText },
         { id: 'section3', label: 'SDG Mapping', icon: Target },
-        { id: 'section4', label: 'Activities', icon: Activity },
+        { id: 'section4', label: 'Activities & Outputs', icon: Activity },
         { id: 'section5', label: 'Outcomes', icon: TrendingUp },
         { id: 'section6', label: 'Resources', icon: Package },
         { id: 'section7', label: 'Partnerships', icon: Handshake },
         { id: 'section8', label: 'Evidence', icon: FileText },
-        { id: 'section10', label: 'Reflection', icon: MessageSquare },
+        { id: 'section9', label: 'Reflection', icon: MessageSquare },
+        { id: 'section10', label: 'Sustainability', icon: Activity },
+        { id: 'section11', label: 'Summary / Print View', icon: FileText },
     ];
+
+    const LabelValue = ({ label, value, fullWidth = false }: { label: string, value: any, fullWidth?: boolean }) => (
+        <div className={`flex flex-col mb-4 ${fullWidth ? 'w-full' : 'w-1/2 pr-4'}`}>
+            <span className="font-bold text-slate-700 text-xs uppercase tracking-wider mb-1">{label}</span>
+            <div className="text-sm text-slate-900 leading-relaxed text-justify">{value || "N/A"}</div>
+        </div>
+    );
 
     if (loading) {
         return (
@@ -253,32 +264,22 @@ export default function ReportDetailPage() {
                     <div className="lg:col-span-3 bg-white rounded-3xl p-8 border border-slate-200 shadow-sm min-h-[500px]">
                         {activeSection === 'section1' && report.section1 && (
                             <div className="space-y-6">
-                                <h2 className="text-2xl font-black text-slate-900">Project Context</h2>
-                                <div>
-                                    <label className="text-sm font-bold text-slate-500 uppercase tracking-wide">Problem Statement</label>
-                                    <p className="mt-2 text-slate-700 leading-relaxed">{report.section1.problem_statement}</p>
-                                </div>
-                            </div>
-                        )}
-
-                        {activeSection === 'section2' && report.section2 && (
-                            <div className="space-y-6">
-                                <h2 className="text-2xl font-black text-slate-900">Team Information</h2>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="text-xs font-bold text-slate-400 uppercase">Team Lead</label>
-                                        <p className="mt-1 font-bold text-slate-900">{report.section2.team_lead?.name}</p>
-                                    </div>
-                                    <div>
-                                        <label className="text-xs font-bold text-slate-400 uppercase">Participation Type</label>
-                                        <p className="mt-1 font-bold text-slate-900 capitalize">{report.section2.participation_type}</p>
+                                <h2 className="text-2xl font-black text-slate-900">Participation Profile</h2>
+                                <LabelValue label="Participation Type" value={report.section1.participation_type} />
+                                <div className="mt-4">
+                                    <h3 className="font-bold text-slate-800 text-sm mb-2 border-b pb-1">Team Lead</h3>
+                                    <div className="flex flex-wrap">
+                                        <LabelValue label="Name" value={report.section1.team_lead?.name} />
+                                        <LabelValue label="University" value={report.section1.team_lead?.university} />
+                                        <LabelValue label="Email" value={report.section1.team_lead?.email} />
+                                        <LabelValue label="Role" value={report.section1.team_lead?.role} />
                                     </div>
                                 </div>
-                                {report.section2.team_members && report.section2.team_members.length > 0 && (
-                                    <div>
-                                        <label className="text-sm font-bold text-slate-500 uppercase tracking-wide">Team Members ({report.section2.team_members.length})</label>
-                                        <div className="mt-4 space-y-2">
-                                            {report.section2.team_members.map((member: any, index: number) => (
+                                {report.section1.team_members && report.section1.team_members.length > 0 && (
+                                    <div className="mt-4">
+                                        <h3 className="font-bold text-slate-800 text-sm mb-2 border-b pb-1">Team Members ({report.section1.team_members.length})</h3>
+                                        <div className="space-y-2">
+                                            {report.section1.team_members.map((member: any, index: number) => (
                                                 <div key={index} className="p-4 bg-slate-50 rounded-2xl flex items-center justify-between">
                                                     <span className="font-bold text-slate-900">{member.name}</span>
                                                     <span className="text-sm text-slate-600">{member.role}</span>
@@ -290,54 +291,168 @@ export default function ReportDetailPage() {
                             </div>
                         )}
 
+                        {activeSection === 'section2' && report.section2 && (
+                            <div className="space-y-6">
+                                <h2 className="text-2xl font-black text-slate-900">Project Context</h2>
+                                <div className="flex flex-wrap">
+                                    <LabelValue label="Discipline" value={report.section2.discipline} />
+                                    <LabelValue label="Problem Statement" value={report.section2.problem_statement} fullWidth />
+                                </div>
+                            </div>
+                        )}
+
                         {activeSection === 'section3' && report.section3 && (
                             <div className="space-y-6">
                                 <h2 className="text-2xl font-black text-slate-900">SDG Mapping</h2>
-                                <div>
-                                    <label className="text-sm font-bold text-slate-500 uppercase tracking-wide">Primary SDG Explanation</label>
-                                    <p className="mt-2 text-slate-700 leading-relaxed">{report.section3.primary_sdg_explanation}</p>
-                                </div>
+                                <LabelValue label="Primary SDG Explanation" value={report.section3.primary_sdg_explanation} fullWidth />
+                                {report.section3.secondary_sdgs && report.section3.secondary_sdgs.length > 0 && (
+                                    <div className="mt-4">
+                                        <h3 className="font-bold text-slate-800 text-sm mb-2 border-b pb-1">Secondary SDGs</h3>
+                                        <ul className="list-disc ml-5 text-sm text-slate-700">
+                                            {report.section3.secondary_sdgs.map((sdg: any, i: number) => (
+                                                <li key={i}>Goal {sdg.sdg_id}: {sdg.justification}</li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                )}
                             </div>
                         )}
 
                         {activeSection === 'section4' && report.section4 && (
                             <div className="space-y-6">
                                 <h2 className="text-2xl font-black text-slate-900">Activities & Outputs</h2>
-                                <div>
-                                    <label className="text-sm font-bold text-slate-500 uppercase tracking-wide">Activity Description</label>
-                                    <p className="mt-2 text-slate-700 leading-relaxed">{report.section4.activity_description}</p>
+                                <div className="flex flex-wrap">
+                                    <LabelValue label="Activity Type" value={report.section4.activity_type} />
+                                    <LabelValue label="Total Beneficiaries" value={report.section4.total_beneficiaries} />
+                                    <LabelValue label="Total Sessions" value={report.section4.total_sessions} />
+                                    <LabelValue label="Duration" value={`${report.section4.duration_val} ${report.section4.duration_unit}`} />
                                 </div>
                             </div>
                         )}
 
-                        {activeSection === 'section8' && (
+                        {activeSection === 'section5' && report.section5 && (
                             <div className="space-y-6">
-                                <h2 className="text-2xl font-black text-slate-900">Evidence Files</h2>
-                                {report.evidence_urls && report.evidence_urls.length > 0 ? (
-                                    <div className="grid grid-cols-2 gap-4">
-                                        {report.evidence_urls.map((url, index) => (
-                                            <a
-                                                key={index}
-                                                href={url}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="p-4 bg-slate-50 rounded-2xl hover:bg-blue-50 transition-all flex items-center justify-between group"
-                                            >
-                                                <span className="font-bold text-slate-900 group-hover:text-blue-600">Evidence {index + 1}</span>
-                                                <ExternalLink className="w-5 h-5 text-slate-400 group-hover:text-blue-600" />
-                                            </a>
+                                <h2 className="text-2xl font-black text-slate-900">Outcomes</h2>
+                                <div className="flex flex-wrap">
+                                    <LabelValue label="Observed Change" value={report.section5.observed_change} fullWidth />
+                                    <LabelValue label="Challenges" value={report.section5.challenges} fullWidth />
+                                </div>
+                            </div>
+                        )}
+
+                        {activeSection === 'section6' && report.section6 && (
+                            <div className="space-y-6">
+                                <h2 className="text-2xl font-black text-slate-900">Resources</h2>
+                                <LabelValue label="Used External Resources" value={report.section6.use_resources} />
+                                {report.section6.resources && report.section6.resources.length > 0 && (
+                                    <div className="mt-4 overflow-x-auto">
+                                        <table className="w-full text-sm border-collapse border border-slate-200">
+                                            <thead>
+                                                <tr className="bg-slate-50 text-left">
+                                                    <th className="border border-slate-200 p-2">Type</th>
+                                                    <th className="border border-slate-200 p-2">Amount</th>
+                                                    <th className="border border-slate-200 p-2">Source</th>
+                                                    <th className="border border-slate-200 p-2">Purpose</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {report.section6.resources.map((r: any, i: number) => (
+                                                    <tr key={i}>
+                                                        <td className="border border-slate-200 p-2">{r.type}</td>
+                                                        <td className="border border-slate-200 p-2">{r.amount} {r.unit}</td>
+                                                        <td className="border border-slate-200 p-2">{r.source}</td>
+                                                        <td className="border border-slate-200 p-2">{r.purpose}</td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {activeSection === 'section7' && report.section7 && (
+                            <div className="space-y-6">
+                                <h2 className="text-2xl font-black text-slate-900">Partnerships</h2>
+                                <LabelValue label="Has Partners" value={report.section7.has_partners} />
+                                {report.section7.partners && report.section7.partners.length > 0 && (
+                                    <div className="mt-4 space-y-2">
+                                        {report.section7.partners.map((p: any, i: number) => (
+                                            <div key={i} className="text-sm border border-slate-200 p-3 rounded-lg bg-slate-50">
+                                                <strong>{p.name}</strong> ({p.type})
+                                                {p.contribution && <div className="mt-1 text-slate-600">Contributions: {p.contribution.join(", ")}</div>}
+                                            </div>
                                         ))}
                                     </div>
-                                ) : (
-                                    <p className="text-slate-500 italic">No evidence files uploaded</p>
                                 )}
+                            </div>
+                        )}
+
+                        {activeSection === 'section8' && report.section8 && (
+                            <div className="space-y-6">
+                                <h2 className="text-2xl font-black text-slate-900">Evidence</h2>
+                                <LabelValue label="Description" value={report.section8.description} fullWidth />
+                                {report.section8.evidence_types && (
+                                    <LabelValue label="Evidence Types" value={report.section8.evidence_types.join(", ")} fullWidth />
+                                )}
+
+                                <div className="mt-4">
+                                    <h3 className="font-bold text-slate-800 text-sm mb-3">Evidence Files</h3>
+                                    {report.evidence_urls && report.evidence_urls.length > 0 ? (
+                                        <div className="grid grid-cols-2 gap-4">
+                                            {report.evidence_urls.map((url, index) => (
+                                                <a
+                                                    key={index}
+                                                    href={url}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="p-4 bg-slate-50 rounded-2xl hover:bg-blue-50 transition-all flex items-center justify-between group border border-slate-100"
+                                                >
+                                                    <span className="font-bold text-slate-900 group-hover:text-blue-600">Evidence {index + 1}</span>
+                                                    <ExternalLink className="w-4 h-4 text-slate-400 group-hover:text-blue-600" />
+                                                </a>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <p className="text-slate-500 italic text-sm">No evidence files uploaded</p>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        {activeSection === 'section9' && report.section9 && (
+                            <div className="space-y-6">
+                                <h2 className="text-2xl font-black text-slate-900">Reflection</h2>
+                                <LabelValue label="Academic Connection" value={report.section9.academic_application} fullWidth />
+                                <LabelValue label="Personal Growth" value={report.section9.personal_learning} fullWidth />
+                                <LabelValue label="Strongest Competency" value={report.section9.strongest_competency} fullWidth />
+                            </div>
+                        )}
+
+                        {activeSection === 'section10' && report.section10 && (
+                            <div className="space-y-6">
+                                <h2 className="text-2xl font-black text-slate-900">Sustainability</h2>
+                                <LabelValue label="Continuation Status" value={report.section10.continuation_status} />
+                                {report.section10.mechanisms && (
+                                    <LabelValue label="Mechanisms" value={report.section10.mechanisms.join(", ")} fullWidth />
+                                )}
+                                <LabelValue label="Sustainability Details" value={report.section10.continuation_details} fullWidth />
+                            </div>
+                        )}
+
+                        {activeSection === 'section11' && (
+                            <div className="space-y-6">
+                                <h2 className="text-2xl font-black text-slate-900 mb-6">Complete Report Summary</h2>
+                                <div className="bg-slate-50 p-6 rounded-3xl border border-slate-200">
+                                    <ReportPrintView projectData={report.opportunity} reportData={{ ...report }} />
+                                </div>
                             </div>
                         )}
                     </div>
                 </div>
 
                 {/* Verification Actions */}
-                {report.status !== 'verified' && report.status !== 'rejected' && report.partner_status !== 'approved' && (
+                {report.partner_status === 'pending' && (
                     <div id="actions" className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm">
                         <h3 className="text-xl font-black text-slate-900 mb-6">Verification Actions</h3>
 

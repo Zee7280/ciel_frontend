@@ -5,7 +5,14 @@ export async function authenticatedFetch(url: string, options: RequestInit = {})
 
     // If url is relative (starts with /), prepend backend base URL directly
     // This ensures all client-side calls correctly hit http://localhost:3000
-    const fullUrl = url.startsWith("/") ? `${BASE_URL}${url}` : url;
+    let fullUrl = url;
+    if (url.startsWith("/")) {
+        if (BASE_URL.endsWith("/api/v1") && url.startsWith("/api/v1")) {
+            fullUrl = `${BASE_URL}${url.substring(7)}`;
+        } else {
+            fullUrl = `${BASE_URL}${url}`;
+        }
+    }
 
     const isFormData = options.body instanceof FormData;
 
