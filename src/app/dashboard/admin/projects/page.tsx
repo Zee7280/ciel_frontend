@@ -17,7 +17,7 @@ export default function AdminProjectsPage() {
         const fetchProjects = async () => {
             setIsLoading(true);
             try {
-                const res = await authenticatedFetch(`${process.env.NEXT_PUBLIC_APP_API_BASE_URL}/admin/projects`);
+                const res = await authenticatedFetch(`/api/v1/admin/projects`);
                 if (res && res.ok) {
                     const data = await res.json();
                     if (data.success || Array.isArray(data.data)) {

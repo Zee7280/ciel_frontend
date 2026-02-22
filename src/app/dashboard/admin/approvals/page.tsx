@@ -1,11 +1,13 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { CheckCircle, XCircle, FileText, UserPlus, ArrowRight, Building2, TrendingUp, Users, Search } from "lucide-react";
+import { CheckCircle, XCircle, FileText, UserPlus, ArrowRight, Building2, TrendingUp, Users, Search, MessageSquare } from "lucide-react";
 import { PaginationControls } from "@/components/ui/PaginationControls";
 import { authenticatedFetch } from "@/utils/api";
+import { useRouter } from "next/navigation";
 
 export default function AdminApprovalsPage() {
+    const router = useRouter();
     const [activeTab, setActiveTab] = useState("registrations");
 
     const [isLoading, setIsLoading] = useState(true);
@@ -36,7 +38,7 @@ export default function AdminApprovalsPage() {
     const fetchPendingOpportunities = async () => {
         setIsLoading(true);
         try {
-            const res = await authenticatedFetch(`${process.env.NEXT_PUBLIC_APP_API_BASE_URL}/admin/opportunities/pending`);
+            const res = await authenticatedFetch(`/api/v1/admin/opportunities/pending`);
             if (res && res.ok) {
                 const data = await res.json();
                 if (data.success) {
@@ -69,7 +71,7 @@ export default function AdminApprovalsPage() {
 
     const handleApprove = async (id: string, type: 'opportunity' | 'user' = 'opportunity') => {
         const endpoint = type === 'opportunity'
-            ? `${process.env.NEXT_PUBLIC_APP_API_BASE_URL}/admin/opportunities/${id}/approve`
+            ? `/api/v1/admin/opportunities/${id}/approve`
             : `/api/v1/admin/users/${id}/approve`;
 
         try {
@@ -95,12 +97,44 @@ export default function AdminApprovalsPage() {
         setIsRejectModalOpen(true);
     };
 
+    const handleChatWithPartner = async (item: any) => {
+        // Find the user ID for the partner. 
+        // For registrations, it's the user's ID. 
+        // For opportunities, it should be the partner's user ID.
+        const partnerUserId = item.partner_id || item.userId || item.creatorId || (activeTab === 'registrations' ? item.id : null);
+
+        if (!partnerUserId) {
+            console.error("Partner user ID not found");
+            // Fallback: try to find by organization or name if needed, but we need an ID for a direct chat
+            return;
+        }
+
+        try {
+            const res = await authenticatedFetch("/api/v1/chat/conversations", {
+                method: "POST",
+                body: JSON.stringify({
+                    participantIds: [partnerUserId],
+                    type: "DIRECT"
+                })
+            });
+
+            if (res && res.ok) {
+                const data = await res.json();
+                if (data.success) {
+                    router.push(`/dashboard/admin/messages?conversationId=${data.data.id}`);
+                }
+            }
+        } catch (error) {
+            console.error("Failed to start chat", error);
+        }
+    };
+
     const confirmReject = async () => {
         if (!rejectId) return;
 
         try {
             const endpoint = rejectType === 'opportunity'
-                ? `${process.env.NEXT_PUBLIC_APP_API_BASE_URL}/admin/opportunities/${rejectId}/reject`
+                ? `/api/v1/admin/opportunities/${rejectId}/reject`
                 : `/api/v1/admin/users/${rejectId}/reject`;
 
             const res = await authenticatedFetch(endpoint, {
@@ -259,6 +293,13 @@ export default function AdminApprovalsPage() {
                                 >
                                     <CheckCircle className="w-4 h-4" /> Approve Project
                                 </button>
+                                {/* <button
+                                    onClick={() => handleChatWithPartner(proj)}
+                                    className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors border border-blue-100"
+                                    title="Chat with Partner"
+                                >
+                                    <MessageSquare className="w-4 h-4" />
+                                </button> */}
                             </div>
                         </div>
                     ))
@@ -480,6 +521,12 @@ export default function AdminApprovalsPage() {
                                 >
                                     Reject
                                 </button>
+                                {/* <button
+                                    onClick={() => handleChatWithPartner(selectedOpportunity)}
+                                    className="px-4 py-2 bg-blue-50 text-blue-600 rounded-lg font-bold hover:bg-blue-100 flex items-center gap-2"
+                                >
+                                    <MessageSquare className="w-4 h-4" /> Chat with Partner
+                                </button> */}
                                 <button
                                     onClick={() => {
                                         handleApprove(selectedOpportunity.id, 'opportunity');

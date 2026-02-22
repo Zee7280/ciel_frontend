@@ -6,7 +6,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         const body = await request.json();
         const authHeader = request.headers.get("Authorization");
 
-        const response = await fetch(`${process.env.NEXT_PUBLIC_APP_API_BASE_URL}/admin/users/${id}`, {
+        const response = await fetch(`${process.env.BACKEND_API_URL}/admin/users/${id}`, {
             method: "POST",
             headers: {
                 "Authorization": authHeader || "",
@@ -29,7 +29,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
         const { id } = await params;
         const authHeader = request.headers.get("Authorization");
 
-        const response = await fetch(`${process.env.NEXT_PUBLIC_APP_API_BASE_URL}/admin/users/${id}`, {
+        const response = await fetch(`${process.env.BACKEND_API_URL}/admin/users/${id}`, {
             method: "DELETE",
             headers: {
                 "Authorization": authHeader || "",

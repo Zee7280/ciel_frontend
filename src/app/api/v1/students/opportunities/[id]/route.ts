@@ -6,7 +6,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
         const { id } = await params;
 
         // Proxy to backend /students/opportunities/[id]
-        const response = await fetch(`${process.env.NEXT_PUBLIC_APP_API_BASE_URL}/students/opportunities/${id}`, {
+        const response = await fetch(`${process.env.BACKEND_API_URL}/students/opportunities/${id}`, {
             method: "GET",
             headers: {
                 "Content-Type": "application/json",

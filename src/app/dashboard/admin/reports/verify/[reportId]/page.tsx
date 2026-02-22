@@ -24,6 +24,8 @@ interface ReportDetail {
     };
     submission_date: string;
     status: string;
+    partner_status: string;
+    admin_status: string;
     section1: any;
     section2: any;
     section3: any;
@@ -54,7 +56,7 @@ export default function AdminReportDetailPage() {
         console.log('📞 ADMIN: Fetching report detail for ID:', params.reportId);
         try {
             setLoading(true);
-            const apiUrl = `${process.env.NEXT_PUBLIC_APP_API_BASE_URL}/students/reports/${params.reportId}`;
+            const apiUrl = `/api/v1/admin/reports/${params.reportId}`;
             console.log('🌐 API URL:', apiUrl);
 
             const response = await authenticatedFetch(apiUrl);
@@ -92,8 +94,7 @@ export default function AdminReportDetailPage() {
             setIsVerifying(true);
             const userData = JSON.parse(localStorage.getItem('ciel_user') || '{}');
 
-            const response = await authenticatedFetch(
-                `${process.env.NEXT_PUBLIC_APP_API_BASE_URL}/students/reports/${params.reportId}/verify`,
+            const response = await authenticatedFetch(`/api/v1/admin/reports/${params.reportId}/verify`,
                 {
                     method: 'PATCH',
                     headers: { 'Content-Type': 'application/json' },
@@ -201,14 +202,26 @@ export default function AdminReportDetailPage() {
                             </div>
                         </div>
 
-                        <span className={clsx(
-                            'px-4 py-2 rounded-xl text-sm font-bold uppercase tracking-wide border',
-                            report.status === 'verified' && 'bg-green-50 text-green-700 border-green-200',
-                            report.status === 'submitted' && 'bg-yellow-50 text-yellow-700 border-yellow-200',
-                            report.status === 'rejected' && 'bg-red-50 text-red-700 border-red-200'
-                        )}>
-                            {report.status}
-                        </span>
+                        <div className="flex flex-col items-end gap-2">
+                            <span className={clsx(
+                                'px-4 py-2 rounded-xl text-sm font-bold uppercase tracking-wide border',
+                                report.status === 'verified' && 'bg-green-50 text-green-700 border-green-200',
+                                report.status === 'submitted' && 'bg-yellow-50 text-yellow-700 border-yellow-200',
+                                report.status === 'partner_verified' && 'bg-indigo-50 text-indigo-700 border-indigo-200',
+                                report.status === 'rejected' && 'bg-red-50 text-red-700 border-red-200'
+                            )}>
+                                {report.status === 'partner_verified' ? 'NGO Verified' : report.status}
+                            </span>
+                            <div className="flex items-center gap-2">
+                                <span className="text-[10px] font-black text-slate-400 mt-1">NGO DECISION:</span>
+                                <span className={clsx(
+                                    'text-[10px] font-black mt-1 uppercase',
+                                    report.partner_status === 'approved' ? 'text-green-600' : 'text-slate-400'
+                                )}>
+                                    {report.partner_status || 'Pending'}
+                                </span>
+                            </div>
+                        </div>
                     </div>
 
                     <div className="mt-6 p-4 bg-slate-50 rounded-2xl">
@@ -327,7 +340,7 @@ export default function AdminReportDetailPage() {
                 </div>
 
                 {/* Verification Actions */}
-                {report.status === 'submitted' && (
+                {(report.status === 'submitted' || report.status === 'partner_verified') && report.admin_status !== 'approved' && (
                     <div id="actions" className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm">
                         <h3 className="text-xl font-black text-slate-900 mb-6">Admin Verification Actions</h3>
 

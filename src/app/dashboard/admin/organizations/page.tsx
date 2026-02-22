@@ -16,7 +16,7 @@ export default function AdminOrganizationsPage() {
     const fetchOrganizations = async () => {
         setIsLoading(true);
         try {
-            const res = await authenticatedFetch(`${process.env.NEXT_PUBLIC_APP_API_BASE_URL}/admin/organizations`);
+            const res = await authenticatedFetch(`/api/v1/admin/organizations`);
             if (res && res.ok) {
                 const data = await res.json();
 
@@ -92,7 +92,7 @@ export default function AdminOrganizationsPage() {
     const handleAction = async (id: string, action: 'approve' | 'suspend' | 'delete') => {
         try {
             if (action === 'delete') {
-                const res = await authenticatedFetch(`${process.env.NEXT_PUBLIC_APP_API_BASE_URL}/admin/organizations/${id}`, {
+                const res = await authenticatedFetch(`/api/v1/admin/organizations/${id}`, {
                     method: 'DELETE'
                 });
                 if (res && res.ok) {
@@ -103,7 +103,7 @@ export default function AdminOrganizationsPage() {
                 }
             } else {
                 const status = action === 'approve' ? 'approve' : 'suspended';
-                const res = await authenticatedFetch(`${process.env.NEXT_PUBLIC_APP_API_BASE_URL}/admin/organizations/status`, {
+                const res = await authenticatedFetch(`/api/v1/admin/organizations/status`, {
                     method: 'POST',
                     body: JSON.stringify({ id, status })
                 });

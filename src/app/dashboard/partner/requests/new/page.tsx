@@ -173,7 +173,7 @@ export default function OpportunityPostingPage() {
                 visibility: formData.visibility
             };
 
-            const res = await authenticatedFetch(`${process.env.NEXT_PUBLIC_APP_API_BASE_URL}/opportunities`, {
+            const res = await authenticatedFetch(`/api/v1/opportunities`, {
                 method: 'POST',
                 body: JSON.stringify(payload)
             });
@@ -239,7 +239,7 @@ export default function OpportunityPostingPage() {
                     return;
                 }
 
-                const res = await authenticatedFetch(`${process.env.NEXT_PUBLIC_APP_API_BASE_URL}/organisation/profile/detail`, {
+                const res = await authenticatedFetch(`/api/v1/organisation/profile/detail`, {
                     method: 'POST',
                     body: JSON.stringify({ userId })
                 });

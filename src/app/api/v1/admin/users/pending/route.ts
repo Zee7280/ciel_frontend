@@ -4,7 +4,7 @@ export async function GET(request: Request) {
     try {
         const authHeader = request.headers.get("Authorization");
 
-        const response = await fetch(`${process.env.NEXT_PUBLIC_APP_API_BASE_URL}/admin/users/pending`, {
+        const response = await fetch(`${process.env.BACKEND_API_URL}/admin/users/pending`, {
             headers: {
                 "Authorization": authHeader || "",
                 "Content-Type": "application/json"

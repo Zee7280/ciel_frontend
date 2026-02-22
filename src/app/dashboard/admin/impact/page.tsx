@@ -19,7 +19,7 @@ export default function AdminImpactPage() {
         const fetchImpactData = async () => {
             setIsLoading(true);
             try {
-                const res = await authenticatedFetch(`${process.env.NEXT_PUBLIC_APP_API_BASE_URL}/admin/analytics/impact`);
+                const res = await authenticatedFetch(`/api/v1/admin/analytics/impact`);
                 if (res && res.ok) {
                     const data = await res.json();
                     if (data.success) {

@@ -22,7 +22,7 @@ export default function PartnerDashboard() {
                     return;
                 }
 
-                const response = await authenticatedFetch(`${process.env.NEXT_PUBLIC_APP_API_BASE_URL}/partner/dashboard?id=${userId}`);
+                const response = await authenticatedFetch(`/api/v1/partners/dashboard?id=${userId}`);
                 if (response?.ok) {
                     const result = await response.json();
                     if (result.success) {

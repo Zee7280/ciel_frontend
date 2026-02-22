@@ -35,8 +35,8 @@ export default function PartnerReportsPage() {
     const fetchReports = async () => {
         try {
             const url = statusFilter === "All"
-                ? `/api/v1/partners/reports`
-                : `/api/v1/partners/reports?status=${statusFilter.toLowerCase()}`;
+                ? `/api/v1/partner/reports`
+                : `/api/v1/partner/reports?status=${statusFilter.toLowerCase()}`;
 
             const res = await authenticatedFetch(url);
             if (res && res.ok) {
@@ -57,7 +57,7 @@ export default function PartnerReportsPage() {
         if (!confirm("Are you sure you want to delete this report?")) return;
 
         try {
-            const res = await authenticatedFetch(`/api/v1/partners/reports/${id}`, {
+            const res = await authenticatedFetch(`/api/v1/partner/reports/${id}`, {
                 method: 'DELETE'
             });
             if (res && res.ok) {

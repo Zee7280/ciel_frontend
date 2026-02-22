@@ -3,6 +3,8 @@ import { Label } from "./ui/label";
 import { Textarea } from "./ui/textarea";
 import { Select } from "./ui/select";
 import { useReportForm } from "../context/ReportContext";
+import { FieldError } from "./ui/FieldError";
+import { AlertCircle } from "lucide-react";
 import clsx from "clsx";
 
 interface Section2Props {
@@ -10,7 +12,10 @@ interface Section2Props {
 }
 
 export default function Section2ProjectContext({ projectData }: Section2Props) {
-    const { data, updateSection } = useReportForm();
+    const { data, updateSection, getFieldError, validationErrors } = useReportForm();
+
+    const sectionErrors = validationErrors['section2'] || [];
+    const hasErrors = sectionErrors.length > 0;
 
     // Safety check for section2 property (since we just renamed it in schema)
     const sectionData = data.section2 || { problem_statement: '', discipline: '', baseline_evidence: '' };
@@ -59,7 +64,25 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
                 <div className="flex items-center gap-2 text-blue-600 mb-2">
                     <span className="text-sm font-bold">🔹 SECTION 2</span>
                 </div>
-                <div className="flex items-center gap-2">
+                <h2 className="text-2xl font-bold text-slate-900">Project Context & Baseline</h2>
+                <p className="text-slate-600 text-sm">Define the problem and academic alignment.</p>
+
+                {/* Error Summary */}
+                {hasErrors && (
+                    <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-start gap-3 mt-4">
+                        <AlertCircle className="w-5 h-5 text-red-600 mt-0.5 shrink-0" />
+                        <div>
+                            <h4 className="font-semibold text-red-900 text-sm">Please fix the following errors:</h4>
+                            <ul className="mt-2 space-y-1">
+                                {sectionErrors.slice(0, 5).map((error, idx) => (
+                                    <li key={idx} className="text-xs text-red-700">• {error.message}</li>
+                                ))}
+                            </ul>
+                        </div>
+                    </div>
+                )}
+
+                <div className="flex items-center gap-2 mt-6">
                     <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold text-sm">2.1</div>
                     <h3 className="text-lg font-bold text-slate-900">Project Identity (Read-Only)</h3>
                 </div>
@@ -104,10 +127,14 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
                     </p>
                     <Textarea
                         placeholder="e.g. In the local community school, 40% of students lacked basic hygiene awareness..."
-                        className="min-h-[160px] rounded-xl border-slate-200 p-4 text-slate-700"
+                        className={clsx(
+                            "min-h-[160px] rounded-xl border-slate-200 p-4 text-slate-700",
+                            getFieldError('problem_statement') && "border-red-400 bg-red-50"
+                        )}
                         value={sectionData.problem_statement}
                         onChange={handleProblemStatementChange}
                     />
+                    <FieldError message={getFieldError('problem_statement')} />
                     <div className="flex justify-between items-center text-xs text-slate-500">
                         <span>Target: 100-150 words</span>
                         <span className={clsx(wordCount >= 100 && wordCount <= 150 ? "text-green-600" : "text-slate-500")}>
@@ -130,22 +157,24 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
                         <Select
                             value={sectionData.discipline}
                             onChange={(e) => updateSection('section2', { discipline: e.target.value })}
-                            className="w-full h-11 border-slate-200 rounded-lg"
+                            className={clsx("w-full h-11 border-slate-200 rounded-lg", getFieldError('discipline') && "border-red-400 bg-red-50")}
                         >
                             <option value="">Select Discipline</option>
                             {disciplines.map(d => <option key={d} value={d}>{d}</option>)}
                         </Select>
+                        <FieldError message={getFieldError('discipline')} />
                     </div>
                     <div className="space-y-2">
                         <Label className="text-sm font-semibold text-slate-700">Baseline Evidence Type</Label>
                         <Select
                             value={sectionData.baseline_evidence}
                             onChange={(e) => updateSection('section2', { baseline_evidence: e.target.value })}
-                            className="w-full h-11 border-slate-200 rounded-lg"
+                            className={clsx("w-full h-11 border-slate-200 rounded-lg", getFieldError('baseline_evidence') && "border-red-400 bg-red-50")}
                         >
                             <option value="">Select Evidence Source</option>
                             {evidenceTypes.map(t => <option key={t} value={t}>{t}</option>)}
                         </Select>
+                        <FieldError message={getFieldError('baseline_evidence')} />
                     </div>
                 </div>
             </div>

@@ -6,16 +6,7 @@ import { Button } from "./ui/button";
 import { useReportForm } from "../context/ReportContext";
 import clsx from "clsx";
 
-// Error message component
-function FieldError({ message }: { message?: string }) {
-    if (!message) return null;
-    return (
-        <div className="flex items-center gap-1.5 text-red-600 text-xs font-medium mt-1">
-            <AlertCircle className="w-3.5 h-3.5" />
-            <span>{message}</span>
-        </div>
-    );
-}
+import { FieldError } from "./ui/FieldError";
 
 export default function Section1Participation() {
     const { data, updateSection, getFieldError, validationErrors } = useReportForm();
@@ -285,36 +276,78 @@ export default function Section1Participation() {
                                 <Trash2 className="w-4 h-4" />
                             </button>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pr-8">
-                                <Input
-                                    placeholder="Name"
-                                    value={member.name}
-                                    onChange={(e) => updateTeamMember(index, 'name', e.target.value)}
-                                    className="h-9 text-sm bg-white"
-                                />
-                                <Input
-                                    placeholder="CNIC"
-                                    value={member.cnic}
-                                    onChange={(e) => updateTeamMember(index, 'cnic', e.target.value)}
-                                    className="h-9 text-sm bg-white"
-                                />
-                                <Input
-                                    placeholder="Role"
-                                    value={member.role}
-                                    onChange={(e) => updateTeamMember(index, 'role', e.target.value)}
-                                    className="h-9 text-sm bg-white"
-                                />
-                                <Input
-                                    type="number"
-                                    placeholder="Hours"
-                                    value={member.hours}
-                                    onChange={(e) => updateTeamMember(index, 'hours', e.target.value)}
-                                    className="h-9 text-sm bg-white"
-                                />
+                                <div className="space-y-1">
+                                    <Input
+                                        placeholder="Name"
+                                        value={member.name}
+                                        onChange={(e) => updateTeamMember(index, 'name', e.target.value)}
+                                        className={clsx("h-9 text-sm bg-white", getFieldError(`team_members.${index}.name`) && "border-red-400 bg-red-50")}
+                                    />
+                                    <FieldError message={getFieldError(`team_members.${index}.name`)} />
+                                </div>
+                                <div className="space-y-1">
+                                    <Input
+                                        placeholder="CNIC"
+                                        value={member.cnic}
+                                        onChange={(e) => updateTeamMember(index, 'cnic', e.target.value)}
+                                        className={clsx("h-9 text-sm bg-white", getFieldError(`team_members.${index}.cnic`) && "border-red-400 bg-red-50")}
+                                    />
+                                    <FieldError message={getFieldError(`team_members.${index}.cnic`)} />
+                                </div>
+                                <div className="space-y-1">
+                                    <Input
+                                        placeholder="Role"
+                                        value={member.role}
+                                        onChange={(e) => updateTeamMember(index, 'role', e.target.value)}
+                                        className={clsx("h-9 text-sm bg-white", getFieldError(`team_members.${index}.role`) && "border-red-400 bg-red-50")}
+                                    />
+                                    <FieldError message={getFieldError(`team_members.${index}.role`)} />
+                                </div>
+                                <div className="space-y-1">
+                                    <Input
+                                        type="number"
+                                        placeholder="Hours"
+                                        value={member.hours}
+                                        onChange={(e) => updateTeamMember(index, 'hours', e.target.value)}
+                                        className={clsx("h-9 text-sm bg-white", getFieldError(`team_members.${index}.hours`) && "border-red-400 bg-red-50")}
+                                    />
+                                    <FieldError message={getFieldError(`team_members.${index}.hours`)} />
+                                </div>
                             </div>
                         </div>
                     ))}
                 </div>
             )}
+
+            {/* Privacy Consent */}
+            <div className={clsx(
+                "rounded-xl p-5 border-2 transition-all",
+                data.section1.privacy_consent
+                    ? "bg-emerald-50 border-emerald-300"
+                    : getFieldError('privacy_consent')
+                        ? "bg-red-50 border-red-300"
+                        : "bg-slate-50 border-slate-200"
+            )}>
+                <label className="flex items-start gap-4 cursor-pointer">
+                    <input
+                        type="checkbox"
+                        checked={!!data.section1.privacy_consent}
+                        onChange={(e) => updateSection('section1', { privacy_consent: e.target.checked })}
+                        className="mt-1 w-5 h-5 accent-emerald-600 cursor-pointer shrink-0"
+                    />
+                    <div>
+                        <p className="text-sm font-semibold text-slate-900">
+                            Privacy & Data Consent <span className="text-red-500">*</span>
+                        </p>
+                        <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+                            I consent to the collection, storage, and use of my personal data for HEC compliance reporting and institutional benchmarking purposes. I confirm that all information provided is accurate and complete.
+                        </p>
+                        {getFieldError('privacy_consent') && (
+                            <p className="text-xs text-red-600 font-semibold mt-2">⚠ {getFieldError('privacy_consent')}</p>
+                        )}
+                    </div>
+                </label>
+            </div>
 
             {/* 1.4 System Outputs */}
             <div className="space-y-4">

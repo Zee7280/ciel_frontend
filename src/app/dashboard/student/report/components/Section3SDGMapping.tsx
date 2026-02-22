@@ -5,6 +5,8 @@ import { Textarea } from "./ui/textarea";
 import { RadioGroup, RadioGroupItem } from "./ui/radio-group";
 import { Select } from "./ui/select";
 import { useReportForm } from "../context/ReportContext";
+import { FieldError } from "./ui/FieldError";
+import { AlertCircle } from "lucide-react";
 import { useState } from "react";
 import clsx from "clsx";
 
@@ -13,9 +15,12 @@ interface Section3Props {
 }
 
 export default function Section3SDGMapping({ projectData }: Section3Props) {
-    const { data, updateSection } = useReportForm();
+    const { data, updateSection, getFieldError, validationErrors } = useReportForm();
     const { primary_sdg_explanation, secondary_sdgs } = data.section3;
     const [hasSecondarySDG, setHasSecondarySDG] = useState(secondary_sdgs.length > 0 ? "yes" : "no");
+
+    const sectionErrors = validationErrors['section3'] || [];
+    const hasErrors = sectionErrors.length > 0;
 
     const handleAddSecondary = () => {
         if (secondary_sdgs.length < 2) {
@@ -63,6 +68,21 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
                         <strong>Purpose:</strong> You are not claiming to solve an SDG. You are explaining how your work contributed toward progress under a specific target.
                     </p>
                 </div>
+
+                {/* Error Summary */}
+                {hasErrors && (
+                    <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-start gap-3 mt-4">
+                        <AlertCircle className="w-5 h-5 text-red-600 mt-0.5 shrink-0" />
+                        <div>
+                            <h4 className="font-semibold text-red-900 text-sm">Please fix the following errors:</h4>
+                            <ul className="mt-2 space-y-1">
+                                {sectionErrors.slice(0, 5).map((error, idx) => (
+                                    <li key={idx} className="text-xs text-red-700">• {error.message}</li>
+                                ))}
+                            </ul>
+                        </div>
+                    </div>
+                )}
             </div>
 
             {/* Primary SDG */}
@@ -93,10 +113,14 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
                         </p>
                         <Textarea
                             placeholder="e.g. Our team conducted four hygiene awareness sessions for 60 students... This contributed to the SDG target by..."
-                            className="min-h-[140px] rounded-xl border-slate-200 p-4 text-slate-700"
+                            className={clsx(
+                                "min-h-[140px] rounded-xl border-slate-200 p-4 text-slate-700",
+                                getFieldError('primary_sdg_explanation') && "border-red-400 bg-red-50"
+                            )}
                             value={primary_sdg_explanation || ''}
                             onChange={(e) => updateSection('section3', { primary_sdg_explanation: e.target.value })}
                         />
+                        <FieldError message={getFieldError('primary_sdg_explanation')} />
                         <div className="flex justify-between text-xs text-slate-500 px-1">
                             <span>Target: 80 - 120 Words</span>
                             <span className={clsx(primary_sdg_explanation.length > 500 ? "text-red-500" : "text-slate-500")}>
@@ -149,13 +173,14 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
                                         <Select
                                             value={sdg.sdg_id || ''}
                                             onChange={(e) => updateSecondary(index, 'sdg_id', e.target.value)}
-                                            className="h-10 border-slate-200 rounded-lg"
+                                            className={clsx("h-10 border-slate-200 rounded-lg", getFieldError(`secondary_sdgs.${index}.sdg_id`) && "border-red-400 bg-red-50")}
                                         >
                                             <option value="">Choose Goal...</option>
                                             {[...Array(17)].map((_, i) => (
                                                 <option key={i + 1} value={`${i + 1}`}>SDG {i + 1}</option>
                                             ))}
                                         </Select>
+                                        <FieldError message={getFieldError(`secondary_sdgs.${index}.sdg_id`)} />
                                     </div>
                                     <div className="md:col-span-2 space-y-2">
                                         <Label className="text-xs font-semibold text-slate-600">Justification (50-80 words)</Label>
@@ -163,8 +188,9 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
                                             placeholder="Why does this goal apply to your project?"
                                             value={sdg.justification || ''}
                                             onChange={(e) => updateSecondary(index, 'justification', e.target.value)}
-                                            className="h-10 border-slate-200 rounded-lg"
+                                            className={clsx("h-10 border-slate-200 rounded-lg", getFieldError(`secondary_sdgs.${index}.justification`) && "border-red-400 bg-red-50")}
                                         />
+                                        <FieldError message={getFieldError(`secondary_sdgs.${index}.justification`)} />
                                     </div>
                                 </div>
                             </div>

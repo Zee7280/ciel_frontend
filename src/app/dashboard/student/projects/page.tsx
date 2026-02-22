@@ -49,7 +49,7 @@ export default function MyProjectsPage() {
                     studentId = userObj.id || userObj.studentId || userObj.userId;
                 }
 
-                const res = await authenticatedFetch(`${process.env.NEXT_PUBLIC_APP_API_BASE_URL}/students/projects`, {
+                const res = await authenticatedFetch(`/api/v1/students/projects`, {
                     method: 'POST',
                     body: JSON.stringify({ studentId })
                 });
@@ -63,8 +63,7 @@ export default function MyProjectsPage() {
                         let reportsMap = new Map<string, any>();
 
                         try {
-                            const reportsRes = await authenticatedFetch(
-                                `${process.env.NEXT_PUBLIC_APP_API_BASE_URL}/students/reports/check?studentId=${studentId}`
+                            const reportsRes = await authenticatedFetch(`/api/v1/students/reports/check?studentId=${studentId}`
                             );
 
                             if (reportsRes && reportsRes.ok) {

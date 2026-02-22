@@ -244,8 +244,22 @@ export function ReportProvider({ children }: { children: React.ReactNode }) {
         clearValidationErrors(section);
     };
 
-    const setFullData = (newData: ReportData) => {
-        setData(newData);
+    const setFullData = (newData: Partial<ReportData>) => {
+        setData(prev => {
+            const merged = { ...defaultReportData, ...newData };
+            // Ensure each section is also merged with its defaults to prevent undefined sub-properties
+            if (newData.section1) merged.section1 = { ...defaultReportData.section1, ...newData.section1 };
+            if (newData.section2) merged.section2 = { ...defaultReportData.section2, ...newData.section2 };
+            if (newData.section3) merged.section3 = { ...defaultReportData.section3, ...newData.section3 };
+            if (newData.section4) merged.section4 = { ...defaultReportData.section4, ...newData.section4 };
+            if (newData.section5) merged.section5 = { ...defaultReportData.section5, ...newData.section5 };
+            if (newData.section6) merged.section6 = { ...defaultReportData.section6, ...newData.section6 };
+            if (newData.section7) merged.section7 = { ...defaultReportData.section7, ...newData.section7 };
+            if (newData.section8) merged.section8 = { ...defaultReportData.section8, ...newData.section8 };
+            if (newData.section9) merged.section9 = { ...defaultReportData.section9, ...newData.section9 };
+            if (newData.section10) merged.section10 = { ...defaultReportData.section10, ...newData.section10 };
+            return merged;
+        });
     };
 
     const setProjectId = (id: string) => {

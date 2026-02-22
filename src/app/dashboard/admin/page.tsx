@@ -12,7 +12,7 @@ export default function AdminDashboard() {
     useEffect(() => {
         const fetchData = async () => {
             try {
-                const res = await authenticatedFetch(`${process.env.NEXT_PUBLIC_APP_API_BASE_URL}/admin/dashboard`);
+                const res = await authenticatedFetch(`/api/v1/admin/dashboard`);
                 if (!res) return;
 
                 const result = await res.json();

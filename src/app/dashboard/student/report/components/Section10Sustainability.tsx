@@ -4,10 +4,12 @@ import { Textarea } from "./ui/textarea";
 import { RadioGroup, RadioGroupItem } from "./ui/radio-group";
 import { Checkbox } from "./ui/checkbox";
 import { useReportForm } from "../context/ReportContext";
+import { FieldError } from "./ui/FieldError";
+import { AlertCircle } from "lucide-react";
 import clsx from "clsx";
 
 export default function Section10Sustainability() {
-    const { data, updateSection } = useReportForm();
+    const { data, updateSection, getFieldError, validationErrors } = useReportForm();
     const {
         continuation_status,
         continuation_details,
@@ -15,6 +17,9 @@ export default function Section10Sustainability() {
         scaling_potential,
         policy_influence
     } = data.section10;
+
+    const sectionErrors = validationErrors['section10'] || [];
+    const hasErrors = sectionErrors.length > 0;
 
     const handleUpdate = (field: string, value: any) => {
         updateSection('section10', { [field]: value });
@@ -42,6 +47,21 @@ export default function Section10Sustainability() {
                 </div>
                 <h2 className="text-2xl font-bold text-slate-900">Sustainability & Future</h2>
                 <p className="text-slate-600 text-sm">Will the impact last? Define the project's future trajectory.</p>
+
+                {/* Error Summary */}
+                {hasErrors && (
+                    <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-start gap-3 mt-4">
+                        <AlertCircle className="w-5 h-5 text-red-600 mt-0.5 shrink-0" />
+                        <div>
+                            <h4 className="font-semibold text-red-900 text-sm">Please fix the following errors:</h4>
+                            <ul className="mt-2 space-y-1">
+                                {sectionErrors.slice(0, 5).map((error, idx) => (
+                                    <li key={idx} className="text-xs text-red-700">• {error.message}</li>
+                                ))}
+                            </ul>
+                        </div>
+                    </div>
+                )}
             </div>
 
             {/* 10.1 Status */}
@@ -79,6 +99,7 @@ export default function Section10Sustainability() {
                             </div>
                         ))}
                     </RadioGroup>
+                    <FieldError message={getFieldError('continuation_status')} />
 
                     {continuation_status !== 'no' && (
                         <div className="space-y-4 animate-in fade-in">
@@ -95,6 +116,7 @@ export default function Section10Sustainability() {
                                     </div>
                                 ))}
                             </div>
+                            <FieldError message={getFieldError('mechanisms')} />
                         </div>
                     )}
 
@@ -102,10 +124,11 @@ export default function Section10Sustainability() {
                         <Label className="text-sm font-semibold text-slate-700">Explainer</Label>
                         <Textarea
                             placeholder="Explain the future plan..."
-                            className="min-h-[100px]"
+                            className={clsx("min-h-[100px]", getFieldError('continuation_details') && "border-red-400 bg-red-50")}
                             value={continuation_details}
                             onChange={(e) => handleUpdate('continuation_details', e.target.value)}
                         />
+                        <FieldError message={getFieldError('continuation_details')} />
                     </div>
                 </div>
             </div>
@@ -127,5 +150,5 @@ export default function Section10Sustainability() {
                 </div>
             </div>
         </div>
-    )
+    );
 }

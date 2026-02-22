@@ -48,7 +48,7 @@ export default function ImpactHistoryPage() {
                 }
 
                 const user = JSON.parse(userStr);
-                const fetchPromise = authenticatedFetch(`${process.env.NEXT_PUBLIC_APP_API_BASE_URL}/students/impact/history`, {
+                const fetchPromise = authenticatedFetch(`/api/v1/students/impact/history`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ student_id: user.id })

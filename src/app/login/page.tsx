@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowRight, Mail, Lock, AlertCircle, Loader2, ArrowLeft } from "lucide-react";
+import { ArrowRight, Mail, Lock, AlertCircle, Loader2, ArrowLeft, CheckCircle } from "lucide-react";
 import Image from "next/image";
 import clsx from "clsx";
 
@@ -15,6 +15,76 @@ export default function LoginPage() {
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
+    // ── Forgot / Reset Password ──────────────────────────────────────────
+    const [view, setView] = useState<"login" | "forgot" | "reset">("login");
+    const [forgotEmail, setForgotEmail] = useState("");
+    const [forgotSuccess, setForgotSuccess] = useState<string | null>(null);
+    const [resetToken, setResetToken] = useState("");
+    const [newPassword, setNewPassword] = useState("");
+    const [confirmPassword, setConfirmPassword] = useState("");
+    const [resetSuccess, setResetSuccess] = useState(false);
+    const [fpError, setFpError] = useState<string | null>(null);
+
+    const handleForgotPassword = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setIsLoading(true);
+        setFpError(null);
+        setForgotSuccess(null);
+        try {
+            const backendUrl = process.env.NEXT_PUBLIC_BACKEND_BASE_URL || "http://localhost:3000";
+            const res = await fetch(`${backendUrl}/api/v1/auth/forgot-password`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email: forgotEmail }),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (res.ok && data.success) {
+                // In testing mode backend sends token in response,
+                // pre-fill token field for convenience
+                if (data.data?.resetToken) {
+                    setResetToken(data.data.resetToken);
+                }
+                setForgotSuccess("Reset token generated! Check your email or copy the token from console.");
+                setView("reset");
+            } else {
+                setFpError(data.message || "Failed to send reset request.");
+            }
+        } catch {
+            setFpError("Network error. Please try again.");
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleResetPassword = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (newPassword !== confirmPassword) {
+            setFpError("Passwords do not match.");
+            return;
+        }
+        setIsLoading(true);
+        setFpError(null);
+        try {
+            const backendUrl = process.env.NEXT_PUBLIC_BACKEND_BASE_URL || "http://localhost:3000";
+            const res = await fetch(`${backendUrl}/api/v1/auth/reset-password`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ token: resetToken, newPassword }),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (res.ok && data.success) {
+                setResetSuccess(true);
+            } else {
+                setFpError(data.message || "Reset failed. Token may have expired.");
+            }
+        } catch {
+            setFpError("Network error. Please try again.");
+        } finally {
+            setIsLoading(false);
+        }
+    };
+    // ────────────────────────────────────────────────────────────────────
+
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsLoading(true);
@@ -23,7 +93,8 @@ export default function LoginPage() {
         try {
             // API call to authenticate
             // In a real app, this would be your backend endpoint
-            const loginUrl = `${process.env.NEXT_PUBLIC_APP_API_BASE_URL}/auth/login`;
+            const backendUrl = process.env.NEXT_PUBLIC_BACKEND_BASE_URL || "http://localhost:3000";
+            const loginUrl = `${backendUrl}/api/v1/auth/login`;
             console.log("Login URL:", loginUrl);
             const response = await fetch(loginUrl, {
                 method: "POST",
@@ -34,17 +105,7 @@ export default function LoginPage() {
             console.log("Response Status:", response.status, response.statusText);
             console.log("Response Type:", response.type);
 
-            const textRaw = await response.text();
-            console.log("Response Raw:", textRaw);
-
-            let jsonResponse;
-            try {
-                jsonResponse = textRaw ? JSON.parse(textRaw) : {};
-            } catch (e) {
-                console.error("Failed to parse JSON", e);
-                jsonResponse = {};
-            }
-
+            const jsonResponse = await response.json().catch(() => ({}));
             console.log("Login API Response Data:", jsonResponse); // Debugging
 
             // Handle standard response format { success: boolean, data: ... }
@@ -53,7 +114,7 @@ export default function LoginPage() {
 
             if (!response.ok || (isStandardResponse && !jsonResponse.success) || jsonResponse.error) {
                 console.error("Login failed response:", jsonResponse);
-                setError(jsonResponse.message || jsonResponse.error || "Login failed");
+                setError(jsonResponse.message || jsonResponse.error || "Invalid email or password");
                 return;
             }
 
@@ -82,13 +143,12 @@ export default function LoginPage() {
 
                 // Fetch full user profile immediately to cache it
                 try {
-                    const profileRes = await fetch(`${process.env.NEXT_PUBLIC_APP_API_BASE_URL}/users/me`, {
-                        method: "POST",
+                    const profileRes = await fetch(`/api/v1/user/me`, {
+                        method: "GET",
                         headers: {
                             "Content-Type": "application/json",
                             "Authorization": `Bearer ${token}`
-                        },
-                        body: JSON.stringify({ userId: payload.user?.id || payload.id })
+                        }
                     });
 
                     if (profileRes.ok) {
@@ -180,83 +240,233 @@ export default function LoginPage() {
                 {/* Right side: Modern Form */}
                 <div className="p-10 md:p-16 flex flex-col justify-center bg-white">
                     <div className="w-full max-w-sm mx-auto">
-                        <Link
-                            href="/"
-                            className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-widest text-slate-400 hover:text-emerald-600 transition-all mb-12 hover:-translate-x-1"
-                        >
-                            <ArrowLeft className="w-3 h-3" /> Back to Portal
-                        </Link>
 
-                        <div className="mb-10 text-center lg:text-left">
-                            <h3 className="text-4xl font-black text-slate-900 tracking-tight mb-3 italic">Welcome Back</h3>
-                            <p className="text-slate-500 font-medium">Please enter your details to sign in.</p>
-                        </div>
+                        {/* ── Back nav ── */}
+                        {view === "login" ? (
+                            <Link href="/" className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-widest text-slate-400 hover:text-emerald-600 transition-all mb-12 hover:-translate-x-1">
+                                <ArrowLeft className="w-3 h-3" /> Back to Portal
+                            </Link>
+                        ) : (
+                            <button onClick={() => { setView("login"); setFpError(null); setResetSuccess(false); }} className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-widest text-slate-400 hover:text-emerald-600 transition-all mb-12 hover:-translate-x-1">
+                                <ArrowLeft className="w-3 h-3" /> Back to Login
+                            </button>
+                        )}
 
-                        <form onSubmit={handleLogin} className="space-y-6">
-                            <div className="space-y-1.5">
-                                <label className="text-[11px] font-black uppercase tracking-widest text-slate-400 ml-1">Email Address</label>
-                                <div className="group relative">
-                                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-emerald-600 transition-colors" />
-                                    <input
-                                        type="email"
-                                        required
-                                        placeholder="e.g. name@ciel.pk"
-                                        value={email}
-                                        onChange={(e) => setEmail(e.target.value)}
-                                        className="w-full pl-12 pr-4 py-4 rounded-2xl border-2 border-slate-100 bg-slate-50/50 focus:bg-white focus:border-emerald-600 outline-none transition-all font-bold text-slate-800 placeholder:text-slate-300 placeholder:font-medium"
-                                    />
+                        {/* ══════════════════════════════════════════ */}
+                        {/* VIEW: LOGIN                               */}
+                        {/* ══════════════════════════════════════════ */}
+                        {view === "login" && (
+                            <>
+                                <div className="mb-10 text-center lg:text-left">
+                                    <h3 className="text-4xl font-black text-slate-900 tracking-tight mb-3 italic">Welcome Back</h3>
+                                    <p className="text-slate-500 font-medium">Please enter your details to sign in.</p>
                                 </div>
-                            </div>
 
-                            <div className="space-y-1.5">
-                                <div className="flex items-center justify-between ml-1">
-                                    <label className="text-[11px] font-black uppercase tracking-widest text-slate-400">Password</label>
-                                    <a href="#" className="text-[10px] font-black uppercase tracking-wider text-emerald-600 hover:text-emerald-700">Forgot Password?</a>
-                                </div>
-                                <div className="group relative">
-                                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-emerald-600 transition-colors" />
-                                    <input
-                                        type="password"
-                                        required
-                                        placeholder="••••••••"
-                                        value={password}
-                                        onChange={(e) => setPassword(e.target.value)}
-                                        className="w-full pl-12 pr-4 py-4 rounded-2xl border-2 border-slate-100 bg-slate-50/50 focus:bg-white focus:border-emerald-600 outline-none transition-all font-bold text-slate-800 placeholder:text-slate-300 placeholder:font-medium"
-                                    />
-                                </div>
-                            </div>
+                                <form onSubmit={handleLogin} className="space-y-6">
+                                    <div className="space-y-1.5">
+                                        <label className="text-[11px] font-black uppercase tracking-widest text-slate-400 ml-1">Email Address</label>
+                                        <div className="group relative">
+                                            <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-emerald-600 transition-colors" />
+                                            <input
+                                                type="email"
+                                                required
+                                                placeholder="e.g. name@ciel.pk"
+                                                value={email}
+                                                onChange={(e) => setEmail(e.target.value)}
+                                                className="w-full pl-12 pr-4 py-4 rounded-2xl border-2 border-slate-100 bg-slate-50/50 focus:bg-white focus:border-emerald-600 outline-none transition-all font-bold text-slate-800 placeholder:text-slate-300 placeholder:font-medium"
+                                            />
+                                        </div>
+                                    </div>
 
-                            {error && (
-                                <div className="flex items-start gap-3 p-4 rounded-2xl bg-orange-50 text-orange-600 text-xs font-bold border border-orange-100">
-                                    <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                                    <span>{error}</span>
-                                </div>
-                            )}
+                                    <div className="space-y-1.5">
+                                        <div className="flex items-center justify-between ml-1">
+                                            <label className="text-[11px] font-black uppercase tracking-widest text-slate-400">Password</label>
+                                            <button type="button" onClick={() => { setView("forgot"); setFpError(null); setForgotSuccess(null); }} className="text-[10px] font-black uppercase tracking-wider text-emerald-600 hover:text-emerald-700">Forgot Password?</button>
+                                        </div>
+                                        <div className="group relative">
+                                            <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-emerald-600 transition-colors" />
+                                            <input
+                                                type="password"
+                                                required
+                                                placeholder="••••••••"
+                                                value={password}
+                                                onChange={(e) => setPassword(e.target.value)}
+                                                className="w-full pl-12 pr-4 py-4 rounded-2xl border-2 border-slate-100 bg-slate-50/50 focus:bg-white focus:border-emerald-600 outline-none transition-all font-bold text-slate-800 placeholder:text-slate-300 placeholder:font-medium"
+                                            />
+                                        </div>
+                                    </div>
 
-                            <button
-                                type="submit"
-                                disabled={isLoading}
-                                className="w-full py-5 rounded-[1.25rem] font-black uppercase tracking-widest text-xs text-white bg-slate-900 border-b-4 border-slate-700 active:border-b-0 active:translate-y-1 hover:bg-emerald-600 hover:border-emerald-700 hover:shadow-2xl hover:shadow-emerald-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3 group"
-                            >
-                                {isLoading ? (
-                                    <>
-                                        <Loader2 className="w-4 h-4 animate-spin" />
-                                        Authenticating...
-                                    </>
+                                    {error && (
+                                        <div className="flex items-start gap-3 p-4 rounded-2xl bg-orange-50 text-orange-600 text-xs font-bold border border-orange-100">
+                                            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                                            <span>{error}</span>
+                                        </div>
+                                    )}
+
+                                    <button
+                                        type="submit"
+                                        disabled={isLoading}
+                                        className="w-full py-5 rounded-[1.25rem] font-black uppercase tracking-widest text-xs text-white bg-slate-900 border-b-4 border-slate-700 active:border-b-0 active:translate-y-1 hover:bg-emerald-600 hover:border-emerald-700 hover:shadow-2xl hover:shadow-emerald-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3 group"
+                                    >
+                                        {isLoading ? (
+                                            <>
+                                                <Loader2 className="w-4 h-4 animate-spin" />
+                                                Authenticating...
+                                            </>
+                                        ) : (
+                                            <>
+                                                Sign In Now <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                                            </>
+                                        )}
+                                    </button>
+                                </form>
+
+                                <div className="mt-12 text-center">
+                                    <p className="text-slate-400 text-[11px] font-bold uppercase tracking-widest">
+                                        New to the platform? <br />
+                                        <Link href="/signup" className="mt-2 inline-block text-emerald-600 hover:text-emerald-700 font-black border-b-2 border-emerald-100 hover:border-emerald-600 transition-all">Create Professional Account</Link>
+                                    </p>
+                                </div>
+                            </>
+                        )}
+
+                        {/* ══════════════════════════════════════════ */}
+                        {/* VIEW: FORGOT PASSWORD                     */}
+                        {/* ══════════════════════════════════════════ */}
+                        {view === "forgot" && (
+                            <>
+                                <div className="mb-10 text-center lg:text-left">
+                                    <h3 className="text-4xl font-black text-slate-900 tracking-tight mb-3 italic">Forgot Password</h3>
+                                    <p className="text-slate-500 font-medium">Enter your email to receive a reset token.</p>
+                                </div>
+
+                                <form onSubmit={handleForgotPassword} className="space-y-6">
+                                    <div className="space-y-1.5">
+                                        <label className="text-[11px] font-black uppercase tracking-widest text-slate-400 ml-1">Email Address</label>
+                                        <div className="group relative">
+                                            <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-emerald-600 transition-colors" />
+                                            <input
+                                                type="email"
+                                                required
+                                                placeholder="e.g. name@ciel.pk"
+                                                value={forgotEmail}
+                                                onChange={(e) => setForgotEmail(e.target.value)}
+                                                className="w-full pl-12 pr-4 py-4 rounded-2xl border-2 border-slate-100 bg-slate-50/50 focus:bg-white focus:border-emerald-600 outline-none transition-all font-bold text-slate-800 placeholder:text-slate-300"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {fpError && (
+                                        <div className="flex items-start gap-3 p-4 rounded-2xl bg-orange-50 text-orange-600 text-xs font-bold border border-orange-100">
+                                            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                                            <span>{fpError}</span>
+                                        </div>
+                                    )}
+
+                                    <button
+                                        type="submit"
+                                        disabled={isLoading}
+                                        className="w-full py-5 rounded-[1.25rem] font-black uppercase tracking-widest text-xs text-white bg-slate-900 border-b-4 border-slate-700 active:border-b-0 active:translate-y-1 hover:bg-emerald-600 hover:border-emerald-700 transition-all disabled:opacity-50 flex items-center justify-center gap-3 group"
+                                    >
+                                        {isLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> Sending...</> : <>Send Reset Token <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" /></>}
+                                    </button>
+                                </form>
+                            </>
+                        )}
+
+                        {/* ══════════════════════════════════════════ */}
+                        {/* VIEW: RESET PASSWORD                      */}
+                        {/* ══════════════════════════════════════════ */}
+                        {view === "reset" && (
+                            <>
+                                {resetSuccess ? (
+                                    <div className="text-center py-8 space-y-4">
+                                        <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mx-auto">
+                                            <CheckCircle className="w-10 h-10 text-emerald-600" />
+                                        </div>
+                                        <h3 className="text-2xl font-black text-slate-900">Password Reset!</h3>
+                                        <p className="text-slate-500 font-medium">Your password has been updated successfully.</p>
+                                        <button
+                                            onClick={() => { setView("login"); setResetSuccess(false); setNewPassword(""); setConfirmPassword(""); setResetToken(""); }}
+                                            className="mt-4 w-full py-4 rounded-2xl font-black uppercase tracking-widest text-xs text-white bg-emerald-600 hover:bg-emerald-700 transition-all"
+                                        >
+                                            Back to Login
+                                        </button>
+                                    </div>
                                 ) : (
                                     <>
-                                        Sign In Now <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                                        <div className="mb-10 text-center lg:text-left">
+                                            <h3 className="text-4xl font-black text-slate-900 tracking-tight mb-3 italic">Reset Password</h3>
+                                            <p className="text-slate-500 font-medium">Enter your token and choose a new password.</p>
+                                        </div>
+
+                                        <form onSubmit={handleResetPassword} className="space-y-5">
+                                            <div className="space-y-1.5">
+                                                <label className="text-[11px] font-black uppercase tracking-widest text-slate-400 ml-1">Reset Token</label>
+                                                <input
+                                                    type="text"
+                                                    required
+                                                    placeholder="Paste token from email"
+                                                    value={resetToken}
+                                                    onChange={(e) => setResetToken(e.target.value)}
+                                                    className="w-full px-4 py-4 rounded-2xl border-2 border-slate-100 bg-slate-50/50 focus:bg-white focus:border-emerald-600 outline-none transition-all font-mono text-sm text-slate-800"
+                                                />
+                                            </div>
+
+                                            <div className="space-y-1.5">
+                                                <label className="text-[11px] font-black uppercase tracking-widest text-slate-400 ml-1">New Password</label>
+                                                <div className="group relative">
+                                                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-emerald-600 transition-colors" />
+                                                    <input
+                                                        type="password"
+                                                        required
+                                                        minLength={8}
+                                                        placeholder="Min 8 characters"
+                                                        value={newPassword}
+                                                        onChange={(e) => setNewPassword(e.target.value)}
+                                                        className="w-full pl-12 pr-4 py-4 rounded-2xl border-2 border-slate-100 bg-slate-50/50 focus:bg-white focus:border-emerald-600 outline-none transition-all font-bold text-slate-800"
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            <div className="space-y-1.5">
+                                                <label className="text-[11px] font-black uppercase tracking-widest text-slate-400 ml-1">Confirm Password</label>
+                                                <div className="group relative">
+                                                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-emerald-600 transition-colors" />
+                                                    <input
+                                                        type="password"
+                                                        required
+                                                        placeholder="Repeat new password"
+                                                        value={confirmPassword}
+                                                        onChange={(e) => setConfirmPassword(e.target.value)}
+                                                        className={clsx(
+                                                            "w-full pl-12 pr-4 py-4 rounded-2xl border-2 bg-slate-50/50 focus:bg-white outline-none transition-all font-bold text-slate-800",
+                                                            confirmPassword && confirmPassword !== newPassword ? "border-red-400 focus:border-red-500" : "border-slate-100 focus:border-emerald-600"
+                                                        )}
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            {fpError && (
+                                                <div className="flex items-start gap-3 p-4 rounded-2xl bg-orange-50 text-orange-600 text-xs font-bold border border-orange-100">
+                                                    <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                                                    <span>{fpError}</span>
+                                                </div>
+                                            )}
+
+                                            <button
+                                                type="submit"
+                                                disabled={isLoading || (!!confirmPassword && confirmPassword !== newPassword)}
+                                                className="w-full py-5 rounded-[1.25rem] font-black uppercase tracking-widest text-xs text-white bg-slate-900 border-b-4 border-slate-700 active:border-b-0 active:translate-y-1 hover:bg-emerald-600 hover:border-emerald-700 transition-all disabled:opacity-50 flex items-center justify-center gap-3 group"
+                                            >
+                                                {isLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> Resetting...</> : <>Reset Password <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" /></>}
+                                            </button>
+                                        </form>
                                     </>
                                 )}
-                            </button>
-                        </form>
+                            </>
+                        )}
 
-                        <div className="mt-12 text-center">
-                            <p className="text-slate-400 text-[11px] font-bold uppercase tracking-widest">
-                                New to the platform? <br />
-                                <Link href="/signup" className="mt-2 inline-block text-emerald-600 hover:text-emerald-700 font-black border-b-2 border-emerald-100 hover:border-emerald-600 transition-all">Create Professional Account</Link>
-                            </p>
-                        </div>
                     </div>
                 </div>
             </div>

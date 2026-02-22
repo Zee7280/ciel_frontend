@@ -10,7 +10,7 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: "Opportunity ID is required" }, { status: 400 });
         }
 
-        const backendUrl = `${process.env.NEXT_PUBLIC_APP_API_BASE_URL}/opportunities/${body.id}`;
+        const backendUrl = `${process.env.BACKEND_API_URL}/opportunities/${body.id}`;
         console.log("Proxying update request to:", backendUrl);
         console.log("Auth Header present:", !!authHeader);
 

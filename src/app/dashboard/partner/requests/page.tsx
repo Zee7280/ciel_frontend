@@ -15,7 +15,7 @@ export default function PartnerRequestsPage() {
 
     const fetchOpportunities = async () => {
         try {
-            const res = await authenticatedFetch(`${process.env.NEXT_PUBLIC_APP_API_BASE_URL}/opportunities`);
+            const res = await authenticatedFetch(`/api/v1/opportunities`);
             if (res && res.ok) {
                 const data = await res.json();
                 if (data.success) {
@@ -52,7 +52,7 @@ export default function PartnerRequestsPage() {
         setActiveMenu(null); // Close menu
 
         try {
-            const res = await authenticatedFetch(`${process.env.NEXT_PUBLIC_APP_API_BASE_URL}/opportunities/${id}`, {
+            const res = await authenticatedFetch(`/api/v1/opportunities/${id}`, {
                 method: 'DELETE'
             });
 

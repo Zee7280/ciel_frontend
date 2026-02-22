@@ -4,12 +4,17 @@ import { Input } from "./ui/input";
 import { Select } from "./ui/select";
 import { Checkbox } from "./ui/checkbox";
 import { useReportForm } from "../context/ReportContext";
+import { FieldError } from "./ui/FieldError";
+import { AlertCircle } from "lucide-react";
 import clsx from "clsx";
 
 export default function Section4Activities() {
-    const { data, updateSection } = useReportForm();
+    const { data, updateSection, getFieldError, validationErrors } = useReportForm();
     const { section1, section4 } = data;
     const isTeam = section1.participation_type === 'team';
+
+    const sectionErrors = validationErrors['section4'] || [];
+    const hasErrors = sectionErrors.length > 0;
 
     const handleSection4Change = (field: string, value: any) => {
         updateSection('section4', { [field]: value });
@@ -58,6 +63,21 @@ export default function Section4Activities() {
                         {isTeam ? " You must enter Team Totals first, then your Individual Contribution." : " Enter your total outputs below."}
                     </p>
                 </div>
+
+                {/* Error Summary */}
+                {hasErrors && (
+                    <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-start gap-3 mt-4">
+                        <AlertCircle className="w-5 h-5 text-red-600 mt-0.5 shrink-0" />
+                        <div>
+                            <h4 className="font-semibold text-red-900 text-sm">Please fix the following errors:</h4>
+                            <ul className="mt-2 space-y-1">
+                                {sectionErrors.slice(0, 5).map((error, idx) => (
+                                    <li key={idx} className="text-xs text-red-700">• {error.message}</li>
+                                ))}
+                            </ul>
+                        </div>
+                    </div>
+                )}
             </div>
 
             {/* 4.1 Activity Overview (Team Level or Individual Total) */}
@@ -74,22 +94,24 @@ export default function Section4Activities() {
                             <Select
                                 value={section4.activity_type}
                                 onChange={(e) => handleSection4Change('activity_type', e.target.value)}
-                                className="h-10 border-slate-200"
+                                className={clsx("h-10 border-slate-200", getFieldError('activity_type') && "border-red-400 bg-red-50")}
                             >
                                 <option value="">Select Type</option>
                                 {activityTypes.map(t => <option key={t} value={t}>{t}</option>)}
                             </Select>
+                            <FieldError message={getFieldError('activity_type')} />
                         </div>
                         <div className="space-y-2">
                             <Label className="text-sm font-semibold text-slate-700">B. Delivery Mode</Label>
                             <Select
                                 value={section4.delivery_mode}
                                 onChange={(e) => handleSection4Change('delivery_mode', e.target.value)}
-                                className="h-10 border-slate-200"
+                                className={clsx("h-10 border-slate-200", getFieldError('delivery_mode') && "border-red-400 bg-red-50")}
                             >
                                 <option value="">Select Mode</option>
                                 {deliveryModes.map(m => <option key={m} value={m}>{m}</option>)}
                             </Select>
+                            <FieldError message={getFieldError('delivery_mode')} />
                         </div>
                     </div>
 
@@ -101,7 +123,9 @@ export default function Section4Activities() {
                                 placeholder="0"
                                 value={section4.total_sessions}
                                 onChange={(e) => handleSection4Change('total_sessions', e.target.value)}
+                                className={clsx(getFieldError('total_sessions') && "border-red-400 bg-red-50")}
                             />
+                            <FieldError message={getFieldError('total_sessions')} />
                         </div>
                         <div className="space-y-2">
                             <Label className="text-sm font-semibold text-slate-700">D. Total Duration</Label>
@@ -109,7 +133,7 @@ export default function Section4Activities() {
                                 <Input
                                     type="number"
                                     placeholder="0"
-                                    className="w-20"
+                                    className={clsx("w-20", getFieldError('duration_val') && "border-red-400 bg-red-50")}
                                     value={section4.duration_val}
                                     onChange={(e) => handleSection4Change('duration_val', e.target.value)}
                                 />
@@ -123,6 +147,7 @@ export default function Section4Activities() {
                                     <option value="Weeks">Weeks</option>
                                 </Select>
                             </div>
+                            <FieldError message={getFieldError('duration_val')} />
                         </div>
                         <div className="space-y-2">
                             <Label className="text-sm font-semibold text-slate-700">E. Total Beneficiaries</Label>
@@ -131,41 +156,57 @@ export default function Section4Activities() {
                                 placeholder="0"
                                 value={section4.total_beneficiaries}
                                 onChange={(e) => handleSection4Change('total_beneficiaries', e.target.value)}
+                                className={clsx(getFieldError('total_beneficiaries') && "border-red-400 bg-red-50")}
                             />
+                            <FieldError message={getFieldError('total_beneficiaries')} />
                         </div>
                     </div>
                 </div>
             </div>
 
-            {/* 4.3 Individual Contribution (Only for Team Mode) */}
+            {/* 4.2 My Contribution (visible for ALL — individual & team) */}
+            <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold text-sm">4.2</div>
+                    <h3 className="text-lg font-bold text-slate-900">My Contribution</h3>
+                </div>
+                <div className="bg-white rounded-2xl p-6 border border-slate-200">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-2">
+                            <Label className="text-sm font-semibold text-slate-700">My Role *</Label>
+                            <Select
+                                value={section4.my_role}
+                                onChange={(e) => handleSection4Change('my_role', e.target.value)}
+                                className={clsx("h-10 border-slate-200", getFieldError('my_role') && "border-red-400 bg-red-50")}
+                            >
+                                <option value="">Select Role</option>
+                                {roles.map(r => <option key={r} value={r}>{r}</option>)}
+                            </Select>
+                            <FieldError message={getFieldError('my_role')} />
+                        </div>
+                        <div className="space-y-2">
+                            <Label className="text-sm font-semibold text-slate-700">My Hours *</Label>
+                            <Input
+                                type="number"
+                                placeholder="Total hours I contributed"
+                                value={section4.my_hours}
+                                onChange={(e) => handleSection4Change('my_hours', e.target.value)}
+                                className={clsx("h-10", getFieldError('my_hours') && "border-red-400 bg-red-50")}
+                            />
+                            <FieldError message={getFieldError('my_hours')} />
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* 4.3 Individual Contribution — extra fields for Team Mode only */}
             {isTeam && (
                 <div className="space-y-4">
                     <div className="flex items-center gap-2">
                         <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold text-sm">4.3</div>
-                        <h3 className="text-lg font-bold text-slate-900">My Individual Contribution</h3>
+                        <h3 className="text-lg font-bold text-slate-900">My Individual Contribution (Team Detail)</h3>
                     </div>
                     <div className="bg-slate-50 rounded-2xl p-6 border border-slate-200 space-y-6">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div className="space-y-2">
-                                <Label className="text-sm font-semibold text-slate-700">My Role</Label>
-                                <Select
-                                    value={section4.my_role}
-                                    onChange={(e) => handleSection4Change('my_role', e.target.value)}
-                                >
-                                    <option value="">Select Role</option>
-                                    {roles.map(max => <option key={max} value={max}>{max}</option>)}
-                                </Select>
-                            </div>
-                            <div className="space-y-2">
-                                <Label className="text-sm font-semibold text-slate-700">My Hours</Label>
-                                <Input
-                                    type="number"
-                                    placeholder="Hours"
-                                    value={section4.my_hours}
-                                    onChange={(e) => handleSection4Change('my_hours', e.target.value)}
-                                />
-                            </div>
-                        </div>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                             <div className="space-y-2">
                                 <Label className="text-sm font-semibold text-slate-700">Sessions Participated</Label>
@@ -215,6 +256,7 @@ export default function Section4Activities() {
                             </div>
                         ))}
                     </div>
+                    <FieldError message={getFieldError('beneficiary_categories')} />
                 </div>
             </div>
         </div>

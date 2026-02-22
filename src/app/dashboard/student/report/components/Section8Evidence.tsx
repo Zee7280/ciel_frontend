@@ -4,12 +4,17 @@ import { Checkbox } from "./ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "./ui/radio-group";
 import { FileUpload } from "./ui/file-upload";
 import { useReportForm } from "../context/ReportContext";
+import { FieldError } from "./ui/FieldError";
+import { AlertCircle } from "lucide-react";
 import { Textarea } from "./ui/textarea";
 import clsx from "clsx";
 
 export default function Section8Evidence() {
-    const { data, updateSection } = useReportForm();
+    const { data, updateSection, getFieldError, validationErrors } = useReportForm();
     const { section8 } = data;
+
+    const sectionErrors = validationErrors['section8'] || [];
+    const hasErrors = sectionErrors.length > 0;
 
     const handleUpdate = (field: string, value: any) => {
         updateSection('section8', { [field]: value });
@@ -41,6 +46,21 @@ export default function Section8Evidence() {
                 </div>
                 <h2 className="text-2xl font-bold text-slate-900">Evidence & Verification</h2>
                 <p className="text-slate-600 text-sm">Provide proofs to validate your reported activities.</p>
+
+                {/* Error Summary */}
+                {hasErrors && (
+                    <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-start gap-3 mt-4">
+                        <AlertCircle className="w-5 h-5 text-red-600 mt-0.5 shrink-0" />
+                        <div>
+                            <h4 className="font-semibold text-red-900 text-sm">Please fix the following errors:</h4>
+                            <ul className="mt-2 space-y-1">
+                                {sectionErrors.slice(0, 5).map((error, idx) => (
+                                    <li key={idx} className="text-xs text-red-700">• {error.message}</li>
+                                ))}
+                            </ul>
+                        </div>
+                    </div>
+                )}
             </div>
 
             {/* Evidence Types & Upload */}
@@ -69,6 +89,7 @@ export default function Section8Evidence() {
                                 </button>
                             ))}
                         </div>
+                        <FieldError message={getFieldError('evidence_types')} />
                     </div>
 
                     <div className="space-y-2">
@@ -129,6 +150,7 @@ export default function Section8Evidence() {
                             </Label>
                         </div>
                     ))}
+                    <FieldError message={getFieldError('ethical_compliance')} />
                 </div>
             </div>
 

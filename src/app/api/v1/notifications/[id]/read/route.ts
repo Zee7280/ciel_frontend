@@ -17,7 +17,7 @@ export async function PUT(
         const token = authHeader.split(" ")[1];
 
         const response = await fetch(
-            `${process.env.NEXT_PUBLIC_APP_API_BASE_URL}/notifications/${id}/read`,
+            `${process.env.BACKEND_API_URL}/notifications/${id}/read`,
             {
                 method: "PUT",
                 headers: {

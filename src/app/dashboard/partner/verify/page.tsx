@@ -11,9 +11,11 @@ interface Report {
     id: string;
     student_name: string;
     student_email: string;
-    project_title: string;  // Backend sends project_title not opportunity_title
+    project_title: string;
     submission_date: string;
-    status: 'submitted' | 'verified' | 'rejected' | 'draft';
+    status: string;
+    partner_status: string;
+    admin_status: string;
     created_at: string;
 }
 
@@ -58,8 +60,8 @@ export default function VerifyWorkPage() {
                 return;
             }
 
-            const statusParam = activeTab !== 'all' ? `&status=${activeTab}` : '';
-            const apiUrl = `${process.env.NEXT_PUBLIC_APP_API_BASE_URL}/students/reports?organisationId=${orgId}${statusParam}`;
+            const statusParam = activeTab !== 'all' ? `?status=${activeTab}` : '';
+            const apiUrl = `/api/v1/partners/student-reports${statusParam}`;
 
             console.log('🌐 Calling API:', apiUrl);
 
@@ -93,10 +95,13 @@ export default function VerifyWorkPage() {
 
     const getStatusBadge = (status: string) => {
         const config = {
-            submitted: { color: 'bg-yellow-50 text-yellow-700 border-yellow-200', icon: Clock, label: 'Submitted' },
-            verified: { color: 'bg-green-50 text-green-700 border-green-200', icon: CheckCircle2, label: 'Verified' },
+            submitted: { color: 'bg-yellow-50 text-yellow-700 border-yellow-200', icon: Clock, label: 'Pending Verification' },
+            partner_verified: { color: 'bg-indigo-50 text-indigo-700 border-indigo-200', icon: CheckCircle2, label: 'Verified by You' },
+            verified: { color: 'bg-green-50 text-green-700 border-green-200', icon: CheckCircle2, label: 'Fully Verified' },
             rejected: { color: 'bg-red-50 text-red-700 border-red-200', icon: XCircle, label: 'Rejected' },
             draft: { color: 'bg-slate-50 text-slate-700 border-slate-200', icon: FileText, label: 'Draft' },
+            approved: { color: 'bg-green-50 text-green-600 border-green-200', icon: CheckCircle2, label: 'Approved' },
+            pending: { color: 'bg-slate-50 text-slate-500 border-slate-200', icon: Clock, label: 'Pending' },
         };
 
         const { color, icon: Icon, label } = config[status as keyof typeof config] || config.draft;

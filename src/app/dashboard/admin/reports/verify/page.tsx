@@ -14,7 +14,9 @@ interface Report {
     project_title: string;
     organization_name?: string;
     submission_date: string;
-    status: 'submitted' | 'verified' | 'rejected' | 'draft';
+    status: string;
+    partner_status: string;
+    admin_status: string;
     created_at: string;
 }
 
@@ -37,8 +39,7 @@ export default function AdminReportsVerificationPage() {
 
     const fetchOrganizations = async () => {
         try {
-            const response = await authenticatedFetch(
-                `${process.env.NEXT_PUBLIC_APP_API_BASE_URL}/admin/organizations`
+            const response = await authenticatedFetch(`/api/v1/admin/organizations`
             );
             if (response?.ok) {
                 const data = await response.json();
@@ -54,12 +55,12 @@ export default function AdminReportsVerificationPage() {
         try {
             setLoading(true);
 
-            // Admin gets ALL reports, optionally filtered by organization
-            let apiUrl = `${process.env.NEXT_PUBLIC_APP_API_BASE_URL}/students/reports?`;
+            // Admin gets ALL reports via the segregated admin endpoint
+            let apiUrl = `/api/v1/admin/reports?`;
 
             // Add organization filter if selected
             if (selectedOrg && selectedOrg !== 'all') {
-                apiUrl += `organisationId=${selectedOrg}&`;
+                apiUrl += `organizationId=${selectedOrg}&`;
             }
 
             // Add status filter
@@ -95,9 +96,12 @@ export default function AdminReportsVerificationPage() {
     const getStatusBadge = (status: string) => {
         const config = {
             submitted: { color: 'bg-yellow-50 text-yellow-700 border-yellow-200', icon: Clock, label: 'Submitted' },
-            verified: { color: 'bg-green-50 text-green-700 border-green-200', icon: CheckCircle2, label: 'Verified' },
+            partner_verified: { color: 'bg-indigo-50 text-indigo-700 border-indigo-200', icon: CheckCircle2, label: 'NGO Verified' },
+            verified: { color: 'bg-green-50 text-green-700 border-green-200', icon: CheckCircle2, label: 'Fully Verified' },
             rejected: { color: 'bg-red-50 text-red-700 border-red-200', icon: XCircle, label: 'Rejected' },
             draft: { color: 'bg-slate-50 text-slate-700 border-slate-200', icon: FileText, label: 'Draft' },
+            pending: { color: 'bg-slate-50 text-slate-500 border-slate-200', icon: Clock, label: 'Pending' },
+            approved: { color: 'bg-green-50 text-green-600 border-green-200', icon: CheckCircle2, label: 'Approved' },
         };
 
         const { color, icon: Icon, label } = config[status as keyof typeof config] || config.draft;
@@ -220,7 +224,8 @@ export default function AdminReportsVerificationPage() {
                                     <th className="p-6 text-xs font-black text-slate-500 uppercase tracking-wider">Project</th>
                                     <th className="p-6 text-xs font-black text-slate-500 uppercase tracking-wider">Organization</th>
                                     <th className="p-6 text-xs font-black text-slate-500 uppercase tracking-wider">Submitted</th>
-                                    <th className="p-6 text-xs font-black text-slate-500 uppercase tracking-wider">Status</th>
+                                    <th className="p-6 text-xs font-black text-slate-500 uppercase tracking-wider">NGO Status</th>
+                                    <th className="p-6 text-xs font-black text-slate-500 uppercase tracking-wider">Overall Status</th>
                                     <th className="p-6 text-xs font-black text-slate-500 uppercase tracking-wider text-right">Actions</th>
                                 </tr>
                             </thead>
@@ -249,6 +254,9 @@ export default function AdminReportsVerificationPage() {
                                                     year: 'numeric'
                                                 })}
                                             </span>
+                                        </td>
+                                        <td className="p-6">
+                                            {getStatusBadge(report.partner_status)}
                                         </td>
                                         <td className="p-6">
                                             {getStatusBadge(report.status)}

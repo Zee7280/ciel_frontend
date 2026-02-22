@@ -103,7 +103,7 @@ export default function OpportunityDetailsPage() {
         const fetchData = async () => {
             try {
                 // Fetch Opportunity
-                const res = await authenticatedFetch(`${process.env.NEXT_PUBLIC_APP_API_BASE_URL}/opportunities/detail`, {
+                const res = await authenticatedFetch(`/api/v1/opportunities/detail`, {
                     method: 'POST',
                     body: JSON.stringify({ id })
                 });
@@ -167,7 +167,7 @@ export default function OpportunityDetailsPage() {
                     const userObj = JSON.parse(storedUser);
                     const userId = userObj.id || userObj.userId;
 
-                    const resOrg = await authenticatedFetch(`${process.env.NEXT_PUBLIC_APP_API_BASE_URL}/organisation/profile/detail`, {
+                    const resOrg = await authenticatedFetch(`/api/v1/organisation/profile/detail`, {
                         method: 'POST',
                         body: JSON.stringify({ userId })
                     });
@@ -303,7 +303,7 @@ export default function OpportunityDetailsPage() {
                 visibility: formData.visibility
             };
 
-            const res = await authenticatedFetch(`${process.env.NEXT_PUBLIC_APP_API_BASE_URL}/opportunities/update`, {
+            const res = await authenticatedFetch(`/api/v1/opportunities/update`, {
                 method: 'POST', // or PATCH/PUT depending on your API
                 body: JSON.stringify(payload)
             });
@@ -332,7 +332,7 @@ export default function OpportunityDetailsPage() {
 
         setIsSubmitting(true);
         try {
-            const res = await authenticatedFetch(`${process.env.NEXT_PUBLIC_APP_API_BASE_URL}/opportunities/${id}`, {
+            const res = await authenticatedFetch(`/api/v1/opportunities/${id}`, {
                 method: 'DELETE'
             });
 

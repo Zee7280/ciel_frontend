@@ -56,8 +56,8 @@ function ReportFormContent() {
         try {
             setIsLoading(true);
             const [projectRes, reportRes] = await Promise.all([
-                authenticatedFetch(`${process.env.NEXT_PUBLIC_APP_API_BASE_URL}/student/projects/${projectId}`),
-                authenticatedFetch(`${process.env.NEXT_PUBLIC_APP_API_BASE_URL}/student/reports/${projectId}`)
+                authenticatedFetch(`/api/v1/student/projects/${projectId}`),
+                authenticatedFetch(`/api/v1/student/reports/${projectId}`)
             ]);
 
             if (projectRes && projectRes.ok) {
@@ -105,7 +105,7 @@ function ReportFormContent() {
         if (isReadOnly) return;
         setIsSaving(true);
         try {
-            const res = await authenticatedFetch(`${process.env.NEXT_PUBLIC_APP_API_BASE_URL}/student/reports`, {
+            const res = await authenticatedFetch(`/api/v1/student/reports`, {
                 method: 'POST',
                 body: JSON.stringify({
                     ...data,
@@ -132,7 +132,7 @@ function ReportFormContent() {
 
         setIsSaving(true);
         try {
-            const res = await authenticatedFetch(`${process.env.NEXT_PUBLIC_APP_API_BASE_URL}/student/reports/${projectId}/submit`, {
+            const res = await authenticatedFetch(`/api/v1/student/reports/${projectId}/submit`, {
                 method: 'POST',
                 body: JSON.stringify(data)
             });

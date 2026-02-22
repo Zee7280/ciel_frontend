@@ -10,7 +10,7 @@ export async function POST(request: Request) {
         }
 
         // Proxy request to backend API
-        const response = await fetch(`${process.env.NEXT_PUBLIC_APP_API_BASE_URL}/organisation/profile/detail`, {
+        const response = await fetch(`${process.env.BACKEND_API_URL}/organisation/profile/detail`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",

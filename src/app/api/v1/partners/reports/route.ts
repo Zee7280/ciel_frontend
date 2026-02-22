@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
         const { searchParams } = new URL(req.url);
         const status = searchParams.get("status");
 
-        let backendUrl = `${process.env.NEXT_PUBLIC_APP_API_BASE_URL}/partners/reports`;
+        let backendUrl = `${process.env.BACKEND_API_URL}/partners/reports`;
         if (status) {
             backendUrl += `?status=${status}`;
         }
@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
         const token = authHeader.split(" ")[1];
         const body = await req.json();
 
-        const response = await fetch(`${process.env.NEXT_PUBLIC_APP_API_BASE_URL}/partners/reports`, {
+        const response = await fetch(`${process.env.BACKEND_API_URL}/partners/reports`, {
             method: "POST",
             headers: {
                 Authorization: `Bearer ${token}`,

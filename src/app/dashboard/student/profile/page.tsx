@@ -126,7 +126,7 @@ export default function StudentProfilePage() {
             }
 
             // Note: Content-Type header is NOT set manually so browser can set boundary
-            const res = await authenticatedFetch(`${process.env.NEXT_PUBLIC_APP_API_BASE_URL}/user/update`, {
+            const res = await authenticatedFetch(`/api/v1/user/update`, {
                 method: 'POST',
                 body: payload
             });

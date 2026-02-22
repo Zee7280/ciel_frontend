@@ -16,7 +16,7 @@ export default function StudentDashboard() {
             try {
                 // In a real app, we might need to pass the student ID if not handled by session/cookie
                 // For now, the API route handles it (mocked)
-                const res = await authenticatedFetch(`${process.env.NEXT_PUBLIC_APP_API_BASE_URL}/student/dashboard`);
+                const res = await authenticatedFetch(`/api/v1/student/dashboard`);
                 if (res && res.ok) {
                     const result = await res.json();
                     if (result.success) {

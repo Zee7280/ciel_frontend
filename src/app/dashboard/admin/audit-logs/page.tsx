@@ -17,7 +17,7 @@ export default function AdminAuditLogsPage() {
         setIsLoading(true);
         try {
             // Note: Backend pagination implemented, passing page/limit
-            const res = await authenticatedFetch(`${process.env.NEXT_PUBLIC_APP_API_BASE_URL}/admin/audit-logs?page=${currentPage}&limit=${itemsPerPage}`);
+            const res = await authenticatedFetch(`/api/v1/admin/audit-logs?page=${currentPage}&limit=${itemsPerPage}`);
             if (res && res.ok) {
                 const data = await res.json();
                 if (data.success) {

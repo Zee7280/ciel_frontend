@@ -11,7 +11,7 @@ export default function FacultyDashboard() {
     useEffect(() => {
         const fetchStats = async () => {
             try {
-                const res = await authenticatedFetch(`${process.env.NEXT_PUBLIC_APP_API_BASE_URL}/faculty/dashboard`);
+                const res = await authenticatedFetch(`/api/v1/faculty/dashboard`);
                 if (res && res.ok) {
                     const data = await res.json();
                     if (data.success) {

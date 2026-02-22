@@ -6,7 +6,7 @@ export async function POST(request: Request) {
         const body = await request.text();
 
         // Proxy request to backend API - assuming /student/opportunities is the endpoint
-        const backendUrl = `${process.env.NEXT_PUBLIC_APP_API_BASE_URL}/student/opportunities`;
+        const backendUrl = `${process.env.BACKEND_API_URL}/student/opportunities`;
 
         const response = await fetch(backendUrl, {
             method: "POST",

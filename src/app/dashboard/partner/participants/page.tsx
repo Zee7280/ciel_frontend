@@ -26,7 +26,7 @@ export default function PartnerParticipantsPage() {
                 return;
             }
 
-            const res = await authenticatedFetch(`${process.env.NEXT_PUBLIC_APP_API_BASE_URL}/participants`, {
+            const res = await authenticatedFetch(`/api/v1/participants`, {
                 method: 'POST',
                 body: JSON.stringify({ id: userId })
             });

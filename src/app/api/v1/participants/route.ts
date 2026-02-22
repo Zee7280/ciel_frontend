@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
         const token = authHeader.split(" ")[1];
 
         // Forward to backend API
-        const backendUrl = `${process.env.NEXT_PUBLIC_APP_API_BASE_URL}/participants`;
+        const backendUrl = `${process.env.BACKEND_API_URL}/participants`;
         const response = await fetch(backendUrl, {
             method: "GET",
             headers: {

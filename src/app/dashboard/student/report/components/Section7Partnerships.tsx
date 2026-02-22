@@ -6,11 +6,16 @@ import { RadioGroup, RadioGroupItem } from "./ui/radio-group";
 import { FileUpload } from "./ui/file-upload";
 import { Button } from "./ui/button";
 import { useReportForm } from "../context/ReportContext";
+import { FieldError } from "./ui/FieldError";
+import { AlertCircle } from "lucide-react";
 import clsx from "clsx";
 
 export default function Section7Partnerships() {
-    const { data, updateSection } = useReportForm();
+    const { data, updateSection, getFieldError, validationErrors } = useReportForm();
     const { has_partners, partners, formalization_status, formalization_files } = data.section7;
+
+    const sectionErrors = validationErrors['section7'] || [];
+    const hasErrors = sectionErrors.length > 0;
 
     const handleUpdate = (field: string, value: any) => {
         updateSection('section7', { [field]: value });
@@ -54,6 +59,21 @@ export default function Section7Partnerships() {
                 </div>
                 <h2 className="text-2xl font-bold text-slate-900">Partnerships & Networks</h2>
                 <p className="text-slate-600 text-sm">Did you work alone or with external partners?</p>
+
+                {/* Error Summary */}
+                {hasErrors && (
+                    <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-start gap-3 mt-4">
+                        <AlertCircle className="w-5 h-5 text-red-600 mt-0.5 shrink-0" />
+                        <div>
+                            <h4 className="font-semibold text-red-900 text-sm">Please fix the following errors:</h4>
+                            <ul className="mt-2 space-y-1">
+                                {sectionErrors.slice(0, 5).map((error, idx) => (
+                                    <li key={idx} className="text-xs text-red-700">• {error.message}</li>
+                                ))}
+                            </ul>
+                        </div>
+                    </div>
+                )}
             </div>
 
             <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 flex items-center justify-between">
@@ -95,13 +115,16 @@ export default function Section7Partnerships() {
                                             placeholder="e.g. WWF Pakistan"
                                             value={p.name}
                                             onChange={(e) => updatePartner(idx, 'name', e.target.value)}
+                                            className={clsx(getFieldError(`partners.${idx}.name`) && "border-red-400 bg-red-50")}
                                         />
+                                        <FieldError message={getFieldError(`partners.${idx}.name`)} />
                                     </div>
                                     <div className="space-y-2">
                                         <Label className="text-xs">Type</Label>
                                         <Select
                                             value={p.type}
                                             onChange={(e) => updatePartner(idx, 'type', e.target.value)}
+                                            className={clsx(getFieldError(`partners.${idx}.type`) && "border-red-400 bg-red-50")}
                                         >
                                             <option value="">Select Type</option>
                                             <option value="NGO">Non-Profit (NGO)</option>
@@ -110,6 +133,7 @@ export default function Section7Partnerships() {
                                             <option value="Educational">School / University</option>
                                             <option value="Community">Community Group</option>
                                         </Select>
+                                        <FieldError message={getFieldError(`partners.${idx}.type`)} />
                                     </div>
                                 </div>
 

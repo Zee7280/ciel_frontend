@@ -174,7 +174,7 @@ export default function StudentOpportunityCreationPage() {
             };
 
             // Use the NEW separate API endpoint for students
-            const res = await authenticatedFetch(`${process.env.NEXT_PUBLIC_APP_API_BASE_URL}/student/opportunity`, {
+            const res = await authenticatedFetch(`/api/v1/student/opportunity`, {
                 method: 'POST',
                 body: JSON.stringify(payload)
             });
@@ -223,7 +223,7 @@ export default function StudentOpportunityCreationPage() {
                     }
                 }
 
-                const res = await authenticatedFetch(`${process.env.NEXT_PUBLIC_APP_API_BASE_URL}/users/me`, {
+                const res = await authenticatedFetch(`/api/v1/user/me`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'

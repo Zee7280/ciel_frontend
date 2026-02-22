@@ -6,7 +6,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         const authHeader = request.headers.get("Authorization");
         const body = await request.json();
 
-        const response = await fetch(`${process.env.NEXT_PUBLIC_APP_API_BASE_URL}/admin/users/${id}/reject`, {
+        const response = await fetch(`${process.env.BACKEND_API_URL}/admin/users/${id}/reject`, {
             method: "POST",
             headers: {
                 "Authorization": authHeader || "",

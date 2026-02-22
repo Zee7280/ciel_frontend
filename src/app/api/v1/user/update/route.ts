@@ -16,7 +16,7 @@ export async function POST(request: Request) {
         const body = await request.arrayBuffer();
 
         // Proxy to backend user/update
-        const response = await fetch(`${process.env.NEXT_PUBLIC_APP_API_BASE_URL}/user/update`, {
+        const response = await fetch(`${process.env.BACKEND_API_URL}/user/update`, {
             method: "POST",
             headers: headers,
             body: body,

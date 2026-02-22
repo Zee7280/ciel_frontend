@@ -46,6 +46,10 @@ body {
     animation: spin 20s linear infinite;
   }
 
+  .animate-spin-extra-slow {
+    animation: spin 60s linear infinite;
+  }
+
   .animate-pulse-slow {
     animation: pulse-slow 4s ease-in-out infinite;
   }

@@ -6,11 +6,16 @@ import { Button } from "./ui/button";
 import { RadioGroup, RadioGroupItem } from "./ui/radio-group";
 import { FileUpload } from "./ui/file-upload";
 import { useReportForm } from "../context/ReportContext";
+import { FieldError } from "./ui/FieldError";
+import { AlertCircle } from "lucide-react";
 import clsx from "clsx";
 
 export default function Section6Resources() {
-    const { data, updateSection } = useReportForm();
+    const { data, updateSection, getFieldError, validationErrors } = useReportForm();
     const { use_resources, resources, evidence_files } = data.section6;
+
+    const sectionErrors = validationErrors['section6'] || [];
+    const hasErrors = sectionErrors.length > 0;
 
     const handleUpdate = (field: string, value: any) => {
         updateSection('section6', { [field]: value });
@@ -41,6 +46,21 @@ export default function Section6Resources() {
                 </div>
                 <h2 className="text-2xl font-bold text-slate-900">Resource Inventory</h2>
                 <p className="text-slate-600 text-sm">Did you utilize any physical, financial, or human resources?</p>
+
+                {/* Error Summary */}
+                {hasErrors && (
+                    <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-start gap-3 mt-4">
+                        <AlertCircle className="w-5 h-5 text-red-600 mt-0.5 shrink-0" />
+                        <div>
+                            <h4 className="font-semibold text-red-900 text-sm">Please fix the following errors:</h4>
+                            <ul className="mt-2 space-y-1">
+                                {sectionErrors.slice(0, 5).map((error, idx) => (
+                                    <li key={idx} className="text-xs text-red-700">• {error.message}</li>
+                                ))}
+                            </ul>
+                        </div>
+                    </div>
+                )}
             </div>
 
             {/* Toggle */}
@@ -81,6 +101,7 @@ export default function Section6Resources() {
                                         <Select
                                             value={res.type}
                                             onChange={(e) => updateResourceRow(idx, 'type', e.target.value)}
+                                            className={clsx(getFieldError(`resources.${idx}.type`) && "border-red-400 bg-red-50")}
                                         >
                                             <option value="">Select Type</option>
                                             <option value="Financial">Financial (Cash)</option>
@@ -88,6 +109,7 @@ export default function Section6Resources() {
                                             <option value="Infrastructure">Infrastructure</option>
                                             <option value="Human Capital">Human Capital</option>
                                         </Select>
+                                        <FieldError message={getFieldError(`resources.${idx}.type`)} />
                                     </div>
                                     <div className="space-y-1">
                                         <Label className="text-xs">Amount</Label>
@@ -96,6 +118,7 @@ export default function Section6Resources() {
                                                 placeholder="0"
                                                 value={res.amount}
                                                 onChange={(e) => updateResourceRow(idx, 'amount', e.target.value)}
+                                                className={clsx(getFieldError(`resources.${idx}.amount`) && "border-red-400 bg-red-50")}
                                             />
                                             <Input
                                                 placeholder="Unit"
@@ -104,6 +127,7 @@ export default function Section6Resources() {
                                                 onChange={(e) => updateResourceRow(idx, 'unit', e.target.value)}
                                             />
                                         </div>
+                                        <FieldError message={getFieldError(`resources.${idx}.amount`)} />
                                     </div>
                                     <div className="space-y-1">
                                         <Label className="text-xs">Source</Label>

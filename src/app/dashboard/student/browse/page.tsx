@@ -80,7 +80,7 @@ export default function StudentBrowseOpportunitiesPage() {
             }
 
             // Fetching all approved opportunities using the requested endpoint
-            const res = await authenticatedFetch(`${process.env.NEXT_PUBLIC_APP_API_BASE_URL}/students/opportunities?status=approved`, {
+            const res = await authenticatedFetch(`/api/v1/students/opportunities?status=approved`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -94,7 +94,9 @@ export default function StudentBrowseOpportunitiesPage() {
                     console.log("Browse API Response:", data.data); // DEBUG: Check if teamMembers and status are present
                     const mappedOps = (data.data || []).map((op: any) => ({
                         ...op,
-                        hasApplied: op.status === 'applied' || op.hasApplied
+                        // If application_status exists, it means the student has applied
+                        // Status 'active' or 'accepted' means it's approved and can be reported
+                        hasApplied: !!op.application_status || op.status === 'applied' || op.status === 'active' || op.status === 'accepted'
                     }));
                     setOpportunities(mappedOps);
                 }
@@ -109,7 +111,7 @@ export default function StudentBrowseOpportunitiesPage() {
     const handleApply = async (opportunityId: string) => {
         setApplyingId(opportunityId);
         try {
-            const res = await authenticatedFetch(`${process.env.NEXT_PUBLIC_APP_API_BASE_URL}/students/opportunities/${opportunityId}/apply`, {
+            const res = await authenticatedFetch(`/api/v1/students/opportunities/${opportunityId}/apply`, {
                 method: 'POST'
             });
 

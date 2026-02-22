@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
         const token = authHeader.split(" ")[1];
 
         const response = await fetch(
-            `${process.env.NEXT_PUBLIC_APP_API_BASE_URL}/partners/impact/metrics`,
+            `${process.env.BACKEND_API_URL}/partners/impact/metrics`,
             {
                 method: "GET",
                 headers: {

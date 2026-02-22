@@ -3,11 +3,34 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
+import { useState, useEffect } from "react";
 import { LayoutDashboard, BookOpen, Users, Settings, PieChart, LogOut, FileText, Heart, Building2, CheckCircle, Briefcase, FileBarChart, ShieldAlert, Bell, User, Flag, MessageSquare, Plus } from "lucide-react";
 import clsx from "clsx";
+import { authenticatedFetch } from "@/utils/api";
 
 export default function Sidebar() {
     const pathname = usePathname();
+    const [unreadCount, setUnreadCount] = useState(0);
+
+    useEffect(() => {
+        const fetchUnreadCount = async () => {
+            try {
+                const res = await authenticatedFetch("/api/v1/chat/unread-count");
+                if (res && res.ok) {
+                    const data = await res.json();
+                    if (data.success) {
+                        setUnreadCount(data.data.count);
+                    }
+                }
+            } catch (error) {
+                console.error("Failed to fetch unread count", error);
+            }
+        };
+
+        fetchUnreadCount();
+        const interval = setInterval(fetchUnreadCount, 30000); // Check every 30s
+        return () => clearInterval(interval);
+    }, []);
 
     // Determine role based on path (simple logic for now)
     const isStudent = pathname.includes("/student");
@@ -26,6 +49,7 @@ export default function Sidebar() {
             { label: "Create Opportunity", href: "/dashboard/student/create-opportunity", icon: Plus },
             { label: "Browse Opportunities", href: "/dashboard/student/browse", icon: Globe },
             { label: "Impact History", href: "/dashboard/student/impact", icon: PieChart },
+            { label: "Messages", href: "/dashboard/student/messages", icon: MessageSquare },
             { label: "My Profile", href: "/dashboard/student/profile", icon: User },
         ] : []),
         // Partner
@@ -36,6 +60,7 @@ export default function Sidebar() {
             { label: "Verify Work", href: "/dashboard/partner/verification", icon: CheckCircle },
             { label: "Reports", href: "/dashboard/partner/reports", icon: FileText },
             { label: "Impact", href: "/dashboard/partner/impact", icon: FileBarChart },
+            { label: "Messages", href: "/dashboard/partner/messages", icon: MessageSquare },
             { label: "Funding", href: "/dashboard/partner/funding", icon: PieChart },
             { label: "Notifications", href: "/dashboard/partner/notifications", icon: Bell },
             { label: "My Profile", href: "/dashboard/partner/profile", icon: User },
@@ -46,6 +71,7 @@ export default function Sidebar() {
             { label: "Project Approvals", href: "/dashboard/faculty/approvals", icon: CheckCircle },
             { label: "Create Opportunity", href: "/dashboard/faculty/create-opportunity", icon: Plus },
             { label: "Student Grading", href: "/dashboard/faculty/grading", icon: FileText },
+            { label: "Messages", href: "/dashboard/faculty/messages", icon: MessageSquare },
             { label: "Impact Analytics", href: "/dashboard/faculty/analytics", icon: PieChart },
         ] : []),
         // Admin
@@ -56,6 +82,7 @@ export default function Sidebar() {
             { label: "Projects", href: "/dashboard/admin/projects", icon: Briefcase },
             { label: "Student Reports", href: "/dashboard/admin/reports/verify", icon: FileText },
             { label: "Impact", href: "/dashboard/admin/impact", icon: FileBarChart },
+            { label: "Messages", href: "/dashboard/admin/messages", icon: MessageSquare },
             { label: "Audit Logs", href: "/dashboard/admin/audit-logs", icon: ShieldAlert },
         ] : []),
     ];
@@ -100,12 +127,19 @@ export default function Sidebar() {
                             key={link.href}
                             href={link.href}
                             className={clsx(
-                                "flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-medium text-sm",
+                                "flex items-center justify-between px-4 py-3 rounded-xl transition-all font-medium text-sm w-full group",
                                 isActive ? "bg-blue-600 text-white shadow-lg shadow-blue-900/50" : "text-slate-400 hover:text-white hover:bg-slate-800"
                             )}
                         >
-                            <link.icon className="w-5 h-5" />
-                            {link.label}
+                            <div className="flex items-center gap-3">
+                                <link.icon className="w-5 h-5" />
+                                {link.label}
+                            </div>
+                            {link.label === "Messages" && unreadCount > 0 && (
+                                <span className="bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm animate-pulse">
+                                    {unreadCount > 99 ? "99+" : unreadCount}
+                                </span>
+                            )}
                         </Link>
                     )
                 })}

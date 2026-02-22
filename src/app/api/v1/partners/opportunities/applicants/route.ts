@@ -24,7 +24,7 @@ export async function POST(request: Request) {
         const body = await request.json();
 
         // Forward request to external API
-        const externalApiUrl = `${process.env.NEXT_PUBLIC_APP_API_BASE_URL}/partners/opportunities/applicants`;
+        const externalApiUrl = `${process.env.BACKEND_API_URL}/partners/opportunities/applicants`;
 
         console.log("Proxying request to external API:", externalApiUrl);
 

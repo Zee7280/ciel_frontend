@@ -14,7 +14,7 @@ export async function POST(req: NextRequest) {
         const body = await req.json();
 
         const response = await fetch(
-            `${process.env.NEXT_PUBLIC_APP_API_BASE_URL}/profile/change-password`,
+            `${process.env.BACKEND_API_URL}/profile/change-password`,
             {
                 method: "POST",
                 headers: {

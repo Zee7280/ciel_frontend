@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
         const status = searchParams.get("status");
         const type = searchParams.get("type");
 
-        let backendUrl = `${process.env.NEXT_PUBLIC_APP_API_BASE_URL}/notifications`;
+        let backendUrl = `${process.env.BACKEND_API_URL}/notifications`;
         const params = [];
         if (status) params.push(`status=${status}`);
         if (type) params.push(`type=${type}`);

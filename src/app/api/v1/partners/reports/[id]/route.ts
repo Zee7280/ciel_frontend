@@ -18,7 +18,7 @@ export async function PUT(
         const body = await req.json();
 
         const response = await fetch(
-            `${process.env.NEXT_PUBLIC_APP_API_BASE_URL}/partners/reports/${id}`,
+            `${process.env.BACKEND_API_URL}/partners/reports/${id}`,
             {
                 method: "PUT",
                 headers: {
@@ -65,7 +65,7 @@ export async function DELETE(
         const token = authHeader.split(" ")[1];
 
         const response = await fetch(
-            `${process.env.NEXT_PUBLIC_APP_API_BASE_URL}/partners/reports/${id}`,
+            `${process.env.BACKEND_API_URL}/partners/reports/${id}`,
             {
                 method: "DELETE",
                 headers: {

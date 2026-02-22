@@ -28,7 +28,7 @@ export default function OpportunityDetailsPage() {
 
     const fetchOpportunityDetails = async () => {
         try {
-            const res = await authenticatedFetch(`${process.env.NEXT_PUBLIC_APP_API_BASE_URL}/students/opportunities/${id}`);
+            const res = await authenticatedFetch(`/api/v1/students/opportunities/${id}`);
             if (res && res.ok) {
                 const data = await res.json();
                 if (data.success) {
@@ -51,20 +51,28 @@ export default function OpportunityDetailsPage() {
     const handleApply = async () => {
         setIsApplying(true);
         try {
-            const res = await authenticatedFetch(`${process.env.NEXT_PUBLIC_APP_API_BASE_URL}/students/opportunities/${id}/apply`, {
+            const res = await authenticatedFetch(`/api/v1/students/opportunities/${id}/apply`, {
                 method: 'POST'
             });
 
+            const data = await res?.json().catch(() => ({}));
+
             if (res && res.ok) {
-                const data = await res.json();
                 if (data.success) {
                     toast.success("Application submitted successfully!");
-                    setOpportunity({ ...opportunity, hasApplied: true });
+                    setOpportunity((prev: any) => ({ ...prev, hasApplied: true }));
                 } else {
                     toast.error(data.message || "Failed to submit application");
                 }
             } else {
-                toast.error("Failed to connect to server");
+                // 400 "Already applied" — treat as already applied
+                const msg: string = data?.message || "";
+                if (res?.status === 400 && msg.toLowerCase().includes("already applied")) {
+                    setOpportunity((prev: any) => ({ ...prev, hasApplied: true }));
+                    toast.info("You have already applied to this opportunity.");
+                } else {
+                    toast.error(msg || "Failed to connect to server");
+                }
             }
         } catch (error) {
             console.error("Error applying", error);

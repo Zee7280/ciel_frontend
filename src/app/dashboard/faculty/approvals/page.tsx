@@ -18,7 +18,7 @@ export default function FacultyApprovalsPage() {
 
     const fetchPendingProjects = async () => {
         try {
-            const res = await authenticatedFetch(`${process.env.NEXT_PUBLIC_APP_API_BASE_URL}/faculty/approvals?status=pending`);
+            const res = await authenticatedFetch(`/api/v1/faculty/approvals?status=pending`);
             if (res && res.ok) {
                 const data = await res.json();
                 if (data.success) {
@@ -35,7 +35,7 @@ export default function FacultyApprovalsPage() {
 
     const handleApprove = async (id: number) => {
         try {
-            const res = await authenticatedFetch(`${process.env.NEXT_PUBLIC_APP_API_BASE_URL}/faculty/approvals/${id}/approve`, {
+            const res = await authenticatedFetch(`/api/v1/faculty/approvals/${id}/approve`, {
                 method: 'POST'
             });
             if (res && res.ok) {
@@ -52,7 +52,7 @@ export default function FacultyApprovalsPage() {
 
     const handleReject = async (id: number) => {
         try {
-            const res = await authenticatedFetch(`${process.env.NEXT_PUBLIC_APP_API_BASE_URL}/faculty/approvals/${id}/reject`, {
+            const res = await authenticatedFetch(`/api/v1/faculty/approvals/${id}/reject`, {
                 method: 'POST',
                 body: JSON.stringify({ reason: "Faculty rejected" })
             });

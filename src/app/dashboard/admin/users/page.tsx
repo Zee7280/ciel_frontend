@@ -62,7 +62,7 @@ export default function AdminUsersPage() {
     const fetchUsers = async () => {
         setIsLoading(true);
         try {
-            const res = await authenticatedFetch(`${process.env.NEXT_PUBLIC_APP_API_BASE_URL}/admin/users`);
+            const res = await authenticatedFetch(`/api/v1/admin/users`);
             if (!res) return;
             const data = await res.json();
 
@@ -91,7 +91,7 @@ export default function AdminUsersPage() {
     const handleAddUser = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
-            const res = await authenticatedFetch(`${process.env.NEXT_PUBLIC_APP_API_BASE_URL}/admin/users`, {
+            const res = await authenticatedFetch(`/api/v1/admin/users`, {
                 method: "POST",
                 body: JSON.stringify(formData)
             });
@@ -110,7 +110,7 @@ export default function AdminUsersPage() {
     const handleDeleteUser = async (id: number | string) => {
         if (!confirm("Are you sure you want to delete this user?")) return;
         try {
-            const res = await authenticatedFetch(`${process.env.NEXT_PUBLIC_APP_API_BASE_URL}/admin/users/${id}`, {
+            const res = await authenticatedFetch(`/api/v1/admin/users/${id}`, {
                 method: "DELETE"
             });
             if (res && res.ok) fetchUsers();
@@ -135,7 +135,7 @@ export default function AdminUsersPage() {
             const payload: any = { ...formData };
             if (!payload.password) delete payload.password; // Don't send empty password
 
-            const res = await authenticatedFetch(`${process.env.NEXT_PUBLIC_APP_API_BASE_URL}/admin/users/${selectedUser.id}`, {
+            const res = await authenticatedFetch(`/api/v1/admin/users/${selectedUser.id}`, {
                 method: "POST",
                 body: JSON.stringify(payload)
             });

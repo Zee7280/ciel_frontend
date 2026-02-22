@@ -133,7 +133,7 @@ export default function ApplicationDialog({ opportunityId, open, onOpenChange, o
                 team_members: participationType === "team" ? teamMembers : undefined
             };
 
-            const res = await authenticatedFetch(`${process.env.NEXT_PUBLIC_APP_API_BASE_URL}/students/opportunities/${opportunityId}/apply`, {
+            const res = await authenticatedFetch(`/api/v1/students/opportunities/${opportunityId}/apply`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'

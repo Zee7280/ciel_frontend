@@ -6,6 +6,7 @@ import { Info, MapPin, Calendar, Clock, CheckCircle, AlertCircle, ChevronDown, C
 import { authenticatedFetch } from "@/utils/api";
 import { toast } from "sonner";
 import { Button } from "@/app/dashboard/student/report/components/ui/button";
+import { sdgData } from "@/utils/sdgData";
 
 export default function FacultyOpportunityCreationPage() {
     const router = useRouter();
@@ -47,7 +48,7 @@ export default function FacultyOpportunityCreationPage() {
                 return;
             }
 
-            const res = await authenticatedFetch(`${process.env.NEXT_PUBLIC_APP_API_BASE_URL}/opportunities`, {
+            const res = await authenticatedFetch(`/api/v1/opportunities`, {
                 method: 'POST',
                 body: JSON.stringify(formData)
             });
@@ -259,10 +260,39 @@ export default function FacultyOpportunityCreationPage() {
                             onChange={(e) => setFormData({ ...formData, sdg: e.target.value, target: "", indicator: "" })}
                         >
                             <option value="">Select an SDG...</option>
-                            <option value="1">SDG 1 — No Poverty</option>
-                            <option value="4">SDG 4 — Quality Education</option>
-                            <option value="13">SDG 13 — Climate Action</option>
-                            {/* Add full list */}
+                            {sdgData.map(sdg => (
+                                <option key={sdg.id} value={sdg.id}>SDG {sdg.number} — {sdg.title}</option>
+                            ))}
+                        </select>
+                    </div>
+
+                    {/* C2. SDG Target */}
+                    <div className={!formData.sdg ? "opacity-50 pointer-events-none" : ""}>
+                        <label className="block text-sm font-bold text-slate-900 mb-2">C2. Select SDG Target <span className="text-red-500">*</span></label>
+                        <select
+                            className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-purple-500 focus:ring-4 focus:ring-purple-500/10 outline-none font-medium"
+                            value={formData.target}
+                            onChange={(e) => setFormData({ ...formData, target: e.target.value, indicator: "" })}
+                        >
+                            <option value="">Select a Target...</option>
+                            {sdgData.find(s => s.id === formData.sdg)?.targets.map(target => (
+                                <option key={target.id} value={target.id}>Target {target.id} — {target.description}</option>
+                            ))}
+                        </select>
+                    </div>
+
+                    {/* C3. SDG Indicator */}
+                    <div className={!formData.target ? "opacity-50 pointer-events-none" : ""}>
+                        <label className="block text-sm font-bold text-slate-900 mb-2">C3. SDG Indicator</label>
+                        <select
+                            className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-purple-500 focus:ring-4 focus:ring-purple-500/10 outline-none font-medium"
+                            value={formData.indicator}
+                            onChange={(e) => setFormData({ ...formData, indicator: e.target.value })}
+                        >
+                            <option value="">Select an Indicator...</option>
+                            {sdgData.find(s => s.id === formData.sdg)?.targets.find(t => t.id === formData.target)?.indicators.map(indicator => (
+                                <option key={indicator.id} value={indicator.id}>Indicator {indicator.id} — {indicator.description}</option>
+                            ))}
                         </select>
                     </div>
                 </div>
