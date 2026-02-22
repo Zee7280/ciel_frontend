@@ -31,8 +31,8 @@ export default function LoginPage() {
         setFpError(null);
         setForgotSuccess(null);
         try {
-            const backendUrl = process.env.NEXT_PUBLIC_BACKEND_BASE_URL || "http://localhost:3000";
-            const res = await fetch(`${backendUrl}/api/v1/auth/forgot-password`, {
+            const backendUrl = process.env.NEXT_PUBLIC_BACKEND_BASE_URL;
+            const res = await fetch(`${backendUrl}/auth/forgot-password`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ email: forgotEmail }),
@@ -65,8 +65,8 @@ export default function LoginPage() {
         setIsLoading(true);
         setFpError(null);
         try {
-            const backendUrl = process.env.NEXT_PUBLIC_BACKEND_BASE_URL || "http://localhost:3000";
-            const res = await fetch(`${backendUrl}/api/v1/auth/reset-password`, {
+            const backendUrl = process.env.NEXT_PUBLIC_BACKEND_BASE_URL;
+            const res = await fetch(`${backendUrl}/auth/reset-password`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ token: resetToken, newPassword }),
@@ -93,8 +93,8 @@ export default function LoginPage() {
         try {
             // API call to authenticate
             // In a real app, this would be your backend endpoint
-            const backendUrl = process.env.NEXT_PUBLIC_BACKEND_BASE_URL || "http://localhost:3000";
-            const loginUrl = `${backendUrl}/api/v1/auth/login`;
+            const backendUrl = process.env.NEXT_PUBLIC_BACKEND_BASE_URL;
+            const loginUrl = `${backendUrl}/auth/login`;
             console.log("Login URL:", loginUrl);
             const response = await fetch(loginUrl, {
                 method: "POST",

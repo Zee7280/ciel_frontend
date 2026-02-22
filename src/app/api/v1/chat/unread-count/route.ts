@@ -7,7 +7,7 @@ export async function GET(req: NextRequest) {
             return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
         }
 
-        const backendUrl = `${process.env.BACKEND_API_URL}/chat/unread-count`;
+        const backendUrl = `${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/chat/unread-count`;
 
         const response = await fetch(backendUrl, {
             method: "GET",

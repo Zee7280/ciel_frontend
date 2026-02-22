@@ -17,7 +17,7 @@ export async function DELETE(
         const token = authHeader.split(" ")[1];
 
         const response = await fetch(
-            `${process.env.BACKEND_API_URL}/notifications/${id}`,
+            `${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/notifications/${id}`,
             {
                 method: "DELETE",
                 headers: {

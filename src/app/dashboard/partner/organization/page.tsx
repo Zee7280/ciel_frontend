@@ -58,7 +58,7 @@ export default function OrganizationProfilePage() {
                     return;
                 }
 
-                const res = await authenticatedFetch(`${process.env.NEXT_PUBLIC_APP_API_BASE_URL}/organisation/profile/detail`, {
+                const res = await authenticatedFetch(`/api/v1/organisation/profile/detail`, {
                     method: 'POST',
                     body: JSON.stringify({ userId })
                 });
@@ -143,7 +143,7 @@ export default function OrganizationProfilePage() {
         }
 
         try {
-            const res = await authenticatedFetch(`${process.env.NEXT_PUBLIC_APP_API_BASE_URL}/partners/profile/logo`, {
+            const res = await authenticatedFetch(`/api/v1/partners/profile/logo`, {
                 method: 'POST',
                 body: formData
             });
@@ -238,7 +238,7 @@ export default function OrganizationProfilePage() {
                 dataPolicyAcknowledged: orgData.isDataPolicyAcknowledged
             };
 
-            const res = await authenticatedFetch(`${process.env.NEXT_PUBLIC_APP_API_BASE_URL}/organisation/profile`, {
+            const res = await authenticatedFetch(`/api/v1/organisation/profile`, {
                 method: 'POST',
                 body: JSON.stringify(payload)
             });

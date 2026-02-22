@@ -7,6 +7,7 @@ import Link from "next/link";
 import { authenticatedFetch } from "@/utils/api";
 import { toast } from "sonner";
 import dynamic from "next/dynamic";
+import { sdgData } from "@/utils/sdgData";
 
 const LocationPicker = dynamic(() => import("@/components/ui/LocationPicker"), {
     ssr: false,
@@ -839,17 +840,11 @@ export default function OpportunityDetailsPage() {
                             onChange={(e) => setFormData({ ...formData, sdg: e.target.value, target: "", indicator: "" })}
                         >
                             <option value="">Select an SDG...</option>
-                            <option value="1">SDG 1 — No Poverty</option>
-                            <option value="2">SDG 2 — Zero Hunger</option>
-                            <option value="3">SDG 3 — Good Health & Well Being</option>
-                            <option value="4">SDG 4 — Quality Education</option>
-                            <option value="5">SDG 5 — Gender Equality</option>
-                            <option value="6">SDG 6 — Clean Water & Sanitation</option>
-                            <option value="8">SDG 8 — Decent Work & Economic Growth</option>
-                            <option value="11">SDG 11 — Sustainable Cities</option>
-                            <option value="13">SDG 13 — Climate Action</option>
-                            <option value="16">SDG 16 — Peace, Justice & Institutions</option>
-                            <option value="17">SDG 17 — Partnerships for the Goals</option>
+                            {sdgData.map((sdg) => (
+                                <option key={sdg.id} value={sdg.id}>
+                                    SDG {sdg.number} — {sdg.title}
+                                </option>
+                            ))}
                         </select>
                     </div>
 
@@ -860,44 +855,35 @@ export default function OpportunityDetailsPage() {
 
                             className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-purple-500 outline-none font-medium disabled:bg-slate-50"
                             value={formData.target}
-                            onChange={(e) => setFormData({ ...formData, target: e.target.value })}
+                            onChange={(e) => setFormData({ ...formData, target: e.target.value, indicator: "" })}
                         >
                             <option value="">Select a Target...</option>
-                            {/* In a real app, these would be filtered based on the selected SDG */}
-                            {formData.sdg === "4" && (
-                                <>
-                                    <option value="4.4">Target 4.4 — Skills for employment</option>
-                                    <option value="4.6">Target 4.6 — Literacy and numeracy</option>
-                                    <option value="4.7">Target 4.7 — Sustainable development education</option>
-                                </>
-                            )}
-                            {formData.sdg === "13" && (
-                                <>
-                                    <option value="13.1">Target 13.1 — Resilience & adaptive capacity</option>
-                                    <option value="13.3">Target 13.3 — Awareness & capacity building</option>
-                                </>
-                            )}
-                            {/* Fallbacks */}
-                            {formData.target && !["4.4", "4.6", "4.7", "13.1", "13.3"].includes(formData.target) && (
-                                <option value={formData.target}>{formData.target}</option>
-                            )}
-                            {!["3", "4", "13"].includes(formData.sdg) && formData.sdg && (
-                                <option value="generic">Target {formData.sdg}.1 — Example Generic Target</option>
-                            )}
+                            {formData.sdg && sdgData.find(sdg => sdg.id === formData.sdg)?.targets.map((target) => (
+                                <option key={target.id} value={target.id}>
+                                    Target {target.id} — {target.description}
+                                </option>
+                            ))}
                         </select>
                     </div>
 
                     {/* C3. Indicator */}
                     <div className={!formData.target ? "opacity-50 pointer-events-none" : ""}>
                         <label className="block text-sm font-bold text-slate-900 mb-2">C3. SDG Indicator</label>
-                        <input
-                            type="text"
+                        <select
 
                             className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-purple-500 outline-none font-medium disabled:bg-slate-50"
-                            placeholder="e.g. 4.4.1"
                             value={formData.indicator}
                             onChange={(e) => setFormData({ ...formData, indicator: e.target.value })}
-                        />
+                        >
+                            <option value="">Select an Indicator...</option>
+                            {formData.sdg && formData.target && sdgData
+                                .find(sdg => sdg.id === formData.sdg)?.targets
+                                .find(target => target.id === formData.target)?.indicators.map((indicator) => (
+                                    <option key={indicator.id} value={indicator.id}>
+                                        Indicator {indicator.id} — {indicator.description}
+                                    </option>
+                                ))}
+                        </select>
                     </div>
                 </div>
             </div>

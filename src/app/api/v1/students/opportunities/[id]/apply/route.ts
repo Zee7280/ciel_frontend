@@ -13,7 +13,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         }
 
         // Proxy to backend /students/opportunities/[id]/apply
-        const response = await fetch(`${process.env.BACKEND_API_URL}/students/opportunities/${id}/apply`, {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/students/opportunities/${id}/apply`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",

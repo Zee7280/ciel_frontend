@@ -7,7 +7,7 @@ export async function GET(request: Request) {
         // Proxy to Real Backend
         // Assuming the backend endpoint is /admin/organizations as per standard convention
         // If this 404s, we might need to check /admin/users or similar
-        const response = await fetch(`${process.env.BACKEND_API_URL}/admin/organizations`, {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/admin/organizations`, {
             headers: {
                 "Authorization": authHeader || "",
                 "Content-Type": "application/json"

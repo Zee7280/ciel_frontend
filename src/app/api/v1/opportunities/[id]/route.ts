@@ -5,7 +5,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
         const authHeader = request.headers.get("Authorization");
         const { id } = await params;
 
-        const response = await fetch(`${process.env.BACKEND_API_URL}/opportunities/${id}`, {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/opportunities/${id}`, {
             method: "GET",
             headers: {
                 "Content-Type": "application/json",

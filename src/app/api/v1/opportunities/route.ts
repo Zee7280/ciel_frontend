@@ -5,7 +5,7 @@ export async function POST(request: Request) {
         const authHeader = request.headers.get("Authorization");
         const body = await request.text();
 
-        const response = await fetch(`${process.env.BACKEND_API_URL}/opportunities`, {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/opportunities`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",

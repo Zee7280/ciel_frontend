@@ -2,10 +2,20 @@ import { useReportForm } from "../context/ReportContext";
 
 interface Props {
     projectData: any;
+    reportData?: any; // Added to support usage outside ReportProvider
 }
 
-export default function ReportPrintView({ projectData }: Props) {
-    const { data } = useReportForm();
+export default function ReportPrintView({ projectData, reportData }: Props) {
+    // Use prop if provided, otherwise fallback to context
+    let data = reportData;
+    try {
+        const { data: contextData } = reportData ? { data: null } : useReportForm();
+        if (!data) data = contextData;
+    } catch (e) {
+        // Ignored if useReportForm fails outside context
+    }
+
+    if (!data) return <div className="p-8 text-center text-slate-500">No report data available for preview.</div>;
 
     const SectionHeader = ({ title, number }: { title: string, number: number }) => (
         <h2 className="text-xl font-bold border-b-2 border-slate-800 pb-2 mb-4 mt-8 font-serif text-slate-800">
@@ -49,7 +59,7 @@ export default function ReportPrintView({ projectData }: Props) {
                                 </tr>
                             </thead>
                             <tbody>
-                                {data.section1.team_members.map((m, i) => (
+                                {data.section1.team_members.map((m: any, i: number) => (
                                     <tr key={i}>
                                         <td className="border p-2">{m.name}</td>
                                         <td className="border p-2">{m.cnic}</td>
@@ -80,7 +90,7 @@ export default function ReportPrintView({ projectData }: Props) {
                     <div className="mt-4">
                         <h3 className="font-bold text-md mb-2">Secondary SDGs</h3>
                         <ul className="list-disc ml-5 text-sm">
-                            {data.section3.secondary_sdgs.map((sdg, i) => (
+                            {data.section3.secondary_sdgs.map((sdg: any, i: number) => (
                                 <li key={i}>Goal {sdg.sdg_id}: {sdg.justification}</li>
                             ))}
                         </ul>
@@ -121,7 +131,7 @@ export default function ReportPrintView({ projectData }: Props) {
                             </tr>
                         </thead>
                         <tbody>
-                            {data.section6.resources.map((r, i) => (
+                            {data.section6.resources.map((r: any, i: number) => (
                                 <tr key={i}>
                                     <td className="border p-2">{r.type}</td>
                                     <td className="border p-2">{r.amount} {r.unit}</td>
@@ -140,7 +150,7 @@ export default function ReportPrintView({ projectData }: Props) {
                 <LabelValue label="Has Partners" value={data.section7.has_partners} />
                 {data.section7.partners.length > 0 && (
                     <div className="mt-2 space-y-2">
-                        {data.section7.partners.map((p, i) => (
+                        {data.section7.partners.map((p: any, i: number) => (
                             <div key={i} className="text-sm border p-2 rounded">
                                 <strong>{p.name}</strong> ({p.type}) - {p.contribution.join(", ")}
                             </div>

@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
         const status = searchParams.get("status") || "pending";
 
         // Forward to backend API
-        const backendUrl = `${process.env.BACKEND_API_URL}/partners/verifications?status=${status}`;
+        const backendUrl = `${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/partners/verifications?status=${status}`;
         const response = await fetch(backendUrl, {
             method: "GET",
             headers: {

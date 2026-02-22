@@ -7,7 +7,7 @@ export async function GET(req: NextRequest) {
             return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
         }
 
-        const backendUrl = `${process.env.BACKEND_API_URL}/chat/conversations`;
+        const backendUrl = `${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/chat/conversations`;
 
         const response = await fetch(backendUrl, {
             method: "GET",
@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
         }
 
         const body = await req.json();
-        const backendUrl = `${process.env.BACKEND_API_URL}/chat/conversations`;
+        const backendUrl = `${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/chat/conversations`;
 
         const response = await fetch(backendUrl, {
             method: "POST",

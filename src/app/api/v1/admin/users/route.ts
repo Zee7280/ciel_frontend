@@ -5,7 +5,7 @@ export async function POST(request: Request) {
         const body = await request.json();
         const authHeader = request.headers.get("Authorization");
 
-        const response = await fetch(`${process.env.BACKEND_API_URL}/admin/users`, {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/admin/users`, {
             method: "POST",
             headers: {
                 "Authorization": authHeader || "",
@@ -28,7 +28,7 @@ export async function GET(request: Request) {
         const authHeader = request.headers.get("Authorization");
 
         // Proxy to Real Backend
-        const response = await fetch(`${process.env.BACKEND_API_URL}/admin/users`, {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/admin/users`, {
             headers: {
                 "Authorization": authHeader || "",
                 "Content-Type": "application/json"

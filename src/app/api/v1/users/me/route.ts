@@ -23,7 +23,7 @@ async function proxyRequest(request: Request, method: string) {
 
         const body = method !== "GET" ? await request.arrayBuffer() : undefined;
 
-        const response = await fetch(`${process.env.BACKEND_API_URL}/user/me`, {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/user/me`, {
             method: method,
             headers: headers,
             body: body,

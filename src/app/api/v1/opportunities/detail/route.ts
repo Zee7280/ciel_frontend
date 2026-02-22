@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        const res = await fetch(`${process.env.BACKEND_API_URL}/opportunities/${id}`, {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/opportunities/${id}`, {
             method: "GET", // Backend still expects GET with path param, we proxy POST to GET or just forward if backend changed?
             // User said "GET ... is ko post bna do", implying the *browser* check or frontend call.
             // If the BACKEND (Laravel/FastAPI?) requires POST, I should change this to POST.
@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
             // "GET http://localhost:3000/api/v1/opportunities/... is ko post bna do" -> This URL IS the Next.js API route.
             // So I definitely need to make THIS route POST.
             // What about the upstream implementation? 
-            // The `organisation/profile/detail` implementation proxied to `${process.env.BACKEND_API_URL}/organisation/profile/detail` (which was the SAME path?).
+            // The `organisation/profile/detail` implementation proxied to `${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/organisation/profile/detail` (which was the SAME path?).
             // Let's check `organisation/profile/detail/route.ts` to see what it calls.
             headers: {
                 "Authorization": token || "",
