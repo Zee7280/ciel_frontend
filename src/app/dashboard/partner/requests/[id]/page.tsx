@@ -2,12 +2,13 @@
 
 import { useParams, useRouter, useSearchParams, usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
-import { Info, MapPin, Calendar, Clock, CheckCircle, AlertCircle, ChevronDown, ChevronUp, Users, Loader2, Edit, ArrowLeft, Save, X, Trash2, Printer, Share2 } from "lucide-react";
+import { Info, MapPin, Calendar, Clock, CheckCircle, AlertCircle, ChevronDown, ChevronUp, Users, Loader2, Edit, ArrowLeft, Save, X, Trash2, Printer, Share2, Search } from "lucide-react";
 import Link from "next/link";
 import { authenticatedFetch } from "@/utils/api";
 import { toast } from "sonner";
 import dynamic from "next/dynamic";
 import { sdgData } from "@/utils/sdgData";
+import { pakistaniUniversities } from "@/utils/universityData";
 
 const LocationPicker = dynamic(() => import("@/components/ui/LocationPicker"), {
     ssr: false,
@@ -34,6 +35,8 @@ export default function OpportunityDetailsPage() {
         // Section B
         title: "",
         opportunityType: [] as string[],
+        isOtherTypeChecked: false,
+        otherType: "",
         mode: "", // on-site, remote, hybrid
         location: { city: "", venue: "", pin: "" },
         timelineType: "", // fixed, flexible, ongoing
@@ -44,6 +47,7 @@ export default function OpportunityDetailsPage() {
         sdg: "",
         target: "",
         indicator: "",
+        secondarySdgs: [] as { sdgId: string, targetId: string, indicatorId: string, justification: string }[],
 
         // Section D
         objectives: {
@@ -55,7 +59,9 @@ export default function OpportunityDetailsPage() {
         // Section E
         activity: {
             responsibilities: "",
-            skills: [] as string[]
+            skills: [] as string[],
+            isOtherSkillChecked: false,
+            otherSkill: ""
         },
 
         // Section F
@@ -71,10 +77,12 @@ export default function OpportunityDetailsPage() {
         verification: [] as string[],
 
         // Section H
-        visibility: "public" // 'public' or 'restricted'
+        visibility: "public", // 'public' or 'restricted'
+        restrictedUniversities: [] as string[],
     });
 
     const [orgDetails, setOrgDetails] = useState({
+        id: "",
         organizationName: "",
         organizationType: "",
         city: "",
@@ -110,14 +118,39 @@ export default function OpportunityDetailsPage() {
                 });
 
                 if (res && res.ok) {
-                    const data = await res.json();
+                    const data = await res.json().catch(() => ({}));
                     if (data.success || data.id) {
                         const opp = data.data || data;
+
+                        // Set Org Details from Opportunity Response if available
+                        if (opp.organization) {
+                            setOrgDetails({
+                                id: opp.organization.id || "",
+                                organizationName: opp.organization.name || "",
+                                organizationType: opp.organization.orgType || "",
+                                city: opp.organization.city || "",
+                                focalPerson: { name: opp.organization.contactName || "", contact: opp.organization.contactPhone || "" }
+                            });
+                        }
+
+                        // Predefined lists for "Other" parsing
+                        const predefinedTypes = ["Community Service", "Volunteer Activity", "Awareness Campaign", "Training / Teaching", "Research / Survey Support", "Technical / Professional Support", "Environmental Action", "Corporate CSR Activity"];
+                        const predefinedSkills = ["Leadership", "Communication", "Teaching", "Teamwork", "Digital Skills", "Research", "Problem Solving"];
+
+                        const apiTypes = opp.types || [];
+                        const otherType = apiTypes.find((t: string) => !predefinedTypes.includes(t)) || "";
+                        const opportunityType = apiTypes.filter((t: string) => predefinedTypes.includes(t));
+
+                        const apiSkills = opp.activity_details?.skills_gained || [];
+                        const otherSkill = apiSkills.find((s: string) => !predefinedSkills.includes(s)) || "";
+                        const activitySkills = apiSkills.filter((s: string) => predefinedSkills.includes(s));
 
                         // Map API response to Form Data
                         setFormData({
                             title: opp.title || "",
-                            opportunityType: opp.types || [],
+                            opportunityType: opportunityType,
+                            isOtherTypeChecked: !!otherType,
+                            otherType: otherType,
                             mode: opp.mode || "",
                             location: {
                                 city: opp.location?.city || "",
@@ -136,6 +169,12 @@ export default function OpportunityDetailsPage() {
                             sdg: opp.sdg_info?.sdg_id?.toString() || "",
                             target: opp.sdg_info?.target_id?.toString() || "",
                             indicator: opp.sdg_info?.indicator_id?.toString() || "",
+                            secondarySdgs: (opp.secondary_sdgs || []).map((s: any) => ({
+                                sdgId: s.sdg_id || "",
+                                targetId: s.target_id || "",
+                                indicatorId: s.indicator_id || "",
+                                justification: s.justification || ""
+                            })),
                             objectives: {
                                 description: opp.objectives?.description || "",
                                 beneficiariesCount: opp.objectives?.beneficiaries_count?.toString() || "",
@@ -143,7 +182,9 @@ export default function OpportunityDetailsPage() {
                             },
                             activity: {
                                 responsibilities: opp.activity_details?.student_responsibilities || "",
-                                skills: opp.activity_details?.skills_gained || []
+                                skills: activitySkills,
+                                isOtherSkillChecked: !!otherSkill,
+                                otherSkill: otherSkill
                             },
                             supervision: {
                                 name: opp.supervision?.supervisor_name || "",
@@ -153,7 +194,8 @@ export default function OpportunityDetailsPage() {
                                 isSupervised: opp.supervision?.supervised || false
                             },
                             verification: opp.verification_method || [],
-                            visibility: opp.visibility || "public"
+                            visibility: opp.visibility || "public",
+                            restrictedUniversities: opp.restricted_universities || []
                         });
                     }
                 } else {
@@ -173,15 +215,23 @@ export default function OpportunityDetailsPage() {
                         body: JSON.stringify({ userId })
                     });
                     if (resOrg && resOrg.ok) {
-                        const dataOrg = await resOrg.json();
-                        const apiData = dataOrg.data || dataOrg;
-                        if (apiData) {
-                            setOrgDetails({
-                                organizationName: apiData.name || "",
-                                organizationType: apiData.orgType || "",
-                                city: apiData.city || "",
-                                focalPerson: { name: apiData.contactName || "", contact: apiData.contactPhone || "" }
-                            });
+                        try {
+                            const text = await resOrg.text();
+                            if (text) {
+                                const dataOrg = JSON.parse(text);
+                                const apiData = dataOrg.data || dataOrg;
+                                if (apiData) {
+                                    setOrgDetails({
+                                        id: apiData.id || "",
+                                        organizationName: apiData.name || "",
+                                        organizationType: apiData.orgType || "",
+                                        city: apiData.city || "",
+                                        focalPerson: { name: apiData.contactName || "", contact: apiData.contactPhone || "" }
+                                    });
+                                }
+                            }
+                        } catch (jsonError) {
+                            console.error("Failed to parse organization details", jsonError);
                         }
                     }
                 }
@@ -206,8 +256,12 @@ export default function OpportunityDetailsPage() {
             toast.error("Please enter an Opportunity Title (Section B)");
             return false;
         }
-        if (formData.opportunityType.length === 0) {
+        if (formData.opportunityType.length === 0 && !formData.isOtherTypeChecked) {
             toast.error("Please select at least one Opportunity Type (Section B)");
+            return false;
+        }
+        if (formData.isOtherTypeChecked && !formData.otherType.trim()) {
+            toast.error("Please specify the other opportunity type (Section B)");
             return false;
         }
         if (!formData.mode) {
@@ -257,6 +311,12 @@ export default function OpportunityDetailsPage() {
             return false;
         }
 
+        // Section H
+        if (formData.visibility === 'restricted' && formData.restrictedUniversities.length === 0) {
+            toast.error("Please select at least one university for restricted visibility (Section H)");
+            return false;
+        }
+
         return true;
     };
 
@@ -268,8 +328,11 @@ export default function OpportunityDetailsPage() {
             // Transform back to API spec
             const payload = {
                 id: id,
+                organisation_id: orgDetails.id,
                 title: formData.title,
-                types: formData.opportunityType,
+                types: formData.isOtherTypeChecked && formData.otherType.trim()
+                    ? [...formData.opportunityType, formData.otherType.trim()]
+                    : formData.opportunityType,
                 mode: formData.mode,
                 location: formData.mode === 'Remote' ? null : formData.location,
                 timeline: {
@@ -279,11 +342,18 @@ export default function OpportunityDetailsPage() {
                     expected_hours: parseInt(formData.capacity.hours) || 0,
                     volunteers_required: parseInt(formData.capacity.volunteers) || 0
                 },
+                sdg: formData.sdg,
                 sdg_info: {
                     sdg_id: formData.sdg,
                     target_id: formData.target,
                     indicator_id: formData.indicator
                 },
+                secondary_sdgs: formData.secondarySdgs.map(s => ({
+                    sdg_id: s.sdgId,
+                    target_id: s.targetId,
+                    indicator_id: s.indicatorId,
+                    justification: s.justification
+                })),
                 objectives: {
                     description: formData.objectives.description,
                     beneficiaries_count: parseInt(formData.objectives.beneficiariesCount) || 0,
@@ -291,17 +361,20 @@ export default function OpportunityDetailsPage() {
                 },
                 activity_details: {
                     student_responsibilities: formData.activity.responsibilities,
-                    skills_gained: formData.activity.skills
+                    skills_gained: formData.activity.isOtherSkillChecked && formData.activity.otherSkill.trim()
+                        ? [...formData.activity.skills, formData.activity.otherSkill.trim()]
+                        : formData.activity.skills
                 },
                 supervision: {
                     supervisor_name: formData.supervision.name,
                     role: formData.supervision.role,
                     contact: formData.supervision.contact,
-                    safe_environment: !formData.supervision.isHarmful, // Inverted Logic: Checkbox "No Harmful" = true means safe = true
+                    safe_environment: formData.supervision.isHarmful,
                     supervised: formData.supervision.isSupervised
                 },
                 verification_method: formData.verification,
-                visibility: formData.visibility
+                visibility: formData.visibility,
+                restricted_universities: formData.visibility === 'restricted' ? formData.restrictedUniversities : null
             };
 
             const res = await authenticatedFetch(`/api/v1/opportunities/update`, {
@@ -642,7 +715,6 @@ export default function OpportunityDetailsPage() {
                                 <label key={type} className={`flex items-center gap-3 p-3 rounded-xl border transition-all cursor-pointer ${formData.opportunityType.includes(type) ? 'bg-blue-50 border-blue-200' : 'border-slate-100'}`}>
                                     <input
                                         type="checkbox"
-
                                         className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
                                         checked={formData.opportunityType.includes(type)}
                                         onChange={() => toggleType(type)}
@@ -650,6 +722,27 @@ export default function OpportunityDetailsPage() {
                                     <span className={`text-sm font-medium ${formData.opportunityType.includes(type) ? 'text-blue-700' : 'text-slate-600'}`}>{type}</span>
                                 </label>
                             ))}
+                            <label className={`flex items-center gap-3 p-3 rounded-xl border transition-all cursor-pointer ${formData.isOtherTypeChecked ? 'bg-blue-50 border-blue-200' : 'border-slate-100'}`}>
+                                <input
+                                    type="checkbox"
+                                    className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                                    checked={formData.isOtherTypeChecked}
+                                    onChange={(e) => setFormData({ ...formData, isOtherTypeChecked: e.target.checked })}
+                                />
+                                <span className={`text-sm font-medium ${formData.isOtherTypeChecked ? 'text-blue-700' : 'text-slate-600'}`}>Other</span>
+                            </label>
+
+                            {formData.isOtherTypeChecked && (
+                                <div className="col-span-full animate-in fade-in slide-in-from-top-2">
+                                    <input
+                                        type="text"
+                                        placeholder="Please specify other opportunity type"
+                                        className="w-full px-4 py-2 rounded-lg border border-blue-200 focus:border-blue-500 outline-none text-sm"
+                                        value={formData.otherType}
+                                        onChange={(e) => setFormData({ ...formData, otherType: e.target.value })}
+                                    />
+                                </div>
+                            )}
                         </div>
                     </div>
 
@@ -870,7 +963,6 @@ export default function OpportunityDetailsPage() {
                     <div className={!formData.target ? "opacity-50 pointer-events-none" : ""}>
                         <label className="block text-sm font-bold text-slate-900 mb-2">C3. SDG Indicator</label>
                         <select
-
                             className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-purple-500 outline-none font-medium disabled:bg-slate-50"
                             value={formData.indicator}
                             onChange={(e) => setFormData({ ...formData, indicator: e.target.value })}
@@ -884,6 +976,119 @@ export default function OpportunityDetailsPage() {
                                     </option>
                                 ))}
                         </select>
+                    </div>
+
+                    {/* C4. Secondary SDGs */}
+                    <div className="pt-6 border-t border-slate-100">
+                        <label className="block text-sm font-bold text-slate-900 mb-2">C4. Secondary SDGs (Optional)</label>
+                        <p className="text-xs text-slate-500 mb-4">Select other SDGs this project contributes to and provide a brief justification.</p>
+
+                        <div className="space-y-4">
+                            <select
+                                className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-purple-500 outline-none font-medium text-sm"
+                                onChange={(e) => {
+                                    const val = e.target.value;
+                                    if (val && !formData.secondarySdgs.find(s => s.sdgId === val)) {
+                                        setFormData({
+                                            ...formData,
+                                            secondarySdgs: [...formData.secondarySdgs, { sdgId: val, targetId: "", indicatorId: "", justification: "" }]
+                                        });
+                                    }
+                                    e.target.value = "";
+                                }}
+                            >
+                                <option value="">Add a Secondary SDG...</option>
+                                {sdgData
+                                    .filter(sdg => sdg.id !== formData.sdg && !formData.secondarySdgs.find(s => s.sdgId === sdg.id))
+                                    .map((sdg) => (
+                                        <option key={sdg.id} value={sdg.id}>
+                                            SDG {sdg.number} — {sdg.title}
+                                        </option>
+                                    ))}
+                            </select>
+
+                            <div className="grid grid-cols-1 gap-4">
+                                {formData.secondarySdgs.map((s, idx) => {
+                                    const sdgDetail = sdgData.find(d => d.id === s.sdgId);
+                                    return (
+                                        <div key={s.sdgId} className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 space-y-4 animate-in fade-in zoom-in-95">
+                                            <div className="flex justify-between items-start">
+                                                <div className="flex items-center gap-2">
+                                                    <div className="w-8 h-8 rounded-lg bg-white shadow-sm flex items-center justify-center font-bold text-slate-700 border border-slate-100">
+                                                        {sdgDetail?.number}
+                                                    </div>
+                                                    <div>
+                                                        <div className="text-sm font-bold text-slate-900">{sdgDetail?.title}</div>
+                                                        <div className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Secondary Goal {idx + 1}</div>
+                                                    </div>
+                                                </div>
+                                                <button
+                                                    onClick={() => setFormData({
+                                                        ...formData,
+                                                        secondarySdgs: formData.secondarySdgs.filter(item => item.sdgId !== s.sdgId)
+                                                    })}
+                                                    className="p-1 hover:bg-red-50 text-slate-400 hover:text-red-500 rounded transition-colors"
+                                                >
+                                                    <X className="w-4 h-4" />
+                                                </button>
+                                            </div>
+
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                                <div>
+                                                    <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">Target</label>
+                                                    <select
+                                                        className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs outline-none focus:border-purple-500 bg-white"
+                                                        value={s.targetId}
+                                                        onChange={(e) => {
+                                                            const newList = [...formData.secondarySdgs];
+                                                            newList[idx].targetId = e.target.value;
+                                                            newList[idx].indicatorId = "";
+                                                            setFormData({ ...formData, secondarySdgs: newList });
+                                                        }}
+                                                    >
+                                                        <option value="">Select Target...</option>
+                                                        {sdgDetail?.targets.map(t => (
+                                                            <option key={t.id} value={t.id}>Target {t.id}</option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                                <div>
+                                                    <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">Indicator</label>
+                                                    <select
+                                                        className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs outline-none focus:border-purple-500 bg-white"
+                                                        value={s.indicatorId}
+                                                        onChange={(e) => {
+                                                            const newList = [...formData.secondarySdgs];
+                                                            newList[idx].indicatorId = e.target.value;
+                                                            setFormData({ ...formData, secondarySdgs: newList });
+                                                        }}
+                                                    >
+                                                        <option value="">Select Indicator...</option>
+                                                        {sdgDetail?.targets.find(t => t.id === s.targetId)?.indicators.map(i => (
+                                                            <option key={i.id} value={i.id}>Indicator {i.id}</option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                            </div>
+
+                                            <div>
+                                                <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">Justification</label>
+                                                <textarea
+                                                    placeholder="How does this project contribute to this goal?"
+                                                    className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs outline-none focus:border-purple-500 bg-white h-16 resize-none"
+                                                    value={s.justification}
+                                                    onChange={(e) => {
+                                                        const newList = [...formData.secondarySdgs];
+                                                        newList[idx].justification = e.target.value;
+                                                        setFormData({ ...formData, secondarySdgs: newList });
+                                                    }}
+                                                />
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -980,7 +1185,6 @@ export default function OpportunityDetailsPage() {
                                 <label key={s} className={`flex items-center gap-2 p-3 border border-slate-100 rounded-lg hover:bg-slate-50 cursor-pointer`}>
                                     <input
                                         type="checkbox"
-
                                         className="rounded text-indigo-600 focus:ring-indigo-500"
                                         checked={formData.activity.skills.includes(s)}
                                         onChange={() => {
@@ -993,6 +1197,27 @@ export default function OpportunityDetailsPage() {
                                     <span className="text-sm font-medium text-slate-700">{s}</span>
                                 </label>
                             ))}
+                            <label className={`flex items-center gap-2 p-3 border border-slate-100 rounded-lg hover:bg-slate-50 cursor-pointer`}>
+                                <input
+                                    type="checkbox"
+                                    className="rounded text-indigo-600 focus:ring-indigo-500"
+                                    checked={formData.activity.isOtherSkillChecked}
+                                    onChange={(e) => setFormData({ ...formData, activity: { ...formData.activity, isOtherSkillChecked: e.target.checked } })}
+                                />
+                                <span className="text-sm font-medium text-slate-700">Other</span>
+                            </label>
+
+                            {formData.activity.isOtherSkillChecked && (
+                                <div className="col-span-full animate-in fade-in slide-in-from-top-2">
+                                    <input
+                                        type="text"
+                                        placeholder="Please specify other skill"
+                                        className="w-full px-4 py-2 rounded-lg border border-indigo-200 focus:border-indigo-500 outline-none text-sm"
+                                        value={formData.activity.otherSkill}
+                                        onChange={(e) => setFormData({ ...formData, activity: { ...formData.activity, otherSkill: e.target.value } })}
+                                    />
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -1109,33 +1334,85 @@ export default function OpportunityDetailsPage() {
                     </h2>
                     {expandedSections.includes('H') ? <ChevronUp className="w-5 h-5 text-slate-400" /> : <ChevronDown className="w-5 h-5 text-slate-400" />}
                 </div>
-                <div className={`p-8 space-y-4 ${!expandedSections.includes('H') ? 'hidden' : ''}`}>
-                    <label className={`flex items-center gap-3 p-4 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-50`}>
-                        <input
-                            type="radio"
-                            name="visibility"
+                <div className={`p-8 space-y-6 ${!expandedSections.includes('H') ? 'hidden' : ''}`}>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <label className={`flex items-center gap-3 p-4 border rounded-xl cursor-pointer transition-all ${formData.visibility === 'public' ? 'border-pink-200 bg-pink-50' : 'border-slate-100 hover:border-slate-300'}`}>
+                            <input
+                                type="radio"
+                                name="visibility"
+                                className="w-5 h-5 text-pink-600"
+                                checked={formData.visibility === 'public'}
+                                onChange={() => setFormData({ ...formData, visibility: 'public' })}
+                            />
+                            <div>
+                                <span className="block font-bold text-slate-900">Open to all universities</span>
+                                <span className="text-xs text-slate-500 italic">Students from any university can apply.</span>
+                            </div>
+                        </label>
+                        <label className={`flex items-center gap-3 p-4 border rounded-xl cursor-pointer transition-all ${formData.visibility === 'restricted' ? 'border-pink-200 bg-pink-50' : 'border-slate-100 hover:border-slate-300'}`}>
+                            <input
+                                type="radio"
+                                name="visibility"
+                                className="w-5 h-5 text-pink-600"
+                                checked={formData.visibility === 'restricted'}
+                                onChange={() => setFormData({ ...formData, visibility: 'restricted' })}
+                            />
+                            <div>
+                                <span className="block font-bold text-slate-900">Restricted</span>
+                                <span className="text-xs text-slate-500 italic">Only students from selected universities can apply.</span>
+                            </div>
+                        </label>
+                    </div>
 
-                            className="w-5 h-5 text-pink-600"
-                            checked={formData.visibility === 'public'}
-                            onChange={() => setFormData({ ...formData, visibility: 'public' })}
-                        />
-                        <div>
-                            <span className="block font-bold text-slate-900">Open to all universities</span>
-                        </div>
-                    </label>
-                    <label className={`flex items-center gap-3 p-4 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-50`}>
-                        <input
-                            type="radio"
-                            name="visibility"
+                    {formData.visibility === 'restricted' && (
+                        <div className="animate-in fade-in slide-in-from-top-4 space-y-4 pt-4 border-t border-slate-100">
+                            <label className="block text-sm font-bold text-slate-900 mb-2">Select Targeted Universities <span className="text-red-500">*</span></label>
+                            <div className="relative">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                                <select
+                                    className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 focus:border-pink-500 outline-none font-medium text-sm appearance-none bg-white"
+                                    onChange={(e) => {
+                                        const val = e.target.value;
+                                        if (val && !formData.restrictedUniversities.includes(val)) {
+                                            setFormData({
+                                                ...formData,
+                                                restrictedUniversities: [...formData.restrictedUniversities, val]
+                                            });
+                                        }
+                                        e.target.value = "";
+                                    }}
+                                >
+                                    <option value="">Search & Select Universities...</option>
+                                    {pakistaniUniversities
+                                        .filter(uni => !formData.restrictedUniversities.includes(uni))
+                                        .map((uni) => (
+                                            <option key={uni} value={uni}>{uni}</option>
+                                        ))
+                                    }
+                                </select>
+                            </div>
 
-                            className="w-5 h-5 text-pink-600"
-                            checked={formData.visibility === 'restricted'}
-                            onChange={() => setFormData({ ...formData, visibility: 'restricted' })}
-                        />
-                        <div>
-                            <span className="block font-bold text-slate-900">Restricted</span>
+                            <div className="flex flex-wrap gap-2">
+                                {formData.restrictedUniversities.map((uni) => (
+                                    <div key={uni} className="flex items-center gap-2 px-3 py-1.5 bg-pink-50 text-pink-700 border border-pink-100 rounded-lg text-sm font-medium animate-in zoom-in-95">
+                                        {uni}
+                                        <button
+                                            onClick={() => setFormData({
+                                                ...formData,
+                                                restrictedUniversities: formData.restrictedUniversities.filter(item => item !== uni)
+                                            })}
+                                            className="hover:text-pink-900"
+                                        >
+                                            <X className="w-3 h-3" />
+                                        </button>
+                                    </div>
+                                ))}
+                                {formData.restrictedUniversities.length === 0 && (
+                                    <p className="text-sm text-slate-400 italic">No universities selected yet.</p>
+                                )}
+                            </div>
                         </div>
-                    </label>
+                    )}
                 </div>
             </div>
 
@@ -1156,6 +1433,6 @@ export default function OpportunityDetailsPage() {
                     {isSubmitting ? "Updating..." : "Save Changes"}
                 </button>
             </div>
-        </div>
+        </div >
     );
 }

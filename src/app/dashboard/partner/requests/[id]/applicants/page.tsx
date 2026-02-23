@@ -43,6 +43,7 @@ export default function ManageApplicantsPage() {
     // Team View State
     const [selectedTeam, setSelectedTeam] = useState<Applicant | null>(null);
     const [isTeamDialogOpen, setIsTeamDialogOpen] = useState(false);
+    const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
     // Fetch Applicants
     useEffect(() => {
@@ -57,8 +58,15 @@ export default function ManageApplicantsPage() {
                 if (res && res.ok) {
                     const data = await res.json();
                     setApplicants(data.data || []);
+                } else if (res) {
+                    const errorData = await res.json().catch(() => ({}));
+                    if (errorData.message === "User is not linked to an organization") {
+                        setErrorMsg("User is not linked to an organization. Please verify your profile.");
+                    } else {
+                        toast.error(errorData.message || "Failed to load applicants");
+                    }
                 } else {
-                    toast.error("Failed to load applicants");
+                    toast.error("Failed to connect to server");
                 }
             } catch (error) {
                 console.error("Error fetching applicants", error);
@@ -169,7 +177,21 @@ export default function ManageApplicantsPage() {
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                        {filteredApplicants.length > 0 ? (
+                        {errorMsg ? (
+                            <tr>
+                                <td colSpan={5} className="px-6 py-12 text-center">
+                                    <div className="flex flex-col items-center gap-3">
+                                        <div className="w-12 h-12 rounded-full bg-amber-50 flex items-center justify-center">
+                                            <Filter className="w-6 h-6 text-amber-500" />
+                                        </div>
+                                        <div>
+                                            <h3 className="text-lg font-bold text-slate-900">Info</h3>
+                                            <p className="text-slate-500 font-medium">{errorMsg}</p>
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                        ) : filteredApplicants.length > 0 ? (
                             filteredApplicants.map((app) => (
                                 <tr key={app.id} className="hover:bg-slate-50 transition-colors">
                                     <td className="px-6 py-4">

@@ -8,6 +8,7 @@ import { authenticatedFetch } from "@/utils/api";
 import { toast } from "sonner";
 import dynamic from "next/dynamic";
 import { sdgData } from "@/utils/sdgData";
+import { pakistaniUniversities } from "@/utils/universityData";
 
 const LocationPicker = dynamic(() => import("@/components/ui/LocationPicker"), {
     ssr: false,
@@ -32,6 +33,8 @@ export default function OpportunityPostingPage() {
         // Section B
         title: "",
         opportunityType: [] as string[],
+        isOtherTypeChecked: false,
+        otherType: "",
         mode: "", // on-site, remote, hybrid
         location: { city: "", venue: "", pin: "" },
         timelineType: "", // fixed, flexible, ongoing
@@ -42,6 +45,7 @@ export default function OpportunityPostingPage() {
         sdg: "",
         target: "",
         indicator: "",
+        secondarySdgs: [] as { sdgId: string, targetId: string, indicatorId: string, justification: string }[],
 
         // Section D
         objectives: {
@@ -71,7 +75,8 @@ export default function OpportunityPostingPage() {
         verification: [] as string[],
 
         // Section H
-        visibility: "public" // 'public' or 'restricted'
+        visibility: "public", // 'public' or 'restricted'
+        restrictedUniversities: [] as string[],
     });
 
     const validateForm = () => {
@@ -79,8 +84,12 @@ export default function OpportunityPostingPage() {
             toast.error("Please enter an Opportunity Title (Section B)");
             return false;
         }
-        if (formData.opportunityType.length === 0) {
+        if (formData.opportunityType.length === 0 && !formData.isOtherTypeChecked) {
             toast.error("Please select at least one Opportunity Type (Section B)");
+            return false;
+        }
+        if (formData.isOtherTypeChecked && !formData.otherType.trim()) {
+            toast.error("Please specify the other opportunity type (Section B)");
             return false;
         }
         if (!formData.mode) {
@@ -130,6 +139,12 @@ export default function OpportunityPostingPage() {
             return false;
         }
 
+        // Section H
+        if (formData.visibility === 'restricted' && formData.restrictedUniversities.length === 0) {
+            toast.error("Please select at least one university for restricted visibility (Section H)");
+            return false;
+        }
+
         return true;
     };
 
@@ -141,7 +156,9 @@ export default function OpportunityPostingPage() {
             // Transform state to match API Spec
             const payload = {
                 title: formData.title,
-                types: formData.opportunityType,
+                types: formData.isOtherTypeChecked && formData.otherType.trim()
+                    ? [...formData.opportunityType, formData.otherType.trim()]
+                    : formData.opportunityType,
                 mode: formData.mode,
                 location: formData.mode === 'Remote' ? null : formData.location,
                 timeline: {
@@ -151,11 +168,18 @@ export default function OpportunityPostingPage() {
                     expected_hours: parseInt(formData.capacity.hours) || 0,
                     volunteers_required: parseInt(formData.capacity.volunteers) || 0
                 },
+                sdg: formData.sdg,
                 sdg_info: {
                     sdg_id: formData.sdg,
                     target_id: formData.target,
-                    indicator_id: formData.indicator
+                    indicator_id: formData.indicator,
                 },
+                secondary_sdgs: formData.secondarySdgs.map(s => ({
+                    sdg_id: s.sdgId,
+                    target_id: s.targetId,
+                    indicator_id: s.indicatorId,
+                    justification: s.justification
+                })),
                 objectives: {
                     description: formData.objectives.description,
                     beneficiaries_count: parseInt(formData.objectives.beneficiariesCount) || 0,
@@ -176,7 +200,8 @@ export default function OpportunityPostingPage() {
                     supervised: formData.supervision.isSupervised
                 },
                 verification_method: formData.verification,
-                visibility: formData.visibility
+                visibility: formData.visibility,
+                restricted_universities: formData.visibility === 'restricted' ? formData.restrictedUniversities : null
             };
 
             const res = await authenticatedFetch(`/api/v1/opportunities`, {
@@ -379,6 +404,26 @@ export default function OpportunityPostingPage() {
                                     <span className={`text-sm font-medium ${formData.opportunityType.includes(type) ? 'text-blue-700' : 'text-slate-600'}`}>{type}</span>
                                 </label>
                             ))}
+                        </div>
+                        <div className="mt-3">
+                            <label className={`flex items-center gap-2 p-3 border rounded-xl hover:bg-slate-50 cursor-pointer w-full md:w-1/3 mb-2 transition-all ${formData.isOtherTypeChecked ? 'bg-blue-50 border-blue-200' : 'border-slate-100'}`}>
+                                <input
+                                    type="checkbox"
+                                    className="rounded text-blue-600 focus:ring-blue-500"
+                                    checked={formData.isOtherTypeChecked}
+                                    onChange={(e) => setFormData({ ...formData, isOtherTypeChecked: e.target.checked })}
+                                />
+                                <span className={`text-sm font-medium ${formData.isOtherTypeChecked ? 'text-blue-700' : 'text-slate-600'}`}>Other</span>
+                            </label>
+                            {formData.isOtherTypeChecked && (
+                                <input
+                                    type="text"
+                                    placeholder="Please specify other opportunity type..."
+                                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 outline-none text-sm transition-all"
+                                    value={formData.otherType}
+                                    onChange={(e) => setFormData({ ...formData, otherType: e.target.value })}
+                                />
+                            )}
                         </div>
                     </div>
 
@@ -619,6 +664,126 @@ export default function OpportunityPostingPage() {
                             <div>
                                 <span className="font-bold">Environmental Action</span> <br />
                                 SDG 13 → Target 13.3 → Indicator 13.3.1
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* C4. Secondary SDGs */}
+                    <div className="pt-6 border-t border-slate-100">
+                        <label className="block text-sm font-bold text-slate-900 mb-2">C4. Secondary SDGs (Optional)</label>
+                        <p className="text-xs text-slate-500 mb-4">Select other SDGs this project contributes to and provide a brief justification.</p>
+
+                        <div className="space-y-4">
+                            <select
+                                className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-purple-500 outline-none font-medium text-sm"
+                                onChange={(e) => {
+                                    const val = e.target.value;
+                                    if (val && !formData.secondarySdgs.find(s => s.sdgId === val)) {
+                                        setFormData({
+                                            ...formData,
+                                            secondarySdgs: [...formData.secondarySdgs, { sdgId: val, targetId: "", indicatorId: "", justification: "" }]
+                                        });
+                                    }
+                                    e.target.value = "";
+                                }}
+                            >
+                                <option value="">Add a Secondary SDG...</option>
+                                {sdgData
+                                    .filter(sdg => sdg.id !== formData.sdg && !formData.secondarySdgs.find(s => s.sdgId === sdg.id))
+                                    .map((sdg) => (
+                                        <option key={sdg.id} value={sdg.id}>
+                                            SDG {sdg.number} — {sdg.title}
+                                        </option>
+                                    ))}
+                            </select>
+
+                            <div className="grid grid-cols-1 gap-4">
+                                {formData.secondarySdgs.map((item, index) => {
+                                    const sdg = sdgData.find(s => s.id === item.sdgId);
+                                    const availableTargets = sdg?.targets || [];
+                                    const availableIndicators = availableTargets.find(t => t.id === item.targetId)?.indicators || [];
+
+                                    return (
+                                        <div key={item.sdgId} className="bg-slate-50 p-6 rounded-2xl border border-slate-200 flex flex-col gap-4 relative animate-in fade-in slide-in-from-top-2">
+                                            <button
+                                                onClick={() => setFormData({
+                                                    ...formData,
+                                                    secondarySdgs: formData.secondarySdgs.filter(s => s.sdgId !== item.sdgId)
+                                                })}
+                                                className="absolute top-4 right-4 text-slate-400 hover:text-red-500 transition-colors"
+                                            >
+                                                <X className="w-5 h-5" />
+                                            </button>
+
+                                            {/* SDG Header */}
+                                            <div className="flex items-center gap-3 pb-2 border-b border-slate-200/60">
+                                                <div className="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center font-bold text-purple-600 shadow-sm">
+                                                    {sdg?.number}
+                                                </div>
+                                                <div>
+                                                    <span className="text-sm font-black text-slate-800 uppercase tracking-tight">Secondary SDG {sdg?.number}</span>
+                                                    <p className="text-xs text-slate-500">{sdg?.title}</p>
+                                                </div>
+                                            </div>
+
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                {/* Target Dropdown */}
+                                                <div>
+                                                    <label className="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-wider">Select Target</label>
+                                                    <select
+                                                        className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-purple-500 outline-none text-xs font-bold bg-white"
+                                                        value={item.targetId}
+                                                        onChange={(e) => {
+                                                            const newSecondary = [...formData.secondarySdgs];
+                                                            newSecondary[index].targetId = e.target.value;
+                                                            newSecondary[index].indicatorId = ""; // Reset indicator
+                                                            setFormData({ ...formData, secondarySdgs: newSecondary });
+                                                        }}
+                                                    >
+                                                        <option value="">Choose Target...</option>
+                                                        {availableTargets.map(t => (
+                                                            <option key={t.id} value={t.id}>Target {t.id} — {t.description.substring(0, 60)}...</option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+
+                                                {/* Indicator Dropdown */}
+                                                <div className={!item.targetId ? "opacity-50 pointer-events-none" : ""}>
+                                                    <label className="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-wider">Select Indicator</label>
+                                                    <select
+                                                        className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-purple-500 outline-none text-xs font-bold bg-white"
+                                                        value={item.indicatorId}
+                                                        onChange={(e) => {
+                                                            const newSecondary = [...formData.secondarySdgs];
+                                                            newSecondary[index].indicatorId = e.target.value;
+                                                            setFormData({ ...formData, secondarySdgs: newSecondary });
+                                                        }}
+                                                    >
+                                                        <option value="">Choose Indicator...</option>
+                                                        {availableIndicators.map(i => (
+                                                            <option key={i.id} value={i.id}>Indicator {i.id} — {i.description.substring(0, 60)}...</option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                            </div>
+
+                                            {/* Justification */}
+                                            <div>
+                                                <label className="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-wider">Justification</label>
+                                                <textarea
+                                                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-purple-500 outline-none text-xs h-24 bg-white font-medium"
+                                                    placeholder="Briefly explain the contribution to this SDG..."
+                                                    value={item.justification}
+                                                    onChange={(e) => {
+                                                        const newSecondary = [...formData.secondarySdgs];
+                                                        newSecondary[index].justification = e.target.value;
+                                                        setFormData({ ...formData, secondarySdgs: newSecondary });
+                                                    }}
+                                                />
+                                            </div>
+                                        </div>
+                                    );
+                                })}
                             </div>
                         </div>
                     </div>
@@ -959,6 +1124,52 @@ export default function OpportunityPostingPage() {
                             <span className="text-xs text-slate-500">Only visible to specific universities (e.g. for MoUs)</span>
                         </div>
                     </label>
+
+                    {formData.visibility === 'restricted' && (
+                        <div className="p-6 bg-pink-50 rounded-2xl border border-pink-100 space-y-4 animate-in fade-in slide-in-from-top-2">
+                            <label className="block text-xs font-black text-pink-600 uppercase tracking-widest">Select Target Universities</label>
+                            <select
+                                className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-pink-500 outline-none text-sm font-bold bg-white"
+                                onChange={(e) => {
+                                    const val = e.target.value;
+                                    if (val && !formData.restrictedUniversities.includes(val)) {
+                                        setFormData({
+                                            ...formData,
+                                            restrictedUniversities: [...formData.restrictedUniversities, val]
+                                        });
+                                    }
+                                    e.target.value = "";
+                                }}
+                            >
+                                <option value="">Add University...</option>
+                                {pakistaniUniversities
+                                    .filter(u => !formData.restrictedUniversities.includes(u))
+                                    .map(u => (
+                                        <option key={u} value={u}>{u}</option>
+                                    ))}
+                            </select>
+
+                            <div className="flex flex-wrap gap-2">
+                                {formData.restrictedUniversities.map(u => (
+                                    <div key={u} className="bg-white px-3 py-1.5 rounded-lg border border-pink-200 flex items-center gap-2 shadow-sm animate-in zoom-in-95">
+                                        <span className="text-xs font-bold text-slate-700">{u}</span>
+                                        <button
+                                            onClick={() => setFormData({
+                                                ...formData,
+                                                restrictedUniversities: formData.restrictedUniversities.filter(item => item !== u)
+                                            })}
+                                            className="text-slate-400 hover:text-red-500 transition-colors"
+                                        >
+                                            <X className="w-3.5 h-3.5" />
+                                        </button>
+                                    </div>
+                                ))}
+                                {formData.restrictedUniversities.length === 0 && (
+                                    <p className="text-xs text-pink-400 italic font-medium">No universities selected yet.</p>
+                                )}
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
 

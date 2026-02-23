@@ -6,6 +6,7 @@ import Link from "next/link";
 import { ArrowRight, Mail, Lock, AlertCircle, Loader2, CheckCircle, School, Landmark, ArrowLeft, Building2, User, GraduationCap, Phone, Globe, Heart } from "lucide-react";
 import Image from "next/image";
 import clsx from "clsx";
+import { pakistaniUniversities } from "@/utils/universityData";
 
 export default function SignUpPage() {
     const router = useRouter();
@@ -358,16 +359,19 @@ export default function SignUpPage() {
                                         <div className="grid grid-cols-2 gap-4">
                                             <div className="space-y-1.5">
                                                 <label className="text-[11px] font-black uppercase tracking-widest text-slate-400 ml-1">Institution</label>
-                                                <input
-                                                    type="text"
+                                                <select
                                                     value={formData.institution}
                                                     onChange={(e) => handleGenericChange("institution", e.target.value)}
                                                     className={clsx(
-                                                        "w-full px-5 py-4 rounded-2xl border-2 bg-slate-50/50 focus:bg-white outline-none transition-all font-bold text-slate-800 placeholder:text-slate-300",
+                                                        "w-full px-5 py-4 rounded-2xl border-2 bg-slate-50/50 focus:bg-white outline-none transition-all font-bold text-slate-800 appearance-none",
                                                         errors.institution ? "border-red-500 focus:border-red-500" : "border-slate-100 focus:border-emerald-600"
                                                     )}
-                                                    placeholder="e.g. NUST"
-                                                />
+                                                >
+                                                    <option value="">Select Institution</option>
+                                                    {pakistaniUniversities.map(u => (
+                                                        <option key={u} value={u}>{u}</option>
+                                                    ))}
+                                                </select>
                                                 {errors.institution && <p className="text-[10px] text-red-500 font-black uppercase tracking-widest ml-1">{errors.institution}</p>}
                                             </div>
                                             <div className="space-y-1.5">

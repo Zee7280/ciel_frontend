@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import { LayoutDashboard, BookOpen, Users, Settings, PieChart, LogOut, FileText, Heart, Building2, CheckCircle, Briefcase, FileBarChart, ShieldAlert, Bell, User, Flag, MessageSquare, Plus } from "lucide-react";
 import clsx from "clsx";
@@ -11,6 +11,13 @@ import { authenticatedFetch } from "@/utils/api";
 export default function Sidebar() {
     const pathname = usePathname();
     const [unreadCount, setUnreadCount] = useState(0);
+    const router = useRouter();
+
+    const handleLogout = () => {
+        localStorage.removeItem("ciel_user");
+        localStorage.removeItem("ciel_token");
+        router.push("/login");
+    };
 
     useEffect(() => {
         const fetchUnreadCount = async () => {
@@ -146,10 +153,13 @@ export default function Sidebar() {
             </div>
 
             <div className="p-4 border-t border-slate-800">
-                <Link href="/login" className="flex items-center gap-3 px-4 py-3 w-full rounded-xl text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-colors text-sm font-medium">
+                <button
+                    onClick={handleLogout}
+                    className="flex items-center gap-3 px-4 py-3 w-full rounded-xl text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-colors text-sm font-medium"
+                >
                     <LogOut className="w-5 h-5" />
                     Sign Out
-                </Link>
+                </button>
             </div>
         </aside>
     );

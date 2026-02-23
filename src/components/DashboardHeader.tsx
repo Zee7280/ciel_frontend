@@ -4,9 +4,17 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Bell, Search, User, LogOut } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 export default function DashboardHeader() {
     const pathname = usePathname();
+    const router = useRouter();
+
+    const handleLogout = () => {
+        localStorage.removeItem("ciel_user");
+        localStorage.removeItem("ciel_token");
+        router.push("/login");
+    };
 
     // Clean up title from pathname
     const getTitle = () => {
@@ -72,9 +80,13 @@ export default function DashboardHeader() {
                             <User className="w-6 h-6 text-slate-400" />
                         )}
                     </div>
-                    <Link href="/login" className="p-2.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all group" title="Sign Out">
+                    <button
+                        onClick={handleLogout}
+                        className="p-2.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all group"
+                        title="Sign Out"
+                    >
                         <LogOut className="w-5 h-5 group-hover:translate-x-0.5 transition-transform" />
-                    </Link>
+                    </button>
                 </div>
             </div>
         </header>

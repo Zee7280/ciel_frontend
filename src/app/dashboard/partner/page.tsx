@@ -124,7 +124,9 @@ export default function PartnerDashboard() {
                             stats.recentProjects.map((project: any) => (
                                 <div key={project.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 border border-slate-50 rounded-xl hover:border-slate-100 hover:shadow-sm transition-all">
                                     <div className="flex items-center gap-4">
-                                        <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center font-bold text-slate-500">#{project.id}</div>
+                                        <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-600">
+                                            <FileText className="w-5 h-5" />
+                                        </div>
                                         <div>
                                             <h4 className="font-bold text-slate-800">{project.title}</h4>
                                             <p className="text-xs text-slate-500">{project.location} • {project.volunteersNeeded} Volunteers Needed</p>

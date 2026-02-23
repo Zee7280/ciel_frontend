@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { authenticatedFetch } from '@/utils/api';
-import { CheckCircle2, XCircle, Clock, FileText, Search } from 'lucide-react';
+import { CheckCircle2, XCircle, Clock, FileText, Search, CalendarDays, ExternalLink, User, Briefcase, Filter, ChevronRight } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import clsx from 'clsx';
@@ -95,19 +95,19 @@ export default function VerifyWorkPage() {
 
     const getStatusBadge = (status: string) => {
         const config = {
-            submitted: { color: 'bg-yellow-50 text-yellow-700 border-yellow-200', icon: Clock, label: 'Pending Verification' },
+            submitted: { color: 'bg-amber-50 text-amber-700 border-amber-200', icon: Clock, label: 'Pending Verification' },
             partner_verified: { color: 'bg-indigo-50 text-indigo-700 border-indigo-200', icon: CheckCircle2, label: 'Verified by You' },
-            verified: { color: 'bg-green-50 text-green-700 border-green-200', icon: CheckCircle2, label: 'Fully Verified' },
-            rejected: { color: 'bg-red-50 text-red-700 border-red-200', icon: XCircle, label: 'Rejected' },
-            draft: { color: 'bg-slate-50 text-slate-700 border-slate-200', icon: FileText, label: 'Draft' },
-            approved: { color: 'bg-green-50 text-green-600 border-green-200', icon: CheckCircle2, label: 'Approved' },
-            pending: { color: 'bg-slate-50 text-slate-500 border-slate-200', icon: Clock, label: 'Pending' },
+            verified: { color: 'bg-emerald-50 text-emerald-700 border-emerald-200', icon: CheckCircle2, label: 'Fully Verified' },
+            rejected: { color: 'bg-rose-50 text-rose-700 border-rose-200', icon: XCircle, label: 'Rejected' },
+            draft: { color: 'bg-slate-50 text-slate-600 border-slate-200', icon: FileText, label: 'Draft' },
+            approved: { color: 'bg-emerald-50 text-emerald-600 border-emerald-200', icon: CheckCircle2, label: 'Approved' },
+            pending: { color: 'bg-slate-100 text-slate-500 border-slate-200', icon: Clock, label: 'Pending' },
         };
 
         const { color, icon: Icon, label } = config[status as keyof typeof config] || config.draft;
 
         return (
-            <span className={clsx('inline-flex items-center gap-1.5 px-3 py-1 rounded-xl border font-bold text-xs uppercase tracking-wide', color)}>
+            <span className={clsx('inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border font-bold text-[10px] uppercase tracking-wider', color)}>
                 <Icon className="w-3 h-3" />
                 {label}
             </span>
@@ -130,34 +130,37 @@ export default function VerifyWorkPage() {
         <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-50 p-8">
             <div className="max-w-7xl mx-auto space-y-8">
                 {/* Header */}
-                <div className="flex items-start justify-between">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div>
-                        <h1 className="text-4xl font-black text-slate-900 tracking-tight">
+                        <h1 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight flex items-center gap-3">
                             Verification & Approval
                         </h1>
                         <p className="text-slate-500 mt-2 font-medium">
-                            Review and verify student activities and reports
+                            Review and verify student activities to empower their journey.
                         </p>
+                    </div>
+                    <div className="hidden md:flex items-center gap-2 text-sm font-bold text-slate-400 bg-white px-4 py-2 rounded-2xl border border-slate-100 italic">
+                        <Filter className="w-4 h-4" /> Filtering for your organization
                     </div>
                 </div>
 
                 {/* Tabs */}
-                <div className="bg-white rounded-3xl p-2 border border-slate-200 shadow-sm inline-flex gap-2">
+                <div className="bg-slate-200/50 p-1 rounded-[22px] border border-slate-200/60 inline-flex flex-wrap gap-1">
                     {tabs.map((tab) => (
                         <button
                             key={tab.id}
                             onClick={() => setActiveTab(tab.id as any)}
                             className={clsx(
-                                'px-6 py-3 rounded-2xl font-bold text-sm transition-all',
+                                'px-6 py-2.5 rounded-[18px] font-bold text-sm transition-all duration-300 flex items-center gap-2',
                                 activeTab === tab.id
-                                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-200'
-                                    : 'text-slate-600 hover:bg-slate-50'
+                                    ? 'bg-white text-blue-600 shadow-[0_4px_12px_rgba(0,0,0,0.05)] ring-1 ring-slate-200/50'
+                                    : 'text-slate-500 hover:text-slate-800 hover:bg-white/50'
                             )}
                         >
                             {tab.label}
                             <span className={clsx(
-                                'ml-2 px-2 py-0.5 rounded-lg text-xs font-black',
-                                activeTab === tab.id ? 'bg-blue-500' : 'bg-slate-100'
+                                'px-2 py-0.5 rounded-lg text-[10px] font-black tracking-tight',
+                                activeTab === tab.id ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-600'
                             )}>
                                 {tab.count}
                             </span>
@@ -193,62 +196,78 @@ export default function VerifyWorkPage() {
                         <p className="text-slate-500 font-medium">No pending items for verification.</p>
                     </div>
                 ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                         {filteredReports.map((report) => (
                             <div
                                 key={report.id}
-                                className="bg-white rounded-3xl p-6 border border-slate-200 hover:shadow-2xl hover:shadow-slate-200/50 transition-all duration-300 group"
+                                className="bg-white rounded-[32px] p-7 border border-slate-200 hover:border-blue-200 hover:shadow-[0_20px_40px_-15px_rgba(37,99,235,0.08)] transition-all duration-500 group relative flex flex-col"
                             >
-                                <div className="flex items-start justify-between mb-4">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white font-black text-lg border-2 border-slate-100">
-                                            {report.student_name.charAt(0)}
+                                <div className="flex items-start justify-between gap-4 mb-6">
+                                    <div className="flex items-center gap-4">
+                                        <div className="relative">
+                                            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-black text-xl shadow-lg shadow-blue-200 ring-4 ring-white">
+                                                {report.student_name.charAt(0)}
+                                            </div>
+                                            <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-green-500 rounded-full border-2 border-white"></div>
                                         </div>
                                         <div>
-                                            <h3 className="font-bold text-slate-900 group-hover:text-blue-600 transition-colors">
+                                            <h3 className="font-bold text-slate-900 text-base group-hover:text-blue-600 transition-colors flex items-center gap-1">
                                                 {report.student_name}
                                             </h3>
-                                            <p className="text-xs text-slate-500 font-medium">{report.student_email}</p>
+                                            <div className="flex items-center gap-1.5 text-slate-400 mt-0.5">
+                                                <User className="w-3.5 h-3.5" />
+                                                <span className="text-[11px] font-bold uppercase tracking-wider truncate max-w-[120px]">{report.student_email.split('@')[0]}</span>
+                                            </div>
                                         </div>
                                     </div>
-                                    {getStatusBadge(report.status)}
+                                    <div className="shrink-0">
+                                        {getStatusBadge(report.status)}
+                                    </div>
                                 </div>
 
-                                <div className="space-y-3 mb-4">
-                                    <div className="bg-slate-50 rounded-2xl p-4">
-                                        <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Project</p>
-                                        <p className="text-sm font-bold text-slate-900 line-clamp-2">
+                                <div className="space-y-4 mb-8 flex-1">
+                                    <div className="bg-slate-50/80 rounded-[24px] p-5 border border-slate-100 group-hover:bg-blue-50/30 group-hover:border-blue-100 transition-colors duration-500">
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <Briefcase className="w-3.5 h-3.5 text-blue-500" />
+                                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Project</p>
+                                        </div>
+                                        <p className="text-sm font-bold text-slate-800 leading-relaxed line-clamp-2">
                                             {report.project_title}
                                         </p>
                                     </div>
 
-                                    <div className="flex items-center justify-between text-xs">
-                                        <div>
-                                            <span className="text-slate-400 font-medium">Submitted:</span>
-                                            <span className="ml-2 font-bold text-slate-700">
-                                                {new Date(report.submission_date).toLocaleDateString('en-US', {
-                                                    month: 'short',
-                                                    day: 'numeric',
-                                                    year: 'numeric'
-                                                })}
-                                            </span>
+                                    <div className="flex items-center gap-4 px-2">
+                                        <div className="flex items-center gap-2">
+                                            <CalendarDays className="w-4 h-4 text-slate-400" />
+                                            <div className="flex flex-col">
+                                                <span className="text-[9px] font-bold text-slate-300 uppercase tracking-wider">Submitted</span>
+                                                <span className="text-xs font-black text-slate-600">
+                                                    {new Date(report.submission_date).toLocaleDateString('en-US', {
+                                                        month: 'short',
+                                                        day: 'numeric',
+                                                        year: 'numeric'
+                                                    })}
+                                                </span>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
 
-                                <div className="flex gap-2">
+                                <div className="flex gap-3 mt-auto">
                                     <button
                                         onClick={() => router.push(`/dashboard/partner/verify/${report.id}`)}
-                                        className="flex-1 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-bold py-2 px-4 shadow-lg shadow-blue-200 hover:shadow-xl transition-all"
+                                        className="flex-[2] bg-slate-900 hover:bg-blue-600 text-white rounded-2xl font-bold py-3.5 px-4 shadow-lg shadow-slate-200 hover:shadow-blue-200 transition-all duration-300 flex items-center justify-center gap-2 group/btn"
                                     >
-                                        View Report
+                                        View Details
+                                        <ExternalLink className="w-4 h-4 group-hover/btn:translate-x-0.5 group-hover/btn:-translate-y-0.5 transition-transform" />
                                     </button>
                                     {report.status === 'submitted' && (
                                         <button
                                             onClick={() => router.push(`/dashboard/partner/verify/${report.id}#actions`)}
-                                            className="rounded-2xl font-bold border-2 border-slate-200 text-slate-700 hover:border-blue-400 hover:bg-blue-50 py-2 px-4 transition-all"
+                                            className="flex-1 rounded-2xl font-bold border-2 border-slate-100 text-slate-600 hover:border-blue-200 hover:text-blue-600 hover:bg-blue-50/50 py-3.5 px-4 transition-all duration-300 flex items-center justify-center"
+                                            title="Quick Verify"
                                         >
-                                            Quick Verify
+                                            <CheckCircle2 className="w-5 h-5" />
                                         </button>
                                     )}
                                 </div>
