@@ -976,10 +976,10 @@ export default function OpportunityDetailsPage() {
                                     </option>
                                 ))}
                         </select>
-                    </div>
+                    </div >
 
                     {/* C4. Secondary SDGs */}
-                    <div className="pt-6 border-t border-slate-100">
+                    < div className="pt-6 border-t border-slate-100" >
                         <label className="block text-sm font-bold text-slate-900 mb-2">C4. Secondary SDGs (Optional)</label>
                         <p className="text-xs text-slate-500 mb-4">Select other SDGs this project contributes to and provide a brief justification.</p>
 
@@ -1089,12 +1089,13 @@ export default function OpportunityDetailsPage() {
                                 })}
                             </div>
                         </div>
-                    </div>
-                </div>
-            </div>
+                    </div >
+                </div >
+            </div >
 
             {/* SECTION D: SDG ALIGNED OBJECTIVES */}
-            <div className={`bg-white rounded-2xl border transition-all duration-300 ${expandedSections.includes('D') ? 'border-teal-500 shadow-xl ring-1 ring-teal-500' : 'border-slate-200 shadow-sm'}`}>
+            < div className={`bg-white rounded-2xl border transition-all duration-300 ${expandedSections.includes('D') ? 'border-teal-500 shadow-xl ring-1 ring-teal-500' : 'border-slate-200 shadow-sm'}`
+            }>
                 <div
                     className="p-6 border-b border-slate-100 flex justify-between items-center cursor-pointer hover:bg-slate-50 transition-colors"
                     onClick={() => toggleSection("D")}
@@ -1153,10 +1154,10 @@ export default function OpportunityDetailsPage() {
                         </div>
                     </div>
                 </div>
-            </div>
+            </div >
 
             {/* SECTION E: ACTIVITY DETAILS */}
-            <div className={`bg-white rounded-2xl border transition-all duration-300 ${expandedSections.includes('E') ? 'border-indigo-500 shadow-xl ring-1 ring-indigo-500' : 'border-slate-200 shadow-sm'}`}>
+            < div className={`bg-white rounded-2xl border transition-all duration-300 ${expandedSections.includes('E') ? 'border-indigo-500 shadow-xl ring-1 ring-indigo-500' : 'border-slate-200 shadow-sm'}`}>
                 <div
                     className="p-6 border-b border-slate-100 flex justify-between items-center cursor-pointer hover:bg-slate-50 transition-colors"
                     onClick={() => toggleSection("E")}
@@ -1221,10 +1222,10 @@ export default function OpportunityDetailsPage() {
                         </div>
                     </div>
                 </div>
-            </div>
+            </div >
 
             {/* SECTION F: SUPERVISION */}
-            <div className={`bg-white rounded-2xl border transition-all duration-300 ${expandedSections.includes('F') ? 'border-orange-500 shadow-xl ring-1 ring-orange-500' : 'border-slate-200 shadow-sm'}`}>
+            < div className={`bg-white rounded-2xl border transition-all duration-300 ${expandedSections.includes('F') ? 'border-orange-500 shadow-xl ring-1 ring-orange-500' : 'border-slate-200 shadow-sm'}`}>
                 <div
                     className="p-6 border-b border-slate-100 flex justify-between items-center cursor-pointer hover:bg-slate-50 transition-colors"
                     onClick={() => toggleSection("F")}
@@ -1285,10 +1286,10 @@ export default function OpportunityDetailsPage() {
                         </label>
                     </div>
                 </div>
-            </div>
+            </div >
 
             {/* SECTION G: VERIFICATION */}
-            <div className={`bg-white rounded-2xl border transition-all duration-300 ${expandedSections.includes('G') ? 'border-cyan-500 shadow-xl ring-1 ring-cyan-500' : 'border-slate-200 shadow-sm'}`}>
+            < div className={`bg-white rounded-2xl border transition-all duration-300 ${expandedSections.includes('G') ? 'border-cyan-500 shadow-xl ring-1 ring-cyan-500' : 'border-slate-200 shadow-sm'}`}>
                 <div
                     className="p-6 border-b border-slate-100 flex justify-between items-center cursor-pointer hover:bg-slate-50 transition-colors"
                     onClick={() => toggleSection("G")}
@@ -1320,10 +1321,10 @@ export default function OpportunityDetailsPage() {
                         ))}
                     </div>
                 </div>
-            </div>
+            </div >
 
             {/* SECTION H: VISIBILITY */}
-            <div className={`bg-white rounded-2xl border transition-all duration-300 ${expandedSections.includes('H') ? 'border-pink-500 shadow-xl ring-1 ring-pink-500' : 'border-slate-200 shadow-sm'}`}>
+            < div className={`bg-white rounded-2xl border transition-all duration-300 ${expandedSections.includes('H') ? 'border-pink-500 shadow-xl ring-1 ring-pink-500' : 'border-slate-200 shadow-sm'}`}>
                 <div
                     className="p-6 border-b border-slate-100 flex justify-between items-center cursor-pointer hover:bg-slate-50 transition-colors"
                     onClick={() => toggleSection("H")}
@@ -1414,10 +1415,10 @@ export default function OpportunityDetailsPage() {
                         </div>
                     )}
                 </div>
-            </div>
+            </div >
 
             {/* Action Bar for Edit Mode */}
-            <div className="fixed bottom-0 left-0 md:left-64 right-0 p-4 bg-white border-t border-slate-200 z-50 flex justify-end gap-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+            < div className="fixed bottom-0 left-0 md:left-64 right-0 p-4 bg-white border-t border-slate-200 z-50 flex justify-end gap-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]" >
                 <button
                     onClick={() => router.replace(pathname)}
                     className="px-6 py-2 border border-slate-200 text-slate-600 font-bold rounded-xl hover:bg-slate-50 flex items-center gap-2"
@@ -1432,7 +1433,7 @@ export default function OpportunityDetailsPage() {
                     {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                     {isSubmitting ? "Updating..." : "Save Changes"}
                 </button>
-            </div>
+            </div >
         </div >
     );
 }
