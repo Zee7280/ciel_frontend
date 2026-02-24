@@ -35,7 +35,7 @@ export default function StoriesGrid() {
         const fetchOpportunities = async () => {
             try {
                 const backendUrl = process.env.NEXT_PUBLIC_BACKEND_BASE_URL;
-                const response = await fetch(`${backendUrl}/opportunities`);
+                const response = await fetch(`${backendUrl}/public/opportunities`);
                 if (response.ok) {
                     const result = await response.json();
                     if (result.success && Array.isArray(result.data)) {
