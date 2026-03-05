@@ -51,7 +51,9 @@ export default function OpportunityPostingPage() {
         objectives: {
             description: "",
             beneficiariesCount: "",
-            beneficiariesType: [] as string[]
+            beneficiariesType: [] as string[],
+            isOtherBeneficiaryChecked: false,
+            otherBeneficiary: ""
         },
 
         // Section E
@@ -73,6 +75,8 @@ export default function OpportunityPostingPage() {
 
         // Section G
         verification: [] as string[],
+        isOtherVerificationChecked: false,
+        otherVerification: "",
 
         // Section H
         visibility: "public", // 'public' or 'restricted'
@@ -183,7 +187,9 @@ export default function OpportunityPostingPage() {
                 objectives: {
                     description: formData.objectives.description,
                     beneficiaries_count: parseInt(formData.objectives.beneficiariesCount) || 0,
-                    beneficiaries_type: formData.objectives.beneficiariesType
+                    beneficiaries_type: formData.objectives.isOtherBeneficiaryChecked && formData.objectives.otherBeneficiary.trim()
+                        ? [...formData.objectives.beneficiariesType, formData.objectives.otherBeneficiary.trim()]
+                        : formData.objectives.beneficiariesType
                 },
                 activity_details: {
                     student_responsibilities: formData.activity.responsibilities,
@@ -199,7 +205,9 @@ export default function OpportunityPostingPage() {
                     safe_environment: formData.supervision.isHarmful, // Note: Logic check needed here, assumes checkbox means "Confirmed Safe"
                     supervised: formData.supervision.isSupervised
                 },
-                verification_method: formData.verification,
+                verification_method: formData.isOtherVerificationChecked && formData.otherVerification.trim()
+                    ? [...formData.verification, formData.otherVerification.trim()]
+                    : formData.verification,
                 visibility: formData.visibility,
                 restricted_universities: formData.visibility === 'restricted' ? formData.restrictedUniversities : null
             };
@@ -851,6 +859,32 @@ export default function OpportunityPostingPage() {
                                         </label>
                                     ))}
                                 </div>
+                                <div className="mt-3">
+                                    <label className={`flex items-center gap-2 p-3 border rounded-xl hover:bg-slate-50 cursor-pointer transition-all ${formData.objectives.isOtherBeneficiaryChecked ? 'bg-teal-50 border-teal-200' : 'border-slate-100'}`}>
+                                        <input
+                                            type="checkbox"
+                                            className="rounded text-teal-600 focus:ring-teal-500"
+                                            checked={formData.objectives.isOtherBeneficiaryChecked}
+                                            onChange={(e) => setFormData({
+                                                ...formData,
+                                                objectives: { ...formData.objectives, isOtherBeneficiaryChecked: e.target.checked }
+                                            })}
+                                        />
+                                        <span className={`text-sm font-medium ${formData.objectives.isOtherBeneficiaryChecked ? 'text-teal-700' : 'text-slate-600'}`}>Other</span>
+                                    </label>
+                                    {formData.objectives.isOtherBeneficiaryChecked && (
+                                        <input
+                                            type="text"
+                                            placeholder="Please specify other beneficiary type..."
+                                            className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-teal-500 outline-none text-sm transition-all"
+                                            value={formData.objectives.otherBeneficiary}
+                                            onChange={(e) => setFormData({
+                                                ...formData,
+                                                objectives: { ...formData.objectives, otherBeneficiary: e.target.value }
+                                            })}
+                                        />
+                                    )}
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -1081,6 +1115,26 @@ export default function OpportunityPostingPage() {
                                 /> {v}
                             </label>
                         ))}
+                    </div>
+                    <div className="mt-4">
+                        <label className={`flex items-center gap-2 p-3 border rounded-xl hover:bg-slate-50 cursor-pointer w-full md:w-1/3 mb-2 transition-all ${formData.isOtherVerificationChecked ? 'bg-cyan-50 border-cyan-200' : 'border-slate-100'}`}>
+                            <input
+                                type="checkbox"
+                                className="rounded text-cyan-600 focus:ring-cyan-500"
+                                checked={formData.isOtherVerificationChecked}
+                                onChange={(e) => setFormData({ ...formData, isOtherVerificationChecked: e.target.checked })}
+                            />
+                            <span className={`text-sm font-medium ${formData.isOtherVerificationChecked ? 'text-cyan-700' : 'text-slate-600'}`}>Other</span>
+                        </label>
+                        {formData.isOtherVerificationChecked && (
+                            <input
+                                type="text"
+                                placeholder="Please specify other verification method..."
+                                className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-cyan-500 outline-none text-sm transition-all"
+                                value={formData.otherVerification}
+                                onChange={(e) => setFormData({ ...formData, otherVerification: e.target.value })}
+                            />
+                        )}
                     </div>
                 </div>
             </div>

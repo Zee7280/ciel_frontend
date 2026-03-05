@@ -33,7 +33,11 @@ export default function OpportunityDetailsPage() {
                 const data = await res.json();
                 if (data.success) {
                     console.log(data.data);
-                    setOpportunity(data.data);
+                    const opData = data.data;
+                    setOpportunity({
+                        ...opData,
+                        hasApplied: !!opData.application_status || opData.status === 'applied'
+                    });
                 } else {
                     toast.error(data.message || "Failed to load opportunity details");
                 }
@@ -116,11 +120,12 @@ export default function OpportunityDetailsPage() {
                     {opportunity.hasApplied ? (
                         <div className="flex items-center gap-2">
                             {['active', 'pending', 'pending_approval', 'completed', 'applied', 'accepted'].includes(opportunity.status) && (
-                                <Link href={`/dashboard/student/report?projectId=${id}`}>
-                                    <Button className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 font-medium">
-                                        Submit Report
-                                    </Button>
-                                </Link>
+                                <Button
+                                    onClick={() => router.push(`/dashboard/student/report?projectId=${id}`)}
+                                    className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 font-medium"
+                                >
+                                    Submit Report
+                                </Button>
                             )}
                             <Button className="flex items-center gap-2 px-6 py-2 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg shadow-none cursor-default font-medium hover:bg-emerald-50">
                                 <CheckCircle2 className="w-4 h-4" /> Applied

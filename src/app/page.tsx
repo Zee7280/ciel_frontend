@@ -1,5 +1,6 @@
 import Navbar from "@/components/Navbar";
 import Hero from "@/components/Hero";
+import FeaturesBar from "@/components/FeaturesBar";
 import HowWeWork from "@/components/HowWeWork";
 import StoriesGrid from "@/components/StoriesGrid";
 import PartnersFooter from "@/components/PartnersFooter";
@@ -11,6 +12,7 @@ export default function Home() {
     <main className="min-h-screen bg-white font-sans">
       <Navbar />
       <Hero />
+      <FeaturesBar />
       <HowWeWork />
       <StoriesGrid />
       <PartnersFooter />

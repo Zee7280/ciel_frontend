@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { BookOpen, Star, Trophy, Clock, Loader2 } from "lucide-react";
+import { BookOpen, Star, Trophy, Clock, Loader2, TrendingUp } from "lucide-react";
 import Link from "next/link";
 import { Button } from "./report/components/ui/button";
 import { DashboardData } from "./types";
@@ -73,6 +73,24 @@ export default function StudentDashboard() {
                         </div>
                     </div>
                 ))}
+            </div>
+
+            {/* Engagement Record Quick Link */}
+            <div className="bg-blue-600 rounded-2xl p-6 text-white flex flex-col md:flex-row items-center justify-between gap-4 shadow-lg shadow-blue-100">
+                <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center">
+                        <TrendingUp className="w-6 h-6" />
+                    </div>
+                    <div>
+                        <h3 className="text-lg font-bold">Verified Impact Tracking (Section 1)</h3>
+                        <p className="text-sm opacity-80">Authenticate your identity and log attendance directly within your Project Report.</p>
+                    </div>
+                </div>
+                <Link href="/dashboard/student/projects">
+                    <Button className="bg-white text-blue-600 hover:bg-blue-50 font-bold px-8">
+                        Go to Project Reports
+                    </Button>
+                </Link>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">

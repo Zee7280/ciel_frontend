@@ -95,8 +95,8 @@ export default function StudentBrowseOpportunitiesPage() {
                     const mappedOps = (data.data || []).map((op: any) => ({
                         ...op,
                         // If application_status exists, it means the student has applied
-                        // Status 'active' or 'accepted' means it's approved and can be reported
-                        hasApplied: !!op.application_status || op.status === 'applied' || op.status === 'active' || op.status === 'accepted'
+                        // Status 'applied' means the current student application is pending
+                        hasApplied: !!op.application_status || op.status === 'applied'
                     }));
                     setOpportunities(mappedOps);
                 }

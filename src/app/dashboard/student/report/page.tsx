@@ -4,8 +4,16 @@ import { useReportForm, ReportProvider } from './context/ReportContext';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { authenticatedFetch } from '@/utils/api';
 import { toast } from 'sonner';
-import { ChevronRight, Save, Loader2, ArrowLeft } from 'lucide-react';
+import { ChevronRight, Save, Loader2, ArrowLeft, Lock } from 'lucide-react';
 import { Button } from './components/ui/button';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "./components/ui/dialog";
 import clsx from 'clsx';
 
 // Import New Sections
@@ -33,6 +41,7 @@ function ReportFormContent() {
         validationErrors,
         data,
         setFullData,
+        setStep,
         setProjectId,
         setReadOnly,
         isReadOnly
@@ -70,10 +79,6 @@ function ReportFormContent() {
                 const actualReportData = reportData.data || reportData; // Handle potential wrapper
                 if (actualReportData && Object.keys(actualReportData).length > 0) {
                     setFullData(actualReportData);
-                    // Check if report is submitted/locked
-                    if (actualReportData.status === 'submitted' || actualReportData.status === 'approved') {
-                        setReadOnly(true);
-                    }
                 }
             }
         } catch (error) {
@@ -84,7 +89,12 @@ function ReportFormContent() {
         }
     };
 
-    const handleNext = async () => {
+    const handleNext = async (e?: React.MouseEvent) => {
+        if (e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
         if (validateCurrentSection()) {
             if (activeStep < 11) {
                 // Auto-save on next
@@ -123,13 +133,22 @@ function ReportFormContent() {
         }
     };
 
-    const handleSubmit = async () => {
+    const [isConfirmOpen, setIsConfirmOpen] = React.useState(false);
+
+    const handleSubmit = async (e?: React.MouseEvent) => {
+        if (e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
         if (isReadOnly) return;
 
         // Final validation check for all sections could go here
 
-        if (!confirm("Are you sure you want to submit? You cannot edit the report after submission.")) return;
+        setIsConfirmOpen(true);
+    };
 
+    const confirmSubmit = async () => {
+        setIsConfirmOpen(false);
         setIsSaving(true);
         try {
             const res = await authenticatedFetch(`/api/v1/student/reports/${projectId}/submit`, {
@@ -140,7 +159,9 @@ function ReportFormContent() {
             if (!res || !res.ok) throw new Error('Submission failed');
 
             toast.success('Report submitted successfully!');
-            router.push('/dashboard/student');
+            setTimeout(() => {
+                window.location.href = '/dashboard/student';
+            }, 3500);
         } catch (error) {
             console.error(error);
             toast.error('Failed to submit report');
@@ -163,7 +184,7 @@ function ReportFormContent() {
     ];
 
     return (
-        <div className="max-w-5xl mx-auto px-4 py-8 space-y-8">
+        <div className="max-w-none mx-auto px-6 md:px-12 py-8 space-y-8">
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div>
@@ -199,13 +220,31 @@ function ReportFormContent() {
                         return (
                             <div key={label} className="flex items-center mb-2">
                                 <div
+                                    onClick={() => {
+                                        // Allow jumping to any completed step, or any step if read-only
+                                        if (isCompleted || isReadOnly) {
+                                            setStep(stepNum);
+                                        } else if (isActive) {
+                                            // Do nothing if clicking current step
+                                        } else {
+                                            // Validate current before jumping forward
+                                            if (validateCurrentSection()) {
+                                                setStep(stepNum);
+                                            } else {
+                                                const firstError = Object.values(validationErrors)[0]?.[0]?.message;
+                                                toast.error(firstError || 'Please fix errors before skipping ahead');
+                                            }
+                                        }
+                                    }}
                                     className={clsx(
-                                        "flex items-center gap-2 px-3 py-1.5 rounded-lg transition-colors text-sm font-medium cursor-default",
-                                        isActive ? "bg-blue-600 text-white shadow-md shadow-blue-200" : isCompleted ? "bg-blue-50 text-blue-700" : "text-slate-400 bg-slate-50"
+                                        "flex items-center gap-2 px-3 py-1.5 rounded-lg transition-colors text-sm font-medium",
+                                        isActive ? "bg-blue-600 text-white shadow-md shadow-blue-200 cursor-default"
+                                            : isCompleted || isReadOnly ? "bg-blue-50 text-blue-700 cursor-pointer hover:bg-blue-100"
+                                                : "text-slate-400 bg-slate-50 cursor-pointer hover:bg-slate-100"
                                     )}
                                 >
                                     <div className={clsx(
-                                        "w-5 h-5 rounded-full flex items-center justify-center text-[10px] border",
+                                        "w-5 h-5 rounded-full flex items-center justify-center text-[10px] border transition-colors",
                                         isActive ? "border-white bg-white/20" : isCompleted ? "border-blue-200 bg-blue-100" : "border-slate-300"
                                     )}>
                                         {stepNum}
@@ -238,15 +277,42 @@ function ReportFormContent() {
 
             {/* Footer Navigation */}
             <div className="flex items-center justify-between pt-6 border-t border-slate-200">
-                <Button variant="outline" onClick={prevStep} disabled={activeStep === 1}>
+                <Button type="button" variant="outline" onClick={prevStep} disabled={activeStep === 1}>
                     Previous Step
                 </Button>
 
-                <Button onClick={handleNext} className="bg-blue-600 hover:bg-blue-700 text-white px-8">
-                    {activeStep === 11 ? 'Submit Report' : 'Next Step'}
+                <Button
+                    type="button"
+                    onClick={handleNext}
+                    disabled={isSaving}
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-8"
+                >
+                    {isSaving && activeStep === 11 ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                    {activeStep === 11 ? (isSaving ? 'Submitting...' : 'Submit Report') : 'Next Step'}
                     {activeStep !== 11 && <ChevronRight className="w-4 h-4 ml-2" />}
                 </Button>
             </div>
+
+            {/* Submit Confirmation Dialog */}
+            <Dialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Submit Report?</DialogTitle>
+                        <DialogDescription>
+                            Are you sure you want to submit this report? You will not be able to edit it after submission.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsConfirmOpen(false)}>
+                            Cancel
+                        </Button>
+                        <Button className="bg-blue-600 hover:bg-blue-700 text-white" onClick={confirmSubmit} disabled={isSaving}>
+                            {isSaving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                            Yes, Submit Report
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

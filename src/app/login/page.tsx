@@ -143,7 +143,7 @@ export default function LoginPage() {
 
                 // Fetch full user profile immediately to cache it
                 try {
-                    const profileRes = await fetch(`/api/v1/user/me`, {
+                    const profileRes = await fetch(`${backendUrl}/user/me`, {
                         method: "GET",
                         headers: {
                             "Content-Type": "application/json",

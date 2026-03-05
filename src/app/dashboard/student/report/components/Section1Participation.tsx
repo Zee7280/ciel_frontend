@@ -1,375 +1,597 @@
-import { Users, UserPlus, Trash2, Shield, Info, AlertCircle, Clock } from "lucide-react";
+import React from "react";
+import { Users, UserPlus, Trash2, Shield, Info, AlertCircle, Clock, CheckCircle2, Loader2, Award, Zap, ChevronRight, ChevronLeft, Save, Lock, Unlock } from "lucide-react";
 import { Label } from "./ui/label";
 import { Input } from "./ui/input";
-import { Select } from "./ui/select";
 import { Button } from "./ui/button";
 import { useReportForm } from "../context/ReportContext";
+import { authenticatedFetch } from "@/utils/api";
+import { useSearchParams } from "next/navigation";
 import clsx from "clsx";
 
 import { FieldError } from "./ui/FieldError";
+import IdentityVerification from "../../engagement/components/IdentityVerification";
+import AttendanceForm from "../../engagement/components/AttendanceForm";
+import AttendanceSummaryTable from "../../engagement/components/AttendanceSummaryTable";
+import EngagementOverview from "../../engagement/components/EngagementOverview";
+import TeamVerification from "./TeamVerification";
+import { calculateEngagementMetrics } from "../utils/engagementMetrics";
 
 export default function Section1Participation() {
-    const { data, updateSection, getFieldError, validationErrors } = useReportForm();
+    const { data, updateSection, getFieldError, validationErrors, nextStep, saveReport, isReadOnly, isParticipationUnlocked, setParticipationUnlocked } = useReportForm();
+    const searchParams = useSearchParams();
+    const projectIdFromUrl = searchParams.get('project') || searchParams.get('projectId');
+
     const { participation_type, team_lead, team_members } = data.section1;
 
-    // Get section-level errors
-    const sectionErrors = validationErrors['section1'] || [];
-    const hasErrors = sectionErrors.length > 0;
+    // Wizard State
+    const [internalStep, setInternalStep] = React.useState(
+        data.section1.verified_summary ? 6 : 1
+    );
+    const [isLoadingMetrics, setIsLoadingMetrics] = React.useState(false);
+    const [verifiedMetrics, setVerifiedMetrics] = React.useState<any>(
+        data.section1.metrics.total_verified_hours > 0 ? {
+            totalHours: data.section1.metrics.total_verified_hours,
+            eis: data.section1.metrics.eis_score,
+            activeDays: data.section1.metrics.total_active_days,
+            spanWeeks: Math.ceil(data.section1.metrics.engagement_span / 7),
+            frequency: data.section1.metrics.attendance_frequency,
+            weeklyContinuity: data.section1.metrics.weekly_continuity,
+            category: data.section1.metrics.engagement_category,
+            hecStatus: data.section1.metrics.hec_compliance
+        } : null
+    );
+    const [verifiedSummary, setVerifiedSummary] = React.useState<string>(data.section1.verified_summary || "");
+    const [isVerified, setIsVerified] = React.useState(!!data.section1.team_lead.verified);
+    const [participantId, setParticipantId] = React.useState<string | null>(null);
+    const [isSubmitted, setIsSubmitted] = React.useState(!!data.section1.verified_summary);
+    const [reviewChecked, setReviewChecked] = React.useState([false, false, false]);
+    const [isDeleting, setIsDeleting] = React.useState<string | null>(null);
 
-    const handleTeamLeadChange = (field: string, value: string | boolean) => {
-        updateSection('section1', {
-            team_lead: { ...team_lead, [field]: value }
-        });
-    };
+    // Hard Validation Gates
+    const canMoveToStep2 = participation_type !== null;
+    const canMoveToStep3 = isVerified; // Self must be verified in Step 2 gateway
+    const canMoveToStep4 = participation_type === 'individual' ||
+        (participation_type === 'team' && team_members.length > 0 && team_members.every(m => m.verified));
+    const canMoveToStep5 = data.section1.attendance_logs.length > 0;
 
-    const handleTypeChange = (type: string) => {
-        updateSection('section1', {
-            participation_type: type as 'individual' | 'team',
-            team_members: type === 'individual' ? [] : team_members
-        });
-    };
+    const steps = [
+        { id: 1, title: 'Participation Mode' },
+        { id: 2, title: 'Identity Verification' },
+        { id: 3, title: 'Team Setup' },
+        { id: 4, title: 'Attendance Logging' },
+        { id: 5, title: 'Review & Submit' },
+        { id: 6, title: 'Metrics Dashboard' }
+    ];
 
-    const addTeamMember = () => {
-        if (team_members.length < 19) {
-            updateSection('section1', {
-                team_members: [...team_members, { name: "", cnic: "", mobile: "", university: "", program: "", year: "", role: "", hours: "" }]
-            });
+    // Data Fetching
+    React.useEffect(() => {
+        if (projectIdFromUrl) {
+            fetchInitialData();
+        }
+    }, [projectIdFromUrl]);
+
+    const fetchInitialData = async () => {
+        try {
+            // 1. Fetch Participant Record
+            const partRes = await authenticatedFetch(`/api/v1/engagement/my`);
+            if (partRes && partRes.ok) {
+                const parts = await partRes.json();
+                const myPart = parts.data.find((p: any) => p.projectId === projectIdFromUrl);
+
+                if (myPart) {
+                    setParticipantId(myPart.id);
+                    setIsVerified(true);
+                    // Update wizard step based on progress
+                    if (['submitted', 'verified', 'finalized'].includes(myPart.status)) {
+                        setInternalStep(6);
+                        setIsSubmitted(true);
+                    } else if (myPart.mobileVerified || myPart.emailVerified) {
+                        setInternalStep(4);
+                    }
+
+                    // 2. Fetch Attendance Entries
+                    const attRes = await authenticatedFetch(`/api/v1/engagement/${myPart.id}/attendance`);
+                    if (attRes && attRes.ok) {
+                        const atts = await attRes.json();
+                        const mappedEntries = (atts.data || []).map((e: any) => ({
+                            id: e.id,
+                            date: e.dateOfEngagement || e.date,
+                            start_time: e.startTime || e.start_time,
+                            end_time: e.endTime || e.end_time,
+                            location: e.organizationName || e.location,
+                            activity_type: e.activityType || e.activity_type,
+                            description: e.description,
+                            hours: e.sessionHours || e.hours,
+                            entryStatus: e.entryStatus
+                        }));
+                        updateSection('section1', { attendance_logs: mappedEntries });
+
+                        // 3. Populate Metrics locally if available
+                        if (mappedEntries.length > 0) {
+                            const calc = calculateEngagementMetrics(mappedEntries);
+                            setVerifiedMetrics({
+                                totalHours: calc.total_verified_hours,
+                                activeDays: calc.total_active_days,
+                                spanWeeks: Math.ceil(calc.engagement_span / 7),
+                                frequency: calc.attendance_frequency,
+                                weeklyContinuity: calc.weekly_continuity,
+                                eis: calc.eis_score,
+                                category: calc.engagement_category,
+                                hecStatus: calc.hec_compliance,
+                                evidenceCount: mappedEntries.filter((l: any) => l.evidence_file).length,
+                                evidenceRatio: Math.round((mappedEntries.filter((l: any) => l.evidence_file).length / mappedEntries.length) * 100)
+                            });
+                        }
+                    }
+                }
+            }
+        } catch (err) {
+            console.error("Error fetching initial dynamic data:", err);
         }
     };
 
-    const updateTeamMember = (index: number, field: string, value: string) => {
-        const newMembers = [...team_members];
-        newMembers[index] = { ...newMembers[index], [field]: value };
-        updateSection('section1', { team_members: newMembers });
+    const handleNext = () => {
+        if (internalStep === 6) {
+            updateSection('section1', {
+                verified_summary: "Participation record finalized with HEC-compliant audit trail."
+            });
+            nextStep(); // Context next step
+            return;
+        }
+        setInternalStep(prev => Math.min(prev + 1, 6));
+    };
+    const handleBack = () => setInternalStep(prev => Math.max(prev - 1, 1));
+
+    const handleFinalSubmit = async () => {
+        if (!participantId) return;
+        setIsLoadingMetrics(true);
+        try {
+            // Trigger backend finalization and record locking
+            const res = await authenticatedFetch(`/api/v1/engagement/${participantId}/finalize`, {
+                method: 'POST'
+            });
+
+            if (res && res.ok) {
+                // Calculate metrics locally since we have all the data
+                const calc = calculateEngagementMetrics(data.section1.attendance_logs);
+                const finalMetrics = {
+                    totalHours: calc.total_verified_hours,
+                    activeDays: calc.total_active_days,
+                    spanWeeks: Math.ceil(calc.engagement_span / 7),
+                    frequency: calc.attendance_frequency,
+                    weeklyContinuity: calc.weekly_continuity,
+                    eis: calc.eis_score,
+                    category: calc.engagement_category,
+                    hecStatus: calc.hec_compliance,
+                    evidenceCount: data.section1.attendance_logs.filter(l => l.evidence_file).length,
+                    evidenceRatio: Math.round((data.section1.attendance_logs.filter(l => l.evidence_file).length / data.section1.attendance_logs.length) * 100)
+                };
+
+                setVerifiedMetrics(finalMetrics);
+                setIsSubmitted(true);
+                setParticipationUnlocked(false); // Relock after submission
+
+                // Persist completion state to report context
+                updateSection('section1', {
+                    verified_summary: "Participation record finalized with HEC-compliant audit trail.",
+                    metrics: calc // Store raw calc for other sections if needed
+                });
+
+                handleNext(); // Move to dashboard
+            } else {
+                throw new Error("Finalization failed");
+            }
+        } catch (err) {
+            console.error("Final Submit Error:", err);
+        } finally {
+            setIsLoadingMetrics(false);
+        }
     };
 
-    const removeTeamMember = (index: number) => {
-        const newMembers = [...team_members];
-        newMembers.splice(index, 1);
-        updateSection('section1', { team_members: newMembers });
+    const handleDeleteEntry = async (entryId: string) => {
+        if (!participantId) return;
+        if (!confirm("Are you sure you want to remove this session?")) return;
+
+        setIsDeleting(entryId);
+        try {
+            const res = await authenticatedFetch(`/api/v1/engagement/${participantId}/attendance/${entryId}`, {
+                method: 'DELETE'
+            });
+
+            if (res && res.ok) {
+                const newLogs = data.section1.attendance_logs.filter(l => l.id !== entryId);
+                updateSection('section1', { attendance_logs: newLogs });
+            } else {
+                alert("Failed to delete entry. Please try again.");
+            }
+        } catch (err) {
+            console.error(err);
+        } finally {
+            setIsDeleting(null);
+        }
     };
 
-    // Calculate totals
-    const totalStudents = participation_type === 'team' ? 1 + team_members.length : 1;
-    const teamMembersHours = team_members.reduce((acc, curr) => acc + (parseFloat(curr.hours) || 0), 0);
-    const teamLeadHours = parseFloat(team_lead.hours) || 0;
-    const totalHours = teamLeadHours + teamMembersHours;
-    const avgHours = totalStudents > 0 ? (totalHours / totalStudents).toFixed(1) : 0;
-
-    // Engagement Score Calculation (Mock logic for now)
-    const engagementScore = Math.min(100, Math.round((totalHours / totalStudents) * 2));
+    const isRecordLocked = isSubmitted && !isParticipationUnlocked;
 
     return (
-        <div className="space-y-8">
-            {/* Section Header */}
-            <div className="space-y-2">
-                <div className="flex items-center gap-2 text-blue-600 mb-2">
-                    <span className="text-sm font-bold">🔹 SECTION 1</span>
-                </div>
-                <h2 className="text-2xl font-bold text-slate-900">Verified Participation & Engagement</h2>
-                <p className="text-slate-600 text-sm">Identity authentication, hours validation & institutional metrics</p>
-
-                <div className="p-4 bg-blue-50 rounded-xl border border-blue-100 mt-4">
-                    <div className="flex items-start gap-3">
-                        <Shield className="w-5 h-5 text-blue-600 mt-0.5" />
-                        <div className="space-y-1">
-                            <p className="text-sm text-blue-900 font-semibold">Purpose</p>
-                            <p className="text-xs text-blue-800 leading-relaxed">
-                                This section establishes authenticity. It confirms who participated, how participation was verified,
-                                and the intensity of engagement. All data is traceable and audit-ready for HEC and QS reporting.
-                            </p>
-                        </div>
+        <div className="space-y-10 pb-20">
+            {/* Sticky Progress Bar */}
+            <div className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-100 py-4 -mx-6 md:-mx-12 px-6 md:px-12 mb-8">
+                <div className="max-w-none mx-auto">
+                    <div className="flex justify-between items-center mb-2">
+                        <span className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-600">Project Engagement Wizard</span>
+                        <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Step {internalStep} of 6</span>
+                    </div>
+                    <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden flex gap-0.5">
+                        {steps.map((s) => (
+                            <div
+                                key={s.id}
+                                className={clsx(
+                                    "h-full flex-1 transition-all duration-500",
+                                    internalStep >= s.id ? "bg-blue-600" : "bg-slate-200"
+                                )}
+                            />
+                        ))}
+                    </div>
+                    <div className="flex justify-between mt-2 overflow-x-auto no-scrollbar gap-4">
+                        {steps.map((s) => (
+                            <button
+                                key={s.id}
+                                onClick={() => internalStep > s.id && setInternalStep(s.id)}
+                                className={clsx(
+                                    "text-[9px] font-bold uppercase tracking-wider whitespace-nowrap transition-colors",
+                                    internalStep === s.id ? "text-blue-600" : internalStep > s.id ? "text-slate-900" : "text-slate-300"
+                                )}
+                            >
+                                {s.title}
+                            </button>
+                        ))}
                     </div>
                 </div>
+            </div>
 
-                {/* Error Summary */}
-                {hasErrors && (
-                    <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-start gap-3 mt-4">
-                        <AlertCircle className="w-5 h-5 text-red-600 mt-0.5 shrink-0" />
-                        <div>
-                            <h4 className="font-semibold text-red-900 text-sm">Please fix the following errors:</h4>
-                            <ul className="mt-2 space-y-1">
-                                {sectionErrors.slice(0, 5).map((error, idx) => (
-                                    <li key={idx} className="text-xs text-red-700">• {error.message}</li>
-                                ))}
-                            </ul>
+            <main className="max-w-none mx-auto animate-in fade-in slide-in-from-bottom-4 duration-700">
+                {internalStep === 1 && (
+                    <div className="space-y-8 py-10">
+                        <div className="text-center space-y-4 max-w-xl mx-auto">
+                            <h2 className="text-3xl font-black text-slate-900 tracking-tight">How are you participating?</h2>
+                            <p className="text-slate-500 font-medium">Select your involvement mode to begin high-intensity verification.</p>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            {[
+                                { id: 'individual', title: 'Individual Participation', desc: 'Direct contribution without a formal student team.', icon: UserPlus },
+                                { id: 'team', title: 'Team Participation', desc: 'Working with a group of up to 20 students.', icon: Users },
+                            ].map((mode) => (
+                                <button
+                                    key={mode.id}
+                                    onClick={() => updateSection('section1', { participation_type: mode.id })}
+                                    className={clsx(
+                                        "p-8 rounded-[2rem] border-2 text-left transition-all group relative overflow-hidden",
+                                        participation_type === mode.id
+                                            ? "border-blue-600 bg-blue-50/30 ring-4 ring-blue-600/5 shadow-xl"
+                                            : "border-slate-100 bg-white hover:border-blue-200"
+                                    )}
+                                >
+                                    <div className={clsx(
+                                        "w-12 h-12 rounded-2xl flex items-center justify-center mb-6 transition-colors",
+                                        participation_type === mode.id ? "bg-blue-600 text-white" : "bg-slate-50 text-slate-400 group-hover:bg-blue-50 group-hover:text-blue-600"
+                                    )}>
+                                        <mode.icon className="w-6 h-6" />
+                                    </div>
+                                    <h3 className="text-xl font-black text-slate-900 mb-2">{mode.title}</h3>
+                                    <p className="text-sm text-slate-500 leading-relaxed font-medium">{mode.desc}</p>
+
+                                    {participation_type === mode.id && (
+                                        <div className="absolute top-6 right-6">
+                                            <div className="w-6 h-6 rounded-full bg-blue-600 flex items-center justify-center">
+                                                <CheckCircle2 className="w-4 h-4 text-white" />
+                                            </div>
+                                        </div>
+                                    )}
+                                </button>
+                            ))}
+                        </div>
+
+                        {participation_type === 'team' && (
+                            <div className="max-w-2xl mx-auto space-y-8 p-10 bg-slate-50 rounded-[2.5rem] border border-slate-100 animate-in zoom-in-95 duration-500">
+                                <div className="space-y-6">
+                                    <div className="space-y-2">
+                                        <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Team Name (Optional)</Label>
+                                        <Input
+                                            placeholder="Enter team alias..."
+                                            className="h-12 bg-white border-none rounded-2xl font-bold shadow-sm"
+                                        />
+                                    </div>
+
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <h4 className="text-sm font-black text-slate-900 uppercase">Team Composition</h4>
+                                            <p className="text-xs text-slate-400 font-medium">{team_members.length}/20 members added</p>
+                                        </div>
+                                        <Button
+                                            onClick={() => updateSection('section1', { team_members: [...team_members, { name: '', cnic: '', verified: false }] })}
+                                            className="bg-slate-900 text-white rounded-xl h-10 px-4 text-xs font-bold"
+                                        >
+                                            <UserPlus className="w-4 h-4 mr-2" /> Add Team Member
+                                        </Button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {internalStep === 2 && (
+                    <div className="space-y-8">
+                        <div className="space-y-2">
+                            <h3 className="text-2xl font-black text-slate-900">Step 2: Your Identity</h3>
+                            <p className="text-slate-500 font-medium">Establish your unique verified link for HEC audit trails.</p>
+                        </div>
+                        {/* Tabbed UI Placeholder */}
+                        <IdentityVerification
+                            projectId={data.project_id || projectIdFromUrl || ""}
+                            participationMode={participation_type as any}
+                            isTeamLead={true}
+                            onSuccess={(p) => {
+                                setIsVerified(true);
+                                setParticipantId(p.id);
+                                // Persist verification status to report context
+                                updateSection('section1', {
+                                    team_lead: { ...team_lead, verified: true }
+                                });
+                                handleNext();
+                            }}
+                        />
+                    </div>
+                )}
+
+                {internalStep === 3 && (
+                    <div className="space-y-8">
+                        <div className="space-y-2">
+                            <h3 className="text-2xl font-black text-slate-900">Step 3: Team Configuration</h3>
+                            <p className="text-slate-500 font-medium">Verification gateway for all participating students.</p>
+                        </div>
+                        {participation_type === 'individual' ? (
+                            <div className="py-20 text-center space-y-4 bg-slate-50 rounded-[2.5rem] border border-dashed border-slate-200">
+                                <Shield className="w-12 h-12 text-slate-300 mx-auto" />
+                                <p className="text-slate-400 font-bold">Not applicable for Individual mode.</p>
+                                <Button onClick={handleNext} className="bg-slate-900 text-white rounded-xl">Skip Step</Button>
+                            </div>
+                        ) : (
+                            <TeamVerification
+                                projectId={data.project_id || projectIdFromUrl || ""}
+                                members={team_members}
+                                onUpdateMembers={(newMembers) => updateSection('section1', { team_members: newMembers })}
+                            />
+                        )}
+                    </div>
+                )}
+
+                {/* Placeholders for Steps 4, 5, 6 */}
+                {internalStep === 4 && (
+                    <div className="space-y-10 animate-in fade-in duration-500">
+                        <div className="flex items-center justify-between">
+                            <div className="space-y-1">
+                                <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tight">Step 4: Attendance Logging</h3>
+                                <p className="text-slate-500 font-medium">Record and verify your engagement sessions.</p>
+                            </div>
+                            <div className="flex gap-3">
+                                {isSubmitted && (
+                                    <Button
+                                        onClick={() => setParticipationUnlocked(!isParticipationUnlocked)}
+                                        variant="outline"
+                                        className={clsx(
+                                            "rounded-xl h-10 px-4 text-[10px] font-black uppercase tracking-widest transition-all",
+                                            isParticipationUnlocked ? "bg-amber-50 text-amber-600 border-amber-200" : "bg-blue-50 text-blue-600 border-blue-200"
+                                        )}
+                                    >
+                                        {isParticipationUnlocked ? <Unlock className="w-3.5 h-3.5 mr-2" /> : <Lock className="w-3.5 h-3.5 mr-2" />}
+                                        {isParticipationUnlocked ? "Re-Lock Record" : "Unlock for Editing"}
+                                    </Button>
+                                )}
+                                <div className="px-4 py-2 bg-amber-50 rounded-xl border border-amber-100 flex items-center gap-2">
+                                    <Clock className="w-4 h-4 text-amber-600" />
+                                    <span className="text-[10px] font-black text-amber-800 uppercase tracking-widest">Gateway active: Hours must exceed 40</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
+                            <div className="space-y-8">
+                                <div className="p-1 bg-slate-100 rounded-2xl flex">
+                                    <button className="flex-1 py-2 text-[10px] font-black uppercase tracking-widest bg-white text-blue-600 rounded-xl shadow-sm">New Entry</button>
+                                    <button className="flex-1 py-2 text-[10px] font-black uppercase tracking-widest text-slate-400">Bulk Import</button>
+                                </div>
+                                <AttendanceForm
+                                    verifiedUsers={[
+                                        ...(isVerified && participantId ? [{ id: participantId, name: (data.section1.team_lead as any).fullName || (data.section1.team_lead as any).name || "Team Lead (Self)" }] : []),
+                                        ...data.section1.team_members
+                                            .filter((m: any) => m.verified && m.id)
+                                            .map((m: any) => ({ id: m.id, name: m.fullName || m.name }))
+                                    ]}
+                                    onSuccess={() => participantId && loadEntries(participantId)}
+                                    isLocked={isRecordLocked}
+                                    isParticipationUnlocked={isParticipationUnlocked}
+                                    setParticipationUnlocked={setParticipationUnlocked}
+                                />
+                            </div>
+                            <div className="space-y-6">
+                                <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden">
+                                    <div className="p-6 border-b border-slate-50 bg-slate-50/50 flex items-center justify-between">
+                                        <h4 className="text-xs font-black text-slate-900 uppercase tracking-widest flex items-center gap-2">
+                                            <Clock className="w-4 h-4 text-blue-600" /> Logged Sessions
+                                        </h4>
+                                        <span className="text-[10px] font-black text-slate-400 bg-white px-3 py-1 rounded-full border border-slate-100">
+                                            Total: {data.section1.attendance_logs.length} Sessions
+                                        </span>
+                                    </div>
+                                    <AttendanceSummaryTable
+                                        entries={data.section1.attendance_logs}
+                                        onDelete={handleDeleteEntry}
+                                        isLocked={isRecordLocked}
+                                    />
+                                </div>
+                            </div>
                         </div>
                     </div>
                 )}
-            </div>
 
-            {/* 1.1 Participation Type */}
-            <div className="space-y-4">
-                <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold text-sm">1.1</div>
-                    <h3 className="text-lg font-bold text-slate-900">Participation Type (Mandatory)</h3>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {[
-                        { id: 'individual', title: 'Individual', icon: Users, desc: 'Solo participation' },
-                        { id: 'team', title: 'Team Participation', icon: UserPlus, desc: 'Collaborative project (Each member verifies own hours)' }
-                    ].map((type) => (
-                        <button
-                            key={type.id}
-                            onClick={() => handleTypeChange(type.id)}
-                            className={clsx(
-                                "p-4 rounded-xl border-2 transition-all text-left",
-                                participation_type === type.id
-                                    ? "bg-blue-50 border-blue-600"
-                                    : "bg-white border-slate-200 hover:border-slate-300"
-                            )}
-                        >
-                            <div className="flex items-center gap-3">
-                                <div className={clsx(
-                                    "w-10 h-10 rounded-lg flex items-center justify-center",
-                                    participation_type === type.id ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-600"
-                                )}>
-                                    <type.icon className="w-5 h-5" />
-                                </div>
-                                <div>
-                                    <h4 className="font-semibold text-slate-900">{type.title}</h4>
-                                    <p className="text-xs text-slate-500">{type.desc}</p>
-                                </div>
+                {internalStep === 5 && (
+                    <div className="max-w-2xl mx-auto space-y-10 py-10 animate-in zoom-in-95 duration-500">
+                        <div className="text-center space-y-4">
+                            <div className="w-20 h-20 bg-blue-600 text-white rounded-[2rem] flex items-center justify-center mx-auto shadow-2xl shadow-blue-200">
+                                <Shield className="w-10 h-10" />
                             </div>
-                        </button>
-                    ))}
-                </div>
-            </div>
-
-            {/* 1.2 Identity Verification */}
-            <div className="space-y-4">
-                <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold text-sm">1.2</div>
-                    <h3 className="text-lg font-bold text-slate-900">Identity Verification</h3>
-                </div>
-
-                <div className="bg-white rounded-2xl p-6 border border-slate-200 space-y-6">
-                    <div className="flex items-center gap-2 text-xs text-amber-600 bg-amber-50 p-3 rounded-lg border border-amber-100">
-                        <Shield className="w-4 h-4" />
-                        <span>Generic identifiers are encrypted and never publicly displayed. Used for HEC compliance.</span>
-                    </div>
-
-                    {/* Full Name */}
-                    <div className="space-y-2">
-                        <Label className="text-sm font-semibold text-slate-700">Full Name *</Label>
-                        <Input
-                            value={team_lead.name || ''}
-                            onChange={(e) => handleTeamLeadChange('name', e.target.value)}
-                            placeholder="Student Name"
-                            className={clsx("h-10 rounded-lg border-slate-200", getFieldError('team_lead.name') && "border-red-400 bg-red-50")}
-                        />
-                        <FieldError message={getFieldError('team_lead.name')} />
-                    </div>
-
-                    {/* CNIC */}
-                    <div className="space-y-2">
-                        <Label className="text-sm font-semibold text-slate-700">CNIC / B Form Number *</Label>
-                        <Input
-                            value={team_lead.cnic || ''}
-                            onChange={(e) => handleTeamLeadChange('cnic', e.target.value)}
-                            placeholder="3520112345678"
-                            maxLength={13}
-                            className={clsx("h-10 rounded-lg border-slate-200", getFieldError('team_lead.cnic') && "border-red-400 bg-red-50")}
-                        />
-                        <FieldError message={getFieldError('team_lead.cnic')} />
-                    </div>
-
-                    {/* Contact Info */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <Label className="text-sm font-semibold text-slate-700">Mobile Number *</Label>
-                            <Input
-                                value={team_lead.mobile || ''}
-                                onChange={(e) => handleTeamLeadChange('mobile', e.target.value)}
-                                placeholder="03001234567"
-                                className={clsx("h-10 rounded-lg border-slate-200", getFieldError('team_lead.mobile') && "border-red-400 bg-red-50")}
-                            />
-                            <FieldError message={getFieldError('team_lead.mobile')} />
+                            <h2 className="text-3xl font-black text-slate-900 tracking-tight">Final Verification & Submission</h2>
+                            <p className="text-slate-500 font-medium">Please review all data points before triggering the hard lock.</p>
                         </div>
-                        <div className="space-y-2">
-                            <Label className="text-sm font-semibold text-slate-700">Email Address *</Label>
-                            <Input
-                                value={team_lead.email || ''}
-                                onChange={(e) => handleTeamLeadChange('email', e.target.value)}
-                                placeholder="student@university.edu.pk"
-                                className={clsx("h-10 rounded-lg border-slate-200", getFieldError('team_lead.email') && "border-red-400 bg-red-50")}
-                            />
-                            <FieldError message={getFieldError('team_lead.email')} />
-                        </div>
-                    </div>
 
-                    {/* Academic Info */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <Label className="text-sm font-semibold text-slate-700">University / Institution *</Label>
-                            <Input
-                                value={team_lead.university || ''}
-                                onChange={(e) => handleTeamLeadChange('university', e.target.value)}
-                                placeholder="University Name"
-                                className={clsx("h-10 rounded-lg border-slate-200", getFieldError('team_lead.university') && "border-red-400 bg-red-50")}
-                            />
-                            <FieldError message={getFieldError('team_lead.university')} />
-                        </div>
-                        <div className="space-y-2">
-                            <Label className="text-sm font-semibold text-slate-700">Degree / Program *</Label>
-                            <Input
-                                value={team_lead.degree || ''}
-                                onChange={(e) => handleTeamLeadChange('degree', e.target.value)}
-                                placeholder="BS Program"
-                                className={clsx("h-10 rounded-lg border-slate-200", getFieldError('team_lead.degree') && "border-red-400 bg-red-50")}
-                            />
-                            <FieldError message={getFieldError('team_lead.degree')} />
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {/* 1.3 Hours Contributed */}
-            <div className="space-y-4">
-                <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold text-sm">1.3</div>
-                    <h3 className="text-lg font-bold text-slate-900">Hours Contributed (Mandatory)</h3>
-                </div>
-
-                <div className="bg-white rounded-2xl p-6 border border-slate-200 space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <Label className="text-sm font-semibold text-slate-700">My Role *</Label>
-                            <Input
-                                value={team_lead.role || ''}
-                                onChange={(e) => handleTeamLeadChange('role', e.target.value)}
-                                placeholder="e.g. Team Lead, Volunteer"
-                                className={clsx("h-10 rounded-lg border-slate-200", getFieldError('team_lead.role') && "border-red-400 bg-red-50")}
-                            />
-                            <FieldError message={getFieldError('team_lead.role')} />
-                        </div>
-                        <div className="space-y-2">
-                            <Label className="text-sm font-semibold text-slate-700">My Hours *</Label>
-                            <Input
-                                type="number"
-                                value={team_lead.hours || ''}
-                                onChange={(e) => handleTeamLeadChange('hours', e.target.value)}
-                                placeholder="Total hours"
-                                className={clsx("h-10 rounded-lg border-slate-200", getFieldError('team_lead.hours') && "border-red-400 bg-red-50")}
-                            />
-                            <p className="text-xs text-slate-500">Only actual hours spent on the project.</p>
-                            <FieldError message={getFieldError('team_lead.hours')} />
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {/* Team Members */}
-            {participation_type === 'team' && (
-                <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                        <h3 className="text-lg font-bold text-slate-900">Team Members</h3>
-                        <Button onClick={addTeamMember} disabled={team_members.length >= 19} size="sm" variant="outline">
-                            <UserPlus className="w-4 h-4 mr-2" /> Add Member
-                        </Button>
-                    </div>
-
-                    {team_members.map((member, index) => (
-                        <div key={index} className="bg-slate-50 rounded-xl p-4 border border-slate-200 relative">
-                            <button onClick={() => removeTeamMember(index)} className="absolute top-4 right-4 text-slate-400 hover:text-red-500">
-                                <Trash2 className="w-4 h-4" />
-                            </button>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pr-8">
-                                <div className="space-y-1">
-                                    <Input
-                                        placeholder="Name"
-                                        value={member.name}
-                                        onChange={(e) => updateTeamMember(index, 'name', e.target.value)}
-                                        className={clsx("h-9 text-sm bg-white", getFieldError(`team_members.${index}.name`) && "border-red-400 bg-red-50")}
-                                    />
-                                    <FieldError message={getFieldError(`team_members.${index}.name`)} />
+                        <div className="space-y-6">
+                            <div className="p-8 bg-amber-50 rounded-[2.5rem] border-2 border-amber-200/50 space-y-4">
+                                <div className="flex items-center gap-3 text-amber-800">
+                                    <AlertCircle className="w-6 h-6 shrink-0" />
+                                    <h4 className="font-black uppercase tracking-widest text-sm">Hard Gateway: Permanent Record Lock</h4>
                                 </div>
-                                <div className="space-y-1">
-                                    <Input
-                                        placeholder="CNIC"
-                                        value={member.cnic}
-                                        onChange={(e) => updateTeamMember(index, 'cnic', e.target.value)}
-                                        className={clsx("h-9 text-sm bg-white", getFieldError(`team_members.${index}.cnic`) && "border-red-400 bg-red-50")}
-                                    />
-                                    <FieldError message={getFieldError(`team_members.${index}.cnic`)} />
-                                </div>
-                                <div className="space-y-1">
-                                    <Input
-                                        placeholder="Role"
-                                        value={member.role}
-                                        onChange={(e) => updateTeamMember(index, 'role', e.target.value)}
-                                        className={clsx("h-9 text-sm bg-white", getFieldError(`team_members.${index}.role`) && "border-red-400 bg-red-50")}
-                                    />
-                                    <FieldError message={getFieldError(`team_members.${index}.role`)} />
-                                </div>
-                                <div className="space-y-1">
-                                    <Input
-                                        type="number"
-                                        placeholder="Hours"
-                                        value={member.hours}
-                                        onChange={(e) => updateTeamMember(index, 'hours', e.target.value)}
-                                        className={clsx("h-9 text-sm bg-white", getFieldError(`team_members.${index}.hours`) && "border-red-400 bg-red-50")}
-                                    />
-                                    <FieldError message={getFieldError(`team_members.${index}.hours`)} />
+                                <p className="text-sm text-amber-800/80 font-medium leading-relaxed">
+                                    By proceeding, you acknowledge that all participation logs for this project will be <strong>strictly immutable</strong>.
+                                    Any inaccuracies will be reflected in your HEC-verified record.
+                                </p>
+                            </div>
+
+                            <div className="bg-white rounded-[2.5rem] border border-slate-100 p-8 shadow-sm space-y-6">
+                                <div className="space-y-4">
+                                    {['I verify that all session entries are authentic.', 'I understand that no further edits are possible after submission.', 'I consent to institutional report sharing.'].map((check, i) => (
+                                        <label key={i} className="flex items-start gap-4 p-4 rounded-2xl hover:bg-slate-50 transition-colors cursor-pointer group">
+                                            <input
+                                                type="checkbox"
+                                                checked={reviewChecked[i]}
+                                                onChange={() => {
+                                                    const newChecked = [...reviewChecked];
+                                                    newChecked[i] = !newChecked[i];
+                                                    setReviewChecked(newChecked);
+                                                }}
+                                                className="mt-1 w-5 h-5 rounded-md border-2 border-slate-200 text-blue-600 focus:ring-blue-500 transition-colors cursor-pointer"
+                                            />
+                                            <span className="text-sm font-bold text-slate-600">{check}</span>
+                                        </label>
+                                    ))}
                                 </div>
                             </div>
                         </div>
-                    ))}
-                </div>
-            )}
+                    </div>
+                )}
 
-            {/* Privacy Consent */}
-            <div className={clsx(
-                "rounded-xl p-5 border-2 transition-all",
-                data.section1.privacy_consent
-                    ? "bg-emerald-50 border-emerald-300"
-                    : getFieldError('privacy_consent')
-                        ? "bg-red-50 border-red-300"
-                        : "bg-slate-50 border-slate-200"
-            )}>
-                <label className="flex items-start gap-4 cursor-pointer">
-                    <input
-                        type="checkbox"
-                        checked={!!data.section1.privacy_consent}
-                        onChange={(e) => updateSection('section1', { privacy_consent: e.target.checked })}
-                        className="mt-1 w-5 h-5 accent-emerald-600 cursor-pointer shrink-0"
-                    />
-                    <div>
-                        <p className="text-sm font-semibold text-slate-900">
-                            Privacy & Data Consent <span className="text-red-500">*</span>
-                        </p>
-                        <p className="text-xs text-slate-600 mt-1 leading-relaxed">
-                            I consent to the collection, storage, and use of my personal data for HEC compliance reporting and institutional benchmarking purposes. I confirm that all information provided is accurate and complete.
-                        </p>
-                        {getFieldError('privacy_consent') && (
-                            <p className="text-xs text-red-600 font-semibold mt-2">⚠ {getFieldError('privacy_consent')}</p>
+                {internalStep === 6 && (
+                    <div className="space-y-10 animate-in fade-in duration-700">
+                        {verifiedMetrics ? (
+                            <div className="animate-in slide-in-from-bottom-8 duration-700">
+                                <EngagementOverview metrics={verifiedMetrics} isTeam={participation_type === 'team'} />
+                            </div>
+                        ) : (
+                            <div className="py-40 text-center space-y-6 bg-slate-50 rounded-[2.5rem] border border-dashed border-slate-200">
+                                <div className="relative">
+                                    <div className="absolute inset-0 flex items-center justify-center animate-pulse">
+                                        <div className="w-20 h-20 bg-blue-100 rounded-full blur-xl opacity-50"></div>
+                                    </div>
+                                    <Loader2 className="w-12 h-12 text-blue-600 animate-spin mx-auto relative z-10" />
+                                </div>
+                                <div className="space-y-2 relative z-10">
+                                    <p className="text-slate-900 font-black uppercase tracking-[0.2em] text-sm">Generating Intensity Analytics</p>
+                                    <p className="text-slate-400 font-medium text-xs max-w-[280px] mx-auto leading-relaxed">
+                                        Calculating EIS scores and verifying HEC compliance status for your record.
+                                    </p>
+                                </div>
+                                {!isSubmitted && (
+                                    <Button
+                                        variant="outline"
+                                        onClick={() => setInternalStep(5)}
+                                        className="rounded-2xl border-2 border-blue-100 text-blue-600 font-bold px-8 hover:bg-blue-50 transition-all"
+                                    >
+                                        Return to Review & Submit
+                                    </Button>
+                                )}
+                            </div>
                         )}
                     </div>
-                </label>
-            </div>
+                )}
 
-            {/* 1.4 System Outputs */}
-            <div className="space-y-4">
-                <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-lg bg-slate-600 text-white flex items-center justify-center font-bold text-sm">1.4</div>
-                    <h3 className="text-lg font-bold text-slate-900">System-Generated Outputs (Read-Only)</h3>
-                </div>
+                {/* Navigation Controls */}
+                <div className="bg-white border-t border-slate-100 p-8 flex justify-center mt-12 mb-20 rounded-[2.5rem] shadow-sm">
+                    <div className="max-w-none w-full flex justify-between items-center">
+                        <Button
+                            variant="ghost"
+                            onClick={handleBack}
+                            disabled={internalStep === 1}
+                            className="rounded-2xl h-14 px-8 font-black text-slate-400 hover:text-slate-900 transition-all"
+                        >
+                            <ChevronLeft className="w-5 h-5 mr-2" /> Back
+                        </Button>
 
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    {[
-                        { label: 'Verified Participants', value: totalStudents },
-                        { label: 'Total Verified Hours', value: totalHours },
-                        { label: 'Avg Hours/Student', value: avgHours },
-                        { label: 'Engagement Score', value: `${engagementScore}/100` },
-                    ].map((metric, i) => (
-                        <div key={i} className="bg-slate-50 rounded-xl p-4 border border-slate-200 text-center">
-                            <p className="text-xs text-slate-500 uppercase tracking-wider font-bold mb-1">{metric.label}</p>
-                            <p className="text-xl font-black text-slate-900">{metric.value}</p>
+                        <div className="flex gap-4">
+                            <Button
+                                onClick={() => saveReport(false)}
+                                className="bg-slate-100 text-slate-900 hover:bg-slate-200 rounded-2xl h-14 px-8 font-black shadow-sm flex items-center gap-2 group transition-all"
+                            >
+                                <Save className="w-4 h-4 text-slate-400 group-hover:text-slate-900" /> Save Draft
+                            </Button>
+
+                            {internalStep < 6 ? (
+                                <div className="flex gap-4">
+                                    {internalStep === 5 && (
+                                        <Button
+                                            onClick={handleFinalSubmit}
+                                            disabled={!reviewChecked.every(Boolean) || isLoadingMetrics}
+                                            className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl h-14 px-12 font-black shadow-2xl shadow-emerald-200 animate-in zoom-in-95 duration-500"
+                                        >
+                                            {isLoadingMetrics ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : null}
+                                            Finalize & Generate Record <Lock className="w-5 h-5 ml-2" />
+                                        </Button>
+                                    )}
+                                    <Button
+                                        onClick={handleNext}
+                                        disabled={false}
+                                        className="bg-blue-600 hover:bg-blue-700 text-white rounded-2xl h-14 px-10 font-black shadow-2xl shadow-blue-200 animate-in slide-in-from-right-4 duration-500"
+                                    >
+                                        {internalStep === 5 ? "Skip Submission & Continue" : "Continue"} <ChevronRight className="w-5 h-5 ml-2" />
+                                    </Button>
+                                </div>
+                            ) : (
+                                <Button
+                                    onClick={handleNext}
+                                    className="bg-slate-900 hover:bg-black text-white rounded-2xl h-14 px-10 font-black shadow-xl transition-all hover:translate-y-[-2px] flex items-center gap-3"
+                                >
+                                    Save & Continue to Next Section <ChevronRight className="w-5 h-5" />
+                                </Button>
+                            )}
                         </div>
-                    ))}
+                    </div>
                 </div>
-            </div>
+            </main>
         </div>
     );
+
+    // Helpers (moved inside component if needed)
+    async function loadEntries(pId: string) {
+        try {
+            const res = await authenticatedFetch(`/api/v1/engagement/${pId}/attendance`);
+            if (res && res.ok) {
+                const result = await res.json();
+                const mappedEntries = (result.data || []).map((e: any) => ({
+                    id: e.id,
+                    date: e.dateOfEngagement || e.date,
+                    start_time: e.startTime || e.start_time,
+                    end_time: e.endTime || e.end_time,
+                    location: e.organizationName || e.location,
+                    activity_type: e.activityType || e.activity_type,
+                    description: e.description,
+                    hours: e.sessionHours || e.hours,
+                    entryStatus: e.entryStatus
+                }));
+                updateSection('section1', { attendance_logs: mappedEntries });
+            }
+        } catch (err) {
+            console.error("Error loading entries:", err);
+        }
+    }
 }

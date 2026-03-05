@@ -22,7 +22,7 @@ export default function Sidebar() {
     useEffect(() => {
         const fetchUnreadCount = async () => {
             try {
-                const res = await authenticatedFetch("/api/v1/chat/unread-count");
+                const res = await authenticatedFetch("/api/v1/chat/unread-count", {}, { redirectToLogin: false });
                 if (res && res.ok) {
                     const data = await res.json();
                     if (data.success) {

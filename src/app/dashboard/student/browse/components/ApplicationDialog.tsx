@@ -10,6 +10,7 @@ import { Select } from "../../report/components/ui/select";
 import { Plus, Trash2, Loader2, Users, User } from "lucide-react";
 import { toast } from "sonner";
 import { authenticatedFetch } from "@/utils/api";
+import { pakistaniUniversities } from "@/utils/universityData";
 
 interface ApplicationDialogProps {
     opportunityId: string | null;
@@ -27,7 +28,9 @@ interface TeamMember {
     university: string;
     program: string;
     role: string;
-    verificationStatus: 'unverified' | 'sending' | 'verified';
+    verificationStatus: 'unverified' | 'sending' | 'otp_sent' | 'verified';
+    otp?: string;
+    showOtpInput?: boolean;
 }
 
 export default function ApplicationDialog({ opportunityId, open, onOpenChange, onSuccess, opportunityTitle }: ApplicationDialogProps) {
@@ -88,16 +91,68 @@ export default function ApplicationDialog({ opportunityId, open, onOpenChange, o
         }
 
         const newMembers = [...teamMembers];
+        // Real API call to SEND OTP
+        try {
+            const res = await authenticatedFetch(`/api/v1/student/verify-team-member/send`, {
+                method: 'POST',
+                body: JSON.stringify({ email: member.email })
+            });
+
+            const updatedMembers = [...teamMembers];
+            if (res && res.ok) {
+                updatedMembers[index].verificationStatus = 'otp_sent';
+                updatedMembers[index].showOtpInput = true;
+                toast.success(`OTP sent to ${member.email}`);
+            } else {
+                updatedMembers[index].verificationStatus = 'unverified';
+                const errorData = res ? await res.json() : { message: "Failed to connect to server" };
+                toast.error(errorData.message || "Failed to send OTP");
+            }
+            setTeamMembers(updatedMembers);
+        } catch (error) {
+            console.error("Verification error", error);
+            const updatedMembers = [...teamMembers];
+            updatedMembers[index].verificationStatus = 'unverified';
+            setTeamMembers(updatedMembers);
+            toast.error("An error occurred while sending OTP");
+        }
+    };
+
+    const handleConfirmOtp = async (index: number) => {
+        const member = teamMembers[index];
+        if (!member.otp) {
+            toast.error("Please enter the OTP code.");
+            return;
+        }
+
+        const newMembers = [...teamMembers];
         newMembers[index].verificationStatus = 'sending';
         setTeamMembers(newMembers);
 
-        // Simulate API call
-        setTimeout(() => {
-            const updatedMembers = [...newMembers];
-            updatedMembers[index].verificationStatus = 'verified';
+        try {
+            const res = await authenticatedFetch(`/api/v1/student/verify-team-member/confirm`, {
+                method: 'POST',
+                body: JSON.stringify({ email: member.email, otp: member.otp })
+            });
+
+            const updatedMembers = [...teamMembers];
+            if (res && res.ok) {
+                updatedMembers[index].verificationStatus = 'verified';
+                updatedMembers[index].showOtpInput = false;
+                toast.success("Email verified successfully!");
+            } else {
+                updatedMembers[index].verificationStatus = 'otp_sent';
+                const errorData = res ? await res.json() : { message: "Invalid OTP" };
+                toast.error(errorData.message || "Invalid OTP code");
+            }
             setTeamMembers(updatedMembers);
-            toast.success(`Verification email sent to ${member.email}`);
-        }, 1500);
+        } catch (error) {
+            console.error("OTP Confirmation error", error);
+            const updatedMembers = [...teamMembers];
+            updatedMembers[index].verificationStatus = 'otp_sent';
+            setTeamMembers(updatedMembers);
+            toast.error("An error occurred during verification");
+        }
     };
 
     const handleSubmit = async () => {
@@ -258,13 +313,18 @@ export default function ApplicationDialog({ opportunityId, open, onOpenChange, o
 
                                             {/* University - moved to 2nd row or shared */}
                                             <div className="space-y-1.5">
-                                                <Label className="text-xs font-medium text-slate-600">University</Label>
-                                                <Input
+                                                <Label className="text-xs font-medium text-slate-600">University *</Label>
+                                                <select
+                                                    className="flex h-9 w-full rounded-md border border-input bg-white px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
                                                     value={member.university}
                                                     onChange={(e) => updateMember(index, 'university', e.target.value)}
-                                                    placeholder="Enter University/School Name"
-                                                    className="h-9 bg-white"
-                                                />
+                                                >
+                                                    <option value="">Select University</option>
+                                                    {pakistaniUniversities.map(uni => (
+                                                        <option key={uni} value={uni}>{uni}</option>
+                                                    ))}
+                                                    <option value="Other">Other / Not Listed</option>
+                                                </select>
                                             </div>
 
                                             {/* Email Verification Row - spans full or separate */}
@@ -296,8 +356,53 @@ export default function ApplicationDialog({ opportunityId, open, onOpenChange, o
                                                     </Button>
                                                 </div>
                                                 {member.verificationStatus === 'verified' && <p className="text-[10px] text-green-600 font-medium">Email verified successfully.</p>}
-                                                {member.verificationStatus === 'unverified' && member.email && <p className="text-[10px] text-slate-400">Click Verify to send confirmation code.</p>}
+                                                {member.verificationStatus === 'unverified' && member.email && <p className="text-[10px] text-slate-400">Click Verify to send OTP code.</p>}
+                                                {member.verificationStatus === 'otp_sent' && <p className="text-[10px] text-blue-600 font-medium">OTP code has been sent to this email.</p>}
                                             </div>
+
+                                            {member.showOtpInput && (
+                                                <div className="lg:col-span-2 mt-2 p-4 bg-blue-50/50 rounded-xl border border-blue-100 animate-in slide-in-from-top-2 duration-300">
+                                                    <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-end">
+                                                        <div className="flex-1 space-y-1.5 w-full">
+                                                            <div className="flex justify-between items-center">
+                                                                <Label className="text-[10px] font-bold text-blue-700 uppercase tracking-wider">Verification Code</Label>
+                                                                <button
+                                                                    onClick={() => handleVerifyEmail(index)}
+                                                                    disabled={member.verificationStatus === 'sending'}
+                                                                    className="text-[10px] font-bold text-blue-600 hover:text-blue-800 hover:underline disabled:opacity-50"
+                                                                >
+                                                                    Resend OTP
+                                                                </button>
+                                                            </div>
+                                                            <div className="relative">
+                                                                <Input
+                                                                    value={member.otp || ""}
+                                                                    onChange={(e) => updateMember(index, 'otp', e.target.value)}
+                                                                    placeholder="000000"
+                                                                    className="h-10 bg-white border-blue-200 focus:border-blue-500 text-center font-mono text-lg tracking-[0.5em] pr-2"
+                                                                    maxLength={6}
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                        <Button
+                                                            size="sm"
+                                                            className="h-10 min-w-[120px] bg-blue-600 hover:bg-blue-700 text-sm font-bold shadow-lg shadow-blue-200"
+                                                            onClick={() => handleConfirmOtp(index)}
+                                                            disabled={member.verificationStatus === 'sending'}
+                                                        >
+                                                            {member.verificationStatus === 'sending' ? (
+                                                                <Loader2 className="w-4 h-4 animate-spin" />
+                                                            ) : (
+                                                                "Confirm OTP"
+                                                            )}
+                                                        </Button>
+                                                    </div>
+                                                    <p className="text-[10px] text-blue-500 mt-2 flex items-center gap-1">
+                                                        <span className="w-1 h-1 rounded-full bg-blue-400"></span>
+                                                        Enter the 6-digit code sent to {member.email}
+                                                    </p>
+                                                </div>
+                                            )}
 
                                         </div>
                                     </div>

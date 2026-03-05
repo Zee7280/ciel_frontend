@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight, Users, Clock, Building2, Globe, Lightbulb, Sprout, Heart, Settings, GraduationCap, BookOpen, User, Briefcase, School } from "lucide-react";
+import { GraduationCap, School } from "lucide-react";
 import { useCounter } from "@/hooks/useCounter";
 import { useState } from "react";
 import clsx from "clsx";
@@ -58,37 +58,36 @@ export default function Hero() {
     };
 
     return (
-        <section className="relative max-w-7xl mx-auto px-6 pt-32 pb-12 lg:pt-40 lg:pb-24 overflow-visible">
+        <section className="relative max-w-[1600px] mx-auto px-4 md:px-10 pt-32 pb-12 lg:pt-40 lg:pb-32 overflow-visible">
             {/* Soft Background Glow */}
-            <div className="absolute top-0 left-0 w-[500px] h-[500px] bg-emerald-50/50 rounded-full blur-[100px] -z-10" />
-            <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-orange-50/50 rounded-full blur-[100px] -z-10" />
+            <div className="absolute top-0 left-0 w-[600px] h-[600px] bg-blue-50/50 rounded-full blur-[120px] -z-10" />
+            <div className="absolute bottom-0 right-0 w-[600px] h-[600px] bg-emerald-50/50 rounded-full blur-[120px] -z-10" />
 
-            <div className="relative z-10 flex flex-col lg:flex-row items-center justify-between gap-12 lg:gap-20">
+            <div className="relative z-10 flex flex-col lg:flex-row items-center justify-between gap-8 lg:gap-16">
 
                 {/* LEFT CONTENT */}
                 <div className="flex-1 max-w-2xl text-center lg:text-left">
 
                     {/* Role Switcher */}
-                    <div className="flex justify-center lg:justify-start gap-2 mb-8">
+                    <div className="flex justify-center lg:justify-start gap-4 mb-10">
                         {[
-                            { id: 'student', label: 'I am a Student', icon: GraduationCap },
-                            { id: 'faculty', label: 'I am Faculty', icon: School },
-                            { id: 'partner', label: 'I am a Partner', icon: HandshakeIcon }
+                            { id: 'student', label: 'I am a Student' },
+                            { id: 'faculty', label: 'I am Faculty' },
+                            { id: 'partner', label: 'I am a Partner' }
                         ].map((role) => {
-                            const Icon = role.icon;
                             const isActive = activeRole === role.id;
                             return (
                                 <button
                                     key={role.id}
                                     onClick={() => setActiveRole(role.id as any)}
                                     className={clsx(
-                                        "flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold transition-all duration-300",
+                                        "flex items-center gap-2 px-6 py-2.5 rounded-full text-[15px] font-medium border transition-all duration-300",
                                         isActive
-                                            ? "bg-emerald-100 text-emerald-700 shadow-sm ring-1 ring-emerald-200"
-                                            : "bg-white text-slate-500 hover:bg-slate-50 border border-slate-100"
+                                            ? "bg-[#E3F2FD] text-[#4285F4] border-[#BBDEFB]"
+                                            : "bg-white text-slate-400 border-slate-100 hover:bg-slate-50"
                                     )}
                                 >
-                                    <Icon className="w-3 h-3" />
+                                    {isActive && <div className="w-2 h-2 rounded-full bg-[#34A853]" />}
                                     {role.label}
                                 </button>
                             );
@@ -96,56 +95,41 @@ export default function Hero() {
                     </div>
 
                     <div className="space-y-6 mb-10">
-                        <h1 className="text-4xl lg:text-4xl font-extrabold text-emerald-600 leading-[1.1] tracking-tight max-w-[700px] mx-auto lg:mx-0">
-                            Where Learning Becomes Measurable  <br className="hidden lg:block" />
-                            <span className="text-orange-500">Community Impact</span>
+                        <h1 className="text-6xl lg:text-[72px] font-[900] text-[#4285F4] leading-[0.9] tracking-tighter max-w-[900px] mx-auto lg:mx-0">
+                            Where Learning <br />
+                            Becomes <br />
+                            <span className="text-[#34A853]">Measurable</span> <br />
+                            Community <br />
+                            Impact
                         </h1>
 
-                        <div className="space-y-4 max-w-lg mx-auto lg:mx-0">
-                            <p className="text-lg md:text-xl text-slate-700 font-medium leading-[1.6]">
+                        <div className="space-y-6 max-w-xl mx-auto lg:mx-0 mt-6 px-1 text-slate-700">
+                            <p className="text-lg md:text-[22px] font-normal leading-tight opacity-90">
                                 Explore opportunities, participate in projects, submit verified engagement, and generate impact intelligence aligned with SDGs.
-                            </p>
-                            <p className="text-sm font-medium text-emerald-600 bg-emerald-50 inline-block px-3 py-1 rounded-lg">
-                                {roleContent[activeRole].text}
                             </p>
                         </div>
                     </div>
 
-                    <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4">
-                        <Link href="/projects" className="w-full sm:w-auto px-8 py-4 bg-orange-500 hover:bg-orange-600 text-white rounded-full font-bold text-lg shadow-[0_10px_20px_-10px_rgba(249,115,22,0.5)] hover:shadow-[0_20px_40px_-10px_rgba(249,115,22,0.6)] hover:-translate-y-1 transition-all duration-300 text-center">
+                    <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4 mt-8">
+                        <Link href="/projects" className="w-full sm:w-auto px-10 py-4 bg-[#4285F4] hover:bg-[#3367D6] text-white rounded-lg font-bold text-lg shadow-xl shadow-blue-100 transition-all duration-300 text-center">
                             Explore Projects
                         </Link>
-                        <Link href="/contact" className="w-full sm:w-auto px-8 py-4 bg-slate-800 text-white rounded-full font-bold text-lg hover:bg-slate-900 shadow-md hover:shadow-lg transition-all duration-300 text-center">
+                        <Link href="/contact" className="w-full sm:w-auto px-10 py-4 border border-[#4285F4] text-[#4285F4] rounded-lg font-bold text-lg hover:bg-blue-50 transition-all duration-300 text-center">
                             Post an Opportunity
                         </Link>
                     </div>
+
+                    <p className="mt-8 text-lg md:text-xl font-normal italic text-[#FFA000] text-center lg:text-left tracking-tight">
+                        Integrate community learning into your curriculum seamlessly.
+                    </p>
                 </div>
 
-                {/* RIGHT - SDG WHEEL & STATS */}
-                <div className="flex-1 flex flex-col items-center relative min-h-[500px]">
-
-                    {/* Floating Decorative Icons (Simulating Illustrations) */}
-                    {/* <div className="absolute top-10 left-10 lg:left-0 animate-bounce delay-100 hidden md:block">
-                        <Lightbulb className="w-10 h-10 text-yellow-400 fill-yellow-100" />
-                    </div> */}
-                    {/* <div className="absolute top-16 right-10 lg:right-0 animate-pulse delay-300 hidden md:block">
-                        <Sprout className="w-10 h-10 text-green-500 fill-green-100" />
-                    </div> */}
-                    {/* <div className="absolute bottom-20 left-10 lg:left-0 animate-bounce delay-500 hidden md:block">
-                        <Heart className="w-8 h-8 text-red-400 fill-red-100" />
-                    </div> */}
-                    {/* <div className="absolute bottom-32 right-10 lg:right-0 animate-pulse delay-700 hidden md:block">
-                        <Settings className="w-8 h-8 text-slate-400 fill-slate-100" />
-                    </div> */}
-                    {/* <div className="absolute top-32 left-32 hidden md:block opacity-60">
-                        <BookOpen className="w-6 h-6 text-blue-400" />
-                    </div> */}
-
-
-                    {/* Video Container */}
-                    <div className="relative w-[400px] h-[400px] md:w-[500px] md:h-[500px] lg:w-[600px] lg:h-[600px] mb-8">
+                {/* RIGHT - VIDEO & STATS */}
+                <div className="flex-1 flex flex-col items-center relative min-h-[500px] w-full lg:w-auto">
+                    {/* Video Container (Increased Size) */}
+                    <div className="relative w-[450px] h-[450px] md:w-[600px] md:h-[600px] lg:w-[850px] lg:h-[850px] mb-8">
                         {/* Subtle Glow Behind Video */}
-                        <div className="absolute inset-0 bg-gradient-to-tr from-emerald-100 to-orange-100 rounded-full blur-3xl opacity-60 animate-pulse-slow" />
+                        <div className="absolute inset-0 bg-gradient-to-tr from-blue-100 to-emerald-100 rounded-full blur-3xl opacity-40 animate-pulse-slow" />
 
                         <div className="relative w-full h-full mix-blend-multiply">
                             <video
@@ -154,7 +138,7 @@ export default function Hero() {
                                 loop
                                 muted
                                 playsInline
-                                className="w-full h-full object-contain pointer-events-none"
+                                className="w-full h-full object-contain pointer-events-none scale-110 lg:scale-125"
                             />
                         </div>
                     </div>
@@ -166,7 +150,6 @@ export default function Hero() {
                         <StatItem label="Universities" value={24} icon="/icon-gears.jpg" delay={300} />
                         <StatItem label="SDGs Impacted" value={17} icon="/icon-graph.jpg" delay={400} />
                     </div>
-
                 </div>
 
             </div>
