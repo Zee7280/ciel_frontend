@@ -189,9 +189,9 @@ export default function Section9Reflection() {
                         <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider leading-relaxed">
                             Explain how your field of study helped you understand the problem, design the intervention, or apply technical methods.
                         </p>
-                        {section2?.student_discipline && (
+                        {section2?.discipline && (
                             <p className="text-[10px] font-black text-violet-600 bg-violet-50 px-3 py-1 rounded-lg inline-flex mt-2">
-                                Your Discipline: {section2.student_discipline}
+                                Your Discipline: {section2.discipline}
                             </p>
                         )}
                     </div>
@@ -324,7 +324,7 @@ export default function Section9Reflection() {
                             </div>
                             <div className="bg-slate-50 rounded-2xl p-5 space-y-2">
                                 <p className="text-sm font-black text-slate-900 leading-snug line-clamp-2">
-                                    {section2?.student_discipline || 'N/A'}
+                                    {section2?.discipline || 'N/A'}
                                 </p>
                                 <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Discipline Applied</p>
                             </div>

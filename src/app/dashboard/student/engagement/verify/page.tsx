@@ -7,7 +7,9 @@ import { authenticatedFetch } from "@/utils/api";
 import { useSearchParams } from "next/navigation";
 import IdentityVerification from "../components/IdentityVerification";
 
-export default function VerifyPage() {
+import { Suspense } from 'react';
+
+function VerifyContent() {
     const [isLoading, setIsLoading] = useState(true);
     const [project, setProject] = useState<any>(null);
     const [error, setError] = useState<string | null>(null);
@@ -82,6 +84,18 @@ export default function VerifyPage() {
                 onSuccess={() => window.location.href = '/dashboard/student/engagement'}
             />
         </div>
+    );
+}
+
+export default function VerifyPage() {
+    return (
+        <Suspense fallback={
+            <div className="flex items-center justify-center min-h-[400px]">
+                <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+            </div>
+        }>
+            <VerifyContent />
+        </Suspense>
     );
 }
 

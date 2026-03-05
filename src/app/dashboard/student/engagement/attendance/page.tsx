@@ -68,7 +68,7 @@ export default function AttendancePage() {
 
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 items-start">
                 <div className="lg:col-span-2">
-                    {participantId && <AttendanceForm participantId={participantId} onSuccess={() => loadEntries(participantId)} />}
+                    {participantId && <AttendanceForm verifiedUsers={[{ id: participantId, name: 'My Attendance' }]} onSuccess={() => loadEntries(participantId)} />}
                 </div>
 
                 <div className="lg:col-span-3 space-y-6">
