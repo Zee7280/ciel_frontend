@@ -281,16 +281,18 @@ function ReportFormContent() {
                     Previous Step
                 </Button>
 
-                <Button
-                    type="button"
-                    onClick={handleNext}
-                    disabled={isSaving}
-                    className="bg-blue-600 hover:bg-blue-700 text-white px-8"
-                >
-                    {isSaving && activeStep === 11 ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
-                    {activeStep === 11 ? (isSaving ? 'Submitting...' : 'Submit Report') : 'Next Step'}
-                    {activeStep !== 11 && <ChevronRight className="w-4 h-4 ml-2" />}
-                </Button>
+                {!(activeStep === 11 && data?.status === 'submitted') && (
+                    <Button
+                        type="button"
+                        onClick={handleNext}
+                        disabled={isSaving}
+                        className="bg-blue-600 hover:bg-blue-700 text-white px-8"
+                    >
+                        {isSaving && activeStep === 11 ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                        {activeStep === 11 ? (isSaving ? 'Submitting...' : 'Submit Report') : 'Next Step'}
+                        {activeStep !== 11 && <ChevronRight className="w-4 h-4 ml-2" />}
+                    </Button>
+                )}
             </div>
 
             {/* Submit Confirmation Dialog */}

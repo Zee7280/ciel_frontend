@@ -7,6 +7,7 @@ import { calculateEngagementMetrics } from '../utils/engagementMetrics';
 // Define the shape of the report data matches the 11 sections (plus summary)
 export interface ReportData {
     project_id: string;
+    status?: string;
     // Section 1: Participation (Was Section 2)
     section1: {
         participation_type: 'individual' | 'team';
