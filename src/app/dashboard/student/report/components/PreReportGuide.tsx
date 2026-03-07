@@ -23,11 +23,11 @@ const sections = [
         color: "violet",
         title: "Section 2 — Project Context & Problem Definition",
         items: [
-            "What problem existed before the project",
-            "Who was affected by the problem",
-            "What gap existed (skills, awareness, services, etc.)",
-            "Why intervention was necessary",
-            "What data or evidence informed the problem (survey, observation, research)",
+            "What problem existed before the project?",
+            "Who was affected by the problem?",
+            "What gap existed (skills, awareness, services, etc.)?",
+            "Why intervention was necessary?",
+            "What data or evidence informed the problem (survey, observation, research)?",
         ],
         note: "Do not describe activities or results here. Only explain the situation before the project started."
     },
@@ -36,11 +36,11 @@ const sections = [
         color: "emerald",
         title: "Section 3 — SDG Alignment",
         items: [
-            "Which SDG Goal the project supports",
+            "Which SDG Goal the project supports?",
             "The SDG Target and Indicator connected to the project",
-            "How your planned activities contribute to that SDG",
-            "What you plan to do and who will benefit",
-            "What type of change you expect to support",
+            "How your planned activities contribute to that SDG?",
+            "What you plan to do and who will benefit?",
+            "What type of change you expect to support?",
         ],
         note: "This section describes intent, not results. Do NOT include numbers, measured outcomes, or final achievements."
     },
@@ -53,7 +53,7 @@ const sections = [
             "Number of sessions conducted",
             "Outputs delivered (people trained, materials distributed, etc.)",
             "Number of beneficiaries reached",
-            "Who the beneficiaries were (youth, women, community members, etc.)",
+            "Who the beneficiaries were (youth, women, community members, etc.)?",
         ],
         note: "This section records outputs only. Do not describe improvements, impact or results — those belong in Section 5."
     },
@@ -62,7 +62,7 @@ const sections = [
         color: "rose",
         title: "Section 5 — Outcomes & Results",
         items: [
-            "What improved or changed for beneficiaries",
+            "What improved or changed for beneficiaries?",
             "A measurable indicator (e.g. number of people who learned a skill)",
             "The baseline value (before) and endline value (after)",
             "Any limitations that affected the results",
@@ -78,7 +78,7 @@ const sections = [
             "Training venue, transport support",
             "Volunteers or experts involved",
             "Institutional support received",
-            "Who provided each resource and what it enabled",
+            "Who provided each resource and what it enabled?",
         ],
         note: "If the project used only volunteer effort, the system records that automatically."
     },

@@ -70,7 +70,7 @@ const formalizationOptions = [
     "Letter of Collaboration",
     "Official Email Confirmation",
     "Government Approval / Notification",
-    "No Formal Documentation"
+    "None of the above"
 ];
 
 // ─── SDG 17 Classification helper ─────────────────────────────────────────────
@@ -264,7 +264,15 @@ export default function Section7Partnerships() {
     };
     const toggleFormalization = (opt: string) => {
         const cur = formalization_status || [];
-        update('formalization_status', cur.includes(opt) ? cur.filter(x => x !== opt) : [...cur, opt]);
+        if (opt === "None of the above") {
+            // If selecting "None of the above", clear everything else and just set this
+            update('formalization_status', cur.includes(opt) ? [] : [opt]);
+        } else {
+            // If selecting a document, remove "None of the above" from the list
+            let next = cur.includes(opt) ? cur.filter(x => x !== opt) : [...cur, opt];
+            next = next.filter(x => x !== "None of the above");
+            update('formalization_status', next);
+        }
     };
 
     // ── Analytics ─────────────────────────────────────────────────────────────

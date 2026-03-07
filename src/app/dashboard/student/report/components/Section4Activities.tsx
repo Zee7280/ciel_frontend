@@ -11,7 +11,8 @@ import React, { useEffect, useMemo } from "react";
 
 export default function Section4Activities() {
     const { data, updateSection, getFieldError, validationErrors, saveReport } = useReportForm();
-    const { section1, section4 } = data;
+    const section1 = data.section1 || {};
+    const section4 = data.section4 || {};
     const isTeam = section1.participation_type === 'team';
 
     const sectionErrors = validationErrors['section4'] || [];
@@ -56,21 +57,53 @@ export default function Section4Activities() {
         "Field Officer", "Communication Lead", "Research Lead", "Volunteer", "Other"
     ];
 
-    // Build the list of verified team members from Section 1 (Team Lead excluded — not a member)
-    const verifiedMembers = section1.team_members
-        .filter(m => m.verified)
-        .map((m: any, i) => ({
-            member_id: `member-${i}`,
-            name: m.fullName || m.name || `Member ${i + 1}`,  // fullName from Participant, fallback to name
-            hours: m.hours || '0',
-            default_role: m.role || '',
-        }));
+    // Build the list of all verified participants from Section 1 (Team Lead + Verified Members)
+    const verifiedMembers = useMemo(() => {
+        const members = [];
+        const seenIds = new Set();
+
+        // 1. Add Team Lead (Self)
+        if (section1.team_lead?.verified) {
+            const leadId = section1.team_lead.id || 'lead-self';
+            members.push({
+                member_id: leadId,
+                name: section1.team_lead.fullName || section1.team_lead.name || 'Team Lead (You)',
+                default_role: 'Team Lead',
+            });
+            seenIds.add(leadId);
+        }
+
+        // 2. Add Verified Team Members (excluding lead if already added)
+        (section1.team_members || [])
+            .filter(m => m.verified && m.id && !seenIds.has(m.id))
+            .forEach((m: any) => {
+                members.push({
+                    member_id: m.id,
+                    name: m.fullName || m.name || 'Team Member',
+                    default_role: m.role || '',
+                });
+                seenIds.add(m.id);
+            });
+
+        // 3. Calculate hours for each member from Section 1 Attendance Logs
+        return members.map(m => {
+            const memberLogs = (section1.attendance_logs || []).filter((log: any) =>
+                log.participantId === m.member_id || (m.member_id === 'lead-self' && !log.participantId)
+            );
+            const totalHours = memberLogs.reduce((acc: number, log: any) => acc + (Number(log.hours) || 0), 0);
+
+            return {
+                ...m,
+                hours: totalHours.toString()
+            };
+        });
+    }, [section1.team_lead, section1.team_members, section1.attendance_logs]);
 
     // Sync team_contributions whenever verified members change
     useEffect(() => {
         if (!isTeam || verifiedMembers.length === 0) return;
 
-        // Build a map of existing contributions by member_id to preserve entered data
+        // Build a map of existing contributions by member_id to preserve entered data (roles, sessions, etc)
         const existingMap = new Map(
             section4.team_contributions.map(c => [c.member_id, c])
         );
@@ -79,23 +112,22 @@ export default function Section4Activities() {
             const existing = existingMap.get(vm.member_id);
             return {
                 member_id: vm.member_id,
-                name: vm.name,                              // always sync name from section 1
-                role: existing?.role || vm.default_role,   // preserve entered role
-                hours: vm.hours,                           // always sync hours from section 1
+                name: vm.name,                              // always sync name from source
+                role: existing?.role || vm.default_role,   // preserve entered role or use default
+                hours: vm.hours,                           // always sync calculated hours
                 sessions: existing?.sessions || '',
                 beneficiaries: existing?.beneficiaries || ''
             };
         });
 
-        // Only update if something actually changed
-        const changed = JSON.stringify(synced) !== JSON.stringify(section4.team_contributions);
-        if (changed) {
+        // Only update if something actually changed (using stringify for deep equality)
+        const currentData = JSON.stringify(section4.team_contributions);
+        const newData = JSON.stringify(synced);
+
+        if (currentData !== newData) {
             updateSection('section4', { team_contributions: synced });
         }
-    }, [
-        isTeam,
-        verifiedMembers.map(v => `${v.member_id}|${v.name}|${v.hours}`).join(','),
-    ]);
+    }, [isTeam, verifiedMembers, section4.team_contributions]);
 
     // Summary calculation
     const autoSummary = useMemo(() => {

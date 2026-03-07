@@ -93,6 +93,12 @@ export default function IdentityVerification({
         }
     };
 
+    const handleChangeEmail = () => {
+        setOtpSent(prev => ({ ...prev, email: false }));
+        setOtpVerified(prev => ({ ...prev, email: false }));
+        setOtpInputs(prev => ({ ...prev, email: '' }));
+    };
+
     const verifyOtp = async (type: 'email') => {
         setIsVerifyingOtp(prev => ({ ...prev, [type]: true }));
         try {
@@ -226,23 +232,48 @@ export default function IdentityVerification({
                                             <button
                                                 onClick={() => sendOtp('email')}
                                                 disabled={isVerifyingOtp.email || !formData.email}
-                                                className="absolute right-2 top-1.5 h-8 px-3 bg-blue-600 text-white rounded-lg text-[9px] font-black uppercase tracking-wider disabled:bg-slate-200"
+                                                className="absolute right-2 top-1.5 h-8 px-3 bg-blue-600 text-white rounded-lg text-[9px] font-black uppercase tracking-wider disabled:bg-slate-200 transition-all hover:bg-blue-700"
                                             >
                                                 {isVerifyingOtp.email ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Send OTP'}
+                                            </button>
+                                        )}
+                                        {otpSent.email && !otpVerified.email && (
+                                            <button
+                                                onClick={handleChangeEmail}
+                                                className="absolute right-2 top-1.5 h-8 px-3 bg-slate-100 text-slate-500 rounded-lg text-[9px] font-black uppercase tracking-wider hover:bg-slate-200 transition-all"
+                                            >
+                                                Change
                                             </button>
                                         )}
                                     </div>
 
                                     {otpSent.email && !otpVerified.email && (
-                                        <div className="flex gap-2 animate-in slide-in-from-top-2">
-                                            <Input
-                                                placeholder="6-digit"
-                                                maxLength={6}
-                                                value={otpInputs.email}
-                                                onChange={(e) => setOtpInputs({ ...otpInputs, email: e.target.value })}
-                                                className="h-11 bg-white border-slate-200 rounded-xl text-center font-bold tracking-[0.4em]"
-                                            />
-                                            <Button onClick={() => verifyOtp('email')} className="bg-slate-900 text-white rounded-xl h-11 px-4">Verify</Button>
+                                        <div className="space-y-3 animate-in fade-in slide-in-from-top-2">
+                                            <div className="flex gap-2">
+                                                <Input
+                                                    placeholder="6-digit"
+                                                    maxLength={6}
+                                                    value={otpInputs.email}
+                                                    onChange={(e) => setOtpInputs({ ...otpInputs, email: e.target.value })}
+                                                    className="h-11 bg-white border-slate-200 rounded-xl text-center font-bold tracking-[0.4em]"
+                                                />
+                                                <Button
+                                                    onClick={() => verifyOtp('email')}
+                                                    disabled={isVerifyingOtp.email || otpInputs.email.length !== 6}
+                                                    className="bg-slate-900 text-white rounded-xl h-11 px-6 font-bold"
+                                                >
+                                                    {isVerifyingOtp.email ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Verify'}
+                                                </Button>
+                                            </div>
+                                            <div className="flex justify-between items-center px-1">
+                                                <button
+                                                    onClick={() => sendOtp('email')}
+                                                    disabled={isVerifyingOtp.email}
+                                                    className="text-[10px] font-black text-blue-600 uppercase tracking-widest hover:underline disabled:text-slate-400"
+                                                >
+                                                    {isVerifyingOtp.email ? 'Sending...' : 'Resend OTP'}
+                                                </button>
+                                            </div>
                                         </div>
                                     )}
 

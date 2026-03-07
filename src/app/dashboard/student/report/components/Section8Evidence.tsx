@@ -1,6 +1,6 @@
 import {
     ShieldCheck, Camera, FileUp, Globe, FileText, Lock, CheckCircle2,
-    Save, Info, AlertCircle, Activity, Image as ImageIcon, Users, BookOpen
+    Save, Info, AlertCircle, Activity, Image as ImageIcon, Users, BookOpen, Trash2
 } from "lucide-react";
 import { Label } from "./ui/label";
 import { FileUpload } from "./ui/file-upload";
@@ -58,9 +58,17 @@ function classifyVerification(filesCount: number, typesCount: number, partnerAss
 // ─── Main Component ────────────────────────────────────────────────────────────
 export default function Section8Evidence() {
     const { data, updateSection, getFieldError, saveReport } = useReportForm();
-    const { section8 } = data;
-    const { evidence_types, evidence_files, description, ethical_compliance,
-        media_visible, partner_verification, partner_verification_type, partner_verification_files } = section8;
+    const section8 = data.section8 || {};
+    const {
+        evidence_types = [],
+        evidence_files = [],
+        description = '',
+        ethical_compliance = {},
+        media_visible = '',
+        partner_verification = false,
+        partner_verification_type = '',
+        partner_verification_files = []
+    } = section8;
 
     const update = (field: string, val: any) => updateSection('section8', { [field]: val });
     const toggleEvidenceType = (type: string) => {
@@ -165,6 +173,38 @@ export default function Section8Evidence() {
                             }
                         }}
                     />
+
+                    {/* Evidence Files List */}
+                    {evidence_files && evidence_files.length > 0 && (
+                        <div className="space-y-3 animate-in fade-in slide-in-from-top-2">
+                            <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Attached Evidence ({evidence_files.length})</Label>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                {evidence_files.map((file: File, fIdx: number) => (
+                                    <div key={fIdx} className="flex items-center justify-between p-3 bg-slate-50 border border-slate-100 rounded-xl group/file">
+                                        <div className="flex items-center gap-3 overflow-hidden">
+                                            <div className="w-8 h-8 rounded-lg bg-amber-100 text-amber-600 flex items-center justify-center shrink-0">
+                                                <ImageIcon className="w-4 h-4" />
+                                            </div>
+                                            <div className="overflow-hidden">
+                                                <p className="text-xs font-bold text-slate-700 truncate">{file.name}</p>
+                                                <p className="text-[9px] font-medium text-slate-400 uppercase">{(file.size / (1024 * 1024)).toFixed(2)} MB</p>
+                                            </div>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                const kept = evidence_files.filter((_: any, i: number) => i !== fIdx);
+                                                update('evidence_files', kept);
+                                            }}
+                                            className="w-7 h-7 rounded-lg bg-white text-slate-400 flex items-center justify-center hover:bg-red-50 hover:text-red-500 transition-all border border-slate-100"
+                                        >
+                                            <Trash2 className="w-3.5 h-3.5" />
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
                     <div className="flex items-center justify-between px-2">
                         <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Upload Status</span>
                         {evidence_files?.length ? (
@@ -384,6 +424,38 @@ export default function Section8Evidence() {
                                     }
                                 }}
                             />
+
+                            {/* Partner Files List */}
+                            {partner_verification_files && partner_verification_files.length > 0 && (
+                                <div className="space-y-3 animate-in fade-in slide-in-from-top-2">
+                                    <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Partner Documents ({partner_verification_files.length})</Label>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                        {partner_verification_files.map((file: File, fIdx: number) => (
+                                            <div key={fIdx} className="flex items-center justify-between p-3 bg-emerald-50 border border-emerald-100 rounded-xl group/file">
+                                                <div className="flex items-center gap-3 overflow-hidden">
+                                                    <div className="w-8 h-8 rounded-lg bg-white text-emerald-600 flex items-center justify-center shrink-0 shadow-sm">
+                                                        <FileText className="w-4 h-4" />
+                                                    </div>
+                                                    <div className="overflow-hidden">
+                                                        <p className="text-xs font-bold text-emerald-900 truncate">{file.name}</p>
+                                                        <p className="text-[9px] font-medium text-emerald-500 uppercase">{(file.size / (1024 * 1024)).toFixed(2)} MB</p>
+                                                    </div>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        const kept = partner_verification_files.filter((_: any, i: number) => i !== fIdx);
+                                                        update('partner_verification_files', kept);
+                                                    }}
+                                                    className="w-7 h-7 rounded-lg bg-white text-slate-400 flex items-center justify-center hover:bg-red-50 hover:text-red-500 transition-all border border-emerald-100"
+                                                >
+                                                    <Trash2 className="w-3.5 h-3.5" />
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>

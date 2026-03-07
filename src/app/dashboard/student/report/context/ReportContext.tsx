@@ -12,7 +12,9 @@ export interface ReportData {
     section1: {
         participation_type: 'individual' | 'team';
         team_lead: {
+            id?: string;
             name: string;
+            fullName?: string;
             cnic: string;
             mobile: string;
             email: string;
@@ -25,7 +27,9 @@ export interface ReportData {
             verified?: boolean;
         };
         team_members: Array<{
+            id?: string;
             name: string;
+            fullName?: string;
             cnic: string;
             mobile: string;
             university: string;

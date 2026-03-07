@@ -340,18 +340,18 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
                             className={clsx(
                                 "min-h-[160px] bg-slate-50 border-2 border-slate-100 rounded-2xl p-8 font-medium text-slate-700 focus:ring-8 focus:ring-indigo-50/50 focus:border-indigo-200 transition-all resize-none text-sm",
                                 getFieldError('discipline_contribution') && "border-red-200",
-                                disciplineWordCount > 60 && "border-red-300"
+                                disciplineWordCount > 100 && "border-red-300"
                             )}
                             value={sectionData.discipline_contribution}
                             onChange={(e) => updateSection('section2', { discipline_contribution: e.target.value })}
                         />
                         <div className="flex justify-between items-center px-2">
-                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Maximum 60 Words</p>
+                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Maximum 100 Words</p>
                             <span className={clsx(
                                 "text-[10px] font-black uppercase tracking-widest",
-                                disciplineWordCount > 60 ? "text-red-500" : disciplineWordCount >= 40 ? "text-emerald-600" : "text-slate-400"
+                                disciplineWordCount > 100 ? "text-red-500" : disciplineWordCount >= 40 ? "text-emerald-600" : "text-slate-400"
                             )}>
-                                {disciplineWordCount} / 60 Words
+                                {disciplineWordCount} / 100 Words
                             </span>
                         </div>
                         <FieldError message={getFieldError('discipline_contribution')} />

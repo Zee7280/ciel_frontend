@@ -403,7 +403,7 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                             setIsVerified(true);
                                             setParticipantId(p.id);
                                             updateSection('section1', {
-                                                team_lead: { ...team_lead, verified: true }
+                                                team_lead: { ...team_lead, id: p.id, verified: true, fullName: p.fullName }
                                             });
                                             toast.success('Identity verified successfully!');
 
@@ -503,6 +503,47 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                     <span className="text-[10px] font-black text-amber-800 uppercase tracking-widest">Gateway active: Hours must exceed 40</span>
                                 </div>
                             </div>
+                        </div>
+
+                        {/* Engagement Hours Summary Dashboard */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-in slide-in-from-top-4 duration-500">
+                            {[
+                                {
+                                    label: "Required Hours",
+                                    value: projectData?.hours || projectData?.timeline?.hours || 40,
+                                    sub: "Institutional Goal",
+                                    color: "bg-slate-50 border-slate-100 text-slate-900",
+                                    icon: Shield
+                                },
+                                {
+                                    label: "Logged Hours",
+                                    value: data.section1.attendance_logs.reduce((acc: number, log: any) => acc + (Number(log.hours) || 0), 0),
+                                    sub: "Sum of Sessions",
+                                    color: "bg-blue-50 border-blue-100 text-blue-700",
+                                    icon: Award
+                                },
+                                {
+                                    label: "Remaining Hours",
+                                    value: Math.max(0, (projectData?.hours || projectData?.timeline?.hours || 40) - data.section1.attendance_logs.reduce((acc: number, log: any) => acc + (Number(log.hours) || 0), 0)),
+                                    sub: "Target Completion",
+                                    color: "bg-emerald-50 border-emerald-100 text-emerald-700",
+                                    icon: Zap
+                                }
+                            ].map((stat, i) => (
+                                <div key={i} className={clsx("p-6 rounded-[2rem] border shadow-sm flex items-center gap-5 transition-all hover:translate-y-[-2px]", stat.color)}>
+                                    <div className="w-12 h-12 rounded-2xl bg-white flex items-center justify-center shadow-sm">
+                                        <stat.icon className="w-6 h-6" />
+                                    </div>
+                                    <div>
+                                        <span className="text-[10px] font-black uppercase tracking-widest opacity-60">{stat.label}</span>
+                                        <div className="flex items-baseline gap-1.5">
+                                            <span className="text-2xl font-black tabular-nums tracking-tight">{stat.value}</span>
+                                            <span className="text-[10px] font-bold opacity-50">HRS</span>
+                                        </div>
+                                        <p className="text-[9px] font-black uppercase tracking-wider opacity-40 mt-1">{stat.sub}</p>
+                                    </div>
+                                </div>
+                            ))}
                         </div>
 
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">

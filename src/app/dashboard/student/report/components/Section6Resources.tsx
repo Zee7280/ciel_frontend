@@ -458,19 +458,51 @@ export default function Section6Resources() {
                                     ))}
                                 </div>
                             </div>
-                            <div className="border-2 border-dashed border-slate-200 rounded-2xl p-8 text-center space-y-3 hover:border-blue-200 transition-colors cursor-pointer">
-                                <FileText className="w-8 h-8 text-slate-200 mx-auto" />
-                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Drag & drop or click to upload</p>
+                            <div className="relative border-2 border-dashed border-slate-200 rounded-2xl p-8 text-center space-y-3 hover:border-blue-200 transition-colors group">
+                                <FileText className="w-8 h-8 text-slate-200 mx-auto group-hover:text-blue-200 transition-colors" />
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest group-hover:text-blue-400 transition-colors">Drag & drop or click to upload</p>
                                 <input
                                     type="file" multiple accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
-                                    className="opacity-0 absolute"
+                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                                     onChange={e => {
                                         if (e.target.files) {
-                                            updateSection('section6', { evidence_files: [...(section6.evidence_files || []), ...Array.from(e.target.files)] });
+                                            const newFiles = Array.from(e.target.files);
+                                            updateSection('section6', { evidence_files: [...(section6.evidence_files || []), ...newFiles] });
                                         }
                                     }}
                                 />
                             </div>
+
+                            {/* Selected Files List */}
+                            {section6.evidence_files && section6.evidence_files.length > 0 && (
+                                <div className="space-y-3 animate-in fade-in slide-in-from-top-2">
+                                    <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Selected Files ({section6.evidence_files.length})</Label>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                        {section6.evidence_files.map((file: File, fIdx: number) => (
+                                            <div key={fIdx} className="flex items-center justify-between p-3 bg-slate-50 border border-slate-100 rounded-xl group/file">
+                                                <div className="flex items-center gap-3 overflow-hidden">
+                                                    <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
+                                                        <FileText className="w-4 h-4" />
+                                                    </div>
+                                                    <div className="overflow-hidden">
+                                                        <p className="text-xs font-bold text-slate-700 truncate">{file.name}</p>
+                                                        <p className="text-[9px] font-medium text-slate-400 uppercase">{(file.size / (1024 * 1024)).toFixed(2)} MB</p>
+                                                    </div>
+                                                </div>
+                                                <button
+                                                    onClick={() => {
+                                                        const kept = section6.evidence_files.filter((_: any, i: number) => i !== fIdx);
+                                                        updateSection('section6', { evidence_files: kept });
+                                                    }}
+                                                    className="w-7 h-7 rounded-lg bg-white text-slate-400 flex items-center justify-center hover:bg-red-50 hover:text-red-500 transition-all border border-slate-100"
+                                                >
+                                                    <Trash2 className="w-3.5 h-3.5" />
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
 
