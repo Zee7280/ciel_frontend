@@ -6,11 +6,13 @@ import { authenticatedFetch } from '@/utils/api';
 import {
     ArrowLeft, CheckCircle2, XCircle, Download, ExternalLink,
     User, Building2, Calendar, Target, Users, Activity,
-    TrendingUp, Package, Handshake, FileText, MessageSquare
+    TrendingUp, Package, Handshake, FileText, MessageSquare,
+    Globe, MapPin, Clock as ClockIcon
 } from 'lucide-react';
 import { toast } from 'sonner';
 import clsx from 'clsx';
 import ReportPrintView from '../../../student/report/components/ReportPrintView';
+import AttendanceSummaryTable from '../../../student/engagement/components/AttendanceSummaryTable';
 
 interface ReportDetail {
     id: string;
@@ -22,6 +24,12 @@ interface ReportDetail {
     opportunity: {
         title: string;
         organization: string;
+        organization_name?: string;
+        city?: string;
+        location_district?: string;
+        start_date?: string;
+        end_date?: string;
+        hours?: number;
     };
     submission_date: string;
     status: string;
@@ -288,15 +296,70 @@ export default function ReportDetailPage() {
                                         </div>
                                     </div>
                                 )}
+
+                                {report.section1.attendance_logs && report.section1.attendance_logs.length > 0 && (
+                                    <div className="mt-8">
+                                        <h3 className="font-bold text-slate-800 text-sm mb-4 border-b pb-1 uppercase tracking-widest text-slate-400">Attendance & Evidence Logs</h3>
+                                        <AttendanceSummaryTable
+                                            entries={report.section1.attendance_logs}
+                                            isLocked={true}
+                                        />
+                                    </div>
+                                )}
                             </div>
                         )}
 
                         {activeSection === 'section2' && report.section2 && (
-                            <div className="space-y-6">
+                            <div className="space-y-8">
                                 <h2 className="text-2xl font-black text-slate-900">Project Context</h2>
-                                <div className="flex flex-wrap">
-                                    <LabelValue label="Discipline" value={report.section2.discipline} />
-                                    <LabelValue label="Problem Statement" value={report.section2.problem_statement} fullWidth />
+
+                                {/* Project Identity Card */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="p-5 bg-slate-50 rounded-2xl border border-slate-100 flex items-start gap-4">
+                                        <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
+                                            <Building2 className="w-5 h-5" />
+                                        </div>
+                                        <div>
+                                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Partner Organization</p>
+                                            <p className="font-bold text-slate-900">{report.opportunity?.organization_name || report.opportunity?.organization || "N/A"}</p>
+                                        </div>
+                                    </div>
+                                    <div className="p-5 bg-slate-50 rounded-2xl border border-slate-100 flex items-start gap-4">
+                                        <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
+                                            <MapPin className="w-5 h-5" />
+                                        </div>
+                                        <div>
+                                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Project Location</p>
+                                            <p className="font-bold text-slate-900">{report.opportunity?.city || report.opportunity?.location_district || "N/A"}</p>
+                                        </div>
+                                    </div>
+                                    <div className="p-5 bg-slate-50 rounded-2xl border border-slate-100 flex items-start gap-4">
+                                        <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center shrink-0">
+                                            <Calendar className="w-5 h-5" />
+                                        </div>
+                                        <div>
+                                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Timeline</p>
+                                            <p className="font-bold text-slate-900">
+                                                {report.opportunity?.start_date ? new Date(report.opportunity.start_date).toLocaleDateString() : "—"} to {report.opportunity?.end_date ? new Date(report.opportunity.end_date).toLocaleDateString() : "—"}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div className="p-5 bg-slate-50 rounded-2xl border border-slate-100 flex items-start gap-4">
+                                        <div className="w-10 h-10 rounded-xl bg-indigo-100 text-indigo-600 flex items-center justify-center shrink-0">
+                                            <ClockIcon className="w-5 h-5" />
+                                        </div>
+                                        <div>
+                                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Credit Hours</p>
+                                            <p className="font-bold text-slate-900">{report.opportunity?.hours || "0"} Hours Credit</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="border-t border-slate-100 pt-6">
+                                    <div className="flex flex-wrap">
+                                        <LabelValue label="Discipline" value={report.section2.discipline} />
+                                        <LabelValue label="Problem Statement" value={report.section2.problem_statement} fullWidth />
+                                    </div>
                                 </div>
                             </div>
                         )}

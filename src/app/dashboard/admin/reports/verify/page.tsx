@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { authenticatedFetch } from '@/utils/api';
-import { CheckCircle2, XCircle, Clock, FileText, Search, Building2, Eye } from 'lucide-react';
+import { CheckCircle2, XCircle, Clock, FileText, Search, Building2, Eye, Trash2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import clsx from 'clsx';
@@ -90,6 +90,26 @@ export default function AdminReportsVerificationPage() {
             toast.error('Failed to load reports');
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleDelete = async (id: string) => {
+        if (!confirm("Are you sure you want to delete this report? This action cannot be undone.")) return;
+
+        try {
+            const response = await authenticatedFetch(`/api/v1/admin/reports/${id}`, {
+                method: 'DELETE'
+            });
+
+            if (response?.ok) {
+                setReports(prev => prev.filter(r => r.id !== id));
+                toast.success("Report deleted successfully");
+            } else {
+                toast.error("Failed to delete report");
+            }
+        } catch (error) {
+            console.error('Error deleting report:', error);
+            toast.error("Failed to delete report");
         }
     };
 
@@ -262,13 +282,22 @@ export default function AdminReportsVerificationPage() {
                                             {getStatusBadge(report.status)}
                                         </td>
                                         <td className="p-6 text-right">
-                                            <button
-                                                onClick={() => router.push(`/dashboard/admin/reports/verify/${report.id}`)}
-                                                className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-sm shadow-lg shadow-blue-200 transition-all"
-                                            >
-                                                <Eye className="w-4 h-4" />
-                                                Review
-                                            </button>
+                                            <div className="flex items-center justify-end gap-3">
+                                                <button
+                                                    onClick={() => router.push(`/dashboard/admin/reports/verify/${report.id}`)}
+                                                    className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-sm shadow-lg shadow-blue-200 transition-all shrink-0"
+                                                >
+                                                    <Eye className="w-4 h-4" />
+                                                    Review
+                                                </button>
+                                                <button
+                                                    onClick={() => handleDelete(report.id)}
+                                                    className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all border border-transparent hover:border-red-100"
+                                                    title="Delete Report"
+                                                >
+                                                    <Trash2 className="w-5 h-5" />
+                                                </button>
+                                            </div>
                                         </td>
                                     </tr>
                                 ))}

@@ -1,5 +1,41 @@
 import { NextResponse } from "next/server";
 
+export async function GET(request: Request) {
+    try {
+        const authHeader = request.headers.get("Authorization");
+        const { searchParams } = new URL(request.url);
+        const partner_id = searchParams.get("partner_id");
+
+        let backendUrl = `${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/opportunities`;
+        if (partner_id) {
+            backendUrl += `?partner_id=${partner_id}`;
+        }
+
+        const response = await fetch(backendUrl, {
+            method: "GET",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": authHeader || ""
+            }
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            return NextResponse.json(
+                { error: data.message || "Failed to fetch opportunities" },
+                { status: response.status }
+            );
+        }
+
+        return NextResponse.json(data);
+
+    } catch (error) {
+        console.error("Error in opportunities GET proxy:", error);
+        return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+    }
+}
+
 export async function POST(request: Request) {
     try {
         const authHeader = request.headers.get("Authorization");

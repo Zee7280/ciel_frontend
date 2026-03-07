@@ -1,5 +1,6 @@
 import { useReportForm } from "../context/ReportContext";
-import { Award, Clock, Users, Target, CheckCircle } from "lucide-react";
+import { Award, Clock, Users, Target, CheckCircle, MapPin, Building2, Calendar } from "lucide-react";
+import AttendanceSummaryTable from "../../engagement/components/AttendanceSummaryTable";
 
 interface Props {
     projectData: any;
@@ -46,8 +47,28 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
                     </div>
                 </div>
                 <div className="text-right">
-                    <p className="font-black text-slate-900 text-lg uppercase tracking-tight">{projectData?.title || "Project Report"}</p>
+                    <p className="font-black text-slate-900 text-lg uppercase tracking-tight">{projectData?.title || data.project_title || "Project Report"}</p>
                     <p className="text-slate-500 font-bold text-xs uppercase tracking-widest">ID: {data.project_id || "CIEL-DRAFT"}</p>
+                </div>
+            </div>
+
+            {/* Project Identity - NEW FOR ALL VIEWS */}
+            <div className="grid grid-cols-4 gap-4 mb-10 pb-10 border-b-2 border-slate-100">
+                <div className="flex flex-col">
+                    <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Organization</span>
+                    <span className="text-xs font-bold text-slate-900 line-clamp-1">{projectData?.organization_name || projectData?.organization || projectData?.partner_name || "Self-Initiated"}</span>
+                </div>
+                <div className="flex flex-col border-l border-slate-100 pl-4">
+                    <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Location</span>
+                    <span className="text-xs font-bold text-slate-900">{projectData?.city || projectData?.location_district || "Remote"}</span>
+                </div>
+                <div className="flex flex-col border-l border-slate-100 pl-4">
+                    <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Start Date</span>
+                    <span className="text-xs font-bold text-slate-900">{projectData?.start_date ? new Date(projectData.start_date).toLocaleDateString() : "—"}</span>
+                </div>
+                <div className="flex flex-col border-l border-slate-100 pl-4">
+                    <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">End Date</span>
+                    <span className="text-xs font-bold text-slate-900">{projectData?.end_date ? new Date(projectData.end_date).toLocaleDateString() : "—"}</span>
                 </div>
             </div>
 
@@ -81,6 +102,17 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
                             ))}
                         </tbody>
                     </table>
+                </div>
+            )}
+
+            {/* Attendance Logs - ADDED FOR ALL VIEWS */}
+            {data.section1.attendance_logs && data.section1.attendance_logs.length > 0 && (
+                <div className="mb-10">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Engagement & Evidence Portfolio</p>
+                    <AttendanceSummaryTable
+                        entries={data.section1.attendance_logs}
+                        isLocked={true}
+                    />
                 </div>
             )}
 

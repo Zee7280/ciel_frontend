@@ -15,7 +15,11 @@ export default function PartnerRequestsPage() {
 
     const fetchOpportunities = async () => {
         try {
-            const res = await authenticatedFetch(`/api/v1/opportunities`);
+            const storedUser = localStorage.getItem("ciel_user");
+            const user = storedUser ? JSON.parse(storedUser) : null;
+            const userId = user?.id || user?.userId;
+
+            const res = await authenticatedFetch(`/api/v1/opportunities${userId ? `?partner_id=${userId}` : ''}`);
             if (res && res.ok) {
                 const data = await res.json();
                 if (data.success) {
