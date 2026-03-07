@@ -80,16 +80,40 @@ export default function AttendanceForm({
             // Sync with backend if participantId exists
             const activeParticipantId = formData.participantId;
             if (activeParticipantId) {
-                const res = await authenticatedFetch(`/api/v1/engagement/${activeParticipantId}/attendance`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        ...formData,
-                        activityType: formData.activityType === 'Other' ? formData.otherActivity : formData.activityType,
-                        evidenceUploaded: !!evidenceFile,
-                        sessionHours: numericHours // Backend should accept this
-                    }),
-                });
+                // Determine if we need to send multipart/form-data or application/json
+                let fetchOptions: RequestInit = {};
+
+                if (evidenceFile) {
+                    const fd = new FormData();
+                    fd.append('dateOfEngagement', formData.dateOfEngagement);
+                    fd.append('startTime', formData.startTime);
+                    fd.append('endTime', formData.endTime);
+                    fd.append('organizationName', formData.organizationName);
+                    fd.append('activityType', formData.activityType === 'Other' ? formData.otherActivity : formData.activityType);
+                    fd.append('description', formData.description);
+                    fd.append('sessionHours', numericHours.toString());
+                    fd.append('evidenceUploaded', 'true');
+                    fd.append('evidence', evidenceFile); // Actual file
+
+                    fetchOptions = {
+                        method: 'POST',
+                        body: fd,
+                        // DO NOT set Content-Type header manually for FormData, fetch will set it with the correct boundary
+                    };
+                } else {
+                    fetchOptions = {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            ...formData,
+                            activityType: formData.activityType === 'Other' ? formData.otherActivity : formData.activityType,
+                            evidenceUploaded: false,
+                            sessionHours: numericHours
+                        })
+                    };
+                }
+
+                const res = await authenticatedFetch(`/api/v1/engagement/${activeParticipantId}/attendance`, fetchOptions);
 
                 if (!res || !res.ok) {
                     console.warn("Backend sync failed, but context updated");

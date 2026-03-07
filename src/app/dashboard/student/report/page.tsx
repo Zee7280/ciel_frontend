@@ -28,6 +28,7 @@ import Section8Evidence from './components/Section8Evidence';
 import Section9Reflection from './components/Section9Reflection'; // New
 import Section10Sustainability from './components/Section10Sustainability'; // Renamed
 import Section11Summary from './components/Section11Summary'; // New
+import PreReportGuide from './components/PreReportGuide';
 
 function ReportFormContent() {
     const router = useRouter();
@@ -50,6 +51,7 @@ function ReportFormContent() {
     const [isSaving, setIsSaving] = React.useState(false);
     const [projectDetails, setProjectDetails] = React.useState<any>(null);
     const [isLoading, setIsLoading] = React.useState(true);
+    const [showGuide, setShowGuide] = React.useState(true);
 
     // Initial Load
     React.useEffect(() => {
@@ -183,6 +185,17 @@ function ReportFormContent() {
         "Resources", "Partnerships", "Evidence", "Reflection", "Sustainability", "Summary"
     ];
 
+    if (showGuide) {
+        return (
+            <div className="max-w-none mx-auto px-6 md:px-12 py-8">
+                <PreReportGuide
+                    projectTitle={projectDetails?.title}
+                    onStart={() => setShowGuide(false)}
+                />
+            </div>
+        );
+    }
+
     return (
         <div className="max-w-none mx-auto px-6 md:px-12 py-8 space-y-8">
             {/* Header */}
@@ -262,7 +275,7 @@ function ReportFormContent() {
 
             {/* Content Area */}
             <div className="min-h-[400px]">
-                {activeStep === 1 && <Section1Participation />}
+                {activeStep === 1 && <Section1Participation projectData={projectDetails} />}
                 {activeStep === 2 && <Section2ProjectContext projectData={projectDetails} />}
                 {activeStep === 3 && <Section3SDGMapping projectData={projectDetails} />}
                 {activeStep === 4 && <Section4Activities />}

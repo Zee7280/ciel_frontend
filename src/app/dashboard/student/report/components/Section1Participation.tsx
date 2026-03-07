@@ -7,6 +7,7 @@ import { useReportForm } from "../context/ReportContext";
 import { authenticatedFetch } from "@/utils/api";
 import { useSearchParams } from "next/navigation";
 import clsx from "clsx";
+import { toast } from "sonner";
 
 import { FieldError } from "./ui/FieldError";
 import IdentityVerification from "../../engagement/components/IdentityVerification";
@@ -16,16 +17,18 @@ import EngagementOverview from "../../engagement/components/EngagementOverview";
 import TeamVerification from "./TeamVerification";
 import { calculateEngagementMetrics } from "../utils/engagementMetrics";
 
-export default function Section1Participation() {
+export default function Section1Participation({ projectData }: { projectData?: any } = {}) {
     const { data, updateSection, getFieldError, validationErrors, nextStep, saveReport, isReadOnly, isParticipationUnlocked, setParticipationUnlocked } = useReportForm();
     const searchParams = useSearchParams();
     const projectIdFromUrl = searchParams.get('project') || searchParams.get('projectId');
 
     const { participation_type, team_lead, team_members } = data.section1;
+    // Extract available spots using all possible backend keys for the opportunity
+    const maxTeamSize = projectData?.timeline?.volunteers_required || projectData?.volunteers_needed || projectData?.available_spots || 20;
 
     // Wizard State
     const [internalStep, setInternalStep] = React.useState(
-        data.section1.verified_summary ? 6 : 1
+        data.section1.verified_summary ? 5 : 1
     );
     const [isLoadingMetrics, setIsLoadingMetrics] = React.useState(false);
     const [verifiedMetrics, setVerifiedMetrics] = React.useState<any>(
@@ -56,11 +59,10 @@ export default function Section1Participation() {
 
     const steps = [
         { id: 1, title: 'Participation Mode' },
-        { id: 2, title: 'Identity Verification' },
-        { id: 3, title: 'Team Setup' },
-        { id: 4, title: 'Attendance Logging' },
-        { id: 5, title: 'Review & Submit' },
-        { id: 6, title: 'Metrics Dashboard' }
+        { id: 2, title: 'Identity & Team Setup' },
+        { id: 3, title: 'Attendance Logging' },
+        { id: 4, title: 'Review & Submit' },
+        { id: 5, title: 'Metrics Dashboard' }
     ];
 
     // Data Fetching
@@ -72,7 +74,7 @@ export default function Section1Participation() {
 
     const fetchInitialData = async () => {
         try {
-            // 1. Fetch Participant Record
+            // 1. Fetch Team Lead's Participant Record
             const partRes = await authenticatedFetch(`/api/v1/engagement/my`);
             if (partRes && partRes.ok) {
                 const parts = await partRes.json();
@@ -83,45 +85,63 @@ export default function Section1Participation() {
                     setIsVerified(true);
                     // Update wizard step based on progress
                     if (['submitted', 'verified', 'finalized'].includes(myPart.status)) {
-                        setInternalStep(6);
+                        setInternalStep(5);
                         setIsSubmitted(true);
                     } else if (myPart.mobileVerified || myPart.emailVerified) {
-                        setInternalStep(4);
+                        setInternalStep(3);
                     }
 
-                    // 2. Fetch Attendance Entries
-                    const attRes = await authenticatedFetch(`/api/v1/engagement/${myPart.id}/attendance`);
-                    if (attRes && attRes.ok) {
-                        const atts = await attRes.json();
-                        const mappedEntries = (atts.data || []).map((e: any) => ({
-                            id: e.id,
-                            date: e.dateOfEngagement || e.date,
-                            start_time: e.startTime || e.start_time,
-                            end_time: e.endTime || e.end_time,
-                            location: e.organizationName || e.location,
-                            activity_type: e.activityType || e.activity_type,
-                            description: e.description,
-                            hours: e.sessionHours || e.hours,
-                            entryStatus: e.entryStatus
-                        }));
-                        updateSection('section1', { attendance_logs: mappedEntries });
+                    // 2. Collect all participant IDs (team lead + verified team members from saved report)
+                    const allIdsToFetch: { id: string; pId: string }[] = [
+                        { id: myPart.id, pId: myPart.id }
+                    ];
 
-                        // 3. Populate Metrics locally if available
-                        if (mappedEntries.length > 0) {
-                            const calc = calculateEngagementMetrics(mappedEntries);
-                            setVerifiedMetrics({
-                                totalHours: calc.total_verified_hours,
-                                activeDays: calc.total_active_days,
-                                spanWeeks: Math.ceil(calc.engagement_span / 7),
-                                frequency: calc.attendance_frequency,
-                                weeklyContinuity: calc.weekly_continuity,
-                                eis: calc.eis_score,
-                                category: calc.engagement_category,
-                                hecStatus: calc.hec_compliance,
-                                evidenceCount: mappedEntries.filter((l: any) => l.evidence_file).length,
-                                evidenceRatio: Math.round((mappedEntries.filter((l: any) => l.evidence_file).length / mappedEntries.length) * 100)
-                            });
+                    // Add already-verified team members stored in the report draft
+                    const savedMembers = data.section1.team_members || [];
+                    savedMembers.forEach((m: any) => {
+                        if (m.verified && m.id) {
+                            allIdsToFetch.push({ id: m.id, pId: m.id });
                         }
+                    });
+
+                    // 3. Fetch Attendance from all participants in parallel and merge
+                    const allLogs: any[] = [];
+                    await Promise.all(allIdsToFetch.map(async ({ pId }) => {
+                        const attRes = await authenticatedFetch(`/api/v1/engagement/${pId}/attendance`);
+                        if (attRes && attRes.ok) {
+                            const atts = await attRes.json();
+                            const mapped = (atts.data || []).map((e: any) => ({
+                                id: e.id,
+                                date: e.dateOfEngagement || e.date,
+                                start_time: e.startTime || e.start_time,
+                                end_time: e.endTime || e.end_time,
+                                location: e.organizationName || e.location,
+                                activity_type: e.activityType || e.activity_type,
+                                description: e.description,
+                                hours: e.sessionHours || e.hours,
+                                entryStatus: e.entryStatus,
+                                participantId: pId,
+                                evidence_file: e.evidenceUrl || (e.evidenceUploaded ? true : undefined)
+                            }));
+                            allLogs.push(...mapped);
+                        }
+                    }));
+
+                    if (allLogs.length > 0) {
+                        updateSection('section1', { attendance_logs: allLogs });
+                        const calc = calculateEngagementMetrics(allLogs);
+                        setVerifiedMetrics({
+                            totalHours: calc.total_verified_hours,
+                            activeDays: calc.total_active_days,
+                            spanWeeks: Math.ceil(calc.engagement_span / 7),
+                            frequency: calc.attendance_frequency,
+                            weeklyContinuity: calc.weekly_continuity,
+                            eis: calc.eis_score,
+                            category: calc.engagement_category,
+                            hecStatus: calc.hec_compliance,
+                            evidenceCount: allLogs.filter((l: any) => l.evidence_file).length,
+                            evidenceRatio: Math.round((allLogs.filter((l: any) => l.evidence_file).length / allLogs.length) * 100)
+                        });
                     }
                 }
             }
@@ -131,14 +151,14 @@ export default function Section1Participation() {
     };
 
     const handleNext = () => {
-        if (internalStep === 6) {
+        if (internalStep === 5) {
             updateSection('section1', {
                 verified_summary: "Participation record finalized with HEC-compliant audit trail."
             });
             nextStep(); // Context next step
             return;
         }
-        setInternalStep(prev => Math.min(prev + 1, 6));
+        setInternalStep(prev => Math.min(prev + 1, 5));
     };
     const handleBack = () => setInternalStep(prev => Math.max(prev - 1, 1));
 
@@ -189,17 +209,21 @@ export default function Section1Participation() {
     };
 
     const handleDeleteEntry = async (entryId: string) => {
-        if (!participantId) return;
         if (!confirm("Are you sure you want to remove this session?")) return;
+
+        // Find which participant this entry belongs to
+        const entry = data.section1.attendance_logs.find((l: any) => l.id === entryId);
+        const entryParticipantId = (entry as any)?.participantId || participantId;
+        if (!entryParticipantId) return;
 
         setIsDeleting(entryId);
         try {
-            const res = await authenticatedFetch(`/api/v1/engagement/${participantId}/attendance/${entryId}`, {
+            const res = await authenticatedFetch(`/api/v1/engagement/${entryParticipantId}/attendance/${entryId}`, {
                 method: 'DELETE'
             });
 
             if (res && res.ok) {
-                const newLogs = data.section1.attendance_logs.filter(l => l.id !== entryId);
+                const newLogs = data.section1.attendance_logs.filter((l: any) => l.id !== entryId);
                 updateSection('section1', { attendance_logs: newLogs });
             } else {
                 alert("Failed to delete entry. Please try again.");
@@ -210,6 +234,7 @@ export default function Section1Participation() {
             setIsDeleting(null);
         }
     };
+
 
     const isRecordLocked = isSubmitted && !isParticipationUnlocked;
 
@@ -307,15 +332,39 @@ export default function Section1Participation() {
                                     <div className="flex items-center justify-between">
                                         <div>
                                             <h4 className="text-sm font-black text-slate-900 uppercase">Team Composition</h4>
-                                            <p className="text-xs text-slate-400 font-medium">{team_members.length}/20 members added</p>
+                                            <p className="text-xs text-slate-400 font-medium">{team_members.length + 1}/{maxTeamSize} members added (including you)</p>
                                         </div>
                                         <Button
                                             onClick={() => updateSection('section1', { team_members: [...team_members, { name: '', cnic: '', verified: false }] })}
                                             className="bg-slate-900 text-white rounded-xl h-10 px-4 text-xs font-bold"
+                                            disabled={team_members.length + 1 >= maxTeamSize}
                                         >
                                             <UserPlus className="w-4 h-4 mr-2" /> Add Team Member
                                         </Button>
                                     </div>
+
+                                    {team_members.length > 0 && (
+                                        <div className="pt-4 flex flex-wrap gap-2 border-t border-slate-100">
+                                            {team_members.map((member: any, idx: number) => (
+                                                <div key={idx} className="flex items-center gap-2 pl-3 pr-1 py-1 bg-slate-200/70 text-slate-800 rounded-xl">
+                                                    <Users className="w-3.5 h-3.5 text-slate-500" />
+                                                    <span className="text-xs font-bold">
+                                                        {member.name || `Member ${idx + 1}`}
+                                                    </span>
+                                                    <button
+                                                        onClick={() => {
+                                                            const newMembers = [...team_members];
+                                                            newMembers.splice(idx, 1);
+                                                            updateSection('section1', { team_members: newMembers });
+                                                        }}
+                                                        className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
+                                                    >
+                                                        <Trash2 className="w-3.5 h-3.5" />
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         )}
@@ -323,57 +372,116 @@ export default function Section1Participation() {
                 )}
 
                 {internalStep === 2 && (
-                    <div className="space-y-8">
-                        <div className="space-y-2">
-                            <h3 className="text-2xl font-black text-slate-900">Step 2: Your Identity</h3>
-                            <p className="text-slate-500 font-medium">Establish your unique verified link for HEC audit trails.</p>
-                        </div>
-                        {/* Tabbed UI Placeholder */}
-                        <IdentityVerification
-                            projectId={data.project_id || projectIdFromUrl || ""}
-                            participationMode={participation_type as any}
-                            isTeamLead={true}
-                            onSuccess={(p) => {
-                                setIsVerified(true);
-                                setParticipantId(p.id);
-                                // Persist verification status to report context
-                                updateSection('section1', {
-                                    team_lead: { ...team_lead, verified: true }
-                                });
-                                handleNext();
-                            }}
-                        />
-                    </div>
-                )}
-
-                {internalStep === 3 && (
-                    <div className="space-y-8">
-                        <div className="space-y-2">
-                            <h3 className="text-2xl font-black text-slate-900">Step 3: Team Configuration</h3>
-                            <p className="text-slate-500 font-medium">Verification gateway for all participating students.</p>
-                        </div>
-                        {participation_type === 'individual' ? (
-                            <div className="py-20 text-center space-y-4 bg-slate-50 rounded-[2.5rem] border border-dashed border-slate-200">
-                                <Shield className="w-12 h-12 text-slate-300 mx-auto" />
-                                <p className="text-slate-400 font-bold">Not applicable for Individual mode.</p>
-                                <Button onClick={handleNext} className="bg-slate-900 text-white rounded-xl">Skip Step</Button>
+                    <div className="space-y-12">
+                        {/* 1. Self Identity Verification */}
+                        <div className="space-y-8">
+                            <div className="space-y-2">
+                                <h3 className="text-2xl font-black text-slate-900">Step 2: Identity & Team Setup</h3>
+                                <p className="text-slate-500 font-medium">Establish your unique verified link and configure your team for HEC audit trails.</p>
                             </div>
-                        ) : (
-                            <TeamVerification
-                                projectId={data.project_id || projectIdFromUrl || ""}
-                                members={team_members}
-                                onUpdateMembers={(newMembers) => updateSection('section1', { team_members: newMembers })}
-                            />
+
+                            <div className="bg-white rounded-[2rem] border-2 border-slate-100 p-8 shadow-sm">
+                                <h4 className="text-sm font-black text-slate-900 uppercase mb-6 flex items-center gap-2">
+                                    <Shield className="w-4 h-4 text-emerald-600" /> My Identity Verification
+                                </h4>
+                                {isVerified ? (
+                                    <div className="flex items-center gap-4 p-5 bg-emerald-50 border border-emerald-200 rounded-2xl">
+                                        <div className="w-10 h-10 rounded-full bg-emerald-500 flex items-center justify-center shrink-0">
+                                            <CheckCircle2 className="w-5 h-5 text-white" />
+                                        </div>
+                                        <div>
+                                            <p className="text-sm font-black text-emerald-700">Identity Verified</p>
+                                            <p className="text-xs text-emerald-600 font-medium mt-0.5">Your academic record has been linked and is ready for HEC audit trails.</p>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <IdentityVerification
+                                        projectId={data.project_id || projectIdFromUrl || ""}
+                                        participationMode={participation_type as any}
+                                        isTeamLead={true}
+                                        onSuccess={(p) => {
+                                            setIsVerified(true);
+                                            setParticipantId(p.id);
+                                            updateSection('section1', {
+                                                team_lead: { ...team_lead, verified: true }
+                                            });
+                                            toast.success('Identity verified successfully!');
+
+                                            if (participation_type === 'individual') {
+                                                handleNext();
+                                            } else {
+                                                toast.info('Please proceed to setup your team members below.');
+                                                setTimeout(() => {
+                                                    const el = document.getElementById('team-setup-section');
+                                                    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                                }, 100);
+                                            }
+                                        }}
+                                    />
+                                )}
+                            </div>
+
+                        </div>
+
+                        {/* 2. Team Configuration (if applicable) */}
+                        {participation_type === 'team' && (
+                            <div id="team-setup-section" className="space-y-6 pt-6 border-t border-slate-100">
+                                <h4 className="text-sm font-black text-slate-900 uppercase flex items-center gap-2">
+                                    <Users className="w-4 h-4 text-blue-600" /> Team Members Setup
+                                </h4>
+                                <TeamVerification
+                                    projectId={data.project_id || projectIdFromUrl || ""}
+                                    members={team_members}
+                                    onUpdateMembers={async (newMembers) => {
+                                        updateSection('section1', { team_members: newMembers });
+                                        // Direct API save to avoid stale React state issue
+                                        // (saveReport reads from state which hasn't updated yet)
+                                        const hasVerified = newMembers.some((m: any) => m.verified && m.id);
+                                        if (hasVerified) {
+                                            try {
+                                                const projectId = data.project_id || projectIdFromUrl || '';
+                                                if (projectId) {
+                                                    await authenticatedFetch(`/api/v1/student/reports`, {
+                                                        method: 'POST',
+                                                        body: JSON.stringify({
+                                                            ...data,
+                                                            project_id: projectId,
+                                                            section1: {
+                                                                ...data.section1,
+                                                                team_members: newMembers
+                                                            },
+                                                            status: 'draft'
+                                                        })
+                                                    });
+                                                }
+                                            } catch (err) {
+                                                console.error('Auto-save after member verification failed:', err);
+                                            }
+                                        }
+                                    }}
+                                />
+                            </div>
                         )}
+
+                        {/* Navigation button to advance manually from this combined step */}
+                        <div className="flex justify-end pt-4">
+                            <Button
+                                onClick={handleNext}
+                                disabled={!isVerified}
+                                className="bg-blue-600 text-white hover:bg-blue-700 rounded-xl px-8 h-12 font-bold transition-all"
+                            >
+                                Continue to Attendance <ChevronRight className="w-4 h-4 ml-2" />
+                            </Button>
+                        </div>
                     </div>
                 )}
 
-                {/* Placeholders for Steps 4, 5, 6 */}
-                {internalStep === 4 && (
+                {/* Placeholders for Steps 3, 4, 5 */}
+                {internalStep === 3 && (
                     <div className="space-y-10 animate-in fade-in duration-500">
                         <div className="flex items-center justify-between">
                             <div className="space-y-1">
-                                <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tight">Step 4: Attendance Logging</h3>
+                                <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tight">Step 3: Attendance Logging</h3>
                                 <p className="text-slate-500 font-medium">Record and verify your engagement sessions.</p>
                             </div>
                             <div className="flex gap-3">
@@ -410,7 +518,7 @@ export default function Section1Participation() {
                                             .filter((m: any) => m.verified && m.id)
                                             .map((m: any) => ({ id: m.id, name: m.fullName || m.name }))
                                     ]}
-                                    onSuccess={() => participantId && loadEntries(participantId)}
+                                    onSuccess={() => loadAllEntries()}
                                     isLocked={isRecordLocked}
                                     isParticipationUnlocked={isParticipationUnlocked}
                                     setParticipationUnlocked={setParticipationUnlocked}
@@ -437,7 +545,7 @@ export default function Section1Participation() {
                     </div>
                 )}
 
-                {internalStep === 5 && (
+                {internalStep === 4 && (
                     <div className="max-w-2xl mx-auto space-y-10 py-10 animate-in zoom-in-95 duration-500">
                         <div className="text-center space-y-4">
                             <div className="w-20 h-20 bg-blue-600 text-white rounded-[2rem] flex items-center justify-center mx-auto shadow-2xl shadow-blue-200">
@@ -482,7 +590,7 @@ export default function Section1Participation() {
                     </div>
                 )}
 
-                {internalStep === 6 && (
+                {internalStep === 5 && (
                     <div className="space-y-10 animate-in fade-in duration-700">
                         {verifiedMetrics ? (
                             <div className="animate-in slide-in-from-bottom-8 duration-700">
@@ -505,7 +613,7 @@ export default function Section1Participation() {
                                 {!isSubmitted && (
                                     <Button
                                         variant="outline"
-                                        onClick={() => setInternalStep(5)}
+                                        onClick={() => setInternalStep(4)}
                                         className="rounded-2xl border-2 border-blue-100 text-blue-600 font-bold px-8 hover:bg-blue-50 transition-all"
                                     >
                                         Return to Review & Submit
@@ -536,9 +644,9 @@ export default function Section1Participation() {
                                 <Save className="w-4 h-4 text-slate-400 group-hover:text-slate-900" /> Save Draft
                             </Button>
 
-                            {internalStep < 6 ? (
+                            {internalStep < 5 ? (
                                 <div className="flex gap-4">
-                                    {internalStep === 5 && (
+                                    {internalStep === 4 && (
                                         <Button
                                             onClick={handleFinalSubmit}
                                             disabled={!reviewChecked.every(Boolean) || isLoadingMetrics}
@@ -553,7 +661,7 @@ export default function Section1Participation() {
                                         disabled={false}
                                         className="bg-blue-600 hover:bg-blue-700 text-white rounded-2xl h-14 px-10 font-black shadow-2xl shadow-blue-200 animate-in slide-in-from-right-4 duration-500"
                                     >
-                                        {internalStep === 5 ? "Skip Submission & Continue" : "Continue"} <ChevronRight className="w-5 h-5 ml-2" />
+                                        {internalStep === 4 ? "Skip Submission & Continue" : "Continue"} <ChevronRight className="w-5 h-5 ml-2" />
                                     </Button>
                                 </div>
                             ) : (
@@ -592,6 +700,45 @@ export default function Section1Participation() {
             }
         } catch (err) {
             console.error("Error loading entries:", err);
+        }
+    }
+    // Load attendance from ALL verified participants and merge
+    async function loadAllEntries() {
+        try {
+            // Build list of all participant IDs: team lead + verified team members
+            const allParticipantIds: string[] = [];
+            if (participantId) allParticipantIds.push(participantId);
+            data.section1.team_members
+                .filter((m: any) => m.verified && m.id)
+                .forEach((m: any) => allParticipantIds.push(m.id));
+
+            if (allParticipantIds.length === 0) return;
+
+            const allLogs: any[] = [];
+            await Promise.all(allParticipantIds.map(async (pId) => {
+                const res = await authenticatedFetch(`/api/v1/engagement/${pId}/attendance`);
+                if (res && res.ok) {
+                    const result = await res.json();
+                    const mapped = (result.data || []).map((e: any) => ({
+                        id: e.id,
+                        date: e.dateOfEngagement || e.date,
+                        start_time: e.startTime || e.start_time,
+                        end_time: e.endTime || e.end_time,
+                        location: e.organizationName || e.location,
+                        activity_type: e.activityType || e.activity_type,
+                        description: e.description,
+                        hours: e.sessionHours || e.hours,
+                        entryStatus: e.entryStatus,
+                        participantId: pId,
+                        evidence_file: e.evidenceUrl || (e.evidenceUploaded ? true : undefined)
+                    }));
+                    allLogs.push(...mapped);
+                }
+            }));
+
+            updateSection('section1', { attendance_logs: allLogs });
+        } catch (err) {
+            console.error("Error loading all entries:", err);
         }
     }
 }

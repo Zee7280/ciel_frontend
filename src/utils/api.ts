@@ -46,13 +46,19 @@ export async function authenticatedFetch(url: string, options: RequestInit = {},
 
     const isFormData = options.body instanceof FormData;
 
-    const headers: HeadersInit = {
-        ...options.headers,
+    // We cast to Record<string, string> so we can manipulate specific headers easily
+    const incomingHeaders: Record<string, string> = (options.headers as Record<string, string>) || {};
+    const headers: Record<string, string> = {
+        ...incomingHeaders,
         "Authorization": `Bearer ${token}`
     };
 
-    if (!isFormData) {
-        (headers as any)["Content-Type"] = "application/json";
+    if (isFormData) {
+        // MUST NOT have Content-Type for FormData, browser sets it with the correct boundary
+        delete headers["Content-Type"];
+        delete headers["content-type"];
+    } else {
+        headers["Content-Type"] = "application/json";
     }
 
     const response = await fetch(fullUrl, {

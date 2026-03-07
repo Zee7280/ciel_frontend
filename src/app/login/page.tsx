@@ -1,14 +1,15 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowRight, Mail, Lock, AlertCircle, Loader2, ArrowLeft, CheckCircle } from "lucide-react";
 import Image from "next/image";
 import clsx from "clsx";
 
-export default function LoginPage() {
+function LoginContent() {
     const router = useRouter();
+    const searchParams = useSearchParams();
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [isMobile, setIsMobile] = useState(false);
@@ -25,6 +26,15 @@ export default function LoginPage() {
     const [resetSuccess, setResetSuccess] = useState(false);
     const [fpError, setFpError] = useState<string | null>(null);
 
+    // Auto-fill token from URL
+    useEffect(() => {
+        const tokenFromUrl = searchParams.get("token");
+        if (tokenFromUrl) {
+            setResetToken(tokenFromUrl);
+            setView("reset");
+        }
+    }, [searchParams]);
+
     const handleForgotPassword = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsLoading(true);
@@ -39,13 +49,8 @@ export default function LoginPage() {
             });
             const data = await res.json().catch(() => ({}));
             if (res.ok && data.success) {
-                // In testing mode backend sends token in response,
-                // pre-fill token field for convenience
-                if (data.data?.resetToken) {
-                    setResetToken(data.data.resetToken);
-                }
-                setForgotSuccess("Reset token generated! Check your email or copy the token from console.");
-                setView("reset");
+                setForgotSuccess("Reset link sent! Check your email to reset your password.");
+                // We keep the view as "forgot" so they see the success message
             } else {
                 setFpError(data.message || "Failed to send reset request.");
             }
@@ -363,6 +368,13 @@ export default function LoginPage() {
                                         </div>
                                     )}
 
+                                    {forgotSuccess && (
+                                        <div className="flex items-start gap-3 p-4 rounded-2xl bg-emerald-50 text-emerald-600 text-xs font-bold border border-emerald-100">
+                                            <CheckCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                                            <span>{forgotSuccess}</span>
+                                        </div>
+                                    )}
+
                                     <button
                                         type="submit"
                                         disabled={isLoading}
@@ -397,21 +409,25 @@ export default function LoginPage() {
                                     <>
                                         <div className="mb-10 text-center lg:text-left">
                                             <h3 className="text-4xl font-black text-slate-900 tracking-tight mb-3 italic">Reset Password</h3>
-                                            <p className="text-slate-500 font-medium">Enter your token and choose a new password.</p>
+                                            <p className="text-slate-500 font-medium">
+                                                {searchParams.get("token") ? "Choose a new password." : "Enter your token and choose a new password."}
+                                            </p>
                                         </div>
 
                                         <form onSubmit={handleResetPassword} className="space-y-5">
-                                            <div className="space-y-1.5">
-                                                <label className="text-[11px] font-black uppercase tracking-widest text-slate-400 ml-1">Reset Token</label>
-                                                <input
-                                                    type="text"
-                                                    required
-                                                    placeholder="Paste token from email"
-                                                    value={resetToken}
-                                                    onChange={(e) => setResetToken(e.target.value)}
-                                                    className="w-full px-4 py-4 rounded-2xl border-2 border-slate-100 bg-slate-50/50 focus:bg-white focus:border-emerald-600 outline-none transition-all font-mono text-sm text-slate-800"
-                                                />
-                                            </div>
+                                            {!searchParams.get("token") && (
+                                                <div className="space-y-1.5">
+                                                    <label className="text-[11px] font-black uppercase tracking-widest text-slate-400 ml-1">Reset Token</label>
+                                                    <input
+                                                        type="text"
+                                                        required
+                                                        placeholder="Paste token from email"
+                                                        value={resetToken}
+                                                        onChange={(e) => setResetToken(e.target.value)}
+                                                        className="w-full px-4 py-4 rounded-2xl border-2 border-slate-100 bg-slate-50/50 focus:bg-white focus:border-emerald-600 outline-none transition-all font-mono text-sm text-slate-800"
+                                                    />
+                                                </div>
+                                            )}
 
                                             <div className="space-y-1.5">
                                                 <label className="text-[11px] font-black uppercase tracking-widest text-slate-400 ml-1">New Password</label>
@@ -471,5 +487,17 @@ export default function LoginPage() {
                 </div>
             </div>
         </div>
+    );
+}
+
+export default function LoginPage() {
+    return (
+        <Suspense fallback={
+            <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
+                <Loader2 className="w-8 h-8 animate-spin text-emerald-600" />
+            </div>
+        }>
+            <LoginContent />
+        </Suspense>
     );
 }

@@ -78,7 +78,11 @@ export default function AttendanceSummaryTable({ entries, onDelete, isLocked = f
                                     </div>
                                 </td>
                                 <td className="px-6 py-6 text-center">
-                                    {entry.evidence_file ? (
+                                    {typeof entry.evidence_file === 'string' ? (
+                                        <a href={entry.evidence_file} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 px-3 py-1 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-xl text-[10px] font-black border border-blue-200 shadow-sm transition-colors cursor-pointer">
+                                            <CheckCircle2 className="w-3.5 h-3.5" /> VIEW
+                                        </a>
+                                    ) : entry.evidence_file ? (
                                         <div className="inline-flex items-center gap-2 px-3 py-1 bg-emerald-50 text-emerald-600 rounded-xl text-[10px] font-black border border-emerald-100 shadow-sm">
                                             <CheckCircle2 className="w-3.5 h-3.5" /> LINKED
                                         </div>

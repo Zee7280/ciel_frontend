@@ -114,12 +114,15 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
 
     // Project identity fields
     const title = projectData?.title || "Untitled Engagement";
-    const partner = projectData?.organization || projectData?.partner_name || "Self-Initiated";
-    const district = projectData?.location_district || projectData?.district || "—";
-    const province = projectData?.location_province || projectData?.province || "—";
-    const country = projectData?.location_country || projectData?.country || "Pakistan";
-    const startDate = projectData?.start_date || projectData?.startDate || "—";
-    const endDate = projectData?.end_date || projectData?.endDate || "—";
+    const partner = projectData?.organization_name || projectData?.partner_name || projectData?.organization || "Self-Initiated";
+    const district = projectData?.city || projectData?.district || projectData?.location_district || "—";
+    const province = projectData?.province || projectData?.location_province || "—";
+    const country = projectData?.country || projectData?.location_country || "Pakistan";
+
+    // Format dates nicely if they exist
+    const formatDate = (dateStr: string) => dateStr ? new Date(dateStr).toLocaleDateString() : "—";
+    const startDate = formatDate(projectData?.start_date || projectData?.startDate);
+    const endDate = formatDate(projectData?.end_date || projectData?.endDate);
 
     return (
         <div className="space-y-14 pb-16">
