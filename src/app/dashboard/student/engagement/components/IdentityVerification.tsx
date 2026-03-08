@@ -159,7 +159,7 @@ export default function IdentityVerification({
                         className={clsx(
                             "flex-1 py-3 px-4 rounded-xl text-xs font-black uppercase tracking-widest transition-all duration-300",
                             activeTab === tab
-                                ? "bg-white text-blue-600 shadow-sm"
+                                ? "bg-white text-report-primary shadow-sm"
                                 : "text-slate-400 hover:text-slate-600"
                         )}
                     >
@@ -232,7 +232,7 @@ export default function IdentityVerification({
                                             <button
                                                 onClick={() => sendOtp('email')}
                                                 disabled={isVerifyingOtp.email || !formData.email}
-                                                className="absolute right-2 top-1.5 h-8 px-3 bg-blue-600 text-white rounded-lg text-[9px] font-black uppercase tracking-wider disabled:bg-slate-200 transition-all hover:bg-blue-700"
+                                                className="absolute right-2 top-1.5 h-8 px-3 bg-report-primary text-white rounded-lg text-[9px] font-black uppercase tracking-wider disabled:bg-slate-200 transition-all hover:bg-report-primary-border"
                                             >
                                                 {isVerifyingOtp.email ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Send OTP'}
                                             </button>
@@ -269,7 +269,7 @@ export default function IdentityVerification({
                                                 <button
                                                     onClick={() => sendOtp('email')}
                                                     disabled={isVerifyingOtp.email}
-                                                    className="text-[10px] font-black text-blue-600 uppercase tracking-widest hover:underline disabled:text-slate-400"
+                                                    className="text-[10px] font-black text-report-primary uppercase tracking-widest hover:underline disabled:text-slate-400"
                                                 >
                                                     {isVerifyingOtp.email ? 'Sending...' : 'Resend OTP'}
                                                 </button>
@@ -278,7 +278,7 @@ export default function IdentityVerification({
                                     )}
 
                                     {otpVerified.email && (
-                                        <div className="flex items-center gap-2 text-emerald-600 font-black text-[10px] uppercase tracking-widest bg-emerald-50 p-2 rounded-xl">
+                                        <div className="flex items-center gap-2 text-report-primary font-black text-[10px] uppercase tracking-widest bg-report-primary-soft p-2 rounded-xl">
                                             <CheckCircle2 className="w-3.5 h-3.5" /> Academy Mail Linked
                                         </div>
                                     )}
@@ -322,9 +322,9 @@ export default function IdentityVerification({
                                                             setFormData({ ...formData, universityName: uni });
                                                             setShowUniDropdown(false);
                                                         }}
-                                                        className="w-full text-left p-3 hover:bg-blue-50 rounded-xl transition-colors flex items-center gap-3 text-sm font-bold text-slate-700"
+                                                        className="w-full text-left p-3 hover:bg-report-primary-soft rounded-xl transition-colors flex items-center gap-3 text-sm font-bold text-slate-700"
                                                     >
-                                                        <School className="w-3.5 h-3.5 text-blue-400" />
+                                                        <School className="w-3.5 h-3.5 text-report-primary" />
                                                         {uni}
                                                     </button>
                                                 ))}
@@ -365,7 +365,7 @@ export default function IdentityVerification({
                                     <select
                                         value={formData.yearOfStudy}
                                         onChange={(e) => setFormData({ ...formData, yearOfStudy: e.target.value })}
-                                        className="w-full h-12 bg-slate-50 border-none rounded-2xl font-bold text-sm px-4 focus:ring-2 focus:ring-blue-600 outline-none appearance-none"
+                                        className="w-full h-12 bg-slate-50 border-none rounded-2xl font-bold text-sm px-4 focus:ring-2 focus:ring-report-primary outline-none appearance-none"
                                     >
                                         {['1st Year', '2nd Year', '3rd Year', '4th Year', 'Graduate', 'Postgraduate'].map(y => (
                                             <option key={y} value={y}>{y}</option>
@@ -377,7 +377,7 @@ export default function IdentityVerification({
                                     <select
                                         value={formData.academicIntegrationType}
                                         onChange={(e) => setFormData({ ...formData, academicIntegrationType: e.target.value })}
-                                        className="w-full h-12 bg-slate-50 border-none rounded-2xl font-bold text-sm px-4 focus:ring-2 focus:ring-blue-600 outline-none appearance-none"
+                                        className="w-full h-12 bg-slate-50 border-none rounded-2xl font-bold text-sm px-4 focus:ring-2 focus:ring-report-primary outline-none appearance-none"
                                     >
                                         {['Voluntary', 'Course-Linked', 'Credit-Bearing', 'Capstone / Thesis', 'Research-Integrated'].map(t => (
                                             <option key={t} value={t}>{t}</option>
@@ -398,7 +398,7 @@ export default function IdentityVerification({
                             <Button
                                 onClick={handleSubmit}
                                 disabled={isSubmitting || !isAcademicValid}
-                                className="flex-1 h-14 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-black text-sm transition-all shadow-xl shadow-blue-200"
+                                className="flex-1 h-14 bg-report-primary hover:bg-report-primary-border text-white rounded-2xl font-black text-sm transition-all shadow-xl shadow-report-primary-shadow"
                             >
                                 {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : "Verify Identity & Link Record"}
                             </Button>
@@ -407,13 +407,12 @@ export default function IdentityVerification({
                 )}
             </div>
 
-            <div className="p-6 bg-blue-50/50 rounded-3xl border border-blue-100 flex items-start gap-4">
-                <AlertCircle className="w-5 h-5 text-blue-600 mt-1 shrink-0" />
-                <p className="text-xs text-blue-800 font-medium leading-relaxed">
+            <div className="p-6 bg-report-primary-soft rounded-3xl border border-report-primary-border flex items-start gap-4">
+                <AlertCircle className="w-5 h-5 text-report-primary mt-1 shrink-0" />
+                <p className="text-xs text-report-primary font-medium leading-relaxed">
                     Identity verification is a <strong>hard gateway</strong>. Your academic record will be locked and traceable for institutional HEC compliance once verified.
                 </p>
             </div>
         </div>
     );
 }
-

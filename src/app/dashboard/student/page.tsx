@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Button } from "./report/components/ui/button";
 import { DashboardData } from "./types";
 import { authenticatedFetch } from "@/utils/api";
+import StudentProgressTracker from "./components/StudentProgressTracker";
 
 export default function StudentDashboard() {
     const [data, setData] = useState<DashboardData | null>(null);
@@ -60,6 +61,11 @@ export default function StudentDashboard() {
 
     return (
         <div className="space-y-8">
+            {/* Student Progress Tracker (Bonus Feature) */}
+            {activeProjects.length > 0 && (
+                <StudentProgressTracker projectId={activeProjects[0].id} />
+            )}
+
             {/* Stats Grid */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                 {statItems.map((stat, index) => (

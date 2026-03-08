@@ -1,13 +1,17 @@
+import React, { useMemo, useEffect, useState } from "react";
+import { generateAISummary } from "../utils/aiSummarizer";
+import { toast } from "sonner";
 import {
     ShieldCheck, Camera, FileUp, Globe, FileText, Lock, CheckCircle2,
-    Save, Info, AlertCircle, Activity, Image as ImageIcon, Users, BookOpen, Trash2
+    Save, Info, AlertCircle, Activity, Image as ImageIcon, Users, BookOpen, Trash2,
+    Sparkles, Loader2
 } from "lucide-react";
 import { Label } from "./ui/label";
 import { FileUpload } from "./ui/file-upload";
 import { Button } from "./ui/button";
 import { useReportForm } from "../context/ReportContext";
+import { useDebounce } from "@/hooks/useDebounce";
 import { FieldError } from "./ui/FieldError";
-import React, { useMemo, useEffect } from "react";
 import clsx from "clsx";
 
 // ─── Static configuration ───────────────────────────────────────────────────
@@ -30,7 +34,7 @@ const ethicalOptions = [
 ];
 
 const visibilityOptions = [
-    { id: "public", label: "Public", desc: "May be used on website, social media, and public reports", icon: Globe, color: "text-emerald-600 border-emerald-200 bg-emerald-50" },
+    { id: "public", label: "Public", desc: "May be used on website, social media, and public reports", icon: Globe, color: "text-report-primary border-report-primary-border bg-report-primary-soft" },
     { id: "limited", label: "Limited", desc: "Institutional reports and presentations only", icon: Users, color: "text-blue-600 border-blue-200 bg-blue-50" },
     { id: "internal", label: "Internal", desc: "Verification purposes only", icon: Lock, color: "text-slate-600 border-slate-200 bg-slate-50" }
 ];
@@ -47,7 +51,7 @@ function classifyVerification(filesCount: number, typesCount: number, partnerAss
     label: string; color: string; desc: string;
 } {
     if (partnerAssessed) {
-        return { label: "Verified by Partner", color: "text-emerald-700 bg-emerald-50 border-emerald-200", desc: "External confirmation included" };
+        return { label: "Verified by Partner", color: "text-report-primary bg-report-primary-soft border-report-primary-border", desc: "External confirmation included" };
     }
     if (filesCount > 1 && typesCount > 1) {
         return { label: "Structured Verification", color: "text-blue-700 bg-blue-50 border-blue-200", desc: "Multiple evidence types, documented outputs" };
@@ -82,18 +86,43 @@ export default function Section8Evidence() {
     const wordCount = (description || '').trim().split(/\s+/).filter(w => w.length > 0).length;
     const allEthicalChecked = Object.values(ethical_compliance || {}).every(v => v === true) && Object.keys(ethical_compliance || {}).length === 4;
 
+    // ─── AI Summarization Logic ─────────────────────────────────────────────
+    const [isGenerating, setIsGenerating] = useState(false);
+
+    const handleGenerateAISummary = async () => {
+        if (evidence_files?.length === 0) {
+            toast.error("Please upload evidence files first");
+            return;
+        }
+
+        setIsGenerating(true);
+        const result = await generateAISummary("section8", section8);
+        setIsGenerating(false);
+
+        if (result.error) {
+            toast.error(result.error);
+        } else if (result.summary) {
+            updateSection('section8', { summary_text: result.summary });
+            toast.success("AI Summary generated!");
+        }
+    };
+
     // ── Content generation ────────────────────────────────────────────────────
     const classification = classifyVerification(evidence_files?.length || 0, evidence_types?.length || 0, partner_verification && !!partner_verification_type);
 
     const autoNarrative = useMemo(() => {
+        if (section8.summary_text && (section8.summary_text.length > 50 || !section8.summary_text.includes("The report includes"))) {
+            return section8.summary_text;
+        }
+
         const filesCount = evidence_files?.length || 0;
         if (filesCount === 0) return "Evidence statement will be generated once files are uploaded and classified.";
-        const typeNames = evidence_types?.map(t => t.split(' ')[0].toLowerCase()) || [];
+        const typeNames = evidence_types?.map((t: string) => t.split(' ')[0].toLowerCase()) || [];
         const typesStr = typeNames.length > 0 ? ` including ${typeNames.slice(0, 2).join(' and ')} documentation` : '';
         const ethicalStr = allEthicalChecked ? "Ethical compliance was fully confirmed." : "Ethical compliance checks are pending.";
         const partnerStr = partner_verification ? `External partner verification was provided via ${partner_verification_type || 'documentation'}.` : "External partner verification was not provided.";
         return `The report includes ${filesCount} supporting evidence ${filesCount === 1 ? 'file' : 'files'}${typesStr}. ${ethicalStr} ${partnerStr}`;
-    }, [evidence_files, evidence_types, allEthicalChecked, partner_verification, partner_verification_type]);
+    }, [evidence_files, evidence_types, allEthicalChecked, partner_verification, partner_verification_type, section8.summary_text]);
 
     useEffect(() => {
         if (section8.summary_text !== autoNarrative) {
@@ -102,27 +131,57 @@ export default function Section8Evidence() {
     }, [autoNarrative, section8.summary_text]);
 
 
+    // ─── Automated AI Summarization ─────────────────────────────────────────
+    const debouncedData = useDebounce({
+        evidence_types: section8.evidence_types,
+        evidence_files_count: section8.evidence_files?.length || 0,
+        ethical_compliance: section8.ethical_compliance,
+        partner_verification: section8.partner_verification
+    }, 3000);
+    const [lastAutoGeneratedFor, setLastAutoGeneratedFor] = useState('');
+
+    useEffect(() => {
+        const hasFiles = debouncedData.evidence_files_count > 0;
+        const allEthical = Object.values(debouncedData.ethical_compliance || {}).every(v => v === true) && Object.keys(debouncedData.ethical_compliance || {}).length === 4;
+
+        const currentDataKey = JSON.stringify(debouncedData);
+
+        const canAutoGenerate =
+            hasFiles &&
+            allEthical &&
+            currentDataKey !== lastAutoGeneratedFor &&
+            (!section8.summary_text ||
+                section8.summary_text.includes("The report includes") ||
+                section8.summary_text.length < 50);
+
+        if (canAutoGenerate && !isGenerating) {
+            setLastAutoGeneratedFor(currentDataKey);
+            handleGenerateAISummary();
+        }
+    }, [debouncedData, section8.summary_text, isGenerating]);
+
+
     return (
         <div className="space-y-12 pb-16">
             {/* ─── Header ─────────────────────────────────────────────────── */}
             <div className="flex items-center gap-4">
-                <div className="w-14 h-14 rounded-2xl bg-amber-600 text-white flex items-center justify-center shadow-xl shadow-amber-100 ring-4 ring-amber-50">
+                <div className="w-14 h-14 rounded-2xl bg-report-primary text-white flex items-center justify-center shadow-xl shadow-report-primary-shadow ring-4 ring-report-primary-soft">
                     <ShieldCheck className="w-7 h-7" />
                 </div>
                 <div>
-                    <h2 className="text-3xl font-black text-slate-900 tracking-tight uppercase">Section 8 — Evidence & Verification</h2>
-                    <p className="text-slate-500 font-bold uppercase tracking-[0.15em] text-[10px]">Proof of Activity & Credibility Layer</p>
+                    <h2 className="report-h2">Section 8 — Evidence & Verification</h2>
+                    <p className="report-label">Proof of Activity & Credibility Layer</p>
                 </div>
             </div>
 
             {/* ─── Purpose note ────────────────────────────────────────────── */}
-            <div className="p-5 bg-amber-50 border border-amber-100 rounded-2xl flex items-start gap-4">
-                <Info className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+            <div className="p-5 bg-report-primary-soft border border-report-primary-border rounded-2xl flex items-start gap-4">
+                <Info className="w-5 h-5 text-report-primary shrink-0 mt-0.5" />
                 <div className="space-y-2">
-                    <p className="text-[10px] font-black text-amber-900 uppercase tracking-widest leading-relaxed">
+                    <p className="report-label !text-report-primary">
                         This section confirms that your reported work is Verifiable, Ethical, Traceable, and Audit-ready.
                     </p>
-                    <p className="text-[10px] text-amber-700 font-semibold leading-relaxed">
+                    <p className="report-help !text-report-primary">
                         It strengthens your report for University documentation, HEC audit, QS impact submissions, Government reporting, and SDG contribution validation. This is the credibility layer of your project.
                     </p>
                 </div>
@@ -131,19 +190,19 @@ export default function Section8Evidence() {
             {/* ─── Step 1: Evidence Submission (Upload) ──────────────────────── */}
             <div className="space-y-4">
                 <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center font-black text-[10px]">8.1</div>
-                    <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Step 1 — Upload Evidence (Mandatory)</h3>
+                    <div className="w-8 h-8 rounded-full bg-report-primary text-white flex items-center justify-center font-black text-[10px]">8.1</div>
+                    <h3 className="report-h3">Step 1 — Upload Evidence (Mandatory)</h3>
                 </div>
                 <div className="bg-white rounded-[2.5rem] border-2 border-slate-100 p-8 shadow-sm space-y-6">
                     <div className="space-y-1">
-                        <Label className="text-sm font-black text-slate-900 uppercase tracking-tight">Evidence Submission</Label>
-                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                        <Label className="report-h3 !text-sm">Evidence Submission</Label>
+                        <p className="report-help">
                             You must upload at least one valid evidence file before submitting this section.
                         </p>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-4 bg-slate-50 rounded-2xl border border-slate-100">
                         <div className="space-y-2">
-                            <p className="text-[10px] font-black text-slate-600 uppercase tracking-widest">Accepted Formats</p>
+                            <p className="report-label !text-slate-600">Accepted Formats</p>
                             <ul className="text-xs font-semibold text-slate-500 space-y-1 list-disc list-inside">
                                 <li>JPG / PNG (Photos)</li>
                                 <li>MP4 (Short videos)</li>
@@ -153,7 +212,7 @@ export default function Section8Evidence() {
                             </ul>
                         </div>
                         <div className="space-y-2">
-                            <p className="text-[10px] font-black text-slate-600 uppercase tracking-widest">What Your Evidence Should Show</p>
+                            <p className="report-label !text-slate-600">What Your Evidence Should Show</p>
                             <ul className="text-xs font-semibold text-slate-500 space-y-1 list-disc list-inside">
                                 <li>The activity took place</li>
                                 <li>You participated</li>
@@ -173,16 +232,17 @@ export default function Section8Evidence() {
                             }
                         }}
                     />
+                    <FieldError message={getFieldError('section8.evidence_files')} />
 
                     {/* Evidence Files List */}
                     {evidence_files && evidence_files.length > 0 && (
                         <div className="space-y-3 animate-in fade-in slide-in-from-top-2">
-                            <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Attached Evidence ({evidence_files.length})</Label>
+                            <Label className="report-label">Attached Evidence ({evidence_files.length})</Label>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 {evidence_files.map((file: File, fIdx: number) => (
                                     <div key={fIdx} className="flex items-center justify-between p-3 bg-slate-50 border border-slate-100 rounded-xl group/file">
                                         <div className="flex items-center gap-3 overflow-hidden">
-                                            <div className="w-8 h-8 rounded-lg bg-amber-100 text-amber-600 flex items-center justify-center shrink-0">
+                                            <div className="w-8 h-8 rounded-lg bg-report-primary-soft text-report-primary flex items-center justify-center shrink-0">
                                                 <ImageIcon className="w-4 h-4" />
                                             </div>
                                             <div className="overflow-hidden">
@@ -206,9 +266,9 @@ export default function Section8Evidence() {
                         </div>
                     )}
                     <div className="flex items-center justify-between px-2">
-                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Upload Status</span>
+                        <span className="report-label">Upload Status</span>
                         {evidence_files?.length ? (
-                            <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-3 py-1 rounded-lg border border-emerald-100 flex items-center gap-1.5">
+                            <span className="text-[10px] font-black text-report-primary bg-report-primary-soft px-3 py-1 rounded-lg border border-report-primary-border flex items-center gap-1.5">
                                 <CheckCircle2 className="w-3.5 h-3.5" /> {evidence_files.length} Files Attached
                             </span>
                         ) : (
@@ -223,13 +283,13 @@ export default function Section8Evidence() {
             {/* ─── Step 2: Classify Evidence ─────────────────────────────────── */}
             <div className="space-y-4">
                 <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center font-black text-[10px]">8.2</div>
-                    <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Step 2 — Classify the Evidence (Required)</h3>
+                    <div className="w-8 h-8 rounded-full bg-report-primary text-white flex items-center justify-center font-black text-[10px]">8.2</div>
+                    <h3 className="report-h3">Step 2 — Classify the Evidence (Required)</h3>
                 </div>
                 <div className="bg-white rounded-[2.5rem] border-2 border-slate-100 p-8 shadow-sm space-y-6">
                     <div className="space-y-1">
-                        <Label className="text-sm font-black text-slate-900 uppercase tracking-tight">Evidence Type</Label>
-                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Select all categories that apply (At least one required).</p>
+                        <Label className="report-h3 !text-sm">Evidence Type</Label>
+                        <p className="report-help">Select all categories that apply (At least one required).</p>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         {evidenceOptions.map(opt => (
@@ -239,18 +299,18 @@ export default function Section8Evidence() {
                                 className={clsx(
                                     "flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all text-left",
                                     (evidence_types || []).includes(opt.id)
-                                        ? "border-amber-500 bg-amber-50 text-amber-900 shadow-sm"
-                                        : "border-slate-100 bg-slate-50 text-slate-600 hover:border-slate-300 hover:bg-white"
+                                        ? "border-report-primary bg-report-primary-soft text-report-primary shadow-sm shadow-report-primary-shadow"
+                                        : "border-slate-100 bg-slate-50 text-slate-600 hover:border-report-primary-border hover:bg-white"
                                 )}
                             >
                                 <div className={clsx(
                                     "w-4 h-4 rounded-sm border-2 flex items-center justify-center flex-shrink-0",
-                                    (evidence_types || []).includes(opt.id) ? "border-amber-500 bg-amber-500" : "border-slate-300 bg-white"
+                                    (evidence_types || []).includes(opt.id) ? "border-report-primary bg-report-primary" : "border-slate-300 bg-white"
                                 )}>
                                     {(evidence_types || []).includes(opt.id) && <CheckCircle2 className="w-3 h-3 text-white" />}
                                 </div>
                                 <opt.icon className="w-4 h-4 opacity-50 flex-shrink-0" />
-                                <span className="text-[10px] font-black uppercase tracking-widest">{opt.id}</span>
+                                <span className="report-label">{opt.id}</span>
                             </button>
                         ))}
                     </div>
@@ -261,13 +321,13 @@ export default function Section8Evidence() {
             {/* ─── Step 3: Describe Evidence ─────────────────────────────────── */}
             <div className="space-y-4">
                 <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center font-black text-[10px]">8.3</div>
-                    <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Step 3 — Describe the Evidence</h3>
+                    <div className="w-8 h-8 rounded-full bg-report-primary text-white flex items-center justify-center font-black text-[10px]">8.3</div>
+                    <h3 className="report-h3">Step 3 — Describe the Evidence</h3>
                 </div>
                 <div className="bg-white rounded-[2.5rem] border-2 border-slate-100 p-8 shadow-sm space-y-4">
                     <div className="space-y-1">
-                        <Label className="text-sm font-black text-slate-900 uppercase tracking-tight">Evidence Description (Mandatory)</Label>
-                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider max-w-2xl leading-relaxed">
+                        <Label className="report-h3 !text-sm">Evidence Description (Mandatory)</Label>
+                        <p className="report-help max-w-2xl leading-relaxed">
                             Briefly explain what this evidence shows, how it relates to your activity, and what it verifies (attendance, outputs, outcomes, resource use).
                         </p>
                     </div>
@@ -276,17 +336,17 @@ export default function Section8Evidence() {
                         value={description}
                         onChange={e => update('description', e.target.value)}
                         rows={4}
-                        className="w-full h-32 bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 font-medium text-slate-700 text-sm outline-none focus:border-amber-200 transition-all resize-none"
+                        className="w-full h-32 bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 font-medium text-slate-700 text-sm outline-none focus:border-report-primary-border transition-all resize-none"
                     />
                     <div className="flex items-center justify-between px-2">
                         <span className={clsx(
-                            "text-[10px] font-black uppercase tracking-widest",
-                            wordCount >= 50 && wordCount <= 80 ? "text-emerald-600" : wordCount > 80 ? "text-red-500" : "text-amber-500"
+                            "report-label",
+                            wordCount >= 50 && wordCount <= 80 ? "text-report-primary" : wordCount > 80 ? "text-red-500" : "text-amber-500"
                         )}>
                             {wordCount} / 80 words (Min 50)
                         </span>
                         {wordCount >= 50 && wordCount <= 80 && (
-                            <span className="text-[10px] font-black text-emerald-600 flex items-center gap-1">
+                            <span className="text-[10px] font-black text-report-primary flex items-center gap-1">
                                 <CheckCircle2 className="w-3 h-3" /> Valid length
                             </span>
                         )}
@@ -298,13 +358,13 @@ export default function Section8Evidence() {
             {/* ─── Step 4: Ethical Compliance ────────────────────────────────── */}
             <div className="space-y-4">
                 <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center font-black text-[10px]">8.4</div>
-                    <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Step 4 — Ethical & Consent Confirmation</h3>
+                    <div className="w-8 h-8 rounded-full bg-report-primary text-white flex items-center justify-center font-black text-[10px]">8.4</div>
+                    <h3 className="report-h3">Step 4 — Ethical & Consent Confirmation</h3>
                 </div>
                 <div className="bg-white rounded-[2.5rem] border-2 border-slate-100 p-8 shadow-sm space-y-6">
                     <div className="space-y-1">
-                        <Label className="text-sm font-black text-slate-900 uppercase tracking-tight">Ethical Declaration (All required)</Label>
-                        <p className="text-[10px] text-amber-600 font-black uppercase tracking-widest flex items-center gap-1">
+                        <Label className="report-h3 !text-sm">Ethical Declaration (All required)</Label>
+                        <p className="report-label !text-report-primary !flex items-center gap-1">
                             <AlertCircle className="w-3 h-3" /> False or misleading submissions may result in rejection and institutional action.
                         </p>
                     </div>
@@ -317,12 +377,12 @@ export default function Section8Evidence() {
                                     onClick={() => updateEthical(opt.key, !isChecked)}
                                     className={clsx(
                                         "flex items-start gap-4 px-5 py-4 rounded-xl border-2 transition-all text-left",
-                                        isChecked ? "border-amber-500 bg-amber-50 shadow-sm" : "border-slate-100 bg-slate-50 hover:bg-white hover:border-slate-300"
+                                        isChecked ? "border-report-primary bg-report-primary-soft shadow-sm shadow-report-primary-shadow" : "border-slate-100 bg-slate-50 hover:bg-white hover:border-slate-300"
                                     )}
                                 >
                                     <div className={clsx(
                                         "w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 mt-0.5 transition-all",
-                                        isChecked ? "border-amber-500 bg-amber-500" : "border-slate-300 bg-white"
+                                        isChecked ? "border-report-primary bg-report-primary" : "border-slate-300 bg-white"
                                     )}>
                                         {isChecked && <CheckCircle2 className="w-4 h-4 text-white" />}
                                     </div>
@@ -339,11 +399,11 @@ export default function Section8Evidence() {
             {/* ─── Step 5: Visibility Preference ─────────────────────────────── */}
             <div className="space-y-4">
                 <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center font-black text-[10px]">8.5</div>
-                    <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Step 5 — Media Visibility Preference</h3>
+                    <div className="w-8 h-8 rounded-full bg-report-primary text-white flex items-center justify-center font-black text-[10px]">8.5</div>
+                    <h3 className="report-h3">Step 5 — Media Visibility Preference</h3>
                 </div>
                 <div className="bg-white rounded-[2.5rem] border-2 border-slate-100 p-8 shadow-sm space-y-6">
-                    <Label className="text-sm font-black text-slate-900 uppercase tracking-tight">Evidence Usage Permission</Label>
+                    <Label className="report-h3 !text-sm">Evidence Usage Permission</Label>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         {visibilityOptions.map(opt => (
                             <button
@@ -372,14 +432,14 @@ export default function Section8Evidence() {
             {/* ─── Step 6: External Confirmation ─────────────────────────────── */}
             <div className="space-y-4">
                 <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center font-black text-[10px]">8.6</div>
-                    <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Step 6 — Partner Verification (Optional)</h3>
+                    <div className="w-8 h-8 rounded-full bg-report-primary text-white flex items-center justify-center font-black text-[10px]">8.6</div>
+                    <h3 className="report-h3">Step 6 — Partner Verification (Optional)</h3>
                 </div>
                 <div className="bg-white rounded-[2.5rem] border-2 border-slate-100 p-8 shadow-sm space-y-6">
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                         <div className="space-y-1">
-                            <Label className="text-sm font-black text-slate-900 uppercase tracking-tight">Did a partner verify this project?</Label>
-                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">External verification significantly strengthens credibility.</p>
+                            <Label className="report-h3 !text-sm">Did a partner verify this project?</Label>
+                            <p className="report-help">External verification significantly strengthens credibility.</p>
                         </div>
                         <div className="flex bg-slate-50 p-1.5 rounded-2xl border-2 border-slate-100 gap-1.5 min-w-[200px]">
                             <button
@@ -390,7 +450,7 @@ export default function Section8Evidence() {
                             </button>
                             <button
                                 type="button" onClick={() => update('partner_verification', true)}
-                                className={clsx("flex-1 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all", partner_verification ? "bg-emerald-600 shadow-md shadow-emerald-100 text-white" : "text-slate-400 hover:text-slate-600")}
+                                className={clsx("flex-1 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all", partner_verification ? "bg-report-primary shadow-md shadow-report-primary-shadow text-white" : "text-slate-400 hover:text-slate-600")}
                             >
                                 Yes
                             </button>
@@ -400,15 +460,15 @@ export default function Section8Evidence() {
                     {partner_verification && (
                         <div className="pt-6 border-t-2 border-slate-50 space-y-6 animate-in fade-in slide-in-from-top-4 duration-500">
                             <div className="space-y-3">
-                                <Label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Verification Type</Label>
+                                <Label className="report-label">Verification Type</Label>
                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                                     {verificationTypes.map(v => (
                                         <button
                                             key={v} type="button"
                                             onClick={() => update('partner_verification_type', v)}
                                             className={clsx(
-                                                "px-3 py-3 rounded-xl border-2 text-[9px] font-black uppercase tracking-widest text-center transition-all",
-                                                partner_verification_type === v ? "border-emerald-500 bg-emerald-50 text-emerald-800" : "border-slate-100 bg-slate-50 text-slate-500 hover:border-slate-300 hover:bg-white"
+                                                "px-4 py-2 rounded-xl report-label transition-all text-center",
+                                                partner_verification_type === v ? "border-report-primary bg-report-primary-soft text-report-primary" : "border-slate-100 bg-slate-50 text-slate-500 hover:border-slate-300 hover:bg-white"
                                             )}
                                         >
                                             {v}
@@ -428,17 +488,17 @@ export default function Section8Evidence() {
                             {/* Partner Files List */}
                             {partner_verification_files && partner_verification_files.length > 0 && (
                                 <div className="space-y-3 animate-in fade-in slide-in-from-top-2">
-                                    <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Partner Documents ({partner_verification_files.length})</Label>
+                                    <Label className="report-label">Partner Documents ({partner_verification_files.length})</Label>
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                         {partner_verification_files.map((file: File, fIdx: number) => (
-                                            <div key={fIdx} className="flex items-center justify-between p-3 bg-emerald-50 border border-emerald-100 rounded-xl group/file">
+                                            <div key={fIdx} className="flex items-center justify-between p-3 bg-report-primary-soft border border-report-primary-border rounded-xl group/file">
                                                 <div className="flex items-center gap-3 overflow-hidden">
-                                                    <div className="w-8 h-8 rounded-lg bg-white text-emerald-600 flex items-center justify-center shrink-0 shadow-sm">
+                                                    <div className="w-8 h-8 rounded-lg bg-white text-report-primary flex items-center justify-center shrink-0 shadow-sm">
                                                         <FileText className="w-4 h-4" />
                                                     </div>
                                                     <div className="overflow-hidden">
-                                                        <p className="text-xs font-bold text-emerald-900 truncate">{file.name}</p>
-                                                        <p className="text-[9px] font-medium text-emerald-500 uppercase">{(file.size / (1024 * 1024)).toFixed(2)} MB</p>
+                                                        <p className="text-xs font-bold text-report-primary truncate">{file.name}</p>
+                                                        <p className="text-[9px] font-medium text-report-primary-border uppercase">{(file.size / (1024 * 1024)).toFixed(2)} MB</p>
                                                     </div>
                                                 </div>
                                                 <button
@@ -447,7 +507,7 @@ export default function Section8Evidence() {
                                                         const kept = partner_verification_files.filter((_: any, i: number) => i !== fIdx);
                                                         update('partner_verification_files', kept);
                                                     }}
-                                                    className="w-7 h-7 rounded-lg bg-white text-slate-400 flex items-center justify-center hover:bg-red-50 hover:text-red-500 transition-all border border-emerald-100"
+                                                    className="w-7 h-7 rounded-lg bg-white text-slate-400 flex items-center justify-center hover:bg-red-50 hover:text-red-500 transition-all border border-report-primary-border"
                                                 >
                                                     <Trash2 className="w-3.5 h-3.5" />
                                                 </button>
@@ -465,10 +525,10 @@ export default function Section8Evidence() {
             <div className="pt-8 border-t-2 border-slate-100 space-y-6">
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 rounded-xl bg-slate-900 text-white flex items-center justify-center shadow-lg shadow-slate-200">
+                        <div className="w-10 h-10 rounded-xl bg-report-primary text-white flex items-center justify-center shadow-lg shadow-report-primary-shadow">
                             <ShieldCheck className="w-5 h-5" />
                         </div>
-                        <h3 className="text-lg font-black text-slate-900 uppercase tracking-tight">System-Generated Evidence Status</h3>
+                        <h3 className="report-h3 !text-lg">System-Generated Evidence Status</h3>
                     </div>
                     <span className="px-3 py-1.5 bg-slate-100 rounded-xl text-[9px] font-black text-slate-500 uppercase tracking-widest">Read-Only</span>
                 </div>
@@ -476,23 +536,23 @@ export default function Section8Evidence() {
                 <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
                     {/* Evidence Profile Grid */}
                     <div className="md:col-span-8 bg-white border-2 border-slate-100 rounded-[2.5rem] p-8 space-y-6">
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Evidence Profile</p>
+                        <p className="report-label !text-slate-400 !mb-4">Evidence Profile</p>
                         <div className="grid grid-cols-2 gap-4">
-                            <div className="bg-slate-50 rounded-2xl p-5 space-y-1">
-                                <p className="text-2xl font-black text-slate-900">{evidence_files?.length || 0}</p>
-                                <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Files Submitted</p>
+                            <div className="bg-report-primary-soft rounded-2xl p-5 space-y-1">
+                                <p className="text-2xl font-black text-report-primary">{evidence_files?.length || 0}</p>
+                                <p className="report-label !text-[8px] !text-report-primary-border">Files Submitted</p>
                             </div>
-                            <div className="bg-slate-50 rounded-2xl p-5 space-y-1">
-                                <p className="text-2xl font-black text-slate-900">{evidence_types?.length || 0}</p>
-                                <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Types Covered</p>
+                            <div className="bg-report-primary-soft rounded-2xl p-5 space-y-1">
+                                <p className="text-2xl font-black text-report-primary">{evidence_types?.length || 0}</p>
+                                <p className="report-label !text-[8px] !text-report-primary-border">Types Covered</p>
                             </div>
-                            <div className={clsx("rounded-2xl p-5 space-y-1", allEthicalChecked ? "bg-emerald-50" : "bg-amber-50")}>
-                                <p className={clsx("text-2xl font-black", allEthicalChecked ? "text-emerald-700" : "text-amber-700")}>{allEthicalChecked ? "Yes" : "No"}</p>
-                                <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Ethical Confirmed</p>
+                            <div className={clsx("rounded-2xl p-5 space-y-1", allEthicalChecked ? "bg-report-primary-soft" : "bg-amber-50")}>
+                                <p className={clsx("text-2xl font-black", allEthicalChecked ? "text-report-primary" : "text-amber-700")}>{allEthicalChecked ? "Yes" : "No"}</p>
+                                <p className="report-label !text-[8px] !text-slate-500">Ethical Confirmed</p>
                             </div>
-                            <div className={clsx("rounded-2xl p-5 space-y-1", partner_verification ? "bg-emerald-50" : "bg-slate-50")}>
-                                <p className={clsx("text-2xl font-black", partner_verification ? "text-emerald-700" : "text-slate-900")}>{partner_verification ? "Verified" : "None"}</p>
-                                <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Partner Status</p>
+                            <div className={clsx("rounded-2xl p-5 space-y-1", partner_verification ? "bg-report-primary-soft" : "bg-slate-50")}>
+                                <p className={clsx("text-2xl font-black", partner_verification ? "text-report-primary" : "text-slate-900")}>{partner_verification ? "Verified" : "None"}</p>
+                                <p className="report-label !text-[8px] !text-slate-500">Partner Status</p>
                             </div>
                         </div>
                     </div>
@@ -502,21 +562,52 @@ export default function Section8Evidence() {
                         <div className={clsx("rounded-[2.5rem] p-8 border-2 flex-1 flex flex-col items-center justify-center text-center space-y-3", classification.color)}>
                             <ShieldCheck className="w-8 h-8 opacity-80" />
                             <div className="space-y-1">
-                                <p className="text-[9px] font-black uppercase tracking-widest opacity-60">Verification Strength</p>
+                                <p className="report-label !text-[9px] !opacity-60">Verification Strength</p>
                                 <p className="text-lg font-black uppercase tracking-tight">{classification.label}</p>
-                                <p className="text-[9px] font-semibold opacity-80 uppercase pt-2">{classification.desc}</p>
+                                <p className="report-label !text-[9px] !opacity-80 !pt-2">{classification.desc}</p>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                {/* Auto narrative */}
-                <div className="bg-slate-900 rounded-[2.5rem] p-8 relative overflow-hidden">
-                    <div className="absolute right-0 top-0 w-40 h-40 bg-white/5 rounded-full -mr-20 -mt-20 blur-3xl" />
-                    <span className="absolute -top-4 -left-2 text-6xl font-serif text-white/10 select-none">"</span>
-                    <p className="relative z-10 text-base font-bold text-white leading-relaxed font-serif">
-                        {autoNarrative}
-                    </p>
+            </div>
+
+            {/* ─── Auto-Generated Summary ────────────────────────────── */}
+            <div className="pt-16 border-t-2 border-slate-100">
+                <div className="flex items-center justify-between mb-8">
+                    <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 rounded-xl bg-report-primary text-white flex items-center justify-center shadow-lg shadow-report-primary-shadow">
+                            <ShieldCheck className="w-6 h-6" />
+                        </div>
+                        <h3 className="report-h3 !text-xl !italic">Evidence Summary</h3>
+                    </div>
+                    <div className="flex items-center gap-3">
+                        <button
+                            type="button"
+                            onClick={handleGenerateAISummary}
+                            disabled={isGenerating || (evidence_files?.length || 0) === 0}
+                            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-report-primary text-white text-[10px] font-black uppercase tracking-widest hover:bg-report-primary/90 disabled:opacity-50 transition-all shadow-lg shadow-report-primary-shadow"
+                        >
+                            {isGenerating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5 font-black" />}
+                            Improve summary with AI
+                        </button>
+                        <div className="px-5 py-2.5 rounded-xl bg-slate-900 text-white text-[10px] font-black uppercase tracking-widest border border-slate-800">
+                            Auto-Generated
+                        </div>
+                    </div>
+                </div>
+
+                <div className="bg-white border-2 border-slate-200 rounded-[3rem] p-12 relative overflow-hidden shadow-xl space-y-10 group">
+                    <div className="absolute -bottom-10 -right-10 opacity-5 group-hover:opacity-10 transition-opacity duration-1000 rotate-12">
+                        <ShieldCheck className="w-80 h-80 text-slate-900" />
+                    </div>
+                    <div className="relative z-10 space-y-6">
+                        <span className="absolute -top-10 -left-6 text-7xl font-serif text-slate-100 select-none">“</span>
+                        <p className="report-ai-text">
+                            {autoNarrative}
+                        </p>
+                        <span className="absolute -bottom-16 -right-6 text-7xl font-serif text-slate-100 select-none rotate-180">“</span>
+                    </div>
                 </div>
             </div>
 

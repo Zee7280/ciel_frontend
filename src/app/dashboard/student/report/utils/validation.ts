@@ -156,6 +156,16 @@ export function validateSection8(data: any): ValidationResult {
     if (!data.evidence_files?.length) {
         errors.push({ field: 'evidence_files', message: 'At least one evidence file is mandatory' });
     }
+    if (!data.evidence_types?.length) {
+        errors.push({ field: 'evidence_types', message: 'At least one evidence type is mandatory' });
+    }
+    const wordCount = (data.description || '').trim().split(/\s+/).filter((w: string) => w.length > 0).length;
+    if (wordCount < 50 || wordCount > 80) {
+        errors.push({ field: 'description', message: `Description must be between 50 and 80 words (Currently ${wordCount})` });
+    }
+    if (!data.media_visible) {
+        errors.push({ field: 'media_visible', message: 'Media visibility preference is required' });
+    }
     const ethics = data.ethical_compliance || {};
     if (!ethics.authentic || !ethics.informed_consent || !ethics.no_harm || !ethics.privacy_respected) {
         errors.push({ field: 'ethical_compliance', message: 'All ethical compliance checks must be accepted' });

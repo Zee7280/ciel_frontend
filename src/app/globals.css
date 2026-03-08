@@ -4,6 +4,15 @@
   --font-sans: var(--font-outfit);
   --shadow-premium: 0 10px 40px -10px rgba(0, 0, 0, 0.08);
   --shadow-premium-hover: 0 20px 40px -10px rgba(0, 0, 0, 0.12);
+
+  /* Unified Report Theme */
+  --color-report-primary: #4f46e5;
+  /* indigo-600 */
+  --color-report-primary-soft: #eef2ff;
+  /* indigo-50 */
+  --color-report-primary-border: #e0e7ff;
+  /* indigo-100 */
+  --color-report-primary-shadow: rgba(79, 70, 229, 0.1);
 }
 
 :root {
@@ -100,5 +109,67 @@ body {
     50% {
       transform: translateY(-10px);
     }
+  }
+
+  /* Standardized Report Typography */
+  .report-h2 {
+    font-family: var(--font-sans);
+    font-size: var(--text-3xl);
+    font-weight: 900;
+    /* black */
+    color: var(--color-slate-900);
+    letter-spacing: var(--letter-spacing-tight);
+    text-transform: uppercase;
+  }
+
+  .report-h3 {
+    font-family: var(--font-sans);
+    font-size: var(--text-sm);
+    font-weight: 900;
+    /* black */
+    color: var(--color-slate-900);
+    text-transform: uppercase;
+    letter-spacing: var(--letter-spacing-widest);
+  }
+
+  .report-label {
+    font-family: var(--font-sans);
+    font-size: 10px;
+    font-weight: 900;
+    /* black */
+    color: var(--color-slate-400);
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+  }
+
+  .report-body {
+    font-family: var(--font-sans);
+    font-size: var(--text-sm);
+    font-weight: 700;
+    /* bold */
+    color: var(--color-slate-800);
+    line-height: var(--leading-relaxed);
+  }
+
+  .report-help {
+    font-family: var(--font-sans);
+    font-size: 10px;
+    font-weight: 600;
+    /* semibold */
+    color: var(--color-slate-400);
+    text-transform: uppercase;
+    letter-spacing: var(--letter-spacing-wider);
+    padding-left: 0.25rem;
+  }
+
+  .report-ai-text {
+    font-family: var(--font-sans);
+    font-size: var(--text-xl);
+    font-weight: 700;
+    /* bold */
+    color: var(--color-slate-800);
+    line-height: 1.7;
+    letter-spacing: var(--letter-spacing-tight);
+    font-style: italic;
   }
 }

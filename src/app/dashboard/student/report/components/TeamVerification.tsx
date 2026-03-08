@@ -38,7 +38,7 @@ export default function TeamVerification({
                         key={idx}
                         className={clsx(
                             "rounded-[2rem] border-2 transition-all overflow-hidden",
-                            member.verified ? "border-emerald-100 bg-emerald-50/20" : "border-slate-100 bg-white"
+                            member.verified ? "border-report-primary-border bg-report-primary-soft/20" : "border-slate-100 bg-white"
                         )}
                     >
                         {/* Accordion Header */}
@@ -49,20 +49,20 @@ export default function TeamVerification({
                             <div className="flex items-center gap-4">
                                 <div className={clsx(
                                     "w-10 h-10 rounded-xl flex items-center justify-center",
-                                    member.verified ? "bg-emerald-600 text-white" : "bg-slate-100 text-slate-400"
+                                    member.verified ? "bg-report-primary text-white" : "bg-slate-100 text-slate-400"
                                 )}>
                                     {member.verified ? <CheckCircle2 className="w-5 h-5" /> : <Users className="w-5 h-5" />}
                                 </div>
                                 <div>
-                                    <h4 className="text-sm font-black text-slate-900 uppercase">
+                                    <h4 className="report-label !text-slate-900 !normal-case">
                                         {member.fullName || member.name || `Student ${idx + 1}`}
                                     </h4>
                                     <div className="flex items-center gap-2 mt-0.5">
                                         <div className={clsx(
                                             "w-2 h-2 rounded-full",
-                                            member.verified ? "bg-emerald-500" : "bg-amber-400"
+                                            member.verified ? "bg-report-primary" : "bg-amber-400"
                                         )}></div>
-                                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                                        <p className="report-label">
                                             {member.verified ? 'Verified' : 'Draft - Identity Required'}
                                         </p>
                                     </div>
@@ -83,9 +83,9 @@ export default function TeamVerification({
                         {/* Accordion Content */}
                         {expandedIndex === idx && (
                             <div className="p-8 pt-0 border-t border-slate-50 animate-in slide-in-from-top-4 duration-500">
-                                <div className="mb-6 flex items-center gap-2 px-4 py-2 bg-blue-50 rounded-xl border border-blue-100">
-                                    <Shield className="w-4 h-4 text-blue-600" />
-                                    <p className="text-[10px] font-black text-blue-800 uppercase tracking-widest">GATEWAY: OTP Verification Required for this member</p>
+                                <div className="mb-6 flex items-center gap-2 px-4 py-2 bg-report-primary-soft rounded-xl border border-report-primary-border">
+                                    <Shield className="w-4 h-4 text-report-primary" />
+                                    <p className="text-[10px] font-black text-report-primary uppercase tracking-widest">GATEWAY: OTP Verification Required for this member</p>
                                 </div>
                                 <IdentityVerification
                                     projectId={projectId}

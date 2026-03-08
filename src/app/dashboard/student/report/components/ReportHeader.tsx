@@ -2,14 +2,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/
 
 export default function ReportHeader() {
     return (
-        <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-100">
+        <Card className="bg-report-primary-soft border-report-primary-border">
             <CardHeader>
-                <CardTitle className="text-blue-900">SECTION 0 — INSTRUCTIONS (Student Guidance)</CardTitle>
-                <CardDescription className="text-blue-700">
+                <CardTitle className="report-h3 !text-report-primary">SECTION 0 — INSTRUCTIONS (Student Guidance)</CardTitle>
+                <CardDescription className="report-label !text-report-primary">
                     Why this exists: Helps students fill out the report accurately.
                 </CardDescription>
             </CardHeader>
-            <CardContent className="text-blue-800 space-y-4">
+            <CardContent className="text-report-primary space-y-4">
                 <p className="font-medium">
                     “Fill this report truthfully with documented evidence. Provide quantitative data where possible (counts, numbers, hours) and qualitative explanations that clearly describe what happened, why it happened, and how it contributed to broader outcomes.”
                 </p>

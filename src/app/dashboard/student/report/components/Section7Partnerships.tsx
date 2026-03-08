@@ -108,10 +108,10 @@ function PartnerCard({
             {/* Card header */}
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                    <div className="w-7 h-7 rounded-full bg-indigo-600 text-white flex items-center justify-center font-black text-[10px]">
+                    <div className="w-7 h-7 rounded-full bg-report-primary text-white flex items-center justify-center font-black text-[10px] shadow-sm">
                         {idx + 1}
                     </div>
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Partner Entry</span>
+                    <span className="report-label">Partner Entry</span>
                 </div>
                 {canRemove && (
                     <button
@@ -125,7 +125,7 @@ function PartnerCard({
 
             {/* Partner Name */}
             <div className="space-y-2">
-                <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Partner Name (Official Registered Name) — Required</Label>
+                <Label className="report-label">Partner Name (Official Registered Name) — Required</Label>
                 <input
                     type="text"
                     placeholder="e.g. XYZ Welfare Trust, District Health Office..."
@@ -134,7 +134,7 @@ function PartnerCard({
                     className="w-full h-13 bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-3 font-bold text-slate-700 text-sm outline-none focus:border-indigo-200 transition-all"
                 />
                 {p.name && (
-                    <p className="text-[9px] text-slate-400 font-semibold px-1">Avoid abbreviations unless officially registered.</p>
+                    <p className="report-help !px-1">Avoid abbreviations unless officially registered.</p>
                 )}
                 <FieldError message={getFieldError(`partners.${idx}.name`)} />
             </div>
@@ -144,7 +144,7 @@ function PartnerCard({
                 <div className="space-y-6">
                     {/* Partner Type */}
                     <div className="space-y-3">
-                        <Label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Partner Type</Label>
+                        <Label className="report-label">Partner Type</Label>
                         <select
                             value={p.type}
                             onChange={e => onUpdate('type', e.target.value)}
@@ -165,20 +165,21 @@ function PartnerCard({
 
                     {/* Role in Project */}
                     <div className="space-y-3">
-                        <Label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Role in Project (Primary Role)</Label>
+                        <Label className="report-label">Role in Project (Primary Role)</Label>
                         <div className="grid grid-cols-1 gap-1.5">
-                            {roleOptions.map(role => (
+                            {roleOptions.map(opt => (
                                 <button
-                                    key={role} type="button"
-                                    onClick={() => onUpdate('role', role)}
+                                    key={opt}
+                                    type="button"
+                                    onClick={() => onUpdate('role', opt)}
                                     className={clsx(
-                                        "px-3 py-2.5 rounded-xl border-2 text-[9px] font-black uppercase tracking-wider text-left transition-all",
-                                        p.role === role
-                                            ? "border-indigo-600 bg-indigo-50 text-indigo-900"
-                                            : "border-slate-50 bg-slate-50 text-slate-500 hover:bg-slate-100"
+                                        "px-3 py-2 rounded-xl border-2 report-label !text-[9px] text-left transition-all",
+                                        p.role === opt
+                                            ? "border-report-primary bg-report-primary-soft/50 text-slate-900 shadow-sm"
+                                            : "border-slate-100 bg-white"
                                     )}
                                 >
-                                    {role}
+                                    {opt}
                                 </button>
                             ))}
                         </div>
@@ -189,23 +190,23 @@ function PartnerCard({
                 <div className="space-y-6">
                     {/* Contribution Type — multi-select */}
                     <div className="space-y-3">
-                        <Label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Contribution Type (Select All That Apply)</Label>
-                        <p className="text-[9px] text-slate-400 font-semibold">At least one must be selected.</p>
+                        <Label className="report-label">Contribution Type (Select All That Apply)</Label>
+                        <p className="report-help">At least one must be selected.</p>
                         <div className="grid grid-cols-1 gap-1.5">
                             {contributionOptions.map(opt => (
                                 <button
                                     key={opt} type="button"
                                     onClick={() => toggleContribution(opt)}
                                     className={clsx(
-                                        "flex items-center gap-2 px-3 py-2 rounded-xl border-2 text-[9px] font-black uppercase tracking-wider text-left transition-all",
+                                        "flex items-center gap-2 px-3 py-2 rounded-xl border-2 report-label !text-[9px] text-left transition-all",
                                         contribution.includes(opt)
-                                            ? "border-indigo-600 bg-indigo-50 text-indigo-900"
-                                            : "border-slate-50 bg-slate-50 text-slate-500 hover:bg-slate-100"
+                                            ? "border-report-primary bg-report-primary-soft/50 text-slate-900 shadow-sm"
+                                            : "border-slate-100 bg-white"
                                     )}
                                 >
                                     <div className={clsx(
                                         "w-3 h-3 rounded-sm border-2 flex items-center justify-center flex-shrink-0",
-                                        contribution.includes(opt) ? "border-indigo-600 bg-indigo-600" : "border-slate-300"
+                                        contribution.includes(opt) ? "border-report-primary bg-report-primary shadow-lg shadow-report-primary-shadow" : "border-slate-300"
                                     )}>
                                         {contribution.includes(opt) && <CheckCircle2 className="w-2 h-2 text-white" />}
                                     </div>
@@ -217,25 +218,27 @@ function PartnerCard({
 
                     {/* Verification Level */}
                     <div className="space-y-3">
-                        <Label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Verification Level</Label>
-                        <p className="text-[9px] text-slate-400 font-semibold">Higher verification strengthens partnership credibility.</p>
+                        <Label className="report-label">Verification Level</Label>
+                        <p className="report-help">Higher verification strengthens partnership credibility.</p>
                         <div className="grid grid-cols-1 gap-1.5">
                             {verificationOptions.map(v => (
                                 <button
                                     key={v} type="button"
                                     onClick={() => onUpdate('verification', v)}
                                     className={clsx(
-                                        "flex items-center gap-2 px-3 py-2 rounded-xl border-2 text-[9px] font-black uppercase tracking-wider text-left transition-all",
+                                        "flex items-center gap-2 px-3 py-2 rounded-xl border-2 report-label !text-[9px] text-left transition-all",
                                         p.verification === v
-                                            ? "border-indigo-600 bg-indigo-50 text-indigo-900"
-                                            : "border-slate-50 bg-slate-50 text-slate-500 hover:bg-slate-100"
+                                            ? "border-report-primary bg-report-primary-soft/50 text-slate-900 shadow-sm"
+                                            : "border-slate-100 bg-white"
                                     )}
                                 >
-                                    {p.verification === v
-                                        ? <ShieldCheck className="w-3 h-3 text-indigo-600 flex-shrink-0" />
-                                        : <div className="w-3 h-3 rounded-full border-2 border-slate-300 flex-shrink-0" />
-                                    }
-                                    {v}
+                                    <div className="flex items-center gap-2">
+                                        {p.verification === v
+                                            ? <ShieldCheck className="w-3.5 h-3.5 text-report-primary flex-shrink-0" />
+                                            : <div className="w-3 h-3 rounded-full border-2 border-slate-300 flex-shrink-0" />
+                                        }
+                                        {v}
+                                    </div>
                                 </button>
                             ))}
                         </div>
@@ -304,21 +307,21 @@ export default function Section7Partnerships() {
         <div className="space-y-12 pb-16">
             {/* ─── Header ─────────────────────────────────────────────────── */}
             <div className="flex items-center gap-4">
-                <div className="w-14 h-14 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shadow-xl shadow-indigo-100 ring-4 ring-indigo-50">
+                <div className="w-14 h-14 rounded-2xl bg-report-primary text-white flex items-center justify-center shadow-xl shadow-report-primary-shadow ring-4 ring-report-primary-soft">
                     <Handshake className="w-7 h-7" />
                 </div>
                 <div>
-                    <h2 className="text-3xl font-black text-slate-900 tracking-tight uppercase">Section 7 — Partnerships & Collaboration</h2>
-                    <p className="text-slate-500 font-bold uppercase tracking-[0.15em] text-[10px]">Measurable Multi-Stakeholder Engagement (SDG 17)</p>
+                    <h2 className="report-h2">Section 7 — Partnerships & Collaboration</h2>
+                    <p className="report-label">Measurable Multi-Stakeholder Engagement (SDG 17)</p>
                 </div>
             </div>
 
             {/* ─── Purpose note ────────────────────────────────────────────── */}
-            <div className="p-4 bg-indigo-50 border border-indigo-100 rounded-2xl flex items-start gap-3">
-                <Info className="w-4 h-4 text-indigo-600 shrink-0 mt-0.5" />
+            <div className="p-4 bg-report-primary-soft border border-report-primary-border rounded-2xl flex items-start gap-3">
+                <Info className="w-4 h-4 text-report-primary shrink-0 mt-0.5" />
                 <div className="space-y-1">
-                    <p className="text-[9px] font-black text-indigo-800 uppercase tracking-widest">⚠ Only include partners who actively contributed</p>
-                    <p className="text-[9px] text-indigo-700 font-semibold">
+                    <p className="report-label !text-report-primary">⚠ Only include partners who actively contributed</p>
+                    <p className="report-help !text-report-primary">
                         Do not list organizations that were only informed, mentioned, or tagged.
                         Include only those who provided support, coordination, expertise, resources, hosting, or verification.
                     </p>
@@ -328,11 +331,11 @@ export default function Section7Partnerships() {
             {/* ─── Step 1: Partnership Confirmation ────────────────────────── */}
             <div className="space-y-4">
                 <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center font-black text-[10px]">7.0</div>
-                    <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Step 1 — Partnership Confirmation</h3>
+                    <div className="w-8 h-8 rounded-full bg-report-primary text-white flex items-center justify-center font-black text-[10px]">7.0</div>
+                    <h3 className="report-h3">Step 1 — Partnership Confirmation</h3>
                 </div>
                 <div className="bg-white rounded-[2.5rem] border-2 border-slate-100 p-8 shadow-sm space-y-4">
-                    <Label className="text-sm font-black text-slate-900 uppercase tracking-tight">Did This Project Involve Any Active Partners?</Label>
+                    <Label className="report-h3 !text-sm !tracking-tight">Did This Project Involve Any Active Partners?</Label>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <button
                             type="button"
@@ -344,8 +347,8 @@ export default function Section7Partnerships() {
                                     : "border-slate-100 bg-slate-50 text-slate-600 hover:border-slate-300"
                             )}
                         >
-                            <p className="text-xs font-black uppercase tracking-widest">⭕ No — Students Worked Independently</p>
-                            <p className={clsx("text-[9px] font-semibold", has_partners === 'no' ? "text-slate-300" : "text-slate-400")}>
+                            <p className="report-h3 !text-xs">⭕ No — Students Worked Independently</p>
+                            <p className={clsx("report-help", has_partners === 'no' ? "text-slate-300" : "text-slate-400")}>
                                 System records: "No formal partnerships reported."
                             </p>
                         </button>
@@ -355,12 +358,12 @@ export default function Section7Partnerships() {
                             className={clsx(
                                 "p-6 rounded-2xl border-2 text-left transition-all space-y-2",
                                 has_partners === 'yes'
-                                    ? "border-indigo-600 bg-indigo-600 text-white shadow-xl shadow-indigo-100"
-                                    : "border-slate-100 bg-slate-50 text-slate-600 hover:border-indigo-100"
+                                    ? "border-report-primary bg-report-primary text-white shadow-xl shadow-report-primary-shadow"
+                                    : "border-slate-100 bg-slate-50 text-slate-600 hover:border-report-primary-border"
                             )}
                         >
-                            <p className="text-xs font-black uppercase tracking-widest">⭕ Yes — One or More Partners Were Actively Involved</p>
-                            <p className={clsx("text-[9px] font-semibold", has_partners === 'yes' ? "text-indigo-100" : "text-slate-400")}>
+                            <p className="report-h3 !text-xs">⭕ Yes — One or More Partners Were Actively Involved</p>
+                            <p className={clsx("report-help", has_partners === 'yes' ? "text-report-primary-soft" : "text-slate-400")}>
                                 Continue to Step 2 to enter partner details.
                             </p>
                         </button>
@@ -373,12 +376,12 @@ export default function Section7Partnerships() {
                 <div className="space-y-6 animate-in fade-in slide-in-from-top-4 duration-500">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center font-black text-[10px]">7.1</div>
-                            <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Step 2 — Enter Partner Details</h3>
+                            <div className="w-8 h-8 rounded-full bg-report-primary text-white flex items-center justify-center font-black text-[10px]">7.1</div>
+                            <h3 className="report-h3">Step 2 — Enter Partner Details</h3>
                         </div>
                         <Button
                             type="button" variant="ghost" onClick={addPartner}
-                            className="h-8 px-3 rounded-lg bg-indigo-50 text-indigo-700 text-[10px] font-black uppercase tracking-widest hover:bg-indigo-100"
+                            className="h-8 px-3 rounded-lg bg-report-primary-soft text-report-primary report-label !text-report-primary hover:bg-report-primary-border"
                         >
                             <Plus className="w-3 h-3 mr-1.5" /> Add Another Partner
                         </Button>
@@ -387,8 +390,8 @@ export default function Section7Partnerships() {
                     {partners.length === 0 ? (
                         <div className="py-16 text-center bg-slate-50 rounded-[2.5rem] border-2 border-dashed border-slate-200 space-y-3">
                             <Users2 className="w-10 h-10 text-slate-200 mx-auto" />
-                            <p className="text-sm font-black text-slate-300 uppercase tracking-widest">No partners added yet</p>
-                            <Button type="button" onClick={addPartner} variant="ghost" className="h-9 px-5 bg-slate-900 text-white text-[10px] font-black rounded-xl">
+                            <p className="report-label !text-sm">No partners added yet</p>
+                            <Button type="button" onClick={addPartner} variant="ghost" className="h-9 px-5 bg-slate-900 text-white report-label !text-white rounded-xl">
                                 <Plus className="w-3 h-3 mr-2" /> Add First Partner
                             </Button>
                         </div>
@@ -409,13 +412,13 @@ export default function Section7Partnerships() {
                     {/* ─── Step 3: Formalization Status ─────────────────────── */}
                     <div className="space-y-4">
                         <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center font-black text-[10px]">7.2</div>
-                            <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Step 3 — Formalization Status</h3>
+                            <div className="w-8 h-8 rounded-full bg-report-primary text-white flex items-center justify-center font-black text-[10px]">7.2</div>
+                            <h3 className="report-h3">Step 3 — Formalization Status</h3>
                         </div>
                         <div className="bg-white rounded-[2.5rem] border-2 border-slate-100 p-8 shadow-sm space-y-6">
                             <div className="space-y-2">
-                                <Label className="text-sm font-black text-slate-900 uppercase tracking-tight">Was This Partnership Supported by Formal Documentation?</Label>
-                                <p className="text-[9px] text-slate-400 font-semibold">Select all that apply. Formalized partnerships increase SDG 17 classification strength.</p>
+                                <Label className="report-h3 !text-sm !tracking-tight">Was This Partnership Supported by Formal Documentation?</Label>
+                                <p className="report-help">Select all that apply. Formalized partnerships increase SDG 17 classification strength.</p>
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                 {formalizationOptions.map(opt => (
@@ -425,11 +428,11 @@ export default function Section7Partnerships() {
                                         className={clsx(
                                             "flex items-center justify-between px-5 py-4 rounded-2xl border-2 transition-all",
                                             formalization_status?.includes(opt)
-                                                ? "bg-indigo-600 border-indigo-600 text-white shadow-lg shadow-indigo-100"
-                                                : "bg-slate-50 border-slate-50 text-slate-600 hover:border-indigo-100 hover:bg-indigo-50"
+                                                ? "bg-report-primary border-report-primary text-white shadow-lg shadow-report-primary-shadow"
+                                                : "bg-slate-50 border-slate-50 text-slate-600 hover:border-report-primary-border hover:bg-report-primary-soft"
                                         )}
                                     >
-                                        <span className="text-[10px] font-black uppercase tracking-widest text-left">{opt}</span>
+                                        <span className="report-label !text-left">{opt}</span>
                                         {formalization_status?.includes(opt)
                                             ? <ShieldCheck className="w-4 h-4 flex-shrink-0" />
                                             : <div className="w-4 h-4 rounded border-2 border-slate-300 flex-shrink-0" />
@@ -439,14 +442,14 @@ export default function Section7Partnerships() {
                             </div>
 
                             {/* Evidence upload */}
-                            <div className="border-2 border-dashed border-slate-200 rounded-2xl p-6 space-y-3 hover:border-indigo-200 transition-colors">
-                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                            <div className="border-2 border-dashed border-slate-200 rounded-2xl p-6 space-y-3 hover:border-report-primary-border transition-colors">
+                                <p className="report-label !flex !items-center !gap-2">
                                     <Info className="w-3.5 h-3.5" /> Upload Supporting Documentation (Optional but recommended)
                                 </p>
-                                <p className="text-[9px] text-slate-400 font-semibold">MOUs, Letters of Collaboration, Official Emails, Government Approvals</p>
+                                <p className="report-help">MOUs, Letters of Collaboration, Official Emails, Government Approvals</p>
                                 <input
                                     type="file" multiple accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
-                                    className="text-xs text-slate-500 file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-[9px] file:font-black file:uppercase file:bg-indigo-50 file:text-indigo-700"
+                                    className="text-xs text-slate-500 file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 report-label !text-[9px] !bg-report-primary-soft !text-report-primary"
                                     onChange={e => {
                                         if (e.target.files) {
                                             updateSection('section7', { formalization_files: [...(formalization_files || []), ...Array.from(e.target.files)] });
@@ -461,32 +464,32 @@ export default function Section7Partnerships() {
                     <div className="pt-8 border-t-2 border-slate-100 space-y-6">
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-4">
-                                <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-lg shadow-indigo-100">
+                                <div className="w-10 h-10 rounded-xl bg-report-primary text-white flex items-center justify-center shadow-lg shadow-report-primary-shadow">
                                     <Activity className="w-5 h-5" />
                                 </div>
-                                <h3 className="text-lg font-black text-slate-900 uppercase tracking-tight">System-Generated Partnership Analytics</h3>
+                                <h3 className="report-h3 !text-lg">System-Generated Partnership Analytics</h3>
                             </div>
-                            <span className="px-3 py-1.5 bg-slate-100 rounded-xl text-[9px] font-black text-slate-500 uppercase tracking-widest">Read-Only</span>
+                            <span className="report-label !bg-slate-100 !px-3 !py-1 !rounded-xl">Read-Only</span>
                         </div>
 
                         {/* Partnership Overview grid */}
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                             {[
-                                { label: "Total Active Partners", val: partners.length, color: "bg-indigo-50 text-indigo-700" },
+                                { label: "Total Active Partners", val: partners.length, color: "bg-report-primary-soft text-report-primary" },
                                 { label: "Government Partners", val: govPartners.length, color: "bg-slate-100 text-slate-700" },
                                 { label: "Private / CSR Partners", val: privatePartners.length, color: "bg-blue-50 text-blue-700" },
                                 { label: "Academic Institutions", val: academicPartners.length, color: "bg-emerald-50 text-emerald-700" },
                             ].map(({ label, val, color }) => (
                                 <div key={label} className={clsx("rounded-2xl p-4 space-y-1", color)}>
                                     <p className="text-2xl font-black">{val}</p>
-                                    <p className="text-[8px] font-black uppercase tracking-widest opacity-70">{label}</p>
+                                    <p className="report-label !text-[8px] !opacity-70">{label}</p>
                                 </div>
                             ))}
                         </div>
 
                         {/* Verification Strength */}
                         <div className="bg-white border-2 border-slate-100 rounded-2xl p-6 space-y-3">
-                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Verification Strength</p>
+                            <p className="report-label">Verification Strength</p>
                             <div className="grid grid-cols-3 gap-4">
                                 {[
                                     { label: "Fully Verified", val: verifiedPartners.filter(p => p.verification?.includes('Output') || p.verification?.includes('Outcome')).length, color: "text-emerald-600" },
@@ -495,7 +498,7 @@ export default function Section7Partnerships() {
                                 ].map(({ label, val, color }) => (
                                     <div key={label} className="text-center space-y-1">
                                         <p className={clsx("text-2xl font-black", color)}>{val}</p>
-                                        <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">{label}</p>
+                                        <p className="report-label !text-[8px]">{label}</p>
                                     </div>
                                 ))}
                             </div>
@@ -504,20 +507,38 @@ export default function Section7Partnerships() {
                         {/* SDG 17 Classification */}
                         <div className={clsx("rounded-2xl border-2 p-5 flex items-center justify-between", classification.color)}>
                             <div className="space-y-1">
-                                <p className="text-[9px] font-black uppercase tracking-widest opacity-60">SDG 17 Engagement Classification</p>
+                                <p className="report-label !text-[9px] !opacity-60">SDG 17 Engagement Classification</p>
                                 <p className="text-sm font-black uppercase tracking-wider">{classification.label}</p>
-                                <p className="text-[9px] font-semibold opacity-60">{classification.desc}</p>
+                                <p className="report-help !opacity-60">{classification.desc}</p>
                             </div>
                             <Globe className="w-8 h-8 opacity-40" />
                         </div>
 
                         {/* Auto narrative */}
-                        <div className="bg-indigo-900 rounded-[2.5rem] p-8 relative overflow-hidden">
-                            <div className="absolute right-0 top-0 w-40 h-40 bg-white/5 rounded-full -mr-20 -mt-20 blur-3xl" />
-                            <span className="absolute -top-4 -left-2 text-6xl font-serif text-white/10 select-none">"</span>
-                            <p className="relative z-10 text-base font-bold text-white leading-relaxed font-serif">
-                                {autoNarrative}
-                            </p>
+                        <div className="pt-8 mt-8 border-t-2 border-slate-100">
+                            <div className="flex items-center justify-between mb-8">
+                                <div className="flex items-center gap-4">
+                                    <div className="w-10 h-10 rounded-xl bg-report-primary text-white flex items-center justify-center shadow-lg shadow-report-primary-shadow">
+                                        <Handshake className="w-6 h-6" />
+                                    </div>
+                                    <h3 className="report-h3 !text-xl !italic">Partnership Summary</h3>
+                                </div>
+                                <div className="px-5 py-2.5 rounded-xl bg-slate-900 text-white text-[10px] font-black uppercase tracking-widest border border-slate-800">
+                                    Auto-Generated
+                                </div>
+                            </div>
+                            <div className="bg-white border-2 border-slate-200 rounded-[3rem] p-12 relative overflow-hidden shadow-xl space-y-10 group">
+                                <div className="absolute -bottom-10 -right-10 opacity-5 group-hover:opacity-10 transition-opacity duration-1000 rotate-12">
+                                    <Handshake className="w-80 h-80 text-slate-900" />
+                                </div>
+                                <div className="relative z-10 space-y-6">
+                                    <span className="absolute -top-10 -left-6 text-7xl font-serif text-slate-100 select-none">“</span>
+                                    <p className="report-ai-text">
+                                        {autoNarrative}
+                                    </p>
+                                    <span className="absolute -bottom-16 -right-6 text-7xl font-serif text-slate-100 select-none rotate-180">“</span>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>

@@ -265,7 +265,7 @@ export default function StudentBrowseOpportunitiesPage() {
                                             {['active', 'pending', 'pending_approval', 'completed', 'applied', 'accepted'].includes(op.status) && (
                                                 <Link href={`/dashboard/student/report?projectId=${op.id}`}>
                                                     <Button size="sm" variant="outline" className="text-xs h-8">
-                                                        Submit Report
+                                                        Start Report
                                                     </Button>
                                                 </Link>
                                             )}
@@ -328,7 +328,7 @@ export default function StudentBrowseOpportunitiesPage() {
                                             {['active', 'pending', 'pending_approval', 'completed', 'applied', 'accepted'].includes(op.status) && (
                                                 <Link href={`/dashboard/student/report?projectId=${op.id}`}>
                                                     <Button size="sm" variant="outline" className="text-xs h-9">
-                                                        Submit Report
+                                                        Start Report
                                                     </Button>
                                                 </Link>
                                             )}

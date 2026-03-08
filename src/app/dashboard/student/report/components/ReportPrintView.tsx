@@ -189,7 +189,7 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
             <div className="grid grid-cols-2 gap-12 border-t-2 border-slate-100 pt-10 mt-10">
                 <div>
                     <h3 className="text-xs font-black text-slate-900 uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
-                        <span className="w-1.5 h-6 bg-indigo-600 rounded-full" /> External Resources
+                        <span className="w-1.5 h-6 bg-report-primary rounded-full" /> External Resources
                     </h3>
                     {data.section6.resources.length > 0 ? (
                         <ul className="space-y-2">
@@ -257,8 +257,8 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
                         </div>
                     </div>
                     <div>
-                        <p className="text-[10px] font-black text-indigo-400 uppercase mb-3">Institutional Intelligence Summary</p>
-                        <p className="text-lg font-medium font-serif italic text-slate-200 leading-relaxed border-l-4 border-indigo-500 pl-6">
+                        <p className="text-[10px] font-black text-report-primary uppercase mb-3">Institutional Intelligence Summary</p>
+                        <p className="text-lg font-medium font-serif italic text-slate-200 leading-relaxed border-l-4 border-report-primary pl-6">
                             "The project addressing SDG {data.section3.primary_sdg.goal_number} has demonstrated robust community integration. With {data.section1.metrics.total_verified_hours} hours of verified field work, the initiative achieved measurable growth in {data.section5.metric || 'targeted social indicators'}. Strategic alignment with {data.section2.discipline} ensures a high standard of academic-professional synthesis."
                         </p>
                     </div>

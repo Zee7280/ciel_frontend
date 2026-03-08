@@ -95,7 +95,7 @@ export default function Section10Sustainability() {
         if (policy_influence?.includes('Policy') || policy_influence?.includes('Community')) score += 2;
         else if (policy_influence?.includes('institution')) score += 1;
 
-        if (score >= 8) return { label: "High Strength", color: "text-emerald-700", bg: "bg-emerald-50 border-emerald-200" };
+        if (score >= 8) return { label: "High Strength", color: "text-report-primary", bg: "bg-report-primary-soft border-report-primary-border shadow-sm shadow-report-primary-shadow" };
         if (score >= 4) return { label: "Moderate Strength", color: "text-blue-700", bg: "bg-blue-50 border-blue-200" };
         return { label: "Basic Strength", color: "text-amber-700", bg: "bg-amber-50 border-amber-200" };
     }, [continuation_status, mechanisms, scaling_potential, policy_influence]);
@@ -132,23 +132,23 @@ export default function Section10Sustainability() {
         <div className="space-y-12 pb-16">
             {/* ─── Header ─────────────────────────────────────────────────── */}
             <div className="flex items-center gap-4">
-                <div className="w-14 h-14 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shadow-xl shadow-emerald-100 ring-4 ring-emerald-50">
+                <div className="w-14 h-14 rounded-2xl bg-report-primary text-white flex items-center justify-center shadow-xl shadow-report-primary-shadow ring-4 ring-report-primary-soft">
                     <Leaf className="w-7 h-7" />
                 </div>
                 <div>
-                    <h2 className="text-3xl font-black text-slate-900 tracking-tight uppercase">Section 10 — Sustainability</h2>
-                    <p className="text-slate-500 font-bold uppercase tracking-[0.15em] text-[10px]">Long-Term Impact & System Continuity</p>
+                    <h2 className="report-h2">Section 10 — Sustainability</h2>
+                    <p className="report-label">Long-Term Impact & System Continuity</p>
                 </div>
             </div>
 
             {/* ─── Purpose note ────────────────────────────────────────────── */}
-            <div className="p-5 bg-emerald-50 border border-emerald-100 rounded-2xl flex items-start gap-4">
-                <Info className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+            <div className="p-5 bg-report-primary-soft border border-report-primary-border rounded-2xl flex items-start gap-4">
+                <Info className="w-5 h-5 text-report-primary shrink-0 mt-0.5" />
                 <div className="space-y-2">
-                    <p className="text-[10px] font-black text-emerald-900 uppercase tracking-widest leading-relaxed">
+                    <p className="report-label !text-report-primary">
                         This section evaluates whether the impact continues beyond your involvement, supporting mechanisms, scaling potential, and policy influence.
                     </p>
-                    <p className="text-[10px] text-emerald-700 font-semibold leading-relaxed">
+                    <p className="report-help !text-report-primary">
                         Not all projects are sustainable — honest reporting strengthens institutional credibility and identifies areas for future focus.
                     </p>
                 </div>
@@ -157,11 +157,11 @@ export default function Section10Sustainability() {
             {/* ─── Step 1: Continuation Status ────────────────────────────── */}
             <div className="space-y-4">
                 <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center font-black text-[10px]">10.1</div>
-                    <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Step 1 — Continuation Status (Required)</h3>
+                    <div className="w-8 h-8 rounded-full bg-report-primary text-white flex items-center justify-center font-black text-[10px]">10.1</div>
+                    <h3 className="report-h3">Step 1 — Continuation Status (Required)</h3>
                 </div>
                 <div className="bg-white rounded-[2.5rem] border-2 border-slate-100 p-8 shadow-sm space-y-6">
-                    <Label className="text-sm font-black text-slate-900 uppercase tracking-tight">Will the Impact Continue After Your Involvement?</Label>
+                    <Label className="report-h3 !text-sm !tracking-tight">Will the Impact Continue After Your Involvement?</Label>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                         {continuationOptions.map((opt) => (
                             <button
@@ -170,15 +170,15 @@ export default function Section10Sustainability() {
                                 className={clsx(
                                     "flex flex-col items-center justify-center text-center p-8 rounded-[2.5rem] border-2 transition-all relative group/opt",
                                     continuation_status === opt.id
-                                        ? "bg-slate-900 border-slate-900 text-white shadow-xl shadow-slate-200"
+                                        ? "bg-report-primary border-report-primary text-white shadow-xl shadow-report-primary-shadow"
                                         : "bg-slate-50 border-slate-50 text-slate-500 hover:border-slate-300 hover:bg-white"
                                 )}
                             >
-                                <opt.icon className={clsx("w-8 h-8 mb-4 transition-transform group-hover/opt:scale-110", continuation_status === opt.id ? "text-emerald-400" : "text-slate-300")} />
-                                <span className="font-black uppercase tracking-widest text-xs mb-2">{opt.label}</span>
-                                <span className="text-[9px] font-bold opacity-70 uppercase tracking-tighter leading-relaxed">{opt.desc}</span>
+                                <opt.icon className={clsx("w-8 h-8 mb-4 transition-transform group-hover/opt:scale-110", continuation_status === opt.id ? "text-white" : "text-slate-300")} />
+                                <span className="report-label !mb-2 !text-xs">{opt.label}</span>
+                                <span className="report-help !text-[9px] !opacity-70 !tracking-tighter">{opt.desc}</span>
                                 {continuation_status === opt.id && (
-                                    <div className="absolute top-6 right-6 w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                                    <div className="absolute top-6 right-6 w-2 h-2 rounded-full bg-white opacity-50 animate-pulse" />
                                 )}
                             </button>
                         ))}
@@ -191,13 +191,13 @@ export default function Section10Sustainability() {
             {continuation_status && (
                 <div className="space-y-4 animate-in fade-in slide-in-from-top-4 duration-500">
                     <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center font-black text-[10px]">10.2</div>
-                        <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Step 2 — Explanation of Continuation</h3>
+                        <div className="w-8 h-8 rounded-full bg-report-primary text-white flex items-center justify-center font-black text-[10px]">10.2</div>
+                        <h3 className="report-h3">Step 2 — Explanation of Continuation</h3>
                     </div>
                     <div className="bg-white rounded-[2.5rem] border-2 border-slate-100 p-8 shadow-sm space-y-4">
                         <div className="space-y-1">
-                            <Label className="text-sm font-black text-slate-900 uppercase tracking-tight">Continuation Details (Mandatory)</Label>
-                            <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider leading-relaxed">
+                            <Label className="report-h3 !text-sm !tracking-tight">Continuation Details (Mandatory)</Label>
+                            <p className="report-help">
                                 {explanationPrompt}
                             </p>
                         </div>
@@ -206,14 +206,14 @@ export default function Section10Sustainability() {
                             value={continuation_details}
                             onChange={e => update('continuation_details', e.target.value)}
                             className={clsx(
-                                "w-full h-32 bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 font-medium text-slate-700 text-sm outline-none focus:border-emerald-200 transition-all resize-none",
+                                "w-full h-32 bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 font-medium text-slate-700 text-sm outline-none focus:border-report-primary-border transition-all resize-none",
                                 getFieldError('section10.continuation_details') && "border-red-200"
                             )}
                         />
                         <div className="flex items-center justify-between px-2">
                             <span className={clsx(
-                                "text-[10px] font-black uppercase tracking-widest",
-                                cdWords >= minWords && cdWords <= maxWords ? "text-emerald-600" : cdWords > maxWords ? "text-red-500" : "text-amber-500"
+                                "report-label",
+                                cdWords >= minWords && cdWords <= maxWords ? "text-report-primary" : cdWords > maxWords ? "text-red-500" : "text-amber-500"
                             )}>
                                 {cdWords} / {maxWords} words (Min {minWords})
                             </span>
@@ -226,13 +226,13 @@ export default function Section10Sustainability() {
             {/* ─── Step 3: Sustainability Mechanisms ───────────────────────── */}
             <div className="space-y-4">
                 <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center font-black text-[10px]">10.3</div>
-                    <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Step 3 — Sustainability Mechanisms</h3>
+                    <div className="w-8 h-8 rounded-full bg-report-primary text-white flex items-center justify-center font-black text-[10px]">10.3</div>
+                    <h3 className="report-h3">Step 3 — Sustainability Mechanisms</h3>
                 </div>
                 <div className="bg-white rounded-[2.5rem] border-2 border-slate-100 p-8 shadow-sm space-y-6">
                     <div className="space-y-1">
-                        <Label className="text-sm font-black text-slate-900 uppercase tracking-tight">Continuation Mechanisms (Multi-Select | Required)</Label>
-                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Select all that apply.</p>
+                        <Label className="report-h3 !text-sm !tracking-tight">Continuation Mechanisms (Multi-Select | Required)</Label>
+                        <p className="report-help">Select all that apply.</p>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                         {mechanismOptions.map(mech => {
@@ -244,12 +244,12 @@ export default function Section10Sustainability() {
                                     className={clsx(
                                         "flex flex-col items-center justify-center gap-3 p-4 rounded-xl border-2 transition-all text-center h-full min-h-[100px]",
                                         isSelected
-                                            ? "border-emerald-500 bg-emerald-50 text-emerald-900 shadow-sm"
+                                            ? "border-report-primary bg-report-primary-soft text-report-primary shadow-sm shadow-report-primary-shadow"
                                             : "border-slate-100 bg-slate-50 text-slate-500 hover:border-slate-300 hover:bg-white"
                                     )}
                                 >
-                                    <mech.icon className={clsx("w-5 h-5", isSelected ? "text-emerald-600" : "opacity-50")} />
-                                    <span className="text-[10px] font-black uppercase tracking-widest">{mech.id}</span>
+                                    <mech.icon className={clsx("w-5 h-5", isSelected ? "text-report-primary" : "opacity-50")} />
+                                    <span className="report-label !text-[10px]">{mech.id}</span>
                                 </button>
                             );
                         })}
@@ -261,22 +261,22 @@ export default function Section10Sustainability() {
             {/* ─── Step 4: Scaling & System Influence ──────────────────────── */}
             <div className="space-y-4">
                 <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center font-black text-[10px]">10.4</div>
-                    <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Step 4 — Scaling & System Influence</h3>
+                    <div className="w-8 h-8 rounded-full bg-report-primary text-white flex items-center justify-center font-black text-[10px]">10.4</div>
+                    <h3 className="report-h3">Step 4 — Scaling & System Influence</h3>
                 </div>
                 <div className="bg-white rounded-[2.5rem] border-2 border-slate-100 p-8 shadow-sm space-y-10">
 
                     <div className="space-y-4">
-                        <Label className="text-sm font-black text-slate-900 uppercase tracking-tight">Scaling Potential (Required)</Label>
+                        <Label className="report-h3 !text-sm !tracking-tight">Scaling Potential (Required)</Label>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             {scalingOptions.map(opt => (
                                 <button
                                     key={opt.id} type="button"
                                     onClick={() => update('scaling_potential', opt.id)}
                                     className={clsx(
-                                        "px-4 py-3 rounded-xl border-2 text-[10px] font-black uppercase tracking-widest transition-all text-left flex items-center gap-3",
+                                        "px-4 py-3 rounded-xl border-2 report-label !text-[10px] transition-all text-left flex items-center gap-3",
                                         scaling_potential === opt.id
-                                            ? "bg-slate-900 border-slate-900 text-white shadow-md shadow-slate-200"
+                                            ? "bg-report-primary border-report-primary text-white shadow-md shadow-report-primary-shadow"
                                             : "bg-slate-50 border-slate-100 text-slate-500 hover:border-slate-300"
                                     )}
                                 >
@@ -289,17 +289,17 @@ export default function Section10Sustainability() {
                     </div>
 
                     <div className="space-y-4 pt-8 border-t-2 border-slate-50">
-                        <Label className="text-sm font-black text-slate-900 uppercase tracking-tight">Policy / Institutional Influence (Required)</Label>
-                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Did this project influence any long-term system?</p>
+                        <Label className="report-h3 !text-sm !tracking-tight">Policy / Institutional Influence (Required)</Label>
+                        <p className="report-help">Did this project influence any long-term system?</p>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             {policyOptions.map(opt => (
                                 <button
                                     key={opt.id} type="button"
                                     onClick={() => update('policy_influence', opt.id)}
                                     className={clsx(
-                                        "px-4 py-3 rounded-xl border-2 text-[10px] font-black uppercase tracking-widest transition-all text-left flex items-center gap-3",
+                                        "px-4 py-3 rounded-xl border-2 report-label !text-[10px] transition-all text-left flex items-center gap-3",
                                         policy_influence === opt.id
-                                            ? "bg-slate-900 border-slate-900 text-white shadow-md shadow-slate-200"
+                                            ? "bg-report-primary border-report-primary text-white shadow-md shadow-report-primary-shadow"
                                             : "bg-slate-50 border-slate-100 text-slate-500 hover:border-slate-300"
                                     )}
                                 >
@@ -317,42 +317,42 @@ export default function Section10Sustainability() {
             <div className="pt-8 border-t-2 border-slate-100 space-y-6">
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 rounded-xl bg-slate-900 text-white flex items-center justify-center shadow-lg shadow-slate-200">
+                        <div className="w-10 h-10 rounded-xl bg-report-primary text-white flex items-center justify-center shadow-lg shadow-report-primary-shadow">
                             <Leaf className="w-5 h-5" />
                         </div>
-                        <h3 className="text-lg font-black text-slate-900 uppercase tracking-tight">System-Generated Sustainability Summary</h3>
+                        <h3 className="report-h3 !text-lg">System-Generated Sustainability Summary</h3>
                     </div>
-                    <span className="px-3 py-1.5 bg-slate-100 rounded-xl text-[9px] font-black text-slate-500 uppercase tracking-widest">Read-Only</span>
+                    <span className="report-label !bg-slate-100 !px-3 !py-1 !rounded-xl">Read-Only</span>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
                     {/* Analytics Grid */}
                     <div className="md:col-span-8 bg-white border-2 border-slate-100 rounded-[2.5rem] p-8 space-y-6">
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Continuation Classification</p>
+                        <p className="report-label !mb-4">Continuation Classification</p>
                         <div className="grid grid-cols-2 gap-4">
                             <div className="bg-slate-50 rounded-2xl p-5 space-y-2">
                                 <p className="text-sm font-black text-slate-900 leading-snug">
                                     {continuation_status ? continuation_status.charAt(0).toUpperCase() + continuation_status.slice(1) : 'Pending'}
                                 </p>
-                                <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Sustainability Level</p>
+                                <p className="report-label !text-[8px] !text-slate-500">Sustainability Level</p>
                             </div>
                             <div className="bg-slate-50 rounded-2xl p-5 space-y-2">
-                                <p className="text-2xl font-black text-emerald-700 leading-none">
+                                <p className="text-2xl font-black text-report-primary leading-none">
                                     {mechanisms?.length || 0}
                                 </p>
-                                <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Mechanisms</p>
+                                <p className="report-label !text-[8px] !text-slate-500">Mechanisms</p>
                             </div>
                             <div className="bg-slate-50 rounded-2xl p-5 space-y-2">
                                 <p className="text-xs font-black text-slate-900 leading-snug truncate">
                                     {scaling_potential || 'Pending'}
                                 </p>
-                                <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Scaling Potential</p>
+                                <p className="report-label !text-[8px] !text-slate-500">Scaling Potential</p>
                             </div>
                             <div className="bg-slate-50 rounded-2xl p-5 space-y-2">
                                 <p className="text-xs font-black text-slate-900 leading-snug truncate">
                                     {policy_influence || 'Pending'}
                                 </p>
-                                <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Policy Influence</p>
+                                <p className="report-label !text-[8px] !text-slate-500">Policy Influence</p>
                             </div>
                         </div>
                     </div>
@@ -362,18 +362,18 @@ export default function Section10Sustainability() {
                         <div className={clsx("rounded-[2.5rem] p-8 border-2 flex-1 flex flex-col items-center justify-center text-center space-y-3", sustainabilityStrength.bg)}>
                             <TrendingUp className={clsx("w-8 h-8 opacity-80", sustainabilityStrength.color)} />
                             <div className="space-y-1">
-                                <p className="text-[9px] font-black uppercase tracking-widest opacity-60">Sustainability Strength Index</p>
-                                <p className={clsx("text-lg font-black uppercase tracking-tight", sustainabilityStrength.color)}>{sustainabilityStrength.label}</p>
+                                <p className="report-label !text-[9px] !opacity-60">Sustainability Strength Index</p>
+                                <p className={clsx("report-h3 !text-lg !tracking-tight", sustainabilityStrength.color)}>{sustainabilityStrength.label}</p>
                             </div>
                         </div>
                     </div>
                 </div>
 
                 {/* Auto narrative */}
-                <div className="bg-emerald-900 rounded-[2.5rem] p-8 relative overflow-hidden">
+                <div className="bg-slate-900 rounded-[2.5rem] p-8 relative overflow-hidden">
                     <div className="absolute right-0 top-0 w-40 h-40 bg-white/5 rounded-full -mr-20 -mt-20 blur-3xl" />
                     <span className="absolute -top-4 -left-2 text-6xl font-serif text-white/10 select-none">"</span>
-                    <p className="relative z-10 text-base font-bold text-white leading-relaxed font-serif">
+                    <p className="report-ai-text !text-white !not-italic">
                         {autoNarrative}
                     </p>
                 </div>

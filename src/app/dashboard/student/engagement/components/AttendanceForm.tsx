@@ -141,7 +141,7 @@ export default function AttendanceForm({
         <form onSubmit={handleSubmit} className="bg-white rounded-3xl border border-slate-100 p-8 shadow-sm space-y-6">
             <div className="flex justify-between items-center mb-4">
                 <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center">
+                    <div className="w-10 h-10 bg-report-primary-soft text-report-primary rounded-xl flex items-center justify-center">
                         <Plus className="w-6 h-6" />
                     </div>
                     <h3 className="text-xl font-bold text-slate-900">Add Attendance Entry</h3>
@@ -157,7 +157,7 @@ export default function AttendanceForm({
                         <select
                             value={formData.participantId}
                             onChange={(e) => setFormData({ ...formData, participantId: e.target.value })}
-                            className="w-full pl-12 h-14 bg-slate-50 border-none rounded-2xl font-bold text-base appearance-none focus:ring-2 focus:ring-blue-600/20 transition-all cursor-pointer"
+                            className="w-full pl-12 h-14 bg-slate-50 border-none rounded-2xl font-bold text-base appearance-none focus:ring-2 focus:ring-report-primary/20 transition-all cursor-pointer"
                             required
                         >
                             {verifiedUsers.length === 0 && <option value="">No verified students found</option>}
@@ -178,7 +178,7 @@ export default function AttendanceForm({
                             value={formData.dateOfEngagement}
                             max={new Date().toISOString().split('T')[0]}
                             onChange={(e) => setFormData({ ...formData, dateOfEngagement: e.target.value })}
-                            className="pl-12 h-14 bg-slate-50 border-none rounded-2xl font-bold text-base shadow-sm focus:ring-2 focus:ring-blue-600/20"
+                            className="pl-12 h-14 bg-slate-50 border-none rounded-2xl font-bold text-base shadow-sm focus:ring-2 focus:ring-report-primary/20"
                             required
                         />
                     </div>
@@ -195,7 +195,7 @@ export default function AttendanceForm({
                                 type="time"
                                 value={formData.startTime}
                                 onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
-                                className="pl-12 h-14 bg-slate-50 border-none rounded-2xl font-bold text-base shadow-sm focus:ring-2 focus:ring-blue-600/20"
+                                className="pl-12 h-14 bg-slate-50 border-none rounded-2xl font-bold text-base shadow-sm focus:ring-2 focus:ring-report-primary/20"
                                 required
                             />
                         </div>
@@ -210,7 +210,7 @@ export default function AttendanceForm({
                                 type="time"
                                 value={formData.endTime}
                                 onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
-                                className="pl-12 h-14 bg-slate-50 border-none rounded-2xl font-bold text-base shadow-sm focus:ring-2 focus:ring-blue-600/20"
+                                className="pl-12 h-14 bg-slate-50 border-none rounded-2xl font-bold text-base shadow-sm focus:ring-2 focus:ring-report-primary/20"
                                 required
                             />
                         </div>
@@ -228,7 +228,7 @@ export default function AttendanceForm({
                             placeholder="Where did you engage?"
                             value={formData.organizationName}
                             onChange={(e) => setFormData({ ...formData, organizationName: e.target.value })}
-                            className="pl-10 h-14 bg-slate-50 border-none rounded-2xl font-bold text-base shadow-sm focus:ring-2 focus:ring-blue-600/20"
+                            className="pl-10 h-14 bg-slate-50 border-none rounded-2xl font-bold text-base shadow-sm focus:ring-2 focus:ring-report-primary/20"
                             required
                         />
                     </div>
@@ -242,7 +242,7 @@ export default function AttendanceForm({
                         <select
                             value={formData.activityType}
                             onChange={(e) => setFormData({ ...formData, activityType: e.target.value })}
-                            className="w-full pl-10 h-14 bg-slate-50 border-none rounded-2xl font-bold text-base appearance-none focus:ring-2 focus:ring-blue-600/20 transition-all cursor-pointer"
+                            className="w-full pl-10 h-14 bg-slate-50 border-none rounded-2xl font-bold text-base appearance-none focus:ring-2 focus:ring-report-primary/20 transition-all cursor-pointer"
                         >
                             {['Training / Workshop', 'Awareness Session', 'Research / Survey', 'Mentoring / Coaching', 'Field Visit', 'Resource Distribution', 'Technical Support', 'Administrative', 'Other'].map(t => (
                                 <option key={t} value={t}>{t}</option>
@@ -254,7 +254,7 @@ export default function AttendanceForm({
                             placeholder="Specify other activity"
                             value={formData.otherActivity}
                             onChange={(e) => setFormData({ ...formData, otherActivity: e.target.value })}
-                            className="mt-2 h-14 bg-slate-50 border-none rounded-2xl font-bold text-base shadow-sm focus:ring-2 focus:ring-blue-600/20"
+                            className="mt-2 h-14 bg-slate-50 border-none rounded-2xl font-bold text-base shadow-sm focus:ring-2 focus:ring-report-primary/20"
                             required
                         />
                     )}
@@ -275,7 +275,7 @@ export default function AttendanceForm({
                         placeholder="What did you accomplish during this session?"
                         value={formData.description}
                         onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                        className="w-full pl-10 p-4 h-32 bg-slate-50 border-none rounded-2xl font-bold text-base focus:ring-2 focus:ring-blue-600/20 resize-none shadow-sm transition-all"
+                        className="w-full pl-10 p-4 h-32 bg-slate-50 border-none rounded-2xl font-bold text-base focus:ring-2 focus:ring-report-primary/20 resize-none shadow-sm transition-all"
                         required
                     />
                 </div>
@@ -286,12 +286,12 @@ export default function AttendanceForm({
                 <Label className="text-xs font-bold uppercase tracking-wider text-slate-500">Supporting Evidence (Optional)</Label>
                 <div className="flex items-center gap-4">
                     {evidenceFile ? (
-                        <div className="flex-1 flex items-center justify-between p-3 bg-emerald-50 rounded-xl border border-emerald-100">
+                        <div className="flex-1 flex items-center justify-between p-3 bg-report-primary-soft rounded-xl border border-report-primary-border">
                             <div className="flex items-center gap-3">
-                                <CheckCircle2 className="w-5 h-5 text-emerald-600" />
-                                <span className="text-sm font-bold text-emerald-800">{evidenceFile.name} (linked)</span>
+                                <CheckCircle2 className="w-5 h-5 text-report-primary" />
+                                <span className="text-sm font-bold text-report-primary">{evidenceFile.name} (linked)</span>
                             </div>
-                            <button onClick={() => setEvidenceFile(null)} className="text-emerald-600 hover:text-emerald-800">
+                            <button onClick={() => setEvidenceFile(null)} className="text-report-primary hover:text-report-primary-border">
                                 <X className="w-4 h-4" />
                             </button>
                         </div>
@@ -320,7 +320,7 @@ export default function AttendanceForm({
                         "w-full h-14 rounded-2xl font-black text-sm transition-all shadow-xl",
                         isLocked
                             ? "bg-slate-100 text-slate-400 border border-slate-200 shadow-none cursor-not-allowed"
-                            : "bg-blue-600 hover:bg-blue-700 text-white shadow-blue-200 hover:translate-y-[-2px]"
+                            : "bg-report-primary hover:bg-report-primary-border text-white shadow-report-primary-shadow hover:translate-y-[-2px]"
                     )}
                 >
                     {isSubmitting ? (
@@ -343,7 +343,7 @@ export default function AttendanceForm({
                         <button
                             type="button"
                             onClick={() => setParticipationUnlocked(true)}
-                            className="text-[10px] font-black uppercase tracking-widest text-blue-600 hover:text-blue-700 underline"
+                            className="text-[10px] font-black uppercase tracking-widest text-report-primary hover:text-report-primary-border underline"
                         >
                             Unlock for editing
                         </button>

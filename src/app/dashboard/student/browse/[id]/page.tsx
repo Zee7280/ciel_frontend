@@ -124,7 +124,7 @@ export default function OpportunityDetailsPage() {
                                     onClick={() => router.push(`/dashboard/student/report?projectId=${id}`)}
                                     className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 font-medium"
                                 >
-                                    Submit Report
+                                    Start Report
                                 </Button>
                             )}
                             <Button className="flex items-center gap-2 px-6 py-2 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg shadow-none cursor-default font-medium hover:bg-emerald-50">

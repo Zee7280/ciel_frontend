@@ -152,7 +152,7 @@ const colorMap: Record<string, { bg: string; icon: string; border: string; badge
     rose: { bg: "bg-rose-50", icon: "text-rose-600 bg-rose-100", border: "border-rose-100", badge: "bg-rose-600" },
     amber: { bg: "bg-amber-50", icon: "text-amber-600 bg-amber-100", border: "border-amber-100", badge: "bg-amber-600" },
     teal: { bg: "bg-teal-50", icon: "text-teal-600 bg-teal-100", border: "border-teal-100", badge: "bg-teal-600" },
-    indigo: { bg: "bg-indigo-50", icon: "text-indigo-600 bg-indigo-100", border: "border-indigo-100", badge: "bg-indigo-600" },
+    indigo: { bg: "bg-report-primary-soft", icon: "text-report-primary bg-report-primary-border", border: "border-report-primary-border", badge: "bg-report-primary" },
     pink: { bg: "bg-pink-50", icon: "text-pink-600 bg-pink-100", border: "border-pink-100", badge: "bg-pink-600" },
     green: { bg: "bg-green-50", icon: "text-green-600 bg-green-100", border: "border-green-100", badge: "bg-green-600" },
     slate: { bg: "bg-slate-50", icon: "text-slate-600 bg-slate-200", border: "border-slate-100", badge: "bg-slate-700" },
@@ -166,7 +166,7 @@ export default function PreReportGuide({ projectTitle, onStart }: { projectTitle
                 <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-blue-50 border border-blue-100 rounded-full text-blue-700 text-xs font-black uppercase tracking-widest">
                     📋 Before You Start
                 </div>
-                <h1 className="text-3xl md:text-4xl font-black text-slate-900 leading-tight">
+                <h1 className="report-h2 md:!text-4xl">
                     Community Engagement Report
                 </h1>
                 {projectTitle && (
@@ -189,7 +189,7 @@ export default function PreReportGuide({ projectTitle, onStart }: { projectTitle
                                     {section.icon}
                                 </div>
                                 <div className="flex-1">
-                                    <h3 className="text-sm font-black text-slate-900">{section.title}</h3>
+                                    <h3 className="report-h3 !normal-case">{section.title}</h3>
                                 </div>
                                 <span className={`${c.badge} text-white text-[10px] font-black rounded-full px-2.5 py-1 shrink-0`}>
                                     {String(idx + 1).padStart(2, '0')}
@@ -217,7 +217,7 @@ export default function PreReportGuide({ projectTitle, onStart }: { projectTitle
 
             {/* Key tip */}
             <div className="bg-slate-900 rounded-2xl p-8 text-white space-y-4">
-                <h3 className="text-lg font-black">✅ Key Advice for Students</h3>
+                <h3 className="report-h3 !text-white !normal-case !text-lg">✅ Key Advice for Students</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     {[
                         "Record attendance for every session",

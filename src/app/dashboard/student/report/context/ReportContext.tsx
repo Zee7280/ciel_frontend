@@ -76,14 +76,15 @@ export interface ReportData {
     // Section 3: SDG Contribution Mapping
     section3: {
         primary_sdg: {
-            goal_number: number | null;
-            goal_title: string;
-            target_code: string;
-            indicator_code: string;
+            goal_number: number | string | null;
+            target_id: string;
+            indicator_id: string;
         };
         contribution_intent_statement: string;
         secondary_sdgs: Array<{
-            goal_number: number;
+            goal_number: number | string | null;
+            target_id?: string;
+            indicator_id?: string;
             justification_text: string;
             status: 'provisional' | 'validated' | 'rejected';
         }>;
@@ -109,6 +110,7 @@ export interface ReportData {
         beneficiary_other?: string;
         total_beneficiaries: string;
         primary_change_area_other?: string;
+        primary_change_area_others?: string[];
 
         // Team-specific details (populated if team project)
         team_contributions: Array<{
@@ -222,7 +224,9 @@ export interface ReportData {
         summary_text?: string;
     };
     // Section 11: Summary (Intelligence Layer - mostly read-only/calculated, strictly strictly read-only so maybe empty here or just status)
-    section11: {};
+    section11: {
+        summary_text?: string;
+    };
 }
 
 const defaultReportData: ReportData = {
@@ -258,9 +262,8 @@ const defaultReportData: ReportData = {
     section3: {
         primary_sdg: {
             goal_number: null,
-            goal_title: '',
-            target_code: '',
-            indicator_code: ''
+            target_id: '',
+            indicator_id: ''
         },
         contribution_intent_statement: '',
         secondary_sdgs: [],
@@ -276,6 +279,8 @@ const defaultReportData: ReportData = {
         outputs: [],
         beneficiary_categories: [],
         total_beneficiaries: '',
+        primary_change_area_other: '',
+        primary_change_area_others: [''],
         team_contributions: [],
         summary_text: ''
     },
@@ -351,7 +356,9 @@ const defaultReportData: ReportData = {
         policy_influence: '',
         summary_text: ''
     },
-    section11: {}
+    section11: {
+        summary_text: ''
+    }
 };
 
 interface ReportContextType {
