@@ -44,11 +44,13 @@ function ReportFormContent() {
         setFullData,
         setStep,
         setProjectId,
+        updateSection,
         setReadOnly,
         isReadOnly
     } = useReportForm();
 
     const [isSaving, setIsSaving] = React.useState(false);
+    const [aiStatus, setAiStatus] = React.useState<string | null>(null);
     const [projectDetails, setProjectDetails] = React.useState<any>(null);
     const [isLoading, setIsLoading] = React.useState(true);
     const [showGuide, setShowGuide] = React.useState(true);
@@ -81,6 +83,10 @@ function ReportFormContent() {
                 const actualReportData = reportData.data || reportData; // Handle potential wrapper
                 if (actualReportData && Object.keys(actualReportData).length > 0) {
                     setFullData(actualReportData);
+                    // If the user already has a saved report draft, skip the guide
+                    if (actualReportData.status === 'draft' || Object.keys(actualReportData).length > 2) {
+                        setShowGuide(false);
+                    }
                 }
             }
         } catch (error) {
@@ -99,8 +105,37 @@ function ReportFormContent() {
 
         if (validateCurrentSection()) {
             if (activeStep < 11) {
+                setIsSaving(true);
+                let updatedData = { ...data };
+
+                // Auto-generate AI Summary for specific sections in the background
+                const sectionsToSummarize = [2, 3, 4, 5, 8, 9, 10];
+                if (sectionsToSummarize.includes(activeStep)) {
+                    setAiStatus('Analyzing Data & Writing Summary...');
+                    try {
+                        const { generateAISummary } = await import('./utils/aiSummarizer');
+                        const sectionKey = `section${activeStep}` as Exclude<keyof typeof data, 'project_id'>;
+                        const summaryRes = await generateAISummary(sectionKey, data[sectionKey]);
+
+                        if (summaryRes.summary) {
+                            updatedData = {
+                                ...updatedData,
+                                [sectionKey]: {
+                                    ...(updatedData[sectionKey] as any),
+                                    summary_text: summaryRes.summary
+                                }
+                            };
+                            updateSection(sectionKey, { summary_text: summaryRes.summary });
+                        }
+                    } catch (error) {
+                        console.error('Failed to auto-generate summary', error);
+                        // Do not block the user if AI fails
+                    }
+                }
+                setAiStatus('Saving Progress...');
+
                 // Auto-save on next
-                await handleSave(true);
+                await handleSave(true, updatedData);
                 nextStep();
                 window.scrollTo(0, 0);
             } else {
@@ -113,14 +148,14 @@ function ReportFormContent() {
         }
     };
 
-    const handleSave = async (silent = false) => {
+    const handleSave = async (silent = false, customData = data) => {
         if (isReadOnly) return;
-        setIsSaving(true);
+        if (!isSaving) setIsSaving(true);
         try {
             const res = await authenticatedFetch(`/api/v1/student/reports`, {
                 method: 'POST',
                 body: JSON.stringify({
-                    ...data,
+                    ...customData,
                     status: 'draft'
                 })
             });
@@ -132,6 +167,7 @@ function ReportFormContent() {
             if (!silent) toast.error('Failed to save progress');
         } finally {
             setIsSaving(false);
+            setAiStatus(null);
         }
     };
 
@@ -294,16 +330,16 @@ function ReportFormContent() {
                     Previous Step
                 </Button>
 
-                {!(activeStep === 11 && data?.status === 'submitted') && (
+                {!(activeStep === 11 && (data?.status === 'submitted' || data?.status === 'approved')) && (
                     <Button
                         type="button"
                         onClick={handleNext}
                         disabled={isSaving}
-                        className="bg-blue-600 hover:bg-blue-700 text-white px-8"
+                        className="bg-blue-600 hover:bg-blue-700 text-white px-8 transition-all"
                     >
-                        {isSaving && activeStep === 11 ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
-                        {activeStep === 11 ? (isSaving ? 'Submitting...' : 'Submit Report') : 'Next Step'}
-                        {activeStep !== 11 && <ChevronRight className="w-4 h-4 ml-2" />}
+                        {isSaving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                        {activeStep === 11 ? (isSaving ? 'Submitting...' : 'Submit Report') : (aiStatus || 'Next Step')}
+                        {activeStep !== 11 && !isSaving && <ChevronRight className="w-4 h-4 ml-2" />}
                     </Button>
                 )}
             </div>

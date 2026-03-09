@@ -16,26 +16,31 @@ export async function POST(req: Request) {
 
         switch (section) {
             case "section2":
-                prompt = `Summarize the following project context and problem definition for a social impact report. 
-                Focus on WHY this project is necessary. Keep it professional, objective, and around 2-3 sentences.
+                prompt = `You are a student writing a formal community service report. Summarize the project context and problem definition. 
+                Focus on WHY this project was necessary. 
+                Strictly write in the first person ('I' or 'We'). Write exactly 2 to 3 concise sentences. 
+                Do NOT use any markdown formatting, asterisks, or bullet points. Output plain text only.
                 
                 Problem Statement: ${data.problem_statement}
                 Discipline: ${data.discipline}
-                Contribution: ${data.discipline_contribution}
-                Problem Category: ${data.problem_category}`;
+                Contribution: ${data.discipline_contribution}`;
                 break;
 
             case "section3":
-                prompt = `Summarize the SDG contribution intent for this project. 
-                Focus on the INTENT and PLAN, not outcomes. Keep it professional and concise (2 sentences).
+                prompt = `You are a student writing a formal community service report. Summarize the SDG contribution intent. 
+                Focus on your INTENT and PLAN to address the goal. 
+                Strictly write in the first person ('I' or 'We'). Write exactly 2 concise sentences. 
+                Do NOT use any markdown formatting, asterisks, or bullet points. Output plain text only.
                 
                 Primary SDG: ${data.primary_sdg?.goal_title}
                 Intent Statement: ${data.contribution_intent_statement}`;
                 break;
 
             case "section4":
-                prompt = `Summarize the activities and outputs delivered in this project.
-                Be specific about quantities and categories. Keep it professional and factual.
+                prompt = `You are a student writing a formal community service report. Summarize the activities and outputs delivered in this project.
+                Be specific about quantities, categories, and reach. 
+                Strictly write in the first person ('I' or 'We'). Write exactly 3 concise sentences. 
+                Do NOT use any markdown formatting, asterisks, or bullet points. Output plain text only.
                 
                 Activities: ${JSON.stringify(data.activities)}
                 Beneficiaries: ${data.total_beneficiaries}
@@ -43,23 +48,69 @@ export async function POST(req: Request) {
                 break;
 
             case "section5":
-                prompt = `Summarize the impact and measurable outcomes achieved.
-                Highlight the change from baseline to endline. Keep it professional and inspiring.
+                prompt = `You are a student writing a formal community service report. Summarize the impact and measurable outcomes achieved.
+                Highlight the change from baseline to endline data. 
+                Strictly write in the first person ('I' or 'We'). Write exactly 3 concise sentences. 
+                Do NOT use any markdown formatting, asterisks, or bullet points. Output plain text only.
                 
                 Observed Change: ${data.observed_change}
                 Metrics: ${JSON.stringify(data.measurable_outcomes)}`;
                 break;
 
             case "section8":
-                prompt = `Generate a verification statement for the evidence and ethical compliance of this project.
-                Mention the types of evidence uploaded and that ethical standards were met.
+                prompt = `You are a student writing a formal community service report. Generate a verification statement confirming the uploaded evidence and ethical compliance of this project.
+                Validate that strict ethical standards were met during execution.
+                Strictly write in the first person ('I' or 'We'). Write exactly 2 to 3 concise sentences. 
+                Do NOT use any markdown formatting, asterisks, or bullet points. Output plain text only.
                 
                 Evidence Types: ${JSON.stringify(data.evidence_types)}
                 Ethical Compliance: ${JSON.stringify(data.ethical_compliance)}`;
                 break;
 
+            case "section9":
+                prompt = `You are a student writing a formal community service report. Summarize your personal reflection and academic integration.
+                Highlight personal growth and how academic knowledge was applied.
+                Strictly write in the first person ('I' or 'We'). Write exactly 3 concise sentences. 
+                Do NOT use any markdown formatting, asterisks, or bullet points. Output plain text only.
+                
+                Academic Application: ${data.academic_application}
+                Personal Learning: ${data.personal_learning}`;
+                break;
+
+            case "section10":
+                prompt = `You are a student writing a formal community service report. Summarize the sustainability and future continuation plans for this project.
+                Highlight the mechanisms put in place to ensure long-term impact.
+                Strictly write in the first person ('I' or 'We'). Write exactly 2 to 3 concise sentences. 
+                Do NOT use any markdown formatting, asterisks, or bullet points. Output plain text only.
+                
+                Continuation Status: ${data.continuation_status}
+                Mechanisms: ${JSON.stringify(data.mechanisms)}
+                Details: ${data.continuation_details}`;
+                break;
+
+            case "section11":
+                prompt = `You are an expert grant writer and impact analyst. Write a comprehensive "Executive Impact Summary" for a Community Engagement Report.
+                Synthesize the following project data into exactly THREE cohesive, professional paragraphs:
+                Paragraph 1: Context & Intent (Summarize the problem, academic discipline, and SDG alignment).
+                Paragraph 2: Execution & Collaboration (Summarize the activities, beneficiary reach, resources used, and key partnerships).
+                Paragraph 3: Outcomes & Legacy (Summarize the measurable changes, academic/personal reflections, and sustainability plans).
+                
+                Do NOT use any markdown formatting (no asterisks, no hash tags, no bolding, no lists). Output plain text only, using double newlines between the 3 paragraphs.
+                
+                Data:
+                - Section 1 (Verified Hours): ${data.section1?.metrics?.total_verified_hours}
+                - Section 2 (Problem): ${data.section2?.problem_statement}
+                - Section 3 (SDG): Goal ${data.section3?.primary_sdg?.goal_number}
+                - Section 4 (Activities & Reach): ${data.section4?.total_beneficiaries} beneficiaries. Actions: ${JSON.stringify(data.section4?.activities)}
+                - Section 5 (Outcomes): ${data.section5?.observed_change}
+                - Section 6 (Resources): ${JSON.stringify(data.section6?.resources)}
+                - Section 7 (Partnerships): ${JSON.stringify(data.section7?.partners)}
+                - Section 9 (Reflection): ${data.section9?.personal_learning}
+                - Section 10 (Sustainability): ${JSON.stringify(data.section10?.mechanisms)}`;
+                break;
+
             default:
-                prompt = `Summarize the following project data professional for a formal report: ${JSON.stringify(data)}`;
+                prompt = `Summarize the following project data professional for a formal report: ${JSON.stringify(data)} `;
         }
 
         const result = await model.generateContent(prompt);

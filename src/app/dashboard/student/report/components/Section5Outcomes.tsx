@@ -269,47 +269,50 @@ function OutcomeCard({
                         </span>
                     </div>
 
-                    {/* Unit */}
-                    <div className="space-y-2">
-                        <Label className="report-label">Unit of Measurement</Label>
-                        <select
-                            value={outcome.unit}
-                            onChange={e => onUpdate('unit', e.target.value)}
-                            className="w-full h-11 bg-white border-2 border-slate-100 rounded-xl px-4 font-bold text-slate-700 text-xs outline-none focus:border-report-primary-border"
-                        >
-                            <option value="">Select Unit...</option>
-                            {units.map(u => <option key={u} value={u}>{u}</option>)}
-                        </select>
-                        {outcome.unit === 'Other' && (
-                            <input
-                                type="text"
-                                placeholder="Specify unit..."
-                                value={outcome.unit_other || ''}
-                                onChange={e => onUpdate('unit_other', e.target.value)}
-                                className="w-full h-10 bg-white border-2 border-emerald-100 rounded-xl px-4 text-xs font-bold text-slate-700 outline-none"
-                            />
-                        )}
-                    </div>
+                    {/* Unit and Confidence Level Grid */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* Unit */}
+                        <div className="space-y-2">
+                            <Label className="report-label">Unit of Measurement</Label>
+                            <select
+                                value={outcome.unit}
+                                onChange={e => onUpdate('unit', e.target.value)}
+                                className="w-full h-11 bg-white border-2 border-slate-100 rounded-xl px-4 font-bold text-slate-700 text-xs outline-none focus:border-report-primary-border"
+                            >
+                                <option value="">Select Unit...</option>
+                                {units.map(u => <option key={u} value={u}>{u}</option>)}
+                            </select>
+                            {outcome.unit === 'Other' && (
+                                <input
+                                    type="text"
+                                    placeholder="Specify unit..."
+                                    value={outcome.unit_other || ''}
+                                    onChange={e => onUpdate('unit_other', e.target.value)}
+                                    className="w-full h-10 bg-white border-2 border-emerald-100 rounded-xl px-4 text-xs font-bold text-slate-700 outline-none"
+                                />
+                            )}
+                        </div>
 
-                    {/* 5.2F Confidence Level */}
-                    <div className="space-y-2">
-                        <Label className="report-label">5.2F — Confidence Level</Label>
-                        <div className="grid grid-cols-2 gap-2">
-                            {confidenceLevels.map(lvl => (
-                                <button
-                                    key={lvl}
-                                    type="button"
-                                    onClick={() => onUpdate('confidence_level', lvl)}
-                                    className={clsx(
-                                        "px-3 py-2 rounded-xl border-2 text-[9px] font-black uppercase tracking-wider text-left transition-all",
-                                        outcome.confidence_level === lvl
-                                            ? "border-emerald-600 bg-emerald-50 text-emerald-900"
-                                            : "border-slate-100 bg-white text-slate-500 hover:bg-slate-50"
-                                    )}
-                                >
-                                    {lvl}
-                                </button>
-                            ))}
+                        {/* 5.2F Confidence Level */}
+                        <div className="space-y-2">
+                            <Label className="report-label">5.2F — Confidence Level</Label>
+                            <div className="grid grid-cols-2 gap-2">
+                                {confidenceLevels.map(lvl => (
+                                    <button
+                                        key={lvl}
+                                        type="button"
+                                        onClick={() => onUpdate('confidence_level', lvl)}
+                                        className={clsx(
+                                            "px-3 py-2 rounded-xl border-2 text-[9px] font-black uppercase tracking-wider text-left transition-all",
+                                            outcome.confidence_level === lvl
+                                                ? "border-emerald-600 bg-emerald-50 text-emerald-900"
+                                                : "border-slate-100 bg-white text-slate-500 hover:bg-slate-50"
+                                        )}
+                                    >
+                                        {lvl}
+                                    </button>
+                                ))}
+                            </div>
                         </div>
                     </div>
 
@@ -360,26 +363,7 @@ export default function Section5Outcomes() {
     const challengeWords = (section5.challenges || '').trim().split(/\s+/).filter(w => w.length > 0).length;
 
     // ── Auto-generated summary ────────────────────────────────────────────────
-    // ─── AI Summarization Logic ─────────────────────────────────────────────
-    const [isGenerating, setIsGenerating] = useState(false);
 
-    const handleGenerateAISummary = async () => {
-        if (outcomes.length === 0 || !observed_change) {
-            toast.error("Please add outcomes and observed change first");
-            return;
-        }
-
-        setIsGenerating(true);
-        const result = await generateAISummary("section5", section5);
-        setIsGenerating(false);
-
-        if (result.error) {
-            toast.error(result.error);
-        } else if (result.summary) {
-            updateSection('section5', { summary_text: result.summary });
-            toast.success("AI Summary generated!");
-        }
-    };
 
     const autoSummary = useMemo(() => {
         if (section5.summary_text && (section5.summary_text.length > 50 || !section5.summary_text.includes("The project successfully achieved"))) {
@@ -399,29 +383,7 @@ export default function Section5Outcomes() {
         }
     }, [autoSummary, section5.summary_text]);
 
-    // ─── Automated AI Summarization ─────────────────────────────────────────
-    const debouncedData = useDebounce({
-        observed_change: section5.observed_change,
-        outcomes: section5.measurable_outcomes
-    }, 3000);
-    const [lastAutoGeneratedFor, setLastAutoGeneratedFor] = useState('');
 
-    useEffect(() => {
-        const hasData = (debouncedData.observed_change?.length > 300) && debouncedData.outcomes.length > 0;
-        const currentDataKey = JSON.stringify(debouncedData);
-
-        const canAutoGenerate =
-            hasData &&
-            currentDataKey !== lastAutoGeneratedFor &&
-            (!section5.summary_text ||
-                section5.summary_text.includes("The project successfully achieved") ||
-                section5.summary_text.length < 50);
-
-        if (canAutoGenerate && !isGenerating) {
-            setLastAutoGeneratedFor(currentDataKey);
-            handleGenerateAISummary();
-        }
-    }, [debouncedData, section5.summary_text, isGenerating]);
 
     // ── Observed change word count ────────────────────────────────────────────
     const observedWords = (section5.observed_change || '').trim().split(/\s+/).filter(w => w.length > 0).length;

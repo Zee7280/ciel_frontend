@@ -95,9 +95,9 @@ export default function Section11Summary() {
             {/* Executive Impact Summary */}
             <div className="bg-white border-2 border-slate-100 rounded-[3rem] p-12 relative overflow-hidden group shadow-2xl shadow-slate-100">
                 <div className="absolute right-0 top-0 w-96 h-96 bg-slate-50 rounded-full -mr-48 -mt-48 blur-3xl group-hover:bg-indigo-50 transition-colors duration-1000" />
-                <div className="relative z-10 flex flex-col lg:flex-row items-center gap-12">
-                    <div className="space-y-6 flex-1 text-center lg:text-left">
-                        <div className="flex items-center justify-between">
+                <div className="relative z-10 flex flex-col lg:flex-row items-stretch gap-12">
+                    <div className="space-y-6 flex-1 text-left">
+                        <div className="flex items-center justify-between border-b border-slate-100 pb-6">
                             <div className="inline-flex items-center gap-3 px-5 py-2 rounded-full bg-report-primary text-white text-[10px] font-black uppercase tracking-widest shadow-lg">
                                 <Quote className="w-3 h-3 text-white opacity-50" /> AI-Generated Executive Summary
                             </div>
@@ -111,11 +111,15 @@ export default function Section11Summary() {
                                 Improve with AI
                             </button>
                         </div>
-                        <h3 className="report-h2 !text-3xl">Project Impact Profile</h3>
-                        <p className="report-ai-text !italic">
-                            "{executiveSummary}"
-                        </p>
-                        <div className="flex flex-wrap items-center justify-center lg:justify-start gap-4">
+                        <h3 className="report-h2 !text-3xl">Comprehensive Impact Profile</h3>
+                        <div className="space-y-4 pt-2">
+                            {executiveSummary.split('\n\n').map((paragraph: string, idx: number) => (
+                                <p key={idx} className="report-ai-text !italic leading-relaxed">
+                                    {paragraph.trim().replace(/^Paragraph \d: /, '').replace(/^Paragraph \d - /, '')}
+                                </p>
+                            ))}
+                        </div>
+                        <div className="flex flex-wrap items-center justify-start gap-4 pt-4 border-t border-slate-50">
                             <span className="flex items-center gap-2 text-[9px] font-black text-report-primary bg-report-primary-soft px-3 py-1 rounded-lg border border-report-primary-border uppercase tracking-widest">
                                 <Sparkles className="w-3 h-3" /> Integrity Verified
                             </span>
@@ -123,9 +127,6 @@ export default function Section11Summary() {
                                 <TrendingUp className="w-3 h-3" /> Growth Documented
                             </span>
                         </div>
-                    </div>
-                    <div className="w-48 h-48 rounded-[2rem] bg-slate-50 border-4 border-white shadow-inner flex items-center justify-center shrink-0 group-hover:rotate-6 transition-transform">
-                        <Award className="w-20 h-20 text-slate-200 group-hover:text-report-primary transition-colors" />
                     </div>
                 </div>
             </div>
@@ -185,15 +186,41 @@ export default function Section11Summary() {
 
             {/* Final Action Hub */}
             <div className="pt-10 border-t-2 border-slate-50 flex flex-col items-center gap-6 text-center">
-                <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mb-2">
-                    <ShieldAlert className="w-8 h-8 text-slate-400" />
-                </div>
-                <div className="max-w-md space-y-2">
-                    <h3 className="report-h3 !text-xl">Report Locked Pending Approval</h3>
-                    <p className="report-help">
-                        The final impact dossier and certificate will be available for preview and download once the report has been reviewed and approved by the NGO and university administration.
-                    </p>
-                </div>
+                {data?.status === 'submitted' || data?.status === 'approved' ? (
+                    <>
+                        <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mb-2">
+                            <ShieldAlert className="w-8 h-8 text-slate-400" />
+                        </div>
+                        <div className="max-w-md space-y-2">
+                            <h3 className="report-h3 !text-xl">Report Locked Pending Approval</h3>
+                            <p className="report-help">
+                                The final impact dossier and certificate will be available for preview and download once the report has been reviewed and approved by the NGO and university administration.
+                            </p>
+                        </div>
+                    </>
+                ) : (
+                    <>
+                        <div className="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center mb-2">
+                            <CheckCircle className="w-8 h-8 text-blue-600" />
+                        </div>
+                        <div className="max-w-md space-y-4">
+                            <h3 className="report-h3 !text-xl !text-slate-900">Ready for Final Submission</h3>
+                            <p className="report-help !text-slate-600">
+                                Please review your institutional impact dashboard above. Once submitted, you will not be able to edit this report.
+                            </p>
+                            <Button
+                                onClick={() => {
+                                    // Trigger the footer's submit button
+                                    const footerSubmitBtn = Array.from(document.querySelectorAll('button')).find(btn => btn.textContent?.includes('Submit Report'));
+                                    if (footerSubmitBtn) footerSubmitBtn.click();
+                                }}
+                                className="bg-report-primary hover:bg-report-primary-border text-white px-8 h-12 rounded-xl w-full"
+                            >
+                                Submit Final Report
+                            </Button>
+                        </div>
+                    </>
+                )}
             </div>
 
             {/* ── Print Preview Modal ── */}

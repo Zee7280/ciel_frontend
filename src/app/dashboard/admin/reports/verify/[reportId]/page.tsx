@@ -7,7 +7,7 @@ import {
     ArrowLeft, CheckCircle2, XCircle, Download, ExternalLink,
     User, Building2, Calendar, Target, Users, Activity,
     TrendingUp, Package, Handshake, FileText, MessageSquare,
-    Globe, MapPin, Clock as ClockIcon
+    Globe, MapPin, Clock as ClockIcon, Lock
 } from 'lucide-react';
 import { toast } from 'sonner';
 import clsx from 'clsx';
@@ -94,9 +94,9 @@ export default function AdminReportDetailPage() {
         }
     };
 
-    const handleVerify = async (action: 'approve' | 'reject') => {
-        if (action === 'reject' && !feedback.trim()) {
-            toast.error('Please provide feedback for rejection');
+    const handleVerify = async (action: 'approve' | 'reject' | 'unlock') => {
+        if ((action === 'reject' || action === 'unlock') && !feedback.trim()) {
+            toast.error(`Please provide notes/feedback for ${action === 'unlock' ? 'unlocking' : 'rejection'}`);
             return;
         }
 
@@ -518,42 +518,50 @@ export default function AdminReportDetailPage() {
                 </div>
 
                 {/* Verification Actions */}
-                {(report.status === 'submitted' || report.status === 'partner_verified') && report.admin_status !== 'approved' && (
-                    <div id="actions" className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm">
-                        <h3 className="text-xl font-black text-slate-900 mb-6">Admin Verification Actions</h3>
+                <div id="actions" className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm mt-8">
+                    <h3 className="text-xl font-black text-slate-900 mb-6">Admin Actions</h3>
 
-                        <div className="space-y-4">
-                            <div>
-                                <label className="text-sm font-bold text-slate-700 mb-2 block">Feedback (Optional for Approval, Required for Rejection)</label>
-                                <textarea
-                                    value={feedback}
-                                    onChange={(e) => setFeedback(e.target.value)}
-                                    placeholder="Provide feedback on this report..."
-                                    className="w-full min-h-[120px] rounded-2xl border border-slate-200 p-4 focus:outline-none focus:ring-4 focus:ring-blue-50 focus:border-blue-400"
-                                />
-                            </div>
+                    <div className="space-y-4">
+                        <div>
+                            <label className="text-sm font-bold text-slate-700 mb-2 block">Feedback / Notes (Optional for Approval/Unlock, Required for Rejection)</label>
+                            <textarea
+                                value={feedback}
+                                onChange={(e) => setFeedback(e.target.value)}
+                                placeholder="Provide feedback or admin notes..."
+                                className="w-full min-h-[120px] rounded-2xl border border-slate-200 p-4 focus:outline-none focus:ring-4 focus:ring-blue-50 focus:border-blue-400"
+                            />
+                        </div>
 
-                            <div className="flex gap-4">
-                                <button
-                                    onClick={() => handleVerify('approve')}
-                                    disabled={isVerifying}
-                                    className="flex-1 flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white rounded-2xl font-bold py-4 text-lg shadow-lg shadow-green-200 transition-all disabled:opacity-50"
-                                >
-                                    <CheckCircle2 className="w-5 h-5" />
-                                    Approve Report
-                                </button>
-                                <button
-                                    onClick={() => handleVerify('reject')}
-                                    disabled={isVerifying}
-                                    className="flex-1 flex items-center justify-center gap-2 border-2 border-red-300 text-red-600 hover:bg-red-50 rounded-2xl font-bold py-4 text-lg transition-all disabled:opacity-50"
-                                >
-                                    <XCircle className="w-5 h-5" />
-                                    Reject Report
-                                </button>
-                            </div>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <button
+                                onClick={() => handleVerify('approve')}
+                                disabled={isVerifying || report.admin_status === 'approved'}
+                                className="flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white rounded-2xl font-bold py-4 text-sm lg:text-base shadow-lg shadow-green-200 transition-all disabled:opacity-50"
+                            >
+                                <CheckCircle2 className="w-5 h-5" />
+                                {report.admin_status === 'approved' ? 'Already Approved' : 'Approve Report'}
+                            </button>
+
+                            <button
+                                onClick={() => handleVerify('reject')}
+                                disabled={isVerifying || report.status === 'rejected'}
+                                className="flex items-center justify-center gap-2 border-2 border-red-300 text-red-600 hover:bg-red-50 rounded-2xl font-bold py-4 text-sm lg:text-base transition-all disabled:opacity-50"
+                            >
+                                <XCircle className="w-5 h-5" />
+                                {report.status === 'rejected' ? 'Already Rejected' : 'Reject Report'}
+                            </button>
+
+                            <button
+                                onClick={() => handleVerify('unlock')}
+                                disabled={isVerifying || report.status === 'draft'}
+                                className="flex items-center justify-center gap-2 border-2 border-blue-300 text-blue-600 hover:bg-blue-50 rounded-2xl font-bold py-4 text-sm lg:text-base transition-all disabled:opacity-50"
+                            >
+                                <Lock className="w-5 h-5 mb-0.5" />
+                                {report.status === 'draft' ? 'Currently Unlocked' : 'Unlock for Changes'}
+                            </button>
                         </div>
                     </div>
-                )}
+                </div>
             </div>
         </div>
     );
