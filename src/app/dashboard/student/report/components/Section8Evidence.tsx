@@ -149,88 +149,117 @@ export default function Section8Evidence() {
                 </div>
                 <div className="bg-white rounded-[2.5rem] border-2 border-slate-100 p-8 shadow-sm space-y-6">
                     <div className="space-y-1">
-                        <Label className="report-h3 !text-sm">Evidence Submission</Label>
-                        <p className="report-help">
-                            You must upload at least one valid evidence file before submitting this section.
-                        </p>
+                        <Label className="report-h3 !text-sm">Do you have evidence to upload?</Label>
+                        <p className="report-help">Selecting 'No' will bypass evidence requirements, but may affect report credibility.</p>
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                        <div className="space-y-2">
-                            <p className="report-label !text-slate-600">Accepted Formats</p>
-                            <ul className="text-xs font-semibold text-slate-500 space-y-1 list-disc list-inside">
-                                <li>JPG / PNG (Photos)</li>
-                                <li>MP4 (Short videos)</li>
-                                <li>PDF (Attendance sheets, reports, structured documents)</li>
-                                <li>Official letters & Email confirmations</li>
-                                <li>Media coverage links (can be included in description)</li>
-                            </ul>
-                        </div>
-                        <div className="space-y-2">
-                            <p className="report-label !text-slate-600">What Your Evidence Should Show</p>
-                            <ul className="text-xs font-semibold text-slate-500 space-y-1 list-disc list-inside">
-                                <li>The activity took place</li>
-                                <li>You participated</li>
-                                <li>Beneficiaries were engaged</li>
-                                <li>Outputs were delivered</li>
-                            </ul>
-                            <p className="text-[9px] font-black text-red-500 uppercase flex items-center gap-1 mt-2">
-                                <AlertCircle className="w-3 h-3" /> Do not upload unrelated or misleading material
-                            </p>
-                        </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pb-4">
+                        <button
+                            type="button"
+                            onClick={() => update('has_evidence', 'no')}
+                            className={clsx(
+                                "p-6 rounded-2xl border-2 text-left transition-all space-y-2",
+                                section8.has_evidence === 'no'
+                                    ? "border-amber-600 bg-amber-50 shadow-sm"
+                                    : "border-slate-100 bg-slate-50 text-slate-600 hover:border-slate-300"
+                            )}
+                        >
+                            <p className={clsx("font-bold text-sm", section8.has_evidence === 'no' ? "text-amber-700" : "text-slate-700")}>⭕ No — I do not have evidence</p>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => update('has_evidence', 'yes')}
+                            className={clsx(
+                                "p-6 rounded-2xl border-2 text-left transition-all space-y-2",
+                                section8.has_evidence === 'yes'
+                                    ? "border-report-primary bg-report-primary-soft shadow-sm"
+                                    : "border-slate-100 bg-slate-50 text-slate-600 hover:border-report-primary-border"
+                            )}
+                        >
+                            <p className={clsx("font-bold text-sm", section8.has_evidence === 'yes' ? "text-report-primary" : "text-slate-700")}>⭕ Yes — I have evidence to upload</p>
+                        </button>
                     </div>
-                    <FileUpload
-                        label="Drag & Drop Files or Click to Browse"
-                        onChange={(e) => {
-                            if (e.target.files) {
-                                update('evidence_files', [...(evidence_files || []), ...Array.from(e.target.files)]);
-                            }
-                        }}
-                    />
-                    <FieldError message={getFieldError('section8.evidence_files')} />
 
-                    {/* Evidence Files List */}
-                    {evidence_files && evidence_files.length > 0 && (
-                        <div className="space-y-3 animate-in fade-in slide-in-from-top-2">
-                            <Label className="report-label">Attached Evidence ({evidence_files.length})</Label>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                {evidence_files.map((file: File, fIdx: number) => (
-                                    <div key={fIdx} className="flex items-center justify-between p-3 bg-slate-50 border border-slate-100 rounded-xl group/file">
-                                        <div className="flex items-center gap-3 overflow-hidden">
-                                            <div className="w-8 h-8 rounded-lg bg-report-primary-soft text-report-primary flex items-center justify-center shrink-0">
-                                                <ImageIcon className="w-4 h-4" />
-                                            </div>
-                                            <div className="overflow-hidden">
-                                                <p className="text-xs font-bold text-slate-700 truncate">{file.name}</p>
-                                                <p className="text-[9px] font-medium text-slate-400 uppercase">{(file.size / (1024 * 1024)).toFixed(2)} MB</p>
-                                            </div>
-                                        </div>
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                const kept = evidence_files.filter((_: any, i: number) => i !== fIdx);
-                                                update('evidence_files', kept);
-                                            }}
-                                            className="w-7 h-7 rounded-lg bg-white text-slate-400 flex items-center justify-center hover:bg-red-50 hover:text-red-500 transition-all border border-slate-100"
-                                        >
-                                            <Trash2 className="w-3.5 h-3.5" />
-                                        </button>
-                                    </div>
-                                ))}
+                    {section8.has_evidence === 'yes' && (
+                        <>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                                <div className="space-y-2">
+                                    <p className="report-label !text-slate-600">Accepted Formats</p>
+                                    <ul className="text-xs font-semibold text-slate-500 space-y-1 list-disc list-inside">
+                                        <li>JPG / PNG (Photos)</li>
+                                        <li>MP4 (Short videos)</li>
+                                        <li>PDF (Attendance sheets, reports, structured documents)</li>
+                                        <li>Official letters & Email confirmations</li>
+                                        <li>Media coverage links (can be included in description)</li>
+                                    </ul>
+                                </div>
+                                <div className="space-y-2">
+                                    <p className="report-label !text-slate-600">What Your Evidence Should Show</p>
+                                    <ul className="text-xs font-semibold text-slate-500 space-y-1 list-disc list-inside">
+                                        <li>The activity took place</li>
+                                        <li>You participated</li>
+                                        <li>Beneficiaries were engaged</li>
+                                        <li>Outputs were delivered</li>
+                                    </ul>
+                                    <p className="text-[9px] font-black text-red-500 uppercase flex items-center gap-1 mt-2">
+                                        <AlertCircle className="w-3 h-3" /> Do not upload unrelated or misleading material
+                                    </p>
+                                </div>
                             </div>
-                        </div>
+                            <FileUpload
+                                label="Drag & Drop Files or Click to Browse"
+                                onChange={(e) => {
+                                    if (e.target.files) {
+                                        update('evidence_files', [...(evidence_files || []), ...Array.from(e.target.files)]);
+                                    }
+                                }}
+                            />
+                            <FieldError message={getFieldError('section8.evidence_files')} />
+
+                            {/* Evidence Files List */}
+                            {evidence_files && evidence_files.length > 0 && (
+                                <div className="space-y-3 animate-in fade-in slide-in-from-top-2">
+                                    <Label className="report-label">Attached Evidence ({evidence_files.length})</Label>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                        {evidence_files.map((file: File, fIdx: number) => (
+                                            <div key={fIdx} className="flex items-center justify-between p-3 bg-slate-50 border border-slate-100 rounded-xl group/file">
+                                                <div className="flex items-center gap-3 overflow-hidden">
+                                                    <div className="w-8 h-8 rounded-lg bg-report-primary-soft text-report-primary flex items-center justify-center shrink-0">
+                                                        <ImageIcon className="w-4 h-4" />
+                                                    </div>
+                                                    <div className="overflow-hidden">
+                                                        <p className="text-xs font-bold text-slate-700 truncate">{file.name}</p>
+                                                        <p className="text-[9px] font-medium text-slate-400 uppercase">{(file.size / (1024 * 1024)).toFixed(2)} MB</p>
+                                                    </div>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        const kept = evidence_files.filter((_: any, i: number) => i !== fIdx);
+                                                        update('evidence_files', kept);
+                                                    }}
+                                                    className="w-7 h-7 rounded-lg bg-white text-slate-400 flex items-center justify-center hover:bg-red-50 hover:text-red-500 transition-all border border-slate-100"
+                                                >
+                                                    <Trash2 className="w-3.5 h-3.5" />
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                            <div className="flex items-center justify-between px-2">
+                                <span className="report-label">Upload Status</span>
+                                {evidence_files?.length ? (
+                                    <span className="text-[10px] font-black text-report-primary bg-report-primary-soft px-3 py-1 rounded-lg border border-report-primary-border flex items-center gap-1.5">
+                                        <CheckCircle2 className="w-3.5 h-3.5" /> {evidence_files.length} Files Attached
+                                    </span>
+                                ) : (
+                                    <span className="text-[10px] font-black text-amber-600 bg-amber-50 px-3 py-1 rounded-lg border border-amber-100 flex items-center gap-1.5">
+                                        <AlertCircle className="w-3.5 h-3.5" /> Missing Evidence
+                                    </span>
+                                )}
+                            </div>
+                        </>
                     )}
-                    <div className="flex items-center justify-between px-2">
-                        <span className="report-label">Upload Status</span>
-                        {evidence_files?.length ? (
-                            <span className="text-[10px] font-black text-report-primary bg-report-primary-soft px-3 py-1 rounded-lg border border-report-primary-border flex items-center gap-1.5">
-                                <CheckCircle2 className="w-3.5 h-3.5" /> {evidence_files.length} Files Attached
-                            </span>
-                        ) : (
-                            <span className="text-[10px] font-black text-amber-600 bg-amber-50 px-3 py-1 rounded-lg border border-amber-100 flex items-center gap-1.5">
-                                <AlertCircle className="w-3.5 h-3.5" /> Missing Evidence
-                            </span>
-                        )}
-                    </div>
                 </div>
             </div>
 
@@ -295,11 +324,11 @@ export default function Section8Evidence() {
                     <div className="flex items-center justify-between px-2">
                         <span className={clsx(
                             "report-label",
-                            wordCount >= 50 && wordCount <= 80 ? "text-report-primary" : wordCount > 80 ? "text-red-500" : "text-amber-500"
+                            wordCount >= 100 && wordCount <= 200 ? "text-report-primary" : wordCount > 200 ? "text-red-500" : "text-amber-500"
                         )}>
-                            {wordCount} / 80 words (Min 50)
+                            {wordCount} / 200 words (Min 100)
                         </span>
-                        {wordCount >= 50 && wordCount <= 80 && (
+                        {wordCount >= 100 && wordCount <= 200 && (
                             <span className="text-[10px] font-black text-report-primary flex items-center gap-1">
                                 <CheckCircle2 className="w-3 h-3" /> Valid length
                             </span>

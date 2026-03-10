@@ -223,7 +223,7 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
                 <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center font-black text-[10px]">2.2</div>
                     <h3 className="report-h3">Problem / System Need</h3>
-                    <span className="ml-auto px-3 py-1 rounded-full bg-amber-50 text-amber-700 font-black text-[9px] uppercase tracking-widest border border-amber-100">Mandatory · 100–150 Words</span>
+                    <span className="ml-auto px-3 py-1 rounded-full bg-amber-50 text-amber-700 font-black text-[9px] uppercase tracking-widest border border-amber-100">Mandatory · 100–200 Words</span>
                 </div>
 
                 <div className="bg-white rounded-[2.5rem] border-2 border-slate-100 p-8 shadow-sm space-y-8">
@@ -273,7 +273,7 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
                     {/* Textarea */}
                     <div className="space-y-4">
                         <Textarea
-                            placeholder="Before our intervention, the situation was characterized by... [100–150 Words]"
+                            placeholder="Before our intervention, the situation was characterized by... [100–200 Words]"
                             readOnly={isReadOnly}
                             disabled={isReadOnly}
                             className={clsx(
@@ -291,20 +291,20 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
                                     <div
                                         className={clsx(
                                             "h-full rounded-full transition-all duration-700",
-                                            wordCount < 100 ? "bg-amber-400" : wordCount > 150 ? "bg-red-500" : "bg-emerald-500"
+                                            wordCount < 100 ? "bg-amber-400" : wordCount > 200 ? "bg-red-500" : "bg-emerald-500"
                                         )}
-                                        style={{ width: `${Math.min((wordCount / 150) * 100, 100)}%` }}
+                                        style={{ width: `${Math.min((wordCount / 200) * 100, 100)}%` }}
                                     />
                                 </div>
                                 <span className={clsx(
                                     "report-label",
-                                    wordCount >= 100 && wordCount <= 150 ? "text-emerald-600" : wordCount > 150 ? "text-red-500" : "text-amber-500"
+                                    wordCount >= 100 && wordCount <= 200 ? "text-emerald-600" : wordCount > 200 ? "text-red-500" : "text-amber-500"
                                 )}>
-                                    {wordCount} / 150 words
+                                    {wordCount} / 200 words (Min 100)
                                 </span>
                             </div>
                             <span className="report-help">
-                                Requirement: 100–150 Words
+                                Requirement: 100–200 Words
                             </span>
                         </div>
                         <FieldError message={getFieldError('problem_statement')} />
@@ -382,12 +382,12 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
                             onChange={(e) => updateSection('section2', { discipline_contribution: e.target.value })}
                         />
                         <div className="flex justify-between items-center px-2">
-                            <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest leading-none">Maximum 100 Words</p>
+                            <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest leading-none">100-200 Words</p>
                             <span className={clsx(
                                 "text-[10px] font-black uppercase tracking-widest leading-none",
-                                disciplineWordCount > 100 ? "text-red-500" : disciplineWordCount >= 40 ? "text-emerald-600" : "text-slate-400"
+                                disciplineWordCount > 200 ? "text-red-500" : disciplineWordCount >= 100 ? "text-emerald-600" : "text-slate-400"
                             )}>
-                                {disciplineWordCount} / 100 Words
+                                {disciplineWordCount} / 200 Words (Min 100)
                             </span>
                         </div>
                         <FieldError message={getFieldError('discipline_contribution')} />
@@ -457,12 +457,12 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
                                 onChange={(e) => updateSection('section2', { baseline_evidence_other: e.target.value })}
                             />
                             <div className="flex justify-between items-center px-2">
-                                <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest leading-none">20–40 words required</p>
+                                <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest leading-none">100-200 words required</p>
                                 <span className={clsx(
                                     "text-[10px] font-black uppercase tracking-widest leading-none",
-                                    otherEvidenceWordCount >= 20 && otherEvidenceWordCount <= 40 ? "text-emerald-600" : "text-amber-500"
+                                    otherEvidenceWordCount >= 100 && otherEvidenceWordCount <= 200 ? "text-emerald-600" : "text-amber-500"
                                 )}>
-                                    {otherEvidenceWordCount} / 40 Words
+                                    {otherEvidenceWordCount} / 200 Words (Min 100)
                                 </span>
                             </div>
                             <FieldError message={getFieldError('baseline_evidence_other')} />

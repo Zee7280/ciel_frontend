@@ -347,7 +347,7 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
                     {/* C3.5 Contribution Logic Statement */}
                     <div className="pt-4 border-t border-slate-100 space-y-3">
                         <label className="block report-h3">
-                            Contribution Logic Statement <span className="report-help normal-case !pl-0">(80–120 words, required)</span>
+                            Contribution Logic Statement <span className="report-help normal-case !pl-0">(100–200 words, required)</span>
                         </label>
                         <p className="report-help !pl-0 font-medium">Explain who benefits and how this activity connects to the selected SDG target. Focus on intent only — no numbers.</p>
                         <Textarea
@@ -364,15 +364,15 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
                                 <div className="h-1.5 w-32 bg-slate-100 rounded-full overflow-hidden">
                                     <div
                                         className={clsx("h-full rounded-full transition-all duration-700",
-                                            wordCount < 80 ? "bg-amber-400" : wordCount > 120 ? "bg-red-500" : "bg-emerald-500"
+                                            wordCount < 100 ? "bg-amber-400" : wordCount > 200 ? "bg-red-500" : "bg-emerald-500"
                                         )}
-                                        style={{ width: `${Math.min((wordCount / 120) * 100, 100)}%` }}
+                                        style={{ width: `${Math.min((wordCount / 200) * 100, 100)}%` }}
                                     />
                                 </div>
                                 <span className={clsx("report-label !tracking-normal",
-                                    wordCount >= 80 && wordCount <= 120 ? "text-emerald-600" : wordCount > 120 ? "text-red-500" : "text-slate-400"
+                                    wordCount >= 100 && wordCount <= 200 ? "text-emerald-600" : wordCount > 200 ? "text-red-500" : "text-slate-400"
                                 )}>
-                                    {wordCount} / 120 words
+                                    {wordCount} / 200 words (Min 100)
                                 </span>
                             </div>
                         </div>
@@ -469,8 +469,8 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
                                                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">BRIEF JUSTIFICATION</label>
                                                         <div className="flex items-center gap-2">
                                                             <span className={clsx("text-[10px] font-bold px-2 py-0.5 rounded-full border",
-                                                                justWords >= 100 && justWords <= 150 ? "bg-emerald-50 text-emerald-600 border-emerald-100" : justWords > 150 ? "bg-red-50 text-red-500 border-red-100" : "bg-slate-50 text-slate-400 border-slate-100"
-                                                            )}>{justWords} / 150 words</span>
+                                                                justWords >= 100 && justWords <= 200 ? "bg-emerald-50 text-emerald-600 border-emerald-100" : justWords > 200 ? "bg-red-50 text-red-500 border-red-100" : "bg-slate-50 text-slate-400 border-slate-100"
+                                                            )}>{justWords} / 200 words (Min 100)</span>
                                                         </div>
                                                     </div>
                                                     <textarea

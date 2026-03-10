@@ -60,6 +60,7 @@ export interface ReportData {
             hec_compliance: 'below' | 'recognized' | 'advanced' | 'full';
         };
         privacy_consent: boolean;
+        review_checked?: boolean[];
         verified_summary?: string; // System-generated narrative
     };
     // Section 2: Project Context (Was Section 1)
@@ -177,6 +178,7 @@ export interface ReportData {
     };
     // Section 8: Evidence (Expanded)
     section8: {
+        has_evidence: 'yes' | 'no' | '';
         evidence_types: string[];
         evidence_files: File[];
         description: string;
@@ -247,6 +249,7 @@ const defaultReportData: ReportData = {
             hec_compliance: 'below'
         },
         privacy_consent: false,
+        review_checked: [false, false, false],
         verified_summary: ''
     },
     section2: {
@@ -312,6 +315,7 @@ const defaultReportData: ReportData = {
         formalization_files: []
     },
     section8: {
+        has_evidence: '',
         evidence_types: [],
         evidence_files: [],
         description: '',

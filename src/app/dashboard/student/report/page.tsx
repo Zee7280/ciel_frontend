@@ -83,8 +83,13 @@ function ReportFormContent() {
                 const actualReportData = reportData.data || reportData; // Handle potential wrapper
                 if (actualReportData && Object.keys(actualReportData).length > 0) {
                     setFullData(actualReportData);
-                    // If the user already has a saved report draft, skip the guide
-                    if (actualReportData.status === 'draft' || Object.keys(actualReportData).length > 2) {
+                    const isSubmitted = ['submitted', 'approved', 'under_review'].includes(actualReportData.status);
+                    if (isSubmitted) {
+                        // Report already submitted — skip guide, go straight to summary
+                        setShowGuide(false);
+                        setStep(11);
+                        setReadOnly(true);
+                    } else if (actualReportData.status === 'draft' || Object.keys(actualReportData).length > 2) {
                         setShowGuide(false);
                     }
                 }
@@ -258,77 +263,85 @@ function ReportFormContent() {
                 </div>
             </div>
 
-            {/* Stepper */}
-            <div className="bg-white border border-slate-200 rounded-xl p-4">
-                <div className="flex flex-wrap gap-2">
-                    {steps.map((label, i) => {
-                        const stepNum = i + 1;
-                        const isActive = activeStep === stepNum;
-                        const isCompleted = activeStep > stepNum;
+            {/* Main Layout Wrap */}
+            <div className="flex flex-col gap-8">
+                <div className="flex-1 space-y-8 min-w-0">
+                    {/* Stepper */}
+                    <div className="bg-white border border-slate-200 rounded-xl p-4">
+                        <div className="flex flex-wrap gap-2">
+                            {steps.map((label, i) => {
+                                const stepNum = i + 1;
+                                const isActive = activeStep === stepNum;
+                                const isCompleted = activeStep > stepNum;
 
-                        return (
-                            <div key={label} className="flex items-center mb-2">
-                                <div
-                                    onClick={() => {
-                                        // Allow jumping to any completed step, or any step if read-only
-                                        if (isCompleted || isReadOnly) {
-                                            setStep(stepNum);
-                                        } else if (isActive) {
-                                            // Do nothing if clicking current step
-                                        } else {
-                                            // Validate current before jumping forward
-                                            if (validateCurrentSection()) {
-                                                setStep(stepNum);
-                                            } else {
-                                                const firstError = Object.values(validationErrors)[0]?.[0]?.message;
-                                                toast.error(firstError || 'Please fix errors before skipping ahead');
-                                            }
-                                        }
-                                    }}
-                                    className={clsx(
-                                        "flex items-center gap-2 px-3 py-1.5 rounded-lg transition-colors text-sm font-medium",
-                                        isActive ? "bg-blue-600 text-white shadow-md shadow-blue-200 cursor-default"
-                                            : isCompleted || isReadOnly ? "bg-blue-50 text-blue-700 cursor-pointer hover:bg-blue-100"
-                                                : "text-slate-400 bg-slate-50 cursor-pointer hover:bg-slate-100"
-                                    )}
-                                >
-                                    <div className={clsx(
-                                        "w-5 h-5 rounded-full flex items-center justify-center text-[10px] border transition-colors",
-                                        isActive ? "border-white bg-white/20" : isCompleted ? "border-blue-200 bg-blue-100" : "border-slate-300"
-                                    )}>
-                                        {stepNum}
+                                return (
+                                    <div key={label} className="flex items-center mb-2">
+                                        <div
+                                            onClick={() => {
+                                                // Allow jumping to any completed step, or any step if read-only
+                                                if (isCompleted || isReadOnly) {
+                                                    setStep(stepNum);
+                                                } else if (isActive) {
+                                                    // Do nothing if clicking current step
+                                                } else {
+                                                    // Validate current before jumping forward
+                                                    if (validateCurrentSection()) {
+                                                        setStep(stepNum);
+                                                    } else {
+                                                        const firstError = Object.values(validationErrors)[0]?.[0]?.message;
+                                                        toast.error(firstError || 'Please fix errors before skipping ahead');
+                                                    }
+                                                }
+                                            }}
+                                            className={clsx(
+                                                "flex items-center gap-2 px-3 py-1.5 rounded-lg transition-colors text-sm font-medium",
+                                                isActive ? "bg-blue-600 text-white shadow-md shadow-blue-200 cursor-default"
+                                                    : isCompleted || isReadOnly ? "bg-blue-50 text-blue-700 cursor-pointer hover:bg-blue-100"
+                                                        : "text-slate-400 bg-slate-50 cursor-pointer hover:bg-slate-100"
+                                            )}
+                                        >
+                                            <div className={clsx(
+                                                "w-5 h-5 rounded-full flex items-center justify-center text-[10px] border transition-colors",
+                                                isActive ? "border-white bg-white/20" : isCompleted ? "border-blue-200 bg-blue-100" : "border-slate-300"
+                                            )}>
+                                                {stepNum}
+                                            </div>
+                                            {label}
+                                        </div>
+                                        {i < steps.length - 1 && (
+                                            <div className="w-4 h-0.5 bg-slate-200 mx-1 hidden sm:block" />
+                                        )}
                                     </div>
-                                    {label}
-                                </div>
-                                {i < steps.length - 1 && (
-                                    <div className="w-4 h-0.5 bg-slate-200 mx-1 hidden sm:block" />
-                                )}
-                            </div>
-                        )
-                    })}
-                </div>
-            </div>
+                                )
+                            })}
+                        </div>
+                    </div>
 
-            {/* Content Area */}
-            <div className="min-h-[400px]">
-                {activeStep === 1 && <Section1Participation projectData={projectDetails} />}
-                {activeStep === 2 && <Section2ProjectContext projectData={projectDetails} />}
-                {activeStep === 3 && <Section3SDGMapping projectData={projectDetails} />}
-                {activeStep === 4 && <Section4Activities />}
-                {activeStep === 5 && <Section5Outcomes />}
-                {activeStep === 6 && <Section6Resources />}
-                {activeStep === 7 && <Section7Partnerships />}
-                {activeStep === 8 && <Section8Evidence />}
-                {activeStep === 9 && <Section9Reflection />}
-                {activeStep === 10 && <Section10Sustainability />}
-                {activeStep === 11 && <Section11Summary />}
+                    {/* Content Area */}
+                    <div className="min-h-[400px]">
+                        {activeStep === 1 && <Section1Participation projectData={projectDetails} />}
+                        {activeStep === 2 && <Section2ProjectContext projectData={projectDetails} />}
+                        {activeStep === 3 && <Section3SDGMapping projectData={projectDetails} />}
+                        {activeStep === 4 && <Section4Activities />}
+                        {activeStep === 5 && <Section5Outcomes />}
+                        {activeStep === 6 && <Section6Resources />}
+                        {activeStep === 7 && <Section7Partnerships />}
+                        {activeStep === 8 && <Section8Evidence />}
+                        {activeStep === 9 && <Section9Reflection />}
+                        {activeStep === 10 && <Section10Sustainability />}
+                        {activeStep === 11 && <Section11Summary />}
+                    </div>
+
+                </div>
             </div>
 
             {/* Footer Navigation */}
             <div className="flex items-center justify-between pt-6 border-t border-slate-200">
-                <Button type="button" variant="outline" onClick={prevStep} disabled={activeStep === 1}>
-                    Previous Step
-                </Button>
+                {!isReadOnly && (
+                    <Button type="button" variant="outline" onClick={prevStep} disabled={activeStep === 1}>
+                        Previous Step
+                    </Button>
+                )}
 
                 {!(activeStep === 11 && (data?.status === 'submitted' || data?.status === 'approved')) && (
                     <Button

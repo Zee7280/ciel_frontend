@@ -47,7 +47,7 @@ export default function Section1Participation({ projectData }: { projectData?: a
     const [isVerified, setIsVerified] = React.useState(!!data.section1.team_lead.verified);
     const [participantId, setParticipantId] = React.useState<string | null>(null);
     const [isSubmitted, setIsSubmitted] = React.useState(!!data.section1.verified_summary);
-    const [reviewChecked, setReviewChecked] = React.useState([false, false, false]);
+    const reviewChecked = data.section1.review_checked || [false, false, false];
     const [isDeleting, setIsDeleting] = React.useState<string | null>(null);
 
     // Hard Validation Gates
@@ -618,7 +618,7 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                                 onChange={() => {
                                                     const newChecked = [...reviewChecked];
                                                     newChecked[i] = !newChecked[i];
-                                                    setReviewChecked(newChecked);
+                                                    updateSection('section1', { review_checked: newChecked });
                                                 }}
                                                 className="mt-1 w-5 h-5 rounded-md border-2 border-slate-200 text-report-primary focus:ring-report-primary transition-colors cursor-pointer"
                                             />

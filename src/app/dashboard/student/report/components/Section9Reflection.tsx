@@ -168,9 +168,9 @@ export default function Section9Reflection() {
                     <div className="flex items-center justify-between px-2">
                         <span className={clsx(
                             "report-label",
-                            plWords >= 80 && plWords <= 120 ? "text-report-primary" : plWords > 120 ? "text-red-500" : "text-amber-500"
+                            plWords >= 100 && plWords <= 200 ? "text-report-primary" : plWords > 200 ? "text-red-500" : "text-amber-500"
                         )}>
-                            {plWords} / 120 words (Min 80)
+                            {plWords} / 200 words (Min 100)
                         </span>
                     </div>
                     <FieldError message={getFieldError('section9.personal_learning')} />
@@ -204,9 +204,9 @@ export default function Section9Reflection() {
                     <div className="flex items-center justify-between px-2">
                         <span className={clsx(
                             "report-label",
-                            aaWords <= 60 ? "text-report-primary" : "text-red-500"
+                            aaWords >= 100 && aaWords <= 200 ? "text-report-primary" : aaWords > 200 ? "text-red-500" : "text-amber-500"
                         )}>
-                            {aaWords} / 60 words (Max 60)
+                            {aaWords} / 200 words (Min 100)
                         </span>
                     </div>
                     <FieldError message={getFieldError('section9.academic_application')} />
@@ -235,9 +235,9 @@ export default function Section9Reflection() {
                     <div className="flex items-center justify-between px-2">
                         <span className={clsx(
                             "report-label",
-                            srWords >= 60 && srWords <= 100 ? "text-report-primary" : srWords > 100 ? "text-red-500" : "text-amber-500"
+                            srWords >= 100 && srWords <= 200 ? "text-report-primary" : srWords > 200 ? "text-red-500" : "text-amber-500"
                         )}>
-                            {srWords} / 100 words (Min 60)
+                            {srWords} / 200 words (Min 100)
                         </span>
                     </div>
                     <FieldError message={getFieldError('section9.sustainability_reflection')} />

@@ -4,6 +4,7 @@ import {
 } from "lucide-react";
 import { Label } from "./ui/label";
 import { Button } from "./ui/button";
+import { Textarea } from "./ui/textarea";
 import { useReportForm } from "../context/ReportContext";
 import { FieldError } from "./ui/FieldError";
 import React, { useMemo, useEffect } from "react";
@@ -154,13 +155,14 @@ function PartnerCard({
                             {partnerTypes.map(t => <option key={t} value={t}>{t}</option>)}
                         </select>
                         {p.type === 'Others (please specify)' && (
-                            <input
-                                type="text" placeholder="Specify partner type..."
+                            <Textarea
+                                placeholder="Specify partner type (100-200 Words)..."
                                 value={p.type_other || ''}
                                 onChange={e => onUpdate('type_other', e.target.value)}
-                                className="w-full h-10 bg-slate-50 border-2 border-indigo-100 rounded-xl px-4 text-xs font-bold text-slate-700 outline-none"
+                                className="w-full h-24 bg-slate-50 border-2 border-indigo-100 rounded-xl px-4 py-3 text-xs font-bold text-slate-700 outline-none resize-none mt-2"
                             />
                         )}
+                        <FieldError message={getFieldError(`partners.${idx}.type`)} />
                     </div>
 
                     {/* Role in Project */}
@@ -183,6 +185,7 @@ function PartnerCard({
                                 </button>
                             ))}
                         </div>
+                        <FieldError message={getFieldError(`partners.${idx}.role`)} />
                     </div>
                 </div>
 
@@ -214,6 +217,7 @@ function PartnerCard({
                                 </button>
                             ))}
                         </div>
+                        <FieldError message={getFieldError(`partners.${idx}.contribution`)} />
                     </div>
 
                     {/* Verification Level */}
@@ -369,6 +373,7 @@ export default function Section7Partnerships() {
                         </button>
                     </div>
                 </div>
+                <FieldError message={getFieldError('has_partners')} />
             </div>
 
             {/* ─── Step 2: Partner Details ──────────────────────────────────── */}

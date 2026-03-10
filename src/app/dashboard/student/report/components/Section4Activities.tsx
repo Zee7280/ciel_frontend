@@ -3,6 +3,7 @@ import { Input } from "./ui/input";
 import { Select } from "./ui/select";
 import { Checkbox } from "./ui/checkbox";
 import { Button } from "./ui/button";
+import { Textarea } from "./ui/textarea";
 import { useReportForm } from "../context/ReportContext";
 import { useDebounce } from "@/hooks/useDebounce";
 import { FieldError } from "./ui/FieldError";
@@ -356,14 +357,12 @@ export default function Section4Activities() {
                                 <div className="space-y-3">
                                     {(act.type === 'Other') && (
                                         <>
-                                            <Label className="report-label text-slate-400">Specify Activity</Label>
-                                            <input
-                                                type="text"
-                                                maxLength={40}
-                                                placeholder="Specify (max 5 words)"
+                                            <Label className="report-label text-slate-400">Specify Activity (100-200 Words)</Label>
+                                            <Textarea
+                                                placeholder="Specify (100-200 Words)..."
                                                 value={act.type_other || ''}
                                                 onChange={(e) => updateActivity(i, 'type_other', e.target.value)}
-                                                className="w-full h-14 bg-slate-50 border-2 border-report-primary-border rounded-2xl px-6 text-xs font-bold text-slate-700 outline-none focus:border-report-primary"
+                                                className="w-full h-24 bg-slate-50 border-2 border-report-primary-border rounded-2xl px-6 py-4 text-xs font-bold text-slate-700 outline-none focus:border-report-primary resize-none"
                                             />
                                         </>
                                     )}
@@ -449,12 +448,11 @@ export default function Section4Activities() {
                             <div className="space-y-3">
                                 {(section4.primary_change_area_others || ['']).map((val: string, idx: number) => (
                                     <div key={idx} className="flex items-center gap-2 animate-in fade-in slide-in-from-left-2 duration-300">
-                                        <input
-                                            type="text"
-                                            placeholder="Specify your change area..."
+                                        <Textarea
+                                            placeholder="Specify your change area (100-200 Words)..."
                                             value={val}
                                             onChange={(e) => updateOtherChangeArea(idx, e.target.value)}
-                                            className="flex-1 h-11 bg-slate-50 border-2 border-report-primary-border rounded-xl px-4 text-xs font-bold text-slate-700 outline-none focus:border-report-primary"
+                                            className="flex-1 h-24 bg-slate-50 border-2 border-report-primary-border rounded-xl px-4 py-3 text-xs font-bold text-slate-700 outline-none focus:border-report-primary resize-none"
                                         />
                                         {(section4.primary_change_area_others || ['']).length > 1 && (
                                             <button
@@ -524,13 +522,12 @@ export default function Section4Activities() {
                                         {/* Other: specify + unit */}
                                         {out.type === 'Other' ? (
                                             <>
-                                                <Label className="report-label text-slate-400">Specify Output</Label>
-                                                <input
-                                                    type="text"
-                                                    placeholder="Specify output + unit (e.g. 'Meals served')"
+                                                <Label className="report-label text-slate-400">Specify Output (100-200 Words)</Label>
+                                                <Textarea
+                                                    placeholder="Specify output + unit (100-200 Words)"
                                                     value={(out as any).other_label || ''}
                                                     onChange={(e) => updateOutput(i, 'other_label', e.target.value)}
-                                                    className="w-full h-12 bg-slate-50 border-2 border-report-primary-border rounded-xl px-4 text-xs font-bold text-slate-700 outline-none focus:border-report-primary"
+                                                    className="w-full h-24 bg-slate-50 border-2 border-report-primary-border rounded-xl px-4 py-3 text-xs font-bold text-slate-700 outline-none focus:border-report-primary resize-none"
                                                 />
                                             </>
                                         ) : (
@@ -593,12 +590,11 @@ export default function Section4Activities() {
                         </div>
                         {/* Other beneficiary specify */}
                         {section4.beneficiary_categories.includes('Other') && (
-                            <input
-                                type="text"
-                                placeholder="Specify beneficiary group..."
+                            <Textarea
+                                placeholder="Specify beneficiary group (100-200 Words)..."
                                 value={section4.beneficiary_other || ''}
                                 onChange={(e) => updateSection('section4', { beneficiary_other: e.target.value })}
-                                className="w-full md:w-1/2 h-10 bg-slate-50 border-2 border-report-primary-border rounded-xl px-4 text-xs font-bold text-slate-700 outline-none focus:border-report-primary"
+                                className="w-full md:w-1/2 h-24 bg-slate-50 border-2 border-report-primary-border rounded-xl px-4 py-3 text-xs font-bold text-slate-700 outline-none focus:border-report-primary resize-none mt-2"
                             />
                         )}
                     </div>

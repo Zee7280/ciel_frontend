@@ -188,12 +188,11 @@ function OutcomeCard({
                             ))}
                         </div>
                         {outcome.outcome_area === 'Other' && (
-                            <input
-                                type="text"
-                                placeholder="Specify custom outcome area..."
+                            <Textarea
+                                placeholder="Specify custom outcome area (100-200 Words)..."
                                 value={outcome.outcome_area_other || ''}
                                 onChange={e => onUpdate('outcome_area_other', e.target.value)}
-                                className="w-full h-10 bg-slate-50 border-2 border-report-primary-border rounded-xl px-4 text-xs font-bold text-slate-700 outline-none focus:border-report-primary"
+                                className="w-full h-24 bg-slate-50 border-2 border-report-primary-border rounded-xl px-4 py-3 text-xs font-bold text-slate-700 outline-none focus:border-report-primary resize-none mt-2"
                             />
                         )}
                     </div>
@@ -220,12 +219,11 @@ function OutcomeCard({
                                 />
                             )}
                             {outcome.metric === 'Other' && (
-                                <input
-                                    type="text"
-                                    placeholder="Specify custom metric..."
+                                <Textarea
+                                    placeholder="Specify custom metric (100-200 Words)..."
                                     value={outcome.metric_other || ''}
                                     onChange={e => onUpdate('metric_other', e.target.value)}
-                                    className="w-full h-11 bg-slate-50 border-2 border-report-primary-border rounded-xl px-4 text-xs font-bold text-slate-700 outline-none focus:border-report-primary animate-in fade-in slide-in-from-top-1"
+                                    className="w-full h-24 bg-slate-50 border-2 border-report-primary-border rounded-xl px-4 py-3 text-xs font-bold text-slate-700 outline-none focus:border-report-primary animate-in fade-in slide-in-from-top-1 resize-none mt-2"
                                 />
                             )}
                         </div>
@@ -283,12 +281,11 @@ function OutcomeCard({
                                 {units.map(u => <option key={u} value={u}>{u}</option>)}
                             </select>
                             {outcome.unit === 'Other' && (
-                                <input
-                                    type="text"
-                                    placeholder="Specify unit..."
+                                <Textarea
+                                    placeholder="Specify unit (100-200 Words)..."
                                     value={outcome.unit_other || ''}
                                     onChange={e => onUpdate('unit_other', e.target.value)}
-                                    className="w-full h-10 bg-white border-2 border-emerald-100 rounded-xl px-4 text-xs font-bold text-slate-700 outline-none"
+                                    className="w-full h-24 bg-white border-2 border-emerald-100 rounded-xl px-4 py-3 text-xs font-bold text-slate-700 outline-none resize-none mt-2"
                                 />
                             )}
                         </div>
@@ -463,7 +460,7 @@ export default function Section5Outcomes() {
                         <Label className="report-h3 !text-sm">Describe the change that occurred (Required)</Label>
                         <p className="text-xs text-slate-500 font-medium leading-relaxed">
                             What improved or strengthened? What can beneficiaries now do that they could not before? How does this relate to the assigned SDG target?
-                            <span className="text-report-primary font-bold ml-1 italic">(80–120 Words)</span>
+                            <span className="text-report-primary font-bold ml-1 italic">(100–200 Words)</span>
                         </p>
                     </div>
 
@@ -496,11 +493,11 @@ export default function Section5Outcomes() {
                     <div className="flex justify-between items-center px-2">
                         <p className={clsx(
                             "report-label",
-                            observedWords >= 80 && observedWords <= 120 ? "text-report-primary" : observedWords > 120 ? "text-red-500" : "text-slate-400"
+                            observedWords >= 100 && observedWords <= 200 ? "text-report-primary" : observedWords > 200 ? "text-red-500" : "text-slate-400"
                         )}>
-                            Word Count: {observedWords} / 120
+                            Word Count: {observedWords} / 200 (Min 100)
                         </p>
-                        {observedWords >= 80 && observedWords <= 120 && (
+                        {observedWords >= 100 && observedWords <= 200 && (
                             <span className="text-[9px] font-black text-report-primary uppercase tracking-widest flex items-center gap-1">
                                 <CheckCircle2 className="w-3 h-3" /> Within range
                             </span>
@@ -552,7 +549,7 @@ export default function Section5Outcomes() {
                         <Label className="report-h3 !text-sm">Reflect honestly on limitations (Required)</Label>
                         <p className="text-xs text-slate-500 font-medium leading-relaxed">
                             What limited scale of impact? What could not be fully measured? What barriers affected sustainability?
-                            <span className="text-orange-600 font-bold ml-1 italic">(Max 150 Words)</span>
+                            <span className="text-orange-600 font-bold ml-1 italic">(100-200 Words)</span>
                         </p>
                     </div>
                     <Textarea
@@ -567,9 +564,9 @@ export default function Section5Outcomes() {
                     <FieldError message={getFieldError('challenges')} />
                     <p className={clsx(
                         "report-label px-2",
-                        challengeWords > 150 ? "text-red-500" : "text-slate-400"
+                        challengeWords > 200 ? "text-red-500" : "text-slate-400"
                     )}>
-                        {challengeWords} / 150 words — Transparent reporting strengthens institutional credibility.
+                        {challengeWords} / 200 words (Min 100) — Transparent reporting strengthens institutional credibility.
                     </p>
                 </div>
             </div>

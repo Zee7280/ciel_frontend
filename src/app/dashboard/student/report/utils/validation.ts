@@ -38,8 +38,8 @@ export function validateSection2(data: any): ValidationResult {
     const words = countWords(data.problem_statement || '');
     if (words < 100) {
         errors.push({ field: 'problem_statement', message: `Problem statement is too short (${words}/100 words min)` });
-    } else if (words > 150) {
-        errors.push({ field: 'problem_statement', message: `Problem statement is too long (${words}/150 words max)` });
+    } else if (words > 200) {
+        errors.push({ field: 'problem_statement', message: `Problem statement is too long (${words}/200 words max)` });
     }
 
     if (!data.discipline) {
@@ -47,10 +47,10 @@ export function validateSection2(data: any): ValidationResult {
     }
 
     const discWords = countWords(data.discipline_contribution || '');
-    if (discWords === 0) {
-        errors.push({ field: 'discipline_contribution', message: 'Discipline contribution explanation is required' });
-    } else if (discWords > 60) {
-        errors.push({ field: 'discipline_contribution', message: `Explanation is too long (${discWords}/60 words max)` });
+    if (discWords < 100) {
+        errors.push({ field: 'discipline_contribution', message: `Discipline contribution explanation is too short (${discWords}/100 words min)` });
+    } else if (discWords > 200) {
+        errors.push({ field: 'discipline_contribution', message: `Explanation is too long (${discWords}/200 words max)` });
     }
 
     if (!data.baseline_evidence) {
@@ -67,10 +67,10 @@ export function validateSection3(data: any): ValidationResult {
     const errors: ValidationError[] = [];
     const intentWords = countWords(data.contribution_intent_statement || '');
 
-    if (intentWords < 80) {
-        errors.push({ field: 'contribution_intent_statement', message: `Contribution logic is too short (${intentWords}/80 words min)` });
-    } else if (intentWords > 120) {
-        errors.push({ field: 'contribution_intent_statement', message: `Contribution logic is too long (${intentWords}/120 words max)` });
+    if (intentWords < 100) {
+        errors.push({ field: 'contribution_intent_statement', message: `Contribution logic is too short (${intentWords}/100 words min)` });
+    } else if (intentWords > 200) {
+        errors.push({ field: 'contribution_intent_statement', message: `Contribution logic is too long (${intentWords}/200 words max)` });
     }
 
     const forbiddenPhrases = ["achieved", "solved", "eliminated"];
@@ -83,8 +83,8 @@ export function validateSection3(data: any): ValidationResult {
     if (data.secondary_sdgs && data.secondary_sdgs.length > 0) {
         data.secondary_sdgs.forEach((sdg: any, index: number) => {
             const justWords = countWords(sdg.justification_text || '');
-            if (justWords < 100 || justWords > 150) {
-                errors.push({ field: `secondary_sdgs.${index}.justification_text`, message: `Justification must be 100-150 words (${justWords} current)` });
+            if (justWords < 100 || justWords > 200) {
+                errors.push({ field: `secondary_sdgs.${index}.justification_text`, message: `Justification must be 100-200 words (${justWords} current)` });
             }
         });
     }
@@ -110,17 +110,28 @@ export function validateSection5(data: any): ValidationResult {
     const errors: ValidationError[] = [];
     const changeWords = countWords(data.observed_change || '');
 
-    if (changeWords < 80 || changeWords > 120) {
-        errors.push({ field: 'observed_change', message: `Observed change narrative must be 80-120 words (${changeWords} current)` });
+    if (changeWords < 100 || changeWords > 200) {
+        errors.push({ field: 'observed_change', message: `Observed change narrative must be 100-200 words (${changeWords} current)` });
     }
 
-    if (!data.metric) errors.push({ field: 'metric', message: 'Primary metric is required' });
-    if (data.baseline === '') errors.push({ field: 'baseline', message: 'Baseline value is required' });
-    if (data.endline === '') errors.push({ field: 'endline', message: 'Endline value is required' });
+    if (!data.measurable_outcomes || data.measurable_outcomes.length === 0) {
+        errors.push({ field: 'measurable_outcomes', message: 'At least one measurable outcome is required' });
+    } else {
+        data.measurable_outcomes.forEach((outcome: any, index: number) => {
+            if (!outcome.outcome_area) errors.push({ field: `measurable_outcomes.${index}.outcome_area`, message: 'Outcome category is required' });
+            if (!outcome.metric) errors.push({ field: `measurable_outcomes.${index}.metric`, message: 'Primary metric is required' });
+            if (outcome.baseline === '') errors.push({ field: `measurable_outcomes.${index}.baseline`, message: 'Baseline value is required' });
+            if (outcome.endline === '') errors.push({ field: `measurable_outcomes.${index}.endline`, message: 'Endline value is required' });
+            if (!outcome.unit) errors.push({ field: `measurable_outcomes.${index}.unit`, message: 'Unit of measurement is required' });
+            if (!outcome.confidence_level) errors.push({ field: `measurable_outcomes.${index}.confidence_level`, message: 'Confidence level is required' });
+        });
+    }
 
     const challengeWords = countWords(data.challenges || '');
-    if (challengeWords > 150) {
-        errors.push({ field: 'challenges', message: `Challenges description too long (${challengeWords}/150 words max)` });
+    if (challengeWords < 100) {
+        errors.push({ field: 'challenges', message: `Challenges description too short (${challengeWords}/100 words min)` });
+    } else if (challengeWords > 200) {
+        errors.push({ field: 'challenges', message: `Challenges description too long (${challengeWords}/200 words max)` });
     }
 
     return { isValid: errors.length === 0, errors };
@@ -142,9 +153,40 @@ export function validateSection6(data: any): ValidationResult {
  */
 export function validateSection7(data: any): ValidationResult {
     const errors: ValidationError[] = [];
-    if (data.has_partners === 'yes' && !data.partners?.length) {
-        errors.push({ field: 'partners', message: 'Please list your external partners' });
+
+    // Require explicit selection — empty string means user hasn't chosen yet
+    if (!data.has_partners) {
+        errors.push({ field: 'has_partners', message: 'Please confirm whether this project had active partners' });
+        return { isValid: false, errors };
     }
+
+    // If 'no', bypass all further validation
+    if (data.has_partners === 'no') {
+        return { isValid: true, errors: [] };
+    }
+
+    // has_partners === 'yes' — must have at least one partner
+    if (!data.partners?.length) {
+        errors.push({ field: 'partners', message: 'Please list your external partners' });
+        return { isValid: false, errors };
+    }
+
+    // Validate individual partner fields
+    data.partners.forEach((p: any, index: number) => {
+        if (!p.name?.trim()) {
+            errors.push({ field: `partners.${index}.name`, message: `Partner ${index + 1}: Organization name is required` });
+        }
+        if (!p.type) {
+            errors.push({ field: `partners.${index}.type`, message: `Partner ${index + 1}: Partner type is required` });
+        }
+        if (!p.role) {
+            errors.push({ field: `partners.${index}.role`, message: `Partner ${index + 1}: Role in project is required` });
+        }
+        if (!p.contribution?.length) {
+            errors.push({ field: `partners.${index}.contribution`, message: `Partner ${index + 1}: At least one contribution type is required` });
+        }
+    });
+
     return { isValid: errors.length === 0, errors };
 }
 
@@ -153,6 +195,13 @@ export function validateSection7(data: any): ValidationResult {
  */
 export function validateSection8(data: any): ValidationResult {
     const errors: ValidationError[] = [];
+
+    // Only run full validation when user has explicitly opted in to providing evidence.
+    // If has_evidence is 'no' OR not yet set (undefined), bypass completely.
+    if (data.has_evidence !== 'yes') {
+        return { isValid: true, errors: [] };
+    }
+
     if (!data.evidence_files?.length) {
         errors.push({ field: 'evidence_files', message: 'At least one evidence file is mandatory' });
     }
@@ -160,8 +209,8 @@ export function validateSection8(data: any): ValidationResult {
         errors.push({ field: 'evidence_types', message: 'At least one evidence type is mandatory' });
     }
     const wordCount = (data.description || '').trim().split(/\s+/).filter((w: string) => w.length > 0).length;
-    if (wordCount < 50 || wordCount > 80) {
-        errors.push({ field: 'description', message: `Description must be between 50 and 80 words (Currently ${wordCount})` });
+    if (wordCount < 100 || wordCount > 200) {
+        errors.push({ field: 'description', message: `Description must be between 100 and 200 words (Currently ${wordCount})` });
     }
     if (!data.media_visible) {
         errors.push({ field: 'media_visible', message: 'Media visibility preference is required' });
@@ -179,10 +228,10 @@ export function validateSection8(data: any): ValidationResult {
 export function validateSection9(data: any): ValidationResult {
     const errors: ValidationError[] = [];
     const appWords = countWords(data.academic_application || '');
-    if (appWords < 80) errors.push({ field: 'academic_application', message: `Academic application needs more detail (${appWords}/80 words min)` });
+    if (appWords < 100 || appWords > 200) errors.push({ field: 'academic_application', message: `Academic application must be 100-200 words (${appWords} current)` });
 
     const personalWords = countWords(data.personal_learning || '');
-    if (personalWords < 60) errors.push({ field: 'personal_learning', message: `Personal growth statement too brief (${personalWords}/60 words min)` });
+    if (personalWords < 100 || personalWords > 200) errors.push({ field: 'personal_learning', message: `Personal growth statement must be 100-200 words (${personalWords} current)` });
 
     if (!data.strongest_competency) errors.push({ field: 'strongest_competency', message: 'Identify your strongest growth area' });
 
@@ -195,7 +244,7 @@ export function validateSection9(data: any): ValidationResult {
 export function validateSection10(data: any): ValidationResult {
     const errors: ValidationError[] = [];
     const detailWords = countWords(data.continuation_details || '');
-    if (detailWords < 30) errors.push({ field: 'continuation_details', message: `Sustainability roadmap needs more detail (${detailWords}/30 words min)` });
+    if (detailWords < 100 || detailWords > 200) errors.push({ field: 'continuation_details', message: `Sustainability roadmap must be 100-200 words (${detailWords} current)` });
 
     if (data.continuation_status !== 'no' && !data.mechanisms?.length) {
         errors.push({ field: 'mechanisms', message: 'Identify at least one sustainability mechanism' });

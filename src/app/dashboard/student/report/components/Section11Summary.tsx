@@ -3,6 +3,7 @@ import { Button } from "./ui/button";
 import { useReportForm } from "../context/ReportContext";
 import React, { useState, useMemo, useEffect } from "react";
 import ReportPrintView from "./ReportPrintView";
+import CIIDashboardMeter from "./CIIDashboardMeter";
 import { generateAISummary } from "../utils/aiSummarizer";
 import { toast } from "sonner";
 import clsx from "clsx";
@@ -62,119 +63,162 @@ export default function Section11Summary() {
         window.print();
     };
 
+    const stats = [
+        { label: "Impact Score", val: engagementScore, suffix: "/100", icon: Award },
+        { label: "Verified Hours", val: verifiedHours, suffix: "hrs", icon: Clock },
+        { label: "Beneficiaries", val: beneficiaries, suffix: "pax", icon: Users },
+        { label: "SDG Priority", val: `Goal ${section3.primary_sdg?.goal_number || "—"}`, suffix: "", icon: Target },
+    ];
+
+    const complianceItems = [
+        {
+            label: "Partner Validation",
+            status: section8.partner_verification ? "PASS" : "PENDING",
+            desc: "Formal recognition from external entities.",
+            icon: ShieldCheck,
+            check: section8.partner_verification,
+        },
+        {
+            label: "Ethical Safeguards",
+            status: Object.values(section8.ethical_compliance || {}).every(Boolean) ? "CERTIFIED" : "PENDING",
+            desc: "Adherence to CIEL ethical declaration protocol.",
+            icon: ShieldAlert,
+            check: Object.values(section8.ethical_compliance || {}).every(Boolean),
+        },
+        {
+            label: "Sustainability Proof",
+            status: section10.mechanisms?.length > 0 ? "SECURED" : "VOLUNTARY",
+            desc: "Documented project legacy and roadmap.",
+            icon: TrendingUp,
+            check: section10.mechanisms?.length > 0,
+        },
+    ];
+
     return (
-        <div className="space-y-12 pb-20">
-            {/* Header */}
-            <div className="space-y-4">
+        <div className="space-y-14 pb-20">
+
+            {/* ── Section Header ── */}
+            <div className="space-y-8">
                 <div className="flex items-center gap-4">
                     <div className="w-14 h-14 rounded-2xl bg-report-primary text-white flex items-center justify-center shadow-xl shadow-report-primary-shadow ring-4 ring-report-primary-soft">
                         <BarChart3 className="w-7 h-7" />
                     </div>
                     <div>
                         <h2 className="report-h2">Section 11 — Intelligence</h2>
-                        <p className="report-label">Institutional Impact Dashboard & Final Preview</p>
+                        <p className="report-label text-slate-400 mt-0.5">Institutional Impact Dashboard &amp; Final Preview</p>
                     </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    {[
-                        { label: "Impact Score", val: engagementScore, suffix: "/100", icon: Award, color: "bg-report-primary shadow-report-primary-shadow" },
-                        { label: "Verified Hours", val: verifiedHours, suffix: "HRS", icon: Clock, color: "bg-report-primary shadow-report-primary-shadow" },
-                        { label: "Beneficiaries", val: beneficiaries, suffix: "PAX", icon: Users, color: "bg-report-primary shadow-report-primary-shadow" },
-                        { label: "SDG Priority", val: `Goal ${section3.primary_sdg?.goal_number || 0}`, suffix: "", icon: Target, color: "bg-report-primary shadow-report-primary-shadow" }
-                    ].map((stat, i) => (
-                        <div key={i} className={clsx("p-6 rounded-[2rem] text-white shadow-xl relative overflow-hidden group transition-transform hover:scale-[1.02]", stat.color)}>
-                            <stat.icon className="absolute -right-4 -bottom-4 w-24 h-24 opacity-10 group-hover:scale-110 transition-transform" />
-                            <p className="report-label !opacity-80 !mb-2">{stat.label}</p>
-                            <p className="text-3xl font-black">{stat.val} <span className="report-label !opacity-70">{stat.suffix}</span></p>
+                {/* ── Stats Row ── */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    {stats.map((stat, i) => (
+                        <div
+                            key={i}
+                            className="group bg-white border-2 border-slate-100 rounded-2xl p-6 flex flex-col gap-4 hover:border-report-primary-border hover:shadow-lg hover:shadow-report-primary-shadow transition-all duration-300"
+                        >
+                            <div className="w-9 h-9 rounded-xl bg-report-primary-soft text-report-primary flex items-center justify-center">
+                                <stat.icon className="w-4 h-4" />
+                            </div>
+                            <div>
+                                <p className="text-2xl font-black text-slate-900 leading-none">
+                                    {stat.val}
+                                    {stat.suffix && (
+                                        <span className="text-xs font-bold text-slate-400 ml-1 uppercase tracking-wider">{stat.suffix}</span>
+                                    )}
+                                </p>
+                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1.5">{stat.label}</p>
+                            </div>
                         </div>
                     ))}
                 </div>
             </div>
 
-            {/* Executive Impact Summary */}
-            <div className="bg-white border-2 border-slate-100 rounded-[3rem] p-12 relative overflow-hidden group shadow-2xl shadow-slate-100">
-                <div className="absolute right-0 top-0 w-96 h-96 bg-slate-50 rounded-full -mr-48 -mt-48 blur-3xl group-hover:bg-indigo-50 transition-colors duration-1000" />
-                <div className="relative z-10 flex flex-col lg:flex-row items-stretch gap-12">
-                    <div className="space-y-6 flex-1 text-left">
-                        <div className="flex items-center justify-between border-b border-slate-100 pb-6">
-                            <div className="inline-flex items-center gap-3 px-5 py-2 rounded-full bg-report-primary text-white text-[10px] font-black uppercase tracking-widest shadow-lg">
-                                <Quote className="w-3 h-3 text-white opacity-50" /> AI-Generated Executive Summary
-                            </div>
-                            <button
-                                type="button"
-                                onClick={handleGenerateAISummary}
-                                disabled={isGenerating}
-                                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-report-primary text-white text-[10px] font-black uppercase tracking-widest hover:bg-report-primary-border disabled:opacity-50 transition-all shadow-lg shadow-report-primary-shadow"
-                            >
-                                {isGenerating ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
-                                Improve with AI
-                            </button>
+            {/* ── CII Dashboard (post-submission) ── */}
+            {(data?.status === 'submitted' || data?.status === 'approved') && (
+                <div className="w-full flex justify-center">
+                    <CIIDashboardMeter />
+                </div>
+            )}
+
+            {/* ── Executive Impact Summary ── */}
+            <div className="bg-white border-2 border-slate-100 rounded-[2.5rem] overflow-hidden shadow-sm">
+                {/* Card Header */}
+                <div className="flex items-center justify-between px-10 py-6 border-b border-slate-100 bg-slate-50/60">
+                    <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-xl bg-report-primary text-white flex items-center justify-center">
+                            <Quote className="w-4 h-4" />
                         </div>
-                        <h3 className="report-h2 !text-3xl">Comprehensive Impact Profile</h3>
-                        <div className="space-y-4 pt-2">
-                            {executiveSummary.split('\n\n').map((paragraph: string, idx: number) => (
-                                <p key={idx} className="report-ai-text !italic leading-relaxed">
-                                    {paragraph.trim().replace(/^Paragraph \d: /, '').replace(/^Paragraph \d - /, '')}
-                                </p>
-                            ))}
+                        <div>
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">AI-Generated</p>
+                            <h3 className="text-sm font-black text-slate-900">Comprehensive Impact Profile</h3>
                         </div>
-                        <div className="flex flex-wrap items-center justify-start gap-4 pt-4 border-t border-slate-50">
-                            <span className="flex items-center gap-2 text-[9px] font-black text-report-primary bg-report-primary-soft px-3 py-1 rounded-lg border border-report-primary-border uppercase tracking-widest">
-                                <Sparkles className="w-3 h-3" /> Integrity Verified
-                            </span>
-                            <span className="flex items-center gap-2 text-[9px] font-black text-report-primary bg-report-primary-soft px-3 py-1 rounded-lg border border-report-primary-border uppercase tracking-widest">
-                                <TrendingUp className="w-3 h-3" /> Growth Documented
-                            </span>
-                        </div>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={handleGenerateAISummary}
+                        disabled={isGenerating}
+                        className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-report-primary text-white text-[10px] font-black uppercase tracking-widest hover:opacity-90 disabled:opacity-40 transition-all shadow-md shadow-report-primary-shadow"
+                    >
+                        {isGenerating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                        {isGenerating ? "Generating…" : "Improve with AI"}
+                    </button>
+                </div>
+
+                {/* Card Body */}
+                <div className="px-10 py-10 space-y-6">
+                    <div className="space-y-5">
+                        {executiveSummary.split('\n\n').map((paragraph: string, idx: number) => (
+                            <p key={idx} className="text-sm font-medium text-slate-600 leading-[1.85] italic">
+                                {paragraph.trim().replace(/^Paragraph \d: /, '').replace(/^Paragraph \d - /, '')}
+                            </p>
+                        ))}
+                    </div>
+
+                    {/* Footer badges */}
+                    <div className="flex flex-wrap items-center gap-3 pt-4 border-t border-slate-100">
+                        <span className="inline-flex items-center gap-1.5 text-[9px] font-black text-report-primary bg-report-primary-soft px-3 py-1.5 rounded-lg border border-report-primary-border uppercase tracking-widest">
+                            <Sparkles className="w-3 h-3" /> Integrity Verified
+                        </span>
+                        <span className="inline-flex items-center gap-1.5 text-[9px] font-black text-report-primary bg-report-primary-soft px-3 py-1.5 rounded-lg border border-report-primary-border uppercase tracking-widest">
+                            <TrendingUp className="w-3 h-3" /> Growth Documented
+                        </span>
                     </div>
                 </div>
             </div>
 
-            {/* Audit & Compliance Matrix */}
-            <div className="space-y-6">
-                <div className="flex items-center gap-3 px-2">
-                    <div className="w-8 h-8 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center report-label !text-[8px]">VERIFY</div>
-                    <h3 className="report-h3 !italic">Institutional Compliance Matrix</h3>
+            {/* ── Institutional Compliance Matrix ── */}
+            <div className="space-y-5">
+                <div className="flex items-center gap-3 px-1">
+                    <div className="w-1 h-6 rounded-full bg-report-primary" />
+                    <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Institutional Compliance Matrix</h3>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    {[
-                        {
-                            label: "Partner Validation",
-                            status: section8.partner_verification ? "PASS" : "PENDING",
-                            desc: "Formal recognition from external entities.",
-                            icon: ShieldCheck,
-                            check: section8.partner_verification
-                        },
-                        {
-                            label: "Ethical Safeguards",
-                            status: Object.values(section8.ethical_compliance || {}).every(Boolean) ? "CERTIFIED" : "PENDING",
-                            desc: "Adherence to CIEL ethical declaration protocol.",
-                            icon: ShieldAlert,
-                            check: Object.values(section8.ethical_compliance || {}).every(Boolean)
-                        },
-                        {
-                            label: "Sustainability Proof",
-                            status: section10.mechanisms?.length > 0 ? "SECURED" : "VOLUNTARY",
-                            desc: "Documented project legacy and roadmap.",
-                            icon: TrendingUp,
-                            check: section10.mechanisms?.length > 0
-                        }
-                    ].map((item, idx) => (
-                        <div key={idx} className="bg-white border-2 border-slate-50 p-8 rounded-[2.5rem] shadow-sm hover:border-slate-200 transition-all flex flex-col justify-between">
-                            <div className="space-y-4">
-                                <div className={clsx("w-10 h-10 rounded-xl flex items-center justify-center", item.check ? "bg-report-primary-soft text-report-primary" : "bg-slate-50 text-slate-300")}>
-                                    <item.icon className="w-5 h-5" />
-                                </div>
-                                <div>
-                                    <h4 className="report-label !text-slate-900">{item.label}</h4>
-                                    <p className="report-help !mt-1">{item.desc}</p>
-                                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                    {complianceItems.map((item, idx) => (
+                        <div
+                            key={idx}
+                            className={clsx(
+                                "bg-white border-2 rounded-2xl p-7 flex flex-col gap-5 transition-all",
+                                item.check ? "border-report-primary-border" : "border-slate-100"
+                            )}
+                        >
+                            <div className={clsx(
+                                "w-10 h-10 rounded-xl flex items-center justify-center",
+                                item.check ? "bg-report-primary-soft text-report-primary" : "bg-slate-50 text-slate-300"
+                            )}>
+                                <item.icon className="w-5 h-5" />
                             </div>
-                            <div className="mt-8 flex items-center justify-between">
-                                <span className={clsx("report-label !text-[9px] !px-3 !py-1 rounded-lg border",
-                                    item.check ? "bg-report-primary-soft text-report-primary border-report-primary-border" : "bg-slate-50 text-slate-400 border-slate-100")}>
+                            <div className="flex-1 space-y-1">
+                                <p className="text-xs font-black text-slate-900">{item.label}</p>
+                                <p className="text-[11px] font-medium text-slate-400 leading-relaxed">{item.desc}</p>
+                            </div>
+                            <div className="flex items-center justify-between pt-3 border-t border-slate-100">
+                                <span className={clsx(
+                                    "text-[9px] font-black px-3 py-1 rounded-lg border uppercase tracking-widest",
+                                    item.check
+                                        ? "bg-report-primary-soft text-report-primary border-report-primary-border"
+                                        : "bg-slate-50 text-slate-400 border-slate-100"
+                                )}>
                                     {item.status}
                                 </span>
                                 {item.check && <CheckCircle className="w-4 h-4 text-report-primary" />}
@@ -184,37 +228,36 @@ export default function Section11Summary() {
                 </div>
             </div>
 
-            {/* Final Action Hub */}
-            <div className="pt-10 border-t-2 border-slate-50 flex flex-col items-center gap-6 text-center">
+            {/* ── Final Action Hub ── */}
+            <div className="border-2 border-slate-100 rounded-2xl p-10 flex flex-col items-center gap-5 text-center bg-white">
                 {data?.status === 'submitted' || data?.status === 'approved' ? (
                     <>
-                        <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mb-2">
-                            <ShieldAlert className="w-8 h-8 text-slate-400" />
+                        <div className="w-14 h-14 bg-slate-100 rounded-2xl flex items-center justify-center">
+                            <ShieldAlert className="w-7 h-7 text-slate-400" />
                         </div>
-                        <div className="max-w-md space-y-2">
-                            <h3 className="report-h3 !text-xl">Report Locked Pending Approval</h3>
-                            <p className="report-help">
+                        <div className="max-w-sm space-y-2">
+                            <h3 className="text-base font-black text-slate-900">Report Locked Pending Approval</h3>
+                            <p className="text-xs font-medium text-slate-400 leading-relaxed">
                                 The final impact dossier and certificate will be available for preview and download once the report has been reviewed and approved by the NGO and university administration.
                             </p>
                         </div>
                     </>
                 ) : (
                     <>
-                        <div className="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center mb-2">
-                            <CheckCircle className="w-8 h-8 text-blue-600" />
+                        <div className="w-14 h-14 bg-report-primary-soft rounded-2xl flex items-center justify-center">
+                            <CheckCircle className="w-7 h-7 text-report-primary" />
                         </div>
-                        <div className="max-w-md space-y-4">
-                            <h3 className="report-h3 !text-xl !text-slate-900">Ready for Final Submission</h3>
-                            <p className="report-help !text-slate-600">
+                        <div className="max-w-sm space-y-4">
+                            <h3 className="text-base font-black text-slate-900">Ready for Final Submission</h3>
+                            <p className="text-xs font-medium text-slate-400 leading-relaxed">
                                 Please review your institutional impact dashboard above. Once submitted, you will not be able to edit this report.
                             </p>
                             <Button
                                 onClick={() => {
-                                    // Trigger the footer's submit button
                                     const footerSubmitBtn = Array.from(document.querySelectorAll('button')).find(btn => btn.textContent?.includes('Submit Report'));
                                     if (footerSubmitBtn) footerSubmitBtn.click();
                                 }}
-                                className="bg-report-primary hover:bg-report-primary-border text-white px-8 h-12 rounded-xl w-full"
+                                className="bg-report-primary hover:opacity-90 text-white px-8 h-11 rounded-xl w-full text-xs font-black uppercase tracking-widest transition-all shadow-md shadow-report-primary-shadow"
                             >
                                 Submit Final Report
                             </Button>
@@ -234,22 +277,22 @@ export default function Section11Summary() {
                                     <Download className="w-5 h-5" />
                                 </div>
                                 <div>
-                                    <h3 className="report-label !text-slate-900 !text-sm">Official Project Dossier</h3>
-                                    <p className="report-help">Review your final submission layout</p>
+                                    <h3 className="text-sm font-black text-slate-900">Official Project Dossier</h3>
+                                    <p className="text-[11px] font-medium text-slate-400">Review your final submission layout</p>
                                 </div>
                             </div>
                             <div className="flex items-center gap-4">
                                 <Button
                                     onClick={handlePrint}
-                                    className="bg-report-primary hover:bg-report-primary-border text-white h-12 px-6 rounded-xl report-label transition-all flex items-center gap-2"
+                                    className="bg-report-primary hover:opacity-90 text-white h-11 px-6 rounded-xl text-xs font-black uppercase tracking-widest transition-all flex items-center gap-2"
                                 >
                                     <Printer className="w-4 h-4" /> Print / Save PDF
                                 </Button>
                                 <button
                                     onClick={() => setShowPreview(false)}
-                                    className="w-12 h-12 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-900 transition-all flex items-center justify-center"
+                                    className="w-11 h-11 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-900 transition-all flex items-center justify-center"
                                 >
-                                    <X className="w-6 h-6" />
+                                    <X className="w-5 h-5" />
                                 </button>
                             </div>
                         </div>

@@ -5,10 +5,12 @@ import {
 import { Label } from "./ui/label";
 import { Input } from "./ui/input";
 import { Button } from "./ui/button";
+import { Textarea } from "./ui/textarea";
 import { useReportForm } from "../context/ReportContext";
 import { FieldError } from "./ui/FieldError";
-import React, { useMemo, useEffect } from "react";
+import React, { useMemo, useEffect, useState } from "react";
 import clsx from "clsx";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog";
 
 // ─── Static data ──────────────────────────────────────────────────────────────
 const resourceTypes = [
@@ -68,6 +70,76 @@ const emptyResource = () => ({
     sources: [] as string[], source_other: '', purpose: '', verification: ''
 });
 
+// ─── File Preview ──────────────────────────────────────────────────────────────
+function FilePreview({ file }: { file: any }) {
+    const isImage = file?.type?.startsWith('image/') || file?.name?.match(/\.(jpg|jpeg|png|gif|webp)$/i);
+    const [previewUrl, setPreviewUrl] = React.useState<string | null>(null);
+
+    useEffect(() => {
+        if (isImage) {
+            if (file instanceof File || file instanceof Blob) {
+                const url = URL.createObjectURL(file);
+                setPreviewUrl(url);
+                return () => URL.revokeObjectURL(url);
+            } else if (typeof file === 'string') {
+                setPreviewUrl(file);
+            } else if (file?.url) {
+                setPreviewUrl(file.url);
+            }
+        }
+    }, [file, isImage]);
+
+    if (isImage && previewUrl) {
+        return (
+            <div className="w-10 h-10 rounded-lg overflow-hidden shrink-0 border border-slate-200 bg-slate-100 flex items-center justify-center">
+                <img src={previewUrl} alt={file?.name || 'Preview'} className="w-full h-full object-cover" />
+            </div>
+        );
+    }
+
+    return (
+        <div className="w-10 h-10 rounded-lg bg-report-primary-soft text-report-primary flex items-center justify-center shrink-0 border border-slate-100">
+            <FileText className="w-5 h-5" />
+        </div>
+    );
+}
+
+function FullFilePreview({ file }: { file: any }) {
+    const isImage = file?.type?.startsWith('image/') || file?.name?.match(/\.(jpg|jpeg|png|gif|webp)$/i);
+    const [previewUrl, setPreviewUrl] = React.useState<string | null>(null);
+
+    useEffect(() => {
+        if (!file) return;
+        if (isImage) {
+            if (file instanceof File || file instanceof Blob) {
+                const url = URL.createObjectURL(file);
+                setPreviewUrl(url);
+                return () => URL.revokeObjectURL(url);
+            } else if (typeof file === 'string') {
+                setPreviewUrl(file);
+            } else if (file?.url) {
+                setPreviewUrl(file.url);
+            }
+        }
+    }, [file, isImage]);
+
+    if (!file) return null;
+
+    if (isImage && previewUrl) {
+        return (
+            <img src={previewUrl} alt={file?.name || 'Preview'} className="max-w-full max-h-[70vh] object-contain rounded-lg" />
+        );
+    }
+
+    return (
+        <div className="flex flex-col items-center justify-center p-12 text-slate-400 space-y-4">
+            <FileText className="w-16 h-16 text-slate-200" />
+            <p className="text-sm font-semibold">Preview not available for this file type</p>
+            <p className="text-xs text-slate-400">({file?.name})</p>
+        </div>
+    );
+}
+
 // ─── Resource Card ─────────────────────────────────────────────────────────────
 function ResourceCard({
     res, idx, onUpdate, onRemove, canRemove, getFieldError
@@ -119,11 +191,11 @@ function ResourceCard({
                             {resourceTypes.map(t => <option key={t} value={t}>{t}</option>)}
                         </select>
                         {res.type === 'Other (Specify)' && (
-                            <input
-                                type="text" placeholder="Specify resource type..."
+                            <Textarea
+                                placeholder="Specify resource type (100-200 Words)..."
                                 value={res.type_other || ''}
                                 onChange={e => onUpdate('type_other', e.target.value)}
-                                className="w-full h-10 bg-slate-50 border-2 border-report-primary-border rounded-xl px-4 text-xs font-bold text-slate-700 outline-none focus:border-report-primary"
+                                className="w-full h-24 bg-slate-50 border-2 border-report-primary-border rounded-xl px-4 py-3 text-xs font-bold text-slate-700 outline-none focus:border-report-primary resize-none mt-2"
                             />
                         )}
                     </div>
@@ -153,11 +225,11 @@ function ResourceCard({
                         </div>
                     </div>
                     {res.unit === 'Other (Specify)' && (
-                        <input
-                            type="text" placeholder="Specify unit..."
+                        <Textarea
+                            placeholder="Specify unit (100-200 Words)..."
                             value={res.unit_other || ''}
                             onChange={e => onUpdate('unit_other', e.target.value)}
-                            className="w-full h-10 bg-slate-50 border-2 border-report-primary-border rounded-xl px-4 text-xs font-bold text-slate-700 outline-none focus:border-report-primary"
+                            className="w-full h-24 bg-slate-50 border-2 border-report-primary-border rounded-xl px-4 py-3 text-xs font-bold text-slate-700 outline-none focus:border-report-primary resize-none mt-2"
                         />
                     )}
 
@@ -212,18 +284,18 @@ function ResourceCard({
                             ))}
                         </div>
                         {sources.includes('Other (Specify)') && (
-                            <input
-                                type="text" placeholder="Specify source..."
+                            <Textarea
+                                placeholder="Specify source (100-200 Words)..."
                                 value={res.source_other || ''}
                                 onChange={e => onUpdate('source_other', e.target.value)}
-                                className="w-full h-10 bg-slate-50 border-2 border-report-primary-border rounded-xl px-4 text-xs font-bold text-slate-700 outline-none focus:border-report-primary"
+                                className="w-full h-24 bg-slate-50 border-2 border-report-primary-border rounded-xl px-4 py-3 text-xs font-bold text-slate-700 outline-none focus:border-report-primary resize-none mt-2"
                             />
                         )}
                     </div>
 
                     {/* 6.2.5 Purpose — 20-40 words */}
                     <div className="space-y-3">
-                        <Label className="report-label">6.2.5 — Purpose of Resource (20–40 Words)</Label>
+                        <Label className="report-label">6.2.5 — Purpose of Resource (100–200 Words)</Label>
                         <textarea
                             placeholder="Explain what exactly this resource enabled (e.g. 'Used to purchase hygiene kits for 45 participants')"
                             value={res.purpose}
@@ -234,11 +306,11 @@ function ResourceCard({
                         <div className="flex items-center justify-between px-1">
                             <p className={clsx(
                                 "report-label !text-[9px]",
-                                purposeWords >= 20 && purposeWords <= 40 ? "text-blue-600" : purposeWords > 40 ? "text-red-500" : "text-slate-400"
+                                purposeWords >= 100 && purposeWords <= 200 ? "text-blue-600" : purposeWords > 200 ? "text-red-500" : "text-amber-500"
                             )}>
-                                {purposeWords} / 40 words
+                                {purposeWords} / 200 words (Min 100)
                             </p>
-                            {purposeWords >= 20 && purposeWords <= 40 && (
+                            {purposeWords >= 100 && purposeWords <= 200 && (
                                 <span className="report-label !text-[9px] !text-report-primary !flex !items-center !gap-1">
                                     <CheckCircle2 className="w-3 h-3" /> Within range
                                 </span>
@@ -256,6 +328,8 @@ export default function Section6Resources() {
     const { data, updateSection, getFieldError, saveReport } = useReportForm();
     const { section1, section3, section4, section6 } = data;
     const { use_resources, resources } = section6;
+
+    const [previewFile, setPreviewFile] = useState<any>(null);
 
     const update = (field: string, val: any) => updateSection('section6', { [field]: val });
 
@@ -479,15 +553,16 @@ export default function Section6Resources() {
                                 <div className="space-y-3 animate-in fade-in slide-in-from-top-2">
                                     <Label className="report-label">Selected Files ({section6.evidence_files.length})</Label>
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                        {section6.evidence_files.map((file: File, fIdx: number) => (
-                                            <div key={fIdx} className="flex items-center justify-between p-3 bg-slate-50 border border-slate-100 rounded-xl group/file">
-                                                <div className="flex items-center gap-3 overflow-hidden">
-                                                    <div className="w-8 h-8 rounded-lg bg-report-primary-soft text-report-primary flex items-center justify-center shrink-0">
-                                                        <FileText className="w-4 h-4" />
-                                                    </div>
+                                        {section6.evidence_files.map((file: any, fIdx: number) => (
+                                            <div key={fIdx} className="flex items-center justify-between p-3 bg-slate-50 border border-slate-100 rounded-xl group/file hover:border-report-primary-border transition-colors">
+                                                <div
+                                                    className="flex items-center gap-3 overflow-hidden cursor-pointer flex-1"
+                                                    onClick={() => setPreviewFile(file)}
+                                                >
+                                                    <FilePreview file={file} />
                                                     <div className="overflow-hidden">
-                                                        <p className="text-xs font-bold text-slate-700 truncate">{file.name}</p>
-                                                        <p className="report-help">{(file.size / (1024 * 1024)).toFixed(2)} MB</p>
+                                                        <p className="text-xs font-bold text-slate-700 truncate group-hover/file:text-report-primary transition-colors">{file.name}</p>
+                                                        <p className="report-help">{file.size ? (file.size / (1024 * 1024)).toFixed(2) : 0} MB</p>
                                                     </div>
                                                 </div>
                                                 <button
@@ -556,6 +631,18 @@ export default function Section6Resources() {
                     <span>Save Section 6 Progress</span>
                 </Button>
             </div>
+            {/* ─── Full File Preview Dialog ─────────────────────────────────── */}
+            <Dialog open={!!previewFile} onOpenChange={(open) => !open && setPreviewFile(null)}>
+                <DialogContent className="max-w-4xl p-6 bg-white flex flex-col items-center">
+                    <DialogHeader className="w-full flex flex-col justify-start items-start mb-4">
+                        <DialogTitle className="text-sm font-bold truncate pr-8 text-slate-800 break-all w-full">{previewFile?.name}</DialogTitle>
+                    </DialogHeader>
+                    <div className="w-full flex justify-center items-center overflow-auto max-h-[80vh] rounded-xl border border-slate-100 bg-slate-50 p-2">
+                        <FullFilePreview file={previewFile} />
+                    </div>
+                </DialogContent>
+            </Dialog>
+
         </div>
     );
 }

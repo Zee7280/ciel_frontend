@@ -65,17 +65,14 @@ export default function Section10Sustainability() {
     const getWordCount = (text: string) => (text || '').trim().split(/\s+/).filter(w => w.length > 0).length;
     const cdWords = getWordCount(continuation_details);
 
-    let minWords = 50;
-    let maxWords = 80;
+    let minWords = 100;
+    let maxWords = 200;
     let explanationPrompt = "";
     if (continuation_status === 'yes') {
-        minWords = 100; maxWords = 150;
         explanationPrompt = "Explain: Who will continue the activity? What system or structure supports continuation? Were materials/tools transferred? Is a partner formally responsible?";
     } else if (continuation_status === 'partially') {
-        minWords = 50; maxWords = 80;
         explanationPrompt = "Explain: What will continue? What may stop? What support is required (funding, training, equipment, policy)?";
     } else if (continuation_status === 'no') {
-        minWords = 50; maxWords = 80;
         explanationPrompt = "Explain: Why continuation is unlikely. What structural changes could enable sustainability in the future. (Honest limitations improve institutional learning)";
     }
 
