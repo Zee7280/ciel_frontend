@@ -53,8 +53,8 @@ export function validateSection2(data: any): ValidationResult {
         errors.push({ field: 'discipline_contribution', message: `Explanation is too long (${discWords}/200 words max)` });
     }
 
-    if (!data.baseline_evidence) {
-        errors.push({ field: 'baseline_evidence', message: 'Baseline evidence type is required' });
+    if (!data.baseline_evidence || data.baseline_evidence.length === 0) {
+        errors.push({ field: 'baseline_evidence', message: 'At least one baseline evidence type is required' });
     }
 
     return { isValid: errors.length === 0, errors };

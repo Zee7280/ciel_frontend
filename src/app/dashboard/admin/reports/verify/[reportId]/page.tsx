@@ -7,12 +7,13 @@ import {
     ArrowLeft, CheckCircle2, XCircle, Download, ExternalLink,
     User, Building2, Calendar, Target, Users, Activity,
     TrendingUp, Package, Handshake, FileText, MessageSquare,
-    Globe, MapPin, Clock as ClockIcon, Lock
+    Globe, MapPin, Clock as ClockIcon, Lock, AlertTriangle, List
 } from 'lucide-react';
 import { toast } from 'sonner';
 import clsx from 'clsx';
 import ReportPrintView from '../../../../student/report/components/ReportPrintView';
 import AttendanceSummaryTable from '../../../../student/engagement/components/AttendanceSummaryTable';
+import { checkReportQuality, QualityAlert } from '@/utils/reportQuality';
 
 interface ReportDetail {
     id: string;
@@ -56,7 +57,7 @@ export default function AdminReportDetailPage() {
     const [loading, setLoading] = useState(true);
     const [feedback, setFeedback] = useState('');
     const [isVerifying, setIsVerifying] = useState(false);
-    const [activeSection, setActiveSection] = useState('section1');
+    const [qualityAlerts, setQualityAlerts] = useState<QualityAlert[]>([]);
 
     useEffect(() => {
         fetchReportDetail();
@@ -80,7 +81,9 @@ export default function AdminReportDetailPage() {
                 console.log('📋 Data field:', data.data);
 
                 // Backend might return { success, data } or { report }
-                setReport(data.data || data.report || data);
+                const reportData = data.data || data.report || data;
+                setReport(reportData);
+                setQualityAlerts(checkReportQuality(reportData));
             } else {
                 const errorText = await response?.text().catch(() => 'No error text');
                 console.error('❌ API Error:', response?.status, errorText);
@@ -184,10 +187,44 @@ export default function AdminReportDetailPage() {
                         <ArrowLeft className="w-4 h-4" />
                         Back to Reports
                     </button>
-                    <span className="px-4 py-2 bg-purple-50 text-purple-700 rounded-xl text-sm font-bold border border-purple-200">
-                        ADMIN VIEW
-                    </span>
+                    <div className="flex items-center gap-3">
+                        <span className="px-4 py-2 bg-blue-50 text-blue-700 rounded-xl text-xs font-black border border-blue-200 uppercase tracking-widest">
+                            Single-Page Dossier Mode
+                        </span>
+                        <span className="px-4 py-2 bg-purple-50 text-purple-700 rounded-xl text-xs font-black border border-purple-200 uppercase tracking-widest">
+                            Super Admin
+                        </span>
+                    </div>
                 </div>
+
+                {/* Quality Insight Banner */}
+                {qualityAlerts.length > 0 && (
+                    <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-3xl p-6 shadow-sm">
+                        <div className="flex items-center gap-3 mb-4">
+                            <div className="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center shadow-lg shadow-amber-200">
+                                <AlertTriangle className="w-5 h-5" />
+                            </div>
+                            <div>
+                                <h2 className="text-lg font-black text-slate-900 leading-none">Impact Quality Insights</h2>
+                                <p className="text-xs text-amber-700 font-bold mt-1 uppercase tracking-wider">AI-Driven Automated Checks</p>
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                            {qualityAlerts.map((alert, idx) => (
+                                <div key={idx} className={clsx(
+                                    "p-3 rounded-2xl border flex items-start gap-3 transition-all",
+                                    alert.severity === 'error' ? "bg-red-50 border-red-100 text-red-700" : "bg-white border-amber-100 text-amber-700"
+                                )}>
+                                    <div className={clsx(
+                                        "w-2 h-2 rounded-full mt-1.5 shrink-0",
+                                        alert.severity === 'error' ? "bg-red-500" : "bg-amber-500"
+                                    )} />
+                                    <p className="text-xs font-bold leading-relaxed">{alert.message}</p>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
 
                 {/* Student & Opportunity Info */}
                 <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm">
@@ -250,43 +287,79 @@ export default function AdminReportDetailPage() {
                     </div>
                 </div>
 
-                {/* Report Sections */}
-                <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-                    {/* Section Navigation */}
-                    <div className="lg:col-span-1 space-y-2">
-                        {sections.map((section) => (
-                            <button
-                                key={section.id}
-                                onClick={() => setActiveSection(section.id)}
-                                className={clsx(
-                                    'w-full flex items-center gap-3 p-4 rounded-2xl transition-all font-bold text-sm text-left',
-                                    activeSection === section.id
-                                        ? 'bg-blue-600 text-white shadow-lg shadow-blue-200'
-                                        : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200'
-                                )}
-                            >
-                                <section.icon className="w-5 h-5" />
-                                {section.label}
-                            </button>
-                        ))}
+                {/* Report Content - Unified Scrollable Dossier */}
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+                    {/* Sticky Table of Contents */}
+                    <div className="lg:col-span-3 sticky top-8 space-y-4">
+                        <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm">
+                            <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                                <List className="w-4 h-4 text-blue-500" />
+                                Dossier Contents
+                            </h3>
+                            <div className="space-y-1">
+                                {sections.map((section) => (
+                                    <button
+                                        key={section.id}
+                                        onClick={() => {
+                                            const el = document.getElementById(section.id);
+                                            el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                        }}
+                                        className="w-full flex items-center gap-3 p-3 rounded-xl transition-all hover:bg-slate-50 group text-left"
+                                    >
+                                        <section.icon className="w-4 h-4 text-slate-400 group-hover:text-blue-500 transition-colors" />
+                                        <span className="text-sm font-bold text-slate-600 group-hover:text-slate-900 transition-colors">{section.label}</span>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Quick Status Summary */}
+                        <div className="bg-slate-900 rounded-3xl p-6 text-white shadow-xl shadow-slate-200">
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Decision Hub</p>
+                            <div className="space-y-4">
+                                <div>
+                                    <p className="text-xs text-slate-500 font-bold mb-1">Impact Score</p>
+                                    <p className="text-2xl font-black">
+                                        {report.section9?.competency_scores ? (Object.values(report.section9.competency_scores as Record<string, any>).reduce((a: any, b: any) => a + Number(b || 0), 0) / 12).toFixed(1) : "0.0"}
+                                        <span className="text-lg text-slate-500 font-bold">/5.0</span>
+                                    </p>
+                                </div>
+                                <button
+                                    onClick={() => {
+                                        const el = document.getElementById('actions');
+                                        el?.scrollIntoView({ behavior: 'smooth' });
+                                    }}
+                                    className="w-full py-3 bg-blue-600 hover:bg-blue-500 rounded-xl font-bold text-sm transition-all shadow-lg shadow-blue-900/40"
+                                >
+                                    Jump to Action
+                                </button>
+                            </div>
+                        </div>
                     </div>
 
-                    {/* Section Content */}
-                    <div className="lg:col-span-3 bg-white rounded-3xl p-8 border border-slate-200 shadow-sm min-h-[500px]">
-                        {activeSection === 'section1' && report.section1 && (
+                    {/* All Sections rendered vertically */}
+                    <div className="lg:col-span-9 space-y-8">
+                        {/* Section 1 */}
+                        <div id="section1" className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm scroll-mt-8">
                             <div className="space-y-6">
-                                <h2 className="text-2xl font-black text-slate-900">Participation Profile</h2>
-                                <LabelValue label="Participation Type" value={report.section1.participation_type} />
+                                <div className="flex items-center gap-4 mb-2">
+                                    <div className="w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-600">
+                                        <Users className="w-6 h-6" />
+                                    </div>
+                                    <h2 className="text-3xl font-black text-slate-900">01. Participation Profile</h2>
+                                </div>
+
+                                <LabelValue label="Participation Type" value={report.section1?.participation_type} />
                                 <div className="mt-4">
                                     <h3 className="font-bold text-slate-800 text-sm mb-2 border-b pb-1">Team Lead</h3>
                                     <div className="flex flex-wrap">
-                                        <LabelValue label="Name" value={report.section1.team_lead?.name} />
-                                        <LabelValue label="University" value={report.section1.team_lead?.university} />
-                                        <LabelValue label="Email" value={report.section1.team_lead?.email} />
-                                        <LabelValue label="Role" value={report.section1.team_lead?.role} />
+                                        <LabelValue label="Name" value={report.section1?.team_lead?.name} />
+                                        <LabelValue label="University" value={report.section1?.team_lead?.university} />
+                                        <LabelValue label="Email" value={report.section1?.team_lead?.email} />
+                                        <LabelValue label="Role" value={report.section1?.team_lead?.role} />
                                     </div>
                                 </div>
-                                {report.section1.team_members && report.section1.team_members.length > 0 && (
+                                {report.section1?.team_members && report.section1.team_members.length > 0 && (
                                     <div className="mt-4">
                                         <h3 className="font-bold text-slate-800 text-sm mb-2 border-b pb-1">Team Members ({report.section1.team_members.length})</h3>
                                         <div className="space-y-2">
@@ -300,7 +373,7 @@ export default function AdminReportDetailPage() {
                                     </div>
                                 )}
 
-                                {report.section1.attendance_logs && report.section1.attendance_logs.length > 0 && (
+                                {report.section1?.attendance_logs && report.section1.attendance_logs.length > 0 && (
                                     <div className="mt-8">
                                         <h3 className="font-bold text-slate-800 text-sm mb-4 border-b pb-1 uppercase tracking-widest text-slate-400">Attendance & Evidence Logs</h3>
                                         <AttendanceSummaryTable
@@ -310,13 +383,18 @@ export default function AdminReportDetailPage() {
                                     </div>
                                 )}
                             </div>
-                        )}
+                        </div>
 
-                        {activeSection === 'section2' && report.section2 && (
+                        {/* Section 2 */}
+                        <div id="section2" className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm scroll-mt-8">
                             <div className="space-y-8">
-                                <h2 className="text-2xl font-black text-slate-900">Project Context</h2>
+                                <div className="flex items-center gap-4">
+                                    <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                                        <FileText className="w-6 h-6" />
+                                    </div>
+                                    <h2 className="text-3xl font-black text-slate-900">02. Project Context</h2>
+                                </div>
 
-                                {/* Project Identity Card */}
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div className="p-5 bg-slate-50 rounded-2xl border border-slate-100 flex items-start gap-4">
                                         <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
@@ -360,57 +438,113 @@ export default function AdminReportDetailPage() {
 
                                 <div className="border-t border-slate-100 pt-6">
                                     <div className="flex flex-wrap">
-                                        <LabelValue label="Discipline" value={report.section2.discipline} />
-                                        <LabelValue label="Problem Statement" value={report.section2.problem_statement} fullWidth />
+                                        <LabelValue label="Discipline" value={report.section2?.discipline} />
+                                        <LabelValue label="Problem Statement" value={report.section2?.problem_statement} fullWidth />
                                     </div>
                                 </div>
                             </div>
-                        )}
+                        </div>
 
-                        {activeSection === 'section3' && report.section3 && (
+                        {/* Section 3 */}
+                        <div id="section3" className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm scroll-mt-8">
                             <div className="space-y-6">
-                                <h2 className="text-2xl font-black text-slate-900">SDG Mapping</h2>
-                                <LabelValue label="Primary SDG Explanation" value={report.section3.primary_sdg_explanation} fullWidth />
-                                {report.section3.secondary_sdgs && report.section3.secondary_sdgs.length > 0 && (
+                                <div className="flex items-center gap-4">
+                                    <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center">
+                                        <Target className="w-6 h-6" />
+                                    </div>
+                                    <h2 className="text-3xl font-black text-slate-900">03. SDG Mapping</h2>
+                                </div>
+                                <LabelValue label="Contribution Logic / Purpose" value={report.section3?.contribution_intent_statement} fullWidth />
+                                {report.section3?.secondary_sdgs && report.section3.secondary_sdgs.length > 0 && (
                                     <div className="mt-4">
                                         <h3 className="font-bold text-slate-800 text-sm mb-2 border-b pb-1">Secondary SDGs</h3>
-                                        <ul className="list-disc ml-5 text-sm text-slate-700">
+                                        <div className="grid grid-cols-1 gap-3">
                                             {report.section3.secondary_sdgs.map((sdg: any, i: number) => (
-                                                <li key={i}>Goal {sdg.sdg_id}: {sdg.justification}</li>
+                                                <div key={i} className="p-3 bg-slate-50 rounded-xl border border-slate-100">
+                                                    <span className="inline-block px-2 py-0.5 bg-blue-600 text-white text-[10px] font-black rounded mr-2">GOAL {sdg.goal_number}</span>
+                                                    <p className="inline text-sm text-slate-700">{sdg.justification_text}</p>
+                                                </div>
                                             ))}
-                                        </ul>
+                                        </div>
                                     </div>
                                 )}
                             </div>
-                        )}
+                        </div>
 
-                        {activeSection === 'section4' && report.section4 && (
-                            <div className="space-y-6">
-                                <h2 className="text-2xl font-black text-slate-900">Activities & Outputs</h2>
-                                <div className="flex flex-wrap">
-                                    <LabelValue label="Activity Type" value={report.section4.activity_type} />
-                                    <LabelValue label="Total Beneficiaries" value={report.section4.total_beneficiaries} />
-                                    <LabelValue label="Total Sessions" value={report.section4.total_sessions} />
-                                    <LabelValue label="Duration" value={`${report.section4.duration_val} ${report.section4.duration_unit}`} />
+                        {/* Section 4 */}
+                        <div id="section4" className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm scroll-mt-8">
+                            <div className="space-y-8">
+                                <div className="flex items-center gap-4">
+                                    <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                                        <Activity className="w-6 h-6" />
+                                    </div>
+                                    <h2 className="text-3xl font-black text-slate-900">04. Activities & Outputs</h2>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                    <div className="space-y-4">
+                                        <h3 className="font-bold text-slate-800 text-sm border-b pb-1 uppercase tracking-widest text-slate-400">Engagement Details</h3>
+                                        <div className="flex flex-wrap">
+                                            <LabelValue label="Total Beneficiaries" value={report.section4?.total_beneficiaries} />
+                                            <LabelValue label="Total Sessions" value={report.section4?.total_sessions} />
+                                            <LabelValue label="Delivery Mode" value={report.section4?.delivery_mode} />
+                                            <LabelValue label="Primary Change Area" value={report.section4?.primary_change_area} />
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-4">
+                                        <h3 className="font-bold text-slate-800 text-sm border-b pb-1 uppercase tracking-widest text-slate-400">Core Activities</h3>
+                                        <div className="flex flex-wrap gap-2">
+                                            {report.section4?.activities?.map((act: any, i: number) => (
+                                                <span key={i} className="px-3 py-1 bg-blue-50 text-blue-700 rounded-lg text-xs font-bold border border-blue-100">
+                                                    {act.type === 'Other' ? act.other_text : act.type}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-4">
+                                    <h3 className="font-bold text-slate-800 text-sm border-b pb-1 uppercase tracking-widest text-slate-400">Tangible Outputs</h3>
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                        {report.section4?.outputs?.map((out: any, i: number) => (
+                                            <div key={i} className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                                                <p className="text-2xl font-black text-slate-900">{out.count}</p>
+                                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{out.type === 'Other' ? out.other_text : out.type}</p>
+                                            </div>
+                                        ))}
+                                    </div>
                                 </div>
                             </div>
-                        )}
+                        </div>
 
-                        {activeSection === 'section5' && report.section5 && (
+                        {/* Section 5 */}
+                        <div id="section5" className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm scroll-mt-8">
                             <div className="space-y-6">
-                                <h2 className="text-2xl font-black text-slate-900">Outcomes</h2>
+                                <div className="flex items-center gap-4">
+                                    <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                                        <TrendingUp className="w-6 h-6" />
+                                    </div>
+                                    <h2 className="text-3xl font-black text-slate-900">05. Outcomes</h2>
+                                </div>
                                 <div className="flex flex-wrap">
-                                    <LabelValue label="Observed Change" value={report.section5.observed_change} fullWidth />
-                                    <LabelValue label="Challenges" value={report.section5.challenges} fullWidth />
+                                    <LabelValue label="Observed Change" value={report.section5?.observed_change} fullWidth />
+                                    <LabelValue label="Challenges" value={report.section5?.challenges} fullWidth />
                                 </div>
                             </div>
-                        )}
+                        </div>
 
-                        {activeSection === 'section6' && report.section6 && (
+                        {/* Section 6 */}
+                        <div id="section6" className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm scroll-mt-8">
                             <div className="space-y-6">
-                                <h2 className="text-2xl font-black text-slate-900">Resources</h2>
-                                <LabelValue label="Used External Resources" value={report.section6.use_resources} />
-                                {report.section6.resources && report.section6.resources.length > 0 && (
+                                <div className="flex items-center gap-4">
+                                    <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center">
+                                        <Package className="w-6 h-6" />
+                                    </div>
+                                    <h2 className="text-3xl font-black text-slate-900">06. Resources</h2>
+                                </div>
+                                <LabelValue label="Used External Resources" value={report.section6?.use_resources} />
+                                {report.section6?.resources && report.section6.resources.length > 0 && (
                                     <div className="mt-4 overflow-x-auto">
                                         <table className="w-full text-sm border-collapse border border-slate-200">
                                             <thead>
@@ -426,7 +560,7 @@ export default function AdminReportDetailPage() {
                                                     <tr key={i}>
                                                         <td className="border border-slate-200 p-2">{r.type}</td>
                                                         <td className="border border-slate-200 p-2">{r.amount} {r.unit}</td>
-                                                        <td className="border border-slate-200 p-2">{r.source}</td>
+                                                        <td className="border border-slate-200 p-2">{r.sources?.join(', ') || r.source}</td>
                                                         <td className="border border-slate-200 p-2">{r.purpose}</td>
                                                     </tr>
                                                 ))}
@@ -435,13 +569,19 @@ export default function AdminReportDetailPage() {
                                     </div>
                                 )}
                             </div>
-                        )}
+                        </div>
 
-                        {activeSection === 'section7' && report.section7 && (
+                        {/* Section 7 */}
+                        <div id="section7" className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm scroll-mt-8">
                             <div className="space-y-6">
-                                <h2 className="text-2xl font-black text-slate-900">Partnerships</h2>
-                                <LabelValue label="Has Partners" value={report.section7.has_partners} />
-                                {report.section7.partners && report.section7.partners.length > 0 && (
+                                <div className="flex items-center gap-4">
+                                    <div className="w-12 h-12 rounded-2xl bg-cyan-50 text-cyan-600 flex items-center justify-center">
+                                        <Handshake className="w-6 h-6" />
+                                    </div>
+                                    <h2 className="text-3xl font-black text-slate-900">07. Partnerships</h2>
+                                </div>
+                                <LabelValue label="Has Partners" value={report.section7?.has_partners} />
+                                {report.section7?.partners && report.section7.partners.length > 0 && (
                                     <div className="mt-4 space-y-2">
                                         {report.section7.partners.map((p: any, i: number) => (
                                             <div key={i} className="text-sm border border-slate-200 p-3 rounded-lg bg-slate-50">
@@ -452,13 +592,19 @@ export default function AdminReportDetailPage() {
                                     </div>
                                 )}
                             </div>
-                        )}
+                        </div>
 
-                        {activeSection === 'section8' && report.section8 && (
+                        {/* Section 8 */}
+                        <div id="section8" className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm scroll-mt-8">
                             <div className="space-y-6">
-                                <h2 className="text-2xl font-black text-slate-900">Evidence</h2>
-                                <LabelValue label="Description" value={report.section8.description} fullWidth />
-                                {report.section8.evidence_types && (
+                                <div className="flex items-center gap-4">
+                                    <div className="w-12 h-12 rounded-2xl bg-slate-100 text-slate-600 flex items-center justify-center">
+                                        <FileText className="w-6 h-6" />
+                                    </div>
+                                    <h2 className="text-3xl font-black text-slate-900">08. Evidence</h2>
+                                </div>
+                                <LabelValue label="Description" value={report.section8?.description} fullWidth />
+                                {report.section8?.evidence_types && (
                                     <LabelValue label="Evidence Types" value={report.section8.evidence_types.join(", ")} fullWidth />
                                 )}
 
@@ -484,81 +630,133 @@ export default function AdminReportDetailPage() {
                                     )}
                                 </div>
                             </div>
-                        )}
+                        </div>
 
-                        {activeSection === 'section9' && report.section9 && (
-                            <div className="space-y-6">
-                                <h2 className="text-2xl font-black text-slate-900">Reflection</h2>
-                                <LabelValue label="Academic Connection" value={report.section9.academic_application} fullWidth />
-                                <LabelValue label="Personal Growth" value={report.section9.personal_learning} fullWidth />
-                                <LabelValue label="Strongest Competency" value={report.section9.strongest_competency} fullWidth />
+                        {/* Section 9 */}
+                        <div id="section9" className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm scroll-mt-8">
+                            <div className="space-y-8">
+                                <div className="flex items-center gap-4">
+                                    <div className="w-12 h-12 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center">
+                                        <MessageSquare className="w-6 h-6" />
+                                    </div>
+                                    <h2 className="text-3xl font-black text-slate-900">09. Reflection & Growth</h2>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="p-5 bg-blue-50 border border-blue-100 rounded-2xl">
+                                        <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1">Academic Integration</p>
+                                        <p className="font-bold text-slate-900">{report.section9?.academic_integration || "N/A"}</p>
+                                    </div>
+                                    <div className="p-5 bg-emerald-50 border border-emerald-100 rounded-2xl">
+                                        <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-1">Impact Score (Calculated)</p>
+                                        <p className="font-bold text-slate-900">{report.section9?.competency_scores ? (Object.values(report.section9.competency_scores as Record<string, any>).reduce((a: any, b: any) => a + Number(b || 0), 0) / 12).toFixed(1) : "0.0"} / 5.0</p>
+                                    </div>
+                                </div>
+
+                                <LabelValue label="Disciplinary / Academic Application" value={report.section9?.academic_application} fullWidth />
+                                <LabelValue label="Personal Learning & Insights" value={report.section9?.personal_learning} fullWidth />
+                                <LabelValue label="Sustainability & Systems Reflection" value={report.section9?.sustainability_reflection} fullWidth />
                             </div>
-                        )}
+                        </div>
 
-                        {activeSection === 'section10' && report.section10 && (
+                        {/* Section 10 */}
+                        <div id="section10" className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm scroll-mt-8">
                             <div className="space-y-6">
-                                <h2 className="text-2xl font-black text-slate-900">Sustainability</h2>
-                                <LabelValue label="Continuation Status" value={report.section10.continuation_status} />
-                                {report.section10.mechanisms && (
+                                <div className="flex items-center gap-4">
+                                    <div className="w-12 h-12 rounded-2xl bg-teal-50 text-teal-600 flex items-center justify-center">
+                                        <Activity className="w-6 h-6" />
+                                    </div>
+                                    <h2 className="text-3xl font-black text-slate-900">10. Sustainability</h2>
+                                </div>
+                                <LabelValue label="Continuation Status" value={report.section10?.continuation_status} />
+                                {report.section10?.mechanisms && (
                                     <LabelValue label="Mechanisms" value={report.section10.mechanisms.join(", ")} fullWidth />
                                 )}
-                                <LabelValue label="Sustainability Details" value={report.section10.continuation_details} fullWidth />
+                                <LabelValue label="Sustainability Details" value={report.section10?.continuation_details} fullWidth />
                             </div>
-                        )}
+                        </div>
 
-                        {activeSection === 'section11' && (
-                            <div className="space-y-6">
-                                <h2 className="text-2xl font-black text-slate-900 mb-6">Complete Report Summary</h2>
-                                <div className="bg-slate-50 p-6 rounded-3xl border border-slate-200">
+                        {/* Summary View */}
+                        <div id="section11" className="bg-white rounded-[3rem] p-12 border border-slate-200 shadow-xl scroll-mt-8 overflow-hidden relative">
+                            <div className="absolute top-0 right-0 p-8 opacity-5">
+                                <FileText className="w-64 h-64 text-slate-900" />
+                            </div>
+                            <div className="relative z-10 text-center">
+                                <div className="inline-flex items-center gap-3 px-6 py-2 bg-indigo-50 border border-indigo-100 rounded-full mb-6">
+                                    <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
+                                    <span className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">Premium Impact Dossier</span>
+                                </div>
+                                <h2 className="text-4xl font-black mb-12 text-slate-900">Executive Impact Dossier</h2>
+                                <div className="text-left">
                                     <ReportPrintView projectData={report.opportunity} reportData={{ ...report }} />
                                 </div>
                             </div>
-                        )}
+                        </div>
                     </div>
                 </div>
 
-                {/* Verification Actions */}
-                <div id="actions" className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm mt-8">
-                    <h3 className="text-xl font-black text-slate-900 mb-6">Admin Actions</h3>
+                <div id="actions" className="bg-white rounded-[3rem] p-12 border border-slate-200 shadow-xl mt-12 mb-20 relative overflow-hidden">
+                    <div className="absolute top-0 right-0 p-8 opacity-5">
+                        <CheckCircle2 className="w-32 h-32" />
+                    </div>
+                    <div className="relative z-10">
+                        <h3 className="text-3xl font-black text-slate-900 mb-2">Impact Decision Hub</h3>
+                        <p className="text-slate-500 font-medium mb-8">Review all sections above before making a final determination on this impact report.</p>
 
-                    <div className="space-y-4">
-                        <div>
-                            <label className="text-sm font-bold text-slate-700 mb-2 block">Feedback / Notes (Optional for Approval/Unlock, Required for Rejection)</label>
-                            <textarea
-                                value={feedback}
-                                onChange={(e) => setFeedback(e.target.value)}
-                                placeholder="Provide feedback or admin notes..."
-                                className="w-full min-h-[120px] rounded-2xl border border-slate-200 p-4 focus:outline-none focus:ring-4 focus:ring-blue-50 focus:border-blue-400"
-                            />
-                        </div>
+                        <div className="space-y-6">
+                            <div>
+                                <label className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 block">Decision Feedback / Notes</label>
+                                <textarea
+                                    value={feedback}
+                                    onChange={(e) => setFeedback(e.target.value)}
+                                    placeholder="Provide detailed feedback for the student..."
+                                    className="w-full min-h-[160px] rounded-[2rem] border border-slate-200 p-6 focus:outline-none focus:ring-8 focus:ring-blue-50 focus:border-blue-400 bg-slate-50/50 text-slate-900 font-medium transition-all"
+                                />
+                                <p className="text-[10px] text-slate-400 mt-3 font-bold uppercase tracking-wider italic">* Required for rejection, shared with the student upon decision.</p>
+                            </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <button
-                                onClick={() => handleVerify('approve')}
-                                disabled={isVerifying || report.admin_status === 'approved'}
-                                className="flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white rounded-2xl font-bold py-4 text-sm lg:text-base shadow-lg shadow-green-200 transition-all disabled:opacity-50"
-                            >
-                                <CheckCircle2 className="w-5 h-5" />
-                                {report.admin_status === 'approved' ? 'Already Approved' : 'Approve Report'}
-                            </button>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4">
+                                <button
+                                    onClick={() => handleVerify('approve')}
+                                    disabled={isVerifying || report.admin_status === 'approved'}
+                                    className="flex flex-col items-center gap-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-[2rem] font-bold p-8 transition-all shadow-xl shadow-emerald-900/20 disabled:opacity-50 group"
+                                >
+                                    <div className="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                        <CheckCircle2 className="w-6 h-6" />
+                                    </div>
+                                    <div className="text-center">
+                                        <p className="text-lg leading-tight">{report.admin_status === 'approved' ? 'Approved' : 'Approve'}</p>
+                                        <p className="text-[10px] opacity-70 font-black uppercase tracking-widest mt-1">Verify Impact</p>
+                                    </div>
+                                </button>
 
-                            <button
-                                onClick={() => handleVerify('reject')}
-                                disabled={isVerifying || report.status === 'rejected'}
-                                className="flex items-center justify-center gap-2 border-2 border-red-300 text-red-600 hover:bg-red-50 rounded-2xl font-bold py-4 text-sm lg:text-base transition-all disabled:opacity-50"
-                            >
-                                <XCircle className="w-5 h-5" />
-                                {report.status === 'rejected' ? 'Already Rejected' : 'Reject Report'}
-                            </button>
+                                <button
+                                    onClick={() => handleVerify('reject')}
+                                    disabled={isVerifying || report.status === 'rejected'}
+                                    className="flex flex-col items-center gap-3 border-2 border-red-100 bg-red-50 text-red-600 hover:bg-red-100 rounded-[2rem] font-bold p-8 transition-all disabled:opacity-50 group"
+                                >
+                                    <div className="w-12 h-12 rounded-2xl bg-red-200/50 flex items-center justify-center group-hover:scale-110 transition-transform text-red-600">
+                                        <XCircle className="w-6 h-6" />
+                                    </div>
+                                    <div className="text-center">
+                                        <p className="text-lg leading-tight">{report.status === 'rejected' ? 'Rejected' : 'Reject'}</p>
+                                        <p className="text-[10px] text-red-400 font-black uppercase tracking-widest mt-1">Needs Revision</p>
+                                    </div>
+                                </button>
 
-                            <button
-                                onClick={() => handleVerify('unlock')}
-                                disabled={isVerifying || report.status === 'draft'}
-                                className="flex items-center justify-center gap-2 border-2 border-blue-300 text-blue-600 hover:bg-blue-50 rounded-2xl font-bold py-4 text-sm lg:text-base transition-all disabled:opacity-50"
-                            >
-                                <Lock className="w-5 h-5 mb-0.5" />
-                                {report.status === 'draft' ? 'Currently Unlocked' : 'Unlock for Changes'}
-                            </button>
+                                <button
+                                    onClick={() => handleVerify('unlock')}
+                                    disabled={isVerifying || report.status === 'draft'}
+                                    className="flex flex-col items-center gap-3 border-2 border-blue-100 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-[2rem] font-bold p-8 transition-all disabled:opacity-50 group"
+                                >
+                                    <div className="w-12 h-12 rounded-2xl bg-blue-200/50 flex items-center justify-center group-hover:scale-110 transition-transform text-blue-600">
+                                        <Lock className="w-6 h-6" />
+                                    </div>
+                                    <div className="text-center">
+                                        <p className="text-lg leading-tight">{report.status === 'draft' ? 'Unlocked' : 'Unlock'}</p>
+                                        <p className="text-[10px] text-blue-400 font-black uppercase tracking-widest mt-1">Allow Changes</p>
+                                    </div>
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>

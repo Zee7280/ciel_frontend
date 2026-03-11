@@ -24,7 +24,7 @@ interface Applicant {
     status: 'pending' | 'shortlisted' | 'accepted' | 'rejected';
     appliedAt: string;
     avatar?: string;
-    type?: 'individual' | 'team';
+    participation_type?: 'individual' | 'team';
     teamName?: string;
     teamMembers?: TeamMember[];
 }
@@ -202,16 +202,16 @@ export default function ManageApplicantsPage() {
                                             </Avatar>
                                             <div>
                                                 <div className="font-bold text-slate-900 flex items-center gap-2">
-                                                    {app.type === 'team' ? (
+                                                    {app.participation_type === 'team' ? (
                                                         <>
-                                                            {app.teamName} <span className="text-[10px] bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wide">Team</span>
+                                                            {app.studentName}'s Team <span className="text-[10px] bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wide">Team</span>
                                                         </>
                                                     ) : (
                                                         app.studentName
                                                     )}
                                                 </div>
                                                 <div className="text-xs text-slate-500">{app.email}</div>
-                                                {app.type === 'team' && (
+                                                {app.participation_type === 'team' && (
                                                     <div className="text-[10px] text-slate-400 mt-0.5">Lead: {app.studentName}</div>
                                                 )}
                                             </div>
@@ -230,7 +230,7 @@ export default function ManageApplicantsPage() {
                                                 <Loader2 className="w-4 h-4 animate-spin text-slate-400" />
                                             ) : (
                                                 <>
-                                                    {app.type === 'team' && (
+                                                    {app.participation_type === 'team' && (
                                                         <button
                                                             onClick={() => openTeamDialog(app)}
                                                             className="p-1.5 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors mr-1"
@@ -287,7 +287,7 @@ export default function ManageApplicantsPage() {
                     <DialogHeader>
                         <DialogTitle className="flex items-center gap-2">
                             <Users className="w-5 h-5 text-indigo-600" />
-                            {selectedTeam?.teamName}
+                            {selectedTeam?.participation_type === 'team' ? `${selectedTeam?.studentName}'s Team` : selectedTeam?.studentName}
                             <span className="text-sm font-normal text-slate-500">({selectedTeam?.studentName})</span>
                         </DialogTitle>
                         <DialogDescription>

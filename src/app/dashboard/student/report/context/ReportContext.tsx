@@ -68,7 +68,7 @@ export interface ReportData {
         problem_statement: string;
         discipline: string;
         discipline_contribution: string;
-        baseline_evidence: string;
+        baseline_evidence: string[];
         baseline_evidence_other?: string;
         problem_category?: string;
         primary_beneficiary?: string;
@@ -256,7 +256,7 @@ const defaultReportData: ReportData = {
         problem_statement: '',
         discipline: '',
         discipline_contribution: '',
-        baseline_evidence: '',
+        baseline_evidence: [],
         baseline_evidence_other: '',
         problem_category: '',
         primary_beneficiary: '',

@@ -10,6 +10,8 @@ import { Button } from "./ui/button";
 import { useReportForm } from "../context/ReportContext";
 import { useDebounce } from "@/hooks/useDebounce";
 import { FieldError } from "./ui/FieldError";
+import { MultiSelect } from "./ui/MultiSelect";
+import { SingleSelect } from "./ui/SingleSelect";
 import clsx from "clsx";
 
 interface Section2Props {
@@ -22,6 +24,46 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
     const sectionErrors = validationErrors['section2'] || [];
     const hasErrors = sectionErrors.length > 0;
     const sectionData = data.section2;
+
+    const [isGenerating, setIsGenerating] = useState(false);
+
+    const handleGenerateAISummary = async () => {
+        const words = sectionData.problem_statement?.trim().split(/\s+/).filter((w: string) => w.length > 0).length || 0;
+        if (words < 100) {
+            toast.error("Please provide at least 100 words in the Problem Statement first.");
+            return;
+        }
+        if (!sectionData.discipline) {
+            toast.error("Please select an Academic Discipline first.");
+            return;
+        }
+
+        setIsGenerating(true);
+        const evidenceSource = sectionData.baseline_evidence?.length > 0
+            ? sectionData.baseline_evidence.map((t: string) => t === 'Other' ? (sectionData.baseline_evidence_other || 'Other Sources') : t).join(", ")
+            : "Unknown Sources";
+
+        const result = await generateAISummary("section2", {
+            ...sectionData,
+            projectTitle: title,
+            partnerOrg: partner,
+            location: `${district}, ${province}, ${country}`,
+            duration: `${startDate} – ${endDate}`,
+            baseline_evidence: evidenceSource
+        });
+        setIsGenerating(false);
+
+        if (result.error) {
+            toast.error(result.error);
+        } else if (result.summary) {
+            updateSection('section2', {
+                summary_text: result.summary,
+                problem_category: classifyProblem(sectionData.problem_statement),
+                primary_beneficiary: detectBeneficiary(sectionData.problem_statement)
+            });
+            toast.success("AI Baseline Summary generated!");
+        }
+    };
 
     // ─── Helper: Rule-based classification ───────────────────────────────────
     const classifyProblem = (text: string) => {
@@ -77,11 +119,12 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
     // ─── Auto-generate summary when inputs are complete ───────────────────────
     React.useEffect(() => {
         const words = sectionData.problem_statement?.trim().split(/\s+/).filter(w => w.length > 0).length || 0;
-        const evidenceSource = sectionData.baseline_evidence === 'Other'
-            ? (sectionData.baseline_evidence_other || 'Other Sources')
-            : sectionData.baseline_evidence;
+        const evidenceArray = sectionData.baseline_evidence || [];
+        const evidenceSource = evidenceArray.includes('Other')
+            ? [...evidenceArray.filter(t => t !== 'Other'), (sectionData.baseline_evidence_other || 'Other Sources')].join(", ")
+            : evidenceArray.join(", ");
 
-        if (words >= 100 && sectionData.discipline && sectionData.baseline_evidence) {
+        if (words >= 100 && sectionData.discipline && evidenceArray.length > 0) {
             const pCategory = classifyProblem(sectionData.problem_statement);
             const beneficiary = detectBeneficiary(sectionData.problem_statement);
             const summary = generateSummary(pCategory, beneficiary, evidenceSource, sectionData.discipline);
@@ -322,28 +365,16 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
 
                 <div className="bg-white rounded-[2.5rem] border-2 border-slate-100 p-8 shadow-sm space-y-10">
 
-                    {/* Discipline picker — pill grid */}
+                    {/* Discipline picker — SingleSelect dropdown */}
                     <div className="space-y-4">
                         <Label className="report-label !text-slate-900">Select Your Primary Academic Discipline</Label>
-                        <div className="flex flex-wrap gap-2">
-                            {disciplines.map(d => (
-                                <button
-                                    key={d}
-                                    type="button"
-                                    disabled={isReadOnly}
-                                    onClick={() => updateSection('section2', { discipline: d })}
-                                    className={clsx(
-                                        "px-3.5 py-2 rounded-full font-black text-[9px] uppercase tracking-widest transition-all border-2",
-                                        sectionData.discipline === d
-                                            ? "bg-report-primary border-report-primary text-white shadow-lg shadow-report-primary-shadow"
-                                            : "bg-slate-50 border-slate-100 text-slate-500 hover:border-report-primary-border hover:text-report-primary hover:bg-white",
-                                        isReadOnly && "cursor-not-allowed opacity-50"
-                                    )}
-                                >
-                                    {d}
-                                </button>
-                            ))}
-                        </div>
+                        <SingleSelect
+                            options={disciplines}
+                            value={sectionData.discipline}
+                            onChange={(val) => updateSection('section2', { discipline: val })}
+                            placeholder="Select a discipline..."
+                            disabled={isReadOnly}
+                        />
                         <FieldError message={getFieldError('discipline')} />
                     </div>
 
@@ -410,31 +441,24 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
                             <p className="report-help !pl-0">What specific data or observation informed your understanding of the baseline situation?</p>
                         </div>
 
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                            {evidenceTypes.map(t => (
-                                <button
-                                    key={t}
-                                    type="button"
-                                    disabled={isReadOnly}
-                                    onClick={() => updateSection('section2', { baseline_evidence: t, ...(t !== 'Other' ? { baseline_evidence_other: '' } : {}) })}
-                                    className={clsx(
-                                        "h-14 rounded-2xl font-black text-[9px] uppercase tracking-widest transition-all border-2 flex flex-col items-center justify-center gap-1.5 px-3 text-center",
-                                        sectionData.baseline_evidence === t
-                                            ? "bg-report-primary border-report-primary text-white shadow-lg shadow-report-primary-shadow"
-                                            : "bg-slate-50 border-slate-100 text-slate-400 hover:border-report-primary-border hover:text-report-primary hover:bg-white",
-                                        isReadOnly && "cursor-not-allowed opacity-50"
-                                    )}
-                                >
-                                    {t}
-                                    {sectionData.baseline_evidence === t && <CheckCircle2 className="w-3 h-3 text-white/70" />}
-                                </button>
-                            ))}
-                        </div>
+                        <MultiSelect
+                            options={evidenceTypes}
+                            selected={sectionData.baseline_evidence || []}
+                            onChange={(values) => {
+                                updateSection('section2', {
+                                    baseline_evidence: values,
+                                    // Clear 'other' text if 'Other' is deselected
+                                    ...(!values.includes('Other') ? { baseline_evidence_other: '' } : {})
+                                });
+                            }}
+                            placeholder="Select data or observations..."
+                            disabled={isReadOnly}
+                        />
                         <FieldError message={getFieldError('baseline_evidence')} />
                     </div>
 
                     {/* Other: specify text */}
-                    {sectionData.baseline_evidence === 'Other' && (
+                    {sectionData.baseline_evidence?.includes('Other') && (
                         <div className="animate-in fade-in slide-in-from-top-4 duration-400 pt-8 border-t-2 border-slate-50 space-y-5">
                             <div className="space-y-2">
                                 <Label className="report-label !text-slate-900 border-b border-slate-100 pb-2 mb-3 flex items-center gap-2">
@@ -483,7 +507,15 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
                         </div>
                     </div>
                     <div className="flex items-center gap-3">
-
+                        <button
+                            type="button"
+                            onClick={handleGenerateAISummary}
+                            disabled={isGenerating}
+                            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-report-primary text-white text-[10px] font-black uppercase tracking-widest hover:opacity-90 disabled:opacity-40 transition-all shadow-md shadow-report-primary-shadow"
+                        >
+                            {isGenerating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                            {isGenerating ? "Generating…" : "Improve with AI"}
+                        </button>
                         <div className="px-4 py-2 rounded-xl bg-slate-900 text-white text-[10px] font-black uppercase tracking-widest border border-slate-800 shadow-sm">
                             Auto-Generated
                         </div>

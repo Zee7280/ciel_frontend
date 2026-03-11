@@ -8,16 +8,21 @@ import { Label } from "../../report/components/ui/label";
 import { authenticatedFetch } from "@/utils/api";
 import clsx from "clsx";
 import { useReportForm } from "../../report/context/ReportContext";
+import React from "react";
 
 export default function AttendanceForm({
     verifiedUsers,
     onSuccess,
+    selectedParticipantId,
+    onParticipantChange,
     isLocked = false,
     isParticipationUnlocked,
     setParticipationUnlocked
 }: {
     verifiedUsers: { id: string, name: string }[],
     onSuccess: () => void,
+    selectedParticipantId?: string | null,
+    onParticipantChange?: (id: string) => void,
     isLocked?: boolean,
     isParticipationUnlocked?: boolean,
     setParticipationUnlocked?: (unlocked: boolean) => void
@@ -26,7 +31,7 @@ export default function AttendanceForm({
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [evidenceFile, setEvidenceFile] = useState<File | null>(null);
     const [formData, setFormData] = useState({
-        participantId: verifiedUsers.length > 0 ? verifiedUsers[0].id : '',
+        participantId: selectedParticipantId || (verifiedUsers.length > 0 ? verifiedUsers[0].id : ''),
         dateOfEngagement: new Date().toISOString().split('T')[0],
         startTime: '09:00',
         endTime: '12:00',
@@ -35,6 +40,13 @@ export default function AttendanceForm({
         otherActivity: '',
         description: '',
     });
+
+    // Keep formData.participantId in sync with selectedParticipantId prop
+    React.useEffect(() => {
+        if (selectedParticipantId && selectedParticipantId !== formData.participantId) {
+            setFormData(prev => ({ ...prev, participantId: selectedParticipantId }));
+        }
+    }, [selectedParticipantId]);
 
     const wordCount = formData.description.trim() === "" ? 0 : formData.description.trim().split(/\s+/).length;
 
@@ -138,13 +150,18 @@ export default function AttendanceForm({
     };
 
     return (
-        <form onSubmit={handleSubmit} className="bg-white rounded-3xl border border-slate-100 p-8 shadow-sm space-y-6">
-            <div className="flex justify-between items-center mb-4">
-                <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-report-primary-soft text-report-primary rounded-xl flex items-center justify-center">
+        <form onSubmit={handleSubmit} className="bg-white rounded-[2.5rem] border-2 border-slate-100 p-8 shadow-xl shadow-slate-200/50 space-y-8 relative overflow-hidden group/form transition-all hover:border-report-primary-border/30">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-report-primary/5 rounded-full blur-3xl -mr-16 -mt-16 group-hover/form:bg-report-primary/10 transition-colors" />
+
+            <div className="flex justify-between items-center relative z-10">
+                <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-report-primary text-white rounded-xl flex items-center justify-center shadow-lg shadow-report-primary-shadow ring-4 ring-report-primary-soft">
                         <Plus className="w-6 h-6" />
                     </div>
-                    <h3 className="text-xl font-bold text-slate-900">Add Attendance Entry</h3>
+                    <div>
+                        <h3 className="text-lg font-black text-slate-900 tracking-tight">Add Attendance Entry</h3>
+                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Session Verification Protocol</p>
+                    </div>
                 </div>
             </div>
 
@@ -156,8 +173,11 @@ export default function AttendanceForm({
                         <Users className="absolute left-4 top-4 w-5 h-5 text-slate-400 z-10" />
                         <select
                             value={formData.participantId}
-                            onChange={(e) => setFormData({ ...formData, participantId: e.target.value })}
-                            className="w-full pl-12 h-14 bg-slate-50 border-none rounded-2xl font-bold text-base appearance-none focus:ring-2 focus:ring-report-primary/20 transition-all cursor-pointer"
+                            onChange={(e) => {
+                                setFormData({ ...formData, participantId: e.target.value });
+                                if (onParticipantChange) onParticipantChange(e.target.value);
+                            }}
+                            className="w-full pl-12 h-14 bg-slate-50 border-2 border-transparent rounded-2xl font-bold text-base appearance-none focus:ring-4 focus:ring-report-primary/10 focus:border-report-primary/20 focus:bg-white transition-all cursor-pointer hover:bg-slate-100"
                             required
                         >
                             {verifiedUsers.length === 0 && <option value="">No verified students found</option>}
@@ -165,6 +185,9 @@ export default function AttendanceForm({
                                 <option key={u.id} value={u.id}>{u.name}</option>
                             ))}
                         </select>
+                        <div className="absolute right-4 top-5 pointer-events-none">
+                            <Plus className="w-4 h-4 text-slate-400 rotate-45" />
+                        </div>
                     </div>
                 </div>
 

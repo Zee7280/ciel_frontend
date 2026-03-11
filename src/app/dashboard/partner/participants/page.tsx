@@ -123,7 +123,22 @@ export default function PartnerParticipantsPage() {
                                             <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center font-bold text-slate-500">
                                                 {p.name[0]}
                                             </div>
-                                            <span className="font-bold text-slate-900">{p.name}</span>
+                                            <div>
+                                                <span className="font-bold text-slate-900 block">{p.name}</span>
+                                                {p.participation_type === 'team' && (
+                                                    <span className="text-[10px] bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wide">
+                                                        Team Leader
+                                                    </span>
+                                                )}
+                                                {p.participation_type === 'team_member' && (
+                                                    <div className="flex flex-col gap-0.5">
+                                                        <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wide w-fit">
+                                                            Team Member
+                                                        </span>
+                                                        <span className="text-[10px] text-slate-400">Lead: {p.leader_name}</span>
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
                                     </td>
                                     <td className="p-6 text-sm text-slate-600">{p.opportunity}</td>

@@ -16,14 +16,31 @@ export async function POST(req: Request) {
 
         switch (section) {
             case "section2":
-                prompt = `You are a student writing a formal community service report. Summarize the project context and problem definition. 
-                Focus on WHY this project was necessary. 
-                Strictly write in the first person ('I' or 'We'). Write exactly 2 to 3 concise sentences. 
-                Do NOT use any markdown formatting, asterisks, or bullet points. Output plain text only.
-                
-                Problem Statement: ${data.problem_statement}
-                Discipline: ${data.discipline}
-                Contribution: ${data.discipline_contribution}`;
+                prompt = `You are a professional institutional impact analyst. Generate a structured baseline summary based on the following student project information.
+
+                Inputs:
+                - Project Title: ${data.projectTitle}
+                - Partner Organization: ${data.partnerOrg}
+                - Location: ${data.location}
+                - Project Duration: ${data.duration}
+                - Problem / System Need: ${data.problem_statement}
+                - Academic Discipline: ${data.discipline}
+                - Discipline Contribution: ${data.discipline_contribution}
+                - Baseline Evidence Sources: ${data.baseline_evidence} ${data.baseline_evidence_other ? `(${data.baseline_evidence_other})` : ''}
+
+                Generate a summary with exactly these 5 numbered sections:
+                1. Identified Problem: Clearly describe the issue or system gap that existed before the intervention.
+                2. Affected Beneficiary Group: Identify who was affected and where.
+                3. Baseline Evidence: Explain what data or sources informed the understanding of the problem.
+                4. Academic Perspective: Explain how the student's academic discipline helped analyze the situation.
+                5. Intervention Justification: Explain why a structured intervention was necessary.
+
+                Constraints:
+                - Limit the entire summary to 120–150 words.
+                - Use professional institutional language.
+                - Do not describe activities, results, or outcomes.
+                - Focus strictly on the baseline context.
+                - Do NOT use markdown formatting (no bolding, no asterisks). Output plain text only.`;
                 break;
 
             case "section3":

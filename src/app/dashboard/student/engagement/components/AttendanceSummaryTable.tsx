@@ -32,82 +32,89 @@ export default function AttendanceSummaryTable({ entries, onDelete, isLocked = f
     }
 
     return (
-        <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
-            <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
+        <div className="bg-white rounded-[2.5rem] border-2 border-slate-100 shadow-xl shadow-slate-200/40 relative overflow-hidden transition-all hover:border-report-primary-border/20 flex flex-col">
+            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-report-primary/30 to-transparent" />
+
+            <div className="w-full overflow-x-auto selection:bg-report-primary/10">
+                <table className="w-full text-left border-collapse min-w-[700px]">
                     <thead>
-                        <tr className="bg-slate-50/50 border-b border-slate-100">
-                            <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Date & Session</th>
-                            <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Activity Type</th>
-                            <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Duration</th>
-                            <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400 text-center">Evidence</th>
-                            <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400 text-right">Status</th>
-                            {!isLocked && onDelete && <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400 text-right">Actions</th>}
+                        <tr className="bg-slate-50/80 backdrop-blur-sm border-b border-slate-100">
+                            <th className="px-5 py-5 text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">Date & Session</th>
+                            <th className="px-5 py-5 text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">Activity Type</th>
+                            <th className="px-5 py-5 text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">Duration</th>
+                            <th className="px-5 py-5 text-[10px] font-black uppercase tracking-[0.12em] text-slate-400 text-center">Evidence</th>
+                            <th className="px-5 py-5 text-[10px] font-black uppercase tracking-[0.12em] text-slate-400 text-right">Status</th>
+                            {!isLocked && onDelete && <th className="px-5 py-5 text-[10px] font-black uppercase tracking-[0.12em] text-slate-400 text-right">Actions</th>}
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50">
                         {entries.map((entry) => (
-                            <tr key={entry.id} className="hover:bg-slate-50/50 transition-colors group border-b border-slate-50 last:border-0">
-                                <td className="px-6 py-6">
-                                    <div className="flex items-center gap-4">
-                                        <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center font-black text-sm shrink-0 border border-blue-100 shadow-sm">
+                            <tr key={entry.id} className="hover:bg-report-primary-soft/10 transition-all group border-b border-slate-50 last:border-0">
+                                <td className="px-5 py-7">
+                                    <div className="flex items-center gap-5">
+                                        <div className="w-14 h-14 rounded-2xl bg-white text-slate-900 flex items-center justify-center font-black text-lg shrink-0 border-2 border-slate-100 shadow-sm group-hover:border-report-primary/30 transition-all group-hover:scale-105 group-hover:rotate-2">
                                             {new Date(entry.date).getDate()}
                                         </div>
                                         <div>
-                                            <p className="font-black text-slate-900 text-base">
+                                            <p className="font-black text-slate-900 text-base tracking-tight">
                                                 {new Date(entry.date).toLocaleDateString(undefined, { month: 'short', year: 'numeric' })}
                                             </p>
-                                            <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest mt-0.5">
+                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">
                                                 {entry.start_time} — {entry.end_time}
                                             </p>
                                         </div>
                                     </div>
                                 </td>
-                                <td className="px-6 py-6 transition-all">
-                                    <div className="flex items-center gap-2.5">
-                                        <div className="w-8 h-8 rounded-lg bg-slate-50 flex items-center justify-center text-slate-400">
+                                <td className="px-5 py-7">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center text-slate-400 group-hover:bg-report-primary-soft group-hover:text-report-primary transition-colors">
                                             <Tag className="w-4 h-4" />
                                         </div>
-                                        <span className="text-sm font-black text-slate-700 uppercase tracking-tight">{entry.activity_type}</span>
+                                        <span className="text-xs font-black text-slate-700 uppercase tracking-wider">{entry.activity_type}</span>
                                     </div>
                                 </td>
-                                <td className="px-6 py-6">
-                                    <div className="flex items-center gap-2">
-                                        <Clock className="w-4 h-4 text-blue-500" />
-                                        <span className="text-base font-black text-slate-900">{entry.hours} <span className="text-[10px] text-slate-400 font-black">HRS</span></span>
+                                <td className="px-5 py-7">
+                                    <div className="flex items-center gap-2.5">
+                                        <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center text-blue-500">
+                                            <Clock className="w-4 h-4" />
+                                        </div>
+                                        <span className="text-lg font-black text-slate-900 tabular-nums">{entry.hours} <span className="text-[10px] text-slate-400 font-black uppercase ml-0.5">hrs</span></span>
                                     </div>
                                 </td>
-                                <td className="px-6 py-6 text-center">
+                                <td className="px-8 py-7 text-center">
                                     {typeof entry.evidence_file === 'string' ? (
-                                        <a href={entry.evidence_file} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 px-3 py-1 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-xl text-[10px] font-black border border-blue-200 shadow-sm transition-colors cursor-pointer">
+                                        <a href={entry.evidence_file} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 px-5 py-2 bg-report-primary text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-md shadow-report-primary-shadow hover:opacity-90 transition-all cursor-pointer">
                                             <CheckCircle2 className="w-3.5 h-3.5" /> VIEW
                                         </a>
                                     ) : entry.evidence_file ? (
-                                        <div className="inline-flex items-center gap-2 px-3 py-1 bg-emerald-50 text-emerald-600 rounded-xl text-[10px] font-black border border-emerald-100 shadow-sm">
+                                        <div className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-600 rounded-xl text-[9px] font-black border-2 border-emerald-100 uppercase tracking-widest">
                                             <CheckCircle2 className="w-3.5 h-3.5" /> LINKED
                                         </div>
                                     ) : (
-                                        <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest">No Evidence</span>
+                                        <span className="text-[9px] font-black text-slate-300 uppercase tracking-[0.2em]">No Evidence</span>
                                     )}
                                 </td>
-                                <td className="px-6 py-6 text-right">
-                                    <div className={`inline-flex items-center px-3 py-1.5 rounded-xl text-[10px] font-black border shadow-sm ${entry.entryStatus === 'verified' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
-                                        entry.entryStatus === 'flagged' ? 'bg-red-50 text-red-600 border-red-100' :
-                                            'bg-amber-50 text-amber-600 border-amber-100'
-                                        }`}>
-                                        <div className={clsx("w-1.5 h-1.5 rounded-full mr-2",
-                                            entry.entryStatus === 'verified' ? 'bg-emerald-500' :
-                                                entry.entryStatus === 'flagged' ? 'bg-red-500' : 'bg-amber-500'
+                                <td className="px-8 py-7 text-right">
+                                    <div className={clsx(
+                                        "inline-flex items-center px-4 py-2 rounded-xl text-[9px] font-black border-2 shadow-sm uppercase tracking-widest",
+                                        entry.entryStatus === 'verified' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
+                                            entry.entryStatus === 'flagged' ? 'bg-red-50 text-red-600 border-red-100' :
+                                                'bg-amber-50 text-amber-600 border-amber-100'
+                                    )}>
+                                        <div className={clsx("w-2 h-2 rounded-full mr-2",
+                                            entry.entryStatus === 'verified' ? 'bg-emerald-500 animate-pulse' :
+                                                entry.entryStatus === 'flagged' ? 'bg-red-500' : 'bg-amber-500 animate-pulse'
                                         )}></div>
+                                        {entry.entryStatus || 'pending'}
                                     </div>
                                 </td>
                                 {!isLocked && onDelete && (
-                                    <td className="px-6 py-6 text-right">
+                                    <td className="px-8 py-7 text-right">
                                         <button
                                             onClick={() => onDelete(entry.id)}
-                                            className="p-2 text-slate-300 hover:text-red-500 transition-colors bg-white rounded-lg border border-slate-100 hover:border-red-100 hover:bg-red-50/50 shadow-sm"
+                                            className="w-10 h-10 flex items-center justify-center text-slate-300 hover:text-red-500 transition-all bg-white rounded-xl border-2 border-slate-100 hover:border-red-100 hover:shadow-lg hover:shadow-red-50 hover:bg-red-50/30"
                                         >
-                                            <Trash2 className="w-4 h-4" />
+                                            <Trash2 className="w-4.5 h-4.5" />
                                         </button>
                                     </td>
                                 )}

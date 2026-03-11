@@ -1,4 +1,5 @@
 import { ReportData } from '../context/ReportContext';
+import { calculateSection1CII } from '@/utils/reportQuality';
 
 export interface CIIResult {
     totalScore: number;
@@ -19,7 +20,21 @@ export interface CIIResult {
 }
 
 export function calculateCII(data: ReportData): CIIResult {
-    let participation = 0;
+    const suggestions: string[] = [];
+
+    // --- 1. Participation & Engagement (Max 15) ---
+    const section1Result = calculateSection1CII({
+        participationMode: data.section1?.participation_type || 'individual',
+        teamSize: data.section1?.team_members?.length ? data.section1.team_members.length + 1 : 1,
+        totalVerifiedTeamHours: data.section1?.team_members?.reduce((sum, member) => sum + (parseFloat(member.hours) || 0), 0) + (parseFloat(data.section1?.team_lead?.hours) || 0),
+        studentVerifiedHours: data.section1?.metrics?.total_verified_hours || 0,
+        studentActiveDays: data.section1?.metrics?.total_active_days || 0,
+        studentEngagementSpan: data.section1?.metrics?.engagement_span || 0,
+        studentTotalSessions: data.section1?.attendance_logs?.length || 0,
+        studentSessionsWithEvidence: data.section1?.attendance_logs?.filter(log => log.evidence_file).length || 0
+    });
+
+    let participation = section1Result.finalScore;
     let context = 0;
     let sdg = 0;
     let outputs = 0;
@@ -30,32 +45,15 @@ export function calculateCII(data: ReportData): CIIResult {
     let learning = 0;
     let sustainability = 0;
 
-    const suggestions: string[] = [];
-
-    // --- 1. Participation & Engagement (Max 15) ---
-    const hours = data.section1?.metrics?.total_verified_hours || 0;
-    if (hours >= 48) participation += 15;
-    else if (hours >= 32) participation += 11;
-    else if (hours >= 16) participation += 7;
-    else if (hours > 0) participation += 3;
-
-    // Engagement span bonus
-    if ((data.section1?.metrics?.weekly_continuity || 0) > 70) participation += 2;
-
-    // Check if evidence attached to > 50% sessions
-    const totalSessionsWithEvidence = data.section1?.attendance_logs?.filter(log => log.evidence_file).length || 0;
-    const totalLogs = data.section1?.attendance_logs?.length || 0;
-    if (totalLogs > 0 && (totalSessionsWithEvidence / totalLogs) > 0.5) {
-        participation += 1;
-    }
-    participation = Math.min(participation, 15);
-
     if (participation < 11) {
-        suggestions.push("Increase verified participation hours to maximize engagement score.");
+        suggestions.push("Increase verified participation hours and evidence consistency to improve engagement score.");
+    }
+    if (section1Result.penaltyApplied < 0) {
+        suggestions.push(`Team hours gap detected. Current team hours: ${section1Result.teamComplianceRatio * 100}%. Ensure all members log at least 16 hours.`);
     }
 
     // --- 2. Project Context & Academic Alignment (Max 5) ---
-    if (data.section2?.baseline_evidence?.length > 50 && data.section2?.discipline_contribution?.length > 50) {
+    if (data.section2?.baseline_evidence?.length > 0 && data.section2?.discipline_contribution?.length > 50) {
         context = 5; // Evidence-based
     } else if (data.section2?.problem_statement?.length > 50) {
         context = 3; // Clear problem

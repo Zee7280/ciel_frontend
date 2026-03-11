@@ -238,7 +238,7 @@ function ReportFormContent() {
     }
 
     return (
-        <div className="max-w-none mx-auto px-6 md:px-12 py-8 space-y-8">
+        <div className="max-w-none mx-auto px-4 md:px-6 py-8 space-y-8">
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div>

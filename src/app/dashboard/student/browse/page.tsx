@@ -252,6 +252,10 @@ export default function StudentBrowseOpportunitiesPage() {
                                             <Clock className="w-3.5 h-3.5" />
                                             {op.hours || "0"} Hours Credit
                                         </div>
+                                        <div className="flex items-center gap-2 text-xs font-bold text-orange-600">
+                                            <Users className="w-3.5 h-3.5" />
+                                            {op.remaining_seats ?? op.volunteersNeeded ?? 0} Seats Remaining
+                                        </div>
                                     </div>
                                 </div>
 
@@ -315,6 +319,7 @@ export default function StudentBrowseOpportunitiesPage() {
                                         <span className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5" /> {op.city || "Remote"}</span>
                                         <span className="flex items-center gap-1"><Calendar className="w-3.5 h-3.5" /> {op.start_date ? new Date(op.start_date).toLocaleDateString() : "Flexible Dates"}</span>
                                         <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5" /> {op.hours || "0"} Hours</span>
+                                        <span className="flex items-center gap-1 font-bold text-orange-600"><Users className="w-3.5 h-3.5" /> {op.remaining_seats ?? op.volunteersNeeded ?? 0} Seats left</span>
                                     </div>
                                 </div>
 

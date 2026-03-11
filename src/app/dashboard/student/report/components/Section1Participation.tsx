@@ -49,6 +49,7 @@ export default function Section1Participation({ projectData }: { projectData?: a
     const [isSubmitted, setIsSubmitted] = React.useState(!!data.section1.verified_summary);
     const reviewChecked = data.section1.review_checked || [false, false, false];
     const [isDeleting, setIsDeleting] = React.useState<string | null>(null);
+    const [selectedParticipantId, setSelectedParticipantId] = React.useState<string | null>(null);
 
     // Hard Validation Gates
     const canMoveToStep2 = participation_type !== null;
@@ -71,6 +72,13 @@ export default function Section1Participation({ projectData }: { projectData?: a
             fetchInitialData();
         }
     }, [projectIdFromUrl]);
+
+    // Sync selectedParticipantId when participantId is fetched
+    React.useEffect(() => {
+        if (participantId && !selectedParticipantId) {
+            setSelectedParticipantId(participantId);
+        }
+    }, [participantId]);
 
     const fetchInitialData = async () => {
         try {
@@ -241,7 +249,7 @@ export default function Section1Participation({ projectData }: { projectData?: a
     return (
         <div className="space-y-10 pb-20">
             {/* Sticky Progress Bar */}
-            <div className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-100 py-4 -mx-6 md:-mx-12 px-6 md:px-12 mb-8">
+            <div className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-100 py-4 -mx-4 md:-mx-6 px-4 md:px-6 mb-8">
                 <div className="max-w-none mx-auto">
                     <div className="flex justify-between items-center mb-2">
                         <span className="report-label !text-report-primary">Project Engagement Wizard</span>
@@ -546,37 +554,58 @@ export default function Section1Participation({ projectData }: { projectData?: a
                             ))}
                         </div>
 
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
+                        <div className="grid grid-cols-1 lg:grid-cols-[400px_1fr] gap-6">
                             <div className="space-y-8">
                                 <div className="p-1 bg-slate-100 rounded-2xl flex">
                                     <button className="flex-1 py-2 text-[10px] font-black uppercase tracking-widest bg-white text-report-primary rounded-xl shadow-sm">New Entry</button>
                                     <button className="flex-1 py-2 text-[10px] font-black uppercase tracking-widest text-slate-400">Bulk Import</button>
                                 </div>
-                                <AttendanceForm
-                                    verifiedUsers={[
+                                {(() => {
+                                    const verifiedUsersList = [
                                         ...(isVerified && participantId ? [{ id: participantId, name: (data.section1.team_lead as any).fullName || (data.section1.team_lead as any).name || "Team Lead (Self)" }] : []),
                                         ...data.section1.team_members
                                             .filter((m: any) => m.verified && m.id)
                                             .map((m: any) => ({ id: m.id, name: m.fullName || m.name }))
-                                    ]}
-                                    onSuccess={() => loadAllEntries()}
-                                    isLocked={isRecordLocked}
-                                    isParticipationUnlocked={isParticipationUnlocked}
-                                    setParticipationUnlocked={setParticipationUnlocked}
-                                />
+                                    ];
+                                    return (
+                                        <>
+                                            <AttendanceForm
+                                                verifiedUsers={verifiedUsersList}
+                                                onSuccess={() => loadAllEntries()}
+                                                selectedParticipantId={selectedParticipantId}
+                                                onParticipantChange={setSelectedParticipantId}
+                                                isLocked={isRecordLocked}
+                                                isParticipationUnlocked={isParticipationUnlocked}
+                                                setParticipationUnlocked={setParticipationUnlocked}
+                                            />
+                                        </>
+                                    );
+                                })()}
                             </div>
                             <div className="space-y-6">
-                                <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden">
-                                    <div className="p-6 border-b border-slate-50 bg-slate-50/50 flex items-center justify-between">
-                                        <h4 className="report-h3 !flex items-center gap-2">
-                                            <Clock className="w-4 h-4 text-report-primary" /> Logged Sessions
-                                        </h4>
-                                        <span className="report-label !bg-white !px-3 !py-1 !rounded-full !border !border-slate-100">
-                                            Total: {data.section1.attendance_logs.length} Sessions
+                                <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-x-auto">
+                                    <div className="p-8 border-b border-slate-50 bg-slate-50/30 flex items-center justify-between">
+                                        <div className="flex flex-col gap-1">
+                                            <h4 className="report-h3 !flex items-center gap-2 !mb-0 text-slate-900 font-black">
+                                                <Clock className="w-5 h-5 text-report-primary" /> Logged Sessions
+                                            </h4>
+                                            {selectedParticipantId && (
+                                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-7">
+                                                    Filtered by: {[
+                                                        ...(isVerified && participantId ? [{ id: participantId, name: (data.section1.team_lead as any).fullName || (data.section1.team_lead as any).name || "Team Lead (Self)" }] : []),
+                                                        ...data.section1.team_members
+                                                            .filter((m: any) => m.verified && m.id)
+                                                            .map((m: any) => ({ id: m.id, name: m.fullName || m.name }))
+                                                    ].find(u => u.id === selectedParticipantId)?.name || "Self"}
+                                                </p>
+                                            )}
+                                        </div>
+                                        <span className="bg-white px-4 py-1.5 rounded-full border border-slate-100 text-[10px] font-black uppercase tracking-widest text-report-primary shadow-sm">
+                                            {data.section1.attendance_logs.filter((log: any) => !selectedParticipantId || log.participantId === selectedParticipantId).length} Records
                                         </span>
                                     </div>
                                     <AttendanceSummaryTable
-                                        entries={data.section1.attendance_logs}
+                                        entries={data.section1.attendance_logs.filter((log: any) => !selectedParticipantId || log.participantId === selectedParticipantId)}
                                         onDelete={handleDeleteEntry}
                                         isLocked={isRecordLocked}
                                     />
