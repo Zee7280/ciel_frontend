@@ -18,13 +18,21 @@ export default function FacultyApprovalsPage() {
 
     const fetchPendingProjects = async () => {
         try {
-            const res = await authenticatedFetch(`/api/v1/faculty/approvals?status=pending`);
+            const res = await authenticatedFetch(`/api/v1/faculty/reports?status=pending`);
             if (res && res.ok) {
                 const data = await res.json();
                 if (data.success) {
                     setPendingProjects(data.data || []);
                 }
+            } else {
+                // Fallback to old endpoint if new one isn't ready
+                const oldRes = await authenticatedFetch(`/api/v1/faculty/approvals?status=pending`);
+                if (oldRes && oldRes.ok) {
+                    const oldData = await oldRes.json();
+                    setPendingProjects(oldData.data || []);
+                }
             }
+
         } catch (error) {
             console.error("Failed to fetch approvals", error);
             toast.error("Failed to load pending projects");
@@ -121,16 +129,21 @@ export default function FacultyApprovalsPage() {
                                         </div>
                                     </div>
 
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50 p-4 rounded-lg border border-slate-100">
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-slate-50 p-4 rounded-lg border border-slate-100">
+                                        <div>
+                                            <p className="text-xs font-bold text-slate-500 uppercase mb-1">Impact Hours</p>
+                                            <p className="font-bold text-blue-600 text-lg">{project.totalHours || 0} <span className="text-xs font-medium text-slate-400">Verified</span></p>
+                                        </div>
+                                        <div>
+                                            <p className="text-xs font-bold text-slate-500 uppercase mb-1">EIS Score</p>
+                                            <p className="font-bold text-amber-600 text-lg">{project.eisScore || 0}<span className="text-xs font-medium text-slate-400">/100</span></p>
+                                        </div>
                                         <div>
                                             <p className="text-xs font-bold text-slate-500 uppercase mb-1">Primary SDG</p>
-                                            <p className="font-medium text-slate-800">{project.sdg}</p>
-                                        </div>
-                                        <div>
-                                            <p className="text-xs font-bold text-slate-500 uppercase mb-1">Proposed Duration</p>
-                                            <p className="font-medium text-slate-800">Feb 15 - Mar 01 (2 Weeks)</p>
+                                            <p className="font-medium text-slate-800 text-sm">{project.sdg || 'SDG Alignment'}</p>
                                         </div>
                                     </div>
+
                                 </div>
 
                                 <div className="bg-slate-50 border-l border-slate-100 p-6 flex flex-row md:flex-col justify-center gap-3 w-full md:w-48">
@@ -140,9 +153,10 @@ export default function FacultyApprovalsPage() {
                                     <Button variant="destructive" className="w-full" onClick={() => handleReject(project.id)}>
                                         <XCircle className="w-4 h-4 mr-2" /> Reject
                                     </Button>
-                                    <Button variant="ghost" className="w-full">
-                                        <Eye className="w-4 h-4 mr-2" /> View Details
+                                    <Button variant="ghost" className="w-full" onClick={() => toast.info("Full Report Review View coming soon!")}>
+                                        <Eye className="w-4 h-4 mr-2" /> Review Report
                                     </Button>
+
                                 </div>
                             </div>
                         </Card>

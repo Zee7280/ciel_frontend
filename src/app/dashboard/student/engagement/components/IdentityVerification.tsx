@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Shield, User, GraduationCap, Mail, Phone, Hash, School, Book, Calendar, CheckCircle2, Loader2, Smartphone, MessageSquare, ChevronRight, AlertCircle } from "lucide-react";
+import { Shield, User, GraduationCap, Phone, Hash, School, Book, Calendar, CheckCircle2, Loader2, Smartphone, MessageSquare, ChevronRight, AlertCircle } from "lucide-react";
 import { Input } from "../../report/components/ui/input";
 import { Label } from "../../report/components/ui/label";
 import { Button } from "../../report/components/ui/button";
@@ -22,6 +22,7 @@ export interface Participant {
     yearOfStudy: string;
     department: string;
     academicIntegrationType: string;
+    facultySupervisorEmail?: string;
 }
 
 export default function IdentityVerification({
@@ -41,7 +42,7 @@ export default function IdentityVerification({
     const [activeTab, setActiveTab] = useState<'personal' | 'academic'>('personal');
     const [isVerifyingOtp, setIsVerifyingOtp] = useState({ email: false });
     const [otpSent, setOtpSent] = useState({ email: false });
-    const [otpVerified, setOtpVerified] = useState({ email: false });
+    const [otpVerified, setOtpVerified] = useState({ email: !!initialData.verified });
     const [showUniDropdown, setShowUniDropdown] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -56,6 +57,12 @@ export default function IdentityVerification({
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
 
+    useEffect(() => {
+        if (initialData.verified) {
+            setOtpVerified({ email: true });
+        }
+    }, [initialData.verified]);
+
     const [formData, setFormData] = useState({
         fullName: initialData.fullName || '',
         cnic: initialData.cnic || '',
@@ -67,6 +74,7 @@ export default function IdentityVerification({
         yearOfStudy: initialData.yearOfStudy || '3rd Year',
         department: initialData.department || '',
         academicIntegrationType: initialData.academicIntegrationType || 'Course-Linked',
+        facultySupervisorEmail: initialData.facultySupervisorEmail || '',
     });
 
     const [otpInputs, setOtpInputs] = useState({ email: '' });
@@ -92,6 +100,29 @@ export default function IdentityVerification({
             setIsVerifyingOtp(prev => ({ ...prev, [type]: false }));
         }
     };
+
+    // Pre-fill from localStorage if this is the lead and form is empty
+    useEffect(() => {
+        if (isTeamLead && !formData.fullName) {
+            const storedUserStr = localStorage.getItem("user") || localStorage.getItem("ciel_user");
+            if (storedUserStr) {
+                try {
+                    const u = JSON.parse(storedUserStr);
+                    setFormData(prev => ({
+                        ...prev,
+                        fullName: u.name || prev.fullName,
+                        email: u.email || prev.email,
+                        mobile: u.phone || u.contact || prev.mobile,
+                        cnic: u.cnic || prev.cnic,
+                        universityName: u.university || u.institution || prev.universityName
+                    }));
+                    if (u.email) {
+                        setOtpVerified({ email: true });
+                    }
+                } catch (e) {}
+            }
+        }
+    }, [isTeamLead]);
 
     const handleChangeEmail = () => {
         setOtpSent(prev => ({ ...prev, email: false }));
@@ -125,10 +156,14 @@ export default function IdentityVerification({
     const handleSubmit = async () => {
         setIsSubmitting(true);
         try {
+            const body: any = { ...formData, projectId, participationMode, isTeamLead, status: 'pending_ciel_approval' };
+            // facultySupervisorEmail is now collected at the application/apply stage — not here
+            delete body.facultySupervisorEmail;
+
             const res = await authenticatedFetch(`/api/v1/engagement/register`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ ...formData, projectId, participationMode, isTeamLead }),
+                body: JSON.stringify(body),
             });
             if (res && res.ok) {
                 const result = await res.json();
@@ -177,8 +212,9 @@ export default function IdentityVerification({
                                 <Input
                                     placeholder="Enter full name"
                                     value={formData.fullName}
+                                    disabled={otpVerified.email || !!initialData.verified}
                                     onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
-                                    className="h-12 bg-slate-50 border-none rounded-2xl font-bold"
+                                    className="h-12 bg-slate-50 border-none rounded-2xl font-bold disabled:opacity-70 disabled:cursor-not-allowed"
                                 />
                             </div>
                             <div className="space-y-2">
@@ -187,8 +223,9 @@ export default function IdentityVerification({
                                     placeholder="13 digits"
                                     maxLength={13}
                                     value={formData.cnic}
+                                    disabled={otpVerified.email || !!initialData.verified}
                                     onChange={(e) => setFormData({ ...formData, cnic: e.target.value.replace(/\D/g, '') })}
-                                    className="h-12 bg-slate-50 border-none rounded-2xl font-bold tracking-[0.2em]"
+                                    className="h-12 bg-slate-50 border-none rounded-2xl font-bold tracking-[0.2em] disabled:opacity-70 disabled:cursor-not-allowed"
                                 />
                             </div>
                         </div>
@@ -205,8 +242,9 @@ export default function IdentityVerification({
                                         <Input
                                             placeholder="03XXXXXXXXX"
                                             value={formData.mobile}
+                                            disabled={otpVerified.email || !!initialData.verified}
                                             onChange={(e) => setFormData({ ...formData, mobile: e.target.value })}
-                                            className="h-11 bg-white border-slate-100 rounded-xl font-bold"
+                                            className="h-11 bg-white border-slate-100 rounded-xl font-bold disabled:opacity-70 disabled:cursor-not-allowed"
                                         />
                                     </div>
                                     <p className="text-[10px] text-slate-400 font-medium">Used for critical institutional notifications.</p>
@@ -216,7 +254,7 @@ export default function IdentityVerification({
                             {/* Email */}
                             <div className="space-y-4 p-6 bg-slate-50 rounded-3xl border border-slate-100">
                                 <Label className="text-[10px] font-black uppercase tracking-widest text-slate-500 flex items-center gap-2">
-                                    <Mail className="w-3.5 h-3.5" /> Email Verification
+                                    <MessageSquare className="w-3.5 h-3.5" /> Email Verification
                                 </Label>
                                 <div className="space-y-3">
                                     <div className="relative">
@@ -224,9 +262,9 @@ export default function IdentityVerification({
                                             type="email"
                                             placeholder="student@uni.edu"
                                             value={formData.email}
-                                            disabled={otpSent.email}
+                                            disabled={otpSent.email || otpVerified.email || !!initialData.verified}
                                             onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                                            className="h-11 bg-white border-slate-100 rounded-xl font-bold"
+                                            className="h-11 bg-white border-slate-100 rounded-xl font-bold disabled:opacity-70 disabled:cursor-not-allowed"
                                         />
                                         {!otpSent.email && (
                                             <button
@@ -385,7 +423,9 @@ export default function IdentityVerification({
                                     </select>
                                 </div>
                             </div>
+
                         </div>
+
 
                         <div className="flex gap-4">
                             <Button

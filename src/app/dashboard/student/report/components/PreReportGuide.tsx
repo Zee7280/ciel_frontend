@@ -1,6 +1,6 @@
 "use client";
 import React from "react";
-import { CheckCircle2, ChevronRight, Users, MapPin, Target, Activity, TrendingUp, Wrench, Handshake, Image, BookOpen, Leaf, BarChart3 } from "lucide-react";
+import { CheckCircle2, ChevronRight, Users, MapPin, Target, Activity, TrendingUp, Wrench, Handshake, Image, BookOpen, Leaf, BarChart3, Download } from "lucide-react";
 import { Button } from "./ui/button";
 
 const sections = [
@@ -160,93 +160,114 @@ const colorMap: Record<string, { bg: string; icon: string; border: string; badge
 
 export default function PreReportGuide({ projectTitle, onStart }: { projectTitle?: string; onStart: () => void }) {
     return (
-        <div className="max-w-4xl mx-auto space-y-10 py-4 animate-in fade-in duration-500">
-            {/* Hero */}
-            <div className="text-center space-y-4">
-                <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-blue-50 border border-blue-100 rounded-full text-blue-700 text-xs font-black uppercase tracking-widest">
-                    📋 Before You Start
+        <div className="max-w-[1600px] mx-auto py-4 animate-in fade-in duration-500">
+            <div className="max-w-[1600px] mx-auto py-4 relative">
+
+                {/* Right side button */}
+                <div className="hidden lg:block absolute top-6 right-0">
+                    <button className="px-6 py-3 bg-blue-600 text-white text-sm font-semibold rounded-xl shadow-lg hover:bg-blue-700 transition">
+                        Download PDF
+                    </button>
                 </div>
-                <h1 className="report-h2 md:!text-4xl">
-                    Community Engagement Report
-                </h1>
-                {projectTitle && (
-                    <p className="text-slate-500 font-medium text-lg">{projectTitle}</p>
-                )}
-                <p className="text-slate-500 max-w-2xl mx-auto text-sm leading-relaxed">
-                    Your report is divided into <strong>11 sections</strong>. Each section records a different part of your project.
-                    Review what you need to collect for each section — then start your report when ready.
-                </p>
-            </div>
 
-            {/* Sections grid */}
-            <div className="grid gap-4">
-                {sections.map((section, idx) => {
-                    const c = colorMap[section.color];
-                    return (
-                        <div key={idx} className={`rounded-2xl border ${c.border} ${c.bg} p-6 space-y-4`}>
-                            <div className="flex items-start gap-4">
-                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${c.icon}`}>
-                                    {section.icon}
-                                </div>
-                                <div className="flex-1">
-                                    <h3 className="report-h3 !normal-case">{section.title}</h3>
-                                </div>
-                                <span className={`${c.badge} text-white text-[10px] font-black rounded-full px-2.5 py-1 shrink-0`}>
-                                    {String(idx + 1).padStart(2, '0')}
-                                </span>
-                            </div>
+                {/* Main content */}
+                <div className="w-full space-y-11">
 
-                            <ul className="space-y-2 pl-2">
-                                {section.items.map((item, i) => (
-                                    <li key={i} className="flex items-start gap-2 text-xs text-slate-700 font-medium">
-                                        <CheckCircle2 className="w-3.5 h-3.5 text-slate-400 mt-0.5 shrink-0" />
-                                        {item}
-                                    </li>
-                                ))}
-                            </ul>
-
-                            {section.note && (
-                                <p className="text-[11px] text-slate-500 font-medium bg-white/70 rounded-xl px-4 py-2.5 border border-white">
-                                    ⚠️ {section.note}
-                                </p>
-                            )}
+                    {/* Hero */}
+                    <div className="text-center space-y-4 lg:text-left">
+                        <div className="inline-flex items-center gap-2 px-4 py-1.5 border border-blue-100 rounded-full text-blue-700 text-xs font-black uppercase tracking-widest">
+                            📋 Before You Start
                         </div>
-                    );
-                })}
-            </div>
 
-            {/* Key tip */}
-            <div className="bg-slate-900 rounded-2xl p-8 text-white space-y-4">
-                <h3 className="report-h3 !text-white !normal-case !text-lg">✅ Key Advice for Students</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {[
-                        "Record attendance for every session",
-                        "Track activities and outputs clearly",
-                        "Measure change where possible",
-                        "Keep evidence (photos, documents, confirmations)",
-                        "Note resources and partnerships",
-                        "Reflect on your learning",
-                    ].map((tip, i) => (
-                        <div key={i} className="flex items-center gap-2 text-sm text-slate-300 font-medium">
-                            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                            {tip}
+                        <h1 className="report-h2 md:!text-4xl">
+                            Community Engagement Report
+                        </h1>
+
+                        {projectTitle && (
+                            <p className="text-slate-500 font-medium text-lg">{projectTitle}</p>
+                        )}
+
+                        <p className="text-slate-500 text-sm leading-relaxed max-w-2xl mx-auto lg:mx-0">
+                            Your report is divided into <strong>11 sections</strong>. Each section records a different part of your project.
+                            Review what you need to collect for each section — then start your report when ready.
+                        </p>
+                    </div>
+
+                    {/* Sections grid */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {sections.map((section, idx) => {
+                            const c = colorMap[section.color];
+                            return (
+                                <div key={idx} className={`rounded-2xl border ${c.border} ${c.bg} p-6 space-y-4`}>
+
+                                    <div className="flex items-start gap-4">
+                                        <div className={`w-10 h-10 rounded-xl flex shrink-0 ${c.icon}`}>
+                                            {section.icon}
+                                        </div>
+
+                                        <div className="flex-1">
+                                            <h3 className="report-h3 !normal-case">{section.title}</h3>
+                                        </div>
+
+                                        <span className={`${c.badge} text-white text-[10px] font-black rounded-full px-2.5 py-1`}>
+                                            {String(idx + 1).padStart(2, '0')}
+                                        </span>
+                                    </div>
+
+                                    <ul className="space-y-2 pl-2">
+                                        {section.items.map((item, i) => (
+                                            <li key={i} className="flex items-start gap-2 text-xs text-slate-700 font-medium">
+                                                <CheckCircle2 className="w-3.5 h-3.5 text-slate-400 mt-0.5 shrink-0" />
+                                                {item}
+                                            </li>
+                                        ))}
+                                    </ul>
+
+                                    {section.note && (
+                                        <p className="text-[11px] text-slate-500 font-medium bg-white/70 rounded-xl px-4 py-2.5 border border-white">
+                                            ⚠️ {section.note}
+                                        </p>
+                                    )}
+                                </div>
+                            );
+                        })}
+                    </div>
+
+                    {/* Key tip */}
+                    <div className="bg-slate-900 rounded-2xl p-8 text-white space-y-4">
+                        <h3 className="report-h3 !text-white !normal-case !text-lg">✅ Key Advice for Students</h3>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            {[
+                                "Record attendance for every session",
+                                "Track activities and outputs clearly",
+                                "Measure change where possible",
+                                "Keep evidence (photos, documents, confirmations)",
+                                "Note resources and partnerships",
+                                "Reflect on your learning",
+                            ].map((tip, i) => (
+                                <div key={i} className="flex items-center gap-2 text-sm text-slate-300 font-medium">
+                                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                                    {tip}
+                                </div>
+                            ))}
                         </div>
-                    ))}
+                    </div>
+
+                    {/* CTA */}
+                    <div className="flex justify-center lg:justify-start pb-8">
+                        <Button
+                            onClick={onStart}
+                            className="h-14 px-12 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-black text-base shadow-xl shadow-blue-200 transition-all"
+                        >
+                            I'm Ready — Start My Report
+                            <ChevronRight className="w-5 h-5 ml-2" />
+                        </Button>
+                    </div>
+
                 </div>
-                <p className="text-slate-400 text-xs pt-2">
-                    If you collect this information during the project, completing the report will be simple and accurate.
-                </p>
-            </div>
-
-            {/* CTA */}
-            <div className="flex justify-center pb-8">
-                <Button
-                    onClick={onStart}
-                    className="h-14 px-12 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-black text-base shadow-xl shadow-blue-200 transition-all"
-                >
-                    I'm Ready — Start My Report <ChevronRight className="w-5 h-5 ml-2" />
-                </Button>
             </div>
         </div>
+
     );
 }

@@ -23,11 +23,25 @@ function countWords(str: string): number {
 
 /**
  * Section 1: Participation
- * Validation is currently bypassed as per request
+ * Enforce individual hour requirements
  */
 export function validateSection1(data: any): ValidationResult {
-    return { isValid: true, errors: [] };
+    const errors: ValidationError[] = [];
+
+    if (data.metrics?.hec_compliance === 'below') {
+        errors.push({ 
+            field: 'metrics.hec_compliance', 
+            message: 'Must meet the required engagement hours (at least equal to the goal) to be eligible for report submission.' 
+        });
+    }
+
+    if (!data.privacy_consent) {
+        errors.push({ field: 'privacy_consent', message: 'You must provide privacy consent to proceed.' });
+    }
+
+    return { isValid: errors.length === 0, errors };
 }
+
 
 /**
  * Section 2: Project Context

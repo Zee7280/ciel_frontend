@@ -4,7 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
-import { LayoutDashboard, BookOpen, Users, Settings, PieChart, LogOut, FileText, Heart, Building2, CheckCircle, Briefcase, FileBarChart, ShieldAlert, Bell, User, Flag, MessageSquare, Plus } from "lucide-react";
+import { LayoutDashboard, BookOpen, Users, Settings, PieChart, LogOut, FileText, Heart, Building2, CheckCircle, Briefcase, FileBarChart, ShieldAlert, Bell, User, Flag, MessageSquare, Plus, CreditCard } from "lucide-react";
 import clsx from "clsx";
 import { authenticatedFetch } from "@/utils/api";
 
@@ -86,6 +86,7 @@ export default function Sidebar() {
             { label: "Users", href: "/dashboard/admin/users", icon: Users },
             { label: "Organizations", href: "/dashboard/admin/organizations", icon: Building2 },
             { label: "Approvals", href: "/dashboard/admin/approvals", icon: CheckCircle },
+            { label: "Payments", href: "/dashboard/admin/payments", icon: CreditCard },
             { label: "Projects", href: "/dashboard/admin/projects", icon: Briefcase },
             { label: "Student Reports", href: "/dashboard/admin/reports/verify", icon: FileText },
             { label: "Impact", href: "/dashboard/admin/impact", icon: FileBarChart },

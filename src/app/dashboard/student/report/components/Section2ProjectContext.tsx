@@ -1,6 +1,7 @@
 "use client";
 import React, { useMemo, useState, useEffect } from "react";
 import { generateAISummary } from "../utils/aiSummarizer";
+import { calculateSection2CII } from "@/utils/reportQuality";
 import { toast } from "sonner";
 import { Sparkles, Loader2 } from "lucide-react";
 import { Building, Globe, Users, BookOpen, AlertCircle, Clock, CheckCircle2, Save, MapPin, Calendar, XCircle } from "lucide-react";
@@ -28,7 +29,7 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
     const [isGenerating, setIsGenerating] = useState(false);
 
     const handleGenerateAISummary = async () => {
-        const words = sectionData.problem_statement?.trim().split(/\s+/).filter((w: string) => w.length > 0).length || 0;
+        const words = (sectionData.problem_statement || "").trim().split(/\s+/).filter(w => w).length;
         if (words < 100) {
             toast.error("Please provide at least 100 words in the Problem Statement first.");
             return;
@@ -118,7 +119,7 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
 
     // ─── Auto-generate summary when inputs are complete ───────────────────────
     React.useEffect(() => {
-        const words = sectionData.problem_statement?.trim().split(/\s+/).filter(w => w.length > 0).length || 0;
+        const words = (sectionData.problem_statement || "").trim().split(/\s+/).filter(w => w).length;
         const evidenceArray = sectionData.baseline_evidence || [];
         const evidenceSource = evidenceArray.includes('Other')
             ? [...evidenceArray.filter(t => t !== 'Other'), (sectionData.baseline_evidence_other || 'Other Sources')].join(", ")
@@ -144,9 +145,9 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
     }, [sectionData.problem_statement, sectionData.discipline, sectionData.baseline_evidence, sectionData.baseline_evidence_other, sectionData.summary_text]);
 
     // ─── Word counts ─────────────────────────────────────────────────────────
-    const wordCount = sectionData.problem_statement?.trim().split(/\s+/).filter(w => w.length > 0).length || 0;
-    const disciplineWordCount = sectionData.discipline_contribution?.trim().split(/\s+/).filter(w => w.length > 0).length || 0;
-    const otherEvidenceWordCount = sectionData.baseline_evidence_other?.trim().split(/\s+/).filter(w => w.length > 0).length || 0;
+    const wordCount = (sectionData.problem_statement || "").trim().split(/\s+/).filter(w => w).length;
+    const disciplineWordCount = (sectionData.discipline_contribution || "").trim().split(/\s+/).filter(w => w).length;
+    const otherEvidenceWordCount = (sectionData.baseline_evidence_other || "").trim().split(/\s+/).filter(w => w).length;
 
     // ─── Data ────────────────────────────────────────────────────────────────
     const disciplines = [
@@ -189,7 +190,7 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
     const endDate = formatDate(projectData?.end_date || projectData?.endDate);
 
     return (
-        <div className="space-y-10 pb-10">
+        <div className="space-y-6 pb-8">
 
             {/* ── Section Header ─────────────────────────────────────────── */}
             <div className="space-y-5">
@@ -269,7 +270,7 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
                     <span className="ml-auto px-3 py-1 rounded-full bg-amber-50 text-amber-700 font-black text-[9px] uppercase tracking-widest border border-amber-100">Mandatory · 100–200 Words</span>
                 </div>
 
-                <div className="bg-white rounded-[2.5rem] border-2 border-slate-100 p-8 shadow-sm space-y-8">
+                <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-8">
                     {/* Guidance */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-3 bg-slate-50/50 rounded-2xl p-5 border border-slate-100">
@@ -363,11 +364,25 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
                     <span className="ml-auto px-3 py-1 rounded-full bg-amber-50 text-amber-700 font-black text-[9px] uppercase tracking-widest border border-amber-100">Mandatory</span>
                 </div>
 
-                <div className="bg-white rounded-[2.5rem] border-2 border-slate-100 p-8 shadow-sm space-y-10">
+                <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-8">
+                    {/* Section Header */}
+                    <div className="space-y-2">
+                        <h2 className="text-lg font-bold text-slate-900 tracking-tight">
+                            Academic Discipline Contribution
+                        </h2>
+                        <p className="text-sm text-slate-500 max-w-xl">
+                            Describe how your academic discipline helped you analyse the problem and
+                            structure your engagement approach.
+                        </p>
+                    </div>
 
-                    {/* Discipline picker — SingleSelect dropdown */}
+
+                    {/* Discipline Picker */}
                     <div className="space-y-4">
-                        <Label className="report-label !text-slate-900">Select Your Primary Academic Discipline</Label>
+                        <Label className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                            Primary Academic Discipline
+                        </Label>
+
                         <SingleSelect
                             options={disciplines}
                             value={sectionData.discipline}
@@ -375,54 +390,76 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
                             placeholder="Select a discipline..."
                             disabled={isReadOnly}
                         />
+
                         <FieldError message={getFieldError('discipline')} />
                     </div>
 
-                    {/* Discipline contribution textarea */}
-                    <div className="space-y-4 pt-8 border-t border-slate-50">
-                        <div className="space-y-1">
-                            <div className="flex items-center justify-between mb-2">
-                                <Label className="report-label">Problem Statement Summary</Label>
 
-                            </div>
-                            <p className="report-help">
-                                Explain how your academic background helped you understand the problem, analyse the situation, design a structured approach, or apply technical, research, legal, financial, or social frameworks. Be specific and practical. Avoid general statements.
+                    {/* Contribution Section */}
+                    <div className="space-y-5 pt-8 border-t border-slate-100">
+
+                        {/* Guidance */}
+                        <div className="bg-slate-50 border border-slate-100 rounded-xl p-5 space-y-3">
+                            <Label className="text-xs font-bold uppercase tracking-wider text-slate-600">
+                                Problem Statement Summary
+                            </Label>
+
+                            <p className="text-sm text-slate-500 leading-relaxed">
+                                Explain how your academic background helped you analyse the problem,
+                                design a structured approach, or apply technical, research, legal,
+                                financial, or social frameworks.
                             </p>
-                            <div className="flex gap-4 mt-2">
-                                {[
-                                    ["✔ Be specific:", "Explain how you applied your knowledge"],
-                                    ["✗ Avoid:", '"My degree helped me understand society."'],
-                                ].map(([label, detail]) => (
-                                    <div key={label} className="text-[10px] font-semibold text-slate-500 italic">
-                                        <span className="font-black text-slate-700 not-italic">{label}</span> {detail}
-                                    </div>
-                                ))}
+
+                            <div className="flex gap-6 text-xs font-semibold">
+                                <span className="text-emerald-700">
+                                    ✔ Be specific: Explain how your knowledge was applied
+                                </span>
+                                <span className="text-slate-500 italic">
+                                    ✗ Avoid: "My degree helped me understand society"
+                                </span>
                             </div>
                         </div>
 
-                        <Textarea
-                            placeholder="Example: Utilized Engineering optimization models to identify structural inefficiencies in waste collection routing, applying network analysis techniques from Operations Research coursework..."
-                            readOnly={isReadOnly}
-                            disabled={isReadOnly}
-                            className={clsx(
-                                "min-h-[140px] bg-slate-50/50 border-2 border-slate-100 rounded-2xl p-6 font-bold text-slate-700 focus:ring-8 focus:ring-report-primary-soft/50 focus:border-report-primary-border transition-all resize-none text-sm leading-relaxed",
-                                getFieldError('discipline_contribution') && "border-red-200",
-                                disciplineWordCount > 100 && "border-red-300"
-                            )}
-                            value={sectionData.discipline_contribution}
-                            onChange={(e) => updateSection('section2', { discipline_contribution: e.target.value })}
-                        />
-                        <div className="flex justify-between items-center px-2">
-                            <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest leading-none">100-200 Words</p>
-                            <span className={clsx(
-                                "text-[10px] font-black uppercase tracking-widest leading-none",
-                                disciplineWordCount > 200 ? "text-red-500" : disciplineWordCount >= 100 ? "text-emerald-600" : "text-slate-400"
-                            )}>
-                                {disciplineWordCount} / 200 Words (Min 100)
-                            </span>
+
+                        {/* Textarea */}
+                        <div className="space-y-3">
+
+                            <Textarea
+                                placeholder="Example: Utilized Engineering optimization models to identify inefficiencies in waste collection routing..."
+                                readOnly={isReadOnly}
+                                disabled={isReadOnly}
+                                className={clsx(
+                                    "min-h-[160px] bg-white border border-slate-200 rounded-xl p-6 text-sm font-medium text-slate-700 leading-relaxed shadow-sm focus:ring-4 focus:ring-report-primary-soft/40 focus:border-report-primary-border transition resize-none",
+                                    getFieldError('discipline_contribution') && "border-red-300",
+                                    disciplineWordCount > 200 && "border-red-400"
+                                )}
+                                value={sectionData.discipline_contribution}
+                                onChange={(e) => updateSection('section2', { discipline_contribution: e.target.value })}
+                            />
+
+                            {/* Word Counter */}
+                            <div className="flex justify-between items-center text-xs font-semibold">
+                                <span className="text-slate-400 uppercase tracking-wider">
+                                    100 – 200 Words Required
+                                </span>
+
+                                <span className={clsx(
+                                    "font-bold",
+                                    disciplineWordCount > 200
+                                        ? "text-red-500"
+                                        : disciplineWordCount >= 100
+                                            ? "text-emerald-600"
+                                            : "text-slate-400"
+                                )}>
+                                    {disciplineWordCount} / 200
+                                </span>
+                            </div>
+
+                            <FieldError message={getFieldError('discipline_contribution')} />
                         </div>
-                        <FieldError message={getFieldError('discipline_contribution')} />
+
                     </div>
+
                 </div>
             </div>
 
@@ -523,7 +560,7 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
                 </div>
 
                 {sectionData.summary_text ? (
-                    <div className="bg-white border-2 border-slate-200 rounded-[2.5rem] p-10 relative overflow-hidden shadow-lg space-y-8">
+                    <div className="bg-white border border-slate-200 rounded-2xl p-6 relative overflow-hidden shadow-sm space-y-6">
                         <div className="absolute -bottom-8 -right-8 opacity-5">
                             <Building className="w-64 h-64 text-slate-900" />
                         </div>
@@ -567,7 +604,7 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
                         </div>
                     </div>
                 ) : (
-                    <div className="p-14 bg-slate-50 border-2 border-dashed border-slate-200 rounded-[2.5rem] flex flex-col items-center justify-center text-center space-y-4">
+                    <div className="p-8 bg-slate-50 border border-dashed border-slate-200 rounded-2xl flex flex-col items-center justify-center text-center space-y-4">
                         <div className="w-16 h-16 rounded-full bg-white shadow-lg flex items-center justify-center text-slate-200">
                             <BookOpen className="w-8 h-8" />
                         </div>
@@ -588,11 +625,12 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
                 <Button
                     variant="outline"
                     onClick={() => saveReport(false)}
-                    className="h-16 px-12 rounded-2xl border-2 border-slate-200 text-slate-500 font-extrabold uppercase tracking-widest hover:border-slate-900 hover:text-slate-900 hover:shadow-2xl hover:shadow-slate-100 transition-all flex items-center gap-4 group"
+                    className="h-12 px-8 rounded-xl border-2 border-slate-200 text-slate-500 font-extrabold uppercase tracking-widest hover:border-slate-900 hover:text-slate-900 hover:shadow-2xl hover:shadow-slate-100 transition-all flex items-center gap-4 group"
                 >
                     <Save className="w-6 h-6 group-hover:rotate-12 transition-transform" /> Save Section 2 Progress
                 </Button>
             </div>
+
         </div>
     );
 }

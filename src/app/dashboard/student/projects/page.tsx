@@ -27,7 +27,7 @@ interface Project {
     submitted_at: string;
     description: string;
     teamMembers?: TeamMember[];
-    report_status?: 'none' | 'draft' | 'submitted' | 'verified' | 'rejected';
+    report_status?: 'none' | 'draft' | 'continue' | 'submitted' | 'verified' | 'rejected' | 'pending_payment' | 'payment_under_review' | 'paid';
     report_id?: string;
     report_feedback?: string;
 }
@@ -155,12 +155,16 @@ export default function MyProjectsPage() {
                                         {/* Report Status Badge */}
                                         {project.report_status && project.report_status !== 'none' && (
                                             <Badge className={`
-                                                ${project.report_status === 'draft' ? 'bg-slate-100 text-slate-700' :
+                                                ${project.report_status === 'continue' || project.report_status === 'draft' ? 'bg-slate-100 text-slate-700' :
                                                     project.report_status === 'submitted' ? 'bg-yellow-100 text-yellow-700' :
-                                                        project.report_status === 'verified' ? 'bg-green-100 text-green-700' :
-                                                            'bg-red-100 text-red-700'}
+                                                        project.report_status === 'pending_payment' ? 'bg-indigo-100 text-indigo-700 border-indigo-200' :
+                                                            project.report_status === 'payment_under_review' ? 'bg-blue-100 text-blue-700 border-blue-200' :
+                                                                project.report_status === 'verified' || project.report_status === 'paid' ? 'bg-green-100 text-green-700' :
+                                                                    'bg-red-100 text-red-700'}
                                             `}>
-                                                Report: {project.report_status.charAt(0).toUpperCase() + project.report_status.slice(1)}
+                                                {project.report_status === 'pending_payment' ? 'Payment Due' : 
+                                                 project.report_status === 'payment_under_review' ? 'Payment Verifying' :
+                                                 project.report_status.charAt(0).toUpperCase() + project.report_status.slice(1).replace('_', ' ')}
                                             </Badge>
                                         )}
                                     </div>
@@ -169,12 +173,34 @@ export default function MyProjectsPage() {
                                         {project.description || "No description provided."}
                                     </p>
 
+                                    {/* Payment Required Alert */}
+                                    {project.report_status === 'pending_payment' && (
+                                        <div className="mt-2 p-3 bg-indigo-50 border border-indigo-200 rounded-lg flex items-center justify-between">
+                                            <p className="text-sm font-bold text-indigo-800">💳 Payment Proof Required</p>
+                                            <Link href={`/dashboard/student/payment?projectId=${project.id}`}>
+                                                <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs h-7 px-4">Pay Now</Button>
+                                            </Link>
+                                        </div>
+                                    )}
+
                                     {/* Verification Feedback */}
-                                    {project.report_status === 'verified' && (
-                                        <div className="mt-2 p-3 bg-green-50 border border-green-200 rounded-lg">
-                                            <p className="text-sm font-bold text-green-800">✅ Report Verified!</p>
+                                    {(project.report_status === 'verified' || project.report_status === 'paid') && (
+                                        <div className="mt-2 p-3 bg-green-50 border border-green-200 rounded-lg space-y-3">
+                                            <div className="flex items-center justify-between">
+                                                <p className="text-sm font-bold text-green-800">✅ Fully Verified & Paid!</p>
+                                                <div className="flex items-center gap-2">
+                                                    <Button size="sm" variant="outline" className="text-xs h-7 border-green-200 text-green-700 hover:bg-green-100">
+                                                        Download cii (Certificate)
+                                                    </Button>
+                                                    <Link href={`/dashboard/student/report?projectId=${project.id}`}>
+                                                        <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white text-xs h-7">
+                                                            View Final Report
+                                                        </Button>
+                                                    </Link>
+                                                </div>
+                                            </div>
                                             {project.report_feedback && (
-                                                <p className="text-sm text-green-700 mt-1">{project.report_feedback}</p>
+                                                <p className="text-sm text-green-700 border-t border-green-100 pt-2">{project.report_feedback}</p>
                                             )}
                                         </div>
                                     )}
@@ -186,10 +212,14 @@ export default function MyProjectsPage() {
                                             )}
                                         </div>
                                     )}
-                                    {project.report_status === 'submitted' && (
+                                    {(project.report_status === 'submitted' || project.report_status === 'payment_under_review') && (
                                         <div className="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                                            <p className="text-sm font-bold text-yellow-800">⏳ Report Under Review</p>
-                                            <p className="text-sm text-yellow-700">Your report is being reviewed by the organization</p>
+                                            <p className="text-sm font-bold text-yellow-800">
+                                                {project.report_status === 'payment_under_review' ? '⏳ Payment Under Review' : '⏳ Report Under Review'}
+                                            </p>
+                                            <p className="text-sm text-yellow-700">
+                                                {project.report_status === 'payment_under_review' ? 'Your payment slip is being verified by the admin team.' : 'Your report is being reviewed by the organization.'}
+                                            </p>
                                         </div>
                                     )}
                                 </div>
@@ -201,13 +231,12 @@ export default function MyProjectsPage() {
                                     </Button>
                                 )}
 
-                                {/* Conditional Report Button */}
-                                {['active', 'pending', 'pending_approval', 'completed', 'applied', 'accepted'].includes(project.status) && (
+                                {['active', 'completed'].includes(project.status) && (
                                     <>
-                                        {project.report_status === 'none' || project.report_status === 'draft' ? (
+                                        {project.report_status === 'none' || project.report_status === 'continue' || project.report_status === 'draft' ? (
                                             <Link href={`/dashboard/student/report?projectId=${project.id}`} className="w-full md:w-auto">
                                                 <Button className="w-full md:w-auto">
-                                                    {project.report_status === 'draft' ? 'Continue Report' : 'Submit Report'}
+                                                    {project.report_status === 'continue' || project.report_status === 'draft' ? 'Continue Report' : 'Submit Report'}
                                                 </Button>
                                             </Link>
                                         ) : project.report_status === 'rejected' ? (
@@ -217,15 +246,23 @@ export default function MyProjectsPage() {
                                                 </Button>
                                             </Link>
                                         ) : project.report_status === 'submitted' ? (
-                                            <Button variant="outline" disabled className="w-full md:w-auto">
-                                                Under Review
-                                            </Button>
+                                            <Link href={`/dashboard/student/payment?projectId=${project.id}`} className="w-full md:w-auto">
+                                                <Button className="w-full md:w-auto bg-indigo-600 hover:bg-indigo-700">
+                                                    Complete Payment
+                                                </Button>
+                                            </Link>
                                         ) : null}
                                     </>
                                 )}
 
+                                {['pending', 'pending_approval', 'applied'].includes(project.status) && (
+                                    <span className="text-xs font-bold text-amber-600 bg-amber-50 px-3 py-2 rounded-md border border-amber-100 italic w-full md:w-auto text-center">
+                                        Pending Admin Approval
+                                    </span>
+                                )}
+
                                 <Link
-                                    href={project.report_status === 'verified'
+                                    href={(project.report_status === 'verified' || project.report_status === 'paid')
                                         ? `/dashboard/student/report?projectId=${project.id}`
                                         : `/dashboard/student/browse/${project.id}`}
                                     className="w-full md:w-auto"

@@ -347,7 +347,6 @@ export default function StudentOpportunityCreationPage() {
                             onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                         />
                     </div>
-
                     {/* B2. Type */}
                     <div>
                         <label className="block text-sm font-bold text-slate-900 mb-3">B2. Activity Type <span className="text-red-500">*</span></label>

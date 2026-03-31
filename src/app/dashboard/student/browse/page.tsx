@@ -55,7 +55,7 @@ export default function StudentBrowseOpportunitiesPage() {
 
     const handleSuccess = (id: string) => {
         setOpportunities(prev => prev.map(op =>
-            op.id === id ? { ...op, hasApplied: true } : op
+            op.id === id ? { ...op, hasApplied: true, application_status: 'pending' } : op
         ));
         setApplyingId(null);
         setApplyingTitle(undefined);
@@ -121,7 +121,7 @@ export default function StudentBrowseOpportunitiesPage() {
                     toast.success("Application submitted successfully!");
                     // Refresh list or update local state
                     setOpportunities(prev => prev.map(op =>
-                        op.id === opportunityId ? { ...op, hasApplied: true } : op
+                        op.id === opportunityId ? { ...op, hasApplied: true, application_status: 'pending' } : op
                     ));
                 } else {
                     toast.error(data.message || "Failed to submit application");
@@ -265,13 +265,19 @@ export default function StudentBrowseOpportunitiesPage() {
                                     </Link>
                                     {op.hasApplied ? (
                                         <div className="flex items-center gap-2">
-                                            {/* Report Button */}
-                                            {['active', 'pending', 'pending_approval', 'completed', 'applied', 'accepted'].includes(op.status) && (
+                                            {/* Report Button - Only show if APPLICATION is approved/active */}
+                                            {['approved', 'verified'].includes(op.application_status) && (
                                                 <Link href={`/dashboard/student/report?projectId=${op.id}`}>
                                                     <Button size="sm" variant="outline" className="text-xs h-8">
                                                         Start Report
                                                     </Button>
                                                 </Link>
+                                            )}
+
+                                            {(!op.application_status || ['pending', 'pending_approval', 'applied'].includes(op.application_status)) && (
+                                                <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-1 rounded-md border border-amber-100 italic">
+                                                    Pending Admin Approval
+                                                </span>
                                             )}
 
                                             {/* Team Button */}
@@ -329,13 +335,19 @@ export default function StudentBrowseOpportunitiesPage() {
                                     </Link>
                                     {op.hasApplied ? (
                                         <div className="flex items-center gap-2 flex-1 md:flex-none justify-end">
-                                            {/* Report Button */}
-                                            {['active', 'pending', 'pending_approval', 'completed', 'applied', 'accepted'].includes(op.status) && (
+                                            {/* Report Button - Only show if APPLICATION is approved/active */}
+                                            {['approved', 'verified'].includes(op.application_status) && (
                                                 <Link href={`/dashboard/student/report?projectId=${op.id}`}>
                                                     <Button size="sm" variant="outline" className="text-xs h-9">
                                                         Start Report
                                                     </Button>
                                                 </Link>
+                                            )}
+
+                                            {(!op.application_status || ['pending', 'pending_approval', 'applied'].includes(op.application_status)) && (
+                                                <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-3 py-1.5 rounded-md border border-amber-100 italic">
+                                                    Pending Admin Approval
+                                                </span>
                                             )}
 
                                             {/* Team Button */}

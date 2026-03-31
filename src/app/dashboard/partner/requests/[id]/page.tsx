@@ -15,7 +15,9 @@ const LocationPicker = dynamic(() => import("@/components/ui/LocationPicker"), {
     loading: () => <div className="h-[300px] w-full bg-slate-50 animate-pulse rounded-xl flex items-center justify-center text-slate-400">Loading Map...</div>
 });
 
-export default function OpportunityDetailsPage() {
+import { Suspense } from "react";
+
+function OpportunityDetailsContent() {
     const params = useParams();
     const router = useRouter();
     const searchParams = useSearchParams();
@@ -1435,5 +1437,17 @@ export default function OpportunityDetailsPage() {
                 </button>
             </div >
         </div >
+    );
+}
+
+export default function OpportunityDetailsPage() {
+    return (
+        <Suspense fallback={
+            <div className="min-h-screen flex items-center justify-center">
+                <Loader2 className="w-10 h-10 animate-spin text-blue-600" />
+            </div>
+        }>
+            <OpportunityDetailsContent />
+        </Suspense>
     );
 }

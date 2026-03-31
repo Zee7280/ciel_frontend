@@ -4,7 +4,7 @@ import { useReportForm, ReportProvider } from './context/ReportContext';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { authenticatedFetch } from '@/utils/api';
 import { toast } from 'sonner';
-import { ChevronRight, Save, Loader2, ArrowLeft, Lock } from 'lucide-react';
+import { ChevronRight, Save, Loader2, ArrowLeft, Lock, Download } from 'lucide-react';
 import { Button } from './components/ui/button';
 import {
     Dialog,
@@ -75,7 +75,18 @@ function ReportFormContent() {
 
             if (projectRes && projectRes.ok) {
                 const projectData = await projectRes.json();
-                setProjectDetails(projectData.data || projectData);
+                const pInfo = projectData.data || projectData;
+                setProjectDetails(pInfo);
+
+                // 🚨 SECURITY CHECK: Ensure project is approved before allowing report access
+                const allowedStatuses = ['active', 'completed', 'approved', 'verified'];
+                const currentStatus = pInfo.status?.toLowerCase() || '';
+
+                if (!allowedStatuses.includes(currentStatus)) {
+                    toast.error('Admin approval is required to start/edit a report for this project.');
+                    router.push('/dashboard/student');
+                    return;
+                }
             }
 
             if (reportRes && reportRes.ok) {
@@ -89,7 +100,7 @@ function ReportFormContent() {
                         setShowGuide(false);
                         setStep(11);
                         setReadOnly(true);
-                    } else if (actualReportData.status === 'draft' || Object.keys(actualReportData).length > 2) {
+                    } else if (actualReportData.status === 'continue' || Object.keys(actualReportData).length > 2) {
                         setShowGuide(false);
                     }
                 }
@@ -157,11 +168,11 @@ function ReportFormContent() {
         if (isReadOnly) return;
         if (!isSaving) setIsSaving(true);
         try {
-            const res = await authenticatedFetch(`/api/v1/student/reports`, {
+            const res = await authenticatedFetch(`/api/v1/student/reports/draft`, {
                 method: 'POST',
                 body: JSON.stringify({
                     ...customData,
-                    status: 'draft'
+                    status: 'continue'
                 })
             });
 
@@ -201,10 +212,10 @@ function ReportFormContent() {
 
             if (!res || !res.ok) throw new Error('Submission failed');
 
-            toast.success('Report submitted successfully!');
+            toast.success('Report submitted! Redirecting to payment...');
             setTimeout(() => {
-                window.location.href = '/dashboard/student';
-            }, 3500);
+                window.location.href = `/dashboard/student/payment?projectId=${projectId}`;
+            }, 2000);
         } catch (error) {
             console.error(error);
             toast.error('Failed to submit report');
@@ -238,102 +249,108 @@ function ReportFormContent() {
     }
 
     return (
-        <div className="max-w-none mx-auto px-4 md:px-6 py-8 space-y-8">
-            {/* Header */}
-            <div className="flex items-center justify-between">
-                <div>
-                    <Button variant="ghost" size="sm" onClick={() => router.back()} className="mb-2 -ml-2 text-slate-500 hover:text-slate-900">
-                        <ArrowLeft className="w-4 h-4 mr-1" /> Back to Dashboard
-                    </Button>
-                    <div className="flex items-center gap-3">
-                        <h1 className="text-2xl font-bold text-slate-900">Community Engagement Report</h1>
-                        <span className="px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 text-xs font-semibold border border-slate-200">
-                            Step {activeStep} of 11
-                        </span>
-                    </div>
-                    <p className="text-slate-600 mt-1">{projectDetails?.title || 'Loading Project...'}</p>
-                </div>
-                <div className="flex items-center gap-2">
-                    {!isReadOnly && (
-                        <Button variant="outline" onClick={() => handleSave(false)} disabled={isSaving}>
-                            {isSaving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
-                            Save Draft
+        <div className="max-w-none mx-auto px-4 md:px-6 py-6 space-y-6">
+            {/* Sticky Header Wrapper */}
+            <div className="sticky top-0 z-30 -mx-4 md:-mx-6 px-4 md:px-6 py-4 bg-slate-50/80 backdrop-blur-md border-b border-slate-200/60 transition-all">
+                <div className="flex items-center justify-between max-w-[1600px] mx-auto">
+                    <div className="min-w-0">
+                        <Button variant="ghost" size="sm" onClick={() => router.back()} className="mb-1 -ml-2 text-slate-400 hover:text-slate-600 h-7 text-[11px] font-bold">
+                            <ArrowLeft className="w-3.5 h-3.5 mr-1" /> Back to Dashboard
                         </Button>
-                    )}
-                </div>
-            </div>
-
-            {/* Main Layout Wrap */}
-            <div className="flex flex-col gap-8">
-                <div className="flex-1 space-y-8 min-w-0">
-                    {/* Stepper */}
-                    <div className="bg-white border border-slate-200 rounded-xl p-4">
-                        <div className="flex flex-wrap gap-2">
-                            {steps.map((label, i) => {
-                                const stepNum = i + 1;
-                                const isActive = activeStep === stepNum;
-                                const isCompleted = activeStep > stepNum;
-
-                                return (
-                                    <div key={label} className="flex items-center mb-2">
-                                        <div
-                                            onClick={() => {
-                                                // Allow jumping to any completed step, or any step if read-only
-                                                if (isCompleted || isReadOnly) {
-                                                    setStep(stepNum);
-                                                } else if (isActive) {
-                                                    // Do nothing if clicking current step
-                                                } else {
-                                                    // Validate current before jumping forward
-                                                    if (validateCurrentSection()) {
-                                                        setStep(stepNum);
-                                                    } else {
-                                                        const firstError = Object.values(validationErrors)[0]?.[0]?.message;
-                                                        toast.error(firstError || 'Please fix errors before skipping ahead');
-                                                    }
-                                                }
-                                            }}
-                                            className={clsx(
-                                                "flex items-center gap-2 px-3 py-1.5 rounded-lg transition-colors text-sm font-medium",
-                                                isActive ? "bg-blue-600 text-white shadow-md shadow-blue-200 cursor-default"
-                                                    : isCompleted || isReadOnly ? "bg-blue-50 text-blue-700 cursor-pointer hover:bg-blue-100"
-                                                        : "text-slate-400 bg-slate-50 cursor-pointer hover:bg-slate-100"
-                                            )}
-                                        >
-                                            <div className={clsx(
-                                                "w-5 h-5 rounded-full flex items-center justify-center text-[10px] border transition-colors",
-                                                isActive ? "border-white bg-white/20" : isCompleted ? "border-blue-200 bg-blue-100" : "border-slate-300"
-                                            )}>
-                                                {stepNum}
-                                            </div>
-                                            {label}
-                                        </div>
-                                        {i < steps.length - 1 && (
-                                            <div className="w-4 h-0.5 bg-slate-200 mx-1 hidden sm:block" />
-                                        )}
-                                    </div>
-                                )
-                            })}
+                        <div className="flex items-center gap-3">
+                            <h1 className="text-xl font-bold text-slate-900 tracking-tight shrink-0">Community Engagement Report</h1>
+                            <span className="px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 text-[10px] font-bold border border-blue-100 uppercase tracking-wider">
+                                Step {activeStep} of 11
+                            </span>
+                        </div>
+                        <div className="flex items-center gap-1.5 mt-0.5 group">
+                            <div className="w-1 h-1 rounded-full bg-slate-400" />
+                            <p className="text-xs font-semibold text-slate-500 truncate group-hover:text-slate-900 transition-colors">
+                                {projectDetails?.title || 'Loading Project...'}
+                            </p>
                         </div>
                     </div>
-
-                    {/* Content Area */}
-                    <div className="min-h-[400px]">
-                        {activeStep === 1 && <Section1Participation projectData={projectDetails} />}
-                        {activeStep === 2 && <Section2ProjectContext projectData={projectDetails} />}
-                        {activeStep === 3 && <Section3SDGMapping projectData={projectDetails} />}
-                        {activeStep === 4 && <Section4Activities />}
-                        {activeStep === 5 && <Section5Outcomes />}
-                        {activeStep === 6 && <Section6Resources />}
-                        {activeStep === 7 && <Section7Partnerships />}
-                        {activeStep === 8 && <Section8Evidence />}
-                        {activeStep === 9 && <Section9Reflection />}
-                        {activeStep === 10 && <Section10Sustainability />}
-                        {activeStep === 11 && <Section11Summary />}
+                    <div className="flex items-center gap-3">
+                        {!isReadOnly && (
+                            <Button
+                                variant="outline"
+                                onClick={() => handleSave(false)}
+                                disabled={isSaving}
+                                className="h-9 px-4 border-slate-200 text-slate-600 text-xs font-bold hover:bg-white hover:border-slate-300 shadow-sm transition-all"
+                            >
+                                {isSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-2" /> : <Save className="w-3.5 h-3.5 mr-2 text-blue-500" />}
+                                Save Draft
+                            </Button>
+                        )}
                     </div>
+                </div>
 
+                {/* Stepper Inside Sticky Header */}
+                <div className="max-w-[1600px] mx-auto mt-4 px-1">
+                    <div className="flex flex-wrap items-center gap-y-2 gap-x-1.5">
+                        {steps.map((label, i) => {
+                            const stepNum = i + 1;
+                            const isActive = activeStep === stepNum;
+                            const isCompleted = activeStep > stepNum;
+
+                            return (
+                                <React.Fragment key={label}>
+                                    <div
+                                        onClick={() => {
+                                            if (isCompleted || isReadOnly) {
+                                                setStep(stepNum);
+                                            } else if (!isActive && validateCurrentSection()) {
+                                                setStep(stepNum);
+                                            } else if (!isActive) {
+                                                const firstError = Object.values(validationErrors)[0]?.[0]?.message;
+                                                toast.error(firstError || 'Please fix errors');
+                                            }
+                                        }}
+                                        className={clsx(
+                                            "flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all text-[11px] font-bold uppercase tracking-tight cursor-pointer",
+                                            isActive ? "bg-blue-600 text-white shadow-lg shadow-blue-200/50 scale-105"
+                                                : isCompleted || isReadOnly ? "bg-white text-blue-600 border border-blue-100 hover:bg-blue-50"
+                                                    : "text-slate-400 bg-transparent border border-transparent hover:border-slate-200"
+                                        )}
+                                    >
+                                        <div className={clsx(
+                                            "w-4 h-4 rounded-full flex items-center justify-center text-[9px] border transition-colors",
+                                            isActive ? "border-white bg-white/20" : isCompleted ? "border-blue-200 bg-blue-50" : "border-slate-300"
+                                        )}>
+                                            {stepNum}
+                                        </div>
+                                        <span className={clsx(isActive ? "block" : "hidden sm:block")}>{label}</span>
+                                    </div>
+                                    {i < steps.length - 1 && (
+                                        <div className="w-2 h-px bg-slate-200 hidden sm:block opacity-40" />
+                                    )}
+                                </React.Fragment>
+                            )
+                        })}
+                    </div>
                 </div>
             </div>
+
+            {/* Main Content Area */}
+            <div className="max-w-[1600px] mx-auto pt-2 flex flex-col lg:flex-row gap-8 items-start">
+                <div className="flex-1 w-full min-h-[400px]">
+                    {activeStep === 1 && <Section1Participation projectData={projectDetails} />}
+                    {activeStep === 2 && <Section2ProjectContext projectData={projectDetails} />}
+                    {activeStep === 3 && <Section3SDGMapping projectData={projectDetails} />}
+                    {activeStep === 4 && <Section4Activities />}
+                    {activeStep === 5 && <Section5Outcomes />}
+                    {activeStep === 6 && <Section6Resources />}
+                    {activeStep === 7 && <Section7Partnerships />}
+                    {activeStep === 8 && <Section8Evidence />}
+                    {activeStep === 9 && <Section9Reflection />}
+                    {activeStep === 10 && <Section10Sustainability />}
+                    {activeStep === 11 && <Section11Summary />}
+                </div>
+
+                {/* PDF Checklist Preview - Visible on large screens only on Step 1 */}
+
+            </div>
+
 
             {/* Footer Navigation */}
             <div className="flex items-center justify-between pt-6 border-t border-slate-200">

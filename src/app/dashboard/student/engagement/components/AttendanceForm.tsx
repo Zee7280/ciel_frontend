@@ -1,14 +1,20 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, Calendar, Clock, MapPin, Tag, FileText, Loader2, CheckCircle2, Upload, X, Lock, Users } from "lucide-react";
+import { Plus, Calendar, Clock, MapPin, Tag, FileText, Loader2, CheckCircle2, Upload, X, Lock, Users, Info } from "lucide-react";
 import { Button } from "../../report/components/ui/button";
 import { Input } from "../../report/components/ui/input";
 import { Label } from "../../report/components/ui/label";
 import { authenticatedFetch } from "@/utils/api";
 import clsx from "clsx";
 import { useReportForm } from "../../report/context/ReportContext";
-import React from "react";
+import React, { useRef, useEffect } from "react";
+import dynamic from "next/dynamic";
+
+const LocationPicker = dynamic(() => import("@/components/ui/LocationPicker"), {
+    ssr: false,
+    loading: () => <div className="h-[200px] w-full bg-slate-50 animate-pulse rounded-2xl flex items-center justify-center text-slate-400 font-bold text-xs uppercase tracking-widest">Loading Interactive Map...</div>
+});
 
 export default function AttendanceForm({
     verifiedUsers,
@@ -19,7 +25,7 @@ export default function AttendanceForm({
     isParticipationUnlocked,
     setParticipationUnlocked
 }: {
-    verifiedUsers: { id: string, name: string }[],
+    verifiedUsers: { id: string, name: string, status?: string }[],
     onSuccess: () => void,
     selectedParticipantId?: string | null,
     onParticipantChange?: (id: string) => void,
@@ -39,6 +45,7 @@ export default function AttendanceForm({
         activityType: 'Field Visit',
         otherActivity: '',
         description: '',
+        locationPin: '', // To store lat,lng
     });
 
     // Keep formData.participantId in sync with selectedParticipantId prop
@@ -49,6 +56,18 @@ export default function AttendanceForm({
     }, [selectedParticipantId]);
 
     const wordCount = formData.description.trim() === "" ? 0 : formData.description.trim().split(/\s+/).length;
+
+    const selectedUser = verifiedUsers.find(u => u.id === formData.participantId);
+    const isUserApproved = selectedUser?.status === 'approved' ||
+        selectedUser?.status === 'verified' ||
+        selectedUser?.status === 'active' ||
+        selectedUser?.status === 'accepted' ||
+        selectedUser?.status === 'pending' ||
+        selectedUser?.status === 'pending_approval' ||
+        selectedUser?.status === 'pending_faculty_approval' ||
+        selectedUser?.status === 'pending_ciel_approval';
+    // const effectiveLocked = !isUserApproved || (isLocked && !isParticipationUnlocked);
+    const effectiveLocked = false; // Temporarily disabled by user request
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -69,6 +88,7 @@ export default function AttendanceForm({
         }
 
         const numericHours = diffMinutes / 60;
+        const activeParticipantId = formData.participantId;
         const newEntry = {
             id: Math.random().toString(36).substring(2, 11),
             date: formData.dateOfEngagement,
@@ -78,9 +98,9 @@ export default function AttendanceForm({
             activity_type: formData.activityType === 'Other' ? formData.otherActivity : formData.activityType,
             description: formData.description,
             evidence_file: evidenceFile || undefined,
-            hours: numericHours
+            hours: numericHours,
+            participantId: activeParticipantId // Tag it for frontend filtering
         };
-
         setIsSubmitting(true);
         try {
             // Update Context first for immediate feedback
@@ -90,13 +110,16 @@ export default function AttendanceForm({
             });
 
             // Sync with backend if participantId exists
-            const activeParticipantId = formData.participantId;
             if (activeParticipantId) {
                 // Determine if we need to send multipart/form-data or application/json
                 let fetchOptions: RequestInit = {};
 
+                // Strip prefix for API calls (e.g. member:0:ID -> ID)
+                const realId = activeParticipantId.includes(':') ? activeParticipantId.split(':').pop() : activeParticipantId;
+
                 if (evidenceFile) {
                     const fd = new FormData();
+                    fd.append('participantId', realId || '');
                     fd.append('dateOfEngagement', formData.dateOfEngagement);
                     fd.append('startTime', formData.startTime);
                     fd.append('endTime', formData.endTime);
@@ -110,7 +133,6 @@ export default function AttendanceForm({
                     fetchOptions = {
                         method: 'POST',
                         body: fd,
-                        // DO NOT set Content-Type header manually for FormData, fetch will set it with the correct boundary
                     };
                 } else {
                     fetchOptions = {
@@ -118,6 +140,7 @@ export default function AttendanceForm({
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
                             ...formData,
+                            participantId: realId,
                             activityType: formData.activityType === 'Other' ? formData.otherActivity : formData.activityType,
                             evidenceUploaded: false,
                             sessionHours: numericHours
@@ -125,7 +148,7 @@ export default function AttendanceForm({
                     };
                 }
 
-                const res = await authenticatedFetch(`/api/v1/engagement/${activeParticipantId}/attendance`, fetchOptions);
+                const res = await authenticatedFetch(`/api/v1/engagement/${realId}/attendance`, fetchOptions);
 
                 if (!res || !res.ok) {
                     console.warn("Backend sync failed, but context updated");
@@ -142,11 +165,10 @@ export default function AttendanceForm({
             setEvidenceFile(null);
         } catch (error) {
             console.error(error);
-            // Even if sync fails, we keep context updated for UX? 
-            // Better to show warning if sync is critical.
         } finally {
             setIsSubmitting(false);
         }
+
     };
 
     return (
@@ -241,24 +263,50 @@ export default function AttendanceForm({
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Organization */}
-                <div className="space-y-2">
-                    <Label className="text-xs font-bold uppercase tracking-wider text-slate-500">Organization / Location</Label>
-                    <div className="relative">
-                        <MapPin className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
-                        <Input
-                            placeholder="Where did you engage?"
-                            value={formData.organizationName}
-                            onChange={(e) => setFormData({ ...formData, organizationName: e.target.value })}
-                            className="pl-10 h-14 bg-slate-50 border-none rounded-2xl font-bold text-base shadow-sm focus:ring-2 focus:ring-report-primary/20"
-                            required
-                        />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                {/* Organization / Location */}
+                <div className="space-y-4 md:col-span-2">
+                    <div className="space-y-2">
+                        <Label className="text-xs font-bold uppercase tracking-wider text-slate-500">Organization / Location Name</Label>
+                        <div className="relative group/location">
+                            <MapPin className="absolute left-3 top-2.5 w-4 h-4 text-slate-400 z-10" />
+                            <Input
+                                placeholder="Enter organization or location name..."
+                                value={formData.organizationName}
+                                onChange={(e) => setFormData({ ...formData, organizationName: e.target.value })}
+                                className="pl-10 h-14 bg-slate-50 border-none rounded-2xl font-bold text-base shadow-sm focus:ring-2 focus:ring-report-primary/20 transition-all"
+                                required
+                            />
+                        </div>
+                    </div>
+
+                    <div className="space-y-2">
+                        <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-2 block">Pin Exact Location (Optional)</Label>
+                        <div className="rounded-[2rem] overflow-hidden border-2 border-slate-100 shadow-inner bg-slate-50 relative group/map">
+                            <LocationPicker
+                                onLocationSelect={(loc) => {
+                                    setFormData(prev => ({
+                                        ...prev,
+                                        organizationName: loc.address || prev.organizationName,
+                                        locationPin: `${loc.lat},${loc.lng}`
+                                    }));
+                                }}
+                            />
+                            <div className="absolute bottom-4 right-4 z-[1000] pointer-events-none opacity-0 group-hover/map:opacity-100 transition-opacity">
+                                <div className="bg-white/90 backdrop-blur-md px-3 py-1.5 rounded-full shadow-lg border border-slate-100 text-[10px] font-black text-slate-500 uppercase tracking-wider">
+                                    Interactive Leaflet Map
+                                </div>
+                            </div>
+                        </div>
+                        <p className="text-[10px] font-bold text-slate-400 flex items-center gap-1.5 px-2">
+                            <Info className="w-3 h-3" />
+                            Click the map to precisely mark your engagement site
+                        </p>
                     </div>
                 </div>
 
                 {/* Activity Type */}
-                <div className="space-y-2">
+                <div className="space-y-2 md:col-span-2">
                     <Label className="text-xs font-bold uppercase tracking-wider text-slate-500">Activity Type</Label>
                     <div className="relative">
                         <Tag className="absolute left-3 top-2.5 w-4 h-4 text-slate-400 z-10" />
@@ -338,20 +386,20 @@ export default function AttendanceForm({
             <div className="space-y-3">
                 <Button
                     type="submit"
-                    disabled={isSubmitting || wordCount > 40 || isLocked}
+                    disabled={isSubmitting || wordCount > 40 || effectiveLocked}
                     className={clsx(
                         "w-full h-14 rounded-2xl font-black text-sm transition-all shadow-xl",
-                        isLocked
+                        effectiveLocked
                             ? "bg-slate-100 text-slate-400 border border-slate-200 shadow-none cursor-not-allowed"
                             : "bg-report-primary hover:bg-report-primary-border text-white shadow-report-primary-shadow hover:translate-y-[-2px]"
                     )}
                 >
                     {isSubmitting ? (
                         <Loader2 className="w-5 h-5 animate-spin mx-auto" />
-                    ) : isLocked ? (
+                    ) : effectiveLocked ? (
                         <div className="flex items-center justify-center gap-2">
                             <Lock className="w-4 h-4" />
-                            RECORD LOCKED
+                            {!isUserApproved && selectedUser ? "APPROVAL PENDING" : "RECORD LOCKED"}
                         </div>
                     ) : (
                         <div className="flex items-center justify-center gap-2">
@@ -361,15 +409,21 @@ export default function AttendanceForm({
                     )}
                 </Button>
 
-                {isLocked && setParticipationUnlocked && (
+                {effectiveLocked && setParticipationUnlocked && (
                     <div className="text-center">
-                        <button
-                            type="button"
-                            onClick={() => setParticipationUnlocked(true)}
-                            className="text-[10px] font-black uppercase tracking-widest text-report-primary hover:text-report-primary-border underline"
-                        >
-                            Unlock for editing
-                        </button>
+                        {!isUserApproved && selectedUser ? (
+                            <p className="text-[10px] font-bold text-amber-600 uppercase tracking-tight">
+                                Attendance logging for this student is disabled until faculty approval.
+                            </p>
+                        ) : (
+                            <button
+                                type="button"
+                                onClick={() => setParticipationUnlocked(true)}
+                                className="text-[10px] font-black uppercase tracking-widest text-report-primary hover:text-report-primary-border underline"
+                            >
+                                Unlock for editing
+                            </button>
+                        )}
                     </div>
                 )}
             </div>

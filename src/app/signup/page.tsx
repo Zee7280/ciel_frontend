@@ -1,14 +1,17 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+
 import Link from "next/link";
 import { ArrowRight, Mail, Lock, AlertCircle, Loader2, CheckCircle, School, Landmark, ArrowLeft, Building2, User, GraduationCap, Phone, Globe, Heart } from "lucide-react";
 import Image from "next/image";
 import clsx from "clsx";
 import { pakistaniUniversities } from "@/utils/universityData";
 
-export default function SignUpPage() {
+import { Suspense } from "react";
+
+function SignUpContent() {
     const router = useRouter();
     const [step, setStep] = useState<"role" | "form">("role");
     const [role, setRole] = useState<string | null>(null);
@@ -16,6 +19,8 @@ export default function SignUpPage() {
     const [isLoading, setIsLoading] = useState(false);
     const [formError, setFormError] = useState<string | null>(null);
     const [errors, setErrors] = useState<Record<string, string>>({});
+    const searchParams = useSearchParams();
+
 
     const [formData, setFormData] = useState({
         name: "",
@@ -29,7 +34,27 @@ export default function SignUpPage() {
         countryCode: "+92",
         phone: "",
         cnic: "",
+        token: "",
     });
+
+    useEffect(() => {
+        const emailParam = searchParams.get('email');
+        const roleParam = searchParams.get('role');
+        const tokenParam = searchParams.get('token');
+
+        if (roleParam && roles.find(r => r.id === roleParam)) {
+            setRole(roleParam);
+            setStep("form");
+            if (emailParam || tokenParam) {
+                setFormData(prev => ({ 
+                    ...prev, 
+                    email: emailParam || prev.email,
+                    token: tokenParam || prev.token
+                }));
+            }
+        }
+    }, [searchParams]);
+
 
     const roles = [
         { id: "student", label: "Student", icon: GraduationCap, desc: "Join verified projects, document your community impact, and earn SDG‑aligned records.", color: "blue" },
@@ -491,5 +516,17 @@ export default function SignUpPage() {
                 </div>
             </div>
         </div>
+    );
+}
+
+export default function SignUpPage() {
+    return (
+        <Suspense fallback={
+            <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
+                <Loader2 className="w-8 h-8 animate-spin text-emerald-600" />
+            </div>
+        }>
+            <SignUpContent />
+        </Suspense>
     );
 }

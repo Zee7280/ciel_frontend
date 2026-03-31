@@ -310,242 +310,427 @@ export default function Section7Partnerships() {
     return (
         <div className="space-y-12 pb-16">
             {/* ─── Header ─────────────────────────────────────────────────── */}
-            <div className="flex items-center gap-4">
-                <div className="w-14 h-14 rounded-2xl bg-report-primary text-white flex items-center justify-center shadow-xl shadow-report-primary-shadow ring-4 ring-report-primary-soft">
-                    <Handshake className="w-7 h-7" />
+            <div className="space-y-4">
+
+                <div className="flex items-center gap-4">
+
+                    <div className="w-12 h-12 rounded-xl bg-report-primary text-white flex items-center justify-center shadow-md">
+                        <Handshake className="w-6 h-6" />
+                    </div>
+
+                    <div className="space-y-1">
+                        <h2 className="text-xl font-semibold text-slate-900">
+                            Section 7 — Partnerships & Collaboration
+                        </h2>
+
+                        <p className="text-sm text-slate-500 font-medium">
+                            Measurable Multi-Stakeholder Engagement (SDG 17)
+                        </p>
+                    </div>
+
                 </div>
-                <div>
-                    <h2 className="report-h2">Section 7 — Partnerships & Collaboration</h2>
-                    <p className="report-label">Measurable Multi-Stakeholder Engagement (SDG 17)</p>
-                </div>
+
             </div>
 
             {/* ─── Purpose note ────────────────────────────────────────────── */}
-            <div className="p-4 bg-report-primary-soft border border-report-primary-border rounded-2xl flex items-start gap-3">
-                <Info className="w-4 h-4 text-report-primary shrink-0 mt-0.5" />
+            <div className="p-4 bg-report-primary-soft border border-report-primary-border rounded-xl flex items-start gap-3">
+                <Info className="w-4 h-4 text-report-primary mt-0.5 shrink-0" />
+
                 <div className="space-y-1">
-                    <p className="report-label !text-report-primary">⚠ Only include partners who actively contributed</p>
-                    <p className="report-help !text-report-primary">
+                    <p className="text-sm font-semibold text-report-primary">
+                        Only include partners who actively contributed
+                    </p>
+
+                    <p className="text-sm text-report-primary">
                         Do not list organizations that were only informed, mentioned, or tagged.
-                        Include only those who provided support, coordination, expertise, resources, hosting, or verification.
+                        Include only those who provided support, coordination, expertise,
+                        resources, hosting, or verification.
                     </p>
                 </div>
             </div>
 
+
+
             {/* ─── Step 1: Partnership Confirmation ────────────────────────── */}
-            <div className="space-y-4">
+            <div className="space-y-6">
+
                 <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-report-primary text-white flex items-center justify-center font-black text-[10px]">7.0</div>
-                    <h3 className="report-h3">Step 1 — Partnership Confirmation</h3>
+
+                    <div className="w-8 h-8 rounded-full bg-report-primary text-white flex items-center justify-center text-[11px] font-semibold">
+                        7.0
+                    </div>
+
+                    <h3 className="text-base font-semibold text-slate-900">
+                        Step 1 — Partnership Confirmation
+                    </h3>
+
                 </div>
-                <div className="bg-white rounded-[2.5rem] border-2 border-slate-100 p-8 shadow-sm space-y-4">
-                    <Label className="report-h3 !text-sm !tracking-tight">Did This Project Involve Any Active Partners?</Label>
+
+
+
+                <div className="bg-white rounded-xl border border-slate-200 p-8 shadow-sm space-y-6">
+
+                    <Label className="text-sm font-semibold text-slate-800">
+                        Did This Project Involve Any Active Partners?
+                    </Label>
+
+
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+                        {/* No option */}
                         <button
                             type="button"
                             onClick={() => update('has_partners', 'no')}
                             className={clsx(
-                                "p-6 rounded-2xl border-2 text-left transition-all space-y-2",
+                                "p-6 rounded-lg border text-left transition space-y-2",
                                 has_partners === 'no'
-                                    ? "border-slate-900 bg-slate-900 text-white shadow-xl"
-                                    : "border-slate-100 bg-slate-50 text-slate-600 hover:border-slate-300"
+                                    ? "border-slate-900 bg-slate-900 text-white shadow-md"
+                                    : "border-slate-200 bg-slate-50 text-slate-600 hover:border-slate-400"
                             )}
                         >
-                            <p className="report-h3 !text-xs">⭕ No — Students Worked Independently</p>
-                            <p className={clsx("report-help", has_partners === 'no' ? "text-slate-300" : "text-slate-400")}>
+
+                            <p className="text-sm font-semibold">
+                                No — Students Worked Independently
+                            </p>
+
+                            <p className={clsx(
+                                "text-sm",
+                                has_partners === 'no' ? "text-slate-300" : "text-slate-400"
+                            )}>
                                 System records: "No formal partnerships reported."
                             </p>
+
                         </button>
+
+
+
+                        {/* Yes option */}
                         <button
                             type="button"
                             onClick={() => update('has_partners', 'yes')}
                             className={clsx(
-                                "p-6 rounded-2xl border-2 text-left transition-all space-y-2",
+                                "p-6 rounded-lg border text-left transition space-y-2",
                                 has_partners === 'yes'
-                                    ? "border-report-primary bg-report-primary text-white shadow-xl shadow-report-primary-shadow"
-                                    : "border-slate-100 bg-slate-50 text-slate-600 hover:border-report-primary-border"
+                                    ? "border-report-primary bg-report-primary text-white shadow-md"
+                                    : "border-slate-200 bg-slate-50 text-slate-600 hover:border-report-primary"
                             )}
                         >
-                            <p className="report-h3 !text-xs">⭕ Yes — One or More Partners Were Actively Involved</p>
-                            <p className={clsx("report-help", has_partners === 'yes' ? "text-report-primary-soft" : "text-slate-400")}>
+
+                            <p className="text-sm font-semibold">
+                                Yes — One or More Partners Were Actively Involved
+                            </p>
+
+                            <p className={clsx(
+                                "text-sm",
+                                has_partners === 'yes'
+                                    ? "text-report-primary-soft"
+                                    : "text-slate-400"
+                            )}>
                                 Continue to Step 2 to enter partner details.
                             </p>
+
                         </button>
+
                     </div>
+
                 </div>
+
+
                 <FieldError message={getFieldError('has_partners')} />
+
             </div>
 
             {/* ─── Step 2: Partner Details ──────────────────────────────────── */}
             {has_partners === 'yes' && (
-                <div className="space-y-6 animate-in fade-in slide-in-from-top-4 duration-500">
+                <div className="space-y-8 animate-in fade-in slide-in-from-top-4 duration-500">
+
+                    {/* HEADER */}
                     <div className="flex items-center justify-between">
+
                         <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-full bg-report-primary text-white flex items-center justify-center font-black text-[10px]">7.1</div>
-                            <h3 className="report-h3">Step 2 — Enter Partner Details</h3>
+                            <div className="w-8 h-8 rounded-full bg-report-primary text-white flex items-center justify-center text-[11px] font-semibold">
+                                7.1
+                            </div>
+
+                            <h3 className="text-base font-semibold text-slate-900">
+                                Step 2 — Enter Partner Details
+                            </h3>
                         </div>
+
                         <Button
-                            type="button" variant="ghost" onClick={addPartner}
-                            className="h-8 px-3 rounded-lg bg-report-primary-soft text-report-primary report-label !text-report-primary hover:bg-report-primary-border"
+                            type="button"
+                            variant="ghost"
+                            onClick={addPartner}
+                            className="h-9 px-4 rounded-md bg-report-primary-soft text-report-primary text-xs font-semibold hover:bg-report-primary-border"
                         >
-                            <Plus className="w-3 h-3 mr-1.5" /> Add Another Partner
+                            <Plus className="w-3 h-3 mr-2" /> Add Partner
                         </Button>
+
                     </div>
 
+
+
+                    {/* EMPTY STATE */}
                     {partners.length === 0 ? (
-                        <div className="py-16 text-center bg-slate-50 rounded-[2.5rem] border-2 border-dashed border-slate-200 space-y-3">
-                            <Users2 className="w-10 h-10 text-slate-200 mx-auto" />
-                            <p className="report-label !text-sm">No partners added yet</p>
-                            <Button type="button" onClick={addPartner} variant="ghost" className="h-9 px-5 bg-slate-900 text-white report-label !text-white rounded-xl">
+
+                        <div className="py-14 text-center bg-slate-50 rounded-xl border border-dashed border-slate-200 space-y-3">
+
+                            <Users2 className="w-10 h-10 text-slate-300 mx-auto" />
+
+                            <p className="text-sm text-slate-500 font-medium">
+                                No partners added yet
+                            </p>
+
+                            <Button
+                                type="button"
+                                onClick={addPartner}
+                                variant="ghost"
+                                className="h-9 px-5 bg-slate-900 text-white rounded-md text-xs font-semibold"
+                            >
                                 <Plus className="w-3 h-3 mr-2" /> Add First Partner
                             </Button>
+
                         </div>
+
                     ) : (
+
                         <div className="space-y-6">
+
                             {partners.map((p, idx) => (
                                 <PartnerCard
-                                    key={idx} p={p} idx={idx}
+                                    key={idx}
+                                    p={p}
+                                    idx={idx}
                                     canRemove={partners.length > 1}
                                     onUpdate={(field, val) => updatePartner(idx, field, val)}
                                     onRemove={() => removePartner(idx)}
                                     getFieldError={getFieldError}
                                 />
                             ))}
+
                         </div>
+
                     )}
 
+
+
                     {/* ─── Step 3: Formalization Status ─────────────────────── */}
-                    <div className="space-y-4">
+                    <div className="space-y-6">
+
                         <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-full bg-report-primary text-white flex items-center justify-center font-black text-[10px]">7.2</div>
-                            <h3 className="report-h3">Step 3 — Formalization Status</h3>
-                        </div>
-                        <div className="bg-white rounded-[2.5rem] border-2 border-slate-100 p-8 shadow-sm space-y-6">
-                            <div className="space-y-2">
-                                <Label className="report-h3 !text-sm !tracking-tight">Was This Partnership Supported by Formal Documentation?</Label>
-                                <p className="report-help">Select all that apply. Formalized partnerships increase SDG 17 classification strength.</p>
-                            </div>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                {formalizationOptions.map(opt => (
-                                    <button
-                                        key={opt} type="button"
-                                        onClick={() => toggleFormalization(opt)}
-                                        className={clsx(
-                                            "flex items-center justify-between px-5 py-4 rounded-2xl border-2 transition-all",
-                                            formalization_status?.includes(opt)
-                                                ? "bg-report-primary border-report-primary text-white shadow-lg shadow-report-primary-shadow"
-                                                : "bg-slate-50 border-slate-50 text-slate-600 hover:border-report-primary-border hover:bg-report-primary-soft"
-                                        )}
-                                    >
-                                        <span className="report-label !text-left">{opt}</span>
-                                        {formalization_status?.includes(opt)
-                                            ? <ShieldCheck className="w-4 h-4 flex-shrink-0" />
-                                            : <div className="w-4 h-4 rounded border-2 border-slate-300 flex-shrink-0" />
-                                        }
-                                    </button>
-                                ))}
+
+                            <div className="w-8 h-8 rounded-full bg-report-primary text-white flex items-center justify-center text-[11px] font-semibold">
+                                7.2
                             </div>
 
-                            {/* Evidence upload */}
-                            <div className="border-2 border-dashed border-slate-200 rounded-2xl p-6 space-y-3 hover:border-report-primary-border transition-colors">
-                                <p className="report-label !flex !items-center !gap-2">
-                                    <Info className="w-3.5 h-3.5" /> Upload Supporting Documentation (Optional but recommended)
+                            <h3 className="text-base font-semibold text-slate-900">
+                                Step 3 — Formalization Status
+                            </h3>
+
+                        </div>
+
+
+
+                        <div className="bg-white rounded-xl border border-slate-200 p-8 shadow-sm space-y-6">
+
+                            <div className="space-y-1">
+
+                                <Label className="text-sm font-semibold text-slate-800">
+                                    Was This Partnership Supported by Formal Documentation?
+                                </Label>
+
+                                <p className="text-sm text-slate-500">
+                                    Select all that apply. Formalized partnerships increase SDG 17 classification strength.
                                 </p>
-                                <p className="report-help">MOUs, Letters of Collaboration, Official Emails, Government Approvals</p>
+
+                            </div>
+
+
+
+                            {/* OPTIONS */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+
+                                {formalizationOptions.map(opt => (
+                                    <button
+                                        key={opt}
+                                        type="button"
+                                        onClick={() => toggleFormalization(opt)}
+                                        className={clsx(
+                                            "flex items-center justify-between px-5 py-3 rounded-lg border transition text-sm",
+                                            formalization_status?.includes(opt)
+                                                ? "bg-report-primary border-report-primary text-white"
+                                                : "bg-slate-50 border-slate-200 text-slate-600 hover:border-report-primary"
+                                        )}
+                                    >
+
+                                        <span>{opt}</span>
+
+                                        {formalization_status?.includes(opt)
+                                            ? <ShieldCheck className="w-4 h-4" />
+                                            : <div className="w-4 h-4 border rounded border-slate-300" />
+                                        }
+
+                                    </button>
+                                ))}
+
+                            </div>
+
+
+
+                            {/* EVIDENCE UPLOAD */}
+                            <div className="border border-dashed border-slate-200 rounded-lg p-6 space-y-3 hover:border-report-primary transition">
+
+                                <p className="text-xs font-semibold text-slate-700 flex items-center gap-2">
+                                    <Info className="w-3.5 h-3.5" /> Upload Supporting Documentation (Optional)
+                                </p>
+
+                                <p className="text-xs text-slate-500">
+                                    MOUs, Letters of Collaboration, Official Emails, Government Approvals
+                                </p>
+
                                 <input
-                                    type="file" multiple accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
-                                    className="text-xs text-slate-500 file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 report-label !text-[9px] !bg-report-primary-soft !text-report-primary"
+                                    type="file"
+                                    multiple
+                                    accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+                                    className="text-xs text-slate-500"
                                     onChange={e => {
                                         if (e.target.files) {
-                                            updateSection('section7', { formalization_files: [...(formalization_files || []), ...Array.from(e.target.files)] });
+                                            updateSection('section7', {
+                                                formalization_files: [
+                                                    ...(formalization_files || []),
+                                                    ...Array.from(e.target.files)
+                                                ]
+                                            })
                                         }
                                     }}
                                 />
+
                             </div>
+
                         </div>
                     </div>
 
+
+
                     {/* ─── Auto-Generated Analytics ─────────────────────────── */}
-                    <div className="pt-8 border-t-2 border-slate-100 space-y-6">
+                    <div className="pt-10 border-t border-slate-200 space-y-6">
+
                         <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-4">
-                                <div className="w-10 h-10 rounded-xl bg-report-primary text-white flex items-center justify-center shadow-lg shadow-report-primary-shadow">
+
+                            <div className="flex items-center gap-3">
+
+                                <div className="w-10 h-10 rounded-lg bg-report-primary text-white flex items-center justify-center">
                                     <Activity className="w-5 h-5" />
                                 </div>
-                                <h3 className="report-h3 !text-lg">System-Generated Partnership Analytics</h3>
+
+                                <h3 className="text-lg font-semibold text-slate-900">
+                                    System-Generated Partnership Analytics
+                                </h3>
+
                             </div>
-                            <span className="report-label !bg-slate-100 !px-3 !py-1 !rounded-xl">Read-Only</span>
+
+                            <span className="text-xs text-slate-500 bg-slate-100 px-3 py-1 rounded">
+                                Read-Only
+                            </span>
+
                         </div>
 
-                        {/* Partnership Overview grid */}
+
+
+                        {/* ANALYTICS GRID */}
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+
                             {[
                                 { label: "Total Active Partners", val: partners.length, color: "bg-report-primary-soft text-report-primary" },
                                 { label: "Government Partners", val: govPartners.length, color: "bg-slate-100 text-slate-700" },
                                 { label: "Private / CSR Partners", val: privatePartners.length, color: "bg-blue-50 text-blue-700" },
                                 { label: "Academic Institutions", val: academicPartners.length, color: "bg-emerald-50 text-emerald-700" },
                             ].map(({ label, val, color }) => (
-                                <div key={label} className={clsx("rounded-2xl p-4 space-y-1", color)}>
-                                    <p className="text-2xl font-black">{val}</p>
-                                    <p className="report-label !text-[8px] !opacity-70">{label}</p>
+                                <div key={label} className={clsx("rounded-lg p-4 space-y-1", color)}>
+                                    <p className="text-xl font-bold">{val}</p>
+                                    <p className="text-xs opacity-70">{label}</p>
                                 </div>
                             ))}
+
                         </div>
 
-                        {/* Verification Strength */}
-                        <div className="bg-white border-2 border-slate-100 rounded-2xl p-6 space-y-3">
-                            <p className="report-label">Verification Strength</p>
-                            <div className="grid grid-cols-3 gap-4">
+
+
+                        {/* VERIFICATION STRENGTH */}
+                        <div className="bg-white border border-slate-200 rounded-lg p-6 space-y-4">
+
+                            <p className="text-sm font-semibold text-slate-800">
+                                Verification Strength
+                            </p>
+
+                            <div className="grid grid-cols-3 gap-4 text-center">
+
                                 {[
-                                    { label: "Fully Verified", val: verifiedPartners.filter(p => p.verification?.includes('Output') || p.verification?.includes('Outcome')).length, color: "text-emerald-600" },
-                                    { label: "Partially Verified", val: verifiedPartners.filter(p => p.verification?.includes('Attendance') || p.verification?.includes('Activity') || p.verification?.includes('Resource')).length, color: "text-blue-600" },
-                                    { label: "Self-Reported", val: selfReportedPartners.length, color: "text-amber-600" },
+                                    {
+                                        label: "Fully Verified",
+                                        val: verifiedPartners.filter(p => p.verification?.includes('Output') || p.verification?.includes('Outcome')).length,
+                                        color: "text-emerald-600"
+                                    },
+                                    {
+                                        label: "Partially Verified",
+                                        val: verifiedPartners.filter(p => p.verification?.includes('Attendance') || p.verification?.includes('Activity') || p.verification?.includes('Resource')).length,
+                                        color: "text-blue-600"
+                                    },
+                                    {
+                                        label: "Self-Reported",
+                                        val: selfReportedPartners.length,
+                                        color: "text-amber-600"
+                                    },
                                 ].map(({ label, val, color }) => (
-                                    <div key={label} className="text-center space-y-1">
-                                        <p className={clsx("text-2xl font-black", color)}>{val}</p>
-                                        <p className="report-label !text-[8px]">{label}</p>
+                                    <div key={label} className="space-y-1">
+                                        <p className={clsx("text-xl font-bold", color)}>{val}</p>
+                                        <p className="text-xs text-slate-500">{label}</p>
                                     </div>
                                 ))}
+
                             </div>
+
                         </div>
 
-                        {/* SDG 17 Classification */}
-                        <div className={clsx("rounded-2xl border-2 p-5 flex items-center justify-between", classification.color)}>
+
+
+                        {/* SDG17 CLASSIFICATION */}
+                        <div className={clsx("rounded-lg border p-5 flex items-center justify-between", classification.color)}>
+
                             <div className="space-y-1">
-                                <p className="report-label !text-[9px] !opacity-60">SDG 17 Engagement Classification</p>
-                                <p className="text-sm font-black uppercase tracking-wider">{classification.label}</p>
-                                <p className="report-help !opacity-60">{classification.desc}</p>
+
+                                <p className="text-xs opacity-70">
+                                    SDG 17 Engagement Classification
+                                </p>
+
+                                <p className="text-sm font-semibold uppercase tracking-wide">
+                                    {classification.label}
+                                </p>
+
+                                <p className="text-xs opacity-70">
+                                    {classification.desc}
+                                </p>
+
                             </div>
-                            <Globe className="w-8 h-8 opacity-40" />
+
+                            <Globe className="w-7 h-7 opacity-40" />
+
                         </div>
 
-                        {/* Auto narrative */}
-                        <div className="pt-8 mt-8 border-t-2 border-slate-100">
-                            <div className="flex items-center justify-between mb-8">
-                                <div className="flex items-center gap-4">
-                                    <div className="w-10 h-10 rounded-xl bg-report-primary text-white flex items-center justify-center shadow-lg shadow-report-primary-shadow">
-                                        <Handshake className="w-6 h-6" />
-                                    </div>
-                                    <h3 className="report-h3 !text-xl !italic">Partnership Summary</h3>
-                                </div>
-                                <div className="px-5 py-2.5 rounded-xl bg-slate-900 text-white text-[10px] font-black uppercase tracking-widest border border-slate-800">
-                                    Auto-Generated
-                                </div>
-                            </div>
-                            <div className="bg-white border-2 border-slate-200 rounded-[3rem] p-12 relative overflow-hidden shadow-xl space-y-10 group">
-                                <div className="absolute -bottom-10 -right-10 opacity-5 group-hover:opacity-10 transition-opacity duration-1000 rotate-12">
-                                    <Handshake className="w-80 h-80 text-slate-900" />
-                                </div>
-                                <div className="relative z-10 space-y-6">
-                                    <span className="absolute -top-10 -left-6 text-7xl font-serif text-slate-100 select-none">“</span>
-                                    <p className="report-ai-text">
-                                        {autoNarrative}
-                                    </p>
-                                    <span className="absolute -bottom-16 -right-6 text-7xl font-serif text-slate-100 select-none rotate-180">“</span>
-                                </div>
-                            </div>
+
+
+                        {/* AUTO NARRATIVE */}
+                        <div className="bg-white border border-slate-200 rounded-xl p-8 relative overflow-hidden">
+
+                            <p className="text-sm text-slate-700 leading-relaxed">
+                                {autoNarrative}
+                            </p>
+
                         </div>
+
                     </div>
+
                 </div>
             )}
 

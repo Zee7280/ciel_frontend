@@ -1,6 +1,7 @@
 "use client";
 
 import { Shield, Clock, TrendingUp, CheckCircle2, Calendar, Activity, Database } from "lucide-react";
+import clsx from "clsx";
 
 interface EngagementMetrics {
     totalHours: number;
@@ -13,9 +14,17 @@ interface EngagementMetrics {
     hecStatus: string;
     evidenceCount: number;
     evidenceRatio: number;
+    requiredHours?: number;
+    individual_metrics?: any[];
 }
 
-export default function EngagementOverview({ metrics, isTeam = false }: { metrics: EngagementMetrics, isTeam?: boolean }) {
+export default function EngagementOverview({ metrics, isTeam = false, participantNames = {} }: { 
+    metrics: EngagementMetrics, 
+    isTeam?: boolean,
+    participantNames?: Record<string, string>
+}) {
+    const requiredHours = metrics.requiredHours || 16;
+
     return (
         <div className="space-y-8">
             {/* EIS Hero Card */}
@@ -45,9 +54,10 @@ export default function EngagementOverview({ metrics, isTeam = false }: { metric
                         <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Intensity Breakdown</p>
                         <div className="space-y-2.5">
                             {[
-                                { label: 'Hours (40%)', value: Math.min(100, (metrics.totalHours / 48) * 100), color: 'bg-blue-400' },
-                                { label: 'Continuity (20%)', value: metrics.weeklyContinuity, color: 'bg-indigo-400' },
-                                { label: 'Span (15%)', value: Math.min(100, (metrics.spanWeeks / 16) * 100), color: 'bg-violet-400' },
+                                { label: `Volume (50%)`, value: Math.min(100, (metrics.totalHours / (requiredHours * (isTeam ? 3 : 1))) * 100), color: 'bg-blue-400' },
+                                { label: 'Continuity (25%)', value: metrics.weeklyContinuity, color: 'bg-indigo-400' },
+                                { label: 'Span (15%)', value: Math.min(100, (metrics.spanWeeks / 12) * 100), color: 'bg-violet-400' },
+                                { label: 'Freq (10%)', value: Math.min(100, (metrics.frequency / 3) * 100), color: 'bg-rose-400' },
                             ].map((d, i) => (
                                 <div key={i} className="space-y-1">
                                     <div className="flex justify-between text-[10px] font-bold">
@@ -62,6 +72,7 @@ export default function EngagementOverview({ metrics, isTeam = false }: { metric
                         </div>
                     </div>
                 </div>
+
 
                 {/* Status Bar */}
                 <div className="mt-12 pt-8 border-t border-white/10">
@@ -89,6 +100,49 @@ export default function EngagementOverview({ metrics, isTeam = false }: { metric
                 </div>
             </div>
 
+            {/* Individual Completion Table - ONLY FOR TEAMS */}
+            {isTeam && metrics.individual_metrics && metrics.individual_metrics.length > 0 && (
+                <div className="bg-white rounded-3xl border border-slate-100 p-8 space-y-6 shadow-sm">
+                    <div className="flex items-center gap-3">
+                        <Activity className="w-5 h-5 text-report-primary" />
+                        <h3 className="text-sm font-black uppercase tracking-[0.2em] text-slate-900">Individual Completion Status</h3>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {metrics.individual_metrics.map((m, i) => (
+                            <div key={i} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100/50">
+                                <div className="space-y-1">
+                                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                                        {participantNames[m.student_id] || 'Team Lead'}
+                                    </p>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-lg font-black text-slate-900">{m.individual_hours}</span>
+                                        <span className="text-[9px] font-bold text-slate-400 uppercase">/ {requiredHours} hrs</span>
+                                    </div>
+                                </div>
+                                <div className="text-right space-y-2">
+                                    <div className="h-2 w-24 bg-slate-200 rounded-full overflow-hidden">
+                                        <div 
+                                            className={clsx(
+                                                "h-full transition-all duration-1000",
+                                                m.completion_percentage >= 100 ? "bg-emerald-500" : "bg-report-primary"
+                                            )} 
+                                            style={{ width: `${m.completion_percentage}%` }}
+                                        />
+                                    </div>
+                                    <p className={clsx(
+                                        "text-[9px] font-black uppercase tracking-widest",
+                                        m.gateway_status === 'ELIGIBLE' ? "text-emerald-500" : "text-amber-500"
+                                    )}>
+                                        {m.gateway_status === 'ELIGIBLE' ? 'Target Met' : 'In Progress'}
+                                    </p>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
             {/* Metrics Grid */}
             <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                 {[
@@ -96,7 +150,7 @@ export default function EngagementOverview({ metrics, isTeam = false }: { metric
                     { label: 'Active Days', value: metrics.activeDays, unit: 'days', icon: CheckCircle2, color: 'text-emerald-600', bg: 'bg-emerald-50' },
                     { label: 'Span', value: metrics.spanWeeks, unit: 'wks', icon: Calendar, color: 'text-violet-600', bg: 'bg-violet-50' },
                     { label: 'Frequency', value: metrics.frequency, unit: 'v/wk', icon: Activity, color: 'text-rose-600', bg: 'bg-rose-50' },
-                    { label: 'Evidence', value: metrics.evidenceRatio, unit: '%', icon: Database, color: 'text-amber-600', bg: 'bg-amber-50' },
+                    { label: 'Evidence', value: Math.round(metrics.evidenceRatio), unit: '%', icon: Database, color: 'text-amber-600', bg: 'bg-amber-50' },
                 ].map((m, i) => (
                     <div key={i} className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
                         <div className={`w-10 h-10 rounded-xl ${m.bg} ${m.color} flex items-center justify-center mb-4`}>

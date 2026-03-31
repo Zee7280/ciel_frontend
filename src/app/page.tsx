@@ -1,10 +1,13 @@
 import Navbar from "@/components/Navbar";
 import Hero from "@/components/Hero";
-import FeaturesBar from "@/components/FeaturesBar";
+import WhoIsItFor from "@/components/WhoIsItFor";
 import HowWeWork from "@/components/HowWeWork";
+import FeaturesBar from "@/components/FeaturesBar";
+import ImpactSnapshot from "@/components/ImpactSnapshot";
+import WhyItMatters from "@/components/WhyItMatters";
+import FinalCTA from "@/components/FinalCTA";
 import StoriesGrid from "@/components/StoriesGrid";
 import PartnersFooter from "@/components/PartnersFooter";
-import FooterBanner from "@/components/FooterBanner";
 import Footer from "@/components/Footer";
 
 export default function Home() {
@@ -12,11 +15,14 @@ export default function Home() {
     <main className="min-h-screen bg-white font-sans">
       <Navbar />
       <Hero />
-      <FeaturesBar />
+      <WhoIsItFor />
       <HowWeWork />
+      <FeaturesBar />
+      <ImpactSnapshot />
+      <WhyItMatters />
+      <FinalCTA />
       <StoriesGrid />
       <PartnersFooter />
-      <FooterBanner />
       <Footer />
     </main>
   );

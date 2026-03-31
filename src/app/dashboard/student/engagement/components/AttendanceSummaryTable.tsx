@@ -12,12 +12,14 @@ interface AttendanceEntry {
     activity_type: string;
     entryStatus?: 'pending' | 'verified' | 'flagged';
     evidence_file?: any;
+    participantId?: string;
 }
 
-export default function AttendanceSummaryTable({ entries, onDelete, isLocked = false }: {
+export default function AttendanceSummaryTable({ entries, onDelete, isLocked = false, participantNames = {} }: {
     entries: AttendanceEntry[],
     onDelete?: (id: string) => void,
-    isLocked?: boolean
+    isLocked?: boolean,
+    participantNames?: Record<string, string>
 }) {
     if (entries.length === 0) {
         return (
@@ -41,6 +43,7 @@ export default function AttendanceSummaryTable({ entries, onDelete, isLocked = f
                         <tr className="bg-slate-50/80 backdrop-blur-sm border-b border-slate-100">
                             <th className="px-5 py-5 text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">Date & Session</th>
                             <th className="px-5 py-5 text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">Activity Type</th>
+                            <th className="px-5 py-5 text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">Student</th>
                             <th className="px-5 py-5 text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">Duration</th>
                             <th className="px-5 py-5 text-[10px] font-black uppercase tracking-[0.12em] text-slate-400 text-center">Evidence</th>
                             <th className="px-5 py-5 text-[10px] font-black uppercase tracking-[0.12em] text-slate-400 text-right">Status</th>
@@ -71,6 +74,16 @@ export default function AttendanceSummaryTable({ entries, onDelete, isLocked = f
                                             <Tag className="w-4 h-4" />
                                         </div>
                                         <span className="text-xs font-black text-slate-700 uppercase tracking-wider">{entry.activity_type}</span>
+                                    </div>
+                                </td>
+                                <td className="px-5 py-7">
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-[10px] font-black text-slate-500">
+                                            {(participantNames[entry.participantId || ''] || '??').charAt(0).toUpperCase()}
+                                        </div>
+                                        <span className="text-[10px] font-bold text-slate-600 uppercase tracking-tight">
+                                            {participantNames[entry.participantId || ''] || 'Team Member'}
+                                        </span>
                                     </div>
                                 </td>
                                 <td className="px-5 py-7">

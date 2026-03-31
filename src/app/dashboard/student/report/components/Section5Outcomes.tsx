@@ -388,143 +388,284 @@ export default function Section5Outcomes() {
     return (
         <div className="space-y-12 pb-16">
             {/* ─── Header ─────────────────────────────────────────────────── */}
-            <div className="space-y-4">
+            <div className="space-y-6">
+
                 <div className="flex items-center gap-4">
-                    <div className="w-14 h-14 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shadow-xl shadow-emerald-100 ring-4 ring-emerald-50">
-                        <TrendingUp className="w-7 h-7" />
+
+                    <div className="w-12 h-12 rounded-xl bg-emerald-600 text-white flex items-center justify-center shadow-sm">
+                        <TrendingUp className="w-6 h-6" />
                     </div>
-                    <div>
-                        <h2 className="report-h2">Section 5 — Outcomes & Results</h2>
-                        <p className="report-label">Measurable Change Resulting from Your Project</p>
+
+                    <div className="space-y-1">
+                        <h2 className="report-h2">
+                            Section 5 — Outcomes & Results
+                        </h2>
+
+                        <p className="report-label text-slate-500">
+                            Measurable Change Resulting from Your Project
+                        </p>
                     </div>
+
                 </div>
+
             </div>
 
             {/* ─── 5.0 Project Snapshot ────────────────────────────────────── */}
-            <div className="space-y-4">
+            <div className="space-y-6">
+
                 <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center font-black text-[10px]">5.0</div>
-                    <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Project Snapshot</h3>
-                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest bg-slate-100 px-3 py-1 rounded-full">Auto-Generated · Read-Only</span>
-                </div>
 
-                <div className="p-6 bg-slate-900 rounded-[2rem] text-white relative overflow-hidden group">
-                    <div className="absolute right-0 top-0 w-32 h-32 bg-emerald-500/20 rounded-full -mr-16 -mt-16 blur-3xl group-hover:scale-150 transition-transform duration-1000" />
-                    <div className="relative z-10 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6">
-                        <div className="space-y-1">
-                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Primary SDG</p>
-                            <p className="text-xs font-black truncate">{sdgData.find(s => s.id === data.section3.primary_sdg.goal_number?.toString())?.title || "—"}</p>
-                        </div>
-                        <div className="space-y-1">
-                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">SDG Target</p>
-                            <p className="text-xs font-black">{data.section3.primary_sdg.target_id || "—"}</p>
-                        </div>
-                        <div className="space-y-1">
-                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Participation</p>
-                            <p className="text-xs font-black capitalize">{data.section1.participation_type}</p>
-                        </div>
-                        <div className="space-y-1">
-                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Beneficiaries</p>
-                            <p className="text-xs font-black">{section4.total_beneficiaries || "0"} Reached</p>
-                        </div>
-                        <div className="space-y-1">
-                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Output Types</p>
-                            <p className="text-xs font-black">{section4.outputs.filter(o => o.type).length} Recorded</p>
-                        </div>
-                        <div className="space-y-1">
-                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Verified Hours</p>
-                            <p className="text-xs font-black">{data.section1.metrics.total_verified_hours}h</p>
-                        </div>
+                    <div className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center text-[11px] font-semibold">
+                        5.0
                     </div>
+
+                    <h3 className="text-sm font-semibold text-slate-900 uppercase tracking-wide">
+                        Project Snapshot
+                    </h3>
+
+                    <span className="text-[10px] font-semibold text-slate-500 uppercase bg-slate-100 px-3 py-1 rounded-full">
+                        Auto-Generated · Read-Only
+                    </span>
+
                 </div>
 
-                {/* Reminder note */}
-                <div className="p-4 bg-blue-50 border border-blue-100 rounded-2xl flex items-start gap-3">
-                    <Info className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+
+                {/* Snapshot Card */}
+
+                <div className="p-6 rounded-2xl text-white shadow-lg bg-gradient-to-r from-[#0B1F3A] to-[#08172E]">
+
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6">
+
+                        <div className="space-y-1">
+                            <p className="text-[10px] text-slate-400 uppercase tracking-wide">
+                                Primary SDG
+                            </p>
+                            <p className="text-sm font-semibold truncate">
+                                {sdgData.find(s => s.id === data.section3.primary_sdg.goal_number?.toString())?.title || "—"}
+                            </p>
+                        </div>
+
+                        <div className="space-y-1">
+                            <p className="text-[10px] text-slate-400 uppercase tracking-wide">
+                                SDG Target
+                            </p>
+                            <p className="text-sm font-semibold">
+                                {data.section3.primary_sdg.target_id || "—"}
+                            </p>
+                        </div>
+
+                        <div className="space-y-1">
+                            <p className="text-[10px] text-slate-400 uppercase tracking-wide">
+                                Participation
+                            </p>
+                            <p className="text-sm font-semibold capitalize">
+                                {data.section1.participation_type}
+                            </p>
+                        </div>
+
+                        <div className="space-y-1">
+                            <p className="text-[10px] text-slate-400 uppercase tracking-wide">
+                                Beneficiaries
+                            </p>
+                            <p className="text-sm font-semibold">
+                                {section4.total_beneficiaries || "0"} Reached
+                            </p>
+                        </div>
+
+                        <div className="space-y-1">
+                            <p className="text-[10px] text-slate-400 uppercase tracking-wide">
+                                Output Types
+                            </p>
+                            <p className="text-sm font-semibold">
+                                {section4.outputs.filter(o => o.type).length} Recorded
+                            </p>
+                        </div>
+
+                        <div className="space-y-1">
+                            <p className="text-[10px] text-slate-400 uppercase tracking-wide">
+                                Verified Hours
+                            </p>
+                            <p className="text-sm font-semibold">
+                                {data.section1.metrics.total_verified_hours}h
+                            </p>
+                        </div>
+
+                    </div>
+
+                </div>
+
+
+                {/* Reminder */}
+
+                <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl flex items-start gap-3">
+
+                    <Info className="w-4 h-4 text-blue-600 mt-0.5 shrink-0" />
+
                     <div className="space-y-1">
-                        <p className="report-label !text-blue-800">📌 Reminder</p>
-                        <p className="text-[9px] text-blue-700 font-semibold">Your outcome must reflect measurable change resulting from the outputs recorded in Section 4. No SDG selection is required here — the SDG framework is already assigned from Section 3.</p>
+                        <p className="text-xs font-semibold text-blue-800">
+                            Reminder
+                        </p>
+
+                        <p className="text-sm text-blue-700">
+                            Your outcome must reflect measurable change resulting from the outputs recorded in Section 4.
+                            No SDG selection is required here — the SDG framework is already assigned from Section 3.
+                        </p>
                     </div>
+
                 </div>
+
             </div>
 
             {/* ─── Step 1: Observed Change ─────────────────────────────────── */}
             <div className="space-y-6">
+
                 <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center font-black text-[10px]">5.1</div>
-                    <h3 className="report-h3 !italic">Step 1 — Observed Change (Narrative)</h3>
+                    <div className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center text-[11px] font-semibold">
+                        5.1
+                    </div>
+
+                    <h3 className="text-base font-semibold text-slate-900 italic">
+                        Step 1 — Observed Change (Narrative)
+                    </h3>
                 </div>
 
-                <div className="bg-white rounded-[2.5rem] border-2 border-slate-100 p-10 shadow-sm space-y-6">
+
+                <div className="bg-white rounded-xl border border-slate-200 p-8 shadow-sm space-y-6">
+
                     <div className="space-y-2">
-                        <Label className="report-h3 !text-sm">Describe the change that occurred (Required)</Label>
-                        <p className="text-xs text-slate-500 font-medium leading-relaxed">
-                            What improved or strengthened? What can beneficiaries now do that they could not before? How does this relate to the assigned SDG target?
-                            <span className="text-report-primary font-bold ml-1 italic">(100–200 Words)</span>
+                        <Label className="text-sm font-semibold text-slate-800">
+                            Describe the change that occurred (Required)
+                        </Label>
+
+                        <p className="text-sm text-slate-500 leading-relaxed">
+                            What improved or strengthened? What can beneficiaries now do that they could not before?
+                            How does this relate to the assigned SDG target?
+                            <span className="text-report-primary font-semibold ml-1 italic">
+                                (100–200 Words)
+                            </span>
                         </p>
                     </div>
 
+
+                    {/* Guidelines */}
                     <div className="space-y-2">
-                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Guidelines</p>
+
+                        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                            Guidelines
+                        </p>
+
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                            {["Refer to beneficiaries from Section 4", "Connect change to activities & outputs", "Be realistic and specific"].map(g => (
-                                <p key={g} className="text-[9px] text-report-primary font-semibold flex items-center gap-1.5">
-                                    <CheckCircle2 className="w-3 h-3" /> {g}
+
+                            {[
+                                "Refer to beneficiaries from Section 4",
+                                "Connect change to activities & outputs",
+                                "Be realistic and specific"
+                            ].map(g => (
+                                <p
+                                    key={g}
+                                    className="text-xs text-report-primary font-medium flex items-center gap-2"
+                                >
+                                    <CheckCircle2 className="w-3 h-3" />
+                                    {g}
                                 </p>
                             ))}
-                            {["Do not claim problem was fully solved", "Do not claim SDG achievement"].map(g => (
-                                <p key={g} className="text-[9px] text-red-600 font-semibold flex items-center gap-1.5">
-                                    <AlertCircle className="w-3 h-3" /> {g}
+
+                            {[
+                                "Do not claim problem was fully solved",
+                                "Do not claim SDG achievement"
+                            ].map(g => (
+                                <p
+                                    key={g}
+                                    className="text-xs text-red-600 font-medium flex items-center gap-2"
+                                >
+                                    <AlertCircle className="w-3 h-3" />
+                                    {g}
                                 </p>
                             ))}
+
                         </div>
+
                     </div>
 
+
+                    {/* Textarea */}
                     <Textarea
                         placeholder="Explain the direction and nature of change resulting from your activities..."
                         className={clsx(
-                            "min-h-[160px] rounded-[1.5rem] border-2 border-slate-50 p-6 text-slate-700 font-medium bg-slate-50 outline-none focus:border-report-primary-border transition-all focus:bg-white",
-                            getFieldError('observed_change') && "border-red-200 bg-red-50"
+                            "min-h-[150px] rounded-lg border border-slate-200 p-5 text-sm text-slate-700 bg-slate-50 outline-none focus:border-report-primary transition focus:bg-white",
+                            getFieldError('observed_change') && "border-red-300 bg-red-50"
                         )}
                         value={section5.observed_change || ''}
                         onChange={(e) => updateSection('section5', { observed_change: e.target.value })}
                     />
+
                     <FieldError message={getFieldError('observed_change')} />
-                    <div className="flex justify-between items-center px-2">
-                        <p className={clsx(
-                            "report-label",
-                            observedWords >= 100 && observedWords <= 200 ? "text-report-primary" : observedWords > 200 ? "text-red-500" : "text-slate-400"
-                        )}>
+
+
+                    {/* Word Count */}
+                    <div className="flex justify-between items-center text-xs">
+
+                        <p
+                            className={clsx(
+                                "font-medium",
+                                observedWords >= 100 && observedWords <= 200
+                                    ? "text-report-primary"
+                                    : observedWords > 200
+                                        ? "text-red-500"
+                                        : "text-slate-400"
+                            )}
+                        >
                             Word Count: {observedWords} / 200 (Min 100)
                         </p>
+
                         {observedWords >= 100 && observedWords <= 200 && (
-                            <span className="text-[9px] font-black text-report-primary uppercase tracking-widest flex items-center gap-1">
-                                <CheckCircle2 className="w-3 h-3" /> Within range
+                            <span className="text-xs font-semibold text-report-primary flex items-center gap-1">
+                                <CheckCircle2 className="w-3 h-3" />
+                                Within range
                             </span>
                         )}
+
                     </div>
+
                 </div>
+
             </div>
 
             {/* ─── Step 2: Measurable Outcomes ─────────────────────────────── */}
             <div className="space-y-6">
+
                 <div className="flex items-center justify-between">
+
                     <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center font-black text-[10px]">5.2</div>
-                        <h3 className="report-h3 !italic">Step 2 — Measurable Outcomes</h3>
+
+                        <div className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center text-[11px] font-semibold">
+                            5.2
+                        </div>
+
+                        <h3 className="text-base font-semibold text-slate-900 italic">
+                            Step 2 — Measurable Outcomes
+                        </h3>
+
                     </div>
+
+
                     <Button
                         type="button"
                         variant="ghost"
                         onClick={addOutcome}
-                        className="h-8 px-3 rounded-lg bg-report-primary-soft text-report-primary text-[10px] font-black uppercase tracking-widest hover:bg-report-primary-border"
+                        className="h-9 px-4 rounded-lg bg-report-primary-soft text-report-primary text-xs font-semibold uppercase tracking-wide hover:bg-report-primary-border transition"
                     >
-                        <Plus className="w-3 h-3 mr-1.5" /> Add Measurable Outcome
+                        <Plus className="w-4 h-4 mr-2" />
+                        Add Measurable Outcome
                     </Button>
+
                 </div>
 
+
                 <div className="space-y-6">
+
                     {outcomes.map((outcome, idx) => (
+
                         <OutcomeCard
                             key={outcome.id}
                             outcome={outcome}
@@ -533,95 +674,182 @@ export default function Section5Outcomes() {
                             onUpdate={(field, val) => updateOutcome(idx, field, val)}
                             onRemove={() => removeOutcome(idx)}
                         />
+
                     ))}
+
                 </div>
+
             </div>
 
             {/* ─── Step 3: Challenges & Limitations ───────────────────────── */}
             <div className="space-y-6">
+
                 <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center font-black text-[10px]">5.3</div>
-                    <h3 className="report-h3 !italic">Step 3 — Challenges & Limitations</h3>
+
+                    <div className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center text-[11px] font-semibold">
+                        5.3
+                    </div>
+
+                    <h3 className="text-base font-semibold text-slate-900 italic">
+                        Step 3 — Challenges & Limitations
+                    </h3>
+
                 </div>
 
-                <div className="bg-white rounded-[2.5rem] border-2 border-slate-100 p-10 shadow-sm space-y-4">
+
+                <div className="bg-white rounded-xl border border-slate-200 p-8 shadow-sm space-y-5">
+
                     <div className="space-y-2">
-                        <Label className="report-h3 !text-sm">Reflect honestly on limitations (Required)</Label>
-                        <p className="text-xs text-slate-500 font-medium leading-relaxed">
-                            What limited scale of impact? What could not be fully measured? What barriers affected sustainability?
-                            <span className="text-orange-600 font-bold ml-1 italic">(100-200 Words)</span>
+
+                        <Label className="text-sm font-semibold text-slate-800">
+                            Reflect honestly on limitations (Required)
+                        </Label>
+
+                        <p className="text-sm text-slate-500 leading-relaxed">
+                            What limited scale of impact? What could not be fully measured?
+                            What barriers affected sustainability?
+                            <span className="text-orange-600 font-semibold ml-1 italic">
+                                (100–200 Words)
+                            </span>
                         </p>
+
                     </div>
+
+
                     <Textarea
                         placeholder="Reflect honestly on barriers, unintended effects, or what could not be fully measured..."
                         className={clsx(
-                            "min-h-[120px] rounded-[1.5rem] border-2 border-slate-50 p-6 text-slate-700 font-medium bg-slate-50 outline-none focus:border-report-primary-border transition-all",
-                            getFieldError('challenges') && "border-red-200 bg-red-50"
+                            "min-h-[130px] rounded-lg border border-slate-200 p-5 text-sm text-slate-700 bg-slate-50 outline-none focus:border-report-primary transition focus:bg-white",
+                            getFieldError('challenges') && "border-red-300 bg-red-50"
                         )}
                         value={section5.challenges || ''}
                         onChange={(e) => updateSection('section5', { challenges: e.target.value })}
                     />
+
                     <FieldError message={getFieldError('challenges')} />
-                    <p className={clsx(
-                        "report-label px-2",
-                        challengeWords > 200 ? "text-red-500" : "text-slate-400"
-                    )}>
+
+
+                    <p
+                        className={clsx(
+                            "text-xs px-2 font-medium",
+                            challengeWords > 200 ? "text-red-500" : "text-slate-400"
+                        )}
+                    >
                         {challengeWords} / 200 words (Min 100) — Transparent reporting strengthens institutional credibility.
                     </p>
+
                 </div>
+
             </div>
 
-            {/* ─── Auto-Generated Summary ──────────────────────────────────── */}
-            <div className="pt-16 border-t-2 border-slate-100">
+
+
+            {/* ─── Auto-Generated Summary ─────────────────────────────────── */}
+            <div className="pt-14 border-t border-slate-200">
+
                 <div className="flex items-center justify-between mb-8">
+
                     <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 rounded-xl bg-report-primary text-white flex items-center justify-center shadow-lg shadow-report-primary-shadow">
-                            <Activity className="w-6 h-6" />
+
+                        <div className="w-10 h-10 rounded-lg bg-report-primary text-white flex items-center justify-center shadow-md">
+                            <Activity className="w-5 h-5" />
                         </div>
-                        <h3 className="report-h3 !text-xl !italic">Outcome Measurement Summary</h3>
+
+                        <h3 className="text-lg font-semibold text-slate-900 italic">
+                            Outcome Measurement Summary
+                        </h3>
+
                     </div>
-                    <div className="px-4 py-2 rounded-xl bg-slate-900 text-white text-[10px] font-black uppercase tracking-widest">
+
+
+                    <div className="px-4 py-2 rounded-lg bg-slate-900 text-white text-xs font-semibold uppercase tracking-wide">
                         System-Generated · Read-Only
                     </div>
+
                 </div>
 
-                <div className="bg-white border-2 border-slate-200 rounded-[3rem] p-10 relative overflow-hidden shadow-xl space-y-8 group">
-                    <div className="absolute -bottom-10 -right-10 opacity-5 group-hover:opacity-10 transition-opacity duration-1000 rotate-12">
-                        <TrendingUp className="w-80 h-80 text-slate-900" />
+
+
+                <div className="bg-white border border-slate-200 rounded-xl p-8 relative overflow-hidden shadow-sm space-y-6">
+
+                    <div className="absolute -bottom-10 -right-10 opacity-5">
+                        <TrendingUp className="w-64 h-64 text-slate-900" />
                     </div>
 
-                    {/* Stats grid for first outcome */}
+
+                    {/* Stats grid */}
                     {outcomes[0]?.metric && (
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 relative z-20 pb-8 border-b border-slate-100">
+
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 pb-6 border-b border-slate-200">
+
                             <div className="space-y-1">
-                                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Primary SDG</span>
-                                <p className="text-xs font-black text-slate-900">{sdgData.find(s => s.id === data.section3.primary_sdg.goal_number?.toString())?.title || "—"}</p>
-                            </div>
-                            <div className="space-y-1">
-                                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Metric</span>
-                                <p className="text-xs font-black text-slate-900 truncate">{outcomes[0].metric}</p>
-                            </div>
-                            <div className="space-y-1">
-                                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Improvement</span>
-                                <p className="text-xs font-black text-report-primary">
-                                    {calcImprovement(outcomes[0]) > 0 ? '+' : ''}{calcImprovement(outcomes[0])} {outcomes[0].unit}
+                                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide">
+                                    Primary SDG
+                                </span>
+
+                                <p className="text-sm font-semibold text-slate-900">
+                                    {sdgData.find(s => s.id === data.section3.primary_sdg.goal_number?.toString())?.title || "—"}
                                 </p>
                             </div>
+
+
                             <div className="space-y-1">
-                                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Confidence</span>
-                                <p className="text-xs font-black text-slate-900">{outcomes[0].confidence_level || "—"}</p>
+                                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide">
+                                    Metric
+                                </span>
+
+                                <p className="text-sm font-semibold text-slate-900 truncate">
+                                    {outcomes[0].metric}
+                                </p>
                             </div>
+
+
+                            <div className="space-y-1">
+                                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide">
+                                    Improvement
+                                </span>
+
+                                <p className="text-sm font-semibold text-report-primary">
+                                    {calcImprovement(outcomes[0]) > 0 ? "+" : ""}
+                                    {calcImprovement(outcomes[0])} {outcomes[0].unit}
+                                </p>
+                            </div>
+
+
+                            <div className="space-y-1">
+                                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide">
+                                    Confidence
+                                </span>
+
+                                <p className="text-sm font-semibold text-slate-900">
+                                    {outcomes[0].confidence_level || "—"}
+                                </p>
+                            </div>
+
                         </div>
+
                     )}
 
-                    <div className="relative z-10 space-y-4 pt-2">
-                        <span className="absolute -top-8 -left-4 text-7xl font-serif text-slate-100 select-none">"</span>
+
+
+                    <div className="relative space-y-3 pt-2">
+
+                        <span className="absolute -top-6 -left-4 text-6xl font-serif text-slate-100 select-none">
+                            "
+                        </span>
+
                         <p className="report-ai-text">
                             {autoSummary}
                         </p>
-                        <span className="absolute -bottom-12 -right-4 text-7xl font-serif text-slate-100 select-none rotate-180">"</span>
+
+                        <span className="absolute -bottom-10 -right-4 text-6xl font-serif text-slate-100 rotate-180 select-none">
+                            "
+                        </span>
+
                     </div>
+
                 </div>
+
             </div>
 
             {/* ─── Save ─────────────────────────────────────────────────────── */}

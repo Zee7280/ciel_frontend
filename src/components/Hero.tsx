@@ -58,7 +58,7 @@ export default function Hero() {
     };
 
     return (
-        <section className="relative max-w-[1600px] mx-auto px-4 md:px-10 pb-12 lg:pb-32 overflow-visible">
+        <section className="relative max-w-[1600px] mx-auto px-4 md:px-10 pb-10 lg:pb-20 overflow-visible">
             {/* Soft Background Glow */}
             <div className="absolute top-0 left-0 w-[600px] h-[600px] bg-blue-50/50 rounded-full blur-[120px] -z-10" />
             <div className="absolute bottom-0 right-0 w-[600px] h-[600px] bg-emerald-50/50 rounded-full blur-[120px] -z-10" />

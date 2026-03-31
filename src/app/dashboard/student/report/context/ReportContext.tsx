@@ -58,10 +58,12 @@ export interface ReportData {
             eis_score: number;
             engagement_category: string;
             hec_compliance: 'below' | 'recognized' | 'advanced' | 'full';
+            individual_metrics?: any[];
         };
         privacy_consent: boolean;
         review_checked?: boolean[];
         verified_summary?: string; // System-generated narrative
+        faculty_supervisor_email?: string;
     };
     // Section 2: Project Context (Was Section 1)
     section2: {
@@ -229,7 +231,9 @@ export interface ReportData {
     section11: {
         summary_text?: string;
     };
+    required_hours?: number;
 }
+
 
 const defaultReportData: ReportData = {
     project_id: '',
@@ -250,7 +254,8 @@ const defaultReportData: ReportData = {
         },
         privacy_consent: false,
         review_checked: [false, false, false],
-        verified_summary: ''
+        verified_summary: '',
+        faculty_supervisor_email: ''
     },
     section2: {
         problem_statement: '',
@@ -362,8 +367,10 @@ const defaultReportData: ReportData = {
     },
     section11: {
         summary_text: ''
-    }
+    },
+    required_hours: 16
 };
+
 
 interface ReportContextType {
     data: ReportData;
@@ -383,7 +390,9 @@ interface ReportContextType {
     saveReport: (silent?: boolean) => Promise<boolean>;
     isParticipationUnlocked: boolean;
     setParticipationUnlocked: (unlocked: boolean) => void;
+    setRequiredHours: (hours: number) => void;
 }
+
 
 const ReportContext = createContext<ReportContextType | undefined>(undefined);
 
@@ -396,7 +405,8 @@ export function ReportProvider({ children }: { children: React.ReactNode }) {
 
     // Auto-calculate Section 1 metrics whenever attendance logs change
     useEffect(() => {
-        const metrics = calculateEngagementMetrics(data.section1.attendance_logs);
+        const teamSize = (data.section1.participation_type === 'team' ? data.section1.team_members.length : 0) + 1;
+        const metrics = calculateEngagementMetrics(data.section1.attendance_logs, data.required_hours, teamSize);
 
         // Deep compare or just check if meaningful change occurred to avoid loop
         if (JSON.stringify(metrics) !== JSON.stringify(data.section1.metrics)) {
@@ -408,7 +418,8 @@ export function ReportProvider({ children }: { children: React.ReactNode }) {
                 }
             }));
         }
-    }, [data.section1.attendance_logs]);
+    }, [data.section1.attendance_logs, data.required_hours]);
+
 
     const clearValidationErrors = useCallback((section: string) => {
         setValidationErrors(prev => ({
@@ -453,6 +464,11 @@ export function ReportProvider({ children }: { children: React.ReactNode }) {
     const setProjectId = useCallback((id: string) => {
         setData(prev => ({ ...prev, project_id: id }));
     }, []);
+
+    const setRequiredHours = useCallback((hours: number) => {
+        setData(prev => ({ ...prev, required_hours: hours }));
+    }, []);
+
 
     const validateCurrentSection = useCallback((): boolean => {
         // Validation implicitly passes in read-only mode to allow navigation without errors
@@ -518,12 +534,12 @@ export function ReportProvider({ children }: { children: React.ReactNode }) {
                 return false;
             }
 
-            const res = await authenticatedFetch(`/api/v1/student/reports`, {
+            const res = await authenticatedFetch(`/api/v1/student/reports/draft`, {
                 method: 'POST',
                 body: JSON.stringify({
                     ...data,
                     project_id: projectId,
-                    status: 'draft'
+                    status: 'continue'
                 })
             });
 
@@ -555,7 +571,8 @@ export function ReportProvider({ children }: { children: React.ReactNode }) {
         setReadOnly,
         saveReport,
         isParticipationUnlocked,
-        setParticipationUnlocked
+        setParticipationUnlocked,
+        setRequiredHours
     }), [
         data,
         updateSection,
@@ -571,8 +588,11 @@ export function ReportProvider({ children }: { children: React.ReactNode }) {
         setFullData,
         isReadOnly,
         saveReport,
-        isParticipationUnlocked
+        isParticipationUnlocked,
+        setParticipationUnlocked,
+        setRequiredHours
     ]);
+
 
     return (
         <ReportContext.Provider value={contextValue}>

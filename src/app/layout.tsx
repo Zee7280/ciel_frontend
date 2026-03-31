@@ -23,6 +23,7 @@ export const metadata: Metadata = {
 };
 
 import { Toaster } from "sonner";
+import Script from "next/script";
 
 export default function RootLayout({
   children,
@@ -30,7 +31,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
+
       <body
         className={`${outfit.variable} ${dancingScript.variable} font-sans antialiased text-slate-800 bg-slate-50`}
       >

@@ -6,9 +6,10 @@ import { useParams, useRouter } from "next/navigation";
 import { Button } from "../../report/components/ui/button";
 import { Badge } from "../../report/components/ui/badge";
 import { authenticatedFetch } from "@/utils/api";
-import { Loader2, MapPin, Calendar, Clock, Globe, ArrowLeft, Building2, Share2, CheckCircle2, User } from "lucide-react";
+import { Loader2, MapPin, Calendar, Clock, Globe, ArrowLeft, Building2, Share2, CheckCircle2, User, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
+import ReportSummaryPopup from "../../report/components/ReportSummaryPopup";
 
 
 export default function OpportunityDetailsPage() {
@@ -19,6 +20,7 @@ export default function OpportunityDetailsPage() {
     const [opportunity, setOpportunity] = useState<any>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [isApplying, setIsApplying] = useState(false);
+    const [isPopupOpen, setIsPopupOpen] = useState(false);
 
     useEffect(() => {
         if (id) {
@@ -52,31 +54,60 @@ export default function OpportunityDetailsPage() {
         }
     };
 
-    const handleApply = async () => {
+    const handleApplyClick = () => {
+        setIsPopupOpen(true);
+    };
+
+    const handleApplyFromPopup = async (facultyEmail: string) => {
         setIsApplying(true);
         try {
-            const res = await authenticatedFetch(`/api/v1/students/opportunities/${id}/apply`, {
-                method: 'POST'
+            // Get user data from localStorage for auto-population
+            const storedUserStr = localStorage.getItem("user") || localStorage.getItem("ciel_user");
+            let userData: any = {};
+            if (storedUserStr) {
+                try {
+                    const u = JSON.parse(storedUserStr);
+                    userData = {
+                        fullName: u.name || "",
+                        email: u.email || "",
+                        mobile: u.phone || u.contact || "",
+                        cnic: u.cnic || "",
+                        universityName: u.university || u.institution || "",
+                        // Defaults for other fields required by /api/v1/engagement/register
+                        universityId: "PENDING",
+                        academicProgram: "PENDING",
+                        yearOfStudy: "3rd Year",
+                        department: "General",
+                        academicIntegrationType: "Course-Linked"
+                    };
+                } catch (e) {}
+            }
+
+            const body: any = { 
+                ...userData,
+                projectId: id,
+                participationMode: 'individual', // Default to individual
+                isTeamLead: true, // Applicant is lead
+                status: 'pending_ciel_approval' // Unified status
+            };
+            
+            if (facultyEmail) {
+                body.facultySupervisorEmail = facultyEmail;
+            }
+
+            const res = await authenticatedFetch(`/api/v1/engagement/register`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body),
             });
 
-            const data = await res?.json().catch(() => ({}));
-
             if (res && res.ok) {
-                if (data.success) {
-                    toast.success("Application submitted successfully!");
-                    setOpportunity((prev: any) => ({ ...prev, hasApplied: true }));
-                } else {
-                    toast.error(data.message || "Failed to submit application");
-                }
+                toast.success("Application submitted successfully! Awaiting CIEL & Faculty approval.");
+                setIsPopupOpen(false);
+                setOpportunity((prev: any) => ({ ...prev, hasApplied: true, status: 'pending_approval' }));
             } else {
-                // 400 "Already applied" — treat as already applied
-                const msg: string = data?.message || "";
-                if (res?.status === 400 && msg.toLowerCase().includes("already applied")) {
-                    setOpportunity((prev: any) => ({ ...prev, hasApplied: true }));
-                    toast.info("You have already applied to this opportunity.");
-                } else {
-                    toast.error(msg || "Failed to connect to server");
-                }
+                const err = await res?.json().catch(() => ({}));
+                toast.error(err?.message || "Failed to submit application");
             }
         } catch (error) {
             console.error("Error applying", error);
@@ -118,22 +149,29 @@ export default function OpportunityDetailsPage() {
                     </button>
 
                     {opportunity.hasApplied ? (
-                        <div className="flex items-center gap-2">
-                            {['active', 'pending', 'pending_approval', 'completed', 'applied', 'accepted'].includes(opportunity.status) && (
-                                <Button
-                                    onClick={() => router.push(`/dashboard/student/report?projectId=${id}`)}
-                                    className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 font-medium"
-                                >
-                                    Start Report
+                        <div className="flex flex-col items-end gap-2">
+                            <div className="flex items-center gap-2">
+                                {['active', 'completed'].includes(opportunity.status) && (
+                                    <Button
+                                        onClick={() => router.push(`/dashboard/student/report?projectId=${id}`)}
+                                        className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 font-medium"
+                                    >
+                                        Start Report
+                                    </Button>
+                                )}
+                                <Button className="flex items-center gap-2 px-6 py-2 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg shadow-none cursor-default font-medium hover:bg-emerald-50">
+                                    <CheckCircle2 className="w-4 h-4" /> Applied
                                 </Button>
+                            </div>
+                            {['pending', 'pending_approval', 'applied'].includes(opportunity.status) && (
+                                <p className="text-[10px] text-amber-600 font-bold italic bg-amber-50 px-2 py-1 rounded border border-amber-100">
+                                    Report access will be enabled after admin approval.
+                                </p>
                             )}
-                            <Button className="flex items-center gap-2 px-6 py-2 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg shadow-none cursor-default font-medium hover:bg-emerald-50">
-                                <CheckCircle2 className="w-4 h-4" /> Applied
-                            </Button>
                         </div>
                     ) : (
                         <Button
-                            onClick={handleApply}
+                            onClick={handleApplyClick}
                             disabled={isApplying}
                             className="flex items-center gap-2 px-6 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 font-medium shadow-sm"
                         >
@@ -318,6 +356,13 @@ export default function OpportunityDetailsPage() {
                     </div>
                 </div>
             </div>
+
+            <ReportSummaryPopup 
+                isOpen={isPopupOpen}
+                onClose={() => setIsPopupOpen(false)}
+                onApply={handleApplyFromPopup}
+                isSubmitting={isApplying}
+            />
         </div>
     );
 

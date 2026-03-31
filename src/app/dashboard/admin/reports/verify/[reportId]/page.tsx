@@ -57,10 +57,17 @@ export default function AdminReportDetailPage() {
     const [loading, setLoading] = useState(true);
     const [feedback, setFeedback] = useState('');
     const [isVerifying, setIsVerifying] = useState(false);
+    const [showStickyActions, setShowStickyActions] = useState(false);
     const [qualityAlerts, setQualityAlerts] = useState<QualityAlert[]>([]);
 
     useEffect(() => {
         fetchReportDetail();
+        
+        const handleScroll = () => {
+            setShowStickyActions(window.scrollY > 600);
+        };
+        window.addEventListener('scroll', handleScroll);
+        return () => window.removeEventListener('scroll', handleScroll);
     }, [params.reportId]);
 
     const fetchReportDetail = async () => {
@@ -699,7 +706,7 @@ export default function AdminReportDetailPage() {
                         <CheckCircle2 className="w-32 h-32" />
                     </div>
                     <div className="relative z-10">
-                        <h3 className="text-3xl font-black text-slate-900 mb-2">Impact Decision Hub</h3>
+                        <h3 className="text-3xl font-black text-slate-900 mb-2">Student Report Approval</h3>
                         <p className="text-slate-500 font-medium mb-8">Review all sections above before making a final determination on this impact report.</p>
 
                         <div className="space-y-6">
@@ -761,6 +768,48 @@ export default function AdminReportDetailPage() {
                     </div>
                 </div>
             </div>
+
+            {/* Sticky Action Bar for quick access while scrolling */}
+            {showStickyActions && !isVerifying && report.admin_status !== 'approved' && (
+                <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-bottom-10 fade-in duration-500 w-full max-w-3xl px-6">
+                    <div className="bg-slate-900/90 backdrop-blur-xl border border-white/10 shadow-2xl rounded-[2.5rem] p-4 flex items-center justify-between gap-6 ring-1 ring-white/20">
+                        <div className="flex items-center gap-4 ml-4">
+                            <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white font-black text-sm border-2 border-white/20">
+                                {report.student.name.charAt(0)}
+                            </div>
+                            <div className="hidden md:block">
+                                <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest leading-none mb-1">Approval Context</p>
+                                <p className="text-sm font-bold text-white truncate max-w-[200px]">{report.student.name}</p>
+                            </div>
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                            <button
+                                onClick={() => handleVerify('approve')}
+                                className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-full text-xs font-black uppercase tracking-widest transition-all hover:scale-105 active:scale-95 shadow-lg shadow-emerald-900/20 flex items-center gap-2"
+                            >
+                                <CheckCircle2 className="w-3.5 h-3.5" /> Approve
+                            </button>
+                            <button
+                                onClick={() => handleVerify('reject')}
+                                className="px-6 py-2.5 bg-white/10 hover:bg-white/20 text-white rounded-full text-xs font-black uppercase tracking-widest transition-all hover:scale-105 active:scale-95 flex items-center gap-2"
+                            >
+                                <XCircle className="w-3.5 h-3.5 text-red-400" /> Reject
+                            </button>
+                            <button
+                                onClick={() => {
+                                    const el = document.getElementById('actions');
+                                    el?.scrollIntoView({ behavior: 'smooth' });
+                                }}
+                                className="p-2.5 bg-white/5 hover:bg-white/10 text-white rounded-full transition-all"
+                                title="Add Feedback & More Options"
+                            >
+                                <MessageSquare className="w-4 h-4" />
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

@@ -217,7 +217,7 @@ export default function AdminApprovalsPage() {
                     className={`pb-4 px-2 text-sm font-bold transition-colors relative ${activeTab === "registrations" ? "text-blue-600" : "text-slate-500 hover:text-slate-700"}`}
                 >
                     <div className="flex items-center gap-2">
-                        <UserPlus className="w-4 h-4" /> User Registrations
+                        <UserPlus className="w-4 h-4" /> User & Participation Requests
                         <span className="bg-red-100 text-red-600 text-xs px-2 py-0.5 rounded-full">{pendingUsers.length}</span>
                     </div>
                     {activeTab === "registrations" && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-blue-600 rounded-t-full"></div>}
@@ -240,8 +240,14 @@ export default function AdminApprovalsPage() {
                         <div key={req.id} className="bg-white p-6 rounded-xl border border-slate-100 shadow-sm flex items-center justify-between">
                             <div>
                                 <h3 className="text-lg font-bold text-slate-900">{req.name}</h3>
-                                <div className="flex items-center gap-4 text-sm text-slate-500 mt-1">
-                                    <span className="bg-slate-100 px-2 py-0.5 rounded text-slate-700 font-medium">{req.organization_type || "User"}</span>
+                                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-slate-500 mt-1">
+                                    <span className="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded font-bold text-[10px] uppercase tracking-wider">{req.organization_type || "User"}</span>
+                                    {req.opportunity && (
+                                        <span className="font-bold text-slate-700 flex items-center gap-1">
+                                            <FileText className="w-3.5 h-3.5 text-blue-500" />
+                                            {req.opportunity}
+                                        </span>
+                                    )}
                                     <span>{req.email}</span>
                                     <span>• Applied: {req.created_at ? new Date(req.created_at).toLocaleDateString() : "N/A"}</span>
                                 </div>
@@ -255,7 +261,7 @@ export default function AdminApprovalsPage() {
                                 <button
                                     onClick={() => handleApprove(req.id, 'user')}
                                     className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold hover:bg-blue-700 flex items-center gap-2 transition-colors shadow-lg shadow-blue-200">
-                                    <CheckCircle className="w-4 h-4" /> Approve for Onboarding
+                                    <CheckCircle className="w-4 h-4" /> {req.opportunity ? 'Approve Participation' : 'Approve User'}
                                 </button>
                             </div>
                         </div>

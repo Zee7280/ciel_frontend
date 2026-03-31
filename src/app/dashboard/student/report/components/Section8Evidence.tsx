@@ -119,473 +119,883 @@ export default function Section8Evidence() {
         <div className="space-y-12 pb-16">
             {/* ─── Header ─────────────────────────────────────────────────── */}
             <div className="flex items-center gap-4">
-                <div className="w-14 h-14 rounded-2xl bg-report-primary text-white flex items-center justify-center shadow-xl shadow-report-primary-shadow ring-4 ring-report-primary-soft">
+
+                <div className="w-14 h-14 rounded-xl bg-report-primary text-white flex items-center justify-center shadow-md ring-4 ring-report-primary-soft">
                     <ShieldCheck className="w-7 h-7" />
                 </div>
-                <div>
-                    <h2 className="report-h2">Section 8 — Evidence & Verification</h2>
-                    <p className="report-label">Proof of Activity & Credibility Layer</p>
-                </div>
-            </div>
 
+                <div className="space-y-0.5">
+
+                    <h2 className="text-xl font-semibold text-slate-900">
+                        Section 8 — Evidence & Verification
+                    </h2>
+
+                    <p className="text-sm text-slate-500">
+                        Proof of Activity & Credibility Layer
+                    </p>
+
+                </div>
+
+            </div>
             {/* ─── Purpose note ────────────────────────────────────────────── */}
-            <div className="p-5 bg-report-primary-soft border border-report-primary-border rounded-2xl flex items-start gap-4">
+            <div className="p-4 bg-report-primary-soft border border-report-primary-border rounded-xl flex items-start gap-3">
                 <Info className="w-5 h-5 text-report-primary shrink-0 mt-0.5" />
-                <div className="space-y-2">
-                    <p className="report-label !text-report-primary">
+
+                <div className="space-y-1">
+                    <p className="text-sm font-semibold text-report-primary">
                         This section confirms that your reported work is Verifiable, Ethical, Traceable, and Audit-ready.
                     </p>
-                    <p className="report-help !text-report-primary">
-                        It strengthens your report for University documentation, HEC audit, QS impact submissions, Government reporting, and SDG contribution validation. This is the credibility layer of your project.
+
+                    <p className="text-sm text-report-primary">
+                        It strengthens your report for University documentation, HEC audit, QS impact submissions,
+                        Government reporting, and SDG contribution validation. This is the credibility layer of your project.
                     </p>
                 </div>
             </div>
 
-            {/* ─── Step 1: Evidence Submission (Upload) ──────────────────────── */}
-            <div className="space-y-4">
+
+
+            {/* ─── Step 1: Evidence Submission ───────────────────── */}
+            <div className="space-y-6">
+
                 <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-report-primary text-white flex items-center justify-center font-black text-[10px]">8.1</div>
-                    <h3 className="report-h3">Step 1 — Upload Evidence (Mandatory)</h3>
-                </div>
-                <div className="bg-white rounded-[2.5rem] border-2 border-slate-100 p-8 shadow-sm space-y-6">
-                    <div className="space-y-1">
-                        <Label className="report-h3 !text-sm">Do you have evidence to upload?</Label>
-                        <p className="report-help">Selecting 'No' will bypass evidence requirements, but may affect report credibility.</p>
+
+                    <div className="w-8 h-8 rounded-full bg-report-primary text-white flex items-center justify-center text-[11px] font-semibold">
+                        8.1
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pb-4">
+
+                    <h3 className="text-base font-semibold text-slate-900">
+                        Step 1 — Upload Evidence (Mandatory)
+                    </h3>
+
+                </div>
+
+
+
+                <div className="bg-white rounded-xl border border-slate-200 p-8 shadow-sm space-y-6">
+
+                    <div className="space-y-1">
+                        <Label className="text-sm font-semibold text-slate-800">
+                            Do you have evidence to upload?
+                        </Label>
+
+                        <p className="text-sm text-slate-500">
+                            Selecting "No" will bypass evidence requirements, but may affect report credibility.
+                        </p>
+                    </div>
+
+
+
+                    {/* OPTION BUTTONS */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
                         <button
                             type="button"
                             onClick={() => update('has_evidence', 'no')}
                             className={clsx(
-                                "p-6 rounded-2xl border-2 text-left transition-all space-y-2",
+                                "p-5 rounded-lg border text-left transition",
                                 section8.has_evidence === 'no'
-                                    ? "border-amber-600 bg-amber-50 shadow-sm"
-                                    : "border-slate-100 bg-slate-50 text-slate-600 hover:border-slate-300"
+                                    ? "border-amber-500 bg-amber-50"
+                                    : "border-slate-200 bg-slate-50 text-slate-600 hover:border-slate-400"
                             )}
                         >
-                            <p className={clsx("font-bold text-sm", section8.has_evidence === 'no' ? "text-amber-700" : "text-slate-700")}>⭕ No — I do not have evidence</p>
+                            <p className={clsx(
+                                "text-sm font-semibold",
+                                section8.has_evidence === 'no'
+                                    ? "text-amber-700"
+                                    : "text-slate-700"
+                            )}>
+                                No — I do not have evidence
+                            </p>
                         </button>
+
+
+
                         <button
                             type="button"
                             onClick={() => update('has_evidence', 'yes')}
                             className={clsx(
-                                "p-6 rounded-2xl border-2 text-left transition-all space-y-2",
+                                "p-5 rounded-lg border text-left transition",
                                 section8.has_evidence === 'yes'
-                                    ? "border-report-primary bg-report-primary-soft shadow-sm"
-                                    : "border-slate-100 bg-slate-50 text-slate-600 hover:border-report-primary-border"
+                                    ? "border-report-primary bg-report-primary-soft"
+                                    : "border-slate-200 bg-slate-50 text-slate-600 hover:border-report-primary"
                             )}
                         >
-                            <p className={clsx("font-bold text-sm", section8.has_evidence === 'yes' ? "text-report-primary" : "text-slate-700")}>⭕ Yes — I have evidence to upload</p>
+                            <p className={clsx(
+                                "text-sm font-semibold",
+                                section8.has_evidence === 'yes'
+                                    ? "text-report-primary"
+                                    : "text-slate-700"
+                            )}>
+                                Yes — I have evidence to upload
+                            </p>
                         </button>
+
                     </div>
+
+
 
                     {section8.has_evidence === 'yes' && (
                         <>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-4 bg-slate-50 rounded-2xl border border-slate-100">
+
+                            {/* GUIDELINES */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-5 bg-slate-50 rounded-lg border border-slate-200">
+
                                 <div className="space-y-2">
-                                    <p className="report-label !text-slate-600">Accepted Formats</p>
-                                    <ul className="text-xs font-semibold text-slate-500 space-y-1 list-disc list-inside">
+
+                                    <p className="text-xs font-semibold text-slate-600 uppercase">
+                                        Accepted Formats
+                                    </p>
+
+                                    <ul className="text-sm text-slate-500 space-y-1 list-disc list-inside">
                                         <li>JPG / PNG (Photos)</li>
                                         <li>MP4 (Short videos)</li>
-                                        <li>PDF (Attendance sheets, reports, structured documents)</li>
-                                        <li>Official letters & Email confirmations</li>
-                                        <li>Media coverage links (can be included in description)</li>
+                                        <li>PDF (Attendance sheets, reports, documents)</li>
+                                        <li>Official letters & email confirmations</li>
+                                        <li>Media coverage links</li>
                                     </ul>
+
                                 </div>
+
+
+
                                 <div className="space-y-2">
-                                    <p className="report-label !text-slate-600">What Your Evidence Should Show</p>
-                                    <ul className="text-xs font-semibold text-slate-500 space-y-1 list-disc list-inside">
+
+                                    <p className="text-xs font-semibold text-slate-600 uppercase">
+                                        Evidence Should Show
+                                    </p>
+
+                                    <ul className="text-sm text-slate-500 space-y-1 list-disc list-inside">
                                         <li>The activity took place</li>
                                         <li>You participated</li>
                                         <li>Beneficiaries were engaged</li>
                                         <li>Outputs were delivered</li>
                                     </ul>
-                                    <p className="text-[9px] font-black text-red-500 uppercase flex items-center gap-1 mt-2">
-                                        <AlertCircle className="w-3 h-3" /> Do not upload unrelated or misleading material
+
+                                    <p className="text-xs font-semibold text-red-500 flex items-center gap-1 mt-2">
+                                        <AlertCircle className="w-3 h-3" /> Do not upload unrelated material
                                     </p>
+
                                 </div>
+
                             </div>
+
+
+
+                            {/* FILE UPLOAD */}
                             <FileUpload
                                 label="Drag & Drop Files or Click to Browse"
                                 onChange={(e) => {
                                     if (e.target.files) {
-                                        update('evidence_files', [...(evidence_files || []), ...Array.from(e.target.files)]);
+                                        update('evidence_files', [
+                                            ...(evidence_files || []),
+                                            ...Array.from(e.target.files)
+                                        ])
                                     }
                                 }}
                             />
+
                             <FieldError message={getFieldError('section8.evidence_files')} />
 
-                            {/* Evidence Files List */}
+
+
+                            {/* FILE LIST */}
                             {evidence_files && evidence_files.length > 0 && (
-                                <div className="space-y-3 animate-in fade-in slide-in-from-top-2">
-                                    <Label className="report-label">Attached Evidence ({evidence_files.length})</Label>
+                                <div className="space-y-3">
+
+                                    <Label className="text-sm font-semibold text-slate-700">
+                                        Attached Evidence ({evidence_files.length})
+                                    </Label>
+
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+
                                         {evidence_files.map((file: File, fIdx: number) => (
-                                            <div key={fIdx} className="flex items-center justify-between p-3 bg-slate-50 border border-slate-100 rounded-xl group/file">
+                                            <div
+                                                key={fIdx}
+                                                className="flex items-center justify-between p-3 bg-slate-50 border border-slate-200 rounded-lg"
+                                            >
+
                                                 <div className="flex items-center gap-3 overflow-hidden">
-                                                    <div className="w-8 h-8 rounded-lg bg-report-primary-soft text-report-primary flex items-center justify-center shrink-0">
+
+                                                    <div className="w-8 h-8 rounded-md bg-report-primary-soft text-report-primary flex items-center justify-center shrink-0">
                                                         <ImageIcon className="w-4 h-4" />
                                                     </div>
+
                                                     <div className="overflow-hidden">
-                                                        <p className="text-xs font-bold text-slate-700 truncate">{file.name}</p>
-                                                        <p className="text-[9px] font-medium text-slate-400 uppercase">{(file.size / (1024 * 1024)).toFixed(2)} MB</p>
+
+                                                        <p className="text-sm font-semibold text-slate-700 truncate">
+                                                            {file.name}
+                                                        </p>
+
+                                                        <p className="text-xs text-slate-400">
+                                                            {(file.size / (1024 * 1024)).toFixed(2)} MB
+                                                        </p>
+
                                                     </div>
+
                                                 </div>
+
+
+
                                                 <button
                                                     type="button"
                                                     onClick={() => {
-                                                        const kept = evidence_files.filter((_: any, i: number) => i !== fIdx);
-                                                        update('evidence_files', kept);
+                                                        const kept = evidence_files.filter((_: any, i: number) => i !== fIdx)
+                                                        update('evidence_files', kept)
                                                     }}
-                                                    className="w-7 h-7 rounded-lg bg-white text-slate-400 flex items-center justify-center hover:bg-red-50 hover:text-red-500 transition-all border border-slate-100"
+                                                    className="w-7 h-7 rounded-md bg-white border border-slate-200 text-slate-400 hover:bg-red-50 hover:text-red-500 transition"
                                                 >
                                                     <Trash2 className="w-3.5 h-3.5" />
                                                 </button>
+
                                             </div>
                                         ))}
+
                                     </div>
+
                                 </div>
                             )}
-                            <div className="flex items-center justify-between px-2">
-                                <span className="report-label">Upload Status</span>
+
+
+
+                            {/* STATUS */}
+                            <div className="flex items-center justify-between pt-2">
+
+                                <span className="text-xs text-slate-500">
+                                    Upload Status
+                                </span>
+
                                 {evidence_files?.length ? (
-                                    <span className="text-[10px] font-black text-report-primary bg-report-primary-soft px-3 py-1 rounded-lg border border-report-primary-border flex items-center gap-1.5">
-                                        <CheckCircle2 className="w-3.5 h-3.5" /> {evidence_files.length} Files Attached
+                                    <span className="text-xs font-semibold text-report-primary bg-report-primary-soft px-3 py-1 rounded-md flex items-center gap-1">
+                                        <CheckCircle2 className="w-3.5 h-3.5" />
+                                        {evidence_files.length} Files Attached
                                     </span>
                                 ) : (
-                                    <span className="text-[10px] font-black text-amber-600 bg-amber-50 px-3 py-1 rounded-lg border border-amber-100 flex items-center gap-1.5">
-                                        <AlertCircle className="w-3.5 h-3.5" /> Missing Evidence
+                                    <span className="text-xs font-semibold text-amber-600 bg-amber-50 px-3 py-1 rounded-md flex items-center gap-1">
+                                        <AlertCircle className="w-3.5 h-3.5" />
+                                        Missing Evidence
                                     </span>
                                 )}
+
                             </div>
+
                         </>
                     )}
+
                 </div>
+
             </div>
 
             {/* ─── Step 2: Classify Evidence ─────────────────────────────────── */}
-            <div className="space-y-4">
-                <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-report-primary text-white flex items-center justify-center font-black text-[10px]">8.2</div>
-                    <h3 className="report-h3">Step 2 — Classify the Evidence (Required)</h3>
-                </div>
-                <div className="bg-white rounded-[2.5rem] border-2 border-slate-100 p-8 shadow-sm space-y-6">
-                    <div className="space-y-1">
-                        <Label className="report-h3 !text-sm">Evidence Type</Label>
-                        <p className="report-help">Select all categories that apply (At least one required).</p>
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        {evidenceOptions.map(opt => (
-                            <button
-                                key={opt.id} type="button"
-                                onClick={() => toggleEvidenceType(opt.id)}
-                                className={clsx(
-                                    "flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all text-left",
-                                    (evidence_types || []).includes(opt.id)
-                                        ? "border-report-primary bg-report-primary-soft text-report-primary shadow-sm shadow-report-primary-shadow"
-                                        : "border-slate-100 bg-slate-50 text-slate-600 hover:border-report-primary-border hover:bg-white"
-                                )}
-                            >
-                                <div className={clsx(
-                                    "w-4 h-4 rounded-sm border-2 flex items-center justify-center flex-shrink-0",
-                                    (evidence_types || []).includes(opt.id) ? "border-report-primary bg-report-primary" : "border-slate-300 bg-white"
-                                )}>
-                                    {(evidence_types || []).includes(opt.id) && <CheckCircle2 className="w-3 h-3 text-white" />}
-                                </div>
-                                <opt.icon className="w-4 h-4 opacity-50 flex-shrink-0" />
-                                <span className="report-label">{opt.id}</span>
-                            </button>
-                        ))}
-                    </div>
-                    <FieldError message={getFieldError('section8.evidence_types')} />
-                </div>
-            </div>
+            <div className="space-y-6">
 
-            {/* ─── Step 3: Describe Evidence ─────────────────────────────────── */}
-            <div className="space-y-4">
                 <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-report-primary text-white flex items-center justify-center font-black text-[10px]">8.3</div>
-                    <h3 className="report-h3">Step 3 — Describe the Evidence</h3>
+                    <div className="w-8 h-8 rounded-full bg-report-primary text-white flex items-center justify-center text-[11px] font-semibold">
+                        8.2
+                    </div>
+                    <h3 className="text-base font-semibold text-slate-900">
+                        Step 2 — Classify the Evidence (Required)
+                    </h3>
                 </div>
-                <div className="bg-white rounded-[2.5rem] border-2 border-slate-100 p-8 shadow-sm space-y-4">
+
+
+                <div className="bg-white rounded-xl border border-slate-200 p-8 shadow-sm space-y-6">
+
                     <div className="space-y-1">
-                        <Label className="report-h3 !text-sm">Evidence Description (Mandatory)</Label>
-                        <p className="report-help max-w-2xl leading-relaxed">
-                            Briefly explain what this evidence shows, how it relates to your activity, and what it verifies (attendance, outputs, outcomes, resource use).
+                        <Label className="text-sm font-semibold text-slate-800">
+                            Evidence Type
+                        </Label>
+
+                        <p className="text-sm text-slate-500">
+                            Select all categories that apply (at least one required).
                         </p>
                     </div>
+
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+
+                        {evidenceOptions.map(opt => (
+                            <button
+                                key={opt.id}
+                                type="button"
+                                onClick={() => toggleEvidenceType(opt.id)}
+                                className={clsx(
+                                    "flex items-center gap-3 px-4 py-3 rounded-lg border transition text-left",
+                                    (evidence_types || []).includes(opt.id)
+                                        ? "border-report-primary bg-report-primary-soft text-report-primary"
+                                        : "border-slate-200 bg-slate-50 text-slate-600 hover:border-report-primary"
+                                )}
+                            >
+
+                                <div
+                                    className={clsx(
+                                        "w-4 h-4 rounded border flex items-center justify-center shrink-0",
+                                        (evidence_types || []).includes(opt.id)
+                                            ? "bg-report-primary border-report-primary"
+                                            : "border-slate-300 bg-white"
+                                    )}
+                                >
+                                    {(evidence_types || []).includes(opt.id) &&
+                                        <CheckCircle2 className="w-3 h-3 text-white" />
+                                    }
+                                </div>
+
+                                <opt.icon className="w-4 h-4 opacity-60 shrink-0" />
+
+                                <span className="text-sm font-medium">
+                                    {opt.id}
+                                </span>
+
+                            </button>
+                        ))}
+
+                    </div>
+
+                    <FieldError message={getFieldError('section8.evidence_types')} />
+
+                </div>
+
+            </div>
+
+
+
+            {/* ─── Step 3: Describe Evidence ─────────────────────────────────── */}
+            <div className="space-y-6">
+
+                <div className="flex items-center gap-3">
+
+                    <div className="w-8 h-8 rounded-full bg-report-primary text-white flex items-center justify-center text-[11px] font-semibold">
+                        8.3
+                    </div>
+
+                    <h3 className="text-base font-semibold text-slate-900">
+                        Step 3 — Describe the Evidence
+                    </h3>
+
+                </div>
+
+
+
+                <div className="bg-white rounded-xl border border-slate-200 p-8 shadow-sm space-y-6">
+
+                    <div className="space-y-1">
+
+                        <Label className="text-sm font-semibold text-slate-800">
+                            Evidence Description (Mandatory)
+                        </Label>
+
+                        <p className="text-sm text-slate-500 max-w-2xl leading-relaxed">
+                            Briefly explain what this evidence shows, how it relates to your activity,
+                            and what it verifies (attendance, outputs, outcomes, resource use).
+                        </p>
+
+                    </div>
+
+
+
                     <textarea
                         placeholder="Example: The uploaded photos show students conducting hygiene awareness sessions at a community school. The attendance sheet confirms 60 participants across three sessions. The presentation slides demonstrate the structured content delivered."
                         value={description}
                         onChange={e => update('description', e.target.value)}
                         rows={4}
-                        className="w-full h-32 bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 font-medium text-slate-700 text-sm outline-none focus:border-report-primary-border transition-all resize-none"
+                        className="w-full min-h-[140px] bg-slate-50 border border-slate-200 rounded-lg px-5 py-4 text-sm text-slate-700 outline-none focus:border-report-primary transition resize-none"
                     />
-                    <div className="flex items-center justify-between px-2">
-                        <span className={clsx(
-                            "report-label",
-                            wordCount >= 100 && wordCount <= 200 ? "text-report-primary" : wordCount > 200 ? "text-red-500" : "text-amber-500"
-                        )}>
+
+
+
+                    <div className="flex items-center justify-between">
+
+                        <span
+                            className={clsx(
+                                "text-xs font-medium",
+                                wordCount >= 100 && wordCount <= 200
+                                    ? "text-report-primary"
+                                    : wordCount > 200
+                                        ? "text-red-500"
+                                        : "text-amber-600"
+                            )}
+                        >
                             {wordCount} / 200 words (Min 100)
                         </span>
+
+
                         {wordCount >= 100 && wordCount <= 200 && (
-                            <span className="text-[10px] font-black text-report-primary flex items-center gap-1">
+                            <span className="text-xs font-semibold text-report-primary flex items-center gap-1">
                                 <CheckCircle2 className="w-3 h-3" /> Valid length
                             </span>
                         )}
-                    </div>
-                    <FieldError message={getFieldError('section8.description')} />
-                </div>
-            </div>
 
-            {/* ─── Step 4: Ethical Compliance ────────────────────────────────── */}
-            <div className="space-y-4">
-                <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-report-primary text-white flex items-center justify-center font-black text-[10px]">8.4</div>
-                    <h3 className="report-h3">Step 4 — Ethical & Consent Confirmation</h3>
-                </div>
-                <div className="bg-white rounded-[2.5rem] border-2 border-slate-100 p-8 shadow-sm space-y-6">
-                    <div className="space-y-1">
-                        <Label className="report-h3 !text-sm">Ethical Declaration (All required)</Label>
-                        <p className="report-label !text-report-primary !flex items-center gap-1">
-                            <AlertCircle className="w-3 h-3" /> False or misleading submissions may result in rejection and institutional action.
-                        </p>
                     </div>
-                    <div className="grid grid-cols-1 gap-3">
+
+
+
+                    <FieldError message={getFieldError('section8.description')} />
+
+                </div>
+
+            </div>
+            {/* ─── Step 4: Ethical Compliance ────────────────────────────────── */}
+            <div className="space-y-6">
+
+                <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-report-primary text-white flex items-center justify-center text-[11px] font-semibold">
+                        8.4
+                    </div>
+                    <h3 className="text-base font-semibold text-slate-900">
+                        Step 4 — Ethical & Consent Confirmation
+                    </h3>
+                </div>
+
+
+                <div className="bg-white rounded-xl border border-slate-200 p-8 shadow-sm space-y-6">
+
+                    <div className="space-y-1">
+
+                        <Label className="text-sm font-semibold text-slate-800">
+                            Ethical Declaration (All required)
+                        </Label>
+
+                        <p className="text-sm text-report-primary flex items-center gap-2">
+                            <AlertCircle className="w-4 h-4" />
+                            False or misleading submissions may result in rejection and institutional action.
+                        </p>
+
+                    </div>
+
+
+
+                    <div className="grid gap-3">
+
                         {ethicalOptions.map(opt => {
+
                             const isChecked = !!ethical_compliance?.[opt.key as keyof typeof ethical_compliance];
+
                             return (
                                 <button
-                                    key={opt.key} type="button"
+                                    key={opt.key}
+                                    type="button"
                                     onClick={() => updateEthical(opt.key, !isChecked)}
                                     className={clsx(
-                                        "flex items-start gap-4 px-5 py-4 rounded-xl border-2 transition-all text-left",
-                                        isChecked ? "border-report-primary bg-report-primary-soft shadow-sm shadow-report-primary-shadow" : "border-slate-100 bg-slate-50 hover:bg-white hover:border-slate-300"
+                                        "flex items-start gap-4 px-5 py-4 rounded-lg border transition text-left",
+                                        isChecked
+                                            ? "border-report-primary bg-report-primary-soft"
+                                            : "border-slate-200 bg-slate-50 hover:border-slate-400"
                                     )}
                                 >
-                                    <div className={clsx(
-                                        "w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 mt-0.5 transition-all",
-                                        isChecked ? "border-report-primary bg-report-primary" : "border-slate-300 bg-white"
-                                    )}>
+
+                                    <div
+                                        className={clsx(
+                                            "w-5 h-5 rounded border flex items-center justify-center mt-0.5",
+                                            isChecked
+                                                ? "bg-report-primary border-report-primary"
+                                                : "border-slate-300 bg-white"
+                                        )}
+                                    >
                                         {isChecked && <CheckCircle2 className="w-4 h-4 text-white" />}
                                     </div>
-                                    <div className="space-y-1">
-                                        <p className="text-xs font-black text-slate-900 uppercase tracking-widest">{opt.desc}</p>
-                                    </div>
+
+
+                                    <p className="text-sm font-medium text-slate-800">
+                                        {opt.desc}
+                                    </p>
+
                                 </button>
                             );
+
                         })}
+
                     </div>
+
                 </div>
+
             </div>
 
+
+
             {/* ─── Step 5: Visibility Preference ─────────────────────────────── */}
-            <div className="space-y-4">
+            <div className="space-y-6">
+
                 <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-report-primary text-white flex items-center justify-center font-black text-[10px]">8.5</div>
-                    <h3 className="report-h3">Step 5 — Media Visibility Preference</h3>
+
+                    <div className="w-8 h-8 rounded-full bg-report-primary text-white flex items-center justify-center text-[11px] font-semibold">
+                        8.5
+                    </div>
+
+                    <h3 className="text-base font-semibold text-slate-900">
+                        Step 5 — Media Visibility Preference
+                    </h3>
+
                 </div>
-                <div className="bg-white rounded-[2.5rem] border-2 border-slate-100 p-8 shadow-sm space-y-6">
-                    <Label className="report-h3 !text-sm">Evidence Usage Permission</Label>
+
+
+
+                <div className="bg-white rounded-xl border border-slate-200 p-8 shadow-sm space-y-6">
+
+                    <Label className="text-sm font-semibold text-slate-800">
+                        Evidence Usage Permission
+                    </Label>
+
+
+
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+
                         {visibilityOptions.map(opt => (
+
                             <button
-                                key={opt.id} type="button"
+                                key={opt.id}
+                                type="button"
                                 onClick={() => update('media_visible', opt.id)}
                                 className={clsx(
-                                    "p-6 rounded-2xl border-2 text-left transition-all relative overflow-hidden",
-                                    media_visible === opt.id ? opt.color : "bg-slate-50 border-slate-100 text-slate-500 hover:border-slate-300"
+                                    "p-5 rounded-lg border text-left transition relative overflow-hidden",
+                                    media_visible === opt.id
+                                        ? opt.color
+                                        : "bg-slate-50 border-slate-200 text-slate-600 hover:border-slate-400"
                                 )}
                             >
-                                <div className="flex items-center gap-3 mb-3">
+
+                                <div className="flex items-center gap-3 mb-2">
                                     <opt.icon className="w-5 h-5" />
-                                    <p className="text-xs font-black uppercase tracking-widest">{opt.label}</p>
+                                    <p className="text-sm font-semibold">
+                                        {opt.label}
+                                    </p>
                                 </div>
-                                <p className="text-[9px] font-bold opacity-80 leading-relaxed uppercase pr-6">{opt.desc}</p>
+
+                                <p className="text-xs opacity-80 leading-relaxed">
+                                    {opt.desc}
+                                </p>
+
+
                                 {media_visible === opt.id && (
-                                    <div className="absolute top-6 right-6 w-2 h-2 rounded-full bg-current animate-pulse" />
+                                    <div className="absolute top-4 right-4 w-2 h-2 rounded-full bg-current animate-pulse" />
                                 )}
+
                             </button>
+
                         ))}
+
                     </div>
+
                     <FieldError message={getFieldError('section8.media_visible')} />
+
                 </div>
+
             </div>
 
             {/* ─── Step 6: External Confirmation ─────────────────────────────── */}
-            <div className="space-y-4">
+            <div className="space-y-6">
+
                 <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-report-primary text-white flex items-center justify-center font-black text-[10px]">8.6</div>
-                    <h3 className="report-h3">Step 6 — Partner Verification (Optional)</h3>
+                    <div className="w-8 h-8 rounded-full bg-report-primary text-white flex items-center justify-center text-[11px] font-semibold">
+                        8.6
+                    </div>
+
+                    <h3 className="text-base font-semibold text-slate-900">
+                        Step 6 — Partner Verification (Optional)
+                    </h3>
                 </div>
-                <div className="bg-white rounded-[2.5rem] border-2 border-slate-100 p-8 shadow-sm space-y-6">
+
+
+                <div className="bg-white rounded-xl border border-slate-200 p-8 shadow-sm space-y-6">
+
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+
                         <div className="space-y-1">
-                            <Label className="report-h3 !text-sm">Did a partner verify this project?</Label>
-                            <p className="report-help">External verification significantly strengthens credibility.</p>
+                            <Label className="text-sm font-semibold text-slate-800">
+                                Did a partner verify this project?
+                            </Label>
+
+                            <p className="text-sm text-slate-500">
+                                External verification significantly strengthens credibility.
+                            </p>
                         </div>
-                        <div className="flex bg-slate-50 p-1.5 rounded-2xl border-2 border-slate-100 gap-1.5 min-w-[200px]">
+
+
+                        <div className="flex bg-slate-50 p-1 rounded-lg border border-slate-200 gap-1 min-w-[200px]">
+
                             <button
-                                type="button" onClick={() => update('partner_verification', false)}
-                                className={clsx("flex-1 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all", !partner_verification ? "bg-white shadow-md text-slate-900" : "text-slate-400 hover:text-slate-600")}
+                                type="button"
+                                onClick={() => update('partner_verification', false)}
+                                className={clsx(
+                                    "flex-1 py-2 text-xs font-semibold rounded-md transition",
+                                    !partner_verification
+                                        ? "bg-white text-slate-900 shadow"
+                                        : "text-slate-400 hover:text-slate-600"
+                                )}
                             >
                                 No
                             </button>
+
                             <button
-                                type="button" onClick={() => update('partner_verification', true)}
-                                className={clsx("flex-1 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all", partner_verification ? "bg-report-primary shadow-md shadow-report-primary-shadow text-white" : "text-slate-400 hover:text-slate-600")}
+                                type="button"
+                                onClick={() => update('partner_verification', true)}
+                                className={clsx(
+                                    "flex-1 py-2 text-xs font-semibold rounded-md transition",
+                                    partner_verification
+                                        ? "bg-report-primary text-white"
+                                        : "text-slate-400 hover:text-slate-600"
+                                )}
                             >
                                 Yes
                             </button>
+
                         </div>
+
                     </div>
 
+
+
                     {partner_verification && (
-                        <div className="pt-6 border-t-2 border-slate-50 space-y-6 animate-in fade-in slide-in-from-top-4 duration-500">
-                            <div className="space-y-3">
-                                <Label className="report-label">Verification Type</Label>
+                        <div className="pt-6 border-t border-slate-200 space-y-6">
+
+                            <div className="space-y-2">
+
+                                <Label className="text-sm font-semibold text-slate-700">
+                                    Verification Type
+                                </Label>
+
                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+
                                     {verificationTypes.map(v => (
                                         <button
-                                            key={v} type="button"
+                                            key={v}
+                                            type="button"
                                             onClick={() => update('partner_verification_type', v)}
                                             className={clsx(
-                                                "px-4 py-2 rounded-xl report-label transition-all text-center",
-                                                partner_verification_type === v ? "border-report-primary bg-report-primary-soft text-report-primary" : "border-slate-100 bg-slate-50 text-slate-500 hover:border-slate-300 hover:bg-white"
+                                                "px-3 py-2 text-xs rounded-md border transition",
+                                                partner_verification_type === v
+                                                    ? "border-report-primary bg-report-primary-soft text-report-primary"
+                                                    : "border-slate-200 bg-slate-50 text-slate-600 hover:border-slate-400"
                                             )}
                                         >
                                             {v}
                                         </button>
                                     ))}
+
                                 </div>
+
                             </div>
+
+
+
                             <FileUpload
                                 label="Upload Partner Verification Letter / Document"
                                 onChange={(e) => {
                                     if (e.target.files) {
-                                        update('partner_verification_files', [...(partner_verification_files || []), ...Array.from(e.target.files)]);
+                                        update(
+                                            'partner_verification_files',
+                                            [...(partner_verification_files || []), ...Array.from(e.target.files)]
+                                        );
                                     }
                                 }}
                             />
 
-                            {/* Partner Files List */}
+
                             {partner_verification_files && partner_verification_files.length > 0 && (
-                                <div className="space-y-3 animate-in fade-in slide-in-from-top-2">
-                                    <Label className="report-label">Partner Documents ({partner_verification_files.length})</Label>
+
+                                <div className="space-y-3">
+
+                                    <Label className="text-sm font-semibold text-slate-700">
+                                        Partner Documents ({partner_verification_files.length})
+                                    </Label>
+
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+
                                         {partner_verification_files.map((file: File, fIdx: number) => (
-                                            <div key={fIdx} className="flex items-center justify-between p-3 bg-report-primary-soft border border-report-primary-border rounded-xl group/file">
+
+                                            <div
+                                                key={fIdx}
+                                                className="flex items-center justify-between p-3 bg-report-primary-soft border border-report-primary-border rounded-lg"
+                                            >
+
                                                 <div className="flex items-center gap-3 overflow-hidden">
-                                                    <div className="w-8 h-8 rounded-lg bg-white text-report-primary flex items-center justify-center shrink-0 shadow-sm">
+
+                                                    <div className="w-8 h-8 rounded-md bg-white text-report-primary flex items-center justify-center">
                                                         <FileText className="w-4 h-4" />
                                                     </div>
+
                                                     <div className="overflow-hidden">
-                                                        <p className="text-xs font-bold text-report-primary truncate">{file.name}</p>
-                                                        <p className="text-[9px] font-medium text-report-primary-border uppercase">{(file.size / (1024 * 1024)).toFixed(2)} MB</p>
+                                                        <p className="text-sm font-semibold text-report-primary truncate">
+                                                            {file.name}
+                                                        </p>
+
+                                                        <p className="text-xs text-report-primary-border">
+                                                            {(file.size / (1024 * 1024)).toFixed(2)} MB
+                                                        </p>
                                                     </div>
+
                                                 </div>
+
+
+
                                                 <button
                                                     type="button"
                                                     onClick={() => {
                                                         const kept = partner_verification_files.filter((_: any, i: number) => i !== fIdx);
                                                         update('partner_verification_files', kept);
                                                     }}
-                                                    className="w-7 h-7 rounded-lg bg-white text-slate-400 flex items-center justify-center hover:bg-red-50 hover:text-red-500 transition-all border border-report-primary-border"
+                                                    className="w-7 h-7 rounded-md bg-white text-slate-400 hover:bg-red-50 hover:text-red-500 border border-report-primary-border flex items-center justify-center"
                                                 >
                                                     <Trash2 className="w-3.5 h-3.5" />
                                                 </button>
+
                                             </div>
+
                                         ))}
+
                                     </div>
+
                                 </div>
+
                             )}
+
                         </div>
                     )}
-                </div>
-            </div>
 
-            {/* ─── Auto-Generated System Analytics ────────────────────────────── */}
-            <div className="pt-8 border-t-2 border-slate-100 space-y-6">
+                </div>
+
+            </div>
+            {/* ─── System Evidence Status ────────────────────────────── */}
+            <div className="pt-10 border-t border-slate-200 space-y-6">
+
                 <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 rounded-xl bg-report-primary text-white flex items-center justify-center shadow-lg shadow-report-primary-shadow">
+
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-lg bg-report-primary text-white flex items-center justify-center">
                             <ShieldCheck className="w-5 h-5" />
                         </div>
-                        <h3 className="report-h3 !text-lg">System-Generated Evidence Status</h3>
+
+                        <h3 className="text-lg font-semibold text-slate-900">
+                            System-Generated Evidence Status
+                        </h3>
                     </div>
-                    <span className="px-3 py-1.5 bg-slate-100 rounded-xl text-[9px] font-black text-slate-500 uppercase tracking-widest">Read-Only</span>
+
+                    <span className="text-xs text-slate-500 bg-slate-100 px-3 py-1 rounded">
+                        Read-Only
+                    </span>
+
                 </div>
+
+
 
                 <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
-                    {/* Evidence Profile Grid */}
-                    <div className="md:col-span-8 bg-white border-2 border-slate-100 rounded-[2.5rem] p-8 space-y-6">
-                        <p className="report-label !text-slate-400 !mb-4">Evidence Profile</p>
+
+                    <div className="md:col-span-8 bg-white border border-slate-200 rounded-xl p-8 space-y-6">
+
+                        <p className="text-xs text-slate-400 uppercase">
+                            Evidence Profile
+                        </p>
+
                         <div className="grid grid-cols-2 gap-4">
-                            <div className="bg-report-primary-soft rounded-2xl p-5 space-y-1">
-                                <p className="text-2xl font-black text-report-primary">{evidence_files?.length || 0}</p>
-                                <p className="report-label !text-[8px] !text-report-primary-border">Files Submitted</p>
+
+                            <div className="bg-report-primary-soft rounded-lg p-5">
+                                <p className="text-2xl font-bold text-report-primary">
+                                    {evidence_files?.length || 0}
+                                </p>
+                                <p className="text-xs text-report-primary-border">
+                                    Files Submitted
+                                </p>
                             </div>
-                            <div className="bg-report-primary-soft rounded-2xl p-5 space-y-1">
-                                <p className="text-2xl font-black text-report-primary">{evidence_types?.length || 0}</p>
-                                <p className="report-label !text-[8px] !text-report-primary-border">Types Covered</p>
+
+                            <div className="bg-report-primary-soft rounded-lg p-5">
+                                <p className="text-2xl font-bold text-report-primary">
+                                    {evidence_types?.length || 0}
+                                </p>
+                                <p className="text-xs text-report-primary-border">
+                                    Types Covered
+                                </p>
                             </div>
-                            <div className={clsx("rounded-2xl p-5 space-y-1", allEthicalChecked ? "bg-report-primary-soft" : "bg-amber-50")}>
-                                <p className={clsx("text-2xl font-black", allEthicalChecked ? "text-report-primary" : "text-amber-700")}>{allEthicalChecked ? "Yes" : "No"}</p>
-                                <p className="report-label !text-[8px] !text-slate-500">Ethical Confirmed</p>
+
+                            <div className={clsx("rounded-lg p-5", allEthicalChecked ? "bg-report-primary-soft" : "bg-amber-50")}>
+                                <p className={clsx("text-2xl font-bold", allEthicalChecked ? "text-report-primary" : "text-amber-700")}>
+                                    {allEthicalChecked ? "Yes" : "No"}
+                                </p>
+                                <p className="text-xs text-slate-500">
+                                    Ethical Confirmed
+                                </p>
                             </div>
-                            <div className={clsx("rounded-2xl p-5 space-y-1", partner_verification ? "bg-report-primary-soft" : "bg-slate-50")}>
-                                <p className={clsx("text-2xl font-black", partner_verification ? "text-report-primary" : "text-slate-900")}>{partner_verification ? "Verified" : "None"}</p>
-                                <p className="report-label !text-[8px] !text-slate-500">Partner Status</p>
+
+                            <div className={clsx("rounded-lg p-5", partner_verification ? "bg-report-primary-soft" : "bg-slate-50")}>
+                                <p className={clsx("text-2xl font-bold", partner_verification ? "text-report-primary" : "text-slate-900")}>
+                                    {partner_verification ? "Verified" : "None"}
+                                </p>
+                                <p className="text-xs text-slate-500">
+                                    Partner Status
+                                </p>
                             </div>
+
                         </div>
+
                     </div>
 
-                    {/* Verification Strength */}
-                    <div className="md:col-span-4 flex flex-col gap-6">
-                        <div className={clsx("rounded-[2.5rem] p-8 border-2 flex-1 flex flex-col items-center justify-center text-center space-y-3", classification.color)}>
-                            <ShieldCheck className="w-8 h-8 opacity-80" />
-                            <div className="space-y-1">
-                                <p className="report-label !text-[9px] !opacity-60">Verification Strength</p>
-                                <p className="text-lg font-black uppercase tracking-tight">{classification.label}</p>
-                                <p className="report-label !text-[9px] !opacity-80 !pt-2">{classification.desc}</p>
-                            </div>
+
+
+                    <div className="md:col-span-4">
+
+                        <div className={clsx("rounded-xl border p-8 text-center space-y-2", classification.color)}>
+                            <ShieldCheck className="w-7 h-7 mx-auto opacity-70" />
+
+                            <p className="text-xs opacity-60">
+                                Verification Strength
+                            </p>
+
+                            <p className="text-lg font-semibold uppercase">
+                                {classification.label}
+                            </p>
+
+                            <p className="text-xs opacity-70">
+                                {classification.desc}
+                            </p>
+
                         </div>
+
                     </div>
+
                 </div>
 
             </div>
-
             {/* ─── Auto-Generated Summary ────────────────────────────── */}
-            <div className="pt-16 border-t-2 border-slate-100">
-                <div className="flex items-center justify-between mb-8">
-                    <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 rounded-xl bg-report-primary text-white flex items-center justify-center shadow-lg shadow-report-primary-shadow">
-                            <ShieldCheck className="w-6 h-6" />
-                        </div>
-                        <h3 className="report-h3 !text-xl !italic">Evidence Summary</h3>
-                    </div>
+            <div className="pt-12 border-t border-slate-200">
+
+                <div className="flex items-center justify-between mb-6">
+
                     <div className="flex items-center gap-3">
 
-                        <div className="px-5 py-2.5 rounded-xl bg-slate-900 text-white text-[10px] font-black uppercase tracking-widest border border-slate-800">
-                            Auto-Generated
+                        <div className="w-10 h-10 rounded-lg bg-report-primary text-white flex items-center justify-center">
+                            <ShieldCheck className="w-5 h-5" />
                         </div>
+
+                        <h3 className="text-lg font-semibold text-slate-900">
+                            Evidence Summary
+                        </h3>
+
                     </div>
+
+                    <span className="text-xs text-slate-500 bg-slate-100 px-3 py-1 rounded">
+                        Auto-Generated
+                    </span>
+
                 </div>
 
-                <div className="bg-white border-2 border-slate-200 rounded-[3rem] p-12 relative overflow-hidden shadow-xl space-y-10 group">
-                    <div className="absolute -bottom-10 -right-10 opacity-5 group-hover:opacity-10 transition-opacity duration-1000 rotate-12">
-                        <ShieldCheck className="w-80 h-80 text-slate-900" />
+
+
+                <div className="bg-white border border-slate-200 rounded-xl p-8 relative overflow-hidden">
+
+                    <div className="absolute -bottom-10 -right-10 opacity-5 rotate-12">
+                        <ShieldCheck className="w-64 h-64 text-slate-900" />
                     </div>
-                    <div className="relative z-10 space-y-6">
-                        <span className="absolute -top-10 -left-6 text-7xl font-serif text-slate-100 select-none">“</span>
-                        <p className="report-ai-text">
+
+
+                    <div className="relative z-10">
+
+                        <p className="text-sm text-slate-700 leading-relaxed">
                             {autoNarrative}
                         </p>
-                        <span className="absolute -bottom-16 -right-6 text-7xl font-serif text-slate-100 select-none rotate-180">“</span>
-                    </div>
-                </div>
-            </div>
 
+                    </div>
+
+                </div>
+
+            </div>
             {/* ─── Save ─────────────────────────────────────────────────────── */}
             <div className="flex justify-center pt-10">
                 <Button

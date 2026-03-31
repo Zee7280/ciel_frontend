@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { Flag, Eye, MessageSquare, AlertTriangle, CheckCircle } from "lucide-react";
 import { authenticatedFetch } from "@/utils/api";
+import Link from "next/link";
 
 export default function AdminReportsPage() {
     const [reports, setReports] = useState<any[]>([]);
@@ -84,7 +85,9 @@ export default function AdminReportsPage() {
                                         )}
                                     </td>
                                     <td className="p-6 text-right">
-                                        <button className="text-blue-600 hover:text-blue-800 font-bold text-sm mr-4">Review</button>
+                                        <Link href={`/dashboard/admin/reports/verify/${report.id}`}>
+                                            <button className="text-blue-600 hover:text-blue-800 font-bold text-sm mr-4">Review</button>
+                                        </Link>
                                         <button className="text-slate-400 hover:text-slate-600"><Eye className="w-5 h-5" /></button>
                                     </td>
                                 </tr>

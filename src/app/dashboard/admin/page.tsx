@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { authenticatedFetch } from "@/utils/api";
 import { Users, Briefcase, Clock, FileText, TrendingUp, AlertCircle, Building2, Eye, ArrowRight } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
+import Link from "next/link";
 
 export default function AdminDashboard() {
     const [data, setData] = useState<any>(null);
@@ -112,7 +113,9 @@ export default function AdminDashboard() {
                         <div className="text-4xl font-black text-slate-900 tracking-tight mb-2">{metrics?.opportunities?.toLocaleString() || 0}</div>
                         <div className="text-sm font-medium text-slate-500 leading-relaxed max-w-[80%]">Active volunteering & internship slots available.</div>
                         <div className="mt-auto pt-6">
-                            <button className="text-amber-600 font-bold text-sm flex items-center gap-2 hover:gap-3 transition-all group-hover:text-amber-700">View All <ArrowRight className="w-4 h-4" /></button>
+                            <Link href="/dashboard/admin/projects">
+                                <button className="text-amber-600 font-bold text-sm flex items-center gap-2 hover:gap-3 transition-all group-hover:text-amber-700">View All <ArrowRight className="w-4 h-4" /></button>
+                            </Link>
                         </div>
                     </div>
                 </div>
@@ -150,9 +153,11 @@ export default function AdminDashboard() {
                         <p className="text-sm font-bold text-red-600 mb-6">Requests awaiting your approval.</p>
 
                         <div className="mt-auto space-y-3">
-                            <button className="w-full py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold text-sm shadow-lg shadow-red-200 transition-all flex items-center justify-center gap-2">
-                                Review Now <ArrowRight className="w-4 h-4" />
-                            </button>
+                            <Link href="/dashboard/admin/approvals">
+                                <button className="w-full py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold text-sm shadow-lg shadow-red-200 transition-all flex items-center justify-center gap-2">
+                                    Review Now <ArrowRight className="w-4 h-4" />
+                                </button>
+                            </Link>
                         </div>
                     </div>
                 </div>
@@ -218,10 +223,12 @@ export default function AdminDashboard() {
                             <Briefcase className="w-5 h-5 text-blue-400" /> Administrative Actions
                         </h3>
                         <div className="space-y-4 relative z-10">
-                            <button className="w-full py-4 bg-white/10 hover:bg-white/20 border border-white/10 rounded-2xl text-sm font-bold transition-all flex items-center justify-between px-6 group backdrop-blur-sm">
-                                Review Approvals
-                                <ArrowRight className="w-4 h-4 opacity-50 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
-                            </button>
+                            <Link href="/dashboard/admin/approvals">
+                                <button className="w-full py-4 bg-white/10 hover:bg-white/20 border border-white/10 rounded-2xl text-sm font-bold transition-all flex items-center justify-between px-6 group backdrop-blur-sm">
+                                    Review Approvals
+                                    <ArrowRight className="w-4 h-4 opacity-50 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
+                                </button>
+                            </Link>
                             <button className="w-full py-4 bg-white/10 hover:bg-white/20 border border-white/10 rounded-2xl text-sm font-bold transition-all flex items-center justify-between px-6 group backdrop-blur-sm">
                                 Export Impact Report
                                 <ArrowRight className="w-4 h-4 opacity-50 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />

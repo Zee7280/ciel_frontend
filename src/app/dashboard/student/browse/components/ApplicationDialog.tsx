@@ -33,9 +33,19 @@ interface TeamMember {
     showOtpInput?: boolean;
 }
 
+// Generate a short unique team ID (e.g. TM-2024-XXXX)
+function generateTeamId() {
+    const year = new Date().getFullYear();
+    const rand = Math.random().toString(36).substring(2, 6).toUpperCase();
+    return `TM-${year}-${rand}`;
+}
+
 export default function ApplicationDialog({ opportunityId, open, onOpenChange, onSuccess, opportunityTitle }: ApplicationDialogProps) {
     const [participationType, setParticipationType] = useState<"individual" | "team">("individual");
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [primaryFacultyEmail, setPrimaryFacultyEmail] = useState("");
+    const [secondaryFacultyEmail, setSecondaryFacultyEmail] = useState("");
+    const [teamId, setTeamId] = useState("");
     const [teamMembers, setTeamMembers] = useState<TeamMember[]>([
         { name: "", cnic: "", mobile: "", email: "", university: "", program: "", role: "Member", verificationStatus: 'unverified' }
     ]);
@@ -43,11 +53,42 @@ export default function ApplicationDialog({ opportunityId, open, onOpenChange, o
     // Reset state when dialog opens/closes
     useEffect(() => {
         if (open) {
-            // Reset to default when opened
             setParticipationType("individual");
-            setTeamMembers([{ name: "", cnic: "", mobile: "", email: "", university: "", program: "", role: "Member", verificationStatus: 'unverified' }]);
+            setPrimaryFacultyEmail("");
+            setSecondaryFacultyEmail("");
+            setTeamId("");
+
+            const storedUserStr = localStorage.getItem("user") || localStorage.getItem("ciel_user");
+            let initialMember: TeamMember = { name: "", cnic: "", mobile: "", email: "", university: "", program: "", role: "Member", verificationStatus: 'unverified' };
+
+            if (storedUserStr) {
+                try {
+                    const u = JSON.parse(storedUserStr);
+                    initialMember = {
+                        name: u.name || "",
+                        cnic: u.cnic || "",
+                        mobile: u.phone || u.contact || "",
+                        email: u.email || "",
+                        university: u.university || u.institution || "",
+                        program: u.program || "",
+                        role: "Lead",
+                        verificationStatus: 'verified'
+                    };
+                } catch (e) {
+                    console.error("Failed to parse user for pre-fill", e);
+                }
+            }
+
+            setTeamMembers([initialMember]);
         }
     }, [open, opportunityId]);
+
+    // Auto-generate team ID when switching to team mode
+    useEffect(() => {
+        if (participationType === 'team' && !teamId) {
+            setTeamId(generateTeamId());
+        }
+    }, [participationType]);
 
     const handleAddMember = () => {
         setTeamMembers([...teamMembers, { name: "", cnic: "", mobile: "", email: "", university: "", program: "", role: "Member", verificationStatus: 'unverified' }]);
@@ -90,30 +131,42 @@ export default function ApplicationDialog({ opportunityId, open, onOpenChange, o
             return;
         }
 
-        const newMembers = [...teamMembers];
-        // Real API call to SEND OTP
+        // 1. Immediately show loader and disable button
+        setTeamMembers(prev => {
+            const updated = [...prev];
+            updated[index] = { ...updated[index], verificationStatus: 'sending' };
+            return updated;
+        });
+
         try {
             const res = await authenticatedFetch(`/api/v1/student/verify-team-member/send`, {
                 method: 'POST',
                 body: JSON.stringify({ email: member.email })
             });
 
-            const updatedMembers = [...teamMembers];
             if (res && res.ok) {
-                updatedMembers[index].verificationStatus = 'otp_sent';
-                updatedMembers[index].showOtpInput = true;
+                setTeamMembers(prev => {
+                    const updated = [...prev];
+                    updated[index] = { ...updated[index], verificationStatus: 'otp_sent', showOtpInput: true };
+                    return updated;
+                });
                 toast.success(`OTP sent to ${member.email}`);
             } else {
-                updatedMembers[index].verificationStatus = 'unverified';
                 const errorData = res ? await res.json() : { message: "Failed to connect to server" };
+                setTeamMembers(prev => {
+                    const updated = [...prev];
+                    updated[index] = { ...updated[index], verificationStatus: 'unverified' };
+                    return updated;
+                });
                 toast.error(errorData.message || "Failed to send OTP");
             }
-            setTeamMembers(updatedMembers);
         } catch (error) {
             console.error("Verification error", error);
-            const updatedMembers = [...teamMembers];
-            updatedMembers[index].verificationStatus = 'unverified';
-            setTeamMembers(updatedMembers);
+            setTeamMembers(prev => {
+                const updated = [...prev];
+                updated[index] = { ...updated[index], verificationStatus: 'unverified' };
+                return updated;
+            });
             toast.error("An error occurred while sending OTP");
         }
     };
@@ -125,9 +178,12 @@ export default function ApplicationDialog({ opportunityId, open, onOpenChange, o
             return;
         }
 
-        const newMembers = [...teamMembers];
-        newMembers[index].verificationStatus = 'sending';
-        setTeamMembers(newMembers);
+        // 1. Immediately show loader and disable button
+        setTeamMembers(prev => {
+            const updated = [...prev];
+            updated[index] = { ...updated[index], verificationStatus: 'sending' };
+            return updated;
+        });
 
         try {
             const res = await authenticatedFetch(`/api/v1/student/verify-team-member/confirm`, {
@@ -135,28 +191,41 @@ export default function ApplicationDialog({ opportunityId, open, onOpenChange, o
                 body: JSON.stringify({ email: member.email, otp: member.otp })
             });
 
-            const updatedMembers = [...teamMembers];
             if (res && res.ok) {
-                updatedMembers[index].verificationStatus = 'verified';
-                updatedMembers[index].showOtpInput = false;
+                setTeamMembers(prev => {
+                    const updated = [...prev];
+                    updated[index] = { ...updated[index], verificationStatus: 'verified', showOtpInput: false };
+                    return updated;
+                });
                 toast.success("Email verified successfully!");
             } else {
-                updatedMembers[index].verificationStatus = 'otp_sent';
                 const errorData = res ? await res.json() : { message: "Invalid OTP" };
+                setTeamMembers(prev => {
+                    const updated = [...prev];
+                    updated[index] = { ...updated[index], verificationStatus: 'otp_sent' };
+                    return updated;
+                });
                 toast.error(errorData.message || "Invalid OTP code");
             }
-            setTeamMembers(updatedMembers);
         } catch (error) {
             console.error("OTP Confirmation error", error);
-            const updatedMembers = [...teamMembers];
-            updatedMembers[index].verificationStatus = 'otp_sent';
-            setTeamMembers(updatedMembers);
+            setTeamMembers(prev => {
+                const updated = [...prev];
+                updated[index] = { ...updated[index], verificationStatus: 'otp_sent' };
+                return updated;
+            });
             toast.error("An error occurred during verification");
         }
     };
 
     const handleSubmit = async () => {
         if (!opportunityId) return;
+
+        // Primary faculty is always required
+        if (!primaryFacultyEmail || !primaryFacultyEmail.includes('@')) {
+            toast.error("Primary Faculty email is required and must be a valid email.");
+            return;
+        }
 
         // Validation for team
         if (participationType === "team") {
@@ -185,6 +254,9 @@ export default function ApplicationDialog({ opportunityId, open, onOpenChange, o
         try {
             const payload = {
                 participation_type: participationType,
+                team_id: participationType === 'team' ? teamId : undefined,
+                primary_faculty_email: primaryFacultyEmail,
+                secondary_faculty_email: secondaryFacultyEmail || undefined,
                 team_members: participationType === "team" ? teamMembers : undefined
             };
 
@@ -249,6 +321,110 @@ export default function ApplicationDialog({ opportunityId, open, onOpenChange, o
                             </label>
                         </RadioGroup>
                     </div>
+
+                    {/* ───────────────────────────────────────────────
+                        FACULTY ASSIGNMENT (appears for both modes)
+                    ─────────────────────────────────────────────── */}
+                    <div className="space-y-4 animate-in fade-in duration-300">
+                        <div className="flex items-center gap-2 border-b pb-3">
+                            <div className="w-6 h-6 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-xs font-black">F</div>
+                            <Label className="text-base font-bold text-slate-800">Faculty Supervisor Assignment</Label>
+                        </div>
+
+                        {/* Primary Faculty — always required */}
+                        <div className="p-5 rounded-2xl border border-indigo-100 bg-indigo-50/40 space-y-3">
+                            <div className="flex items-center justify-between">
+                                <Label className="text-xs font-black text-indigo-700 uppercase tracking-widest">
+                                    Primary Faculty Supervisor <span className="text-red-500 ml-1">*</span>
+                                </Label>
+                                <span className="text-[10px] font-bold text-indigo-500 bg-indigo-100 px-2 py-0.5 rounded-full">Required · Analytics Owner</span>
+                            </div>
+                            <Input
+                                id="primary-faculty-email"
+                                type="email"
+                                value={primaryFacultyEmail}
+                                onChange={(e) => setPrimaryFacultyEmail(e.target.value)}
+                                placeholder="faculty@university.edu.pk"
+                                className="h-10 bg-white border-indigo-200 focus:border-indigo-400"
+                            />
+                            <p className="text-[10px] text-indigo-500 font-medium">
+                                This faculty member will receive approval requests and own the analytics for this project.
+                            </p>
+                        </div>
+
+                        {/* Secondary Faculty — optional */}
+                        <div className="p-5 rounded-2xl border border-slate-100 bg-slate-50/40 space-y-3">
+                            <div className="flex items-center justify-between">
+                                <Label className="text-xs font-black text-slate-500 uppercase tracking-widest">
+                                    Secondary Faculty Supervisor
+                                </Label>
+                                <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">Optional · Visibility Only</span>
+                            </div>
+                            <Input
+                                id="secondary-faculty-email"
+                                type="email"
+                                value={secondaryFacultyEmail}
+                                onChange={(e) => setSecondaryFacultyEmail(e.target.value)}
+                                placeholder="co-supervisor@university.edu.pk"
+                                className="h-10 bg-white border-slate-200"
+                            />
+                            <p className="text-[10px] text-slate-400 font-medium">
+                                Added for collaboration only. They can view but cannot approve or own analytics.
+                            </p>
+                        </div>
+                    </div>
+
+                    {/* ───────────────────────────────────────────────
+                        TEAM ID (only shown for team mode)
+                    ─────────────────────────────────────────────── */}
+                    {participationType === 'team' && teamId && (
+                        <div className="flex items-center gap-4 p-4 rounded-2xl border border-emerald-100 bg-emerald-50/50 animate-in fade-in duration-200">
+                            <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+                                <Users className="w-5 h-5" />
+                            </div>
+                            <div className="flex-1">
+                                <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-0.5">System-Generated Team ID</p>
+                                <p className="text-lg font-black text-slate-900 tracking-widest font-mono">{teamId}</p>
+                            </div>
+                            <p className="text-[10px] text-slate-400 font-medium max-w-[150px] text-right leading-relaxed">
+                                This ID is unique to your team and links all members together.
+                            </p>
+                        </div>
+                    )}
+
+                    {participationType === "individual" && teamMembers.length > 0 && (
+                        <div className="space-y-4 animate-in fade-in slide-in-from-top-4 duration-300">
+                            <div className="border-b pb-2">
+                                <Label className="text-lg font-bold text-slate-800">My Details (Autofilled)</Label>
+                                <p className="text-sm text-slate-500">Your verified profile information will be used for this application.</p>
+                            </div>
+                            
+                            <div className="p-6 border rounded-2xl bg-indigo-50/30 border-indigo-100 relative group transition-all">
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                                    <div className="space-y-1">
+                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Full Name</p>
+                                        <p className="font-bold text-slate-700">{teamMembers[0].name || "Not provided"}</p>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Email Address</p>
+                                        <p className="font-bold text-slate-700">{teamMembers[0].email || "Not provided"}</p>
+                                        <div className="flex items-center gap-1 mt-1">
+                                            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500"></div>
+                                            <span className="text-[10px] font-bold text-emerald-600 uppercase">Verified</span>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">University</p>
+                                        <p className="font-bold text-slate-700">{teamMembers[0].university || "Not provided"}</p>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Contact</p>
+                                        <p className="font-bold text-slate-700">{teamMembers[0].mobile || teamMembers[0].cnic || "Not provided"}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
 
                     {participationType === "team" && (
                         <div className="space-y-4 animate-in fade-in slide-in-from-top-4 duration-300">
