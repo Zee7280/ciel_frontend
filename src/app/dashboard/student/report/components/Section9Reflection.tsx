@@ -19,33 +19,34 @@ const integrationOptions = [
 const competencies = [
     {
         id: 'cognitive', icon: BrainCircuit, label: 'Cognitive Competencies', items: [
-            { key: 'cognitive_systemic', label: 'Understanding interconnected social, environmental & economic issues' },
-            { key: 'cognitive_critical', label: 'Critical and ethical reasoning' },
-            { key: 'cognitive_evaluate', label: 'Ability to evaluate impact' }
+            { key: 'cognitive_systemic', label: 'Understanding Interconnected Social, Environmental & Economic Issues', description: 'You can confidently connect theory to real-life problems.' },
+            { key: 'cognitive_critical', label: 'Critical and Ethical Reasoning', description: 'You are developing judgment but can improve independent decision-making.' },
+            { key: 'cognitive_evaluate', label: 'Ability to Evaluate Impact', description: 'You can evaluate effectiveness, not just participation.' }
         ]
     },
     {
         id: 'practical', icon: Star, label: 'Practical Competencies', items: [
-            { key: 'practical_design', label: 'Project design & implementation' },
-            { key: 'practical_evidence', label: 'Evidence-based reporting' },
-            { key: 'practical_engagement', label: 'Community engagement' }
+            { key: 'practical_design', label: 'Project Design & Implementation', description: 'You can turn ideas into action.' },
+            { key: 'practical_evidence', label: 'Evidence-Based Reporting', description: 'You worked at a professional, audit-ready level.' },
+            { key: 'practical_engagement', label: 'Community Engagement', description: 'You showed strong field presence and interpersonal impact.' }
         ]
     },
     {
         id: 'social', icon: Info, label: 'Social & Civic Competencies', items: [
-            { key: 'social_empathy', label: 'Responsibility & empathy' },
-            { key: 'social_diversity', label: 'Awareness of diversity & inclusion' },
-            { key: 'social_collaboration', label: 'Collaborative problem-solving' }
+            { key: 'social_empathy', label: 'Responsibility & Empathy', description: 'You went beyond task completion and connected on a human level.' },
+            { key: 'social_diversity', label: 'Awareness of Diversity & Inclusion', description: 'You respected and adapted to diverse community needs.' },
+            { key: 'social_collaboration', label: 'Collaborative Problem-Solving', description: 'You demonstrated leadership and teamwork.' }
         ]
     },
     {
         id: 'transformative', icon: TrendingUp, label: 'Transformative Competencies', items: [
-            { key: 'transformative_longterm', label: 'Long-term thinking' },
-            { key: 'transformative_benefits', label: 'Understanding benefits and possible downsides' },
-            { key: 'transformative_sustainability', label: 'Sustainability-oriented decision making' }
+            { key: 'transformative_longterm', label: 'Long-Term Thinking', description: 'You are beginning to think beyond short-term results.' },
+            { key: 'transformative_benefits', label: 'Understanding Benefits & Possible Downsides', description: 'You think in a balanced and realistic way.' },
+            { key: 'transformative_sustainability', label: 'Sustainability-Oriented Decision Making', description: 'You are developing a sustainability mindset.' }
         ]
     }
 ];
+
 
 export default function Section9Reflection() {
     const { data, updateSection, getFieldError, saveReport } = useReportForm();
@@ -373,14 +374,39 @@ export default function Section9Reflection() {
 
                 <div className="bg-slate-50 border-2 border-slate-100 rounded-[2rem] p-10 space-y-12">
 
-                    <div className="space-y-1 text-center">
-                        <Label className="report-h3 !text-sm !tracking-tight">
-                            Competency Development Rating
-                        </Label>
-
-                        <p className="report-help">
-                            Rate each from 1 (Low) to 5 (Strong)
-                        </p>
+                    <div className="space-y-4 max-w-3xl mx-auto">
+                        <div className="bg-white rounded-2xl border-2 border-slate-100 overflow-hidden shadow-sm">
+                            <table className="w-full text-left">
+                                <thead className="bg-slate-50 border-b-2 border-slate-100">
+                                    <tr>
+                                        <th className="px-6 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400">Rating</th>
+                                        <th className="px-6 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400">Meaning</th>
+                                        <th className="px-6 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400">What it looks like in your work</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-50">
+                                    {[
+                                        { val: "1", meaning: "Low", context: "No meaningful engagement — You had little to no involvement in this area and did not develop this competency during the project" },
+                                        { val: "2", meaning: "Basic", context: "Initial exposure — You were introduced to this competency but had limited opportunity to apply it independently" },
+                                        { val: "3", meaning: "Moderate", context: "Developing capability — You applied this competency with some guidance and are building confidence in using it" },
+                                        { val: "4", meaning: "Strong", context: "Independent application — You applied this competency effectively and independently in real project situations" },
+                                        { val: "5", meaning: "Advanced", context: "High level of proficiency — You demonstrated strong command, initiative, or leadership in applying this competency" }
+                                    ].map(r => (
+                                        <tr key={r.val} className="hover:bg-slate-50/50 transition-colors">
+                                            <td className="px-6 py-4">
+                                                <span className="w-6 h-6 rounded-md bg-slate-900 text-white flex items-center justify-center font-black text-[10px] tracking-tight">{r.val}</span>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <span className="text-xs font-bold text-slate-700">{r.meaning}</span>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <p className="text-[10px] font-medium text-slate-500 leading-relaxed">{r.context}</p>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
 
 
@@ -415,10 +441,17 @@ export default function Section9Reflection() {
 
                                                 <div className="flex justify-between items-center gap-4">
 
-                                                    <p className="report-label !normal-case !text-xs !text-slate-600 pr-4">
-                                                        {item.label}
-                                                    </p>
-
+                                                    <div className="space-y-0.5">
+                                                        <p className="font-bold text-slate-900 text-[11px] leading-tight">
+                                                            {item.label}
+                                                        </p>
+                                                        {item.description && (
+                                                            <p className="text-[10px] font-medium text-slate-400 italic">
+                                                                {item.description}
+                                                            </p>
+                                                        )}
+                                                    </div>
+ 
                                                     <div className="w-8 h-8 rounded-lg bg-slate-50 border border-slate-100 text-slate-900 flex items-center justify-center font-black text-xs shrink-0">
                                                         {score > 0 ? score : '-'}
                                                     </div>

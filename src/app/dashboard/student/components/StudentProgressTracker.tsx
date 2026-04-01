@@ -3,6 +3,8 @@
 import React, { useEffect, useState } from 'react';
 import { authenticatedFetch } from '@/utils/api';
 import { CheckCircle2, Square, Loader2 } from 'lucide-react';
+import clsx from 'clsx';
+
 import {
     validateSection1,
     validateSection2,
@@ -77,44 +79,80 @@ export default function StudentProgressTracker({ projectId }: StudentProgressTra
     const progressPercentage = Math.round((completedCount / totalCount) * 100);
 
     return (
-        <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200">
-            <h3 className="text-sm font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2 mb-4">
-                <span className="text-amber-500 text-lg">⭐</span> BONUS FEATURE (Highly Recommended)
-            </h3>
+        <div className="bg-white p-7 rounded-[2rem] border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] relative overflow-hidden">
+            {/* Background Accent */}
+            <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-50/30 rounded-full blur-3xl -mr-16 -mt-16" />
 
-            <p className="text-slate-700 text-sm mb-4">
-                Add a student progress tracker at the top of the dashboard:
-            </p>
-
-            <div className="flex items-center gap-4 mb-6">
-                <span className="text-slate-600 font-medium">Progress:</span>
-                <div className="flex-1 max-w-[200px] h-4 bg-slate-200 rounded-full overflow-hidden">
-                    <div
-                        className="h-full bg-slate-700 rounded-full transition-all duration-1000"
-                        style={{ width: `${progressPercentage}%`, backgroundImage: 'radial-gradient(circle, #ffffff33 1px, transparent 1px)', backgroundSize: '4px 4px' }}
-                    />
+            <div className="relative z-10 space-y-6">
+                <div className="flex items-center justify-between">
+                    <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2">
+                        <span className="flex items-center justify-center w-5 h-5 rounded-full bg-amber-50 text-xs shadow-sm">⭐</span>
+                        Bonus Feature — Highly Recommended
+                    </h3>
+                    <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full uppercase tracking-wider">
+                        Completion Boost
+                    </span>
                 </div>
-                <span className="text-slate-600 font-medium">{progressPercentage}%</span>
-            </div>
 
-            <div className="space-y-2 mb-6">
-                {sections.map((section, idx) => (
-                    <div key={idx} className="flex items-center gap-2">
-                        {section.completed ? (
-                            <CheckCircle2 className="w-5 h-5 text-indigo-500 fill-indigo-100" strokeWidth={2.5} />
-                        ) : (
-                            <Square className="w-5 h-5 text-indigo-200 fill-indigo-50/50 rounded drop-shadow-sm" strokeWidth={2.5} />
-                        )}
-                        <span className={`text-sm ${section.completed ? 'text-slate-700 font-medium' : 'text-slate-500'}`}>
-                            {section.label} {section.completed ? 'Completed' : 'Pending'}
+                <div className="space-y-4">
+                    <div className="flex items-end justify-between px-1">
+                        <span className="text-xs font-bold text-slate-500 uppercase tracking-wide">Current Progress</span>
+                        <span className="text-2xl font-black text-slate-900 leading-none">
+                            {progressPercentage}<span className="text-sm ml-0.5 text-slate-400">%</span>
                         </span>
                     </div>
-                ))}
-            </div>
 
-            <p className="text-slate-400 text-xs mt-2">
-                This dramatically improves student completion rates.
-            </p>
+                    <div className="relative w-full h-3 bg-slate-100 rounded-full overflow-hidden">
+                        <div
+                            className="absolute inset-y-0 left-0 bg-slate-900 rounded-full transition-all duration-1000 ease-out shadow-[0_2px_10px_rgba(0,0,0,0.1)]"
+                            style={{ width: `${progressPercentage}%` }}
+                        />
+                        {/* Animated stripes on the progress bar */}
+                        <div
+                            className="absolute inset-0 opacity-10"
+                            style={{
+                                backgroundImage: `linear-gradient(45deg, rgba(255,255,255,0.2) 25%, transparent 25%, transparent 50%, rgba(255,255,255,0.2) 50%, rgba(255,255,255,0.2) 75%, transparent 75%, transparent)`,
+                                backgroundSize: '1rem 1rem'
+                            }}
+                        />
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-5 gap-4 pt-2">
+                    {sections.map((section, idx) => (
+                        <div
+                            key={idx}
+                            className={clsx(
+                                "flex items-center gap-3 p-3 rounded-2xl border transition-all duration-300",
+                                section.completed
+                                    ? "bg-emerald-50/30 border-emerald-100"
+                                    : "bg-slate-50/50 border-slate-50 grayscale opacity-60"
+                            )}
+                        >
+                            <div className={clsx(
+                                "w-6 h-6 rounded-lg flex items-center justify-center shrink-0 border-2",
+                                section.completed
+                                    ? "bg-emerald-500 border-emerald-500 text-white"
+                                    : "bg-white border-slate-200 text-slate-300"
+                            )}>
+                                <CheckCircle2 className={clsx("w-3.5 h-3.5", section.completed ? "block" : "hidden")} strokeWidth={3} />
+                            </div>
+                            <span className={clsx(
+                                "text-[10px] font-bold uppercase tracking-wide",
+                                section.completed ? "text-emerald-700" : "text-slate-500"
+                            )}>
+                                {section.label}
+                            </span>
+                        </div>
+                    ))}
+                </div>
+
+                <div className="flex items-center gap-2 pt-2 text-[10px] font-bold text-slate-400">
+                    <div className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse" />
+                    Tracking activity for Project ID: {projectId.substring(0, 8)}... — Complete all sections to generate Section 1 results.
+                </div>
+            </div>
         </div>
+
     );
 }

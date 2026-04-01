@@ -1,1172 +1,539 @@
 import { Label } from "./ui/label";
 import { Input } from "./ui/input";
-import { Select } from "./ui/select";
-import { Checkbox } from "./ui/checkbox";
 import { Button } from "./ui/button";
 import { Textarea } from "./ui/textarea";
 import { useReportForm } from "../context/ReportContext";
-import { useDebounce } from "@/hooks/useDebounce";
 import { FieldError } from "./ui/FieldError";
 import clsx from "clsx";
-import React, { useEffect, useMemo, useState } from "react";
-import { generateAISummary } from "../utils/aiSummarizer";
-import { toast } from "sonner";
+import React, { useMemo } from "react";
 import {
-    Activity, Layers, Target, Users, MapPin, Globe, CheckCircle2,
-    ChevronRight, Save, Info, Plus, Trash2, Shield, PlusCircle,
-    Sparkles, Loader2, AlertCircle, Lock, X as LucideX
+    Activity, Target, Users, MapPin, CheckCircle2,
+    Save, Plus, Trash2, PlusCircle, AlertCircle, Lock, 
+    Truck, GraduationCap, Megaphone, Search, Building, Smartphone, Gavel, 
+    Handshake, Globe, Info
 } from "lucide-react";
 
 export default function Section4Activities() {
-    const { data, updateSection, getFieldError, validationErrors, saveReport } = useReportForm();
+    const { data, updateSection, getFieldError, saveReport } = useReportForm();
     const section1 = data.section1 || {};
     const section4 = data.section4 || {};
-    const isTeam = section1.participation_type === 'team';
 
-    const [isGenerating, setIsGenerating] = useState(false);
-
-    const handleGenerateAISummary = async () => {
-        setIsGenerating(true);
-        // Prepare data for Section 4 summary, including Section 1 engagement context
-        const summaryData = {
-            ...section4,
-            engagementProfile: {
-                engagement_span: section1.metrics?.engagement_span || 0,
-                total_verified_hours: section1.metrics?.total_verified_hours || 0,
-            }
-        };
-
-        const result = await generateAISummary("section4", summaryData);
-        setIsGenerating(false);
-
-        if (result.error) {
-            toast.error(result.error);
-        } else if (result.summary) {
-            updateSection('section4', { summary_text: result.summary });
-            toast.success("Section 4 summary improved with AI!");
-        }
-    };
-
-    const sectionErrors = validationErrors['section4'] || [];
-    const hasErrors = sectionErrors.length > 0;
-
-    // Consts from specs
-    const activityTypes = [
-        "Training / Workshop", "Awareness Session", "Research / Survey / Assessment",
-        "Mentoring / Coaching", "Service Delivery", "Resource Distribution",
-        "Infrastructure / Facility Improvement", "Digital / Technology Development",
-        "Policy / Advocacy / Consultation", "Field Engagement / Community Mobilization",
-        "System / Process Development", "Monitoring & Evaluation", "Other"
+    // ─── Constants ────────────────────────────────────────────────────────────
+    const primaryActivityTypes = [
+        { id: "Resource Distribution", label: "Resource Distribution", icon: Truck, context: "e.g., ration kits, supplies" },
+        { id: "Service Delivery", label: "Service Delivery", icon: Activity, context: "e.g., healthcare, tutoring, support services" },
+        { id: "Training / Capacity Building", label: "Training / Capacity Building", icon: GraduationCap, context: "e.g., workshops, skill sessions" },
+        { id: "Awareness / Advocacy", label: "Awareness / Advocacy", icon: Megaphone, context: "e.g., campaigns, sessions" },
+        { id: "Research / Data Collection", label: "Research / Data Collection", icon: Search, context: "e.g., surveys, studies" },
+        { id: "Infrastructure Development", label: "Infrastructure Development", icon: Building, context: "e.g., building, renovation" },
+        { id: "Digital / Technology Solution", label: "Digital / Technology Solution", icon: Smartphone, context: "e.g., app, platform" },
+        { id: "Policy / Governance Engagement", label: "Policy / Governance Engagement", icon: Gavel, context: "e.g., policy work" },
+        { id: "Community Mobilization", label: "Community Mobilization", icon: Users, context: "e.g., outreach, volunteering" },
+        { id: "Partnership Development", label: "Partnership Development", icon: Handshake, context: "e.g., collaboration building" },
+        { id: "Other", label: "Other", icon: Plus, context: "Please specify below" }
     ];
 
-    const deliveryModes = ["In-person", "Online", "Hybrid", "Field-based"];
-
-    const changeAreas = [
-        "Education & Skills", "Health & Wellbeing", "Economic Opportunity",
-        "Environment & Climate", "Governance & Policy", "Infrastructure & Services",
-        "Digital Access & Systems", "Social Inclusion & Protection", "Food & Basic Needs",
-        "Research & Knowledge", "Partnerships & Institutional Strengthening", "Other"
-    ];
+    const deliveryModes = ["Field-Based (on-ground)", "Online (digital)", "Hybrid (both)"];
+    const implementationModels = ["Individual", "Team-Based", "Partner-Led", "Multi-Stakeholder"];
 
     const outputTypes = [
-        "People trained", "People reached", "Households supported", "Sessions conducted",
-        "Services delivered", "Referrals facilitated", "Packs / Kits distributed",
-        "Materials distributed", "Infrastructure improved / created",
-        "Digital tool / system developed", "Surveys / Assessments conducted",
-        "Reports / Policy briefs prepared", "Funds / Resources mobilized",
-        "Partnerships activated", "Policy / Advocacy actions completed", "Other"
+        "Individuals Reached", "Households Supported", "Sessions Conducted",
+        "Trainings Delivered", "Resources Distributed", "Services Delivered",
+        "Systems Developed", "Facilities Improved", "Reports / Data Generated",
+        "Partnerships Formed", "Other"
     ];
 
     const beneficiaryGroups = [
-        "Children (Under 18)", "Youth (18–29)", "Women", "Persons with Disabilities",
-        "Low-Income Households", "Rural Communities", "Urban Communities",
-        "Refugees / Displaced Populations", "Small Businesses / Entrepreneurs",
-        "Public Institutions", "Community Members (General)", "Other"
+        "Children", "Youth", "Women", "Elderly", "Persons with Disabilities",
+        "Low-Income Households", "Students", "Workers / Laborers",
+        "Institutions / Organizations", "General Community", "Other"
     ];
 
-    const teamRoles = [
-        "Team Lead", "Project Coordinator", "Trainer / Facilitator", "Technical Specialist",
-        "Field Officer", "Communication Lead", "Research Lead", "Volunteer", "Other"
+    const geographicReachOptions = [
+        "Single Site", "Local Community", "Multi-Community", "City-Wide",
+        "District-Wide", "Province / State", "National", "International",
+        "Digital", "Hybrid"
     ];
 
-    // Build the list of all verified participants from Section 1 (Team Lead + Verified Members)
-    const verifiedMembers = useMemo(() => {
-        const members = [];
-        const seenIds = new Set();
-
-        // 1. Add Team Lead (Self)
-        if (section1.team_lead?.verified) {
-            const leadId = section1.team_lead.id || 'lead-self';
-            members.push({
-                member_id: leadId,
-                name: section1.team_lead.fullName || section1.team_lead.name || 'Team Lead (You)',
-                default_role: 'Team Lead',
-            });
-            seenIds.add(leadId);
-        }
-
-        // 2. Add Verified Team Members (excluding lead if already added)
-        (section1.team_members || [])
-            .filter(m => m.verified && m.id && !seenIds.has(m.id))
-            .forEach((m: any) => {
-                members.push({
-                    member_id: m.id,
-                    name: m.fullName || m.name || 'Team Member',
-                    default_role: m.role || '',
-                });
-                seenIds.add(m.id);
-            });
-
-        // 3. Calculate hours for each member from Section 1 Attendance Logs
-        return members.map(m => {
-            const memberLogs = (section1.attendance_logs || []).filter((log: any) => {
-                const rawLogId = log.participantId ? (log.participantId.includes(':') ? log.participantId.split(':').pop() : log.participantId) : '';
-                return rawLogId === m.member_id || (m.member_id === 'lead-self' && !log.participantId) || log.participantId === m.member_id;
-            });
-            const totalHours = memberLogs.reduce((acc: number, log: any) => acc + (Number(log.hours) || 0), 0);
-
-            return {
-                ...m,
-                hours: totalHours.toString()
-            };
-        });
-    }, [section1.team_lead, section1.team_members, section1.attendance_logs]);
-
-    // Sync team_contributions whenever verified members change
-    useEffect(() => {
-        if (!isTeam || verifiedMembers.length === 0) return;
-
-        // Build a map of existing contributions by member_id to preserve entered data (roles, sessions, etc)
-        const existingMap = new Map(
-            section4.team_contributions.map(c => [c.member_id, c])
-        );
-
-        const synced = verifiedMembers.map(vm => {
-            const existing = existingMap.get(vm.member_id);
-            return {
-                member_id: vm.member_id,
-                name: vm.name,                              // always sync name from source
-                role: existing?.role || vm.default_role,   // preserve entered role or use default
-                hours: vm.hours,                           // always sync calculated hours
-                sessions: existing?.sessions || '',
-                beneficiaries: existing?.beneficiaries || ''
-            };
-        });
-
-        // Only update if something actually changed (using stringify for deep equality)
-        const currentData = JSON.stringify(section4.team_contributions);
-        const newData = JSON.stringify(synced);
-
-        if (currentData !== newData) {
-            updateSection('section4', { team_contributions: synced });
-        }
-    }, [isTeam, verifiedMembers, section4.team_contributions]);
-
-
-
-    const autoSummary = useMemo(() => {
-        // Only return early if user has manually entered a custom summary (detected by not matching the pattern)
-        if (section4.summary_text && (section4.summary_text.length > 50 && !section4.summary_text.startsWith("The project conducted") && !section4.summary_text.includes("The implementation profile"))) {
-            return section4.summary_text;
-        }
-
-        // 1. Implementation Profile
-        const activitiesStr = section4.activities.map(a => a.type === 'Other' ? (a as any).type_other || a.other_text : a.type).filter(Boolean).join(", ");
-        const deliveryMode = section4.delivery_mode || "various";
-        const sessions = section4.total_sessions || "0";
-        const duration = section1.metrics?.engagement_span || "0";
-        const implementationText = `The project conducted ${sessions} sessions of ${activitiesStr} over ${duration} days using a ${deliveryMode} delivery mode.`;
-
-        // 2. Output Profile
-        const outputsStr = section4.outputs.map(o => {
-            const label = o.type === 'Other' ? (o as any).other_label || "additional resources" : o.type;
-            return `${o.count} ${label}`;
-        }).filter(Boolean).join(", ");
-        const outputText = outputsStr ? `Implementation produced structured outputs across multiple categories, including ${outputsStr}.` : "The project delivered structured implementation outputs.";
-
-        // 3. Beneficiary Profile
-        const beneficiaries = section4.total_beneficiaries || "0";
-        const categories = section4.beneficiary_categories.join(", ");
-        const beneficiaryText = `A total of ${beneficiaries} beneficiaries were reached, with participation from ${categories || "community members"}.`;
-
-        return `${implementationText} ${outputText} ${beneficiaryText}`;
-    }, [section4.activities, section4.total_sessions, section4.outputs, section4.total_beneficiaries, section4.beneficiary_categories, section4.summary_text, section4.primary_change_area, section4.primary_change_area_others, section4.delivery_mode, section1.metrics?.engagement_span]);
-
-    useEffect(() => {
-        if (section4.summary_text !== autoSummary) {
-            updateSection('section4', { summary_text: autoSummary });
-        }
-    }, [autoSummary, section4.summary_text]);
-
-
-
-    // Handlers
-    const addActivity = () => updateSection('section4', {
-        activities: [...section4.activities, { type: '', delivery_mode: '', sessions: '' }]
-    });
-    const removeActivity = (i: number) => updateSection('section4', { activities: section4.activities.filter((_, idx) => idx !== i) });
-    const updateActivity = (i: number, field: string, val: string) => {
-        const next = [...section4.activities];
-        next[i] = { ...next[i], [field]: val };
-        updateSection('section4', { activities: next });
+    const subCategoryMap: Record<string, string[]> = {
+        "Single Site": ["School / College", "NGO / Organization", "Hospital", "Village", "Neighborhood", "Other"],
+        "Local Community": ["Village", "Union Council", "Neighborhood", "Campus", "Workplace", "Partner Organization Community"],
+        "Multi-Community": ["Multiple villages", "Multiple neighborhoods", "Multiple institutions"],
+        "City-Wide": ["Multi-area coverage"],
+        "District-Wide": ["Multi-area coverage"],
+        "Province / State": ["Multi-area coverage"],
+        "Digital": ["Online platform", "Remote users"]
     };
 
-    const addOutput = () => updateSection('section4', { outputs: [...section4.outputs, { type: '', count: '' }] });
-    const removeOutput = (i: number) => updateSection('section4', { outputs: section4.outputs.filter((_, idx) => idx !== i) });
+    // ─── Handlers ─────────────────────────────────────────────────────────────
+    const update = (field: string, val: any) => updateSection('section4', { [field]: val });
+
+    const toggleSecondary = (id: string) => {
+        const types = section4.activity_secondary_types || [];
+        if (types.includes(id)) {
+            update('activity_secondary_types', types.filter(t => t !== id));
+        } else {
+            update('activity_secondary_types', [...types, id]);
+        }
+    };
+
+    const toggleModel = (id: string) => {
+        const models = section4.implementation_model || [];
+        if (models.includes(id)) {
+            update('implementation_model', models.filter(m => m !== id));
+        } else {
+            update('implementation_model', [...models, id]);
+        }
+    };
+
+    const addOutput = () => update('outputs', [...(section4.outputs || []), { type: '', quantity: '', unit: '' }]);
+    const removeOutput = (i: number) => update('outputs', section4.outputs.filter((_, idx) => idx !== i));
     const updateOutput = (i: number, field: string, val: string) => {
         const next = [...section4.outputs];
         next[i] = { ...next[i], [field]: val };
-        updateSection('section4', { outputs: next });
+        update('outputs', next);
     };
 
     const toggleBeneficiary = (cat: string) => {
-        const current = section4.beneficiary_categories;
+        const current = section4.beneficiary_categories || [];
         if (current.includes(cat)) {
-            updateSection('section4', { beneficiary_categories: current.filter(c => c !== cat) });
+            update('beneficiary_categories', current.filter(c => c !== cat));
         } else {
-            updateSection('section4', { beneficiary_categories: [...current, cat] });
+            update('beneficiary_categories', [...current, cat]);
         }
     };
 
-    const updateContributor = (i: number, field: string, val: string) => {
-        if (field === 'beneficiaries') {
-            const total = parseInt(section4.total_beneficiaries || '0');
-            const entered = parseInt(val || '0');
-            if (entered > total) {
-                toast.error(`Individual count cannot exceed Section Total (${total})`);
-                return;
-            }
-        }
-        const next = [...section4.team_contributions];
-        next[i] = { ...next[i], [field]: val };
-        updateSection('section4', { team_contributions: next });
-    };
-
-    const addOtherChangeArea = () => {
-        const others = section4.primary_change_area_others || [''];
-        updateSection('section4', { primary_change_area_others: [...others, ''] });
-    };
-
-    const removeOtherChangeArea = (index: number) => {
-        const others = section4.primary_change_area_others || [''];
-        if (others.length > 1) {
-            updateSection('section4', { primary_change_area_others: others.filter((_, i) => i !== index) });
-        }
-    };
-
-    const updateOtherChangeArea = (index: number, val: string) => {
-        const others = [...(section4.primary_change_area_others || [''])];
-        others[index] = val;
-        updateSection('section4', { primary_change_area_others: others });
-    };
+    const activityDescWords = (section4.activity_description || '').trim().split(/\s+/).filter(w => w.length > 0).length;
+    const deliveryDescWords = (section4.delivery_explanation || '').trim().split(/\s+/).filter(w => w.length > 0).length;
 
     return (
         <div className="space-y-12 pb-16">
             {/* Header */}
-            <div className="space-y-5">
-
-                {/* Header */}
+            <div className="space-y-6">
                 <div className="flex items-center gap-4">
-
                     <div className="w-12 h-12 rounded-xl bg-report-primary text-white flex items-center justify-center shadow-sm">
-                        <Activity className="w-6 h-6" />
+                        <Globe className="w-6 h-6" />
                     </div>
-
                     <div>
-                        <h2 className="text-lg font-semibold text-slate-900">
-                            Section 4 — Structured Activities & Outputs
-                        </h2>
-                        <p className="text-sm text-slate-500">
-                            What Was Done and Delivered
-                        </p>
+                        <h2 className="report-h2">Section 4 — Activities, Outputs & Scale</h2>
+                        <p className="report-label text-slate-500">What Was Done, Delivered, and the Magnitude of Effort</p>
                     </div>
-
                 </div>
 
+                {/* Purpose Note */}
+                <div className="p-6 bg-report-primary-soft border border-report-primary-border rounded-3xl space-y-4">
+                    <div className="flex items-center gap-3 text-report-primary">
+                        <Target className="w-5 h-5" />
+                        <h3 className="report-h3 !text-sm">Purpose of This Section</h3>
+                    </div>
+                    <p className="text-sm text-slate-600 leading-relaxed font-medium">
+                        This section explains what you did in your project, how you did it, and what you produced.
+                        This forms the foundation for measuring impact in Section 5.
+                    </p>
+                    <ul className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-2 text-xs font-semibold text-report-primary/70">
+                        <li className="flex items-center gap-2">
+                            <div className="w-1 h-1 rounded-full bg-current" /> Describe your activities
+                        </li>
+                        <li className="flex items-center gap-2">
+                            <div className="w-1 h-1 rounded-full bg-current" /> Record measurable outputs
+                        </li>
+                        <li className="flex items-center gap-2">
+                            <div className="w-1 h-1 rounded-full bg-current" /> Identify who benefited
+                        </li>
+                        <li className="flex items-center gap-2">
+                            <div className="w-1 h-1 rounded-full bg-current" /> Show how large and intensive your project was
+                        </li>
+                    </ul>
+                </div>
+            </div>
 
-                {/* Purpose Card */}
-                <div className="p-6 bg-report-primary-soft border border-report-primary-border rounded-2xl relative overflow-hidden">
+            {/* 4.1 Activity Type */}
+            <div className="space-y-6">
+                <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center text-[10px] font-black">4.1</div>
+                    <h3 className="report-h3">Activity Type & Design</h3>
+                </div>
 
-                    <div className="flex items-start gap-4">
+                <div className="bg-white rounded-[2.5rem] border-2 border-slate-100 p-8 shadow-sm space-y-8">
+                    <div className="space-y-4">
+                        <Label className="report-label">Primary Activity Type (Required — Select One)</Label>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                            {primaryActivityTypes.map(opt => (
+                                <button
+                                    key={opt.id}
+                                    type="button"
+                                    onClick={() => update('activity_primary_type', opt.id)}
+                                    className={clsx(
+                                        "p-4 rounded-xl border-2 text-left transition-all relative group",
+                                        section4.activity_primary_type === opt.id
+                                            ? "border-report-primary bg-report-primary-soft text-report-primary"
+                                            : "border-slate-50 bg-slate-50 text-slate-500 hover:border-slate-200"
+                                    )}
+                                >
+                                    <div className="flex items-center gap-3 mb-1">
+                                        <opt.icon className="w-4 h-4" />
+                                        <span className="text-[10px] font-black uppercase tracking-wider">{opt.label}</span>
+                                    </div>
+                                    <p className="text-[9px] font-medium opacity-80">{opt.context}</p>
+                                    {section4.activity_primary_type === opt.id && (
+                                        <div className="absolute top-3 right-3 w-4 h-4 rounded-full bg-report-primary text-white flex items-center justify-center">
+                                            <CheckCircle2 className="w-2.5 h-2.5" />
+                                        </div>
+                                    )}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
 
-                        <div className="w-9 h-9 rounded-lg bg-white flex items-center justify-center border border-report-primary-border shadow-sm shrink-0">
-                            <Target className="w-4 h-4 text-report-primary" />
+                    <div className="space-y-4 pt-8 border-t-2 border-slate-50">
+                        <Label className="report-label">Secondary Activity Type (Optional — Select Multiple)</Label>
+                        <div className="flex flex-wrap gap-2">
+                            {primaryActivityTypes.filter(o => o.id !== 'Other' && o.id !== section4.activity_primary_type).map(opt => (
+                                <button
+                                    key={opt.id}
+                                    type="button"
+                                    onClick={() => toggleSecondary(opt.id)}
+                                    className={clsx(
+                                        "px-4 py-2 rounded-lg border-2 text-[10px] font-bold transition-all",
+                                        (section4.activity_secondary_types || []).includes(opt.id)
+                                            ? "border-slate-900 bg-slate-900 text-white"
+                                            : "border-slate-100 bg-white text-slate-400 hover:border-slate-200"
+                                    )}
+                                >
+                                    {opt.label}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="space-y-3 pt-8 border-t-2 border-slate-50">
+                        <div className="flex justify-between items-center">
+                            <Label className="report-label">Activity Description (Required — 50–100 words)</Label>
+                            <span className={clsx("text-[10px] font-bold", activityDescWords >= 50 && activityDescWords <= 100 ? "text-report-primary" : "text-amber-500")}>
+                                {activityDescWords} / 100 Words
+                            </span>
+                        </div>
+                        <p className="text-[10px] text-slate-400 font-medium italic mb-2">Briefly explain: What was done? Who was involved? How it was carried out?</p>
+                        <Textarea
+                            placeholder="Describe your activity in detail..."
+                            value={section4.activity_description}
+                            onChange={e => update('activity_description', e.target.value)}
+                            className="min-h-[120px] rounded-2xl border-2 border-slate-50 bg-slate-50 p-6 text-xs font-bold text-slate-700 focus:bg-white focus:border-report-primary-border outline-none transition-all resize-none"
+                        />
+                        <FieldError message={getFieldError('section4.activity_description')} />
+                    </div>
+                </div>
+            </div>
+
+            {/* 4.2 Delivery Mechanism */}
+            <div className="space-y-6">
+                <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center text-[10px] font-black">4.2</div>
+                    <h3 className="report-h3">Delivery Mechanism</h3>
+                </div>
+
+                <div className="bg-white rounded-[2.5rem] border-2 border-slate-100 p-8 shadow-sm space-y-8">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                        <div className="space-y-4">
+                            <Label className="report-label">Mode of Delivery (Select One)</Label>
+                            <div className="grid grid-cols-1 gap-2">
+                                {deliveryModes.map(mode => (
+                                    <button
+                                        key={mode}
+                                        type="button"
+                                        onClick={() => update('delivery_mode', mode)}
+                                        className={clsx(
+                                            "px-4 py-3 rounded-xl border-2 text-left text-[10px] font-black uppercase tracking-wider transition-all",
+                                            section4.delivery_mode === mode
+                                                ? "border-report-primary bg-report-primary-soft text-report-primary"
+                                                : "border-slate-50 bg-slate-50 text-slate-500 hover:bg-slate-100"
+                                        )}
+                                    >
+                                        {mode}
+                                    </button>
+                                ))}
+                            </div>
                         </div>
 
                         <div className="space-y-4">
-
-                            <div>
-                                <h3 className="text-sm font-semibold text-report-primary uppercase tracking-wide mb-1">
-                                    Purpose of This Section
-                                </h3>
-
-                                <p className="text-sm text-slate-600 leading-relaxed max-w-2xl">
-                                    This section documents the tangible aspects of your project's implementation.
-                                    It provides a structured record of:
-                                </p>
-                            </div>
-
-
-                            {/* Bullet Lists */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-
-                                <ul className="space-y-2 text-sm text-slate-600">
-
-                                    <li className="flex items-center gap-2">
-                                        <div className="w-1.5 h-1.5 rounded-full bg-report-primary" />
-                                        What activities were conducted
-                                    </li>
-
-                                    <li className="flex items-center gap-2">
-                                        <div className="w-1.5 h-1.5 rounded-full bg-report-primary" />
-                                        What was delivered
-                                    </li>
-
-                                    <li className="flex items-center gap-2">
-                                        <div className="w-1.5 h-1.5 rounded-full bg-report-primary" />
-                                        Outputs only (no impact)
-                                    </li>
-
-                                </ul>
-
-
-                                <ul className="space-y-2 text-sm text-slate-600">
-
-                                    <li className="flex items-center gap-2">
-                                        <div className="w-1.5 h-1.5 rounded-full bg-report-primary" />
-                                        Who was reached
-                                    </li>
-
-                                    <li className="flex items-center gap-2">
-                                        <div className="w-1.5 h-1.5 rounded-full bg-report-primary" />
-                                        Scale of implementation
-                                    </li>
-
-                                    <li className="flex items-center gap-2">
-                                        <div className="w-1.5 h-1.5 rounded-full bg-report-primary" />
-                                        Beneficiary specificity
-                                    </li>
-
-                                </ul>
-
-                            </div>
-
-                        </div>
-
-                    </div>
-
-                </div>
-
-
-                {/* Error Block */}
-                {hasErrors && (
-
-                    <div className="bg-red-50 border border-red-200 rounded-xl p-5 flex items-start gap-3">
-
-                        <AlertCircle className="w-5 h-5 text-red-600 mt-0.5 shrink-0" />
-
-                        <div>
-
-                            <h4 className="text-sm font-semibold text-red-800">
-                                Action Required: Validation Errors
-                            </h4>
-
-                            <ul className="mt-2 space-y-1">
-
-                                {sectionErrors.slice(0, 5).map((error: any, idx: number) => (
-                                    <li key={idx} className="text-sm text-red-700">
-                                        • {error.message}
-                                    </li>
+                            <Label className="report-label">Implementation Model (Select One or More)</Label>
+                            <div className="grid grid-cols-1 gap-2">
+                                {implementationModels.map(model => (
+                                    <button
+                                        key={model}
+                                        type="button"
+                                        onClick={() => toggleModel(model)}
+                                        className={clsx(
+                                            "px-4 py-3 rounded-xl border-2 text-left text-[10px] font-black uppercase tracking-wider transition-all",
+                                            (section4.implementation_model || []).includes(model)
+                                                ? "border-slate-900 bg-slate-100 text-slate-900"
+                                                : "border-slate-50 bg-slate-50 text-slate-500 hover:bg-slate-100"
+                                        )}
+                                    >
+                                        {model}
+                                    </button>
                                 ))}
-
-                            </ul>
-
+                            </div>
                         </div>
-
                     </div>
 
-                )}
-
+                    <div className="space-y-3 pt-8 border-t-2 border-slate-50">
+                        <div className="flex justify-between items-center">
+                            <Label className="report-label">Delivery Explanation (Optional — 50–100 words)</Label>
+                            <span className="text-[10px] font-bold text-slate-400">{deliveryDescWords} / 100 Words</span>
+                        </div>
+                        <p className="text-[10px] text-slate-400 font-medium italic mb-2">Explain how the project was executed (e.g., with NGO support, volunteers, etc.)</p>
+                        <Textarea
+                            placeholder="Explain the execution process..."
+                            value={section4.delivery_explanation}
+                            onChange={e => update('delivery_explanation', e.target.value)}
+                            className="min-h-[100px] rounded-2xl border-2 border-slate-50 bg-slate-50 p-6 text-xs font-bold text-slate-700 focus:bg-white focus:border-report-primary-border outline-none transition-all resize-none"
+                        />
+                    </div>
+                </div>
             </div>
 
-            {/* 4.1 Activity Overview */}
+            {/* 4.3 Outputs */}
             <div className="space-y-6">
-
-                {/* Header */}
                 <div className="flex items-center justify-between">
-
                     <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center text-[11px] font-bold">
-                            4.1
-                        </div>
-
-                        <h3 className="text-base font-semibold text-slate-900">
-                            Activity Overview
-                        </h3>
+                        <div className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center text-[10px] font-black">4.3</div>
+                        <h3 className="report-h3">Outputs (Measurable Results)</h3>
                     </div>
-
                     <Button
                         type="button"
-                        variant="ghost"
-                        onClick={addActivity}
-                        className="h-9 px-4 rounded-lg bg-report-primary text-white text-xs font-semibold uppercase tracking-wide hover:bg-report-primary/90 transition"
+                        onClick={addOutput}
+                        variant="outline"
+                        className="h-10 px-6 rounded-xl border-2 border-slate-900 text-slate-900 font-black text-[10px] uppercase tracking-wider hover:bg-slate-900 hover:text-white transition-all shadow-md shadow-slate-100"
                     >
-                        <PlusCircle className="w-4 h-4 mr-2" />
-                        Add Activity
+                        <PlusCircle className="w-4 h-4 mr-2" /> Add Output
                     </Button>
-
                 </div>
 
+                <div className="bg-white rounded-[2.5rem] border-2 border-slate-100 p-8 shadow-sm space-y-6">
+                    <div className="p-4 bg-amber-50 rounded-2xl border border-amber-100 flex items-start gap-4">
+                        <Info className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                        <div>
+                            <p className="text-[10px] font-black text-amber-900 uppercase mb-1">Guidelines</p>
+                            <p className="text-[9px] font-medium text-amber-800 leading-relaxed uppercase">
+                                Outputs must be numeric and verifiable. They should be delivered or produced things.
+                                ✗ Do not write descriptions here.
+                            </p>
+                        </div>
+                    </div>
 
-                {/* Activities */}
-                <div className="space-y-6">
-
-                    {section4.activities.map((act: any, i: number) => (
-
-                        <div
-                            key={i}
-                            className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm space-y-6 relative"
-                        >
-
-                            {/* Remove button */}
-                            {i > 0 && (
+                    <div className="space-y-4">
+                        {section4.outputs.map((out, i) => (
+                            <div key={i} className="flex flex-col md:flex-row gap-4 p-6 bg-slate-50/50 rounded-3xl border-2 border-slate-50 relative group">
+                                <div className="flex-1 space-y-2">
+                                    <Label className="text-[9px] font-black uppercase text-slate-400 tracking-widest pl-1">Output Type</Label>
+                                    <select
+                                        value={out.type}
+                                        onChange={e => updateOutput(i, 'type', e.target.value)}
+                                        className="w-full h-12 bg-white border-2 border-slate-100 rounded-xl px-4 text-xs font-bold text-slate-700 outline-none focus:border-report-primary-border"
+                                    >
+                                        <option value="">Select Type...</option>
+                                        {outputTypes.map(t => <option key={t} value={t}>{t}</option>)}
+                                    </select>
+                                </div>
+                                <div className="w-full md:w-32 space-y-2">
+                                    <Label className="text-[9px] font-black uppercase text-slate-400 tracking-widest pl-1">Quantity</Label>
+                                    <Input
+                                        type="number"
+                                        placeholder="300"
+                                        value={out.quantity}
+                                        onChange={e => updateOutput(i, 'quantity', e.target.value)}
+                                        className="h-12 bg-white border-2 border-slate-100 rounded-xl font-black text-lg text-report-primary"
+                                    />
+                                </div>
+                                <div className="flex-1 space-y-2">
+                                    <Label className="text-[9px] font-black uppercase text-slate-400 tracking-widest pl-1">Unit</Label>
+                                    <Input
+                                        placeholder="Individuals / Kits / Sessions"
+                                        value={out.unit}
+                                        onChange={e => updateOutput(i, 'unit', e.target.value)}
+                                        className="h-12 bg-white border-2 border-slate-100 rounded-xl font-bold"
+                                    />
+                                </div>
                                 <button
                                     type="button"
-                                    onClick={() => removeActivity(i)}
-                                    className="absolute top-4 right-4 w-8 h-8 rounded-full bg-red-50 text-red-400 flex items-center justify-center hover:bg-red-100 hover:text-red-600 transition"
+                                    onClick={() => removeOutput(i)}
+                                    className="absolute -top-3 -right-3 w-8 h-8 rounded-full bg-red-100 text-red-500 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center hover:bg-red-200"
                                 >
                                     <Trash2 className="w-4 h-4" />
                                 </button>
-                            )}
-
-
-                            {/* Activity Type */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-
-                                <div className="space-y-2">
-
-                                    <Label className="text-sm font-semibold text-slate-800">
-                                        Activity Type
-                                    </Label>
-
-                                    <select
-                                        value={act.type || ''}
-                                        onChange={(e) => updateActivity(i, 'type', e.target.value)}
-                                        className={clsx(
-                                            "w-full h-12 bg-slate-50 border border-slate-200 rounded-lg px-4 text-sm font-medium text-slate-700 outline-none focus:border-report-primary",
-                                            getFieldError(`activities.${i}.type`) && "border-red-300"
-                                        )}
-                                    >
-                                        <option value="">Select Activity Type...</option>
-                                        {activityTypes.map(t => (
-                                            <option key={t} value={t}>{t}</option>
-                                        ))}
-                                    </select>
-
-                                    <FieldError message={getFieldError(`activities.${i}.type`)} />
-
-                                </div>
-
-
-                                {/* Other Type */}
-                                <div className="space-y-2">
-
-                                    {(act.type === 'Other') && (
-                                        <>
-                                            <Label className="text-sm font-semibold text-slate-800">
-                                                Specify Activity
-                                            </Label>
-
-                                            <Textarea
-                                                placeholder="Specify activity..."
-                                                value={act.type_other || ''}
-                                                onChange={(e) => updateActivity(i, 'type_other', e.target.value)}
-                                                className="w-full h-24 bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 text-sm text-slate-700 outline-none focus:border-report-primary resize-none"
-                                            />
-                                        </>
-                                    )}
-
-                                </div>
-
                             </div>
-
-
-                            {/* Delivery / Sessions / Duration */}
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4 border-t border-slate-200">
-
-                                {/* Delivery Mode */}
-                                <div className="space-y-2">
-
-                                    <Label className="text-xs font-semibold text-slate-700 uppercase tracking-wide">
-                                        Delivery Mode
-                                    </Label>
-
-                                    <select
-                                        value={act.delivery_mode || section4.delivery_mode || ''}
-                                        onChange={(e) => {
-                                            updateActivity(i, 'delivery_mode', e.target.value);
-                                            if (i === 0) updateSection('section4', { delivery_mode: e.target.value });
-                                        }}
-                                        className="w-full h-11 bg-slate-50 border border-slate-200 rounded-lg px-3 text-sm text-slate-700"
-                                    >
-                                        <option value="">Select Mode...</option>
-
-                                        {deliveryModes.map(m => (
-                                            <option key={m} value={m}>{m}</option>
-                                        ))}
-
-                                    </select>
-
-                                </div>
-
-
-                                {/* Sessions */}
-                                <div className="space-y-2">
-
-                                    <Label className="text-xs font-semibold text-slate-700 uppercase tracking-wide">
-                                        Total Sessions
-                                    </Label>
-
-                                    <input
-                                        type="number"
-                                        placeholder="e.g. 5"
-                                        value={act.sessions || (i === 0 ? section4.total_sessions : '') || ''}
-                                        onChange={(e) => {
-                                            updateActivity(i, 'sessions', e.target.value);
-                                            if (i === 0) updateSection('section4', { total_sessions: e.target.value });
-                                        }}
-                                        className="w-full h-11 bg-slate-50 border border-slate-200 rounded-lg px-3 text-sm text-slate-700 outline-none"
-                                    />
-
-                                </div>
-
-
-                                {/* Duration */}
-                                <div className="space-y-2">
-
-                                    <Label className="text-xs font-semibold text-slate-700 uppercase tracking-wide">
-                                        Project Duration
-                                    </Label>
-
-                                    <div className="h-11 bg-slate-100 rounded-lg px-3 flex items-center justify-between border border-slate-200">
-
-                                        <span className="text-sm font-medium text-slate-600">
-                                            {section1.metrics.engagement_span} Days
-                                        </span>
-
-                                        <Lock className="w-4 h-4 text-slate-400" />
-
-                                    </div>
-
-                                    <p className="text-xs text-slate-400">
-                                        Linked from Section 1 Attendance
-                                    </p>
-
-                                </div>
-
-                            </div>
-
-                        </div>
-
-                    ))}
-
-                </div>
-
-            </div>
-
-            {/* 4.2 Primary Change Area */}
-            <div className="space-y-6">
-
-                <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center text-[11px] font-bold">
-                        4.2
-                    </div>
-
-                    <h3 className="text-base font-semibold text-slate-900">
-                        Primary Change Area
-                    </h3>
-                </div>
-
-
-                <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm relative">
-
-                    <div className="space-y-6">
-
-                        {/* Label */}
-                        <div className="space-y-1">
-                            <Label className="text-sm font-semibold text-slate-800">
-                                Primary Change Area (Required)
-                            </Label>
-
-                            <p className="text-xs text-slate-500">
-                                What type of change was your project primarily designed to support?
-                            </p>
-                        </div>
-
-
-                        {/* Options */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-
-                            {changeAreas.map((area) => (
-
-                                <button
-                                    key={area}
-                                    type="button"
-                                    onClick={() => updateSection('section4', { primary_change_area: area })}
-                                    className={clsx(
-                                        "px-4 py-3 rounded-lg border text-left transition text-xs font-semibold uppercase tracking-wide",
-                                        section4.primary_change_area === area
-                                            ? "border-report-primary bg-report-primary text-white"
-                                            : "border-slate-200 bg-slate-50 text-slate-600 hover:border-report-primary hover:text-report-primary"
-                                    )}
-                                >
-                                    {area}
-                                </button>
-
-                            ))}
-
-                        </div>
-
-
-                        {/* Other specify */}
-                        {section4.primary_change_area === 'Other' && (
-
-                            <div className="space-y-3">
-
-                                {(section4.primary_change_area_others || ['']).map((val: string, idx: number) => (
-
-                                    <div key={idx} className="flex items-center gap-2">
-
-                                        <Textarea
-                                            placeholder="Specify your change area (100–200 words)..."
-                                            value={val}
-                                            onChange={(e) => updateOtherChangeArea(idx, e.target.value)}
-                                            className="flex-1 min-h-[80px] max-h-[120px] bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 text-sm text-slate-700 outline-none focus:border-report-primary resize-none"
-                                        />
-
-                                        {(section4.primary_change_area_others || ['']).length > 1 && (
-                                            <button
-                                                type="button"
-                                                onClick={() => removeOtherChangeArea(idx)}
-                                                className="w-8 h-8 rounded-full bg-red-50 text-red-500 flex items-center justify-center hover:bg-red-100 transition"
-                                            >
-                                                <LucideX className="w-4 h-4" />
-                                            </button>
-                                        )}
-
-                                    </div>
-
-                                ))}
-
-
-                                <Button
-                                    type="button"
-                                    variant="ghost"
-                                    onClick={addOtherChangeArea}
-                                    className="h-8 px-3 rounded-md bg-slate-100 text-slate-600 text-xs font-semibold uppercase tracking-wide hover:bg-slate-200"
-                                >
-                                    <Plus className="w-3 h-3 mr-2" />
-                                    Add Another Area
-                                </Button>
-
-                            </div>
-
-                        )}
-
-
-                        {/* Warning */}
-                        <div className="p-4 bg-amber-50 rounded-lg border border-amber-200 flex items-start gap-3">
-
-                            <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-
-                            <p className="text-xs text-amber-800 font-medium leading-relaxed">
-                                The system internally maps this to the SDG, Target, and Indicator locked in Section 3.
-                            </p>
-
-                        </div>
-
-                    </div>
-
-                </div>
-
-            </div>
-
-            {/* 4.3 Structured Outputs */}
-            <div className="space-y-6">
-
-                {/* Header */}
-                <div className="flex items-center justify-between">
-
-                    <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center text-[11px] font-bold">
-                            4.3
-                        </div>
-
-                        <h3 className="text-base font-semibold text-slate-900">
-                            Structured Outputs
-                        </h3>
-                    </div>
-
-                    <Button
-                        type="button"
-                        variant="ghost"
-                        onClick={addOutput}
-                        className="h-9 px-4 rounded-lg bg-slate-900 text-white text-xs font-semibold uppercase tracking-wide hover:bg-black transition shadow-sm"
-                    >
-                        <PlusCircle className="w-4 h-4 mr-2" />
-                        Add Output Row
-                    </Button>
-
-                </div>
-
-
-                {/* Outputs Card */}
-                <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
-
-                    <div className="space-y-5">
-
-                        {section4.outputs.map((out, i) => (
-
-                            <div key={i} className="space-y-2">
-
-                                <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
-
-                                    {/* Output Type */}
-                                    <div className="md:col-span-5 space-y-2">
-
-                                        <Label className="text-xs font-semibold text-slate-600 uppercase tracking-wide">
-                                            Output Type
-                                        </Label>
-
-                                        <select
-                                            value={out.type}
-                                            onChange={(e) => updateOutput(i, 'type', e.target.value)}
-                                            className="w-full h-11 bg-slate-50 border border-slate-200 rounded-lg px-3 text-sm text-slate-700 outline-none focus:border-report-primary"
-                                        >
-                                            <option value="">Select Output Type...</option>
-
-                                            {outputTypes.map(t => (
-                                                <option key={t} value={t}>{t}</option>
-                                            ))}
-
-                                        </select>
-
-                                    </div>
-
-
-                                    {/* Other specify */}
-                                    <div className="md:col-span-4 space-y-2">
-
-                                        {out.type === 'Other' ? (
-
-                                            <>
-                                                <Label className="text-xs font-semibold text-slate-600 uppercase tracking-wide">
-                                                    Specify Output
-                                                </Label>
-
-                                                <Textarea
-                                                    placeholder="Specify output + unit..."
-                                                    value={(out as any).other_label || ''}
-                                                    onChange={(e) => updateOutput(i, 'other_label', e.target.value)}
-                                                    className="w-full min-h-[70px] bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 outline-none focus:border-report-primary resize-none"
-                                                />
-                                            </>
-
-                                        ) : (
-
-                                            <div className="h-11 hidden md:block"></div>
-
-                                        )}
-
-                                    </div>
-
-
-                                    {/* Total Number */}
-                                    <div className="md:col-span-2 space-y-2">
-
-                                        <Label className="text-xs font-semibold text-slate-600 uppercase tracking-wide">
-                                            Total Number
-                                        </Label>
-
-                                        <Input
-                                            type="number"
-                                            placeholder="0"
-                                            value={out.count}
-                                            onChange={(e) => updateOutput(i, 'count', e.target.value)}
-                                            className="h-11 bg-slate-50 border border-slate-200 rounded-lg px-3 text-sm font-medium"
-                                        />
-
-                                    </div>
-
-
-                                    {/* Delete Button */}
-                                    <div className="md:col-span-1 pb-1 flex justify-end">
-
-                                        <button
-                                            type="button"
-                                            onClick={() => removeOutput(i)}
-                                            disabled={section4.outputs.length === 1}
-                                            className="w-9 h-9 rounded-full bg-red-50 text-red-500 flex items-center justify-center hover:bg-red-100 disabled:opacity-30 transition"
-                                        >
-                                            <Trash2 className="w-4 h-4" />
-                                        </button>
-
-                                    </div>
-
-                                </div>
-
-                            </div>
-
                         ))}
-
                     </div>
-
                 </div>
-
             </div>
-            {/* 4.4 Beneficiary Profile */}
+
+            {/* 4.4 Beneficiary Reach */}
             <div className="space-y-6">
-
-                {/* Header */}
                 <div className="flex items-center gap-3">
-
-                    <div className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center text-[11px] font-bold">
-                        4.4
-                    </div>
-
-                    <h3 className="text-base font-semibold text-slate-900">
-                        Beneficiary Profile
-                    </h3>
-
+                    <div className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center text-[10px] font-black">4.4</div>
+                    <h3 className="report-h3">Beneficiary Reach & Segmentation</h3>
                 </div>
 
-
-                {/* Card */}
-                <div className="bg-white rounded-xl border border-slate-200 p-8 shadow-sm space-y-10">
-
-
-                    {/* Category Selection */}
-                    <div className="space-y-5">
-
-                        <Label className="text-xs font-semibold text-slate-600 uppercase tracking-wide">
-                            Select Categories (Select All That Apply)
-                        </Label>
-
-
-                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-
-                            {beneficiaryGroups.map((group) => (
-
-                                <button
-                                    key={group}
-                                    type="button"
-                                    onClick={() => toggleBeneficiary(group)}
-                                    className={clsx(
-                                        "px-4 py-4 rounded-lg border text-center transition text-xs font-semibold uppercase tracking-wide",
-                                        section4.beneficiary_categories.includes(group)
-                                            ? "border-report-primary bg-report-primary-soft text-report-primary"
-                                            : "border-slate-200 bg-slate-50 text-slate-600 hover:border-report-primary hover:text-report-primary"
-                                    )}
-                                >
-                                    {group}
-                                </button>
-
-                            ))}
-
-                        </div>
-
-
-                        {/* Other Beneficiary */}
-                        {section4.beneficiary_categories.includes('Other') && (
-
-                            <Textarea
-                                placeholder="Specify beneficiary group..."
-                                value={section4.beneficiary_other || ''}
-                                onChange={(e) => updateSection('section4', { beneficiary_other: e.target.value })}
-                                className="w-full md:w-[420px] min-h-[70px] bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 text-sm text-slate-700 outline-none focus:border-report-primary resize-none"
+                <div className="bg-white rounded-[2.5rem] border-2 border-slate-100 p-8 shadow-sm space-y-8">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                        <div className="space-y-2">
+                            <Label className="report-label">Total Beneficiaries (Required)</Label>
+                            <p className="text-[10px] text-slate-400 font-medium mb-3">Total distinct people receiving benefit.</p>
+                            <Input
+                                type="number"
+                                placeholder="e.g. 500"
+                                value={section4.total_beneficiaries}
+                                onChange={e => update('total_beneficiaries', e.target.value)}
+                                className="h-14 bg-slate-50 border-2 border-slate-50 rounded-2xl font-black text-2xl text-slate-900 px-6"
                             />
-
-                        )}
-
-                    </div>
-
-
-
-                    {/* Divider */}
-                    <div className="border-t border-slate-200 pt-8">
-
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
-
-
-                            {/* Total Beneficiaries */}
-                            <div className="space-y-3">
-
-                                <Label className="text-xs font-semibold text-slate-600 uppercase tracking-wide">
-                                    Total Beneficiaries Reached (Numeric Only)
-                                </Label>
-
-                                <Input
-                                    type="number"
-                                    placeholder="Total unique individuals"
-                                    value={section4.total_beneficiaries}
-                                    onChange={(e) => updateSection('section4', { total_beneficiaries: e.target.value })}
-                                    className="h-12 bg-slate-50 border border-slate-200 rounded-lg px-4 text-sm font-semibold text-slate-800"
-                                />
-
-                                <p className="text-xs text-slate-400 flex items-center gap-2">
-                                    <Info className="w-3 h-3" />
-                                    Enter total unique individuals reached
-                                </p>
-
-                            </div>
-
-
-
-                            {/* System Validation Card */}
-                            <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg space-y-2">
-
-                                <p className="text-xs font-semibold text-amber-800 uppercase tracking-wide">
-                                    System validates consistency between:
-                                </p>
-
-                                <ul className="text-xs text-amber-700 space-y-1">
-
-                                    <li>• "People reached" output entries</li>
-                                    <li>• Selected beneficiary categories</li>
-                                    <li>• Attendance records from Section 1</li>
-
-                                </ul>
-
-                            </div>
                         </div>
 
+                        <div className="space-y-4">
+                            <Label className="report-label">Beneficiary Categories (Select All That Apply)</Label>
+                            <div className="flex flex-wrap gap-2">
+                                {beneficiaryGroups.map(cat => (
+                                    <button
+                                        key={cat}
+                                        type="button"
+                                        onClick={() => toggleBeneficiary(cat)}
+                                        className={clsx(
+                                            "px-4 py-2 rounded-xl border-2 text-[10px] font-bold transition-all",
+                                            (section4.beneficiary_categories || []).includes(cat)
+                                                ? "border-emerald-600 bg-emerald-50 text-emerald-700"
+                                                : "border-slate-50 bg-slate-50 text-slate-400 hover:border-slate-200"
+                                        )}
+                                    >
+                                        {cat}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
                     </div>
 
+                    <div className="space-y-3 pt-8 border-t-2 border-slate-50">
+                        <Label className="report-label">Optional Description (50–100 words)</Label>
+                        <p className="text-[10px] text-slate-400 font-medium italic mb-2">Explain: Who these people are and why they were selected.</p>
+                        <Textarea
+                            placeholder="Describe your beneficiaries..."
+                            value={section4.beneficiary_description}
+                            onChange={e => update('beneficiary_description', e.target.value)}
+                            className="min-h-[100px] rounded-2xl border-2 border-slate-50 bg-slate-50 p-6 text-xs font-bold text-slate-700 focus:bg-white focus:border-report-primary-border outline-none transition-all resize-none"
+                        />
+                    </div>
                 </div>
-
             </div>
 
-            {/* 4.5 Team Contribution Details (Team Only) */}
-            {isTeam && (
-                <div className="space-y-6">
+            {/* 4.5 Scale */}
+            <div className="space-y-6">
+                <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center text-[10px] font-black">4.5</div>
+                    <h3 className="report-h3">Scale of Implementation</h3>
+                </div>
 
-                    <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center text-[11px] font-bold">
-                            4.5
+                <div className="bg-white rounded-[2.5rem] border-2 border-slate-100 p-8 shadow-sm space-y-10">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                        <div className="space-y-2">
+                            <Label className="report-label">4.5.1 Number of Sessions</Label>
+                            <p className="text-[10px] text-slate-400 font-medium mb-3">Total specific activities or events conducted.</p>
+                            <Input
+                                type="number"
+                                value={section4.total_sessions}
+                                onChange={e => update('total_sessions', e.target.value)}
+                                className="h-14 bg-slate-50 border-2 border-slate-50 rounded-2xl font-black text-2xl text-slate-900 px-6"
+                            />
                         </div>
 
-                        <h3 className="text-base font-semibold text-slate-900">
-                            Team Contribution Details
-                        </h3>
+                        <div className="space-y-2">
+                            <Label className="report-label">4.5.2 Duration & Intensity (Auto-Generated)</Label>
+                            <div className="grid grid-cols-2 gap-3 pt-2">
+                                <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
+                                    <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Total Hours</p>
+                                    <p className="text-sm font-black text-slate-900">{section1.metrics?.total_verified_hours || 0}h</p>
+                                </div>
+                                <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
+                                    <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Active Days</p>
+                                    <p className="text-sm font-black text-slate-900">{section1.metrics?.total_active_days || 0}</p>
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
-                    <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-10 pt-10 border-t-2 border-slate-50">
+                        <div className="space-y-4">
+                            <Label className="report-label">4.5.3 Geographic Reach (Select One)</Label>
+                            <select
+                                value={section4.geographic_reach}
+                                onChange={e => {
+                                    update('geographic_reach', e.target.value);
+                                    update('geographic_sub_category', '');
+                                }}
+                                className="w-full h-14 bg-slate-50 border-2 border-slate-50 rounded-2xl px-6 font-bold text-slate-700 text-sm outline-none focus:border-report-primary-border"
+                            >
+                                <option value="">Select Reach...</option>
+                                {geographicReachOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                            </select>
+                        </div>
 
-                        <div className="overflow-x-auto">
-
-                            <table className="w-full text-left text-sm">
-
-                                <thead className="bg-slate-50 border-b border-slate-200">
-
-                                    <tr className="text-xs font-semibold text-slate-600 uppercase tracking-wide">
-
-                                        <th className="px-6 py-4">Member</th>
-                                        <th className="px-6 py-4">Role</th>
-                                        <th className="px-6 py-4">Hours</th>
-                                        <th className="px-6 py-4">Sessions</th>
-                                        <th className="px-6 py-4">Beneficiaries Engaged</th>
-
-                                    </tr>
-
-                                </thead>
-
-
-                                <tbody className="divide-y divide-slate-100">
-
-                                    {section4.team_contributions.map((cont, i) => (
-
-                                        <tr key={i} className="hover:bg-slate-50 transition">
-
-                                            <td className="px-6 py-4">
-
-                                                <div className="flex items-center gap-3">
-
-                                                    <div className="w-9 h-9 rounded-lg bg-report-primary-soft text-report-primary flex items-center justify-center text-xs font-bold border border-report-primary-border uppercase">
-                                                        {cont.name.substring(0, 2)}
-                                                    </div>
-
-                                                    <div>
-
-                                                        <span className="text-sm font-semibold text-slate-900 block">
-                                                            {cont.name}
-                                                        </span>
-
-                                                        <span className="text-[10px] text-report-primary flex items-center gap-1 mt-0.5 font-semibold">
-                                                            <div className="w-1.5 h-1.5 rounded-full bg-report-primary animate-pulse" />
-                                                            Verified Member
-                                                        </span>
-
-                                                    </div>
-
-                                                </div>
-
-                                            </td>
-
-
-                                            <td className="px-6 py-4">
-
-                                                <select
-                                                    value={cont.role}
-                                                    onChange={(e) => updateContributor(i, 'role', e.target.value)}
-                                                    className="w-full h-10 bg-slate-50 border border-slate-200 rounded-lg px-3 text-xs text-slate-700 outline-none focus:border-report-primary"
-                                                >
-
-                                                    <option value="">Select Role...</option>
-
-                                                    {teamRoles.map(r => (
-                                                        <option key={r} value={r}>{r}</option>
-                                                    ))}
-
-                                                </select>
-
-                                            </td>
-
-
-                                            <td className="px-6 py-4">
-
-                                                <div className="h-10 bg-slate-100 rounded-lg px-3 flex items-center text-xs font-semibold text-slate-600 border border-slate-200">
-                                                    {cont.hours}h
-                                                </div>
-
-                                            </td>
-
-
-                                            <td className="px-6 py-4">
-
-                                                <Input
-                                                    type="number"
-                                                    value={cont.sessions}
-                                                    onChange={(e) => updateContributor(i, 'sessions', e.target.value)}
-                                                    className="h-10 w-24 bg-slate-50 border border-slate-200 rounded-lg px-3 text-sm"
-                                                />
-
-                                            </td>
-
-
-                                            <td className="px-6 py-4">
-
-                                                <Input
-                                                    type="number"
-                                                    value={cont.beneficiaries}
-                                                    onChange={(e) => updateContributor(i, 'beneficiaries', e.target.value)}
-                                                    className="h-10 w-24 bg-slate-50 border border-slate-200 rounded-lg px-3 text-sm"
-                                                />
-
-                                            </td>
-
-                                        </tr>
-
+                        {section4.geographic_reach && subCategoryMap[section4.geographic_reach] && (
+                            <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
+                                <Label className="report-label">4.5.4 Geographic Sub-Category (Select One)</Label>
+                                <div className="flex flex-wrap gap-2">
+                                    {subCategoryMap[section4.geographic_reach].map(sub => (
+                                        <button
+                                            key={sub}
+                                            type="button"
+                                            onClick={() => update('geographic_sub_category', sub)}
+                                            className={clsx(
+                                                "px-4 py-2 rounded-xl border-2 text-[10px] font-bold transition-all",
+                                                section4.geographic_sub_category === sub
+                                                    ? "border-slate-900 bg-slate-900 text-white shadow-lg shadow-slate-200"
+                                                    : "border-slate-50 bg-slate-50 text-slate-400 hover:border-slate-200"
+                                            )}
+                                        >
+                                            {sub}
+                                        </button>
                                     ))}
-
-                                </tbody>
-
-                            </table>
-
-                        </div>
-
-
-                        <div className="p-4 bg-slate-50 border-t border-slate-200">
-
-                            <p className="text-xs text-slate-600 flex items-center gap-2">
-
-                                <Shield className="w-3.5 h-3.5 text-slate-500" />
-
-                                Hours are linked from Section 1 Attendance and cannot be edited.
-
-                            </p>
-
-                        </div>
-
+                                </div>
+                            </div>
+                        )}
                     </div>
 
+                    {/* Scale Analytics */}
+                    <div className="p-8 bg-slate-900 rounded-[2rem] text-white space-y-6 relative overflow-hidden">
+                        <div className="relative z-10 grid grid-cols-1 md:grid-cols-3 gap-8">
+                            <div className="space-y-1">
+                                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Session Frequency</p>
+                                <p className="text-xl font-black">{((parseInt(section4.total_sessions) || 0) / (section1.metrics?.engagement_span || 1)).toFixed(1)} <span className="text-[10px] text-slate-400 font-bold tracking-normal">/ day</span></p>
+                            </div>
+                            <div className="space-y-1">
+                                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Engagement Intensity</p>
+                                <p className="text-xl font-black">{section1.metrics?.eis_score || 0}%</p>
+                            </div>
+                            <div className="space-y-1">
+                                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">HEC Compliance</p>
+                                <p className="text-xl font-black uppercase text-emerald-400">{section1.metrics?.hec_compliance || 'Recognized'}</p>
+                            </div>
+                        </div>
+                        <div className="absolute -bottom-10 -right-10 opacity-10">
+                            <Activity className="w-64 h-64" />
+                        </div>
+                    </div>
                 </div>
-            )}
-
-
-
-            {/* Auto-Generated Summary */}
-            <div className="pt-14 border-t border-slate-200">
-
-                <div className="flex items-center justify-between mb-6">
-
-                    <div className="flex items-center gap-3">
-
-                        <div className="w-9 h-9 rounded-lg bg-report-primary text-white flex items-center justify-center shadow-sm">
-                            <Activity className="w-5 h-5" />
-                        </div>
-
-                        <h3 className="text-lg font-semibold text-slate-900 italic">
-                            Activity & Output Summary
-                        </h3>
-
-                    </div>
-
-
-                    <div className="flex items-center gap-3">
-
-                        <button
-                            type="button"
-                            onClick={handleGenerateAISummary}
-                            disabled={isGenerating}
-                            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-report-primary text-white text-xs font-semibold uppercase tracking-wide hover:opacity-90 disabled:opacity-40 transition"
-                        >
-
-                            {isGenerating
-                                ? <Loader2 className="w-4 h-4 animate-spin" />
-                                : <Sparkles className="w-4 h-4" />
-                            }
-
-                            {isGenerating ? "Generating…" : "Improve with AI"}
-
-                        </button>
-
-
-                        <div className="px-4 py-2 rounded-lg bg-slate-900 text-white text-xs font-semibold uppercase tracking-wide">
-                            Live Preview
-                        </div>
-
-                    </div>
-
-                </div>
-
-
-
-                <div className="bg-white border border-slate-200 rounded-xl p-8 relative shadow-sm">
-
-                    <div className="relative z-10">
-
-                        <p className="report-ai-text text-sm leading-relaxed text-slate-700">
-                            {autoSummary}
-                        </p>
-
-                    </div>
-
-                </div>
-
             </div>
 
+            {/* Save Button */}
             <div className="flex justify-center pt-10">
                 <Button
                     type="button"
                     variant="outline"
                     onClick={() => saveReport(false)}
-                    className="h-16 px-12 rounded-2xl border-2 border-slate-200 bg-white text-slate-500 font-extrabold uppercase tracking-widest hover:border-slate-900 hover:text-slate-900 hover:shadow-2xl hover:shadow-slate-100 transition-all flex items-center gap-4 group"
+                    className="h-16 px-12 rounded-2xl border-2 border-slate-100 bg-white text-slate-500 font-extrabold uppercase tracking-widest hover:border-slate-900 hover:text-slate-900 hover:shadow-xl transition-all flex items-center gap-4 group"
                 >
                     <Save className="w-6 h-6 group-hover:rotate-12 transition-transform" />
-                    <span>Save Section 4 Progress</span>
+                    <span>Save Activities Section</span>
                 </Button>
             </div>
         </div>
-    )
+    );
 }

@@ -36,9 +36,10 @@ export default function AttendanceForm({
     const { data: reportData, updateSection } = useReportForm();
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [evidenceFile, setEvidenceFile] = useState<File | null>(null);
+    const [mounted, setMounted] = React.useState(false);
     const [formData, setFormData] = useState({
         participantId: selectedParticipantId || (verifiedUsers.length > 0 ? verifiedUsers[0].id : ''),
-        dateOfEngagement: new Date().toISOString().split('T')[0],
+        dateOfEngagement: '', // Default to empty to avoid hydration mismatch
         startTime: '09:00',
         endTime: '12:00',
         organizationName: '',
@@ -47,6 +48,17 @@ export default function AttendanceForm({
         description: '',
         locationPin: '', // To store lat,lng
     });
+
+    // Handle client-side initialization
+    React.useEffect(() => {
+        setMounted(true);
+        if (!formData.dateOfEngagement) {
+            setFormData(prev => ({
+                ...prev,
+                dateOfEngagement: new Date().toISOString().split('T')[0]
+            }));
+        }
+    }, []);
 
     // Keep formData.participantId in sync with selectedParticipantId prop
     React.useEffect(() => {
@@ -58,16 +70,14 @@ export default function AttendanceForm({
     const wordCount = formData.description.trim() === "" ? 0 : formData.description.trim().split(/\s+/).length;
 
     const selectedUser = verifiedUsers.find(u => u.id === formData.participantId);
-    const isUserApproved = selectedUser?.status === 'approved' ||
-        selectedUser?.status === 'verified' ||
-        selectedUser?.status === 'active' ||
-        selectedUser?.status === 'accepted' ||
-        selectedUser?.status === 'pending' ||
-        selectedUser?.status === 'pending_approval' ||
-        selectedUser?.status === 'pending_faculty_approval' ||
-        selectedUser?.status === 'pending_ciel_approval';
-    // const effectiveLocked = !isUserApproved || (isLocked && !isParticipationUnlocked);
-    const effectiveLocked = false; // Temporarily disabled by user request
+    const isUserApproved = !!selectedUser && [
+        'approved', 'verified', 'active', 'accepted', 'pending',
+        'pending_approval', 'pending_faculty_approval', 'pending_ciel_approval', 'registered'
+    ].includes(selectedUser.status || '');
+    
+    // Restore proper locking logic: record is locked if report is submitted OR if user is not yet approved
+    const effectiveLocked = !isUserApproved || (isLocked && !isParticipationUnlocked);
+    // const effectiveLocked = false; // Previously disabled, now restored
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -115,7 +125,8 @@ export default function AttendanceForm({
                 let fetchOptions: RequestInit = {};
 
                 // Strip prefix for API calls (e.g. member:0:ID -> ID)
-                const realId = activeParticipantId.includes(':') ? activeParticipantId.split(':').pop() : activeParticipantId;
+                const segments = activeParticipantId.split(':');
+                const realId = segments.length > 1 ? segments[segments.length - 1] : activeParticipantId;
 
                 if (evidenceFile) {
                     const fd = new FormData();
@@ -129,29 +140,41 @@ export default function AttendanceForm({
                     fd.append('sessionHours', numericHours.toString());
                     fd.append('evidenceUploaded', 'true');
                     fd.append('evidence', evidenceFile); // Actual file
+                    if (formData.locationPin) fd.append('locationPin', formData.locationPin);
 
                     fetchOptions = {
                         method: 'POST',
                         body: fd,
                     };
                 } else {
+                    const payload = {
+                        participantId: realId,
+                        dateOfEngagement: formData.dateOfEngagement,
+                        startTime: formData.startTime,
+                        endTime: formData.endTime,
+                        organizationName: formData.organizationName,
+                        activityType: formData.activityType === 'Other' ? formData.otherActivity : formData.activityType,
+                        description: formData.description,
+                        sessionHours: numericHours,
+                        evidenceUploaded: false,
+                        locationPin: formData.locationPin || undefined
+                    };
+
+                    console.log(`[Attendance] Body:`, payload);
+
                     fetchOptions = {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            ...formData,
-                            participantId: realId,
-                            activityType: formData.activityType === 'Other' ? formData.otherActivity : formData.activityType,
-                            evidenceUploaded: false,
-                            sessionHours: numericHours
-                        })
+                        body: JSON.stringify(payload)
                     };
                 }
 
+                console.log(`[Attendance] Submitting session for Participant ID: ${realId}`);
                 const res = await authenticatedFetch(`/api/v1/engagement/${realId}/attendance`, fetchOptions);
 
                 if (!res || !res.ok) {
                     console.warn("Backend sync failed, but context updated");
+                    if (res) console.error("[Attendance] Server Response Error:", res.status, res.statusText);
                 }
             }
 
@@ -196,8 +219,9 @@ export default function AttendanceForm({
                         <select
                             value={formData.participantId}
                             onChange={(e) => {
-                                setFormData({ ...formData, participantId: e.target.value });
-                                if (onParticipantChange) onParticipantChange(e.target.value);
+                                const newId = e.target.value;
+                                setFormData({ ...formData, participantId: newId });
+                                if (onParticipantChange) onParticipantChange(newId);
                             }}
                             className="w-full pl-12 h-14 bg-slate-50 border-2 border-transparent rounded-2xl font-bold text-base appearance-none focus:ring-4 focus:ring-report-primary/10 focus:border-report-primary/20 focus:bg-white transition-all cursor-pointer hover:bg-slate-100"
                             required
@@ -221,7 +245,7 @@ export default function AttendanceForm({
                         <Input
                             type="date"
                             value={formData.dateOfEngagement}
-                            max={new Date().toISOString().split('T')[0]}
+                            max={mounted ? new Date().toISOString().split('T')[0] : undefined}
                             onChange={(e) => setFormData({ ...formData, dateOfEngagement: e.target.value })}
                             className="pl-12 h-14 bg-slate-50 border-none rounded-2xl font-bold text-base shadow-sm focus:ring-2 focus:ring-report-primary/20"
                             required
@@ -397,15 +421,15 @@ export default function AttendanceForm({
                     {isSubmitting ? (
                         <Loader2 className="w-5 h-5 animate-spin mx-auto" />
                     ) : effectiveLocked ? (
-                        <div className="flex items-center justify-center gap-2">
+                        <span className="flex items-center justify-center gap-2">
                             <Lock className="w-4 h-4" />
                             {!isUserApproved && selectedUser ? "APPROVAL PENDING" : "RECORD LOCKED"}
-                        </div>
+                        </span>
                     ) : (
-                        <div className="flex items-center justify-center gap-2">
+                        <span className="flex items-center justify-center gap-2">
                             <CheckCircle2 className="w-5 h-5" />
                             SAVE ATTENDANCE ENTRY
-                        </div>
+                        </span>
                     )}
                 </Button>
 

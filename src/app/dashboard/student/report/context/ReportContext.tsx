@@ -97,25 +97,27 @@ export interface ReportData {
     };
     // Section 4: Activities & Outputs (Expanded)
     section4: {
-        activities: Array<{
-            type: string;
-            other_text?: string;
-        }>;
-        delivery_mode: string;
+        activity_primary_type: string;
+        activity_secondary_types: string[];
+        activity_description: string;
+        delivery_mode: string;           // select one: Field-based, Online, Hybrid
+        implementation_model: string[];  // select multiple: Individual, Team-Based, Partner-Led, Multi-Stakeholder
+        delivery_explanation: string;
         total_sessions: string;
         primary_change_area: string;
         outputs: Array<{
             type: string;
-            other_text?: string;
-            count: string;
+            quantity: string;
+            unit: string;
         }>;
         beneficiary_categories: string[];
-        beneficiary_other?: string;
         total_beneficiaries: string;
-        primary_change_area_other?: string;
-        primary_change_area_others?: string[];
-
-        // Team-specific details (populated if team project)
+        beneficiary_description: string;
+        geographic_reach: string;        // Single Site, Local Community, etc.
+        geographic_sub_category: string; // School, Village, Neighborhood, etc.
+        summary_text?: string;
+        activities: Array<{ type: string; other_text?: string; }>; // Keep for backwards compatibility if needed
+        primary_change_area_others?: string[];                      // Keep for backwards compatibility if needed
         team_contributions: Array<{
             member_id: string;
             name: string;
@@ -125,8 +127,6 @@ export interface ReportData {
             sessions: string;
             beneficiaries: string;
         }>;
-
-        summary_text?: string; // Auto-generated
     };
     // Section 5: Outcomes (Detailed Metrics)
     section5: {
@@ -142,10 +142,12 @@ export interface ReportData {
             unit: string;
             unit_other?: string;
             confidence_level: string;
+            measurement_explanation?: string;
         }>;
         challenges: string;
         summary_text?: string;
     };
+
     // Section 6: Resources (Structured Table)
     section6: {
         use_resources: 'yes' | 'no' | '';
@@ -280,18 +282,26 @@ const defaultReportData: ReportData = {
         summary_text: ''
     },
     section4: {
-        activities: [],
+        activity_primary_type: '',
+        activity_secondary_types: [],
+        activity_description: '',
         delivery_mode: '',
+        implementation_model: [],
+        delivery_explanation: '',
         total_sessions: '',
         primary_change_area: '',
         outputs: [],
         beneficiary_categories: [],
         total_beneficiaries: '',
-        primary_change_area_other: '',
+        beneficiary_description: '',
+        geographic_reach: '',
+        geographic_sub_category: '',
+        summary_text: '',
+        activities: [],
         primary_change_area_others: [''],
-        team_contributions: [],
-        summary_text: ''
+        team_contributions: []
     },
+
     section5: {
         observed_change: '',
         measurable_outcomes: [{
@@ -301,11 +311,13 @@ const defaultReportData: ReportData = {
             baseline: '',
             endline: '',
             unit: '',
-            confidence_level: ''
+            confidence_level: '',
+            measurement_explanation: ''
         }],
         challenges: '',
         summary_text: ''
     },
+
     section6: {
         use_resources: '',
         resources: [],

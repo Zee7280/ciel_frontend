@@ -46,7 +46,6 @@ export default function AttendanceSummaryTable({ entries, onDelete, isLocked = f
                             <th className="px-5 py-5 text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">Student</th>
                             <th className="px-5 py-5 text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">Duration</th>
                             <th className="px-5 py-5 text-[10px] font-black uppercase tracking-[0.12em] text-slate-400 text-center">Evidence</th>
-                            <th className="px-5 py-5 text-[10px] font-black uppercase tracking-[0.12em] text-slate-400 text-right">Status</th>
                             {!isLocked && onDelete && <th className="px-5 py-5 text-[10px] font-black uppercase tracking-[0.12em] text-slate-400 text-right">Actions</th>}
                         </tr>
                     </thead>
@@ -59,7 +58,7 @@ export default function AttendanceSummaryTable({ entries, onDelete, isLocked = f
                                             {new Date(entry.date).getDate()}
                                         </div>
                                         <div>
-                                            <p className="font-black text-slate-900 text-base tracking-tight">
+                                            <p className="font-black text-slate-900 text-base tracking-tight" suppressHydrationWarning>
                                                 {new Date(entry.date).toLocaleDateString(undefined, { month: 'short', year: 'numeric' })}
                                             </p>
                                             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">
@@ -107,21 +106,8 @@ export default function AttendanceSummaryTable({ entries, onDelete, isLocked = f
                                         <span className="text-[9px] font-black text-slate-300 uppercase tracking-[0.2em]">No Evidence</span>
                                     )}
                                 </td>
-                                <td className="px-8 py-7 text-right">
-                                    <div className={clsx(
-                                        "inline-flex items-center px-4 py-2 rounded-xl text-[9px] font-black border-2 shadow-sm uppercase tracking-widest",
-                                        entry.entryStatus === 'verified' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
-                                            entry.entryStatus === 'flagged' ? 'bg-red-50 text-red-600 border-red-100' :
-                                                'bg-amber-50 text-amber-600 border-amber-100'
-                                    )}>
-                                        <div className={clsx("w-2 h-2 rounded-full mr-2",
-                                            entry.entryStatus === 'verified' ? 'bg-emerald-500 animate-pulse' :
-                                                entry.entryStatus === 'flagged' ? 'bg-red-500' : 'bg-amber-500 animate-pulse'
-                                        )}></div>
-                                        {entry.entryStatus || 'pending'}
-                                    </div>
-                                </td>
                                 {!isLocked && onDelete && (
+
                                     <td className="px-8 py-7 text-right">
                                         <button
                                             onClick={() => onDelete(entry.id)}

@@ -242,6 +242,12 @@ export default function AdminApprovalsPage() {
                                 <h3 className="text-lg font-bold text-slate-900">{req.name}</h3>
                                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-slate-500 mt-1">
                                     <span className="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded font-bold text-[10px] uppercase tracking-wider">{req.organization_type || "User"}</span>
+                                    {/* Naya Status Badge */}
+                                    {req.status === 'pending_ciel_approval' && (
+                                        <span className="bg-amber-50 text-amber-700 px-2 py-0.5 rounded font-bold text-[10px] uppercase tracking-wider ml-2">
+                                            Identity Verified (CIEL Review)
+                                        </span>
+                                    )}
                                     {req.opportunity && (
                                         <span className="font-bold text-slate-700 flex items-center gap-1">
                                             <FileText className="w-3.5 h-3.5 text-blue-500" />

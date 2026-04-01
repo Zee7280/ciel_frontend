@@ -23,7 +23,9 @@ export default function Section1Participation({ projectData }: { projectData?: a
     const { data, updateSection, getFieldError, validationErrors, nextStep, saveReport, isReadOnly, isParticipationUnlocked, setParticipationUnlocked, setRequiredHours } = useReportForm();
 
     const searchParams = useSearchParams();
-    const projectIdFromUrl = searchParams.get('project') || searchParams.get('projectId') || data.project_id;
+    // Use search params primarily for initialization to prevent context-update loops
+    const queryProjectId = searchParams.get('project') || searchParams.get('projectId');
+    const projectIdFromUrl = queryProjectId || data.project_id;
 
     const { participation_type, team_lead, team_members } = data.section1;
     // Extract available spots using all possible backend keys for the opportunity
@@ -49,8 +51,6 @@ export default function Section1Participation({ projectData }: { projectData?: a
         } : null
     );
     const [verifiedSummary, setVerifiedSummary] = React.useState<string>(data.section1.verified_summary || "");
-    const [isVerified, setIsVerified] = React.useState(!!data.section1.team_lead.verified);
-    const [participantId, setParticipantId] = React.useState<string | null>(data.section1.team_lead.id || null);
     const isSubmittedReport = data.status === 'submitted' || data.status === 'verified' || data.status === 'partner_verified' || data.status === 'finalized';
     const [isSubmitted, setIsSubmitted] = React.useState(isSubmittedReport);
     const reviewChecked = data.section1.review_checked || [false, false, false];
@@ -58,6 +58,52 @@ export default function Section1Participation({ projectData }: { projectData?: a
     const [selectedParticipantId, setSelectedParticipantId] = React.useState<string | null>(null);
     const [isEditingLead, setIsEditingLead] = React.useState(false);
     const [leadStatus, setLeadStatus] = React.useState<string>('pending_approval');
+    const [isVerified, setIsVerified] = React.useState(!!data.section1.team_lead.verified);
+    const [participantId, setParticipantId] = React.useState<string | null>(data.section1.team_lead.id || null);
+    const [currentUserEmail, setCurrentUserEmail] = React.useState<string | null>(null);
+
+    // Identify current user for labeling
+    React.useEffect(() => {
+        const storedUser = localStorage.getItem("user") || localStorage.getItem("ciel_user");
+        if (storedUser) {
+            try {
+                const u = JSON.parse(storedUser);
+                const email = u?.email || u?.Email;
+                if (email) setCurrentUserEmail(email);
+            } catch (e) { }
+        }
+    }, []);
+
+    const rawParticipants = React.useMemo(() => [
+        ...(isVerified || data.section1.team_lead.verified || participantId ? [{
+            id: `lead:${participantId || data.section1.team_lead.id}`,
+            name: `${((data.section1.team_lead as any).fullName || (data.section1.team_lead as any).name || "Team Lead")}${((data.section1.team_lead as any).email === currentUserEmail) ? ' (Self)' : ''}`,
+            status: leadStatus,
+            email: (data.section1.team_lead as any).email
+        }] : []),
+        ...data.section1.team_members
+            .map((m: any, idx: number) => ({
+                id: `member:${idx}:${m.id || m.participantId || m.cnic || m.email || 'anon'}`,
+                name: `${(m.fullName || m.name || m.email || `Student ${idx + 1}`)}${(m.email === currentUserEmail) ? ' (Self)' : ''}`,
+                verified: m.verified,
+                status: m.status || (m.verified ? 'approved' : 'pending_approval'),
+                email: m.email
+            }))
+    ], [isVerified, participantId, data.section1.team_lead, data.section1.team_members, currentUserEmail, leadStatus]);
+
+    const [hasSelectedInitial, setHasSelectedInitial] = React.useState(false);
+
+    // Auto-select "Self" record ONCE initially
+    React.useEffect(() => {
+        if (!hasSelectedInitial && currentUserEmail && rawParticipants.length > 0) {
+            const selfRecord = rawParticipants.find(p => p.email === currentUserEmail);
+            if (selfRecord) {
+                console.log(`[Identity] Initial Sync: Defaulting to 'Self' (${selfRecord.id})`);
+                setSelectedParticipantId(selfRecord.id);
+                setHasSelectedInitial(true); // Mark as done to avoid overriding manual selection
+            }
+        }
+    }, [currentUserEmail, rawParticipants, hasSelectedInitial, selectedParticipantId]);
     const [teamId, setTeamId] = React.useState<string>('');
     const [primaryFacultyEmail, setPrimaryFacultyEmail] = React.useState<string>('');
 
@@ -83,29 +129,18 @@ export default function Section1Participation({ projectData }: { projectData?: a
         { id: 4, title: 'Metrics Dashboard' }
     ];
 
-    const rawParticipants = [
-        ...(isVerified || data.section1.team_lead.verified || participantId ? [{
-            id: `lead:${participantId || data.section1.team_lead.id}`,
-            name: ((data.section1.team_lead as any).fullName || (data.section1.team_lead as any).name || "Team Lead (Self)") as string,
-            status: leadStatus
-        }] : []),
-        ...data.section1.team_members
-            .map((m: any, idx: number) => ({
-                id: `member:${idx}:${m.id || m.participantId || m.cnic || m.email || 'anon'}`,
-                name: (m.fullName || m.name || m.email || `Student ${idx + 1}`) as string,
-                verified: m.verified,
-                status: m.status || (m.verified ? 'approved' : 'pending_approval')
-            }))
-    ];
     const participantNamesMap = Object.fromEntries(rawParticipants.map((u: any) => [u.id, u.name]));
 
-    // Data Fetching
+    const isFetchingRef = React.useRef(false);
+
+    // Data Fetching - Initialization ONLY when project ID in URL changes
     React.useEffect(() => {
-        if (projectIdFromUrl) {
+        if (queryProjectId) {
+            console.log("[Identity] Initializing data for project:", queryProjectId);
             fetchInitialData();
             setRequiredHours(requiredHoursPerStudent);
         }
-    }, [projectIdFromUrl, requiredHoursPerStudent]);
+    }, [queryProjectId]);
     
     // Sync context required hours if it changes from projectData
     React.useEffect(() => {
@@ -118,9 +153,10 @@ export default function Section1Participation({ projectData }: { projectData?: a
     // Sync selectedParticipantId when participantId is fetched
     React.useEffect(() => {
         if (participantId && !selectedParticipantId) {
-            setSelectedParticipantId(participantId);
+            setSelectedParticipantId(`lead:${participantId || data.section1.team_lead.id}`);
         }
-    }, [participantId]);
+    }, [participantId, data.section1.team_lead.id]);
+
 
     // Sync local states with context if context is updated from elsewhere
     React.useEffect(() => {
@@ -133,15 +169,22 @@ export default function Section1Participation({ projectData }: { projectData?: a
     }, [data.section1.team_lead.id, data.section1.team_lead.verified]);
 
     const fetchInitialData = async () => {
+        if (!queryProjectId || isFetchingRef.current) return;
+        isFetchingRef.current = true;
         try {
             // 1. Fetch Team Lead's Participant Record
             const partRes = await authenticatedFetch(`/api/v1/engagement/my`);
             if (partRes && partRes.ok) {
                 const parts = await partRes.json();
+                console.log("[Identity] Found my records:", parts.data.map((p: any) => `${p.projectId}: ${p.id} (${p.email})`));
                 const myPart = parts.data.find((p: any) => p.projectId === projectIdFromUrl);
 
                 if (myPart) {
+                    console.log(`[Identity] Syncing correct ID for this project: ${myPart.id}`);
                     setParticipantId(myPart.id);
+                    // Explicitly update selected ID if it was null or stale
+                    setSelectedParticipantId(`lead:${myPart.id}`);
+                    
                     setLeadStatus(myPart.status || 'pending_approval');
                     setIsVerified(true);
                     
@@ -202,19 +245,23 @@ export default function Section1Participation({ projectData }: { projectData?: a
             }
         } catch (err) {
             console.error("Error fetching initial dynamic data:", err);
+        } finally {
+            isFetchingRef.current = false;
         }
     };
 
+    const teamVerifications = data.section1.team_members.map((m: any) => m.verified).join(',');
+    
     // Re-fetch logs whenever the team composition or verification status changes
     React.useEffect(() => {
         if (projectIdFromUrl && isVerified) {
-            // Check if we need to re-fetch logs or sync team
             loadAllEntries();
         }
     }, [
+        projectIdFromUrl,
         isVerified, 
         data.section1.team_members.length,
-        data.section1.team_members.map((m: any) => m.verified).join(',')
+        teamVerifications
     ]);
 
     const handleNext = () => {
@@ -284,7 +331,8 @@ export default function Section1Participation({ projectData }: { projectData?: a
         if (!entryParticipantId) return;
 
         // Strip prefix for API call
-        const realId = entryParticipantId.includes(':') ? entryParticipantId.split(':').pop() : entryParticipantId;
+        const segments = entryParticipantId.split(':');
+        const realId = segments.length > 1 ? segments[segments.length - 1] : entryParticipantId;
         if (!realId) return;
 
         setIsDeleting(entryId);
@@ -311,72 +359,97 @@ export default function Section1Participation({ projectData }: { projectData?: a
 
     // Helpers
     async function loadEntries(pId: string) {
+        // Individual loadEntries is now deprecated in favor of loadAllEntries bulk sync,
+        // but we keep it for fallback or specific single-user refreshes if needed.
         try {
-            // Strip prefix for API call (e.g. member:0:ID -> ID)
-            const realId = pId.includes(':') ? pId.split(':').pop() : pId;
+            const segments = pId.split(':');
+            const realId = segments.length > 1 ? segments[segments.length - 1] : pId;
             const res = await authenticatedFetch(`/api/v1/engagement/${realId}/attendance`);
             if (res && res.ok) {
                 const result = await res.json();
                 return (result.data || []).map((e: any) => ({
+                    ...e,
                     id: e.id,
                     date: e.dateOfEngagement || e.date,
                     start_time: e.startTime || e.start_time,
                     end_time: e.endTime || e.end_time,
                     location: e.organizationName || e.location,
                     activity_type: e.activityType || e.activity_type,
-                    description: e.description,
                     hours: e.sessionHours || e.hours,
-                    participantId: pId, // KEEP THE PREFIXED ID HERE for frontend isolation
-                    entryStatus: e.entryStatus,
+                    participantId: pId, 
                     evidence_file: e.evidenceUrl || (e.evidenceUploaded ? true : undefined)
                 }));
             }
-        } catch (err) {
-            console.error(`Error loading entries for ${pId}:`, err);
-        }
+        } catch (e) {}
         return [];
     }
 
     async function loadAllEntries() {
+        if (!projectIdFromUrl) return;
         try {
-            const compoundIds = [
-                ...(isVerified || data.section1.team_lead.verified || participantId ? [`lead:${participantId || data.section1.team_lead.id}`] : []).filter(id => !id.endsWith('undefined') && !id.endsWith('null') && id !== 'lead:'),
-                ...data.section1.team_members.map((m: any, idx: number) => `member:${idx}:${m.id || m.participantId || m.cnic || m.email || 'anon'}`)
-            ];
-
-            const allLogsResults = await Promise.all(compoundIds.map(pId => loadEntries(pId)));
-            const allLogs = allLogsResults.flat();
+            console.log(`[Attendance] Performing unified bulk sync for project: ${projectIdFromUrl}`);
+            const res = await authenticatedFetch(`/api/v1/engagement/project/${projectIdFromUrl}/attendance-logs`);
             
-            // Deduplicate by Log ID to ensure that if the same 
-            // record is returned for multiple people (e.g. sharing an ID), it doesn't duplicate the state.
-            const uniqueLogs = Array.from(new Map(allLogs.map(l => [l.id || JSON.stringify(l), l])).values());
+            if (res && res.ok) {
+                const result = await res.json();
+                const rawLogs = result.data || [];
 
-            updateSection('section1', { attendance_logs: uniqueLogs });
+                // Map raw logs to prefixed IDs for frontend isolation
+                const unifiedLogs = rawLogs.map((e: any) => {
+                    const realId = e.participantId;
+                    const match = rawParticipants.find(p => p.id.endsWith(realId));
+                    const prefixedId = match ? match.id : realId;
 
-            // Recalculate metrics for UI update
-            const teamSize = 1 + team_members.length;
-            const calc = calculateEngagementMetrics(uniqueLogs, requiredHoursPerStudent, teamSize);
+                    return {
+                        ...e,
+                        id: e.id,
+                        date: e.dateOfEngagement || e.date,
+                        start_time: e.startTime || e.start_time,
+                        end_time: e.endTime || e.end_time,
+                        location: e.organizationName || e.location,
+                        activity_type: e.activityType || e.activity_type,
+                        hours: e.sessionHours || e.hours,
+                        participantId: prefixedId,
+                        evidence_file: e.evidenceUrl || (e.evidenceUploaded ? true : undefined)
+                    };
+                });
+                
+                // Deduplicate and update
+                const uniqueLogs = Array.from(new Map(unifiedLogs.map((l: any) => [l.id, l])).values());
+                console.log(`[Attendance] Bulk sync completed: ${uniqueLogs.length} entries found.`);
+                
+                updateSection('section1', { attendance_logs: uniqueLogs });
 
-            setVerifiedMetrics({
-                totalHours: calc.total_verified_hours,
-                activeDays: calc.total_active_days,
-                spanWeeks: Math.ceil(calc.engagement_span / 7),
-                frequency: calc.attendance_frequency,
-                weeklyContinuity: calc.weekly_continuity,
-                eis: calc.eis_score,
-                category: calc.engagement_category,
-                hecStatus: calc.hec_compliance,
-                evidenceCount: uniqueLogs.filter((l: any) => l.evidence_file).length,
-                evidenceRatio: Math.round((uniqueLogs.filter((l: any) => l.evidence_file).length / (uniqueLogs.length || 1)) * 100)
-            });
+                // Recalculate metrics
+                const teamSize = 1 + data.section1.team_members.length;
+                const calc = calculateEngagementMetrics(uniqueLogs as any, requiredHoursPerStudent, teamSize);
+                setVerifiedMetrics({
+                    totalHours: calc.total_verified_hours,
+                    activeDays: calc.total_active_days,
+                    spanWeeks: Math.ceil(calc.engagement_span / 7),
+                    frequency: calc.attendance_frequency,
+                    weeklyContinuity: calc.weekly_continuity,
+                    eis: calc.eis_score,
+                    category: calc.engagement_category,
+                    hecStatus: calc.hec_compliance,
+                    evidenceCount: uniqueLogs.filter((l: any) => l.evidence_file).length,
+                    evidenceRatio: Math.round((uniqueLogs.filter((l: any) => l.evidence_file).length / (uniqueLogs.length || 1)) * 100)
+                });
+            }
         } catch (err) {
-            console.error("Error loading all entries:", err);
+            console.error("Error in unified attendance sync:", err);
         }
     }
 
 
 
     const projectGoal = requiredHoursPerStudent * (1 + team_members.length);
+    const isMinimumHoursMet = rawParticipants.every(u => {
+        const hours = data.section1.attendance_logs
+            .filter((l: any) => l.participantId === u.id)
+            .reduce((acc: number, log: any) => acc + (Number(log.hours) || 0), 0);
+        return hours >= requiredHoursPerStudent;
+    });
 
 
     return (
@@ -652,10 +725,9 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                                             val: data.section1.attendance_logs
                                                                 .filter((l: any) => {
                                                                     if (!selectedParticipantId) return true;
-                                                                    const logRealId = l.participantId?.includes(':') ? l.participantId.split(':').pop() : l.participantId;
-                                                                    const selRealId = selectedParticipantId?.includes(':') ? selectedParticipantId.split(':').pop() : selectedParticipantId;
-                                                                    return logRealId === selRealId;
+                                                                    return l.participantId === selectedParticipantId;
                                                                 })
+
                                                                 .reduce((acc: number, log: any) => acc + (Number(log.hours) || 0), 0),
                                                             color: "text-report-primary"
                                                         },
@@ -664,10 +736,9 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                                             val: Math.max(0, requiredHoursPerStudent - data.section1.attendance_logs
                                                                 .filter((l: any) => {
                                                                     if (!selectedParticipantId) return true;
-                                                                    const logRealId = l.participantId?.includes(':') ? l.participantId.split(':').pop() : l.participantId;
-                                                                    const selRealId = selectedParticipantId?.includes(':') ? selectedParticipantId.split(':').pop() : selectedParticipantId;
-                                                                    return logRealId === selRealId;
+                                                                    return l.participantId === selectedParticipantId;
                                                                 })
+
                                                                 .reduce((acc: number, log: any) => acc + (Number(log.hours) || 0), 0)),
                                                             color: "text-amber-600"
                                                         }
@@ -718,19 +789,17 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                                         <span className="bg-white px-4 py-1.5 rounded-full border border-slate-100 text-[10px] font-black uppercase tracking-widest text-report-primary shadow-sm">
                                                             {data.section1.attendance_logs.filter((log: any) => {
                                                                 if (!selectedParticipantId) return true;
-                                                                const logRealId = log.participantId?.includes(':') ? log.participantId.split(':').pop() : log.participantId;
-                                                                const selRealId = selectedParticipantId?.includes(':') ? selectedParticipantId.split(':').pop() : selectedParticipantId;
-                                                                return logRealId === selRealId;
+                                                                return log.participantId === selectedParticipantId;
                                                             }).length} Records
+
                                                         </span>
                                                     </div>
                                                     <AttendanceSummaryTable
                                                         entries={data.section1.attendance_logs.filter((log: any) => {
                                                             if (!selectedParticipantId) return true;
-                                                            const logRealId = log.participantId?.includes(':') ? log.participantId.split(':').pop() : log.participantId;
-                                                            const selRealId = selectedParticipantId?.includes(':') ? selectedParticipantId.split(':').pop() : selectedParticipantId;
-                                                            return logRealId === selRealId;
+                                                            return log.participantId === selectedParticipantId;
                                                         })}
+
                                                     participantNames={participantNamesMap}
                                                     onDelete={handleDeleteEntry}
                                                     isLocked={isRecordLocked}
@@ -790,6 +859,23 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                     </p>
 
                                 </div>
+
+                                {/* HOURS COMPLIANCE WARNING */}
+                                {!isMinimumHoursMet && (
+                                    <div className="p-6 bg-red-50 rounded-xl border border-red-100 flex items-start gap-4">
+                                        <div className="w-10 h-10 rounded-full bg-red-100/50 flex items-center justify-center shrink-0">
+                                            <AlertCircle className="w-5 h-5 text-red-600" />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <h4 className="text-sm font-bold text-red-900">Minimum Hours Not Met</h4>
+                                            <p className="text-xs text-red-700 leading-relaxed">
+                                                To finalize this report and generate compliance results, every student must reach the minimum goal of 
+                                                <strong className="mx-1">{requiredHoursPerStudent} hours</strong>. 
+                                                Please return to Step 2 to add the remaining sessions.
+                                            </p>
+                                        </div>
+                                    </div>
+                                )}
 
 
 
@@ -941,20 +1027,22 @@ export default function Section1Participation({ projectData }: { projectData?: a
                             {internalStep === 3 && (
                                 <Button
                                     onClick={handleFinalSubmit}
-                                    disabled={!reviewChecked.every(Boolean) || isLoadingMetrics}
+                                    disabled={!reviewChecked.every(Boolean) || isLoadingMetrics || !isMinimumHoursMet}
                                     className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl h-12 px-10 font-bold shadow-lg shadow-indigo-200 transition-all"
                                 >
                                     {isLoadingMetrics ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
                                     Finalize & Generate Record <Lock className="w-4 h-4 ml-2" />
                                 </Button>
+
                             )}
                             <Button
                                 onClick={handleNext}
-                                disabled={internalStep === 1 && !isVerified}
+                                disabled={(internalStep === 1 && !isVerified) || (internalStep === 3 && !isMinimumHoursMet)}
                                 className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl h-12 px-10 font-bold shadow-lg shadow-indigo-200 transition-all flex items-center gap-2"
                             >
                                 {internalStep === 3 ? "Skip Submission & Continue" : "Continue"} <ChevronRight className="w-4 h-4 ml-2" />
                             </Button>
+
                         </div>
                     ) : (
                         <Button
