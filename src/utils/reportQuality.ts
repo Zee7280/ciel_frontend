@@ -17,7 +17,7 @@ export const checkReportQuality = (report: any): QualityAlert[] => {
     }
 
     // Section 4: Activities
-    if (!report.section4?.activities || report.section4.activities.length === 0) {
+    if (!report.section4?.activity_blocks || report.section4.activity_blocks.length === 0) {
         alerts.push({
             sectionId: 'section4',
             message: 'No core activities logged. Impact cannot be verified without activities.',
@@ -57,101 +57,159 @@ export const checkReportQuality = (report: any): QualityAlert[] => {
 
 export interface Section1CIIInput {
     participationMode: 'individual' | 'team';
-    teamSize?: number; // if team
-    totalVerifiedTeamHours?: number; // if team
+    leadProfile: {
+        name: string;
+        cnic: string;
+        mobile: string;
+        university: string;
+        degree: string;
+        year: string;
+        verified: boolean;
+    };
+    attendanceLogs: any[];
     studentVerifiedHours: number;
+    requiredHours: number;
     studentActiveDays: number;
     studentEngagementSpan: number;
-    studentTotalSessions: number;
-    studentSessionsWithEvidence: number;
+    teamSize?: number; 
+    totalVerifiedTeamHours?: number;
 }
 
 export interface Section1CIIResult {
-    studentBaseScore: number;
-    expectedTeamHours: number;
-    teamComplianceRatio: number;
-    penaltyApplied: number;
+    scores: {
+        identity: number;    // Max 1.5
+        academic: number;    // Max 1.5
+        participation: number; // Max 1.0
+        attendance: number;  // Max 2.0
+        hours: number;       // Max 3.0
+        bonus: number;       // Max 1.0 (Limited)
+    };
+    redFlags: string[];
+    isNonCompliant: boolean;
+    intensity: {
+        volume: number;
+        continuity: number;
+        span: number;
+        frequency: number;
+    };
     finalScore: number;
+    complianceStatus: 'non-compliant' | 'standard' | 'advanced' | 'transformational';
     justification: string;
 }
 
 export const calculateSection1CII = (input: Section1CIIInput): Section1CIIResult => {
     const {
         participationMode,
-        teamSize = 1,
-        totalVerifiedTeamHours = 0,
+        leadProfile,
+        attendanceLogs = [],
         studentVerifiedHours,
+        requiredHours = 16,
         studentActiveDays,
         studentEngagementSpan,
-        studentTotalSessions,
-        studentSessionsWithEvidence
+        teamSize = 1,
+        totalVerifiedTeamHours = 0
     } = input;
 
-    // Step 1 - Calculate Student Base Score
+    const redFlags: string[] = [];
 
-    // A. Participation Completion (0–5)
-    let scoreA = 0;
-    if (studentVerifiedHours >= 16) scoreA = 5;
-    else if (studentVerifiedHours >= 12) scoreA = 3;
-    else if (studentVerifiedHours >= 8) scoreA = 2;
+    // --- 1. Identity Verification (Max 1.5) ---
+    // Criteria: authentic, traceable, verified
+    let identity = 0;
+    if (leadProfile.verified) identity += 1.0;
+    if (leadProfile.name && leadProfile.cnic && leadProfile.mobile) identity += 0.5;
+    
+    if (!leadProfile.verified) redFlags.push("Missing Admin Identity Verification");
+    if (!leadProfile.cnic) redFlags.push("CNIC Traceability Gap");
 
-    // B. Extended Engagement Bonus (0–4)
-    let scoreB = 0;
-    if (studentVerifiedHours > 16) {
-        const cappedHours = Math.min(studentVerifiedHours, 48);
-        const extraHours = cappedHours - 16;
-        scoreB = (extraHours / 32) * 4;
+    // --- 2. Academic Linkage (Max 1.5) ---
+    // Criteria: Connection to institution, faculty, course
+    let academic = 0;
+    if (leadProfile.university) academic += 0.5;
+    if (leadProfile.degree) academic += 0.5;
+    if (leadProfile.year) academic += 0.5;
+
+    if (!leadProfile.university || !leadProfile.degree) {
+        redFlags.push("Weak Academic Institutional Linkage");
     }
 
-    // C. Attendance Consistency (0–3)
-    let scoreC = 0;
-    const consistencyRatio = studentEngagementSpan > 0 ? studentActiveDays / studentEngagementSpan : 0;
-    if (consistencyRatio >= 0.60) scoreC = 3;
-    else if (consistencyRatio >= 0.40) scoreC = 2;
-    else if (consistencyRatio >= 0.20) scoreC = 1;
+    // --- 3. Participation Structure (Max 1.0) ---
+    // Criteria: Individual vs team clarity, roles
+    const participation = participationMode ? 1.0 : 0;
 
-    // D. Evidence Strength (0–3)
-    let scoreD = 0;
-    const evidenceRatio = studentTotalSessions > 0 ? studentSessionsWithEvidence / studentTotalSessions : 0;
-    if (evidenceRatio >= 0.70) scoreD = 3;
-    else if (evidenceRatio >= 0.40) scoreD = 2;
-    else if (evidenceRatio >= 0.10) scoreD = 1;
+    // --- 4. Attendance Integrity (Max 2.0) ---
+    // Criteria: consistency, logical progression, no inflation
+    let attendance = 0;
+    const sessions = attendanceLogs.length;
+    if (sessions >= 8) attendance = 2.0;
+    else if (sessions >= 4) attendance = 1.0;
+    else if (sessions > 0) attendance = 0.5;
 
-    const studentBaseScore = scoreA + scoreB + scoreC + scoreD;
+    // RED FLAG CHECK: Inflation & Overlaps
+    const hoursPerDay: Record<string, number> = {};
+    attendanceLogs.forEach(log => {
+        const date = log.date;
+        const h = parseFloat(log.hours) || 0;
+        hoursPerDay[date] = (hoursPerDay[date] || 0) + h;
+    });
 
-    // Step 2 - Team Compliance
-    let penalty = 0;
-    let expectedTeamHours = 0;
-    let teamComplianceRatio = 0;
+    Object.entries(hoursPerDay).forEach(([date, hrs]) => {
+        if (hrs > 8) redFlags.push(`Unrealistic daily output detected on ${date} (>8 hrs)`);
+    });
 
-    if (participationMode === 'team') {
-        expectedTeamHours = teamSize * 16;
-        teamComplianceRatio = expectedTeamHours > 0 ? totalVerifiedTeamHours / expectedTeamHours : 0;
-
-        if (teamComplianceRatio >= 1.00) penalty = 0;
-        else if (teamComplianceRatio >= 0.80) penalty = -1;
-        else if (teamComplianceRatio >= 0.60) penalty = -2;
-        else penalty = -3;
+    // Patterns (e.g., exact same time range repeated too many times)
+    const patterns: Record<string, number> = {};
+    attendanceLogs.forEach(log => {
+        const p = `${log.start_time}-${log.end_time}`;
+        patterns[p] = (patterns[p] || 0) + 1;
+    });
+    if (Object.values(patterns).some(v => v > 6)) {
+        redFlags.push("Duplicate attendance patterns detected (suspicious log frequency)");
     }
 
-    const finalScore = Math.max(0, studentBaseScore + penalty);
+    // --- 5. Hours Compliance (Max 3.0) ---
+    // Rule: Proportionally reduced if below RHS. Max 3.0 if meets or exceeds RHS.
+    const ratio = Math.min(1.0, studentVerifiedHours / requiredHours);
+    const hoursScore = 3.0 * ratio;
 
-    // Short justification
-    let justification = `Base score of ${studentBaseScore.toFixed(1)} calculated from participation (${scoreA}), bonus (${scoreB.toFixed(1)}), consistency (${scoreC}), and evidence (${scoreD}).`;
-    if (participationMode === 'team') {
-        if (penalty < 0) {
-            justification += ` A penalty of ${penalty} was applied due to team compliance ratio of ${(teamComplianceRatio * 100).toFixed(0)}%.`;
-        } else {
-            justification += ` No team penalty applied (100%+ compliance).`;
-        }
+    // --- 6. Bonus Engagement (Max 2.0) ---
+    // Rule: B = min(2, (Hs - RHS) / RHS * 2)
+    let bonus = 0;
+    if (studentVerifiedHours > requiredHours) {
+        bonus = Math.min(2.0, ((studentVerifiedHours - requiredHours) / requiredHours) * 2.0);
     }
+
+    const baseScore = identity + academic + participation + attendance + hoursScore + bonus;
+    const finalScore = Math.min(10, baseScore);
+
+    // Intensity Metrics (0-100%)
+    const volume = Math.min(100, (studentVerifiedHours / requiredHours) * 100);
+    const continuity = Math.min(100, (studentActiveDays / (studentEngagementSpan || 1)) * 100);
+    const span = Math.min(100, (studentActiveDays / 15) * 100);
+    const frequency = Math.min(100, (sessions / 10) * 100);
+
+    let complianceStatus: Section1CIIResult['complianceStatus'] = 'standard';
+    const isBelowRHS = studentVerifiedHours < requiredHours;
+    const isNonCompliant = isBelowRHS || redFlags.length > 2;
+
+    if (isNonCompliant) {
+        complianceStatus = 'non-compliant';
+    } else if (studentVerifiedHours >= requiredHours * 2) {
+        complianceStatus = 'transformational';
+    } else if (studentVerifiedHours >= requiredHours) {
+        complianceStatus = 'advanced';
+    }
+
+    const justification = isBelowRHS 
+        ? `Evaluation: ${finalScore.toFixed(1)}/10. STATUS: NOT ELIGIBLE FOR COMPLETION (Hrs < RHS).`
+        : `Evaluation: ${finalScore.toFixed(1)}/10. Status: ${complianceStatus.toUpperCase()}. Flags: ${redFlags.length}. Bonus: +${bonus.toFixed(1)}.`;
 
     return {
-        studentBaseScore: Number(studentBaseScore.toFixed(2)),
-        expectedTeamHours,
-        teamComplianceRatio: Number(teamComplianceRatio.toFixed(2)),
-        penaltyApplied: penalty,
-        finalScore: Number(finalScore.toFixed(2)),
+        scores: { identity, academic, participation, attendance, hours: hoursScore, bonus },
+        redFlags,
+        isNonCompliant,
+        intensity: { volume, continuity, span, frequency },
+        finalScore,
+        complianceStatus,
         justification
     };
 };

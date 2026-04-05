@@ -72,7 +72,7 @@ export default function ReportSummaryPopup({ isOpen, onClose, onApply, isSubmitt
             <ShieldCheck className="w-32 h-32 rotate-12" />
           </div>
           <DialogHeader className="relative z-10">
-            <DialogTitle className="text-2xl font-black tracking-tight">CIEL Reporting Framework</DialogTitle>
+            <DialogTitle className="report-h3 !text-2xl font-black">CIEL Reporting Framework</DialogTitle>
             <DialogDescription className="text-indigo-100 font-medium">
               Review the 11-section reporting structure required for project completion and HEC verification.
             </DialogDescription>
@@ -139,7 +139,7 @@ export default function ReportSummaryPopup({ isOpen, onClose, onApply, isSubmitt
           {step === 1 ? (
             <>
               <Button variant="ghost" onClick={onClose} className="text-slate-500 font-bold rounded-xl">Cancel</Button>
-              <Button onClick={handleNext} className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl h-12 px-8 font-black text-xs uppercase tracking-widest flex items-center gap-2">
+              <Button onClick={handleNext} className="bg-report-primary hover:opacity-90 text-white rounded-xl h-12 px-8 font-black text-xs uppercase tracking-widest flex items-center gap-2">
                 I Understand <ChevronRight className="w-4 h-4" />
               </Button>
             </>
@@ -149,7 +149,7 @@ export default function ReportSummaryPopup({ isOpen, onClose, onApply, isSubmitt
               <Button 
                 onClick={() => handleSubmit()} 
                 disabled={isSubmitting}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl h-12 px-8 font-black text-xs uppercase tracking-widest disabled:bg-slate-200 transition-all shadow-lg shadow-indigo-100"
+                className="bg-report-primary hover:opacity-90 text-white rounded-xl h-12 px-8 font-black text-xs uppercase tracking-widest disabled:bg-slate-200 transition-all shadow-lg shadow-indigo-100"
               >
                 {isSubmitting ? "Submitting Application..." : "Confirm & Apply Now"}
               </Button>

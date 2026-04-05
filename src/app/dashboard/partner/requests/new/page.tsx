@@ -842,7 +842,7 @@ export default function OpportunityPostingPage() {
                             </div>
                             <div>
                                 <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Type of Beneficiaries</label>
-                                <div className="h-32 overflow-y-auto border border-slate-200 rounded-lg bg-white p-2 space-y-2">
+                                <div className="h-40 overflow-y-auto border border-slate-200 rounded-lg bg-white p-2 space-y-2">
                                     {["Children", "Youth", "Women", "Elderly", "Persons with disabilities", "Students", "Community members"].map(b => (
                                         <label key={b} className="flex items-center gap-2 text-sm text-slate-600">
                                             <input
@@ -858,6 +858,50 @@ export default function OpportunityPostingPage() {
                                             /> {b}
                                         </label>
                                     ))}
+                                    <label className="flex items-center gap-2 text-sm text-slate-600">
+                                        <input
+                                            type="checkbox"
+                                            className="rounded text-teal-600 focus:ring-teal-500"
+                                            checked={formData.objectives.beneficiariesType.some(t => !["Children", "Youth", "Women", "Elderly", "Persons with disabilities", "Students", "Community members"].includes(t))}
+                                            onChange={(e) => {
+                                                const predefined = ["Children", "Youth", "Women", "Elderly", "Persons with disabilities", "Students", "Community members"];
+                                                if (!e.target.checked) {
+                                                    setFormData({
+                                                        ...formData,
+                                                        objectives: { ...formData.objectives, beneficiariesType: formData.objectives.beneficiariesType.filter(t => predefined.includes(t)) }
+                                                    });
+                                                } else {
+                                                    setFormData({
+                                                        ...formData,
+                                                        objectives: { ...formData.objectives, beneficiariesType: [...formData.objectives.beneficiariesType, "Other"] }
+                                                    });
+                                                }
+                                            }}
+                                        /> Other (please specify)
+                                    </label>
+                                    {formData.objectives.beneficiariesType.some(t => !["Children", "Youth", "Women", "Elderly", "Persons with disabilities", "Students", "Community members"].includes(t)) && (
+                                        <div className="pl-6 animate-in fade-in slide-in-from-top-2">
+                                            <input
+                                                type="text"
+                                                placeholder="Please specify"
+                                                className="w-full px-3 py-1.5 rounded border border-teal-200 focus:border-teal-500 outline-none text-xs"
+                                                value={formData.objectives.beneficiariesType.find(t => !["Children", "Youth", "Women", "Elderly", "Persons with disabilities", "Students", "Community members"].includes(t)) !== "Other" ? formData.objectives.beneficiariesType.find(t => !["Children", "Youth", "Women", "Elderly", "Persons with disabilities", "Students", "Community members"].includes(t)) || "" : ""}
+                                                onChange={(e) => {
+                                                    const predefined = ["Children", "Youth", "Women", "Elderly", "Persons with disabilities", "Students", "Community members"];
+                                                    const cleanTypes = formData.objectives.beneficiariesType.filter(t => predefined.includes(t));
+                                                    if (e.target.value.trim() !== "") {
+                                                        cleanTypes.push(e.target.value);
+                                                    } else {
+                                                        cleanTypes.push("Other");
+                                                    }
+                                                    setFormData({
+                                                        ...formData,
+                                                        objectives: { ...formData.objectives, beneficiariesType: cleanTypes }
+                                                    });
+                                                }}
+                                            />
+                                        </div>
+                                    )}
                                 </div>
                                 <div className="mt-3">
                                     <label className={`flex items-center gap-2 p-3 border rounded-xl hover:bg-slate-50 cursor-pointer transition-all ${formData.objectives.isOtherBeneficiaryChecked ? 'bg-teal-50 border-teal-200' : 'border-slate-100'}`}>

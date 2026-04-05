@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { BookOpen, Star, Trophy, Clock, Loader2, TrendingUp } from "lucide-react";
+import { BookOpen, Star, Trophy, Clock, Loader2, TrendingUp, Award } from "lucide-react";
 import Link from "next/link";
 import { Button } from "./report/components/ui/button";
 import { DashboardData } from "./types";
@@ -99,10 +99,39 @@ export default function StudentDashboard() {
                 </Link>
             </div>
 
+            {/* ── Official Impact Credentials & CII ── */}
+            {activeProjects.some(p => 
+                p.status?.toLowerCase() === 'verified' || 
+                p.status?.toLowerCase() === 'approved' || 
+                p.progress >= 80
+            ) && (
+                <div className="bg-white border-2 border-slate-900 rounded-[2.5rem] p-8 relative overflow-hidden group shadow-2xl shadow-slate-200/50 animate-in fade-in slide-in-from-top-4 duration-700">
+                    <div className="absolute top-0 right-0 p-12 opacity-5 -mr-16 -mt-16 bg-slate-900 rounded-full scale-150 transition-transform group-hover:scale-[1.6] duration-700" />
+                    <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-8 text-center md:text-left">
+                        <div className="flex flex-col md:flex-row items-center gap-6">
+                            <div className="w-16 h-16 rounded-2xl bg-slate-900 text-white flex items-center justify-center shadow-xl rotate-3 group-hover:rotate-0 transition-transform duration-500">
+                                <Award className="w-8 h-8" />
+                            </div>
+                            <div>
+                                <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">Official Digital Credentials</h3>
+                                <p className="text-sm font-bold text-slate-400 mt-1">Your social impact has been institutionally verified. Download your CII certificate.</p>
+                            </div>
+                        </div>
+                        <div className="flex flex-wrap justify-center gap-3">
+                            <Link href="/dashboard/student/report">
+                                <Button className="bg-slate-900 hover:bg-slate-800 text-white px-8 h-12 rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-lg flex items-center gap-2">
+                                    <Star className="w-4 h-4 text-amber-400" /> View CII & Dossier
+                                </Button>
+                            </Link>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 {/* Main Content */}
                 <div className="lg:col-span-2 space-y-6">
-                    <h2 className="text-lg font-bold text-slate-800">My Active Projects</h2>
+                    <h2 className="text-lg font-bold text-slate-800">My Projects</h2>
                     <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
                         {activeProjects.length > 0 ? (
                             activeProjects.map((project) => (
@@ -113,14 +142,17 @@ export default function StudentDashboard() {
                                         </div>
                                         <div>
                                             <h4 className="font-bold text-slate-800 group-hover:text-blue-600 transition-colors">{project.title}</h4>
-                                            <p className="text-xs text-slate-500">{project.category} • Assigned {new Date(project.assignedAt).toLocaleDateString()}</p>
+                                            <p className="text-xs text-slate-500">{project.category} • {project.status}</p>
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-3">
-                                        <span className="px-3 py-1 rounded-full bg-blue-50 text-blue-600 text-xs font-bold">{project.status}</span>
-                                        <Link href="/dashboard/student/projects">
-                                            <Button size="sm" variant="outline">
-                                                View Projects
+                                        <Link href={`/dashboard/student/report?projectId=${project.id}`}>
+                                            <Button 
+                                                size="sm" 
+                                                variant={project.status?.toLowerCase() === 'verified' || project.progress >= 80 ? "default" : "outline"} 
+                                                className={project.status?.toLowerCase() === 'verified' || project.progress >= 80 ? "bg-green-600 hover:bg-green-700 text-white border-none shadow-md shadow-green-100" : ""}
+                                            >
+                                                {project.status?.toLowerCase() === 'verified' || project.progress >= 80 ? "Get CII Certificate" : "Edit Report"}
                                             </Button>
                                         </Link>
                                     </div>

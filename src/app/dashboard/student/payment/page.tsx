@@ -52,7 +52,37 @@ function PaymentContent() {
             const res = await authenticatedFetch(`/api/v1/student/projects/${projectId}`);
             if (res && res.ok) {
                 const data = await res.json();
-                setProjectDetails(data.data || data);
+                const project = data.data || data;
+                setProjectDetails(project);
+
+                // 🚀 Check report/payment status to potentially skip this page
+                const storedUser = localStorage.getItem("ciel_user");
+                if (storedUser) {
+                    const userObj = JSON.parse(storedUser);
+                    const studentId = userObj.id || userObj.studentId || userObj.userId;
+                    
+                    const reportsRes = await authenticatedFetch(`/api/v1/students/reports/check?studentId=${studentId}`);
+                    if (reportsRes && reportsRes.ok) {
+                        const reportsData = await reportsRes.json();
+                        if (reportsData.success && Array.isArray(reportsData.data)) {
+                            const report = reportsData.data.find((r: any) => 
+                                (r.opportunityId || r.opportunity_id || r.projectId || r.project_id || r.project_title) === projectId
+                            );
+                            
+                            if (report) {
+                                const status = report.status || 'none';
+                                if (status === 'paid' || status === 'verified') {
+                                    // Already approved - go to summary
+                                    router.replace(`/dashboard/student/report?projectId=${projectId}`);
+                                    return;
+                                } else if (status === 'payment_under_review') {
+                                    // Already submitted - show success view
+                                    setPaymentSubmitted(true);
+                                }
+                            }
+                        }
+                    }
+                }
             }
         } catch (error) {
             console.error('Error fetching project:', error);

@@ -295,7 +295,7 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
 
                                 {/* SDG Number Side */}
                                 <div
-                                    className="w-16 h-16 md:w-20 md:h-auto rounded-xl flex items-center justify-center text-2xl font-black text-white shadow-lg shadow-inner shrink-0"
+                                    className="w-16 h-16 md:w-20 md:h-auto rounded-xl flex items-center justify-center report-h3 !text-2xl font-black"
                                     style={{ backgroundColor: sdg.color, boxShadow: `inset 0 2px 4px rgba(0,0,0,0.1)` }}
                                 >
                                     {sdg.num}
@@ -313,7 +313,7 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
                                                 SDG {sdg.num}: {sdg.name}
                                             </h4>
                                         </div>
-                                        
+
                                         <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-600 text-[10px] font-bold border border-emerald-100">
                                             <CheckCircle2 className="w-3 h-3" />
                                             VERIFIED
@@ -434,6 +434,55 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
                         </div>
                     )}
 
+
+                    <div className="pt-8 border-t border-slate-100 space-y-4">
+
+                        <div className="flex items-center justify-between">
+                            <Label className="text-sm font-semibold text-slate-900">
+                                3.1.1 Contribution Logic Statement
+                            </Label>
+                            <span className="px-2 py-0.5 rounded bg-slate-100 text-[10px] font-bold text-slate-500 tracking-wider uppercase">
+                                Required
+                            </span>
+                        </div>
+
+                        <p className="text-xs text-slate-500 leading-relaxed">
+                            Explain the "Pathway to Change" — how do your activities directly lead to the selected SDG Target? Consider who benefits and what specific shift occurs.
+                        </p>
+
+                        <div className="relative">
+                            <Textarea
+                                placeholder="Describe the planned contribution pathway..."
+                                className={clsx(
+                                    "min-h-[160px] rounded-xl border border-slate-200 bg-slate-50/30 p-4 text-sm focus:bg-white transition-all focus:ring-8 focus:ring-report-primary-soft/50 focus:border-report-primary-border",
+                                    getFieldError('contribution_intent_statement') && "border-red-300"
+                                )}
+                                value={contribution_intent_statement || ''}
+                                onChange={(e) => updateSection('section3', { contribution_intent_statement: e.target.value })}
+                            />
+
+                            <div className="absolute bottom-4 right-4 flex items-center gap-3 bg-white/80 backdrop-blur px-3 py-1.5 rounded-lg border border-slate-200 shadow-sm">
+                                <div className="h-1.5 w-16 bg-slate-100 rounded-full overflow-hidden">
+                                    <div
+                                        className={clsx(
+                                            "h-full transition-all",
+                                            wordCount < 100 ? "bg-amber-400"
+                                                : wordCount > 200 ? "bg-red-500"
+                                                    : "bg-emerald-500"
+                                        )}
+                                        style={{ width: `${Math.min((wordCount / 200) * 100, 100)}%` }}
+                                    />
+                                </div>
+
+                                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-tight">
+                                    {wordCount} / 200 Words
+                                </span>
+                            </div>
+                        </div>
+
+                        <FieldError message={getFieldError('contribution_intent_statement')} />
+
+                    </div>
                 </div>
 
             </div>
@@ -449,9 +498,15 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
                         <div className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center text-[11px] font-bold">
                             3.2
                         </div>
-                        <h3 className="text-base font-semibold text-slate-900">
-                            Student SDG Mapping
-                        </h3>
+                        <div className="space-y-1">
+                            <h3 className="text-base font-semibold text-slate-900">
+                                Optional Student SDG Mapping
+                            </h3>
+                            <p className="text-sm text-slate-500 leading-relaxed">
+                                If you wish to align your project with additional SDGs, you may select up to two.
+                                Please briefly explain how your activities contribute to achieving each selected SDG.
+                            </p>
+                        </div>
                     </div>
                 </div>
 
@@ -595,7 +650,7 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
                                 value={contribution_intent_statement || ''}
                                 onChange={(e) => updateSection('section3', { contribution_intent_statement: e.target.value })}
                             />
-                            
+
                             <div className="absolute bottom-4 right-4 flex items-center gap-3 bg-white/80 backdrop-blur px-3 py-1.5 rounded-lg border border-slate-200 shadow-sm">
                                 <div className="h-1.5 w-16 bg-slate-100 rounded-full overflow-hidden">
                                     <div
@@ -686,7 +741,7 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
                                                 .filter(s => s.id !== studentPrimaryId)
                                                 .map(s => (
                                                     <option key={s.id} value={s.id}>
-                                                        SDG {s.number}: {s.title}
+                                                        SDG {s.number} — {s.title}
                                                     </option>
                                                 ))}
                                         </select>
@@ -714,7 +769,7 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
 
                                                         {secTargets.map(t => (
                                                             <option key={t.id} value={t.id}>
-                                                                Target {t.id}
+                                                                Target {t.id} — {t.description}
                                                             </option>
                                                         ))}
                                                     </select>
@@ -737,7 +792,7 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
 
                                                         {secIndicators.map(ind => (
                                                             <option key={ind.id} value={ind.id}>
-                                                                Indicator {ind.id}
+                                                                Indicator {ind.id} — {ind.description}
                                                             </option>
                                                         ))}
                                                     </select>
@@ -816,11 +871,11 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
             {/* ── Preliminary Summary ──────────────────────────────────── */}
             <div className="pt-12 border-t border-slate-200">
 
-                <div className="bg-slate-900 rounded-2xl p-8 relative overflow-hidden shadow-xl shadow-slate-200">
+                <div className="bg-white border-2 border-slate-100 rounded-2xl p-8 relative overflow-hidden shadow-sm hover:shadow-md transition-shadow">
 
                     {/* Background Detail */}
-                    <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none">
-                        <Sparkles className="w-32 h-32 text-white" />
+                    <div className="absolute top-0 right-0 p-8 opacity-[0.03] pointer-events-none group-hove:opacity-[0.05]">
+                        <Sparkles className="w-32 h-32 text-report-primary" />
                     </div>
 
                     <div className="relative space-y-6">
@@ -828,21 +883,21 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
                         {/* Header */}
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-3">
-                                <div className="w-1.5 h-6 bg-amber-400 rounded-full" />
-                                <h3 className="text-lg font-bold text-white tracking-tight">
+                                <div className="w-1.5 h-6 bg-report-primary rounded-full" />
+                                <h3 className="report-h3 !text-lg">
                                     Preliminary SDG Alignment Statement
                                 </h3>
                             </div>
 
-                            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 backdrop-blur-md border border-white/10 text-[10px] font-bold text-white/80 uppercase tracking-widest leading-none">
+                            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-50 border border-slate-200 text-[10px] font-bold text-slate-500 uppercase tracking-widest leading-none">
                                 <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
                                 System Synthesis
                             </div>
                         </div>
 
                         {/* Summary Content */}
-                        <div className="p-6 rounded-xl bg-white/5 border border-white/10 backdrop-blur-sm">
-                            <p className="text-base text-slate-200 leading-relaxed italic font-medium">
+                        <div className="p-6 rounded-xl bg-slate-50 border border-slate-100">
+                            <p className="report-ai-text !text-base">
                                 "{data.section3.summary_text}"
                             </p>
                         </div>
@@ -854,8 +909,8 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
                                 { label: "No Performance Claims", icon: Info },
                                 { label: "Structural Validation Only", icon: Layers }
                             ].map((tag, idx) => (
-                                <div key={idx} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-[10px] font-bold text-slate-400 uppercase tracking-wide">
-                                    <tag.icon className="w-3 h-3 text-slate-500" />
+                                <div key={idx} className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-[10px] font-bold text-slate-500 uppercase tracking-wide">
+                                    <tag.icon className="w-3 h-3 text-report-primary" />
                                     {tag.label}
                                 </div>
                             ))}

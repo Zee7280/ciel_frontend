@@ -1,4 +1,4 @@
-import { Leaf, Recycle, TrendingUp, Info, Save, ShieldCheck, Globe, Zap, FileText, CheckCircle2, AlertCircle, Share2, Quote } from "lucide-react";
+import { Leaf, Recycle, TrendingUp, Info, Save, ShieldCheck, Globe, Zap, FileText, CheckCircle2, AlertCircle, Share2, Quote, Lock } from "lucide-react";
 import { Label } from "./ui/label";
 import { Textarea } from "./ui/textarea";
 import { RadioGroup, RadioGroupItem } from "./ui/radio-group";
@@ -41,7 +41,7 @@ const policyOptions = [
 ];
 
 export default function Section10Sustainability() {
-    const { data, updateSection, getFieldError, saveReport } = useReportForm();
+    const { data, updateSection, getFieldError, saveReport, isEligibleForSubmission } = useReportForm();
     const { section10 } = data;
     const {
         continuation_status, continuation_details,
@@ -126,7 +126,38 @@ export default function Section10Sustainability() {
 
 
     return (
-        <div className="space-y-12 pb-16">
+        <div className="relative">
+            {/* Lock Overlay */}
+            {!isEligibleForSubmission && (
+                <div className="absolute inset-0 z-50 bg-slate-50/60 backdrop-blur-[2px] flex flex-col items-center justify-start pt-32 text-center p-8 rounded-[3rem] animate-in fade-in duration-500">
+                    <div className="bg-white p-10 rounded-[3rem] shadow-2xl border-2 border-slate-100 max-w-md space-y-6">
+                        <div className="w-20 h-20 rounded-3xl bg-amber-50 text-amber-500 flex items-center justify-center mx-auto shadow-inner">
+                            <Lock className="w-10 h-10" />
+                        </div>
+                        <div className="space-y-2">
+                            <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">Section Locked</h3>
+                            <p className="text-sm font-bold text-slate-500 leading-relaxed">
+                                Sustainability analysis activates once the <span className="text-report-primary">16-hour minimum</span> engagement is verified. 
+                                <br/><br/>
+                                Please complete your attendance logs in Section 1 to unlock this final verification.
+                            </p>
+                        </div>
+                        <div className="pt-4">
+                            <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
+                                <div 
+                                    className="h-full bg-amber-500 transition-all duration-1000" 
+                                    style={{ width: `${Math.min((data.section1.metrics?.total_verified_hours || 0) / (data.required_hours || 16) * 100, 100)}%` }} 
+                                />
+                            </div>
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-3">
+                                Current Progress: {data.section1.metrics?.total_verified_hours || 0} / {data.required_hours || 16} Hours
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            <div className={clsx("space-y-12 pb-16 transition-all duration-500", !isEligibleForSubmission && "opacity-40 grayscale pointer-events-none blur-[1px]")}>
             {/* ─── Header ─────────────────────────────────────────────────── */}
             <div className="flex items-center gap-4">
 
@@ -527,7 +558,7 @@ export default function Section10Sustainability() {
 
 
                             <div className="bg-slate-50 rounded-2xl p-5 space-y-2">
-                                <p className="text-2xl font-black text-report-primary leading-none">
+                                <p className="report-h3 !text-2xl font-black">
                                     {mechanisms?.length || 0}
                                 </p>
 
@@ -625,15 +656,7 @@ export default function Section10Sustainability() {
 
             </div>
 
-            {/* ─── Save ─────────────────────────────────────────────────────── */}
-            <div className="flex justify-center pt-10">
-                <Button
-                    type="button" variant="outline" onClick={() => saveReport(false)}
-                    className="h-16 px-12 rounded-2xl border-2 border-slate-100 bg-white text-slate-500 font-extrabold uppercase tracking-widest hover:border-slate-900 hover:text-slate-900 hover:shadow-xl transition-all flex items-center gap-4 group"
-                >
-                    <Save className="w-6 h-6 group-hover:rotate-12 transition-transform" />
-                    <span>Save Sustainability Impact</span>
-                </Button>
+            
             </div>
         </div>
     );

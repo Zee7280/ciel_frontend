@@ -888,7 +888,7 @@ export default function Section8Evidence() {
                         <div className="grid grid-cols-2 gap-4">
 
                             <div className="bg-report-primary-soft rounded-lg p-5">
-                                <p className="text-2xl font-bold text-report-primary">
+                                <p className="report-h3 !text-2xl">
                                     {evidence_files?.length || 0}
                                 </p>
                                 <p className="text-xs text-report-primary-border">
@@ -897,7 +897,7 @@ export default function Section8Evidence() {
                             </div>
 
                             <div className="bg-report-primary-soft rounded-lg p-5">
-                                <p className="text-2xl font-bold text-report-primary">
+                                <p className="report-h3 !text-2xl">
                                     {evidence_types?.length || 0}
                                 </p>
                                 <p className="text-xs text-report-primary-border">
@@ -906,7 +906,7 @@ export default function Section8Evidence() {
                             </div>
 
                             <div className={clsx("rounded-lg p-5", allEthicalChecked ? "bg-report-primary-soft" : "bg-amber-50")}>
-                                <p className={clsx("text-2xl font-bold", allEthicalChecked ? "text-report-primary" : "text-amber-700")}>
+                                <p className={clsx("report-h3 !text-2xl", allEthicalChecked ? "text-report-primary" : "text-amber-700")}>
                                     {allEthicalChecked ? "Yes" : "No"}
                                 </p>
                                 <p className="text-xs text-slate-500">
@@ -915,7 +915,7 @@ export default function Section8Evidence() {
                             </div>
 
                             <div className={clsx("rounded-lg p-5", partner_verification ? "bg-report-primary-soft" : "bg-slate-50")}>
-                                <p className={clsx("text-2xl font-bold", partner_verification ? "text-report-primary" : "text-slate-900")}>
+                                <p className={clsx("report-h3 !text-2xl", partner_verification ? "text-report-primary" : "text-slate-900")}>
                                     {partner_verification ? "Verified" : "None"}
                                 </p>
                                 <p className="text-xs text-slate-500">
@@ -996,16 +996,7 @@ export default function Section8Evidence() {
                 </div>
 
             </div>
-            {/* ─── Save ─────────────────────────────────────────────────────── */}
-            <div className="flex justify-center pt-10">
-                <Button
-                    type="button" variant="outline" onClick={() => saveReport(false)}
-                    className="h-16 px-12 rounded-2xl border-2 border-slate-100 bg-white text-slate-500 font-extrabold uppercase tracking-widest hover:border-slate-900 hover:text-slate-900 hover:shadow-2xl transition-all flex items-center gap-4 group"
-                >
-                    <Save className="w-6 h-6 group-hover:rotate-12 transition-transform" />
-                    <span>Save Evidence Record</span>
-                </Button>
-            </div>
+            
         </div>
     );
 }

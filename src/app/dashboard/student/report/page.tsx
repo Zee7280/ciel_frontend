@@ -4,7 +4,7 @@ import { useReportForm, ReportProvider } from './context/ReportContext';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { authenticatedFetch } from '@/utils/api';
 import { toast } from 'sonner';
-import { ChevronRight, Save, Loader2, ArrowLeft, Lock, Download } from 'lucide-react';
+import { ChevronRight, Save, Loader2, ArrowLeft, Lock, Download, CheckCircle2 } from 'lucide-react';
 import { Button } from './components/ui/button';
 import {
     Dialog,
@@ -46,7 +46,8 @@ function ReportFormContent() {
         setProjectId,
         updateSection,
         setReadOnly,
-        isReadOnly
+        isReadOnly,
+        isEligibleForSubmission
     } = useReportForm();
 
     const [isSaving, setIsSaving] = React.useState(false);
@@ -94,7 +95,8 @@ function ReportFormContent() {
                 const actualReportData = reportData.data || reportData; // Handle potential wrapper
                 if (actualReportData && Object.keys(actualReportData).length > 0) {
                     setFullData(actualReportData);
-                    const isSubmitted = ['submitted', 'approved', 'under_review'].includes(actualReportData.status);
+                    const isSubmitted = ['submitted', 'approved', 'under_review'].includes(actualReportData.status) || 
+                                       ['verified', 'approved'].includes(actualReportData.admin_status);
                     if (isSubmitted) {
                         // Report already submitted — skip guide, go straight to summary
                         setShowGuide(false);
@@ -119,48 +121,56 @@ function ReportFormContent() {
             e.stopPropagation();
         }
 
-        if (validateCurrentSection()) {
-            if (activeStep < 11) {
-                setIsSaving(true);
-                let updatedData = { ...data };
+        // --- FLEXIBLE NAVIGATION (Progress Mode) ---
+        // If not at the final step, allow navigation even if validation fails
+        const isValid = validateCurrentSection();
+        
+        if (activeStep < 11) {
+            setIsSaving(true);
+            let updatedData = { ...data };
 
-                // Auto-generate AI Summary for specific sections in the background
-                const sectionsToSummarize = [2, 3, 4, 5, 8, 9, 10];
-                if (sectionsToSummarize.includes(activeStep)) {
-                    setAiStatus('Analyzing Data & Writing Summary...');
-                    try {
-                        const { generateAISummary } = await import('./utils/aiSummarizer');
-                        const sectionKey = `section${activeStep}` as Exclude<keyof typeof data, 'project_id'>;
-                        const summaryRes = await generateAISummary(sectionKey, data[sectionKey]);
+            // Auto-generate AI Summary for specific sections
+            const sectionsToSummarize = [2, 3, 4, 5, 8, 9, 10];
+            if (sectionsToSummarize.includes(activeStep) && isValid) {
+                setAiStatus('Analyzing Data & Writing Summary...');
+                try {
+                    const { generateAISummary } = await import('./utils/aiSummarizer');
+                    const sectionKey = `section${activeStep}` as Exclude<keyof typeof data, 'project_id'>;
+                    const summaryRes = await generateAISummary(sectionKey, data[sectionKey]);
 
-                        if (summaryRes.summary) {
-                            updatedData = {
-                                ...updatedData,
-                                [sectionKey]: {
-                                    ...(updatedData[sectionKey] as any),
-                                    summary_text: summaryRes.summary
-                                }
-                            };
-                            updateSection(sectionKey, { summary_text: summaryRes.summary });
-                        }
-                    } catch (error) {
-                        console.error('Failed to auto-generate summary', error);
-                        // Do not block the user if AI fails
+                    if (summaryRes.summary) {
+                        updatedData = {
+                            ...updatedData,
+                            [sectionKey]: {
+                                ...(updatedData[sectionKey] as any),
+                                summary_text: summaryRes.summary
+                            }
+                        };
+                        updateSection(sectionKey, { summary_text: summaryRes.summary });
                     }
+                } catch (error) {
+                    console.error('Failed to auto-generate summary', error);
                 }
-                setAiStatus('Saving Progress...');
-
-                // Auto-save on next
-                await handleSave(true, updatedData);
-                nextStep();
-                window.scrollTo(0, 0);
-            } else {
-                // Final Submit
-                handleSubmit();
             }
+            
+            setAiStatus('Saving Progress...');
+            await handleSave(true, updatedData);
+            
+            if (!isValid) {
+                toast.info("Draft saved. Some fields need attention before submission.");
+            }
+            
+            nextStep();
+            window.scrollTo(0, 0);
         } else {
-            const firstError = Object.values(validationErrors)[0]?.[0]?.message;
-            toast.error(firstError || 'Please fix the errors before proceeding');
+            // Final step: enforce strict validation or eligibility
+            if (isValid && isEligibleForSubmission) {
+                handleSubmit();
+            } else if (!isEligibleForSubmission) {
+                toast.error("You are not yet eligible for submission. Check requirements on the summary page.");
+            } else {
+                toast.error("Please fix all errors before final submission.");
+            }
         }
     };
 
@@ -270,6 +280,32 @@ function ReportFormContent() {
                             </p>
                         </div>
                     </div>
+
+                    {/* Eligibility Banner */}
+                    {!isReadOnly && (
+                        <div className={clsx(
+                            "hidden md:flex items-center gap-3 px-6 py-2.5 rounded-2xl border transition-all animate-in fade-in zoom-in duration-500",
+                            isEligibleForSubmission 
+                                ? "bg-emerald-50 border-emerald-100 text-emerald-700 shadow-sm" 
+                                : "bg-amber-50 border-amber-100 text-amber-700"
+                        )}>
+                            <div className={clsx(
+                                "w-2.5 h-2.5 rounded-full animate-pulse",
+                                isEligibleForSubmission ? "bg-emerald-500" : "bg-amber-500"
+                            )} />
+                            <div className="flex flex-col">
+                                <span className="text-[10px] font-black uppercase tracking-widest leading-none mb-0.5">
+                                    {isEligibleForSubmission ? "Submission Mode Ready" : "Progress Mode"}
+                                </span>
+                                <span className="text-[9px] font-bold opacity-70 leading-none">
+                                    {isEligibleForSubmission 
+                                        ? "All eligibility criteria met. Finalize and submit." 
+                                        : `Verification in progress: ${data.section1.metrics?.total_verified_hours || 0}/${data.required_hours || 16} hours met.`}
+                                </span>
+                            </div>
+                            {isEligibleForSubmission && <CheckCircle2 className="w-4 h-4 text-emerald-500 ml-1" />}
+                        </div>
+                    )}
                     <div className="flex items-center gap-3">
                         {!isReadOnly && (
                             <Button
@@ -297,13 +333,13 @@ function ReportFormContent() {
                                 <React.Fragment key={label}>
                                     <div
                                         onClick={() => {
-                                            if (isCompleted || isReadOnly) {
+                                            if (isCompleted || isReadOnly || activeStep < 11) {
                                                 setStep(stepNum);
                                             } else if (!isActive && validateCurrentSection()) {
                                                 setStep(stepNum);
                                             } else if (!isActive) {
-                                                const firstError = Object.values(validationErrors)[0]?.[0]?.message;
-                                                toast.error(firstError || 'Please fix errors');
+                                                toast.info("Navigating to step. Please complete mandatory fields later.");
+                                                setStep(stepNum);
                                             }
                                         }}
                                         className={clsx(
@@ -354,24 +390,43 @@ function ReportFormContent() {
 
             {/* Footer Navigation */}
             <div className="flex items-center justify-between pt-6 border-t border-slate-200">
-                {!isReadOnly && (
-                    <Button type="button" variant="outline" onClick={prevStep} disabled={activeStep === 1}>
-                        Previous Step
-                    </Button>
+                <div className="flex-1">
+                    {!isReadOnly && (
+                        <Button type="button" variant="outline" onClick={prevStep} disabled={activeStep === 1}>
+                            Previous Step
+                        </Button>
+                    )}
+                </div>
+
+                {!isReadOnly && activeStep < 11 && (
+                    <div className="flex-1 flex justify-center">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => handleSave(false)}
+                            disabled={isSaving}
+                            className="bg-white hover:bg-slate-50 text-slate-700 h-12 px-6 rounded-xl border-2 border-slate-200 font-bold text-xs uppercase tracking-widest transition-all shadow-sm flex items-center gap-2"
+                        >
+                            {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4 text-slate-400" />}
+                            <span>Save Section {activeStep} Progress</span>
+                        </Button>
+                    </div>
                 )}
 
-                {!(activeStep === 11 && (data?.status === 'submitted' || data?.status === 'approved')) && (
-                    <Button
-                        type="button"
-                        onClick={handleNext}
-                        disabled={isSaving}
-                        className="bg-blue-600 hover:bg-blue-700 text-white px-8 transition-all"
-                    >
-                        {isSaving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
-                        {activeStep === 11 ? (isSaving ? 'Submitting...' : 'Submit Report') : (aiStatus || 'Next Step')}
-                        {activeStep !== 11 && !isSaving && <ChevronRight className="w-4 h-4 ml-2" />}
-                    </Button>
-                )}
+                <div className="flex-1 flex justify-end">
+                    {!(activeStep === 11 && (data?.status === 'submitted' || data?.status === 'approved')) && (
+                        <Button
+                            type="button"
+                            onClick={handleNext}
+                            disabled={isSaving}
+                            className="bg-blue-600 hover:bg-blue-700 text-white px-8 transition-all"
+                        >
+                            {isSaving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                            {activeStep === 11 ? (isSaving ? 'Submitting...' : 'Submit Report') : (aiStatus || 'Next Step')}
+                            {activeStep !== 11 && !isSaving && <ChevronRight className="w-4 h-4 ml-2" />}
+                        </Button>
+                    )}
+                </div>
             </div>
 
             {/* Submit Confirmation Dialog */}

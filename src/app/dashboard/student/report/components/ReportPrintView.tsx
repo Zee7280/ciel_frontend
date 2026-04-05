@@ -1,204 +1,142 @@
 import { useReportForm } from "../context/ReportContext";
-import { Award, Clock, Users, Target, CheckCircle, MapPin, Building2, Calendar } from "lucide-react";
+import { Award, Clock, Users, Target, CheckCircle, MapPin, Building2, Calendar, FileText, LayoutList, Fingerprint, Microscope, Globe, Repeat, Share2, ClipboardCheck, TrendingUp, ShieldCheck } from "lucide-react";
 import AttendanceSummaryTable from "../../engagement/components/AttendanceSummaryTable";
+import { calculateCII } from "../utils/calculateCII";
 
 interface Props {
     projectData: any;
-    reportData?: any; // Added to support usage outside ReportProvider
+    reportData?: any;
 }
 
 export default function ReportPrintView({ projectData, reportData }: Props) {
-    // Use prop if provided, otherwise fallback to context
     let data = reportData;
     try {
         const contextData = useReportForm().data;
         if (!data) data = contextData;
-    } catch (e) {
-        // Ignored if useReportForm fails outside context
-    }
+    } catch (e) {}
 
     if (!data) return <div className="p-8 text-center text-slate-500 italic">No report data available for preview.</div>;
 
-    // --- Robust Data Calculation ---
+    const ciiResult = calculateCII(data);
+    const { totalScore, level, breakdown } = ciiResult;
+
     const calculateMetrics = () => {
         const metrics = {
             total_verified_hours: data.section1?.metrics?.total_verified_hours || 0,
-            eis_score: data.section1?.metrics?.eis_score || 0,
+            eis_score: totalScore,
             attendance_frequency: data.section1?.metrics?.attendance_frequency || 0,
-            total_beneficiaries: data.section4?.total_beneficiaries || 0,
+            total_beneficiaries: data.section4?.project_summary?.distinct_total_beneficiaries || 0,
             engagement_span: data.section1?.metrics?.engagement_span || 0
         };
-
-        // Fallback for verified hours if metrics missing
-        if (!metrics.total_verified_hours && data.section1?.attendance_logs) {
-            metrics.total_verified_hours = data.section1.attendance_logs.reduce((acc: number, log: any) => acc + (Number(log.hours) || 0), 0);
-        }
-
-        // Fallback for EIS Score (Aggregate from competencies)
-        if (!metrics.eis_score && data.section9?.competency_scores) {
-            const scores = Object.values(data.section9.competency_scores).map(v => Number(v) || 0);
-            if (scores.length > 0) {
-                const avg = scores.reduce((a, b) => a + b, 0) / scores.length;
-                metrics.eis_score = Math.round((avg / 5) * 100);
-            }
-        }
-
-        // Fallback for Engagement Span
-        if (!metrics.engagement_span && data.section1?.attendance_logs?.length > 0) {
-            const dates = data.section1.attendance_logs.map((log: any) => new Date(log.date).getTime()).filter((t: number) => !isNaN(t));
-            if (dates.length > 1) {
-                const span = Math.ceil((Math.max(...dates) - Math.min(...dates)) / (1000 * 60 * 60 * 24));
-                metrics.engagement_span = span;
-            }
-        }
-
         return metrics;
     };
 
     const metrics = calculateMetrics();
 
-    const SectionHeader = ({ title, number }: { title: string, number: number }) => (
-        <h2 className="text-xl font-black border-b-4 border-slate-900 pb-2 mb-6 mt-10 font-sans uppercase tracking-tight text-slate-900 flex items-center gap-3">
-            <span className="w-8 h-8 rounded-lg bg-slate-900 text-white flex items-center justify-center text-sm font-black">{number}</span>
-            {title}
-        </h2>
+    const SectionHeader = ({ title, number, question }: { title: string, number: number, question?: string }) => (
+        <div className="mb-10 mt-12 border-b-4 border-slate-900 pb-4 break-inside-avoid">
+            <div className="flex items-center gap-4 mb-2">
+                <span className="w-10 h-10 rounded-xl bg-slate-900 text-white flex items-center justify-center text-sm font-black shadow-lg">{number}</span>
+                <h2 className="report-h3 !text-2xl font-black">{title}</h2>
+            </div>
+            {question && (
+                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest pl-14 leading-relaxed max-w-2xl">
+                    {question}
+                </p>
+            )}
+        </div>
     );
 
-    const LabelValue = ({ label, value, fullWidth = false }: { label: string, value: any, fullWidth?: boolean }) => (
-        <div className={`flex flex-col mb-5 ${fullWidth ? 'w-full' : 'w-1/2 pr-6'}`}>
-            <span className="font-black text-slate-400 text-[9px] uppercase tracking-[0.15em] mb-1">{label}</span>
-            <div className={`text-sm text-slate-900 font-medium leading-relaxed ${fullWidth ? 'text-justify' : ''}`}>
-                {value || <span className="text-slate-300 italic">Not Specified</span>}
+    const QandA = ({ q, a, fullWidth = false }: { q: string, a: any, fullWidth?: boolean }) => (
+        <div className={`flex flex-col mb-8 ${fullWidth ? 'col-span-2' : 'col-span-1'} break-inside-avoid`}>
+            <span className="font-black text-slate-400 text-[9px] uppercase tracking-[0.25em] mb-2 leading-relaxed italic">Question: {q}</span>
+            <div className="bg-slate-50/50 border-l-4 border-slate-200 p-4 rounded-r-xl">
+                <div className={`text-[13px] text-slate-900 font-bold leading-relaxed ${fullWidth ? 'text-justify' : ''}`}>
+                    {a || <span className="text-slate-300 font-medium italic">Pending Verification / Not Provided</span>}
+                </div>
             </div>
         </div>
     );
 
+    const scoreTableItems = [
+        { label: "Identity & Participation", score: breakdown.participation, max: 10, weight: "10%" },
+        { label: "Project Context & Discipline", score: breakdown.context, max: 10, weight: "10%" },
+        { label: "SDG Strategy & Intent", score: breakdown.sdg, max: 10, weight: "10%" },
+        { label: "Activities & Output Scale", score: breakdown.outputs, max: 15, weight: "15%" },
+        { label: "Outcomes & Measurable Change", score: breakdown.outcomes, max: 20, weight: "20%" },
+        { label: "Resource Mobilization", score: breakdown.resources, max: 7, weight: "7%" },
+        { label: "Partnerships & Collaboration", score: breakdown.partnerships, max: 7, weight: "7%" },
+        { label: "Evidence & Verification", score: breakdown.evidence, max: 12, weight: "12%" },
+        { label: "Personal & Academic Reflection", score: breakdown.learning, max: 4, weight: "4%" },
+        { label: "Sustainability & Continuation", score: breakdown.sustainability, max: 5, weight: "5%" }
+    ];
+
     return (
         <div className="font-sans text-slate-900 max-w-4xl mx-auto bg-white p-2 relative group print:p-0 print:m-0 print:max-w-none">
-            {/* Print Control Overlay - Hidden on Print */}
-            <div className="absolute -top-16 right-0 flex items-center gap-3 print:hidden transition-all duration-300">
-                <div className="px-4 py-2 bg-indigo-50 border border-indigo-100 rounded-xl flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
-                    <span className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">Document Ready</span>
-                </div>
-                <button
-                    onClick={() => window.print()}
-                    className="flex items-center gap-2 px-6 py-3 bg-slate-900 text-white rounded-xl font-black text-xs hover:bg-slate-800 transition-all shadow-xl hover:-translate-y-1 active:translate-y-0"
-                >
-                    <CheckCircle className="w-4 h-4" />
-                    DOWNLOAD OFFICIAL PDF
-                </button>
-            </div>
-
             <style dangerouslySetInnerHTML={{
                 __html: `
                 @media print {
-                    /* Isolation Logic: Hide body content, show only print container */
-                    body { visibility: hidden !important; background: white !important; }
-                    #print-root, #print-root * { visibility: visible !important; }
-                    #print-root { 
-                        position: absolute !important; 
-                        left: 0 !important; 
-                        top: 0 !important; 
-                        width: 100% !important; 
-                        display: block !important;
-                    }
-                    
-                    /* Reset Dashboard Layouts / Overrides */
-                    .print\\:hidden { display: none !important; }
-                    
-                    /* Force Colors for PDF */
-                    .bg-slate-900 { background-color: #0f172a !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-                    .bg-slate-50 { background-color: #f8fafc !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-                    .bg-white { background-color: white !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-                    .border-slate-900 { border-color: #0f172a !important; -webkit-print-color-adjust: exact; }
+                    @page { margin: 1cm; size: A4; }
+                    body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                    .print-container { width: 100% !important; margin: 0 !important; padding: 0 !important; }
+                    .break-inside-avoid { page-break-inside: avoid !important; break-inside: avoid !important; }
+                    .bg-slate-900 { background-color: #0f172a !important; }
+                    .bg-slate-50 { background-color: #f8fafc !important; }
                     .text-slate-900 { color: #0f172a !important; }
                     .text-slate-400 { color: #94a3b8 !important; }
-                    
-                    /* Page Breaks */
-                    .break-inside-avoid { page-break-inside: avoid !important; break-inside: avoid !important; }
-                    
-                    @page {
-                        margin: 1.5cm;
-                        size: auto;
-                    }
+                    .border-slate-900 { border-color: #0f172a !important; }
                 }
             `}} />
 
-            <div id="print-root" className="print-container bg-white">
-                {/* Professional Header */}
-                <div className="flex justify-between items-start border-b-8 border-slate-900 pb-12 mb-12">
-                    <div className="space-y-6">
-                        <img src="/logo-1.png" alt="CIEL" className="h-16 w-auto mb-4" />
+            <div className="print-container bg-white">
+                {/* Header Profile */}
+                <div className="flex justify-between items-start border-b-[10px] border-slate-900 pb-12 mb-12">
+                    <div className="space-y-8">
+                        <img src="/logo-1.png" alt="CIEL" className="h-14 w-auto" />
                         <div>
-                            <div className="flex items-center gap-2 mb-2">
-                                <span className="w-12 h-[2px] bg-slate-200" />
-                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em]">IMPACT PROTOCOL</span>
+                            <div className="flex items-center gap-2 mb-3">
+                                <span className="w-12 h-[3px] bg-slate-900" />
+                                <span className="text-[11px] font-black text-slate-900 uppercase tracking-[0.5em]">IMPACT RECORD</span>
                             </div>
-                            <h1 className="text-5xl font-black tracking-tighter uppercase text-slate-900 leading-none mb-1">Community</h1>
-                            <h1 className="text-5xl font-black tracking-tighter uppercase text-slate-900 opacity-30 leading-none">Engagement</h1>
-                        </div>
-                        <div className="flex items-center gap-3">
-                            <span className="px-4 py-1.5 bg-slate-900 text-white text-[10px] font-black uppercase tracking-widest rounded-lg">Official Dossier</span>
-                            <span className="text-slate-400 font-bold text-[10px] uppercase tracking-[0.2em]">{new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                            <h1 className="text-5xl font-black tracking-tighter uppercase text-slate-900 leading-[0.85] mb-2">Student</h1>
+                            <h1 className="text-5xl font-black tracking-tighter uppercase text-slate-900 opacity-20 leading-[0.85]">Dossier</h1>
                         </div>
                     </div>
-                    <div className="text-right flex flex-col items-end pt-8">
-                        <div className="w-24 h-2 bg-slate-900 mb-6" />
-                        <p className="font-black text-slate-900 text-2xl uppercase tracking-tighter max-w-[320px] leading-[1.1] mb-2">{projectData?.title || data.project_title || "Project Report"}</p>
-                        <div className="bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-100 flex items-center gap-2">
-                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">VERIFICATION:</span>
-                            <span className="text-[10px] font-black text-slate-900 uppercase tracking-widest">{data.project_id || "CIEL-DRAFT"}</span>
+                    <div className="text-right flex flex-col items-end pt-10">
+                        <p className="font-black text-slate-900 text-3xl uppercase tracking-tighter max-w-[350px] leading-[1] mb-4">
+                            {projectData?.title || data.project_title || "Project Impact Record"}
+                        </p>
+                        <div className="inline-flex items-center gap-3 px-4 py-2 bg-slate-900 text-white rounded-xl">
+                            <span className="text-[10px] font-black uppercase tracking-widest opacity-60">Dossier ID:</span>
+                            <span className="text-[11px] font-bold uppercase tracking-widest">{data.project_id?.split('-')[0] || "CIEL"}—{(new Date().getFullYear())}</span>
                         </div>
                     </div>
                 </div>
 
-                {/* Project Identity Grid */}
-                <div className="grid grid-cols-4 gap-6 mb-12 pb-12 border-b-2 border-slate-100">
-                    <div className="space-y-1">
-                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">Partner Organization</span>
-                        <span className="text-sm font-black text-slate-900 leading-tight">{projectData?.organization_name || projectData?.organization || projectData?.partner_name || "Self-Initiated"}</span>
-                    </div>
-                    <div className="space-y-1 border-l-2 border-slate-50 pl-6">
-                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">Engagement Location</span>
-                        <span className="text-sm font-black text-slate-900">{projectData?.city || projectData?.location_district || "Remote"}</span>
-                    </div>
-                    <div className="space-y-1 border-l-2 border-slate-50 pl-6">
-                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">Commencement</span>
-                        <span className="text-sm font-black text-slate-900">{projectData?.start_date ? new Date(projectData.start_date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : "—"}</span>
-                    </div>
-                    <div className="space-y-1 border-l-2 border-slate-50 pl-6">
-                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">Conclusion</span>
-                        <span className="text-sm font-black text-slate-900">{projectData?.end_date ? new Date(projectData.end_date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : "—"}</span>
-                    </div>
-                </div>
-
-                {/* Section 1: Participation */}
-                <SectionHeader number={1} title="Participation Profile" />
-                <div className="grid grid-cols-2 gap-x-12 gap-y-4 mb-10">
-                    <LabelValue label="Type" value={data.section1.participation_type} />
-                    <LabelValue label="Lead Member" value={data.section1.team_lead.name} />
-                    <LabelValue label="Host Institution" value={data.section1.team_lead.university} />
-                    <LabelValue label="HEC Compliance" value={data.section1.metrics?.hec_compliance || 'Verified'} />
+                {/* Section 1: Participation Profile */}
+                <SectionHeader number={1} title="Participation Profile" question="Who participated in the project and what are their institutional credentials?" />
+                <div className="grid grid-cols-2 gap-x-12 gap-y-4">
+                    <QandA q="Participation Structure?" a={data.section1.participation_type === 'team' ? "Team-Based Initiative" : "Individual Project"} />
+                    <QandA q="Lead Author / Coordinator?" a={data.section1.team_lead.name} />
+                    <QandA q="Host Institution / University?" a={data.section1.team_lead.university} />
+                    <QandA q="Verified Total Engagement?" a={`${metrics.total_verified_hours} Hours Verified`} />
                 </div>
 
                 {data.section1.team_members.length > 0 && (
-                    <div className="mb-12">
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4">Certified Team Roster</p>
-                        <table className="w-full text-xs border-collapse">
+                    <div className="mb-12 mt-4 break-inside-avoid">
+                        <span className="font-black text-slate-400 text-[9px] uppercase tracking-[0.25em] mb-4 block italic">Supplementary Question: Full Team Composition?</span>
+                        <table className="w-full text-xs border-collapse rounded-2xl overflow-hidden border border-slate-200">
                             <thead>
-                                <tr className="bg-slate-900 text-white">
-                                    <th className="p-3 text-left font-black uppercase tracking-widest text-[9px]">Full Member Name</th>
-                                    <th className="p-3 text-left font-black uppercase tracking-widest text-[9px]">ID / Qualification</th>
-                                    <th className="p-3 text-left font-black uppercase tracking-widest text-[9px]">Strategic Capacity</th>
+                                <tr className="bg-slate-900 text-white text-[9px] uppercase tracking-widest">
+                                    <th className="p-4 text-left font-black">Full Name</th>
+                                    <th className="p-4 text-left font-black">Capacity / Role</th>
                                 </tr>
                             </thead>
-                            <tbody className="border-x border-b border-slate-100 divide-y divide-slate-50">
+                            <tbody className="divide-y divide-slate-100">
                                 {data.section1.team_members.map((m: any, i: number) => (
-                                    <tr key={i}>
-                                        <td className="p-3 font-black text-slate-900">{m.name}</td>
-                                        <td className="p-3 text-slate-500 font-medium">{m.cnic}</td>
-                                        <td className="p-3 text-slate-900 text-[10px] font-black uppercase tracking-tight">{m.role}</td>
+                                    <tr key={i} className="bg-white">
+                                        <td className="p-4 font-bold text-slate-900">{m.name}</td>
+                                        <td className="p-4 text-slate-600 font-bold uppercase tracking-tight text-[10px]">{m.role}</td>
                                     </tr>
                                 ))}
                             </tbody>
@@ -206,202 +144,215 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
                     </div>
                 )}
 
-                {/* Verified Engagement Portfolio */}
-                {data.section1.attendance_logs && data.section1.attendance_logs.length > 0 && (
-                    <div className="mb-12">
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4">Verified Engagement Portfolio</p>
-                        <div className="border border-slate-100 rounded-2xl overflow-hidden p-1">
-                            <AttendanceSummaryTable
-                                entries={data.section1.attendance_logs}
-                                isLocked={true}
-                            />
-                        </div>
-                    </div>
-                )}
-
-                {/* Framework & Impact Logic */}
-                <div className="grid grid-cols-2 gap-16 mb-12">
-                    <div>
-                        <SectionHeader number={2} title="Project Framework" />
-                        <div className="space-y-6">
-                            <LabelValue label="Academic Discipline" value={data.section2.discipline} fullWidth />
-                            <LabelValue label="Community Problem Statement" value={data.section2.problem_statement} fullWidth />
-                        </div>
-                    </div>
-                    <div>
-                        <SectionHeader number={3} title="SDG Impact Alignment" />
-                        <div className="space-y-6">
-                            <div className="flex items-center gap-4 p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                                <div className="w-12 h-12 rounded-xl bg-slate-900 text-white flex items-center justify-center text-xl font-black">
-                                    {data.section3.primary_sdg?.goal_number || 'X'}
-                                </div>
-                                <div>
-                                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">PRIMARY GOAL</p>
-                                    <p className="text-xs font-black text-slate-900 uppercase tracking-tight line-clamp-1">{data.section3.primary_sdg?.goal_title || 'N/A'}</p>
-                                </div>
-                            </div>
-                            <LabelValue label="Impact Indicator Mapping" value={`${data.section3.primary_sdg?.target_id || data.section3.primary_sdg?.target_code || 'N/A'} / ${data.section3.primary_sdg?.indicator_id || data.section3.primary_sdg?.indicator_code || 'N/A'}`} fullWidth />
-                        </div>
+                {/* Section 2: Project Context */}
+                <SectionHeader number={2} title="Project Context" question="What specific problem was addressed and how did it relate to your academic discipline?" />
+                <div className="grid grid-cols-1 gap-4">
+                    <QandA q="What was the core problem statement?" a={data.section2.problem_statement} fullWidth />
+                    <div className="grid grid-cols-2 gap-8">
+                        <QandA q="Academic Discipline?" a={data.section2.discipline} />
+                        <QandA q="Disciplinary Contribution?" a={data.section2.discipline_contribution} />
                     </div>
                 </div>
 
-                {/* Operations & Sustenance */}
-                <SectionHeader number={4} title="Operational Metrics" />
-                <div className="grid grid-cols-4 gap-6 mb-10">
-                    <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100 text-center">
+                {/* Section 3: SDG Impact */}
+                <SectionHeader number={3} title="SDG Impact Mapping" question="Which United Nations Sustainable Development Goals (SDGs) were prioritized by this project?" />
+                <div className="grid grid-cols-2 gap-x-12 gap-y-4">
+                    <div className="bg-slate-900 text-white p-6 rounded-[2rem] flex items-center gap-6 col-span-1 shadow-xl">
+                        <div className="text-5xl font-black opacity-40">0{data.section3.primary_sdg?.goal_number}</div>
+                        <div className="space-y-1">
+                            <p className="text-[9px] font-black uppercase tracking-[0.3em] opacity-60 italic">Primary Goal Mapping</p>
+                            <p className="text-sm font-black uppercase leading-tight">{data.section3.primary_sdg?.goal_title}</p>
+                        </div>
+                    </div>
+                    <QandA q="Target Indicator Mapping?" a={`${data.section3.primary_sdg?.target_id || 'T/A'} — ${data.section3.primary_sdg?.indicator_id || 'I/A'}`} />
+                </div>
+
+                {/* Section 4: Operational Metrics */}
+                <SectionHeader number={4} title="Operational Metrics" question="What were the measurable outputs and beneficiary reach of the project?" />
+                <div className="grid grid-cols-4 gap-4 mb-4">
+                    <div className="bg-slate-50 p-6 rounded-3xl border border-slate-200 text-center">
                         <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Human Capital</p>
-                        <p className="text-3xl font-black text-slate-900">{metrics.total_verified_hours}<span className="text-xs ml-1">HRS</span></p>
+                        <p className="report-h3 !text-2xl font-black">{metrics.total_verified_hours}<span className="text-[10px] ml-1">HRS</span></p>
                     </div>
-                    <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100 text-center">
-                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Sessions</p>
-                        <p className="text-3xl font-black text-slate-900">{data.section4.total_sessions || data.section4.activities?.length || 0}</p>
-                    </div>
-                    <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100 text-center">
+                    <div className="bg-slate-50 p-6 rounded-3xl border border-slate-200 text-center">
                         <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Reach</p>
-                        <p className="text-3xl font-black text-slate-900">{metrics.total_beneficiaries}</p>
+                        <p className="report-h3 !text-2xl font-black">{metrics.total_beneficiaries}<span className="text-[10px] ml-1">PAX</span></p>
                     </div>
-                    <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100 text-center">
-                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Span</p>
-                        <p className="text-3xl font-black text-slate-900">{metrics.engagement_span}<span className="text-xs ml-1">DAYS</span></p>
+                    <div className="bg-slate-50 p-6 rounded-3xl border border-slate-200 text-center">
+                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Sessions</p>
+                        <p className="report-h3 !text-2xl font-black">{data.section4.total_sessions || data.section4.activity_blocks.length || 1}</p>
+                    </div>
+                    <div className="bg-slate-50 p-6 rounded-3xl border border-slate-200 text-center">
+                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Impact Span</p>
+                        <p className="report-h3 !text-2xl font-black">{metrics.engagement_span}<span className="text-[10px] ml-1">DAYS</span></p>
                     </div>
                 </div>
+                <QandA q="Comprehensive Activity Description?" a={data.section4.activity_description} fullWidth />
 
-                {/* Systemic Outcomes */}
-                <SectionHeader number={5} title="Systemic Outcomes" />
-                <div className="space-y-6 mb-12">
+                {/* Section 5: Measurable Outcomes */}
+                <SectionHeader number={5} title="Systemic Outcomes" question="What specific measurable changes were observed at the end of the project?" />
+                <div className="space-y-6">
                     {data.section5.measurable_outcomes?.map((outcome: any, i: number) => (
-                        <div key={i} className="p-6 bg-slate-50 rounded-[2rem] border border-slate-200 grid grid-cols-1 md:grid-cols-2 gap-8 break-inside-avoid">
+                        <div key={i} className="p-8 bg-slate-50/50 border-2 border-slate-100 rounded-[2.5rem] grid grid-cols-2 gap-12 break-inside-avoid shadow-sm">
                             <div>
-                                <div className="flex items-center gap-3 mb-3">
-                                    <span className="w-1.5 h-6 bg-slate-900 rounded-full" />
-                                    <p className="text-[10px] font-black text-slate-900 uppercase tracking-widest">Outcome Measurement {i + 1}</p>
-                                </div>
-                                <p className="text-xl font-black text-slate-900 leading-tight mb-6">{outcome.metric || "N/A"}</p>
-                                <div className="flex items-center gap-8">
-                                    <div className="space-y-1">
-                                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest text-center">Baseline</p>
-                                        <div className="bg-white border border-slate-200 px-6 py-3 rounded-2xl font-black text-slate-500">{outcome.baseline} {outcome.unit}</div>
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 italic">Question {i + 1}: Measurable Change Observed?</p>
+                                <p className="text-xl font-black text-slate-900 leading-tight mb-8 underline decoration-slate-200 underline-offset-8 decoration-4">{outcome.metric}</p>
+                                <div className="flex items-center gap-10">
+                                    <div className="flex flex-col items-center">
+                                        <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-2">Baseline</span>
+                                        <div className="px-6 py-3 bg-white border border-slate-200 rounded-2xl font-black text-slate-400">{outcome.baseline} {outcome.unit}</div>
                                     </div>
-                                    <div className="w-12 h-[2px] bg-slate-200 mt-4" />
-                                    <div className="space-y-1">
-                                        <p className="text-[9px] font-black text-slate-900 uppercase tracking-widest text-center">Achieved</p>
-                                        <div className="bg-slate-900 px-6 py-3 rounded-2xl font-black text-white">{outcome.endline} {outcome.unit}</div>
+                                    <div className="w-10 h-[2px] bg-slate-200 mt-6" />
+                                    <div className="flex flex-col items-center">
+                                        <span className="text-[8px] font-black text-slate-900 uppercase tracking-widest mb-2">Achieved</span>
+                                        <div className="px-6 py-3 bg-slate-900 rounded-2xl font-black text-white shadow-lg">{outcome.endline} {outcome.unit}</div>
                                     </div>
                                 </div>
                             </div>
-                            <div className="space-y-6 pt-2">
-                                <LabelValue label="Impact Dimension" value={outcome.outcome_area} fullWidth />
-                                <LabelValue label="Data Confidence Level" value={outcome.confidence_level} fullWidth />
-                            </div>
+                            <QandA q="Impact Dimension?" a={outcome.outcome_area} />
                         </div>
                     ))}
+                    <QandA q="Core Implementation Challenges?" a={data.section5.challenges} fullWidth />
                 </div>
 
-                {/* Resources & Partnerships */}
-                <div className="grid grid-cols-2 gap-16 border-t-2 border-slate-100 pt-12 mt-12 mb-16 break-inside-avoid">
-                    <div>
-                        <h3 className="text-[11px] font-black text-slate-900 uppercase tracking-[0.35em] mb-6 flex items-center gap-3">
-                            <span className="w-2 h-2 rounded-full bg-slate-900" /> Capital Deployment
-                        </h3>
-                        {data.section6.resources?.length > 0 ? (
-                            <div className="space-y-4">
-                                {data.section6.resources.map((r: any, i: number) => (
-                                    <div key={i} className="flex justify-between items-end border-b border-slate-100 pb-3">
-                                        <div>
-                                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-tight">{r.source}</p>
-                                            <p className="text-xs font-black text-slate-900">{r.type}</p>
-                                        </div>
-                                        <p className="text-sm font-black text-slate-900">{r.amount} {r.unit}</p>
-                                    </div>
-                                ))}
-                            </div>
-                        ) : <p className="text-xs text-slate-400 italic">No external resource usage reported.</p>}
+                {/* Section 6: Resources */}
+                <SectionHeader number={6} title="Resource Utilization" question="What resources were deployed and how were they sourced?" />
+                {data.section6.resources?.length > 0 ? (
+                    <div className="grid grid-cols-2 gap-8">
+                        {data.section6.resources.map((r: any, i: number) => (
+                            <QandA key={i} q={`Resource ${i+1}: ${r.type}?`} a={`Count: ${r.amount} ${r.unit} | Source: ${r.source}`} />
+                        ))}
                     </div>
-                    <div>
-                        <h3 className="text-[11px] font-black text-slate-900 uppercase tracking-[0.35em] mb-6 flex items-center gap-3">
-                            <span className="w-2 h-2 rounded-full bg-slate-900" /> Strategic Alliance
-                        </h3>
-                        {data.section7.partners?.length > 0 ? (
-                            <div className="space-y-4">
-                                {data.section7.partners.map((p: any, i: number) => (
-                                    <div key={i} className="flex justify-between items-center border-b border-slate-100 pb-3">
-                                        <div>
-                                            <p className="text-xs font-black text-slate-900">{p.name}</p>
-                                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest tracking-tight">{p.type} PARTNER</p>
-                                        </div>
-                                        <CheckCircle className="w-4 h-4 text-slate-900 opacity-20" />
-                                    </div>
-                                ))}
-                            </div>
-                        ) : <p className="text-xs text-slate-400 italic">No formal partnerships reported.</p>}
+                ) : <QandA q="External resources used?" a="No external financial or physical resources were reported for this project." fullWidth />}
+
+                {/* Section 7: Strategic Partnerships */}
+                <SectionHeader number={7} title="Strategic Partnerships" question="Which organizations or partners collaborated in the project?" />
+                {data.section7.partners?.length > 0 ? (
+                    <div className="grid grid-cols-2 gap-8">
+                        {data.section7.partners.map((p: any, i: number) => (
+                            <QandA key={i} q={`Partner ${i+1} Name?`} a={`${p.name} (${p.type} Organization)`} />
+                        ))}
                     </div>
+                ) : <QandA q="Formal partnerships established?" a="Sustainable impact was achieved through student-led initiative without formal external organizational partnering." fullWidth />}
+
+                {/* Section 8: Evidence & Ethics */}
+                <SectionHeader number={8} title="Evidence & Ethics" question="What evidence was captured and how were ethical standards maintained?" />
+                <div className="grid grid-cols-2 gap-x-12 gap-y-4">
+                    <QandA q="Primary Evidence Types Captured?" a={data.section8.evidence_types?.join(', ')} />
+                    <QandA q="Ethical Declaration Compliance?" a={Object.entries(data.section8.ethical_compliance || {})
+                        .filter(([_, v]) => v)
+                        .map(([k, _]) => k.replace(/_/g, ' '))
+                        .join(', ') || 'Global Ethical Compliance Adhered'} />
                 </div>
 
-                {/* Reflection & Academic Synthesis */}
-                <div className="mb-16 border-t-2 border-slate-100 pt-12 break-inside-avoid">
-                    <SectionHeader number={9} title="Reflection & Synthesis" />
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-12 mb-10">
-                        <LabelValue label="Academic-Professional Synthesis" value={data.section9.academic_application} fullWidth />
-                        <div className="space-y-8">
-                            <LabelValue label="Sustainability Road-map" value={data.section10.continuation_details} fullWidth />
-                            <div className="grid grid-cols-2 gap-8">
-                                <LabelValue label="Personal Insight" value={data.section9.personal_learning} />
-                                <LabelValue label="Strategy" value={data.section10.continuation_status} />
-                            </div>
-                        </div>
-                    </div>
+                {/* Section 9: Reflection */}
+                <SectionHeader number={9} title="Reflection & Synthesis" question="How has this project influenced your professional growth and academic understanding?" />
+                <div className="space-y-4">
+                    <QandA q="Academic-Professional Synthesis?" a={data.section9.academic_application} fullWidth />
+                    <QandA q="Personal Narrative & Identity Growth?" a={data.section9.personal_learning} fullWidth />
                 </div>
 
-                {/* Institutional Summary Dashboard - UNIFIED DESIGN (LIGHT) */}
-                <div className="mt-16 p-12 bg-slate-50 rounded-[3rem] border-4 border-slate-900 relative overflow-hidden break-inside-avoid">
-                    <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-indigo-500 opacity-5 rounded-full -mr-48 -mt-48 blur-3xl" />
-                    <div className="relative z-10">
-                        <div className="flex items-center justify-between mb-12 border-b-2 border-slate-200 pb-8">
+                {/* Section 10: Sustainability */}
+                <SectionHeader number={10} title="Sustainability & Roadmap" question="How will the impact of this project be sustained after your involvement concludes?" />
+                <div className="grid grid-cols-2 gap-8 mb-8">
+                    <QandA q="Continuation Strategy Status?" a={data.section10.continuation_status} />
+                    <QandA q="Scaling Potential?" a={data.section10.scaling_potential} />
+                </div>
+                <QandA q="Detailed Roadmap for Future Continuity?" a={data.section10.continuation_details} fullWidth />
+
+                {/* Section 11: Impact Intelligence breakdown */}
+                <SectionHeader number={11} title="Impact Intelligence Analysis" question="What is the detailed breakdown of the CII Index Score performance?" />
+                <div className="mb-12 break-inside-avoid">
+                    <table className="w-full text-xs border-collapse rounded-2xl overflow-hidden border border-slate-200">
+                        <thead>
+                            <tr className="bg-slate-900 text-white text-[9px] uppercase tracking-widest">
+                                <th className="p-4 text-left font-black">Score Category</th>
+                                <th className="p-4 text-center font-black">Weight</th>
+                                <th className="p-4 text-center font-black">Max Points</th>
+                                <th className="p-4 text-right font-black">Achieved Score</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                            {scoreTableItems.map((item, i) => (
+                                <tr key={i} className="bg-white">
+                                    <td className="p-4 font-bold text-slate-900">{item.label}</td>
+                                    <td className="p-4 text-center text-slate-400 font-bold uppercase tracking-tight text-[10px]">{item.weight}</td>
+                                    <td className="p-4 text-center text-slate-400 font-bold text-[10px]">{item.max}</td>
+                                    <td className="p-4 text-right">
+                                        <span className="inline-flex items-center justify-center w-12 py-1 bg-slate-50 border border-slate-100 rounded-lg text-slate-900 font-black text-[11px]">
+                                            {item.score}
+                                        </span>
+                                    </td>
+                                </tr>
+                            ))}
+                            <tr className="bg-slate-50 border-t-2 border-slate-200">
+                                <td colSpan={3} className="p-4 text-right font-black uppercase text-slate-900 tracking-widest text-[10px]">Aggregated CII Index Score</td>
+                                <td className="p-4 text-right">
+                                    <span className="inline-flex items-center justify-center w-12 py-2 bg-slate-900 text-white rounded-lg font-black text-xs shadow-lg">
+                                        {totalScore}
+                                    </span>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <div className="mt-8 p-6 bg-slate-900 rounded-[2.5rem] flex items-center justify-between text-white shadow-2xl">
+                        <div className="flex items-center gap-6">
+                            <div className="w-16 h-16 bg-white/10 rounded-2xl flex items-center justify-center border border-white/20">
+                                <ShieldCheck className="w-8 h-8 text-white" />
+                            </div>
                             <div>
-                                <p className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-400 mb-2">CIEL Institutional Framework</p>
-                                <h2 className="text-3xl font-black uppercase tracking-tighter text-slate-900">Impact Intelligence Dashboard</h2>
-                            </div>
-                            <Award className="w-16 h-16 text-slate-900 opacity-10" />
-                        </div>
-                        <div className="grid grid-cols-4 gap-8 mb-12">
-                            <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
-                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Aggregate EIS</p>
-                                <p className="text-4xl font-black text-slate-900">{metrics.eis_score}<span className="text-xs text-slate-400 ml-1">/100</span></p>
-                            </div>
-                            <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
-                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Engagement Index</p>
-                                <p className="text-4xl font-black text-slate-900">{metrics.attendance_frequency || '—'}<span className="text-xs text-slate-400 ml-1">%</span></p>
-                            </div>
-                            <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
-                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Total Outreach</p>
-                                <p className="text-4xl font-black text-slate-900">{metrics.total_beneficiaries}</p>
-                            </div>
-                            <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
-                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Compliance</p>
-                                <div className="flex items-center gap-2 mt-2">
-                                    <CheckCircle className="w-6 h-6 text-emerald-600" />
-                                    <p className="text-2xl font-black text-emerald-600 uppercase tracking-tighter">OK</p>
-                                </div>
+                                <p className="text-[10px] font-black uppercase tracking-[0.3em] opacity-40 italic">Engagement Status</p>
+                                <p className="text-xl font-black uppercase tracking-tight">{level}</p>
                             </div>
                         </div>
-                        <div className="bg-white p-10 rounded-[3rem] border border-slate-200 shadow-md">
-                            <div className="flex items-center gap-3 mb-6">
-                                <span className="w-12 h-[2px] bg-slate-100" />
-                                <p className="text-[11px] font-black text-slate-400 uppercase tracking-[0.4em]">Strategic Perspective</p>
-                            </div>
-                            <p className="text-2xl font-black font-serif italic text-slate-900 leading-[1.45]">
-                                "This project aligns with CIEL's impact protocol for SDG {data.section3.primary_sdg?.goal_number || 'X'}. Through {metrics.total_verified_hours} total hours of verified engagement, the initiative has successfully converted academic theory into measurable community benefit, demonstrating excellence in {data.section2.discipline || 'applied'} methodology."
-                            </p>
+                        <div className="text-right">
+                            <p className="text-[10px] font-black uppercase tracking-[0.3em] opacity-40 mb-1">CII Score Calculation Matrix</p>
+                            <p className="text-[10px] font-bold text-white/60 max-w-[300px]">CIEL Institutional Protocol v2.4 — Verified Impact Scoring Algorithm</p>
                         </div>
                     </div>
                 </div>
 
-                <div className="mt-20 flex justify-between items-center text-[10px] font-black text-slate-300 uppercase tracking-[0.4em] border-t-2 border-slate-50 pt-10 mb-12">
-                    <div className="flex items-center gap-6">
-                        <img src="/logo-1.png" alt="CIEL" className="h-5 grayscale opacity-20" />
-                        <span className="opacity-50">CIEL-DIGITAL-VERIFICATION-PROTOCOL</span>
+                {/* Institutional Impact Summary */}
+                <div className="mt-20 p-14 bg-slate-50 rounded-[4rem] border-[4px] border-slate-900 relative overflow-hidden break-inside-avoid">
+                    <div className="relative z-10">
+                        <div className="flex items-center justify-between mb-12 border-b-2 border-slate-200 pb-10">
+                            <div>
+                                <p className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-400 mb-3 block">CIEL IMPACT PROTOCOL</p>
+                                <h2 className="report-h2">Intelligence Dashboard</h2>
+                            </div>
+                            <Award className="w-20 h-20 text-slate-900 opacity-10" />
+                        </div>
+                        <div className="grid grid-cols-4 gap-8">
+                            <div className="bg-white p-8 rounded-3xl border border-slate-200">
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 italic">Impact Score</p>
+                                <p className="text-5xl font-black text-slate-900">{totalScore}<span className="text-xs text-slate-400 ml-1">/100</span></p>
+                            </div>
+                            <div className="bg-white p-8 rounded-3xl border border-slate-200">
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 italic">Hours Logged</p>
+                                <p className="text-5xl font-black text-slate-900">{metrics.total_verified_hours}</p>
+                            </div>
+                            <div className="bg-white p-8 rounded-3xl border border-slate-200">
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 italic">Strategic SDG</p>
+                                <p className="text-5xl font-black text-slate-900">0{data.section3.primary_sdg?.goal_number || 'X'}</p>
+                            </div>
+                            <div className="bg-white p-8 rounded-3xl border border-slate-200 flex flex-col items-center justify-center">
+                                <CheckCircle className="w-12 h-12 text-slate-900 mb-2 opacity-20" />
+                                <p className="text-[10px] font-black text-slate-900 uppercase tracking-[0.3em]">VERIFIED</p>
+                            </div>
+                        </div>
                     </div>
-                    <span className="opacity-50 tracking-[0.2em]">© {new Date().getFullYear()} Community Impact Lab</span>
+                </div>
+
+                {/* Footer Signing Area */}
+                <div className="mt-24 border-t-4 border-slate-100 pt-10 flex justify-between items-end mb-12">
+                    <div className="space-y-6">
+                        <div className="w-48 h-[2px] bg-slate-900" />
+                        <p className="text-[9px] font-black uppercase tracking-[0.4em] text-slate-400">Student Signature / Attestation</p>
+                    </div>
+                    <div className="text-right">
+                        <img src="/logo-1.png" alt="CIEL" className="h-6 grayscale opacity-20 mb-4 ml-auto" />
+                        <p className="text-[9px] font-black text-slate-300 uppercase tracking-[0.4em]">CIEL DIGITAL PROTOCOL — © {new Date().getFullYear()}</p>
+                    </div>
                 </div>
             </div>
         </div>

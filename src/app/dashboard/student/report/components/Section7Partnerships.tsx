@@ -734,16 +734,7 @@ export default function Section7Partnerships() {
                 </div>
             )}
 
-            {/* ─── Save ─────────────────────────────────────────────────────── */}
-            <div className="flex justify-center pt-10">
-                <Button
-                    type="button" variant="outline" onClick={() => saveReport(false)}
-                    className="h-16 px-12 rounded-2xl border-2 border-slate-100 bg-white text-slate-500 font-extrabold uppercase tracking-widest hover:border-slate-900 hover:text-slate-900 hover:shadow-2xl transition-all flex items-center gap-4 group"
-                >
-                    <Save className="w-6 h-6 group-hover:rotate-12 transition-transform" />
-                    <span>Save Section 7 Progress</span>
-                </Button>
-            </div>
+            
         </div>
     );
 }

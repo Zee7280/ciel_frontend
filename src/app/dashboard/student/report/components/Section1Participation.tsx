@@ -288,7 +288,7 @@ export default function Section1Participation({ projectData }: { projectData?: a
             if (res && res.ok) {
                 // Calculate metrics locally since we have all the data
                 const teamSize = 1 + team_members.length;
-                const calc = calculateEngagementMetrics(data.section1.attendance_logs, requiredHoursPerStudent, teamSize);
+                const calc = calculateEngagementMetrics(data.section1.attendance_logs, requiredHoursPerStudent, teamSize, data.section1.team_lead);
 
                 const finalMetrics = {
                     totalHours: calc.total_verified_hours,
@@ -300,7 +300,9 @@ export default function Section1Participation({ projectData }: { projectData?: a
                     category: calc.engagement_category,
                     hecStatus: calc.hec_compliance,
                     evidenceCount: data.section1.attendance_logs.filter(l => l.evidence_file).length,
-                    evidenceRatio: Math.round((data.section1.attendance_logs.filter(l => l.evidence_file).length / data.section1.attendance_logs.length) * 100)
+                    evidenceRatio: Math.round((data.section1.attendance_logs.filter(l => l.evidence_file).length / data.section1.attendance_logs.length) * 100),
+                    redFlags: calc.redFlags,
+                    isNonCompliant: calc.isNonCompliant
                 };
 
                 setVerifiedMetrics(finalMetrics);
@@ -485,9 +487,78 @@ export default function Section1Participation({ projectData }: { projectData?: a
                 <div className="max-w-6xl mx-auto space-y-10">
                     {internalStep === 1 && (
                         <div className="space-y-6">
-                            <div className="space-y-1 mb-8">
-                                <h3 className="text-xl font-bold text-slate-900">STEP 1 — Participation</h3>
-                                <p className="text-sm text-slate-500">Configure identity and team members for this engagement report</p>
+                            {/* ── Impact Intelligence Briefing: Purpose & Scoring ── */}
+                            <div className="bg-white border-2 border-slate-900 rounded-[2.5rem] p-8 relative overflow-hidden group shadow-xl">
+                                <div className="absolute top-0 right-0 p-12 opacity-[0.03] group-hover:opacity-[0.05] transition-opacity">
+                                    <Award className="w-48 h-48 rotate-12" />
+                                </div>
+                                
+                                <div className="relative z-10 grid grid-cols-1 md:grid-cols-2 gap-10">
+                                    {/* Purpose Column */}
+                                    <div className="space-y-4">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center shadow-sm">
+                                                <Zap className="w-5 h-5" />
+                                            </div>
+                                            <h4 className="text-sm font-black text-slate-400 uppercase tracking-[0.2em]">Institutional Purpose</h4>
+                                        </div>
+                                        <div className="space-y-3">
+                                            <h3 className="text-xl font-bold text-slate-800">Establish Accountability</h3>
+                                            <ul className="space-y-2">
+                                                {[
+                                                    "Verified participation via audit-ready logs",
+                                                    "Academic linkage to official student records",
+                                                    "Attendance integrity through HEC-compliant tracking",
+                                                    "Individual accountability for community hours"
+                                                ].map((p, i) => (
+                                                    <li key={i} className="flex items-start gap-2 text-xs font-bold text-slate-500">
+                                                        <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 mt-1.5 shrink-0" />
+                                                        {p}
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    </div>
+
+                                    {/* Formula Column */}
+                                    <div className="bg-slate-50 rounded-[2rem] p-6 border border-slate-100 space-y-4">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-10 h-10 rounded-xl bg-indigo-100 text-indigo-600 flex items-center justify-center shadow-sm">
+                                                <Activity className="w-5 h-5" />
+                                            </div>
+                                            <h4 className="text-sm font-black text-slate-400 uppercase tracking-[0.2em]">CII Scoring Formula</h4>
+                                        </div>
+                                        <div className="py-2">
+                                            <div className="report-h3 !text-3xl font-black">
+                                                S1 <span className="text-indigo-600 text-xl">=</span> I + A + P + T + H + B
+                                            </div>
+                                            <p className="text-[10px] font-bold text-slate-400 mt-2 leading-relaxed">
+                                                I: Identity • A: Academic Info • P: Participation Type • T: Attendance Presence • H: Hours Compliance • B: Bonus Engagement
+                                            </p>
+                                        </div>
+                                        <div className="pt-2 border-t border-slate-200/50 space-y-2">
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-[10px] font-black text-slate-400 uppercase">Max Section Weight</span>
+                                                <span className="text-xs font-black text-indigo-600">10 POINTS</span>
+                                            </div>
+                                            <div className="p-3 bg-indigo-50/50 rounded-xl space-y-1.5 border border-indigo-100/50">
+                                                <p className="text-[9px] font-black text-indigo-900 uppercase tracking-widest flex items-center gap-1.5">
+                                                    <Zap className="w-3 h-3" /> Audit Rules: Compliance & Bonus
+                                                </p>
+                                                <ul className="text-[9px] leading-relaxed text-indigo-800/80 space-y-1">
+                                                    <li>• <strong>Hs &lt; RHS:</strong> Proportional Score &amp; Not Eligible for Completion.</li>
+                                                    <li>• <strong>Hs &ge; RHS:</strong> Full marks for the Hours (H) component.</li>
+                                                    <li>• <strong>Bonus (B):</strong> Min(2, (Hs - RHS) / RHS * 2) if hours exceed RHS.</li>
+                                                </ul>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="space-y-1 mt-4">
+                                <h3 className="text-xl font-bold text-slate-900 uppercase tracking-tight">Step 1 — Identity & Context</h3>
+                                <p className="text-sm text-slate-500 font-medium">Verify your profile and team configuration to unlock attendance logging.</p>
                             </div>
 
                             {/* 1. Identity Verification Accordion */}
@@ -683,7 +754,7 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                                 <div>
                                                     <span className="report-label !opacity-60">{stat.label}</span>
                                                     <div className="flex items-baseline gap-1.5">
-                                                        <span className="text-2xl font-black tabular-nums tracking-tight">{stat.value}</span>
+                                                        <span className="report-h3 !text-2xl font-black">{stat.value}</span>
                                                         {stat.label !== "Team Compliance" && <span className="text-[10px] font-bold opacity-50">HRS</span>}
                                                     </div>
                                                     <p className="report-label !text-[9px] !opacity-40 !mt-1">{stat.sub}</p>
@@ -747,7 +818,7 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                                         <div key={i} className="text-center">
                                                             <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">{m.label}</p>
                                                             <div className="flex items-baseline justify-center gap-1">
-                                                                <span className={clsx("text-3xl font-black tabular-nums", m.color)}>{m.val}</span>
+                                                                <span className={clsx("report-h3 !text-3xl font-black", m.color)}>{m.val}</span>
                                                                 <span className="text-[10px] font-bold text-slate-300">HRS</span>
                                                             </div>
                                                         </div>
@@ -1028,7 +1099,7 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                 <Button
                                     onClick={handleFinalSubmit}
                                     disabled={!reviewChecked.every(Boolean) || isLoadingMetrics || !isMinimumHoursMet}
-                                    className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl h-12 px-10 font-bold shadow-lg shadow-indigo-200 transition-all"
+                                    className="bg-report-primary hover:opacity-90 text-white rounded-xl h-12 px-10 font-bold shadow-lg shadow-indigo-200 transition-all"
                                 >
                                     {isLoadingMetrics ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
                                     Finalize & Generate Record <Lock className="w-4 h-4 ml-2" />
@@ -1038,7 +1109,7 @@ export default function Section1Participation({ projectData }: { projectData?: a
                             <Button
                                 onClick={handleNext}
                                 disabled={(internalStep === 1 && !isVerified) || (internalStep === 3 && !isMinimumHoursMet)}
-                                className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl h-12 px-10 font-bold shadow-lg shadow-indigo-200 transition-all flex items-center gap-2"
+                                className="bg-report-primary hover:opacity-90 text-white rounded-xl h-12 px-10 font-bold shadow-lg shadow-indigo-200 transition-all flex items-center gap-2"
                             >
                                 {internalStep === 3 ? "Skip Submission & Continue" : "Continue"} <ChevronRight className="w-4 h-4 ml-2" />
                             </Button>

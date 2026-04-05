@@ -492,7 +492,7 @@ export default function AdminReportDetailPage() {
                                     <div className="space-y-4">
                                         <h3 className="font-bold text-slate-800 text-sm border-b pb-1 uppercase tracking-widest text-slate-400">Engagement Details</h3>
                                         <div className="flex flex-wrap">
-                                            <LabelValue label="Total Beneficiaries" value={report.section4?.total_beneficiaries} />
+                                            <LabelValue label="Total Beneficiaries" value={report.section4?.project_summary?.distinct_total_beneficiaries} />
                                             <LabelValue label="Total Sessions" value={report.section4?.total_sessions} />
                                             <LabelValue label="Delivery Mode" value={report.section4?.delivery_mode} />
                                             <LabelValue label="Primary Change Area" value={report.section4?.primary_change_area} />
@@ -502,7 +502,7 @@ export default function AdminReportDetailPage() {
                                     <div className="space-y-4">
                                         <h3 className="font-bold text-slate-800 text-sm border-b pb-1 uppercase tracking-widest text-slate-400">Core Activities</h3>
                                         <div className="flex flex-wrap gap-2">
-                                            {report.section4?.activities?.map((act: any, i: number) => (
+                                            {report.section4?.activity_blocks.map((act: any, i: number) => (
                                                 <span key={i} className="px-3 py-1 bg-blue-50 text-blue-700 rounded-lg text-xs font-bold border border-blue-100">
                                                     {act.type === 'Other' ? act.other_text : act.type}
                                                 </span>

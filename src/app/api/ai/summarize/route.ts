@@ -87,7 +87,7 @@ export async function POST(req: Request) {
                 - Total Sessions: ${data.total_sessions}
                 - Project Duration: ${data.engagementProfile?.engagement_span || 'Not specified'} days
                 - Outputs: ${JSON.stringify(data.outputs)}
-                - Total Beneficiaries: ${data.total_beneficiaries}
+                - Total Beneficiaries: ${data.project_summary?.distinct_total_beneficiaries}
                 - Beneficiary Categories: ${JSON.stringify(data.beneficiary_categories)}
                 - Team Contributions: ${JSON.stringify(data.team_contributions)}`;
                 break;
@@ -102,7 +102,7 @@ Generate a concise outcome summary for Section 5 — Outcomes & Results.
 Inputs:
 Primary SDG: ${data.primary_sdg}
 SDG Target: ${data.sdg_target}
-Total Beneficiaries Reached: ${data.total_beneficiaries}
+Total Beneficiaries Reached: ${data.project_summary?.distinct_total_beneficiaries}
 Output Types Recorded: ${JSON.stringify(data.outputs)}
 Observed Change Narrative: ${data.observed_change}
 Measurable Outcomes: ${JSON.stringify(data.measurable_outcomes)}
@@ -136,7 +136,7 @@ Project Snapshot:
 - Primary SDG: ${data.primary_sdg}
 - SDG Target: ${data.sdg_target}
 - Participation Mode: ${data.participation_mode}
-- Total Beneficiaries Reached: ${data.total_beneficiaries}
+- Total Beneficiaries Reached: ${data.project_summary?.distinct_total_beneficiaries}
 - Output Types Recorded: ${JSON.stringify(data.outputs)}
 - Total Verified Student Hours: ${data.total_verified_hours}
 
@@ -206,7 +206,7 @@ Generate the auto-generated summary for Section 6 — Resources & Implementation
 Inputs:
 Primary SDG: ${data.primary_sdg}
 SDG Target: ${data.sdg_target}
-Total Beneficiaries Reached: ${data.total_beneficiaries}
+Total Beneficiaries Reached: ${data.project_summary?.distinct_total_beneficiaries}
 Total Verified Student Hours: ${data.total_verified_hours}
 Resource Confirmation Model: ${data.resource_model}
 Resource Entries: ${JSON.stringify(data.resources)}
@@ -237,7 +237,7 @@ Evaluate Section 6 — Resources & Implementation Support of a community engagem
 INPUTS
 Project Snapshot:
 Primary SDG: ${data.primary_sdg}
-Total Beneficiaries: ${data.total_beneficiaries}
+Total Beneficiaries: ${data.project_summary?.distinct_total_beneficiaries}
 Verified Hours: ${data.total_verified_hours}
 Resources Recorded: ${JSON.stringify(data.resources)}
 Evidence: ${data.evidence}
@@ -534,23 +534,28 @@ Provide short explanation (50–80 words).
             // =====================================================
             case "section11":
                 prompt = `You are an expert grant writer and impact analyst. Write a comprehensive "Executive Impact Summary" for a Community Engagement Report.
-                Synthesize the following project data into exactly THREE cohesive, professional paragraphs:
-                Paragraph 1: Context & Intent (Summarize the problem, academic discipline, and SDG alignment).
-                Paragraph 2: Execution & Collaboration (Summarize the activities, beneficiary reach, resources used, and key partnerships).
-                Paragraph 3: Outcomes & Legacy (Summarize the measurable changes, academic/personal reflections, and sustainability plans).
+                Synthesize the provided student project data into exactly THREE cohesive, professional paragraphs (approx. 180-220 words total):
+
+                - Paragraph 1 (Problem & Academic Alignment): Summarize the specific community need addressed, identifying the student's academic discipline and how its theoretical frameworks were applied to analyze or solve the problem. Link this clearly to the selected SDG (${data.section3?.primary_sdg?.goal_number}).
+                - Paragraph 2 (Implementation & Stakeholders): Describe the core execution strategy, the variety of activities conducted, and the verified engagement scale (${data.section1?.metrics?.total_verified_hours} total hours). Highlight the reach to ${data.section4?.project_summary?.distinct_total_beneficiaries} beneficiaries and the involvement of any reported partners.
+                - Paragraph 3 (Durable Change & Growth): Articulate the measurable outcomes achieved (baseline vs endline) and describe how the project secured long-term sustainability through institutional mechanisms. Conclude with a note on the student's personal competency development.
                 
-                Do NOT use any markdown formatting (no asterisks, no hash tags, no bolding, no lists). Output plain text only, using double newlines between the 3 paragraphs.
+                Constraints:
+                1. Use professional, third-person institutional language.
+                2. Do NOT use markdown (no bolding, no asterisks, no bullet points). Output plain text only.
+                3. Use double newlines between paragraphs.
+                4. Do NOT mention specific file names or internal system IDs.
                 
-                Data:
-                - Section 1 (Verified Hours): ${data.section1?.metrics?.total_verified_hours}
-                - Section 2 (Problem): ${data.section2?.problem_statement}
-                - Section 3 (SDG): Goal ${data.section3?.primary_sdg?.goal_number}
-                - Section 4 (Activities & Reach): ${data.section4?.total_beneficiaries} beneficiaries. Actions: ${JSON.stringify(data.section4?.activities)}
-                - Section 5 (Outcomes): ${data.section5?.observed_change}
-                - Section 6 (Resources): ${JSON.stringify(data.section6?.resources)}
-                - Section 7 (Partnerships): ${JSON.stringify(data.section7?.partners)}
-                - Section 9 (Reflection): ${data.section9?.personal_learning}
-                - Section 10 (Sustainability): ${JSON.stringify(data.section10?.mechanisms)}`;
+                Cleaned Data Context:
+                - Verified Hours: ${data.section1?.metrics?.total_verified_hours}
+                - Problem: ${data.section2?.problem_statement}
+                - Primary SDG: Goal ${data.section3?.primary_sdg?.goal_number}
+                - Beneficiaries: ${data.section4?.project_summary?.distinct_total_beneficiaries}
+                - Observed Change: ${data.section5?.observed_change}
+                - Reflection & Competencies: ${data.section9?.personal_learning}
+                - Sustainability Logic: ${data.section10?.continuation_details}
+                - Partner Count: ${data.section7?.partners?.length || 0}
+                - Resource Count: ${data.section6?.resources?.length || 0}`;
                 break;
 
             default:

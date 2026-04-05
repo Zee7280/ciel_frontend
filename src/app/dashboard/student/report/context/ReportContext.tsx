@@ -8,6 +8,8 @@ import { calculateEngagementMetrics } from '../utils/engagementMetrics';
 export interface ReportData {
     project_id: string;
     status?: string;
+    admin_status?: string;
+    partner_status?: string;
     // Section 1: Participation (Was Section 2)
     section1: {
         participation_type: 'individual' | 'team';
@@ -57,8 +59,10 @@ export interface ReportData {
             weekly_continuity: number;
             eis_score: number;
             engagement_category: string;
-            hec_compliance: 'below' | 'recognized' | 'advanced' | 'full';
+            hec_compliance: 'below' | 'recognized' | 'advanced' | 'full' | 'non-compliant';
             individual_metrics?: any[];
+            redFlags?: string[];
+            isNonCompliant?: boolean;
         };
         privacy_consent: boolean;
         review_checked?: boolean[];
@@ -80,6 +84,7 @@ export interface ReportData {
     section3: {
         primary_sdg: {
             goal_number: number | string | null;
+            goal_title?: string;
             target_id: string;
             indicator_id: string;
         };
@@ -95,38 +100,55 @@ export interface ReportData {
         summary_stage: 'preliminary' | 'validated';
         summary_text?: string;
     };
-    // Section 4: Activities & Outputs (Expanded)
     section4: {
-        activity_primary_type: string;
-        activity_secondary_types: string[];
-        activity_description: string;
-        delivery_mode: string;           // select one: Field-based, Online, Hybrid
-        implementation_model: string[];  // select multiple: Individual, Team-Based, Partner-Led, Multi-Stakeholder
-        delivery_explanation: string;
-        total_sessions: string;
-        primary_change_area: string;
-        outputs: Array<{
-            type: string;
-            quantity: string;
-            unit: string;
+        activity_blocks: Array<{
+            id: string;
+            title: string;
+            primary_category: string;
+            sub_category: string;
+            other_category_text?: string;
+            description: string;
+            status: string; // Completed, Partially Completed, Ongoing
+            
+            // 4.2 Delivery
+            delivery_mode: string;
+            implementation_models: string[];
+            sessions_count: string;
+            delivery_explanation: string;
+            
+            // 4.3 Outputs
+            outputs: Array<{
+                title: string;
+                type: string;
+                quantity: string;
+                unit: string;
+                verification_note: string;
+                is_shared: boolean;
+            }>;
+            
+            // 4.4 Beneficiaries
+            serves_beneficiaries: boolean;
+            beneficiaries_reached: string;
+            beneficiary_categories: string[];
+            relevance_types: string[];
+            overlap_status: string;
+            beneficiary_description: string;
+            
+            // 4.5 Location
+            geographic_reach: string;
+            geographic_sub_category: string;
+            site_note: string;
         }>;
-        beneficiary_categories: string[];
-        total_beneficiaries: string;
-        beneficiary_description: string;
-        geographic_reach: string;        // Single Site, Local Community, etc.
-        geographic_sub_category: string; // School, Village, Neighborhood, etc.
+        project_summary: {
+            distinct_total_beneficiaries: string;
+            counting_method: string;
+            overall_overlap: string;
+            overall_delivery_mode: string;
+            overall_implementation_model: string[];
+            overall_geographic_reach: string;
+            project_implementation_explanation: string;
+        };
         summary_text?: string;
-        activities: Array<{ type: string; other_text?: string; }>; // Keep for backwards compatibility if needed
-        primary_change_area_others?: string[];                      // Keep for backwards compatibility if needed
-        team_contributions: Array<{
-            member_id: string;
-            name: string;
-            role: string;
-            other_role?: string;
-            hours: string;
-            sessions: string;
-            beneficiaries: string;
-        }>;
     };
     // Section 5: Outcomes (Detailed Metrics)
     section5: {
@@ -137,11 +159,13 @@ export interface ReportData {
             outcome_area_other?: string;
             metric: string;
             metric_other?: string;
+            metric_category: string;
+            outcome_sub_category: string;
             baseline: string;
             endline: string;
             unit: string;
             unit_other?: string;
-            confidence_level: string;
+            confidence_level: string[];
             measurement_explanation?: string;
         }>;
         challenges: string;
@@ -232,6 +256,7 @@ export interface ReportData {
     // Section 11: Summary (Intelligence Layer - mostly read-only/calculated, strictly strictly read-only so maybe empty here or just status)
     section11: {
         summary_text?: string;
+        is_ai_generated?: boolean;
     };
     required_hours?: number;
 }
@@ -282,24 +307,17 @@ const defaultReportData: ReportData = {
         summary_text: ''
     },
     section4: {
-        activity_primary_type: '',
-        activity_secondary_types: [],
-        activity_description: '',
-        delivery_mode: '',
-        implementation_model: [],
-        delivery_explanation: '',
-        total_sessions: '',
-        primary_change_area: '',
-        outputs: [],
-        beneficiary_categories: [],
-        total_beneficiaries: '',
-        beneficiary_description: '',
-        geographic_reach: '',
-        geographic_sub_category: '',
-        summary_text: '',
-        activities: [],
-        primary_change_area_others: [''],
-        team_contributions: []
+        activity_blocks: [],
+        project_summary: {
+            distinct_total_beneficiaries: '',
+            counting_method: '',
+            overall_overlap: '',
+            overall_delivery_mode: '',
+            overall_implementation_model: [],
+            overall_geographic_reach: '',
+            project_implementation_explanation: ''
+        },
+        summary_text: ''
     },
 
     section5: {
@@ -307,11 +325,13 @@ const defaultReportData: ReportData = {
         measurable_outcomes: [{
             id: 'outcome-0',
             outcome_area: '',
+            outcome_sub_category: '',
+            metric_category: '',
             metric: '',
             baseline: '',
             endline: '',
             unit: '',
-            confidence_level: '',
+            confidence_level: [],
             measurement_explanation: ''
         }],
         challenges: '',
@@ -403,6 +423,7 @@ interface ReportContextType {
     isParticipationUnlocked: boolean;
     setParticipationUnlocked: (unlocked: boolean) => void;
     setRequiredHours: (hours: number) => void;
+    isEligibleForSubmission: boolean;
 }
 
 
@@ -414,6 +435,12 @@ export function ReportProvider({ children }: { children: React.ReactNode }) {
     const [validationErrors, setValidationErrors] = useState<Record<string, ValidationError[]>>({});
     const [isReadOnly, setReadOnly] = useState(false);
     const [isParticipationUnlocked, setParticipationUnlocked] = useState(false);
+    
+    // Eligibility for Submission (Progress vs Submission Mode)
+    const isEligibleForSubmission = useMemo(() => {
+        const metHours = (data.section1.metrics?.total_verified_hours || 0) >= (data.required_hours || 16);
+        return metHours;
+    }, [data.section1.metrics?.total_verified_hours, data.required_hours]);
 
     // Auto-calculate Section 1 metrics whenever attendance logs change
     useEffect(() => {
@@ -441,7 +468,9 @@ export function ReportProvider({ children }: { children: React.ReactNode }) {
     }, []);
 
     const updateSection = useCallback((section: keyof Omit<ReportData, 'project_id'>, payload: any) => {
-        if (isReadOnly) return; // Prevent updates via updateSection in read-only mode
+        // Intelligence layer (Section 11) is allowed to be updated even in read-only mode
+        // to show/persist AI summaries generated after submission.
+        if (isReadOnly && section !== 'section11') return;
 
         setData(prev => ({
             ...prev,
@@ -584,7 +613,8 @@ export function ReportProvider({ children }: { children: React.ReactNode }) {
         saveReport,
         isParticipationUnlocked,
         setParticipationUnlocked,
-        setRequiredHours
+        setRequiredHours,
+        isEligibleForSubmission
     }), [
         data,
         updateSection,
@@ -602,7 +632,8 @@ export function ReportProvider({ children }: { children: React.ReactNode }) {
         saveReport,
         isParticipationUnlocked,
         setParticipationUnlocked,
-        setRequiredHours
+        setRequiredHours,
+        isEligibleForSubmission
     ]);
 
 

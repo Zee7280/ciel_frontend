@@ -12,6 +12,10 @@ import React, { useMemo, useEffect, useState } from "react";
 import clsx from "clsx";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog";
 
+function countWords(str: string): number {
+    return (str || "").trim().split(/\s+/).filter(w => w.length > 0).length;
+}
+
 // ─── Static data ──────────────────────────────────────────────────────────────
 const resourceTypes = [
     "Financial (Cash Funding)",
@@ -191,12 +195,23 @@ function ResourceCard({
                             {resourceTypes.map(t => <option key={t} value={t}>{t}</option>)}
                         </select>
                         {res.type === 'Other (Specify)' && (
-                            <Textarea
-                                placeholder="Specify resource type (100-200 Words)..."
-                                value={res.type_other || ''}
-                                onChange={e => onUpdate('type_other', e.target.value)}
-                                className="w-full h-24 bg-slate-50 border-2 border-report-primary-border rounded-xl px-4 py-3 text-xs font-bold text-slate-700 outline-none focus:border-report-primary resize-none mt-2"
-                            />
+                            <div className="space-y-2 mt-2">
+                                <Textarea
+                                    placeholder="Specify resource type (50-200 Words)..."
+                                    value={res.type_other || ''}
+                                    onChange={e => onUpdate('type_other', e.target.value)}
+                                    className="w-full h-24 bg-slate-50 border-2 border-report-primary-border rounded-xl px-4 py-3 text-xs font-bold text-slate-700 outline-none focus:border-report-primary resize-none"
+                                />
+                                <div className="flex items-center justify-between px-1">
+                                    <p className={clsx(
+                                        "report-label !text-[9px]",
+                                        countWords(res.type_other || '') >= 50 && countWords(res.type_other || '') <= 200 ? "text-blue-600" : "text-amber-500"
+                                    )}>
+                                        {countWords(res.type_other || '')} / 200 words (Min 50)
+                                    </p>
+                                    <FieldError message={getFieldError(`resources.${idx}.type_other`)} />
+                                </div>
+                            </div>
                         )}
                     </div>
 
@@ -225,12 +240,23 @@ function ResourceCard({
                         </div>
                     </div>
                     {res.unit === 'Other (Specify)' && (
-                        <Textarea
-                            placeholder="Specify unit (100-200 Words)..."
-                            value={res.unit_other || ''}
-                            onChange={e => onUpdate('unit_other', e.target.value)}
-                            className="w-full h-24 bg-slate-50 border-2 border-report-primary-border rounded-xl px-4 py-3 text-xs font-bold text-slate-700 outline-none focus:border-report-primary resize-none mt-2"
-                        />
+                        <div className="space-y-2 mt-2">
+                            <Textarea
+                                placeholder="Specify unit (50-200 Words)..."
+                                value={res.unit_other || ''}
+                                onChange={e => onUpdate('unit_other', e.target.value)}
+                                className="w-full h-24 bg-slate-50 border-2 border-report-primary-border rounded-xl px-4 py-3 text-xs font-bold text-slate-700 outline-none focus:border-report-primary resize-none"
+                            />
+                            <div className="flex items-center justify-between px-1">
+                                <p className={clsx(
+                                    "report-label !text-[9px]",
+                                    countWords(res.unit_other || '') >= 50 && countWords(res.unit_other || '') <= 200 ? "text-blue-600" : "text-amber-500"
+                                )}>
+                                    {countWords(res.unit_other || '')} / 200 words (Min 50)
+                                </p>
+                                <FieldError message={getFieldError(`resources.${idx}.unit_other`)} />
+                            </div>
+                        </div>
                     )}
 
                     {/* 6.2.6 Verification */}
@@ -284,18 +310,29 @@ function ResourceCard({
                             ))}
                         </div>
                         {sources.includes('Other (Specify)') && (
-                            <Textarea
-                                placeholder="Specify source (100-200 Words)..."
-                                value={res.source_other || ''}
-                                onChange={e => onUpdate('source_other', e.target.value)}
-                                className="w-full h-24 bg-slate-50 border-2 border-report-primary-border rounded-xl px-4 py-3 text-xs font-bold text-slate-700 outline-none focus:border-report-primary resize-none mt-2"
-                            />
+                            <div className="space-y-2 mt-2">
+                                <Textarea
+                                    placeholder="Specify source (50-200 Words)..."
+                                    value={res.source_other || ''}
+                                    onChange={e => onUpdate('source_other', e.target.value)}
+                                    className="w-full h-24 bg-slate-50 border-2 border-report-primary-border rounded-xl px-4 py-3 text-xs font-bold text-slate-700 outline-none focus:border-report-primary resize-none"
+                                />
+                                <div className="flex items-center justify-between px-1">
+                                    <p className={clsx(
+                                        "report-label !text-[9px]",
+                                        countWords(res.source_other || '') >= 50 && countWords(res.source_other || '') <= 200 ? "text-blue-600" : "text-amber-500"
+                                    )}>
+                                        {countWords(res.source_other || '')} / 200 words (Min 50)
+                                    </p>
+                                    <FieldError message={getFieldError(`resources.${idx}.source_other`)} />
+                                </div>
+                            </div>
                         )}
                     </div>
 
                     {/* 6.2.5 Purpose — 20-40 words */}
                     <div className="space-y-3">
-                        <Label className="report-label">6.2.5 — Purpose of Resource (100–200 Words)</Label>
+                        <Label className="report-label">6.2.5 — Purpose of Resource (50–200 Words)</Label>
                         <textarea
                             placeholder="Explain what exactly this resource enabled (e.g. 'Used to purchase hygiene kits for 45 participants')"
                             value={res.purpose}
@@ -306,11 +343,12 @@ function ResourceCard({
                         <div className="flex items-center justify-between px-1">
                             <p className={clsx(
                                 "report-label !text-[9px]",
-                                purposeWords >= 100 && purposeWords <= 200 ? "text-blue-600" : purposeWords > 200 ? "text-red-500" : "text-amber-500"
+                                purposeWords >= 50 && purposeWords <= 200 ? "text-blue-600" : purposeWords > 200 ? "text-red-500" : "text-amber-500"
                             )}>
-                                {purposeWords} / 200 words (Min 100)
+                                {purposeWords} / 200 words (Min 50)
                             </p>
-                            {purposeWords >= 100 && purposeWords <= 200 && (
+                            <FieldError message={getFieldError(`resources.${idx}.purpose`)} />
+                            {purposeWords >= 50 && purposeWords <= 200 && (
                                 <span className="report-label !text-[9px] !text-report-primary !flex !items-center !gap-1">
                                     <CheckCircle2 className="w-3 h-3" /> Within range
                                 </span>
@@ -419,10 +457,10 @@ export default function Section6Resources() {
                         {[
                             { label: "Primary SDG", val: section3.primary_sdg.goal_number ? `SDG ${section3.primary_sdg.goal_number}` : "—" },
                             { label: "SDG Target", val: section3.primary_sdg.target_id || "—" },
-                            { label: "Beneficiaries", val: `${section4.total_beneficiaries || "0"} Reached` },
+                            { label: "Beneficiaries", val: `${section4.project_summary?.distinct_total_beneficiaries || "0"} Reached` },
                             { label: "Verified Hours", val: `${section1.metrics.total_verified_hours}h` },
-                            { label: "Activity Types", val: `${section4.activities.filter(a => a.type).length} Recorded` },
-                            { label: "Outputs", val: `${section4.outputs.filter(o => o.type).length} Recorded` },
+                            { label: "Activity Types", val: `${(section4.activity_blocks || []).filter((a: any) => a.type).length} Recorded` },
+                            { label: "Outputs", val: `${(section4.activity_blocks || []).reduce((acc: number, b: any) => acc + (b.outputs?.length || 0), 0)} Recorded` },
                         ].map(({ label, val }) => (
 
                             <div key={label} className="space-y-1">
@@ -896,16 +934,7 @@ export default function Section6Resources() {
 
             )}
 
-            {/* ─── Save ─────────────────────────────────────────────────────── */}
-            <div className="flex justify-center pt-10">
-                <Button
-                    type="button" variant="outline" onClick={() => saveReport(false)}
-                    className="h-16 px-12 rounded-2xl border-2 border-slate-100 bg-white text-slate-500 font-extrabold uppercase tracking-widest hover:border-slate-900 hover:text-slate-900 hover:shadow-2xl transition-all flex items-center gap-4 group"
-                >
-                    <Save className="w-6 h-6 group-hover:rotate-12 transition-transform" />
-                    <span>Save Section 6 Progress</span>
-                </Button>
-            </div>
+            
             {/* ─── Full File Preview Dialog ─────────────────────────────────── */}
             <Dialog open={!!previewFile} onOpenChange={(open) => !open && setPreviewFile(null)}>
                 <DialogContent className="max-w-4xl p-6 bg-white flex flex-col items-center">

@@ -118,7 +118,7 @@ export default function CIIDashboardMeter() {
                             <div className="absolute bottom-[-6px] left-1/2 w-3.5 h-3.5 rounded-full bg-slate-900 -translate-x-1/2 z-20" />
                         </div>
                         <div className="text-center mt-2">
-                            <p className="text-3xl font-black text-slate-900 leading-none">
+                            <p className="report-h3 !text-3xl font-black">
                                 {totalScore}
                                 <span className="text-sm font-semibold text-slate-400 ml-1">/ 100</span>
                             </p>

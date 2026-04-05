@@ -53,6 +53,7 @@ export default function LocationPicker({ onLocationSelect, initialLocation }: Lo
 
     // Ensure we only render map on client
     const [isMounted, setIsMounted] = useState(false);
+    const [mapInstance, setMapInstance] = useState<L.Map | null>(null);
 
     useEffect(() => {
         setIsMounted(true);
@@ -202,16 +203,21 @@ export default function LocationPicker({ onLocationSelect, initialLocation }: Lo
                     center={position || defaultCenter}
                     zoom={13}
                     style={{ height: '300px', width: '100%' }}
+                    ref={setMapInstance}
                 >
-                    <TileLayer
-                        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                    />
-                    <LocationMarker
-                        position={position}
-                        setPosition={setPosition}
-                        onLocationSelect={(pos) => onLocationSelect({ lat: pos.lat, lng: pos.lng })}
-                    />
+                    {mapInstance && (
+                        <>
+                            <TileLayer
+                                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                            />
+                            <LocationMarker
+                                position={position}
+                                setPosition={setPosition}
+                                onLocationSelect={(pos) => onLocationSelect({ lat: pos.lat, lng: pos.lng })}
+                            />
+                        </>
+                    )}
                 </MapContainer>
 
                 {/* Floating Indicators */}

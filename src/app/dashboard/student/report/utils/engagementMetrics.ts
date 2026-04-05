@@ -32,11 +32,20 @@ export interface CalculatedMetrics {
     weekly_continuity: number;
     eis_score: number;
     engagement_category: string;
-    hec_compliance: 'below' | 'recognized' | 'advanced' | 'full';
+    hec_compliance: 'below' | 'recognized' | 'advanced' | 'full' | 'non-compliant';
     individual_metrics?: IndividualMetric[];
+    redFlags?: string[];
+    isNonCompliant?: boolean;
 }
 
-export function calculateEngagementMetrics(logs: AttendanceLog[], requiredHours: number = 16, teamSize: number = 1): CalculatedMetrics {
+export function calculateEngagementMetrics(
+    logs: AttendanceLog[], 
+    requiredHours: number = 16, 
+    teamSize: number = 1,
+    leadProfile?: any
+): CalculatedMetrics {
+    const redFlags: string[] = [];
+    
     if (!logs || logs.length === 0) {
         return {
             total_verified_hours: 0,
@@ -58,6 +67,34 @@ export function calculateEngagementMetrics(logs: AttendanceLog[], requiredHours:
     
     const totalHours = logs.reduce((sum, log) => sum + (Number(log.hours) || 0), 0);
     const uniqueDays = new Set(logs.map(log => log.date)).size;
+
+    // --- AUDIT: Red Flag Detection ---
+    const hoursPerDay: Record<string, number> = {};
+    const patterns: Record<string, number> = {};
+    
+    logs.forEach(log => {
+        const h = Number(log.hours) || 0;
+        hoursPerDay[log.date] = (hoursPerDay[log.date] || 0) + h;
+        
+        // Pattern detection (e.g., exact same hours or times)
+        const p = `${log.hours}`; 
+        patterns[p] = (patterns[p] || 0) + 1;
+    });
+
+    Object.entries(hoursPerDay).forEach(([date, hrs]) => {
+        if (hrs > 8) redFlags.push(`Inflation: Unrealistic daily output on ${date} (${hrs} hrs)`);
+    });
+
+    if (Object.values(patterns).some(v => v > 10)) {
+        redFlags.push("Suspicious Pattern: Multiple identical duration logs detected");
+    }
+
+    // Identity/Academic Trace
+    if (leadProfile) {
+        if (!leadProfile.verified) redFlags.push("Admin Identity Verification Pending");
+        if (!leadProfile.university || !leadProfile.degree) redFlags.push("Weak Academic Traceability");
+        if (!leadProfile.cnic) redFlags.push("Missing National ID Attribution");
+    }
 
     const dates = logs.map(log => new Date(log.date).getTime());
     const minDate = Math.min(...dates);
@@ -83,27 +120,18 @@ export function calculateEngagementMetrics(logs: AttendanceLog[], requiredHours:
     let frequencyScore = 0;
     let teamEIS = 0;
 
+    const ratio = Math.min(totalHours / projectGoal, 1);
+
     if (totalHours > 0) {
-        hoursScore = Math.min(totalHours / projectGoal, 1) * 45;
-        
-        // ExpectedWeeks = system-derived or projectSpan or config default (fallback = 12 weeks)
+        hoursScore = ratio * 45;
         const expectedWeeks = Math.max(12, projectSpan); 
         continuityScore = Math.min(activeWeeks / expectedWeeks, 1) * 25;
-        
-        const expectedSpan = 12; // target logic 12 weeks
+        const expectedSpan = 12; 
         spanScore = Math.min(projectSpan / expectedSpan, 1) * 15;
-        
-        const targetFrequency = 3; // 3 visits/week default
+        const targetFrequency = 3; 
         frequencyScore = Math.min(avgFrequency / targetFrequency, 1) * 15;
         
         teamEIS = Math.round(hoursScore + continuityScore + spanScore + frequencyScore);
-        if (teamEIS > 100) teamEIS = 100;
-        
-        // Edge cases
-        if (activeWeeks === 0) continuityScore = 0;
-        if (projectSpan === 0) spanScore = 0;
-        if (avgFrequency === 0) frequencyScore = 0;
-        if (totalHours === 0) teamEIS = 0;
     }
 
     // 3. INDIVIDUAL SCORE & BONUS
@@ -118,30 +146,20 @@ export function calculateEngagementMetrics(logs: AttendanceLog[], requiredHours:
     const individualMetrics: IndividualMetric[] = Object.keys(studentHoursMap).map(pId => {
         const ih = studentHoursMap[pId];
         const evidenceUploaded = studentEvidenceMap[pId] || false;
-        
-        let gateway: "ELIGIBLE" | "INCOMPLETE" = "ELIGIBLE";
-        if (ih < RHS) gateway = "INCOMPLETE";
+        let gateway: "ELIGIBLE" | "INCOMPLETE" = ih < RHS ? "INCOMPLETE" : "ELIGIBLE";
 
         let bonus = 0;
-        if (gateway === "ELIGIBLE") {
-            bonus = Math.min((ih - RHS) / RHS, 1) * 10;
+        if (gateway === "ELIGIBLE" && redFlags.length === 0 && ih > RHS) {
+            bonus = Math.min(2.0, ((ih - RHS) / RHS) * 2.0);
         }
 
-        let finalScore: number | null = null;
-        let finalStatus = "";
-        let band = "";
+        let finalScore: number | null = gateway === "INCOMPLETE" ? null : Math.round(teamEIS + (bonus * 5)); // Scaling bonus to EIS 100-point scale
+        let finalStatus = gateway === "INCOMPLETE" ? "INCOMPLETE" : (finalScore! < 50 ? "LOW" : "COMPLETE");
+        let band = "Incomplete";
 
-        if (gateway === "INCOMPLETE") {
-            finalStatus = "INCOMPLETE";
-            band = "Incomplete";
-        } else {
-            finalScore = Math.round(teamEIS + bonus);
-            if (finalScore < 50) finalStatus = "LOW";
-            else finalStatus = "COMPLETE";
-            
+        if (gateway === "ELIGIBLE" && finalScore !== null) {
             if (finalScore >= 80) band = "Band E – Transformative Community Impact Leader";
             else if (finalScore >= 60) band = "Band D – Impact Advancement Leader";
-            else if (finalScore >= 40) band = "Band C – Structured Impact Contributor";
             else if (finalScore >= 20) band = "Band B – Developing Community Contributor";
             else band = "Band A – Emerging Service Participant";
         }
@@ -160,16 +178,17 @@ export function calculateEngagementMetrics(logs: AttendanceLog[], requiredHours:
         };
     });
 
-    // 4. Determine Display Category for the Team (using TeamEIS)
+    // 4. Compliance & Status
+    const isNonCompliant = ratio < 1.0 || redFlags.length > 0;
+    
     let category = 'Band A – Emerging Service Participant';
     if (teamEIS >= 80) category = 'Band E – Transformative Community Impact Leader';
     else if (teamEIS >= 60) category = 'Band D – Impact Advancement Leader';
-    else if (teamEIS >= 40) category = 'Band C – Structured Impact Contributor';
     else if (teamEIS >= 20) category = 'Band B – Developing Community Contributor';
 
-    // 5. Overall HEC Compliance (mapped closely to teamEIS for UX)
-    let hec: 'below' | 'recognized' | 'advanced' | 'full' = 'below';
-    if (teamEIS >= 80) hec = 'full';
+    let hec: 'below' | 'recognized' | 'advanced' | 'full' | 'non-compliant' = 'below';
+    if (isNonCompliant) hec = 'non-compliant';
+    else if (teamEIS >= 80) hec = 'full';
     else if (teamEIS >= 60) hec = 'advanced';
     else if (teamEIS >= 40) hec = 'recognized';
 
@@ -180,9 +199,11 @@ export function calculateEngagementMetrics(logs: AttendanceLog[], requiredHours:
         attendance_frequency: Number(avgFrequency.toFixed(1)),
         weekly_continuity: activeWeeks > 0 ? Math.round((activeWeeks / Math.max(12, projectSpan)) * 100) : 0,
         eis_score: teamEIS,
-        engagement_category: category,
+        engagement_category: isNonCompliant ? "Non-Compliant Participation" : category,
         hec_compliance: hec,
-        individual_metrics: individualMetrics
+        individual_metrics: individualMetrics,
+        redFlags,
+        isNonCompliant
     };
 }
 

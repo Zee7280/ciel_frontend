@@ -13,23 +13,139 @@ type MeasurableOutcome = {
     id: string;
     outcome_area: string;
     outcome_area_other?: string;
+    outcome_sub_category: string;
+    metric_category: string;
     metric: string;
     metric_other?: string;
     baseline: string;
     endline: string;
     unit: string;
     unit_other?: string;
-    confidence_level: string;
+    confidence_level: string[];
     measurement_explanation?: string;
 };
 
 // ─── Static data ──────────────────────────────────────────────────────────────
-const outcomeCategories = [
-    "Access Improvement", "Behavior Change", "Knowledge / Skills Improvement",
-    "Economic Improvement", "Health & Well-being", "Environmental Improvement",
-    "Institutional Strengthening", "Inclusion / Participation", "Partnership Strengthening",
-    "Policy Change", "Other"
-];
+const outcomeHierarchy: Record<string, string[]> = {
+    "1. Access Improvement": [
+        "Access to Education", "Access to Healthcare", "Access to Food / Nutrition",
+        "Access to Clean Water / Sanitation", "Access to Financial Services",
+        "Access to Public Services", "Access to Information"
+    ],
+    "2. Service Delivery / Immediate Relief": [
+        "Food Distribution", "Medical Camps / Health Services",
+        "Emergency Relief (Disaster / Crisis)", "Shelter Support",
+        "Clothing Distribution", "Ramadan / Seasonal Campaigns"
+    ],
+    "3. Behavior Change": [
+        "Hygiene Practices", "Environmental Awareness", "Health Awareness",
+        "Financial Behavior Change", "Social Attitude Change (e.g., gender, inclusivity)",
+        "Civic Responsibility"
+    ],
+    "4. Knowledge / Skills Improvement": [
+        "Basic Education Support", "Literacy / Numeracy",
+        "Soft Skills (Communication, Teamwork)", "Digital Literacy",
+        "Academic Support / Tutoring", "Awareness Sessions"
+    ],
+    "5. Capacity Building (Advanced Training)": [
+        "Vocational Training", "Professional Skills Development",
+        "Entrepreneurship Training", "Leadership Development",
+        "Technical Skills Training", "Teacher / Staff Training"
+    ],
+    "6. Economic Improvement": [
+        "Household Income Support", "Cost Reduction / Financial Relief",
+        "Microfinance / Financial Inclusion", "Business Support (Small Scale)",
+        "Resource Optimization"
+    ],
+    "7. Livelihood / Employment Generation": [
+        "Job Creation", "Freelancing Opportunities", "Small Business Setup",
+        "Women Employment Initiatives", "Youth Employment Programs"
+    ],
+    "8. Health & Well-being": [
+        "Physical Health Improvement", "Mental Health Support",
+        "Nutrition Improvement", "Maternal / Child Health",
+        "Preventive Healthcare", "Fitness & Lifestyle Improvement"
+    ],
+    "9. Environmental Improvement": [
+        "Waste Management", "Tree Plantation", "Cleanliness Drives",
+        "Water Conservation", "Climate Awareness", "Pollution Reduction"
+    ],
+    "10. Infrastructure / Facility Development": [
+        "School Infrastructure Development", "Library Setup",
+        "Water System Installation", "Sanitation Facilities",
+        "Community Space Development", "Digital Labs / Learning Spaces"
+    ],
+    "11. Digital Inclusion / Technology Access": [
+        "Access to Devices", "Internet Access", "Digital Skills Training",
+        "Platform / System Development", "E-learning Enablement"
+    ],
+    "12. Institutional Strengthening": [
+        "Process Improvement", "Capacity Building of Organization",
+        "System Development", "Documentation & Reporting Systems",
+        "Governance Support"
+    ],
+    "13. Inclusion / Participation": [
+        "Gender Inclusion", "Disability Inclusion", "Youth Engagement",
+        "Community Participation", "Marginalized Group Inclusion"
+    ],
+    "14. Partnership Strengthening": [
+        "NGO Collaboration", "Corporate Partnerships", "Academic Partnerships",
+        "Community Networks", "Public-Private Partnerships"
+    ],
+    "15. Policy Change / Advocacy": [
+        "Policy Recommendations", "Awareness Campaigns for Policy",
+        "Advocacy Initiatives", "Legal Awareness", "Community Mobilization"
+    ],
+    "16. Other": []
+};
+
+const outcomeCategories = Object.keys(outcomeHierarchy);
+
+const metricHierarchy: Record<string, string[]> = {
+    "🔹 People-Based Metrics": [
+        "Number of Individuals", "Number of Beneficiaries", "Number of Households",
+        "Number of Participants", "Number of Students", "Number of Patients"
+    ],
+    "🔹 Distribution / Items": [
+        "Number of Items Distributed", "Number of Kits Distributed",
+        "Number of Packages Distributed", "Number of Meals Served", "Number of Units Delivered"
+    ],
+    "🔹 Financial Metrics": [
+        "Amount (PKR)", "Amount (USD)", "Value of In-Kind Support (PKR/USD)",
+        "Cost Savings Generated (PKR/USD)", "Funds Raised (PKR/USD)"
+    ],
+    "🔹 Time & Effort": [
+        "Number of Hours Contributed", "Number of Volunteer Hours", "Number of Days", "Number of Weeks"
+    ],
+    "🔹 Sessions & Activities": [
+        "Number of Sessions Conducted", "Number of Trainings Conducted",
+        "Number of Workshops Conducted", "Number of Events Conducted", "Number of Campaigns Conducted"
+    ],
+    "🔹 Infrastructure / Outputs": [
+        "Number of Facilities Developed", "Number of Systems Installed",
+        "Number of Projects Completed", "Number of Spaces Created"
+    ],
+    "🔹 Environmental Metrics": [
+        "Number of Trees Planted", "Waste Collected (kg / tons)",
+        "Water Saved (liters)", "Area Cleaned (sq. ft / acres)"
+    ],
+    "🔹 Digital & Technology": [
+        "Number of Devices Distributed", "Number of Users Enabled",
+        "Number of Systems Developed", "Number of Platforms Created"
+    ],
+    "🔹 Economic / Livelihood": [
+        "Number of Jobs Created", "Number of Businesses Supported", "Number of Individuals Employed"
+    ],
+    "🔹 Partnership & Engagement": [
+        "Number of Partnerships", "Number of Organizations Engaged", "Number of Stakeholder Meetings"
+    ],
+    "🔹 Percentage-Based (Advanced)": [
+        "Percentage Improvement (%)", "Percentage Increase in Access (%)", "Percentage Behavior Change (%)"
+    ],
+    "🔹 Other": []
+};
+
+const metricCategories = Object.keys(metricHierarchy);
 
 const confidenceLevels = ["Directly Measured", "Partner Confirmed", "Observed", "Estimated"];
 
@@ -39,13 +155,17 @@ function OutcomeCard({
     index,
     canRemove,
     onUpdate,
+    onUpdateFields,
     onRemove,
+    getFieldError,
 }: {
     outcome: MeasurableOutcome;
     index: number;
     canRemove: boolean;
-    onUpdate: (field: keyof MeasurableOutcome, val: string) => void;
+    onUpdate: (field: keyof MeasurableOutcome, val: any) => void;
+    onUpdateFields: (fields: Partial<MeasurableOutcome>) => void;
     onRemove: () => void;
+    getFieldError: (fieldPath: string) => string | undefined;
 }) {
     const baseline = parseFloat(outcome.baseline) || 0;
     const endline = parseFloat(outcome.endline) || 0;
@@ -76,10 +196,15 @@ function OutcomeCard({
                 {/* Left side: Category & Metric */}
                 <div className="space-y-6">
                     <div className="space-y-3">
-                        <Label className="report-label">5.2.1 Outcome Category (Select One)</Label>
+                        <Label className="report-label text-report-primary">5.2.1 Outcome Category (Select One)</Label>
                         <select
                             value={outcome.outcome_area}
-                            onChange={e => onUpdate('outcome_area', e.target.value)}
+                            onChange={e => {
+                                onUpdateFields({
+                                    outcome_area: e.target.value,
+                                    outcome_sub_category: ''
+                                });
+                            }}
                             className="w-full h-14 bg-slate-50 border-2 border-slate-50 rounded-2xl px-6 font-bold text-slate-700 text-sm outline-none focus:border-report-primary-border transition-all"
                         >
                             <option value="">Select Category...</option>
@@ -87,25 +212,123 @@ function OutcomeCard({
                         </select>
                     </div>
 
-                    <div className="space-y-3">
-                        <Label className="report-label">5.2.2 Specific Metric</Label>
-                        <p className="text-[10px] text-slate-400 font-medium italic mb-1">e.g. Number of students trained / Number of people receiving food</p>
-                        <Input
-                            placeholder="What exactly are you measuring?"
-                            value={outcome.metric}
-                            onChange={e => onUpdate('metric', e.target.value)}
-                            className="h-14 bg-slate-50 border-2 border-slate-50 rounded-2xl px-6 font-bold text-slate-700 focus:bg-white"
-                        />
-                    </div>
+                    {/* Sub-Category Selection */}
+                    {outcome.outcome_area && outcome.outcome_area !== "16. Other" && (
+                        <div className="space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
+                            <Label className="report-label text-emerald-600">5.2.1.b Specific Sub-Category</Label>
+                            <select
+                                value={outcome.outcome_sub_category}
+                                onChange={e => onUpdate('outcome_sub_category', e.target.value)}
+                                className="w-full h-14 bg-emerald-50/50 border-2 border-emerald-100 rounded-2xl px-6 font-bold text-emerald-900 text-sm outline-none focus:border-emerald-300 transition-all"
+                            >
+                                <option value="">Select Sub-Category...</option>
+                                {outcomeHierarchy[outcome.outcome_area]?.map(sub => (
+                                    <option key={sub} value={sub}>{sub}</option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
+
+                    {/* Other Explanation Field */}
+                    {outcome.outcome_area === "16. Other" && (
+                        <div className="space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
+                            <Label className="report-label text-amber-600">Please Specify "Other" Outcome Area</Label>
+                            <Input
+                                placeholder="Mandatory explanation..."
+                                value={outcome.outcome_area_other}
+                                onChange={e => onUpdate('outcome_area_other', e.target.value)}
+                                className="h-14 bg-white border-2 border-amber-200 rounded-2xl px-6 font-bold text-slate-700 focus:border-amber-400"
+                            />
+                        </div>
+                    )}
 
                     <div className="space-y-3">
-                        <Label className="report-label">5.2.7 Measurement Explanation (IMPORTANT)</Label>
+                        <Label className="report-label text-report-primary">5.2.2 Standard Metric Scale</Label>
+                        <select
+                            value={outcome.metric_category}
+                            onChange={e => {
+                                onUpdateFields({
+                                    metric_category: e.target.value,
+                                    metric: ''
+                                });
+                            }}
+                            className="w-full h-14 bg-slate-50 border-2 border-slate-50 rounded-2xl px-6 font-bold text-slate-700 text-sm outline-none focus:border-report-primary-border transition-all"
+                        >
+                            <option value="">Select Metric Group...</option>
+                            {metricCategories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                        </select>
+                    </div>
+
+                    {/* Specific Metric Unit */}
+                    {outcome.metric_category && outcome.metric_category !== " Other" && (
+                        <div className="space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
+                            <Label className="report-label text-emerald-600">5.2.2.b Specific Metric Unit</Label>
+                            <select
+                                value={outcome.metric}
+                                onChange={e => {
+                                    // Also sync unit field for backend compatibility if needed
+                                    onUpdateFields({
+                                        metric: e.target.value,
+                                        unit: e.target.value
+                                    });
+                                }}
+                                className="w-full h-14 bg-emerald-50/50 border-2 border-emerald-100 rounded-2xl px-6 font-bold text-emerald-900 text-sm outline-none focus:border-emerald-300 transition-all"
+                            >
+                                <option value="">Select Specific Unit...</option>
+                                {metricHierarchy[outcome.metric_category]?.map(unit => (
+                                    <option key={unit} value={unit}>{unit}</option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
+
+                    {/* Other Metric Unit Explanation */}
+                    {outcome.metric_category === " Other" && (
+                        <div className="space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
+                            <Label className="report-label text-amber-600">Define Custom Metric Unit</Label>
+                            <Input
+                                placeholder="e.g. Number of Solar Panels installed"
+                                value={outcome.metric_other}
+                                onChange={e => onUpdateFields({
+                                    metric: 'Other',
+                                    metric_other: e.target.value
+                                })}
+                                className="h-14 bg-white border-2 border-amber-200 rounded-2xl px-6 font-bold text-slate-700 focus:border-amber-400"
+                            />
+                        </div>
+                    )}
+
+                    <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                            <Label className="report-label">5.2.7 Measurement Explanation (IMPORTANT)</Label>
+                            <span className={clsx(
+                                "text-[10px] font-black px-2 py-1 rounded-md transition-all",
+                                ((outcome.measurement_explanation?.trim().split(/\s+/).filter(Boolean).length || 0) < 50 || (outcome.measurement_explanation?.trim().split(/\s+/).filter(Boolean).length || 0) > 100)
+                                    ? "bg-amber-100 text-amber-700"
+                                    : "bg-emerald-100 text-emerald-700"
+                            )}>
+                                {outcome.measurement_explanation?.trim().split(/\s+/).filter(Boolean).length || 0} / 50-100 WORDS
+                            </span>
+                        </div>
                         <Textarea
                             placeholder="Explain how your numbers come from Section 4 and what data supports this..."
                             value={outcome.measurement_explanation}
                             onChange={e => onUpdate('measurement_explanation', e.target.value)}
-                            className="min-h-[100px] rounded-2xl border-2 border-slate-50 bg-slate-50 p-6 text-xs font-bold text-slate-700 focus:bg-white resize-none"
+                            className={clsx(
+                                "min-h-[120px] rounded-2xl border-2 p-6 text-xs font-bold text-slate-700 focus:bg-white resize-none transition-all",
+                                getFieldError(`measurable_outcomes.${index}.measurement_explanation`)
+                                    ? "bg-red-50 border-red-200 focus:border-red-400"
+                                    : "bg-slate-50 border-slate-50 focus:border-report-primary-border"
+                            )}
                         />
+                        {getFieldError(`measurable_outcomes.${index}.measurement_explanation`) && (
+                            <p className="text-[10px] text-red-500 font-bold px-2">
+                                {getFieldError(`measurable_outcomes.${index}.measurement_explanation`)}
+                            </p>
+                        )}
+                        <p className="text-[10px] text-slate-400 font-medium italic px-2">
+                            Standard: Clear evidence logic connecting Sections 4 & 5.
+                        </p>
                     </div>
                 </div>
 
@@ -141,7 +364,7 @@ function OutcomeCard({
                             <span className="report-label !mb-0">Improvement</span>
                         </div>
                         <span className={clsx(
-                            "text-2xl font-black rounded-lg px-4",
+                            "report-h3 !text-2xl font-black",
                             improvement > 0 ? "text-emerald-600" : improvement < 0 ? "text-red-500" : "text-slate-300"
                         )}>
                             {improvement > 0 ? '+' : ''}{improvement}
@@ -151,21 +374,30 @@ function OutcomeCard({
                     <div className="space-y-4">
                         <Label className="report-label">5.2.6 Confidence Level</Label>
                         <div className="grid grid-cols-2 gap-2">
-                            {confidenceLevels.map(lvl => (
-                                <button
-                                    key={lvl}
-                                    type="button"
-                                    onClick={() => onUpdate('confidence_level', lvl)}
-                                    className={clsx(
-                                        "px-4 py-2 rounded-xl border-2 text-[10px] font-black uppercase tracking-wider text-left transition-all",
-                                        outcome.confidence_level === lvl
-                                            ? "border-emerald-600 bg-emerald-50 text-emerald-900 shadow-md shadow-emerald-100"
-                                            : "border-white bg-white text-slate-400 hover:border-slate-200"
-                                    )}
-                                >
-                                    {lvl}
-                                </button>
-                            ))}
+                            {confidenceLevels.map(lvl => {
+                                const isSelected = outcome.confidence_level?.includes(lvl);
+                                return (
+                                    <button
+                                        key={lvl}
+                                        type="button"
+                                        onClick={() => {
+                                            const current = Array.isArray(outcome.confidence_level) ? outcome.confidence_level : [];
+                                            const next = isSelected
+                                                ? current.filter(c => c !== lvl)
+                                                : [...current, lvl];
+                                            onUpdate('confidence_level', next);
+                                        }}
+                                        className={clsx(
+                                            "px-4 py-2 rounded-xl border-2 text-[10px] font-black uppercase tracking-wider text-left transition-all",
+                                            isSelected
+                                                ? "border-emerald-600 bg-emerald-50 text-emerald-900 shadow-md shadow-emerald-100"
+                                                : "border-white bg-white text-slate-400 hover:border-slate-200"
+                                        )}
+                                    >
+                                        {lvl}
+                                    </button>
+                                );
+                            })}
                         </div>
                     </div>
                 </div>
@@ -185,7 +417,7 @@ export default function Section5Outcomes() {
     const addOutcome = () => {
         update('measurable_outcomes', [
             ...outcomes,
-            { id: `outcome-${Date.now()}`, outcome_area: '', metric: '', baseline: '', endline: '', unit: '', confidence_level: '', measurement_explanation: '' }
+            { id: `outcome-${Date.now()}`, outcome_area: '', outcome_sub_category: '', metric_category: '', metric: '', baseline: '', endline: '', unit: '', confidence_level: '', measurement_explanation: '' }
         ]);
     };
 
@@ -193,9 +425,15 @@ export default function Section5Outcomes() {
         update('measurable_outcomes', outcomes.filter((_, i) => i !== idx));
     };
 
-    const updateOutcome = (idx: number, field: keyof MeasurableOutcome, val: string) => {
+    const updateOutcome = (idx: number, field: keyof MeasurableOutcome, val: any) => {
         const next = [...outcomes];
         next[idx] = { ...next[idx], [field]: val };
+        update('measurable_outcomes', next);
+    };
+
+    const updateOutcomeFields = (idx: number, fields: Partial<MeasurableOutcome>) => {
+        const next = [...outcomes];
+        next[idx] = { ...next[idx], ...fields };
         update('measurable_outcomes', next);
     };
 
@@ -303,7 +541,9 @@ export default function Section5Outcomes() {
                             index={idx}
                             canRemove={outcomes.length > 1}
                             onUpdate={(field, val) => updateOutcome(idx, field, val)}
+                            onUpdateFields={(fields) => updateOutcomeFields(idx, fields)}
                             onRemove={() => removeOutcome(idx)}
+                            getFieldError={getFieldError}
                         />
                     ))}
                 </div>
@@ -338,18 +578,7 @@ export default function Section5Outcomes() {
                 </div>
             </div>
 
-            {/* Save Button */}
-            <div className="flex justify-center pt-10">
-                <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => saveReport(false)}
-                    className="h-16 px-12 rounded-2xl border-2 border-slate-100 bg-white text-slate-500 font-extrabold uppercase tracking-widest hover:border-slate-900 hover:text-slate-900 hover:shadow-xl transition-all flex items-center gap-4 group"
-                >
-                    <Save className="w-6 h-6 group-hover:rotate-12 transition-transform" />
-                    <span>Save Outcomes Section</span>
-                </Button>
-            </div>
+            
         </div>
     );
 }

@@ -53,7 +53,7 @@ export default function Section9Reflection() {
     const { section9, section2 } = data;
     const {
         academic_integration, personal_learning, academic_application,
-        sustainability_reflection, competency_scores
+        competency_scores
     } = section9;
 
     const update = (field: string, val: any) => updateSection('section9', { [field]: val });
@@ -62,7 +62,6 @@ export default function Section9Reflection() {
     const getWordCount = (text: string) => (text || '').trim().split(/\s+/).filter(w => w.length > 0).length;
     const plWords = getWordCount(personal_learning);
     const aaWords = getWordCount(academic_application);
-    const srWords = getWordCount(sustainability_reflection);
 
     // ── Content generation ────────────────────────────────────────────────────
     const autoNarrative = useMemo(() => {
@@ -80,10 +79,8 @@ export default function Section9Reflection() {
             }
         });
 
-        const susStr = srWords > 80 ? "strong long-term systems awareness" : srWords > 40 ? "moderate long-term systems awareness" : "developing long-term systems awareness";
-
-        return `This project was classified as a ${typeStr}. The student demonstrated strong ${bestCategory} competencies, with high ratings across key development areas. Sustainability reflection indicates ${susStr}.`;
-    }, [academic_integration, competency_scores, srWords]);
+        return `This project was classified as a ${typeStr}. The student demonstrated strong ${bestCategory} competencies, with high ratings across key development areas.`;
+    }, [academic_integration, competency_scores]);
 
     useEffect(() => {
         if (section9.summary_text !== autoNarrative) {
@@ -180,7 +177,7 @@ export default function Section9Reflection() {
 
                     </div>
 
-                    <FieldError message={getFieldError('section9.academic_integration')} />
+                    <FieldError message={getFieldError('academic_integration')} />
 
                 </div>
 
@@ -233,7 +230,7 @@ export default function Section9Reflection() {
                         </span>
                     </div>
 
-                    <FieldError message={getFieldError('section9.personal_learning')} />
+                    <FieldError message={getFieldError('personal_learning')} />
 
                 </div>
 
@@ -296,65 +293,12 @@ export default function Section9Reflection() {
                         </span>
                     </div>
 
-                    <FieldError message={getFieldError('section9.academic_application')} />
+                    <FieldError message={getFieldError('academic_application')} />
 
                 </div>
 
             </div>
 
-            {/* ─── Step 4: Sustainability ─────────────────────────────────── */}
-            <div className="space-y-4">
-
-                <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-report-primary text-white flex items-center justify-center font-black text-[10px]">
-                        9.3
-                    </div>
-
-                    <h3 className="report-h3">
-                        Step 4 — Sustainability & Systems Thinking
-                    </h3>
-                </div>
-
-
-                <div className="bg-white rounded-[2rem] border-2 border-slate-100 p-8 shadow-sm space-y-4">
-
-                    <div className="space-y-1">
-                        <Label className="report-h3 !text-sm !tracking-tight">
-                            Sustainability Reflection (Mandatory)
-                        </Label>
-
-                        <p className="report-help">
-                            Reflect on the long-term dimension. Will impact continue? What limits sustainability? Any unintended effects?
-                        </p>
-                    </div>
-
-
-                    <Textarea
-                        placeholder="While the immediate training was successful, long-term impact depends on community access to resources..."
-                        value={sustainability_reflection}
-                        onChange={e => update('sustainability_reflection', e.target.value)}
-                        className="min-h-[140px] w-full rounded-[1.5rem] border-2 border-slate-50 p-6 text-slate-700 font-medium bg-slate-50 outline-none focus:border-report-primary-border transition-all focus:bg-white resize-none"
-                    />
-
-
-                    <div className="flex items-center justify-between px-2">
-                        <span className={clsx(
-                            "report-label",
-                            srWords >= 100 && srWords <= 200
-                                ? "text-report-primary"
-                                : srWords > 200
-                                    ? "text-red-500"
-                                    : "text-amber-500"
-                        )}>
-                            {srWords} / 200 words (Min 100)
-                        </span>
-                    </div>
-
-                    <FieldError message={getFieldError('section9.sustainability_reflection')} />
-
-                </div>
-
-            </div>
 
 
 
@@ -363,11 +307,11 @@ export default function Section9Reflection() {
 
                 <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-full bg-report-primary text-white flex items-center justify-center font-black text-[10px]">
-                        9.4
+                        9.3
                     </div>
 
                     <h3 className="report-h3">
-                        Step 5 — Competency Self-Assessment
+                        Step 4 — Competency Self-Assessment
                     </h3>
                 </div>
 
@@ -558,7 +502,7 @@ export default function Section9Reflection() {
 
 
                             <div className="bg-slate-50 rounded-2xl p-5 space-y-2">
-                                <p className="text-2xl font-black text-report-primary">
+                                <p className="report-h3 !text-2xl font-black">
                                     {(Object.values(competency_scores).reduce((a, b) => a + Number(b), 0) / 12).toFixed(1)}
                                 </p>
 
@@ -568,19 +512,6 @@ export default function Section9Reflection() {
                             </div>
 
 
-                            <div className="bg-slate-50 rounded-2xl p-5 space-y-2">
-                                <p className="text-sm font-black text-emerald-700 leading-snug">
-                                    {srWords >= 60 && srWords <= 100
-                                        ? "Strong"
-                                        : srWords > 30
-                                            ? "Moderate"
-                                            : "Basic"}
-                                </p>
-
-                                <p className="report-label !text-[8px] !text-slate-500">
-                                    Sustainability Reflection
-                                </p>
-                            </div>
 
                         </div>
 
@@ -642,16 +573,7 @@ export default function Section9Reflection() {
                 </div>
 
             </div>
-            {/* ─── Save ─────────────────────────────────────────────────────── */}
-            <div className="flex justify-center pt-10">
-                <Button
-                    type="button" variant="outline" onClick={() => saveReport(false)}
-                    className="h-16 px-12 rounded-2xl border-2 border-slate-100 bg-white text-slate-500 font-extrabold uppercase tracking-widest hover:border-slate-900 hover:text-slate-900 hover:shadow-xl transition-all flex items-center gap-4 group"
-                >
-                    <Save className="w-6 h-6 group-hover:rotate-12 transition-transform" />
-                    <span>Save Reflection Section</span>
-                </Button>
-            </div>
+            
         </div>
     );
 }

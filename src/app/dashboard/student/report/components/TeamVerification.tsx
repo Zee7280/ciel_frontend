@@ -87,7 +87,7 @@ export default function TeamVerification({
                     {!isLocked && (
                         <Button
                             onClick={handleAddMember}
-                            className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl h-11 px-6 font-bold text-sm transition-all flex items-center gap-2 shadow-lg shadow-indigo-100 hover:scale-[1.02] active:scale-95"
+                            className="bg-report-primary hover:opacity-90 text-white rounded-xl h-11 px-6 font-bold text-sm transition-all flex items-center gap-2 shadow-lg shadow-indigo-100 hover:scale-[1.02] active:scale-95"
                         >
                             <UserPlus className="w-4 h-4" /> Add Team Member
                         </Button>

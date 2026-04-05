@@ -621,15 +621,7 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
                 )}
             </div>
 
-            <div className="flex justify-center pt-8">
-                <Button
-                    variant="outline"
-                    onClick={() => saveReport(false)}
-                    className="h-12 px-8 rounded-xl border-2 border-slate-200 text-slate-500 font-extrabold uppercase tracking-widest hover:border-slate-900 hover:text-slate-900 hover:shadow-2xl hover:shadow-slate-100 transition-all flex items-center gap-4 group"
-                >
-                    <Save className="w-6 h-6 group-hover:rotate-12 transition-transform" /> Save Section 2 Progress
-                </Button>
-            </div>
+            
 
         </div>
     );

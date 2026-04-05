@@ -388,7 +388,7 @@ export default function AdminApprovalsPage() {
                                             </span>
                                         </div>
                                         <div>
-                                            <span className="text-xs text-slate-500 block mb-1">Expected Hours</span>
+                                            <span className="text-xs text-slate-500 block mb-1">Expected Hours (Per Student)</span>
                                             <span className="font-bold text-slate-900 text-sm">{selectedOpportunity.timeline?.expected_hours || 0} hrs/student</span>
                                         </div>
                                         <div>
