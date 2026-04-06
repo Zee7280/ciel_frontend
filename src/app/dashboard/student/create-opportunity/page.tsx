@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Info, MapPin, Calendar, Clock, CheckCircle, AlertCircle, ChevronDown, ChevronUp, Users, Loader2, X } from "lucide-react";
+import { Info, MapPin, Calendar, Clock, CheckCircle, AlertCircle, ChevronDown, ChevronUp, Users, Loader2, X, Plus } from "lucide-react";
 import { authenticatedFetch } from "@/utils/api";
 import { toast } from "sonner";
 import dynamic from 'next/dynamic';
@@ -55,7 +55,7 @@ export default function StudentOpportunityCreationPage() {
             responsibilities: "",
             skills: [] as string[],
             isOtherSkillChecked: false,
-            otherSkill: ""
+            otherSkills: [""] as string[]
         },
 
         // Section F
@@ -175,9 +175,9 @@ export default function StudentOpportunityCreationPage() {
                 },
                 activity_details: {
                     student_responsibilities: formData.activity.responsibilities,
-                    // Append `otherSkill` if checked and not empty
-                    skills_gained: formData.activity.isOtherSkillChecked && formData.activity.otherSkill.trim()
-                        ? [...formData.activity.skills, formData.activity.otherSkill.trim()]
+                    // Append `otherSkills` if checked and not empty
+                    skills_gained: formData.activity.isOtherSkillChecked
+                        ? [...formData.activity.skills, ...formData.activity.otherSkills.filter(s => s.trim() !== "")]
                         : formData.activity.skills
                 },
                 supervision: {
@@ -735,17 +735,23 @@ export default function StudentOpportunityCreationPage() {
                         ></textarea>
                     </div>
                     <div>
-                        <label className="block text-sm font-bold text-slate-900 mb-2">E2. Skills Students Will Gain (Select up to 5)</label>
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                            {["Leadership", "Communication", "Teaching", "Teamwork", "Digital Skills", "Community Engagement"].map(s => (
+                        <label className="block text-sm font-bold text-slate-900 mb-2">E2. Skills Students Will Gain (Select up to 10)</label>
+                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                            {[
+                                "Leadership", "Communication", "Teaching", "Teamwork", 
+                                "Digital Skills", "Community Engagement", "Critical Thinking", 
+                                "Problem Solving", "Time Management", "Project Management", 
+                                "Research", "Documentation", "Financial Literacy", 
+                                "Public Speaking", "Event Planning", "Media/Content Creation"
+                            ].map(s => (
                                 <label key={s} className="flex items-center gap-2 p-3 border border-slate-100 rounded-lg hover:bg-slate-50 cursor-pointer">
                                     <input
                                         type="checkbox"
                                         className="rounded text-indigo-600 focus:ring-indigo-500"
                                         checked={formData.activity.skills.includes(s)}
                                         onChange={(e) => {
-                                            if (e.target.checked && formData.activity.skills.length >= 5) {
-                                                toast.error("You can select up to 5 skills.");
+                                            if (e.target.checked && formData.activity.skills.length >= 10) {
+                                                toast.error("You can select up to 10 skills.");
                                                 return;
                                             }
                                             const skills = formData.activity.skills.includes(s)
@@ -759,7 +765,7 @@ export default function StudentOpportunityCreationPage() {
                             ))}
                         </div>
                         <div className="mt-3">
-                            <label className="flex items-center gap-2 p-3 border border-slate-100 rounded-lg hover:bg-slate-50 cursor-pointer w-full md:w-1/3 mb-2">
+                            <label className="flex items-center gap-2 p-3 border border-slate-100 rounded-lg hover:bg-slate-50 cursor-pointer w-full md:w-1/3 mb-4">
                                 <input
                                     type="checkbox"
                                     className="rounded text-indigo-600 focus:ring-indigo-500"
@@ -768,14 +774,52 @@ export default function StudentOpportunityCreationPage() {
                                 />
                                 <span className="text-sm font-medium text-slate-700">Other</span>
                             </label>
+
                             {formData.activity.isOtherSkillChecked && (
-                                <input
-                                    type="text"
-                                    placeholder="Please specify other skill..."
-                                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-indigo-500 outline-none text-sm transition-all"
-                                    value={formData.activity.otherSkill}
-                                    onChange={(e) => setFormData({ ...formData, activity: { ...formData.activity, otherSkill: e.target.value } })}
-                                />
+                                <div className="space-y-3 pl-4 border-l-2 border-indigo-100">
+                                    {formData.activity.otherSkills.map((skill, idx) => (
+                                        <div key={idx} className="flex gap-2">
+                                            <div className="relative flex-1">
+                                                <input
+                                                    type="text"
+                                                    placeholder="Please specify other skill..."
+                                                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-indigo-500 outline-none text-sm transition-all"
+                                                    value={skill}
+                                                    onChange={(e) => {
+                                                        const newOthers = [...formData.activity.otherSkills];
+                                                        newOthers[idx] = e.target.value;
+                                                        setFormData({ ...formData, activity: { ...formData.activity, otherSkills: newOthers } });
+                                                    }}
+                                                />
+                                                {formData.activity.otherSkills.length > 1 && (
+                                                    <button
+                                                        onClick={() => {
+                                                            const newOthers = formData.activity.otherSkills.filter((_, i) => i !== idx);
+                                                            setFormData({ ...formData, activity: { ...formData.activity, otherSkills: newOthers } });
+                                                        }}
+                                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-red-500 transition-colors"
+                                                    >
+                                                        <X className="w-4 h-4" />
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))}
+                                    <button
+                                        type="button"
+                                        onClick={() => setFormData({ 
+                                            ...formData, 
+                                            activity: { 
+                                                ...formData.activity, 
+                                                otherSkills: [...formData.activity.otherSkills, ""] 
+                                            } 
+                                        })}
+                                        className="text-xs font-bold text-indigo-600 hover:text-indigo-700 flex items-center gap-1.5 px-2 py-1"
+                                    >
+                                        <Plus className="w-3.5 h-3.5" />
+                                        Add another skill
+                                    </button>
+                                </div>
                             )}
                         </div>
                     </div>

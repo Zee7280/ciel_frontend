@@ -2,7 +2,7 @@ import Image from "next/image";
 
 export default function PartnersFooter() {
     return (
-        <section className="py-16 px-6 bg-white overflow-hidden">
+        <section className="py-12 px-6 bg-white overflow-hidden">
             <div className="max-w-7xl mx-auto flex flex-col items-center">
                 {/* Partners Row - Stylized to match mockup logos */}
                 <div className="flex flex-wrap justify-center items-center gap-12 md:gap-20 opacity-80 group hover:opacity-100 transition-all duration-500">

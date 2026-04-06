@@ -82,7 +82,7 @@ export default function DashboardHeader() {
                     </div>
                     <button
                         onClick={handleLogout}
-                        className="p-2.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all group"
+                        className="p-2.5 text-slate-300 hover:text-[#4285F4] hover:bg-slate-50 rounded-xl transition-all group"
                         title="Sign Out"
                     >
                         <LogOut className="w-5 h-5 group-hover:translate-x-0.5 transition-transform" />

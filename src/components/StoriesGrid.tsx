@@ -19,11 +19,11 @@ interface Opportunity {
 // SDG Mapping Helper
 const getSdgStyles = (sdgNumber: number | string) => {
     const num = Number(sdgNumber);
-    if (num <= 4) return { header: "bg-yellow-400", icon: "text-yellow-600", bg: "bg-yellow-50/30", iconType: GraduationCap };
+    if (num <= 4) return { header: "bg-[#4285F4]", icon: "text-[#4285F4]", bg: "bg-slate-50/30", iconType: GraduationCap };
     if (num <= 8) return { header: "bg-blue-400", icon: "text-blue-600", bg: "bg-blue-50/30", iconType: Target };
-    if (num <= 12) return { header: "bg-orange-400", icon: "text-orange-600", bg: "bg-orange-50/30", iconType: Users };
-    if (num <= 15) return { header: "bg-emerald-400", icon: "text-emerald-600", bg: "bg-emerald-50/30", iconType: Leaf };
-    return { header: "bg-purple-400", icon: "text-purple-600", bg: "bg-purple-50/30", iconType: Heart };
+    if (num <= 12) return { header: "bg-[#4285F4]", icon: "text-[#4285F4]", bg: "bg-slate-50/30", iconType: Users };
+    if (num <= 15) return { header: "bg-[#4285F4]", icon: "text-[#4285F4]", bg: "bg-slate-50/30", iconType: Leaf };
+    return { header: "bg-[#4285F4]", icon: "text-[#4285F4]", bg: "bg-slate-50/30", iconType: Heart };
 };
 
 export default function StoriesGrid() {
@@ -56,11 +56,11 @@ export default function StoriesGrid() {
         <section className="pt-12 pb-4 px-6 max-w-7xl mx-auto">
             {/* Header */}
             <div className="text-center mb-12">
-                <h2 className="text-4xl md:text-5xl font-black text-orange-500 mb-4 tracking-tight">
+                <h2 className="text-3xl md:text-4xl lg:text-[42px] font-black text-[#4285F4] mb-4 tracking-tight">
                     Verified Community Impact
                 </h2>
-                <p className="text-xl text-slate-800 font-bold max-w-2xl mx-auto">
-                    Projects that turned learning into <span className="text-emerald-600">measurable community impact.</span>
+                <p className="text-base md:text-lg text-slate-800 font-bold max-w-2xl mx-auto">
+                    Projects that turned learning into <span className="text-[#4285F4]">measurable community impact.</span>
                 </p>
             </div>
 
@@ -124,7 +124,7 @@ export default function StoriesGrid() {
                                     {/* Button */}
                                     <button
                                         onClick={() => router.push(`/opportunities/${opp.id}`)}
-                                        className="mt-auto bg-orange-400 hover:bg-orange-500 text-white font-bold py-2.5 px-8 rounded-full text-sm transition-all shadow-md hover:shadow-lg flex items-center gap-2"
+                                        className="mt-auto bg-[#4285F4] hover:bg-slate-500 text-white font-bold py-2.5 px-8 rounded-full text-sm transition-all shadow-md hover:shadow-lg flex items-center gap-2"
                                     >
                                         View Project <ArrowRight className="w-4 h-4" />
                                     </button>
@@ -133,7 +133,7 @@ export default function StoriesGrid() {
                         );
                     })
                 ) : (
-                    <div className="col-span-full py-20 text-center bg-slate-50 rounded-[3rem] border-2 border-dashed border-slate-200">
+                    <div className="col-span-full py-12 text-center bg-slate-50 rounded-[3rem] border-2 border-dashed border-slate-200">
                         <div className="mx-auto w-16 h-16 bg-white rounded-2xl shadow-sm flex items-center justify-center mb-4">
                             <Search className="w-8 h-8 text-slate-300" />
                         </div>

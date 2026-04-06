@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { authenticatedFetch } from "@/utils/api";
 import { Search, Filter, MoreVertical, Shield, User, Building2, GraduationCap, Plus, Edit, Trash2, X } from "lucide-react";
+import DataTable from "react-data-table-component";
 
 interface User {
     id: number | string;
@@ -215,77 +216,122 @@ export default function AdminUsersPage() {
             </div>
 
             {/* Table */}
-            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden min-h-[400px]">
-                <table className="w-full text-left">
-                    <thead className="bg-slate-50 border-b border-slate-100 text-slate-500 uppercase text-xs font-bold tracking-wider">
-                        <tr>
-                            <th className="p-6">User</th>
-                            <th className="p-6">Role</th>
-                            <th className="p-6">Status</th>
-                            <th className="p-6">Joined Date</th>
-                            <th className="p-6 text-right">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                        {isLoading ? (
-                            <tr><td colSpan={5} className="p-8 text-center text-slate-500">Loading users...</td></tr>
-                        ) : paginatedUsers.length === 0 ? (
-                            <tr><td colSpan={5} className="p-8 text-center text-slate-500">No users found.</td></tr>
-                        ) : paginatedUsers.map((user) => (
-                            <tr key={user.id} className="group hover:bg-slate-50/50 transition-colors">
-                                <td className="p-6">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center font-bold text-slate-500 uppercase">
-                                            {user.name && user.name[0]}
-                                        </div>
-                                        <div>
-                                            <div className="font-bold text-slate-900">{user.name}</div>
-                                            <div className="text-sm text-slate-500">{user.email}</div>
-                                        </div>
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-visible min-h-[400px] relative">
+
+                <DataTable
+                    columns={[
+                        {
+                            name: "User",
+                            cell: (user: User) => (
+                                <div className="flex items-center gap-3 py-2">
+                                    <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center font-bold text-slate-500 uppercase">
+                                        {user.name && user.name[0]}
                                     </div>
-                                </td>
-                                <td className="p-6">
-                                    <div className="flex items-center gap-2 capitalize text-sm font-bold text-slate-700">
-                                        <div className="p-1.5 rounded-md bg-slate-50">
-                                            {getRoleIcon(user.role)}
-                                        </div>
-                                        {user.role}
+                                    <div>
+                                        <div className="font-bold text-slate-900">{user.name}</div>
+                                        <div className="text-sm text-slate-500">{user.email}</div>
                                     </div>
-                                </td>
-                                <td className="p-6">
-                                    <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${user.status === 'active' ? 'bg-green-50 text-green-600' :
-                                        user.status === 'pending' ? 'bg-amber-50 text-amber-600' :
-                                            'bg-red-50 text-red-600'}`}>
-                                        {user.status}
-                                    </span>
-                                </td>
-                                <td className="p-6 text-slate-500 text-sm font-medium">
-                                    {user.joinDate}
-                                </td>
-                                <td className="p-6 text-right relative">
+                                </div>
+                            ),
+                            grow: 2
+                        },
+                        {
+                            name: "Role",
+                            cell: (user: User) => (
+                                <div className="flex items-center gap-2 capitalize text-sm font-bold text-slate-700">
+                                    <div className="p-1.5 rounded-md bg-slate-50">
+                                        {getRoleIcon(user.role)}
+                                    </div>
+                                    {user.role}
+                                </div>
+                            )
+                        },
+                        {
+                            name: "Status",
+                            cell: (user: User) => (
+                                <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${user.status === 'active'
+                                    ? 'bg-green-50 text-green-600'
+                                    : user.status === 'pending'
+                                        ? 'bg-amber-50 text-amber-600'
+                                        : 'bg-red-50 text-red-600'
+                                    }`}>
+                                    {user.status}
+                                </span>
+                            )
+                        },
+                        {
+                            name: "Joined Date",
+                            selector: (user: User) => user.joinDate,
+                            sortable: true
+                        },
+                        {
+                            name: "Actions",
+                            cell: (user: User) => (
+                                <div className="relative overflow-visible">
                                     <button
-                                        onClick={() => setActiveActionMenu(activeActionMenu === user.id ? null : user.id)}
-                                        className="p-2 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                                        onClick={() =>
+                                            setActiveActionMenu(
+                                                activeActionMenu === user.id ? null : user.id
+                                            )
+                                        }
+                                        className="p-2 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition"
                                     >
                                         <MoreVertical className="w-5 h-5" />
                                     </button>
 
-                                    {/* Action Dropdown */}
                                     {activeActionMenu === user.id && (
-                                        <div className="absolute right-8 top-12 w-32 bg-white rounded-lg shadow-xl border border-slate-100 z-10 py-1">
-                                            <button onClick={() => openEditModal(user)} className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2">
+                                        <div className="absolute right-0 top-full mt-2 w-36 bg-white rounded-lg shadow-xl border border-slate-100 z-[9999] py-1">
+                                            <button
+                                                onClick={() => openEditModal(user)}
+                                                className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
+                                            >
                                                 <Edit className="w-4 h-4" /> Edit
                                             </button>
-                                            <button onClick={() => handleDeleteUser(user.id)} className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2">
+
+                                            <button
+                                                onClick={() => handleDeleteUser(user.id)}
+                                                className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+                                            >
                                                 <Trash2 className="w-4 h-4" /> Delete
                                             </button>
                                         </div>
                                     )}
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
+                                </div>
+                            )
+                        }
+                    ]}
+                    data={filteredUsers}
+                    progressPending={isLoading}
+                    pagination
+                    highlightOnHover
+                    responsive
+
+                    /* 🔥 IMPORTANT FIX */
+                    customStyles={{
+                        table: {
+                            style: {
+                                overflow: "visible"
+                            }
+                        },
+                        tableWrapper: {
+                            style: {
+                                overflow: "visible"
+                            }
+                        },
+                        rows: {
+                            style: {
+                                overflow: "visible",
+                                position: "relative"
+                            }
+                        },
+                        cells: {
+                            style: {
+                                overflow: "visible"
+                            }
+                        }
+                    }}
+                />
+
             </div>
 
             {/* Pagination Controls */}

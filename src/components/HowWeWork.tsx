@@ -15,10 +15,10 @@ const steps = [
         icon: UserCheck,
         title: "Register & Join Project",
         description: "Sign up, verify your identity, and apply to a real community project aligned with your goals.",
-        color: "bg-violet-50 border-violet-100",
-        iconBg: "bg-violet-100 text-violet-700",
+        color: "bg-slate-50 border-slate-100",
+        iconBg: "bg-slate-50 text-[#4285F4]",
         numberColor: "text-violet-200",
-        accentLine: "bg-violet-400",
+        accentLine: "bg-[#4285F4]",
         connectorColor: "from-violet-300",
     },
     {
@@ -26,10 +26,10 @@ const steps = [
         icon: ClipboardList,
         title: "Record Activities & Attendance",
         description: "Log each session with date, hours, activity type, and upload supporting evidence.",
-        color: "bg-sky-50 border-sky-100",
-        iconBg: "bg-sky-100 text-sky-700",
+        color: "bg-slate-50 border-slate-100",
+        iconBg: "bg-slate-50 text-[#4285F4]",
         numberColor: "text-sky-200",
-        accentLine: "bg-sky-400",
+        accentLine: "bg-[#4285F4]",
         connectorColor: "from-sky-300",
     },
     {
@@ -37,10 +37,10 @@ const steps = [
         icon: Users,
         title: "Track Outputs & Beneficiaries",
         description: "Document who you helped, what you produced, and how many lives were touched.",
-        color: "bg-emerald-50 border-emerald-100",
-        iconBg: "bg-emerald-100 text-emerald-700",
+        color: "bg-slate-50 border-slate-100",
+        iconBg: "bg-slate-50 text-[#4285F4]",
         numberColor: "text-emerald-200",
-        accentLine: "bg-emerald-400",
+        accentLine: "bg-[#4285F4]",
         connectorColor: "from-emerald-300",
     },
     {
@@ -48,10 +48,10 @@ const steps = [
         icon: BarChart2,
         title: "Measure Outcomes",
         description: "Compare before vs. after data. CIEL generates your engagement intensity score automatically.",
-        color: "bg-orange-50 border-orange-100",
-        iconBg: "bg-orange-100 text-orange-700",
+        color: "bg-slate-50 border-slate-100",
+        iconBg: "bg-slate-50 text-[#4285F4]",
         numberColor: "text-orange-200",
-        accentLine: "bg-orange-400",
+        accentLine: "bg-[#4285F4]",
         connectorColor: "from-orange-300",
     },
     {
@@ -59,8 +59,8 @@ const steps = [
         icon: Award,
         title: "Get Reports + CII Score + Certificate",
         description: "Receive your verified report, community impact index, and a digital certificate — all HEC-recognized.",
-        color: "bg-rose-50 border-rose-100",
-        iconBg: "bg-rose-100 text-rose-700",
+        color: "bg-slate-50 border-slate-100",
+        iconBg: "bg-slate-50 text-[#4285F4]",
         numberColor: "text-rose-200",
         accentLine: "bg-rose-400",
         connectorColor: "from-rose-300",
@@ -69,28 +69,36 @@ const steps = [
 
 export default function HowWeWork() {
     return (
-        <section className="py-16 px-6 bg-white relative overflow-hidden">
+        <section className="py-24 px-6 bg-white relative overflow-hidden">
             {/* Subtle dot grid */}
             <div className="absolute inset-0 bg-[radial-gradient(rgba(0,0,0,0.03)_1px,transparent_1px)] bg-[size:32px_32px] pointer-events-none" />
 
             {/* Glow blobs */}
-            <div className="absolute top-0 left-1/4 w-96 h-96 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none" />
-            <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-indigo-500/5 rounded-full blur-3xl pointer-events-none" />
+            <div className="absolute top-0 left-1/4 w-96 h-96 bg-slate-500/5 rounded-full blur-3xl pointer-events-none" />
+            <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-slate-50/5 rounded-full blur-3xl pointer-events-none" />
 
             <div className="max-w-7xl mx-auto relative z-10">
                 {/* Header */}
-                <div className="text-center mb-12">
+                <div className="text-center mb-16">
                     <div className="inline-flex items-center gap-2 px-4 py-2 bg-slate-100 rounded-full text-slate-500 text-[10px] font-black uppercase tracking-widest mb-6">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                        <span className="w-1.5 h-1.5 rounded-full bg-slate-500 animate-pulse" />
                         5 Simple Steps
                     </div>
-                    <h2 className="text-4xl md:text-5xl font-black text-slate-900 tracking-tight leading-tight mb-4">
-                        How{" "}
-                        <span className="bg-gradient-to-r from-emerald-600 to-sky-600 bg-clip-text text-transparent">
-                            CIEL Works
-                        </span>
-                    </h2>
-                    <p className="text-slate-500 text-lg font-medium max-w-xl mx-auto">
+
+                    <div className="relative inline-block mb-4">
+                        <h2 className="text-3xl md:text-4xl lg:text-[42px] font-black text-slate-900 tracking-tight leading-tight">
+                            How{" "}
+                            <span className="text-[#3A72AA]">
+                                CIEL Works
+                            </span>
+                        </h2>
+                        {/* Wavy Underline (Red) */}
+                        <svg className="absolute -bottom-3 left-0 w-full h-3 text-[#EA4335]/30" preserveAspectRatio="none" viewBox="0 0 100 10" fill="none">
+                            <path d="M0 5Q 25 0 50 5 Q 75 10 100 5" stroke="currentColor" strokeWidth="4" />
+                        </svg>
+                    </div>
+
+                    <p className="text-base md:text-lg text-slate-500 font-medium max-w-xl mx-auto mt-6">
                         From your first session to a verified certificate — every step is tracked, measured, and credentialed.
                     </p>
                 </div>
@@ -101,13 +109,19 @@ export default function HowWeWork() {
                     <div className="hidden lg:block absolute top-[5.5rem] left-[10%] right-[10%] h-px bg-gradient-to-r from-violet-200 via-emerald-200 to-rose-200 z-0" />
 
                     <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 relative z-10">
-                        {steps.map((step, i) => {
+                        {[
+                            { icon: UserCheck, title: "Register & Join Project", description: "Sign up, verify your identity, and apply to a community project.", bg: "bg-blue-50 text-blue-600" },
+                            { icon: ClipboardList, title: "Record Activities", description: "Log each session with date, hours, activity type, and evidence.", bg: "bg-rose-50 text-rose-600" },
+                            { icon: Users, title: "Track Outputs", description: "Document who you helped and what you produced in each session.", bg: "bg-orange-50 text-orange-600" },
+                            { icon: BarChart2, title: "Measure Outcomes", description: "CIEL generates your engagement intensity score automatically.", bg: "bg-amber-50 text-amber-600" },
+                            { icon: Award, title: "Get Certified", description: "Receive your verified HEC-recognized digital certificate.", bg: "bg-emerald-50 text-emerald-600" }
+                        ].map((step, i) => {
                             const Icon = step.icon;
-                            const isLast = i === steps.length - 1;
+                            const isLast = i === 4;
                             return (
                                 <div key={i} className="relative flex flex-col items-center text-center group">
                                     {/* Icon Circle */}
-                                    <div className={`relative w-20 h-20 rounded-2xl ${step.iconBg} flex items-center justify-center mb-6 shadow-sm group-hover:shadow-xl group-hover:scale-110 transition-all duration-300`}>
+                                    <div className={`relative w-20 h-20 rounded-[1.5rem] ${step.bg} flex items-center justify-center mb-6 shadow-sm group-hover:shadow-xl group-hover:scale-110 transition-all duration-300`}>
                                         <Icon className="w-9 h-9" strokeWidth={1.5} />
                                         {/* Step number overlay */}
                                         <div className="absolute -top-2 -right-2 w-7 h-7 rounded-full bg-white border-2 border-slate-100 shadow-sm flex items-center justify-center text-[10px] font-black text-slate-900">
@@ -136,16 +150,16 @@ export default function HowWeWork() {
                 </div>
 
                 {/* Bottom CTA banner */}
-                <div className="mt-12 p-8 rounded-[2.5rem] bg-slate-50 border-2 border-slate-100 shadow-premium flex flex-col md:flex-row items-center justify-between gap-6">
+                <div className="mt-16 p-10 rounded-[3rem] bg-slate-50 border-2 border-slate-100 shadow-premium flex flex-col md:flex-row items-center justify-between gap-8">
                     <div>
-                        <p className="text-lg font-black text-slate-900 tracking-tight mb-1">Ready to start your impact journey?</p>
-                        <p className="text-sm text-slate-500 font-medium">Join thousands of students already building verified portfolios.</p>
+                        <p className="text-xl font-black text-slate-900 tracking-tight mb-2">Ready to start your impact journey?</p>
+                        <p className="text-sm text-slate-500 font-medium font-bold">Join thousands of students already building verified portfolios.</p>
                     </div>
                     <a
                         href="/signup"
-                        className="shrink-0 inline-flex items-center gap-2 px-8 py-4 bg-[#4285F4] text-white font-black rounded-2xl hover:bg-[#3367D6] hover:scale-105 transition-all duration-300 shadow-xl shadow-blue-100 text-sm"
+                        className="shrink-0 inline-flex items-center gap-3 px-10 py-5 bg-[#3A72AA] text-white font-black rounded-2xl hover:scale-105 transition-all duration-300 shadow-2xl shadow-blue-100 text-base"
                     >
-                        Get Started Free <ArrowRight className="w-4 h-4" />
+                        Get Started Free <ArrowRight className="w-5 h-5" />
                     </a>
                 </div>
             </div>

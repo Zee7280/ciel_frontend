@@ -65,7 +65,7 @@ export default function StatsRow() {
     ];
 
     return (
-        <section className="relative z-20 max-w-7xl mx-auto px-6 -mt-10 lg:-mt-20 pb-20">
+        <section className="relative z-20 max-w-7xl mx-auto px-6 -mt-10 lg:-mt-12 pb-20">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-8 gap-y-12">
                 {stats.map((stat, index) => (
                     <StatCard

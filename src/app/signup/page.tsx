@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import Link from "next/link";
-import { ArrowRight, Mail, Lock, AlertCircle, Loader2, CheckCircle, School, Landmark, ArrowLeft, Building2, User, GraduationCap, Phone, Globe, Heart } from "lucide-react";
+import { ArrowRight, Mail, Lock, AlertCircle, Loader2, CheckCircle, School, Landmark, ArrowLeft, Building2, User, GraduationCap, Phone, Globe, Heart, Eye, EyeOff, ShieldCheck } from "lucide-react";
 import Image from "next/image";
 import clsx from "clsx";
 import { pakistaniUniversities } from "@/utils/universityData";
@@ -13,13 +13,21 @@ import { Suspense } from "react";
 
 function SignUpContent() {
     const router = useRouter();
-    const [step, setStep] = useState<"role" | "form">("role");
+    const [step, setStep] = useState<"role" | "form" | "otp">("role");
     const [role, setRole] = useState<string | null>(null);
     const [hoveredRole, setHoveredRole] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [formError, setFormError] = useState<string | null>(null);
+    const [showPassword, setShowPassword] = useState(false);
     const [errors, setErrors] = useState<Record<string, string>>({});
     const searchParams = useSearchParams();
+
+    // OTP states
+    const [otpDigits, setOtpDigits] = useState<string[]>(["" ,"", "", "", "", ""]);
+    const [otpError, setOtpError] = useState<string | null>(null);
+    const [otpLoading, setOtpLoading] = useState(false);
+    const [resendCooldown, setResendCooldown] = useState(0);
+    const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
 
 
     const [formData, setFormData] = useState({
@@ -124,6 +132,10 @@ function SignUpContent() {
             newErrors.password = "Password is required";
         } else if (formData.password.length < 8) {
             newErrors.password = "Password must be at least 8 characters";
+        } else if (/^(\d)\1+$/.test(formData.password) || /^(0123456789|1234567890|12345678|123456789|0987654321|abcdefgh|qwertyui|password|pass1234)/i.test(formData.password) || ["12345678", "123456789", "1234567890", "00000000", "11111111", "password", "pass1234", "qwerty123", "abc12345"].includes(formData.password.toLowerCase())) {
+            newErrors.password = "Password is too weak. Avoid simple sequences like 12345678";
+        } else if (!/[A-Za-z]/.test(formData.password) && /^\d+$/.test(formData.password)) {
+            newErrors.password = "Password must contain at least one letter, not just numbers";
         }
 
         if (formData.cnic && formData.cnic.replace(/-/g, "").length !== 13) {
@@ -134,80 +146,165 @@ function SignUpContent() {
         return Object.keys(newErrors).length === 0;
     };
 
+    // Step 1: Validate form, then send OTP
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setFormError(null);
 
-        if (!validateForm()) {
-            return;
-        }
+        if (!validateForm()) return;
 
         setIsLoading(true);
-
         try {
-            const backendUrl = process.env.NEXT_PUBLIC_BACKEND_BASE_URL;
-            const response = await fetch(`${backendUrl}/auth/signup`, {
+            const res = await fetch("/api/v1/auth/send-otp", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    ...formData,
-                    role,
-                }),
+                body: JSON.stringify({ email: formData.email }),
             });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || "Failed to send OTP");
 
-            if (!response.ok) {
-                const data = await response.json();
-                throw new Error(data.message || data.error || "Signup failed");
-            }
-
-            const data = await response.json();
-
-            if (data.user?.status === "pending") {
-                router.push("/login?signup=pending");
-            } else {
-                router.push("/login?signup=success");
-            }
+            // Move to OTP step
+            setOtpDigits(["", "", "", "", "", ""]);
+            setOtpError(null);
+            setStep("otp");
+            setResendCooldown(30);
         } catch (error) {
-            console.error("Signup failed", error);
-            setFormError(error instanceof Error ? error.message : "Signup failed");
+            setFormError(error instanceof Error ? error.message : "Failed to send OTP");
         } finally {
             setIsLoading(false);
         }
     };
 
-    const activeRoleData = roles.find(r => r.id === (hoveredRole || role));
-    const displayTitle = step === 'form'
-        ? `Register as ${roles.find(r => r.id === role)?.label}`
-        : hoveredRole
-            ? activeRoleData?.label
-            : "Create Your CIEL Account";
+    // Step 2: Verify OTP then create account
+    const handleVerifyOtp = async () => {
+        const otp = otpDigits.join("");
+        if (otp.length !== 6) {
+            setOtpError("Please enter all 6 digits.");
+            return;
+        }
+        setOtpLoading(true);
+        setOtpError(null);
+        try {
+            // Verify OTP
+            const verifyRes = await fetch("/api/v1/auth/verify-otp", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email: formData.email, otp }),
+            });
+            const verifyData = await verifyRes.json();
+            if (!verifyRes.ok) throw new Error(verifyData.error || "Invalid or expired OTP");
 
-    const displayText = step === 'form'
-        ? "Fill in your details to create your account and start making an impact."
-        : hoveredRole
-            ? activeRoleData?.desc
-            : "Choose how you want to engage with CIEL’s Community Impact Education Lab.";
+            // OTP verified — now create account
+            const backendUrl = process.env.NEXT_PUBLIC_BACKEND_BASE_URL;
+            const signupRes = await fetch(`${backendUrl}/auth/signup`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ ...formData, role }),
+            });
+            if (!signupRes.ok) {
+                const err = await signupRes.json();
+                throw new Error(err.message || err.error || "Signup failed");
+            }
+            const signupData = await signupRes.json();
+            if (signupData.user?.status === "pending") {
+                router.push("/login?signup=pending");
+            } else {
+                router.push("/login?signup=success");
+            }
+        } catch (error) {
+            setOtpError(error instanceof Error ? error.message : "Verification failed");
+        } finally {
+            setOtpLoading(false);
+        }
+    };
+
+    // OTP input handlers
+    const handleOtpChange = (index: number, value: string) => {
+        if (!/^[0-9]?$/.test(value)) return;
+        const next = [...otpDigits];
+        next[index] = value;
+        setOtpDigits(next);
+        setOtpError(null);
+        if (value && index < 5) otpRefs.current[index + 1]?.focus();
+    };
+
+    const handleOtpKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === "Backspace" && !otpDigits[index] && index > 0) {
+            otpRefs.current[index - 1]?.focus();
+        }
+    };
+
+    const handleOtpPaste = (e: React.ClipboardEvent) => {
+        const pasted = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
+        if (!pasted) return;
+        e.preventDefault();
+        const next = [...otpDigits];
+        pasted.split("").forEach((ch, i) => { if (i < 6) next[i] = ch; });
+        setOtpDigits(next);
+        otpRefs.current[Math.min(pasted.length, 5)]?.focus();
+    };
+
+    const handleResendOtp = async () => {
+        if (resendCooldown > 0) return;
+        setOtpError(null);
+        try {
+            await fetch("/api/v1/auth/send-otp", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email: formData.email }),
+            });
+            setOtpDigits(["", "", "", "", "", ""]);
+            setResendCooldown(30);
+            otpRefs.current[0]?.focus();
+        } catch {
+            setOtpError("Could not resend OTP. Try again.");
+        }
+    };
+
+    // Resend cooldown timer
+    useEffect(() => {
+        if (resendCooldown <= 0) return;
+        const t = setTimeout(() => setResendCooldown(c => c - 1), 1000);
+        return () => clearTimeout(t);
+    }, [resendCooldown]);
+
+    const activeRoleData = roles.find(r => r.id === (hoveredRole || role));
+    const displayTitle = step === 'otp'
+        ? 'Verify Email'
+        : step === 'form'
+            ? `Register as ${roles.find(r => r.id === role)?.label}`
+            : hoveredRole
+                ? activeRoleData?.label
+                : 'Create Your CIEL Account';
+
+    const displayText = step === 'otp'
+        ? `A 6-digit code was sent to ${formData.email}. Enter it to activate your account.`
+        : step === 'form'
+            ? 'Fill in your details to create your account and start making an impact.'
+            : hoveredRole
+                ? activeRoleData?.desc
+                : "Choose how you want to engage with CIEL's Community Impact Education Lab.";
 
     return (
         <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4 md:p-8 font-sans antialiased text-slate-900">
             <div className="w-full max-w-6xl grid grid-cols-1 lg:grid-cols-2 bg-white rounded-[2.5rem] shadow-[0_32px_64px_-16px_rgba(0,0,0,0.15)] overflow-hidden border border-slate-200/50 min-h-[700px]">
 
                 {/* Left side: Premium Branding & Dynamic Context */}
-                <div className="relative bg-slate-800 p-12 text-white flex flex-col justify-between overflow-hidden order-2 lg:order-1">
+                <div className="relative bg-[#1a3152] p-12 text-white flex flex-col justify-between overflow-hidden order-2 lg:order-1">
                     {/* Abstract background elements */}
-                    <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-emerald-600/20 rounded-full blur-[120px] -mr-48 -mt-48 transition-opacity duration-700"></div>
-                    <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-orange-500/10 rounded-full blur-[100px] -ml-40 -mb-40"></div>
+                    <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-emerald-400/10 rounded-full blur-[120px] -mr-48 -mt-48 transition-opacity duration-700"></div>
+                    <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-white/5 rounded-full blur-[100px] -ml-40 -mb-40"></div>
 
                     <div className="relative z-10">
-                        <Link href="/" className="inline-flex items-center gap-4 transition-transform hover:scale-105 duration-300">
-                            <div className="relative w-24 h-24 p-2 bg-white rounded-full flex items-center justify-center">
+                        <Link href="/" className="inline-flex items-center gap-5 transition-transform hover:scale-105 duration-300">
+                            <div className="relative w-24 h-24 p-3 bg-white rounded-[2rem] flex items-center justify-center shadow-2xl shadow-emerald-900/20">
                                 <Image src="/ciel-logo-final.png" alt="CIEL Logo" width={200} height={200} className="object-contain" />
                             </div>
                             <div className="flex flex-col">
-                                <span className="text-2xl font-bold tracking-tight text-white leading-none">
+                                <span className="text-2xl font-black tracking-tighter text-white leading-none uppercase">
                                     Community Impact <br /> Education Lab
                                 </span>
-                                <span className="text-sm text-emerald-400 font-[family-name:var(--font-dancing)] mt-1 tracking-wide">
+                                <span className="text-[10px] font-black text-emerald-400 mt-2 tracking-[0.3em] uppercase opacity-80">
                                     Youth Empowered Community Impact
                                 </span>
                             </div>
@@ -215,42 +312,45 @@ function SignUpContent() {
                     </div>
 
                     <div className="relative z-10 py-12">
-                        <div className="space-y-6 animate-in fade-in slide-in-from-left-4 duration-500" key={displayTitle}>
-                            <h2 className="text-4xl md:text-5xl font-extrabold leading-[1.1] tracking-tight mb-8">
+                        <div className="space-y-8 animate-in fade-in slide-in-from-left-4 duration-500" key={displayTitle}>
+                            <h2 className="text-3xl md:text-4xl font-black leading-[1.1] tracking-tight mb-8">
                                 {step === 'role' ? (
-                                    <>Empowering <br /><span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-orange-400">Pakistan's Youth</span><br />for Measurable Impact</>
+                                    <>Empowering <br /><span className="text-emerald-400">Pakistan's Youth</span><br />for Impact.</>
                                 ) : (
-                                    <>Verify <br /><span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-orange-400">Identity.</span></>
+                                    <>Verify <br /><span className="text-emerald-400">Identity.</span></>
                                 )}
                             </h2>
-                            <h3 className="text-2xl font-bold tracking-tight text-white mb-2">{displayTitle}</h3>
-                            <p className="text-slate-400 text-lg font-medium leading-relaxed max-w-sm">
-                                {step === 'role'
-                                    ? "Join Pakistan's leading platform for university-led community impact and SDG-aligned growth."
-                                    : displayText
-                                }
-                            </p>
+                            <div className="space-y-3">
+                                <h3 className="text-sm font-black text-white/90 uppercase tracking-widest">{displayTitle}</h3>
+                                <p className="text-slate-300/70 text-sm font-medium leading-relaxed max-w-sm">
+                                    {step === 'role'
+                                        ? "Join Pakistan's leading platform for university-led community impact and SDG-aligned growth."
+                                        : displayText
+                                    }
+                                </p>
+                            </div>
                         </div>
                     </div>
 
-                    <div className="relative z-10 flex flex-col gap-8">
-                        {step === "form" && (
+                    <div className="relative z-10 flex flex-col gap-10">
+                        {(step === "form" || step === "otp") && (
                             <button
-                                onClick={() => setStep("role")}
-                                className="group flex items-center gap-3 text-xs font-black uppercase tracking-widest text-slate-400 hover:text-white transition-all w-fit"
+                                onClick={() => step === "otp" ? setStep("form") : setStep("role")}
+                                className="group flex items-center gap-3 text-xs font-black uppercase tracking-widest text-slate-400 hover:text-emerald-400 transition-all w-fit"
                             >
-                                <div className="w-8 h-8 rounded-full border border-white/10 flex items-center justify-center group-hover:border-white/40 transition-colors">
-                                    <ArrowLeft className="w-3 h-3 group-hover:-translate-x-0.5 transition-transform" />
+                                <div className="w-10 h-10 rounded-xl border border-white/10 flex items-center justify-center group-hover:border-emerald-400/50 group-hover:bg-emerald-400/5 transition-all">
+                                    <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
                                 </div>
-                                Back to Selection
+                                {step === "otp" ? "Back to Form" : "Back to Role Grid"}
                             </button>
                         )}
 
-                        <div className="flex items-center justify-between pt-8 border-t border-white/5">
-                            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 italic">© 2026 CIEL Pakistan</p>
+                        <div className="flex items-center justify-between pt-10 border-t border-white/5">
+                            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 italic">© 2026 CIEL Global</p>
                             <div className="flex gap-4 items-center">
-                                <div className={clsx("w-1.5 h-1.5 rounded-full transition-all", step === 'role' ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)] scale-125" : "bg-white/20")}></div>
-                                <div className={clsx("w-1.5 h-1.5 rounded-full transition-all", step === 'form' ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)] scale-125" : "bg-white/20")}></div>
+                                <div className={clsx("w-2 h-2 rounded-full transition-all duration-500", step === 'role' ? "bg-emerald-400 shadow-[0_0_15px_rgba(52,211,153,0.6)] scale-125" : "bg-white/10")}></div>
+                                <div className={clsx("w-2 h-2 rounded-full transition-all duration-500", step === 'form' ? "bg-emerald-400 shadow-[0_0_15px_rgba(52,211,153,0.6)] scale-125" : "bg-white/10")}></div>
+                                <div className={clsx("w-2 h-2 rounded-full transition-all duration-500", step === 'otp' ? "bg-emerald-400 shadow-[0_0_15px_rgba(52,211,153,0.6)] scale-125" : "bg-white/10")}></div>
                             </div>
                         </div>
                     </div>
@@ -263,44 +363,37 @@ function SignUpContent() {
                         {step === "role" && (
                             <div className="space-y-8 animate-in fade-in slide-in-from-right-8 duration-500">
                                 <div className="text-center lg:text-left">
-                                    <h3 className="text-4xl font-black text-slate-900 tracking-tight mb-3 italic">Account Type</h3>
+                                    <h3 className="text-4xl font-black text-[#1E293B] tracking-tight mb-3">Account Type</h3>
                                     <p className="text-slate-500 font-medium">Select your professional category to proceed.</p>
                                 </div>
 
-                                <div className="grid gap-3">
+                                <div className="grid gap-4">
                                     {roles.map((r) => (
                                         <button
                                             key={r.id}
                                             onClick={() => handleRoleSelect(r.id)}
                                             onMouseEnter={() => setHoveredRole(r.id)}
                                             onMouseLeave={() => setHoveredRole(null)}
-                                            className="group relative flex items-center gap-4 p-5 rounded-2xl border-2 border-slate-100 hover:border-emerald-500 hover:bg-emerald-50 transition-all text-left overflow-hidden"
+                                            className="group relative flex items-center gap-5 p-6 rounded-2xl border-2 border-slate-100 hover:border-emerald-500 hover:bg-emerald-50/50 hover:shadow-[0_20px_40px_-15px_rgba(0,0,0,0.05)] transition-all text-left overflow-hidden bg-white"
                                         >
-                                            <div className={clsx(
-                                                "w-12 h-12 rounded-xl flex items-center justify-center transition-all duration-300 group-hover:scale-110 shadow-sm border",
-                                                r.id === "student" ? "bg-blue-50 text-blue-600 border-blue-100" :
-                                                    r.id === "faculty" ? "bg-amber-50 text-amber-600 border-amber-100" :
-                                                        r.id === "university" ? "bg-indigo-50 text-indigo-600 border-indigo-100" :
-                                                            r.id === "ngo" ? "bg-emerald-50 text-emerald-600 border-emerald-100" :
-                                                                "bg-slate-50 text-slate-600 border-slate-200"
-                                            )}>
-                                                <r.icon className="w-6 h-6" />
+                                            <div className="w-14 h-14 rounded-2xl bg-slate-50 text-slate-400 group-hover:bg-white group-hover:text-emerald-500 flex items-center justify-center transition-all duration-300 group-hover:scale-110 shadow-sm border border-slate-100 group-hover:border-emerald-100 group-hover:shadow-lg group-hover:shadow-emerald-50">
+                                                <r.icon className="w-7 h-7" />
                                             </div>
                                             <div className="flex-1">
-                                                <h4 className="text-sm font-black uppercase tracking-widest text-slate-900 mb-0.5">{r.label}</h4>
-                                                <p className="text-[10px] font-bold text-slate-400 group-hover:text-slate-600 transition-colors">Start impacting today</p>
+                                                <h4 className="text-sm font-black uppercase tracking-widest text-[#1E293B] mb-0.5">{r.label}</h4>
+                                                <p className="text-[10px] font-black text-slate-400 group-hover:text-emerald-600/70 transition-colors uppercase tracking-widest">Start impacting today</p>
                                             </div>
-                                            <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center opacity-0 group-hover:opacity-100 -translate-x-4 group-hover:translate-x-0 transition-all duration-300">
-                                                <ArrowRight className="w-4 h-4 text-emerald-600" />
+                                            <div className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center opacity-0 group-hover:opacity-100 -translate-x-4 group-hover:translate-x-0 transition-all duration-300 border border-slate-100 group-hover:bg-white group-hover:border-emerald-200">
+                                                <ArrowRight className="w-5 h-5 text-emerald-600" />
                                             </div>
                                         </button>
                                     ))}
                                 </div>
 
-                                <div className="text-center pt-4">
-                                    <p className="text-slate-400 text-[11px] font-bold uppercase tracking-widest">
+                                <div className="text-center pt-6">
+                                    <p className="text-slate-400 text-[11px] font-black uppercase tracking-widest">
                                         Already a member? <br />
-                                        <Link href="/login" className="mt-2 inline-block text-emerald-600 hover:text-emerald-700 font-black border-b-2 border-emerald-100 hover:border-emerald-600 transition-all">Sign In to Dashboard</Link>
+                                        <Link href="/login" className="mt-3 inline-block text-emerald-600 hover:text-emerald-700 font-black border-b-4 border-emerald-50 hover:border-emerald-600/20 transition-all">Sign In to Dashboard</Link>
                                     </p>
                                 </div>
                             </div>
@@ -309,11 +402,11 @@ function SignUpContent() {
                         {step === "form" && (
                             <form onSubmit={handleSubmit} className="space-y-6 animate-in fade-in slide-in-from-right-8 duration-500">
                                 <div className="mb-8 text-center lg:text-left">
-                                    <h3 className="text-4xl font-black text-slate-900 tracking-tight mb-2 italic">Credentials</h3>
-                                    <p className="text-slate-500 font-medium text-sm">Verify your details as <span className="text-emerald-600 font-bold">{roles.find(r => r.id === role)?.label}</span></p>
+                                    <h3 className="text-4xl font-black text-[#1E293B] tracking-tight mb-2">Credentials</h3>
+                                    <p className="text-slate-500 font-medium text-sm italic">Verify your details as <span className="text-emerald-600 font-black uppercase tracking-tight">{roles.find(r => r.id === role)?.label}</span></p>
                                 </div>
 
-                                <div className="max-h-[500px] overflow-y-auto pr-2 space-y-6 scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent">
+                                <div className="space-y-6">
                                     {['university', 'ngo', 'corporate'].includes(role || "") ? (
                                         <div className="space-y-5">
                                             <div className="space-y-1.5">
@@ -467,17 +560,52 @@ function SignUpContent() {
                                         <div className="group relative">
                                             <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-emerald-600 transition-colors" />
                                             <input
-                                                type="password"
+                                                type={showPassword ? "text" : "password"}
                                                 value={formData.password}
                                                 onChange={(e) => handleGenericChange("password", e.target.value)}
                                                 className={clsx(
-                                                    "w-full pl-12 pr-5 py-4 rounded-2xl border-2 bg-slate-50/50 focus:bg-white outline-none transition-all font-bold text-slate-800 placeholder:text-slate-300",
+                                                    "w-full pl-12 pr-12 py-4 rounded-2xl border-2 bg-slate-50/50 focus:bg-white outline-none transition-all font-bold text-slate-800 placeholder:text-slate-300",
                                                     errors.password ? "border-red-500 focus:border-red-500" : "border-slate-100 focus:border-emerald-600"
                                                 )}
                                                 placeholder="••••••••"
                                             />
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowPassword(!showPassword)}
+                                                className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-emerald-600 transition-colors focus:outline-none"
+                                                tabIndex={-1}
+                                            >
+                                                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                            </button>
                                         </div>
-                                        {errors.password && <p className="text-[10px] text-red-500 font-black uppercase tracking-widest ml-1">{errors.password}</p>}
+                                        {errors.password && (
+                                            <div className="flex items-start gap-1.5 mt-1">
+                                                <AlertCircle className="w-3 h-3 text-red-500 shrink-0 mt-0.5" />
+                                                <p className="text-[10px] text-red-500 font-black uppercase tracking-widest">{errors.password}</p>
+                                            </div>
+                                        )}
+                                        {!errors.password && formData.password && (
+                                            <div className="mt-2 space-y-1">
+                                                <div className="flex gap-1">
+                                                    {[1,2,3,4].map((level) => (
+                                                        <div key={level} className={clsx(
+                                                            "h-1 flex-1 rounded-full transition-all duration-300",
+                                                            level <= (formData.password.length >= 12 && /[A-Z]/.test(formData.password) && /[0-9]/.test(formData.password) && /[^A-Za-z0-9]/.test(formData.password) ? 4 :
+                                                               formData.password.length >= 10 && /[A-Z]/.test(formData.password) && /[0-9]/.test(formData.password) ? 3 :
+                                                               formData.password.length >= 8 && /[A-Za-z]/.test(formData.password) ? 2 : 1)
+                                                            ? level === 1 ? "bg-red-400" : level === 2 ? "bg-amber-400" : level === 3 ? "bg-emerald-400" : "bg-emerald-600"
+                                                            : "bg-slate-100"
+                                                        )} />
+                                                    ))}
+                                                </div>
+                                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                                                    {formData.password.length >= 12 && /[A-Z]/.test(formData.password) && /[0-9]/.test(formData.password) && /[^A-Za-z0-9]/.test(formData.password) ? "Strong Password" :
+                                                     formData.password.length >= 10 && /[A-Z]/.test(formData.password) && /[0-9]/.test(formData.password) ? "Good Password" :
+                                                     formData.password.length >= 8 && /[A-Za-z]/.test(formData.password) ? "Acceptable — add uppercase & numbers" :
+                                                     "Weak — must be at least 8 characters"}
+                                                </p>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
 
@@ -496,7 +624,7 @@ function SignUpContent() {
                                     {isLoading ? (
                                         <>
                                             <Loader2 className="w-4 h-4 animate-spin" />
-                                            Provisioning Account...
+                                            Sending OTP...
                                         </>
                                     ) : (
                                         <>
@@ -510,6 +638,79 @@ function SignUpContent() {
                                     <span className="text-slate-900">CIEL’s Global Governance Protocols.</span>
                                 </p>
                             </form>
+                        )}
+
+                        {step === "otp" && (
+                            <div className="animate-in fade-in slide-in-from-right-8 duration-500">
+                                {/* Header */}
+                                <div className="mb-8 text-center lg:text-left">
+                                    <div className="inline-flex items-center justify-center w-16 h-16 rounded-[1.25rem] bg-emerald-50 mb-5">
+                                        <ShieldCheck className="w-8 h-8 text-emerald-600" />
+                                    </div>
+                                    <h3 className="text-4xl font-black text-[#1E293B] tracking-tight mb-2">Verify OTP</h3>
+                                    <p className="text-slate-500 font-medium text-sm">
+                                        Code sent to <span className="text-emerald-600 font-black">{formData.email}</span>
+                                    </p>
+                                </div>
+
+                                {/* 6 Digit Boxes */}
+                                <div className="flex gap-3 justify-center mb-6" onPaste={handleOtpPaste}>
+                                    {otpDigits.map((digit, i) => (
+                                        <input
+                                            key={i}
+                                            ref={el => { otpRefs.current[i] = el; }}
+                                            type="text"
+                                            inputMode="numeric"
+                                            maxLength={1}
+                                            value={digit}
+                                            onChange={e => handleOtpChange(i, e.target.value)}
+                                            onKeyDown={e => handleOtpKeyDown(i, e)}
+                                            className={clsx(
+                                                "w-12 h-14 text-center text-2xl font-black rounded-2xl border-2 outline-none transition-all duration-200 bg-slate-50 focus:bg-white",
+                                                otpError
+                                                    ? "border-red-400 focus:border-red-500 bg-red-50"
+                                                    : digit
+                                                        ? "border-emerald-500 shadow-[0_0_0_3px_rgba(16,185,129,0.1)]"
+                                                        : "border-slate-200 focus:border-emerald-500 focus:shadow-[0_0_0_3px_rgba(16,185,129,0.1)]"
+                                            )}
+                                        />
+                                    ))}
+                                </div>
+
+                                {/* Error */}
+                                {otpError && (
+                                    <div className="flex items-center gap-2 mb-4 p-3 rounded-2xl bg-red-50 border border-red-100">
+                                        <AlertCircle className="w-4 h-4 text-red-500 shrink-0" />
+                                        <p className="text-xs font-bold text-red-600">{otpError}</p>
+                                    </div>
+                                )}
+
+                                {/* Verify Button */}
+                                <button
+                                    onClick={handleVerifyOtp}
+                                    disabled={otpLoading || otpDigits.join("").length !== 6}
+                                    className="w-full py-5 rounded-[1.25rem] font-black uppercase tracking-widest text-xs text-white bg-slate-900 border-b-4 border-slate-700 active:border-b-0 active:translate-y-1 hover:bg-emerald-700 hover:border-emerald-800 hover:shadow-2xl hover:shadow-emerald-100 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3 mb-4"
+                                >
+                                    {otpLoading ? (
+                                        <><Loader2 className="w-4 h-4 animate-spin" /> Verifying...</>
+                                    ) : (
+                                        <><ShieldCheck className="w-4 h-4" /> Verify &amp; Create Account</>
+                                    )}
+                                </button>
+
+                                {/* Resend */}
+                                <div className="text-center">
+                                    <button
+                                        onClick={handleResendOtp}
+                                        disabled={resendCooldown > 0}
+                                        className="text-[11px] font-black uppercase tracking-widest text-slate-400 hover:text-emerald-600 transition-colors disabled:cursor-not-allowed"
+                                    >
+                                        {resendCooldown > 0
+                                            ? `Resend OTP in ${resendCooldown}s`
+                                            : "Didn't receive? Resend OTP"}
+                                    </button>
+                                </div>
+                            </div>
                         )}
 
                     </div>

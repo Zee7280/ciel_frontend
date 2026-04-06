@@ -74,7 +74,7 @@ export default function Sidebar() {
         ] : []),
         // Faculty
         ...(isFaculty ? [
-            { label: "My Courses", href: "/dashboard/faculty/courses", icon: BookOpen },
+            // { label: "My Courses", href: "/dashboard/faculty/courses", icon: BookOpen },
             { label: "Project Approvals", href: "/dashboard/faculty/approvals", icon: CheckCircle },
             { label: "Create Opportunity", href: "/dashboard/faculty/create-opportunity", icon: Plus },
             { label: "Student Grading", href: "/dashboard/faculty/grading", icon: FileText },
@@ -120,7 +120,7 @@ export default function Sidebar() {
                         <span className="text-xs font-bold tracking-tight text-white leading-tight">
                             Community Impact <br /> Education Lab
                         </span>
-                        <span className="text-[8px] text-emerald-400 font-[family-name:var(--font-dancing)] tracking-wide mt-0.5">
+                        <span className="text-[8px] text-[#4285F4] font-[family-name:var(--font-dancing)] tracking-wide mt-0.5">
                             Youth Empowered Community Impact
                         </span>
                     </div>
@@ -144,7 +144,7 @@ export default function Sidebar() {
                                 {link.label}
                             </div>
                             {link.label === "Messages" && unreadCount > 0 && (
-                                <span className="bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm animate-pulse">
+                                <span className="bg-slate-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm animate-pulse">
                                     {unreadCount > 99 ? "99+" : unreadCount}
                                 </span>
                             )}
@@ -156,7 +156,7 @@ export default function Sidebar() {
             <div className="p-4 border-t border-slate-800">
                 <button
                     onClick={handleLogout}
-                    className="flex items-center gap-3 px-4 py-3 w-full rounded-xl text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-colors text-sm font-medium"
+                    className="flex items-center gap-3 px-4 py-3 w-full rounded-xl text-[#4285F4] hover:bg-slate-500/10 hover:text-[#4285F4] transition-colors text-sm font-medium"
                 >
                     <LogOut className="w-5 h-5" />
                     Sign Out

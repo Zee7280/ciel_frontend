@@ -5,7 +5,7 @@ import Link from "next/link";
 
 export default function FooterBanner() {
     return (
-        <div className="w-full bg-gradient-to-r from-[#0ea5e9] via-[#0d9488] to-[#10b981] py-20 px-6 text-center">
+        <div className="w-full bg-gradient-to-r from-[#0ea5e9] via-[#0d9488] to-[#10b981] py-12 px-6 text-center">
             <div className="max-w-4xl mx-auto">
                 <h2 className="text-4xl md:text-6xl font-black text-white mb-6 tracking-tight leading-[1.1]">
                     Empowering Youth for a <br className="hidden md:block" />

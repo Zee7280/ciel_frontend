@@ -3,223 +3,192 @@
 import Navbar from "@/components/Navbar";
 import PartnersFooter from "@/components/PartnersFooter";
 import FooterBanner from "@/components/FooterBanner";
-import { MapPin, Users, Calendar, Target, ArrowLeft, CheckCircle2, Clock } from "lucide-react";
+import Footer from "@/components/Footer";
+import { MapPin, Users, Calendar, Target, ArrowLeft, CheckCircle2, Loader2, Globe2, Sparkles, Building2, Tag } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import { useState, useEffect } from "react";
 
-// Mock data - in production, fetch from API
-const MOCK_PROJECTS = {
-    "1": {
-        id: 1,
-        title: "Clean Water Initiative",
-        org: "Water for Life",
-        location: "Tharparkar, Sindh",
-        status: "Active",
-        volunteers: 45,
-        hoursServed: 1200,
-        startDate: "Jan 15, 2026",
-        endDate: "Jun 30, 2026",
-        description: "Installing solar-powered water pumps in remote villages to provide clean drinking water to over 5,000 residents.",
-        category: "Infrastructure",
-        sdgs: ["Clean Water and Sanitation", "Good Health and Well-being"],
-        objectives: [
-            "Install 10 solar-powered water pumps",
-            "Train local technicians for maintenance",
-            "Conduct water quality testing",
-            "Educate communities on water conservation"
-        ],
-        impact: {
-            beneficiaries: "5,000+ people",
-            villages: "8 villages",
-            pumps: "10 solar pumps"
-        }
-    },
-    "2": {
-        id: 2,
-        title: "Tech Skills for Youth",
-        org: "Digital Future",
-        location: "Lahore, Punjab",
-        status: "Recruiting",
-        volunteers: 120,
-        hoursServed: 3600,
-        startDate: "Feb 1, 2026",
-        endDate: "Apr 30, 2026",
-        description: "A 3-month coding boot camp for underprivileged youth to cover basic web development skills including HTML, CSS, JavaScript, and React.",
-        category: "Education",
-        sdgs: ["Quality Education", "Decent Work and Economic Growth"],
-        objectives: [
-            "Train 200 students in web development",
-            "Provide laptops and internet access",
-            "Connect graduates with internship opportunities",
-            "Build portfolio projects"
-        ],
-        impact: {
-            students: "200 students",
-            graduates: "150+ expected",
-            placements: "80% placement target"
-        }
-    },
-    "3": {
-        id: 3,
-        title: "Urban Forest Drive",
-        org: "Green Pakistan",
-        location: "Islamabad",
-        status: "Completed",
-        volunteers: 300,
-        hoursServed: 2400,
-        startDate: "Oct 1, 2025",
-        endDate: "Dec 31, 2025",
-        description: "Planting 10,000 trees in the capital city to combat urban heat islands and improve air quality.",
-        category: "Environment",
-        sdgs: ["Climate Action", "Life on Land"],
-        objectives: [
-            "Plant 10,000 native trees",
-            "Create 5 urban green spaces",
-            "Engage 500+ volunteers",
-            "Monitor tree survival rates"
-        ],
-        impact: {
-            trees: "10,000 trees planted",
-            survival: "92% survival rate",
-            co2: "500 tons CO2 absorbed/year"
-        }
-    }
-};
+interface ProjectDetails {
+    id: string | number;
+    title: string;
+    partner_name?: string;
+    location?: string | { pin?: string; city?: string; venue?: string };
+    status: string;
+    participant_count?: number;
+    description: string;
+    types?: string[];
+    sdg_info?: { sdg_id?: string; description?: string };
+    submitted_at?: string;
+}
 
 export default function ProjectDetailsPage() {
     const params = useParams();
     const projectId = params.id as string;
-    const project = MOCK_PROJECTS[projectId as keyof typeof MOCK_PROJECTS];
+    const [project, setProject] = useState<ProjectDetails | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
 
-    if (!project) {
+    useEffect(() => {
+        const fetchProjectDetails = async () => {
+            try {
+                const backendUrl = process.env.NEXT_PUBLIC_BACKEND_BASE_URL;
+                const response = await fetch(`${backendUrl}/public/opportunities`);
+                const data = await response.json();
+                
+                if (data.success && Array.isArray(data.data)) {
+                    const found = data.data.find((p: any) => p.id.toString() === projectId);
+                    if (found) {
+                        setProject(found);
+                    }
+                }
+            } catch (err) {
+                console.error("Failed to fetch project details:", err);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        fetchProjectDetails();
+    }, [projectId]);
+
+    const getDisplayLocation = (loc: any) => {
+        if (!loc) return "Remote / Pakistan";
+        if (typeof loc === 'string') return loc;
+        const parts = [];
+        if (loc.city) parts.push(loc.city);
+        if (loc.venue) parts.push(loc.venue);
+        return parts.length > 0 ? parts.join(", ") : (loc.pin || "Pakistan");
+    };
+
+    if (isLoading) {
         return (
-            <main className="min-h-screen bg-slate-50 font-sans">
+            <main className="min-h-screen bg-slate-50 font-sans text-center">
                 <Navbar />
-                <div className="pt-32 pb-20 px-6 max-w-7xl mx-auto text-center">
-                    <h1 className="text-3xl font-bold text-slate-900 mb-4">Project Not Found</h1>
-                    <Link href="/projects" className="text-blue-600 hover:underline font-semibold">
-                        ← Back to Projects
-                    </Link>
+                <div className="flex flex-col items-center justify-center min-h-screen pt-20 text-slate-400 gap-4">
+                    <Loader2 className="w-10 h-10 animate-spin text-[#4285F4]" />
+                    <p className="font-bold text-sm tracking-widest uppercase">Fetching Details...</p>
                 </div>
             </main>
         );
     }
 
+    if (!project) {
+        return (
+            <main className="min-h-screen bg-slate-50 font-sans">
+                <Navbar />
+                <div className="pt-48 pb-20 px-6 max-w-7xl mx-auto text-center">
+                    <h1 className="text-4xl font-black text-slate-900 mb-4 tracking-tight">Project Not Found</h1>
+                    <Link href="/projects" className="inline-flex items-center gap-3 px-8 py-4 bg-[#4285F4] text-white font-black rounded-2xl hover:scale-105 transition-all shadow-xl shadow-blue-200">
+                        ← Back to Projects
+                    </Link>
+                </div>
+                <PartnersFooter />
+                <Footer />
+            </main>
+        );
+    }
+
+    const category = (project.types && project.types.length > 0) ? project.types[0] : "Social Impact";
+    const status = project.status || "Active";
+    const displayLocation = getDisplayLocation(project.location);
+
     return (
-        <main className="min-h-screen bg-slate-50 font-sans">
+        <main className="min-h-screen bg-slate-50 font-sans selection:bg-blue-100 pb-20">
             <Navbar />
 
-            {/* Header */}
-            <section className="pt-32 pb-12 px-6 max-w-7xl mx-auto">
-                <Link href="/projects" className="inline-flex items-center gap-2 text-slate-600 hover:text-blue-600 font-semibold mb-6 transition-colors animate-fade-in-up">
-                    <ArrowLeft className="w-4 h-4" /> Back to Projects
+            <div className="pt-40 px-6 max-w-5xl mx-auto mb-10 text-center md:text-left transition-all">
+                <Link href="/projects" className="group inline-flex items-center gap-2 text-slate-500 hover:text-[#4285F4] font-black text-[10px] uppercase tracking-widest mb-10">
+                    <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" /> Back to Projects list
                 </Link>
-
-                <div className="flex flex-col lg:flex-row gap-8 items-start justify-between mb-8">
-                    <div className="flex-1 animate-fade-in-up" style={{ animationDelay: '100ms' }}>
-                        <div className="flex items-center gap-3 mb-4">
-                            <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${project.status === 'Active' ? 'bg-green-100 text-green-700' :
-                                    project.status === 'Recruiting' ? 'bg-blue-100 text-blue-700' :
-                                        'bg-slate-100 text-slate-600'
-                                }`}>
-                                {project.status}
-                            </span>
-                            <span className="text-sm font-bold text-slate-400">{project.category}</span>
-                        </div>
-                        <h1 className="text-4xl md:text-5xl font-bold text-slate-900 mb-4">{project.title}</h1>
-                        <p className="text-xl font-semibold text-blue-600 mb-4">{project.org}</p>
-                        <p className="text-lg text-slate-600 leading-relaxed">{project.description}</p>
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                    <div>
+                        <h1 className="text-4xl md:text-5xl font-black text-slate-900 mb-3 tracking-tight leading-tight">{project.title}</h1>
+                        <p className="text-lg font-bold text-[#4285F4]">{project.partner_name || "Verified Organization"}</p>
                     </div>
-
-                    <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 min-w-[280px] animate-fade-in-up" style={{ animationDelay: '200ms' }}>
-                        <h3 className="font-bold text-slate-900 mb-4">Quick Stats</h3>
-                        <div className="space-y-4">
-                            <div className="flex items-center gap-3">
-                                <MapPin className="w-5 h-5 text-slate-400" />
-                                <span className="text-sm text-slate-600">{project.location}</span>
-                            </div>
-                            <div className="flex items-center gap-3">
-                                <Users className="w-5 h-5 text-slate-400" />
-                                <span className="text-sm text-slate-600">{project.volunteers} Volunteers</span>
-                            </div>
-                            <div className="flex items-center gap-3">
-                                <Clock className="w-5 h-5 text-slate-400" />
-                                <span className="text-sm text-slate-600">{project.hoursServed.toLocaleString()} Hours</span>
-                            </div>
-                            <div className="flex items-center gap-3">
-                                <Calendar className="w-5 h-5 text-slate-400" />
-                                <span className="text-sm text-slate-600">{project.startDate} - {project.endDate}</span>
-                            </div>
-                        </div>
-                        <button className="w-full mt-6 py-3 rounded-xl bg-blue-600 text-white font-bold hover:bg-blue-700 transition-all shadow-md hover:shadow-lg">
-                            Join Project
-                        </button>
+                    <div className="flex items-center gap-3">
+                         <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest ${
+                                status.toLowerCase() === 'active' ? 'bg-green-50 text-green-700 border border-green-100' :
+                                status.toLowerCase() === 'recruiting' ? 'bg-blue-50 text-blue-700 border border-blue-100' :
+                                'bg-slate-50 text-slate-600 border border-slate-100'
+                            }`}>
+                                {status}
+                        </span>
                     </div>
                 </div>
-            </section>
+            </div>
 
-            {/* Content Sections */}
-            <section className="pb-20 px-6 max-w-7xl mx-auto">
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                    {/* Main Content */}
-                    <div className="lg:col-span-2 space-y-8">
-                        {/* Objectives */}
-                        <div className="bg-white rounded-2xl p-8 shadow-sm border border-slate-100 animate-fade-in-up" style={{ animationDelay: '300ms' }}>
-                            <h2 className="text-2xl font-bold text-slate-900 mb-6 flex items-center gap-2">
-                                <Target className="w-6 h-6 text-blue-600" /> Project Objectives
-                            </h2>
-                            <ul className="space-y-3">
-                                {project.objectives.map((obj, index) => (
-                                    <li key={index} className="flex items-start gap-3">
-                                        <CheckCircle2 className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
-                                        <span className="text-slate-700">{obj}</span>
-                                    </li>
-                                ))}
-                            </ul>
-                        </div>
-
-                        {/* Impact Metrics */}
-                        <div className="bg-white rounded-2xl p-8 shadow-sm border border-slate-100 animate-fade-in-up" style={{ animationDelay: '400ms' }}>
-                            <h2 className="text-2xl font-bold text-slate-900 mb-6">Expected Impact</h2>
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                {Object.entries(project.impact).map(([key, value], index) => (
-                                    <div key={index} className="text-center p-4 bg-slate-50 rounded-xl">
-                                        <div className="text-3xl font-bold text-blue-600 mb-2">{value}</div>
-                                        <div className="text-sm text-slate-500 capitalize">{key}</div>
-                                    </div>
-                                ))}
+            {/* Consolidated Details Card */}
+            <div className="px-6 max-w-5xl mx-auto">
+                <div className="bg-white rounded-[2.5rem] p-10 md:p-14 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05)] border border-slate-100 animate-fade-in-up">
+                    
+                    {/* Key Metrics Grid */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-8 pb-12 mb-12 border-b border-slate-50">
+                        <div className="flex flex-col gap-1.5">
+                            <div className="flex items-center gap-2 text-slate-400">
+                                <MapPin className="w-4 h-4" />
+                                <span className="text-[10px] font-black uppercase tracking-widest">Location</span>
                             </div>
+                            <span className="text-sm font-bold text-slate-900">{displayLocation}</span>
+                        </div>
+                        <div className="flex flex-col gap-1.5">
+                            <div className="flex items-center gap-2 text-slate-400">
+                                <Users className="w-4 h-4" />
+                                <span className="text-[10px] font-black uppercase tracking-widest">Volunteers</span>
+                            </div>
+                            <span className="text-sm font-bold text-slate-900">{project.participant_count || 0} Registered</span>
+                        </div>
+                        <div className="flex flex-col gap-1.5">
+                            <div className="flex items-center gap-2 text-slate-400">
+                                <Calendar className="w-4 h-4" />
+                                <span className="text-[10px] font-black uppercase tracking-widest">Posted on</span>
+                            </div>
+                            <span className="text-sm font-bold text-slate-900">{project.submitted_at ? new Date(project.submitted_at).toLocaleDateString() : "Just Now"}</span>
+                        </div>
+                        <div className="flex flex-col gap-1.5">
+                            <div className="flex items-center gap-2 text-slate-400">
+                                <Tag className="w-4 h-4" />
+                                <span className="text-[10px] font-black uppercase tracking-widest">Category</span>
+                            </div>
+                            <span className="text-sm font-bold text-slate-900">{category}</span>
                         </div>
                     </div>
 
-                    {/* Sidebar */}
-                    <div className="space-y-6">
-                        {/* SDGs */}
-                        <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 animate-fade-in-up" style={{ animationDelay: '500ms' }}>
-                            <h3 className="font-bold text-slate-900 mb-4">Related SDGs</h3>
-                            <div className="space-y-2">
-                                {project.sdgs.map((sdg, index) => (
-                                    <div key={index} className="px-3 py-2 bg-blue-50 rounded-lg text-sm font-medium text-blue-700">
-                                        {sdg}
-                                    </div>
-                                ))}
+                    {/* Description Section */}
+                    <div className="mb-14">
+                        <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-6">About the Project</h3>
+                        <p className="text-xl text-slate-600 font-medium leading-[1.8]">
+                            {project.description}
+                        </p>
+                    </div>
+
+                    {/* SDG Section (Simplified) */}
+                    {project.sdg_info && (
+                        <div className="bg-slate-50 p-8 rounded-3xl border border-slate-100 flex flex-col md:flex-row items-start md:items-center gap-6 mb-14">
+                            <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center shadow-sm shrink-0">
+                                <Globe2 className="w-7 h-7 text-[#4285F4]" />
+                            </div>
+                            <div>
+                                <h4 className="text-[10px] font-black text-[#4285F4] uppercase tracking-widest mb-1">{project.sdg_info.sdg_id || "UN GLOBAL GOAL"}</h4>
+                                <p className="text-sm font-bold text-slate-600 leading-relaxed max-w-2xl">{project.sdg_info.description || "Contributing to sustainable community development."}</p>
                             </div>
                         </div>
+                    )}
 
-                        {/* CTA */}
-                        <div className="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-2xl p-6 text-white animate-fade-in-up" style={{ animationDelay: '600ms' }}>
-                            <h3 className="font-bold text-lg mb-2">Want to contribute?</h3>
-                            <p className="text-blue-100 text-sm mb-4">Join our team and make a real difference in your community.</p>
-                            <button className="w-full py-3 rounded-xl bg-white text-blue-600 font-bold hover:bg-blue-50 transition-all">
-                                Get Involved
-                            </button>
-                        </div>
-                    </div>
+                    {/* Apply Action */}
+                    <Link 
+                        href="/signup"
+                        className="w-full flex items-center justify-center py-6 rounded-2xl bg-[#4285F4] text-white font-black text-base hover:scale-[1.02] active:scale-[0.98] transition-all shadow-2xl shadow-blue-100 tracking-widest uppercase"
+                    >
+                        Apply to Project
+                    </Link>
+                    <p className="text-[10px] text-center text-slate-400 font-black mt-6 tracking-widest uppercase italic">You must be a verified student to join this initiative.</p>
                 </div>
-            </section>
+            </div>
 
             <PartnersFooter />
             <FooterBanner />
+            <Footer />
         </main>
     );
 }
+

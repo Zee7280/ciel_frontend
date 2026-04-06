@@ -20,8 +20,8 @@ const stats: Stat[] = [
         suffix: "+",
         label: "Students Enrolled",
         sub: "Verified participants",
-        color: "text-violet-600",
-        iconBg: "bg-violet-100",
+        color: "text-[#4285F4]",
+        iconBg: "bg-slate-50",
     },
     {
         icon: Clock,
@@ -29,8 +29,8 @@ const stats: Stat[] = [
         suffix: "+",
         label: "Engagement Hours",
         sub: "Logged & verified",
-        color: "text-sky-500",
-        iconBg: "bg-sky-100",
+        color: "text-[#4285F4]",
+        iconBg: "bg-slate-50",
     },
     {
         icon: Globe2,
@@ -38,8 +38,8 @@ const stats: Stat[] = [
         suffix: "",
         label: "SDGs Covered",
         sub: "Across all projects",
-        color: "text-emerald-500",
-        iconBg: "bg-emerald-100",
+        color: "text-[#4285F4]",
+        iconBg: "bg-slate-50",
     },
     {
         icon: Handshake,
@@ -47,8 +47,8 @@ const stats: Stat[] = [
         suffix: "+",
         label: "Active Projects",
         sub: "Community-led",
-        color: "text-orange-500",
-        iconBg: "bg-orange-100",
+        color: "text-[#4285F4]",
+        iconBg: "bg-slate-50",
     },
     {
         icon: TrendingUp,
@@ -56,8 +56,8 @@ const stats: Stat[] = [
         suffix: "",
         label: "Avg CII Score",
         sub: "Community Impact Index",
-        color: "text-rose-500",
-        iconBg: "bg-rose-100",
+        color: "text-[#4285F4]",
+        iconBg: "bg-slate-50",
     },
 ];
 
@@ -98,7 +98,7 @@ function AnimatedCounter({ target, suffix, duration = 2000 }: { target: number; 
 
 export default function ImpactSnapshot() {
     return (
-        <section className="py-16 px-6 bg-slate-50/50 relative overflow-hidden">
+        <section className="py-24 px-6 bg-slate-50/50 relative overflow-hidden">
             {/* Radial glow */}
             <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(66,133,244,0.04)_0%,transparent_70%)] pointer-events-none" />
             {/* Dot grid */}
@@ -106,18 +106,26 @@ export default function ImpactSnapshot() {
 
             <div className="max-w-7xl mx-auto relative z-10">
                 {/* Header */}
-                <div className="text-center mb-12">
+                <div className="text-center mb-16">
                     <div className="inline-flex items-center gap-2 px-4 py-2 bg-slate-100 rounded-full text-slate-500 text-[10px] font-black uppercase tracking-widest mb-6">
                         <span className="w-1.5 h-1.5 rounded-full bg-[#34A853] animate-pulse" />
                         Live Impact
                     </div>
-                    <h2 className="text-4xl md:text-5xl font-black text-slate-900 tracking-tight leading-tight mb-4">
-                        Real Numbers.{" "}
-                        <span className="bg-gradient-to-r from-[#4285F4] to-[#34A853] bg-clip-text text-transparent">
-                            Real Impact.
-                        </span>
-                    </h2>
-                    <p className="text-slate-500 text-lg font-medium max-w-xl mx-auto">
+
+                    <div className="relative inline-block mb-4">
+                        <h2 className="text-3xl md:text-4xl lg:text-[42px] font-black text-slate-900 tracking-tight leading-tight">
+                            Real Numbers.{" "}
+                            <span className="bg-gradient-to-r from-[#3A72AA] to-[#34A853] bg-clip-text text-transparent">
+                                Real Impact.
+                            </span>
+                        </h2>
+                        {/* Wavy Underline (Yellow) */}
+                        <svg className="absolute -bottom-3 left-0 w-full h-3 text-[#FBBC05]/40" preserveAspectRatio="none" viewBox="0 0 100 10" fill="none">
+                            <path d="M0 5Q 25 0 50 5 Q 75 10 100 5" stroke="currentColor" strokeWidth="4" />
+                        </svg>
+                    </div>
+
+                    <p className="text-base md:text-lg text-slate-500 font-medium max-w-xl mx-auto mt-6">
                         CIEL is already changing lives across Pakistan — and growing every day.
                     </p>
                 </div>
@@ -137,7 +145,7 @@ export default function ImpactSnapshot() {
                                 </div>
 
                                 {/* Counter */}
-                                <div className={`text-4xl md:text-5xl font-black ${stat.color} tabular-nums mb-2 tracking-tighter`}>
+                                <div className={`text-3xl md:text-4xl font-black ${stat.color} tabular-nums mb-2 tracking-tighter`}>
                                     <AnimatedCounter target={stat.value} suffix={stat.suffix} />
                                 </div>
 
