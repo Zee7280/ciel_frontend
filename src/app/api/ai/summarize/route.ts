@@ -21,6 +21,97 @@ export async function POST(req: Request) {
         switch (section) {
 
             // =====================================================
+            // SECTION 1 EVALUATION
+            // =====================================================
+            case "section1_evaluation":
+                prompt = `Evaluate Section 1 — PARTICIPATION, IDENTITY & ATTENDANCE INTEGRITY and calculate the Composite Impact Index (CII) score.
+
+INPUTS:
+Data: ${JSON.stringify(data)}
+
+SECTION 1 — PARTICIPATION, IDENTITY & ATTENDANCE INTEGRITY
+Weight = 20
+S1=S1_base+B
+
+Where:
+S1_base = base participation score out of 15 
+B = bonus for extra hours out of 5 
+
+Base Formula
+S1_base=15×(0.10*I + 0.10*A + 0.35*H + 0.20*F + 0.15*C + 0.10*L)
+
+Where:
+I = identity completeness score 
+A = academic/team setup completeness score 
+H = individual hours compliance score 
+F = visit frequency score 
+C = continuity/spread score 
+L = attendance log quality score 
+All scores are between 0 and 1.
+
+How values are calculated:
+1) Identity Completeness Score (I)
+Check whether the student’s identity and verification fields are complete enough for auditability.
+Scoring rule:
+1.00 = all required identity fields complete and verified 
+0.75 = fields complete but one verification missing 
+0.50 = partial identity information 
+0.25 = major identity gaps 
+0.00 = unusable / unverifiable identity 
+
+2) Academic / Team Setup Completeness Score (A)
+Check whether the student is properly linked to the academic and team structure of the project.
+Scoring rule:
+1.00 = all core academic and team fields complete 
+0.75 = minor missing information 
+0.50 = several missing fields 
+0.25 = weak/incomplete linkage 
+0.00 = no meaningful academic/team setup 
+
+3) Individual Hours Compliance Score (H)
+H = min((IH_i) / RHS, 1)
+Where IH_i = individual student hours completed, RHS = required hours per student.
+
+4) Visit Frequency Score (F)
+Let: V_i = actual number of visits, V_exp = max(2, ceiling(RHS/8))
+Then: F = min(V_i / V_exp, 1)
+
+5) Continuity / Spread Score (C)
+Let: D_span = days between first and last attendance + 1, D_exp = max(2, ceiling(V_exp * 1.5))
+Then: C = min(D_span / D_exp, 1)
+
+6) Attendance Log Quality Score (L)
+L = 0.20*Q_d + 0.20*Q_t + 0.20*Q_p + 0.20*Q_a + 0.20*Q_r
+Each sub-component is scored from 0 to 1.
+Q_d = 1 if date is properly recorded 
+Q_t = 1 if duration/start-end time is properly recorded 
+Q_p = 1 if partner/location is clearly identified 
+Q_a = 1 if the work description is specific and meaningful 
+Q_r = 1 if logs appear realistic, not repetitive/copied/fake-looking 
+
+7) Bonus for extra hours (B)
+Only if student is already eligible (IH_i > RHS):
+B = min(5, 5 × (IH_i - RHS) / RHS)
+If IH_i <= RHS, then B = 0
+
+------------------------------------------------
+
+OUTPUT FORMAT
+Return:
+Identity Completeness (I) = ___
+Academic / Team Setup (A) = ___
+Individual Hours Compliance (H) = ___
+Visit Frequency (F) = ___
+Continuity / Spread (C) = ___
+Attendance Log Quality (L) = ___
+Bonus (B) = ___
+
+Section 1 CII Score = ___ / 20
+Quality Level: Poor / Basic / Good / Strong / Exceptional
+Provide a short explanation (80-120 words) explaining why the score was assigned.`;
+                break;
+
+            // =====================================================
             // SECTION 2 AUTO SUMMARY
             // =====================================================
             case "section2":
@@ -52,6 +143,68 @@ export async function POST(req: Request) {
                 break;
 
             // =====================================================
+            // SECTION 2 EVALUATION
+            // =====================================================
+            case "section2_evaluation":
+                prompt = `Evaluate Section 2 — PROJECT CONTEXT & BASELINE UNDERSTANDING and calculate the Composite Impact Index (CII) score.
+
+INPUTS:
+Data: ${JSON.stringify(data)}
+
+SECTION 2 — PROJECT CONTEXT & BASELINE UNDERSTANDING
+Weight = 10
+S2=10×(0.35*P + 0.25*B + 0.20*E + 0.20*D)
+
+Where:
+P = problem clarity 
+B = baseline specificity 
+E = evidence/source credibility 
+D = discipline linkage 
+
+1) Problem Clarity Score (P):
+P = 0.25*P1 + 0.20*P2 + 0.15*P3 + 0.20*P4 + 0.20*P5
+P1 = 1 if the core issue is clearly defined 
+P2 = 1 if the affected population is clearly named 
+P3 = 1 if the setting/community is clearly identified 
+P4 = 1 if the student explains why the issue matters 
+P5 = 1 if the problem is focused and concrete rather than vague 
+
+2) Baseline Specificity Score (B):
+B = 0.25*B1 + 0.25*B2 + 0.20*B3 + 0.15*B4 + 0.15*B5
+B1 = 1 if pre-project condition is clearly described 
+B2 = 1 if description is specific 
+B3 = 1 if baseline is logically tied to the stated problem 
+B4 = 1 if some indicator/observation/metric is given 
+B5 = 1 if baseline looks credible and relevant 
+
+3) Evidence / Source Credibility Score (E):
+E = 0.20*E1 + 0.25*E2 + 0.25*E3 + 0.15*E4 + 0.15*E5
+E1 = 1 if a source is actually cited or referenced 
+E2 = 1 if source directly supports the problem/baseline 
+E3 = 1 if source is credible 
+E4 = 1 if source is concrete rather than generic 
+E5 = 1 if source is appropriate for the context 
+
+4) Discipline Linkage Score (D):
+D = 0.20*D1 + 0.25*D2 + 0.20*D3 + 0.20*D4 + 0.15*D5
+D1 = 1 if department/discipline is explicitly identified 
+D2 = 1 if project linkage is clearly explained 
+D3 = 1 if student shows actual use of discipline-based knowledge 
+D4 = 1 if the linkage is relevant and not forced 
+D5 = 1 if the student explains what role the discipline played in action 
+
+OUTPUT FORMAT
+Return:
+Problem Clarity (P) = ___
+Baseline Specificity (B) = ___
+Evidence Credibility (E) = ___
+Discipline Linkage (D) = ___
+
+Section 2 CII Score = ___ / 10
+Provide a brief explanation of the score.`;
+                break;
+
+            // =====================================================
             // SECTION 3 AUTO SUMMARY
             // =====================================================
             case "section3":
@@ -62,6 +215,62 @@ export async function POST(req: Request) {
                 
                 Primary SDG: ${data.primary_sdg?.goal_title}
                 Intent Statement: ${data.contribution_intent_statement}`;
+                break;
+
+            // =====================================================
+            // SECTION 3 EVALUATION
+            // =====================================================
+            case "section3_evaluation":
+                prompt = `Evaluate Section 3 — SDG CONTRIBUTION MAPPING and calculate the Composite Impact Index (CII) score.
+
+INPUTS:
+Data: ${JSON.stringify(data)}
+
+SECTION 3 — SDG CONTRIBUTION MAPPING
+Weight = 10
+Final Section 3 Formula
+S3=S3_base+S3_bonus
+
+Base score
+S3_base=9×(0.40*M + 0.25*T + 0.20*I + 0.15*J)
+
+Bonus for optional secondary SDGs
+S3_bonus=min(1, B_1 + B_2)
+
+For each optional secondary SDG:
+B_k=0.5×(0.50*R_k + 0.50*J_k)
+
+M = SDG match accuracy
+M = 0.25*M1 + 0.20*M2 + 0.20*M3 + 0.20*M4 + 0.15*M5
+(M1: problem-to-SDG fit, M2: activity-to-SDG fit, M3: outcome-to-SDG fit, M4: primacy of SDG, M5: absence of contradiction)
+
+T = target alignment quality
+T = 0.20*T1 + 0.25*T2 + 0.20*T3 + 0.20*T4 + 0.15*T5
+(T1: belongs to SDG, T2: matches purpose, T3: matches activities, T4: matches outcomes, T5: specificity)
+
+I = indicator relevance
+I = 0.20*I1 + 0.25*I2 + 0.25*I3 + 0.15*I4 + 0.15*I5
+
+J = justification strength
+J = 0.20*J1 + 0.20*J2 + 0.20*J3 + 0.20*J4 + 0.20*J5
+
+R_k = relevance of secondary SDG
+R_k = 0.30*R1_k + 0.25*R2_k + 0.25*R3_k + 0.20*R4_k
+
+J_k = justification quality of secondary SDG
+J_k = 0.30*K1_k + 0.25*K2_k + 0.25*K3_k + 0.20*K4_k
+
+Calculate everything with values from 0 to 1 for subparts.
+OUTPUT FORMAT
+Return:
+SDG Match (M) = ___
+Target Alignment (T) = ___
+Indicator Relevance (I) = ___
+Justification (J) = ___
+Secondary Bonus (S3_bonus) = ___
+
+Section 3 CII Score = ___ / 10
+Provide a brief explanation of the score.`;
                 break;
 
             // =====================================================
@@ -90,6 +299,49 @@ export async function POST(req: Request) {
                 - Total Beneficiaries: ${data.project_summary?.distinct_total_beneficiaries}
                 - Beneficiary Categories: ${JSON.stringify(data.beneficiary_categories)}
                 - Team Contributions: ${JSON.stringify(data.team_contributions)}`;
+                break;
+
+            // =====================================================
+            // SECTION 4 EVALUATION
+            // =====================================================
+            case "section4_evaluation":
+                prompt = `Evaluate Section 4 — ACTIVITIES, OUTPUTS & SCALE and calculate the Composite Impact Index (CII) score.
+
+INPUTS:
+Data: ${JSON.stringify(data)}
+
+SECTION 4 — ACTIVITIES, OUTPUTS & SCALE
+Weight = 15
+Core Formula
+S4=15×(0.25*A + 0.25*O + 0.20*B + 0.15*M + 0.15*S)
+
+Where:
+A = Activity Block Quality 
+O = Output Quality & Measurability 
+B = Beneficiary Reach & Counting Clarity 
+M = Delivery & Implementation Model Clarity 
+S = Scale Credibility & Implementation Magnitude 
+
+Each variable is scored from 0 to 1 using numeric benchmarks:
+1.00 = Excellent, 0.80 = Good, 0.60 = Moderate, 0.40 = Weak, 0.20 = Very Weak, 0.00 = Absent
+
+A = 0.20*A1 + 0.20*A2 + 0.25*A3 + 0.15*A4 + 0.20*A5
+O = 0.20*O1 + 0.25*O2 + 0.20*O3 + 0.20*O4 + 0.15*O5
+B = 0.20*B1 + 0.20*B2 + 0.20*B3 + 0.20*B4 + 0.20*B5
+M = 0.20*M1 + 0.20*M2 + 0.20*M3 + 0.20*M4 + 0.20*M5
+S = 0.20*S1 + 0.20*S2 + 0.20*S3 + 0.15*S4 + 0.25*S5
+
+OUTPUT FORMAT
+Return:
+Activity Quality (A) = ___
+Output Quality (O) = ___
+Beneficiary Clarity (B) = ___
+Delivery Clarity (M) = ___
+Scale Credibility (S) = ___
+
+Section 4 CII Score = ___ / 15
+Classify quality: 13-15=Excellent, 10.5-12.9=Good, 8-10.4=Moderate, 5-7.9=Weak, 0-4.9=Very Weak
+Provide a brief explanation of the score.`;
                 break;
 
             // =====================================================
@@ -129,71 +381,60 @@ Write one concise paragraph (35–50 words).
             // SECTION 5 EVALUATION
             // =====================================================
             case "section5_evaluation":
-                prompt = `Evaluate Section 5 — Outcomes & Results of a community engagement report and calculate the Composite Impact Index (CII) score.
+                prompt = `Evaluate Section 5 — OUTCOMES & RESULTS and calculate the Composite Impact Index (CII) score.
 
-INPUTS
-Project Snapshot:
-- Primary SDG: ${data.primary_sdg}
-- SDG Target: ${data.sdg_target}
-- Participation Mode: ${data.participation_mode}
-- Total Beneficiaries Reached: ${data.project_summary?.distinct_total_beneficiaries}
-- Output Types Recorded: ${JSON.stringify(data.outputs)}
-- Total Verified Student Hours: ${data.total_verified_hours}
+INPUTS:
+Data: ${JSON.stringify(data)}
 
-Observed Change Narrative:
-${data.observed_change}
+SECTION 5 — OUTCOMES & RESULTS
+Weight = 20
+Core Formula
+S5=20×(0.25*N + 0.30*M + 0.20*C + 0.15*L + 0.10*R)
 
-Measurable Outcomes:
-${JSON.stringify(data.measurable_outcomes)}
+Where:
+N = quality of change narrative 
+M = measurable outcome strength 
+C = confidence / credibility of measurement 
+L = linkage with outputs and baseline 
+R = realism of claims 
 
-Challenges & Limitations Narrative:
-${data.challenges}
+SCORING SCALE FOR ALL SUB-INDICATORS:
+1.00 = Excellent / fully demonstrated 
+0.75 = Good / mostly demonstrated 
+0.50 = Moderate / partially demonstrated 
+0.25 = Weak / minimally demonstrated 
+0.00 = Very weak / absent / unsupported 
 
-------------------------------------------------
+1) N = QUALITY OF CHANGE NARRATIVE
+N = 0.25*N1 + 0.20*N2 + 0.20*N3 + 0.15*N4 + 0.20*N5
+(N1: change stated, N2: affected group identified, N3: type of change described, N4: before/after logic present, N5: narrative specificity/coherence)
 
-STEP 1 — OUTCOME NARRATIVE QUALITY (0–5)
-0 = no meaningful outcome narrative
-1 = vague or generic statement
-2 = basic explanation with weak activity linkage
-3 = clear explanation linked to project activities
-4 = strong explanation showing logical change pathway
-5 = highly coherent, realistic, and specific outcome description
+2) M = MEASURABLE OUTCOME STRENGTH
+M = 0.20*M1 + 0.20*M2 + 0.20*M3 + 0.20*M4 + 0.20*M5
+(M1: outcome is measurable, M2: relevant metric/unit, M3: value/magnitude provided, M4: reflects change not activity, M5: strength/significance)
 
-STEP 2 — MEASUREMENT INTEGRITY (0–8)
-0 = no measurable outcome
-2 = numbers present but unclear or inconsistent
-4 = basic baseline vs endline comparison
-6 = clearly defined measurable indicator
-8 = strong measurement with full logical consistency
+3) C = CONFIDENCE / CREDIBILITY OF MEASUREMENT
+C = 0.20*C1 + 0.20*C2 + 0.20*C3 + 0.20*C4 + 0.20*C5
+(C1: source identified, C2: method explained, C3: evidence exists, C4: consistency with implementation, C5: credibility of inference)
 
-STEP 3 — MAGNITUDE OF CHANGE (0–5)
-Formula: Improvement Ratio = (Endline − Baseline) / Baseline
-0 = no change or unclear improvement
-1 = small improvement (<20%)
-3 = moderate improvement (20–40%)
-4 = strong improvement (40–70%)
-5 = significant improvement (>70%)
+4) L = LINKAGE WITH OUTPUTS AND BASELINE
+L = 0.20*L1 + 0.20*L2 + 0.20*L3 + 0.20*L4 + 0.20*L5
+(L1: baseline-to-outcome, L2: activity-to-outcome, L3: output-to-outcome, L4: internal consistency, L5: attributable to intervention)
 
-STEP 4 — EVIDENCE CONFIDENCE (0–3)
-Estimated → 1, Observed → 2, Partner Confirmed → 2.5, Directly Measured → 3
-
-STEP 5 — REFLECTION & LIMITATIONS (0–4)
-0 = no reflection, 1 = generic, 2 = basic, 3 = clear, 4 = strong analytical reflection
-
-------------------------------------------------
+5) R = REALISM OF CLAIMS
+R = 0.25*R1 + 0.25*R2 + 0.20*R3 + 0.15*R4 + 0.15*R5
+(R1: proportionality, R2: plausibility of magnitude, R3: evidence sufficiency, R4: absence of exaggeration, R5: acknowledgment of limits)
 
 OUTPUT FORMAT
 Return:
-Outcome Narrative Evaluation
-Measurement Integrity Assessment
-Magnitude of Change Assessment
-Evidence Confidence Assessment
-Reflection Assessment
+Narrative Quality (N) = ___
+Measurable Score (M) = ___
+Confidence (C) = ___
+Linkage (L) = ___
+Realism (R) = ___
 
-Section 5 CII Score = ___ / 25
-Quality Level: Poor / Basic / Good / Strong / Exceptional
-Final short explanation (80–120 words) explaining why the score was assigned.
-`;
+Section 5 CII Score = ___ / 20
+Provide a brief explanation of the score.`;
                 break;
 
             // =====================================================
@@ -231,38 +472,54 @@ Write one concise paragraph (35–50 words).
             // SECTION 6 EVALUATION
             // =====================================================
             case "section6_evaluation":
-                prompt = `
-Evaluate Section 6 — Resources & Implementation Support of a community engagement report and calculate the Composite Impact Index (CII) score.
+                prompt = `Evaluate Section 6 — RESOURCES & IMPLEMENTATION SUPPORT and calculate the Composite Impact Index (CII) score.
 
-INPUTS
-Project Snapshot:
-Primary SDG: ${data.primary_sdg}
-Total Beneficiaries: ${data.project_summary?.distinct_total_beneficiaries}
-Verified Hours: ${data.total_verified_hours}
-Resources Recorded: ${JSON.stringify(data.resources)}
-Evidence: ${data.evidence}
+INPUTS:
+Data: ${JSON.stringify(data)}
 
-------------------------------------------------
-STEP 1 — RESOURCE DIVERSITY (0–2)
-Volunteer effort only → 0, 1 category → 1, 2+ categories → 2  
+SECTION 6 — RESOURCES & IMPLEMENTATION SUPPORT
+Weight = 5
+Core Formula
+S6=5×(0.30*R + 0.25*S + 0.25*P + 0.20*V)
 
-STEP 2 — EXTERNAL SUPPORT STRENGTH (0–2)
-Student only → 0, One external source → 1, Two+ external sources → 2  
+Where:
+R = resource relevance 
+S = source clarity 
+P = purpose justification 
+V = verification of support 
 
-STEP 3 — VERIFICATION CREDIBILITY (0–1)
-Self reported → 0, Evidence or official confirmation → 1  
+SCORING SCALE FOR ALL SUB-INDICATORS:
+1.00 = Excellent / fully demonstrated 
+0.75 = Good / mostly demonstrated 
+0.50 = Moderate / partially demonstrated 
+0.25 = Weak / minimally demonstrated 
+0.00 = Very weak / absent / unsupported 
 
-STEP 4 — FINAL SCORE
-Section 6 CII = Diversity + Support + Verification (Max 5)
+1) R = RESOURCE RELEVANCE
+R = 0.25*R1 + 0.25*R2 + 0.20*R3 + 0.15*R4 + 0.15*R5
+(R1: relevance to activities, R2: relevance to implementation needs, R3: relevance to outputs, R4: proportionality, R5: absence of decorative entries)
 
-------------------------------------------------
+2) S = SOURCE CLARITY
+S = 0.25*S1 + 0.20*S2 + 0.20*S3 + 0.15*S4 + 0.20*S5
+(S1: source identified, S2: source specificity, S3: source traceability, S4: distinction between sources, S5: overall clarity)
+
+3) P = PURPOSE JUSTIFICATION
+P = 0.20*P1 + 0.20*P2 + 0.20*P3 + 0.20*P4 + 0.20*P5
+(P1: purpose stated, P2: linked to activity, P3: linked to implementation, P4: explanation of use, P5: specificity/coherence)
+
+4) V = VERIFICATION OF SUPPORT
+V = 0.20*V1 + 0.20*V2 + 0.20*V3 + 0.20*V4 + 0.20*V5
+(V1: presence of supporting basis, V2: relevance of proof, V3: external confirmation, V4: consistency with records, V5: overall credibility)
+
 OUTPUT FORMAT
-Resource Profile
-Verification Profile
-Section 6 CII Score = _ / 5
-Quality Level: Minimal / Moderate / Strong / Exceptional
-Provide explanation (50–80 words).
-`;
+Return:
+Resource Relevance (R) = ___
+Source Clarity (S) = ___
+Purpose Justification (P) = ___
+Verification (V) = ___
+
+Section 6 CII Score = ___ / 5
+Provide a brief explanation of the score.`;
                 break;
 
             // =====================================================
@@ -295,44 +552,54 @@ Write one concise paragraph (35–50 words).
             // SECTION 7 EVALUATION
             // =====================================================
             case "section7_evaluation":
-                prompt = `
-Evaluate Section 7 — Partnerships & Collaboration and calculate the Composite Impact Index (CII) score.
+                prompt = `Evaluate Section 7 — PARTNERSHIPS & COLLABORATION and calculate the Composite Impact Index (CII) score.
 
-INPUTS
-Partners: ${JSON.stringify(data.partners)}
-Documentation: ${data.documentation}
+INPUTS:
+Data: ${JSON.stringify(data)}
 
-------------------------------------------------
-STEP 1 — PARTNERSHIP PRESENCE (0–1)
-Independent → 0, Partners involved → 1  
+SECTION 7 — PARTNERSHIPS & COLLABORATION
+Weight = 5
+Core Formula
+S7=5×(0.25*Re + 0.25*Ro + 0.25*Co + 0.25*Ve)
 
-STEP 2 — PARTNER DIVERSITY (0–3)
-1 → 1, 2 → 2, 3 → 2.5, 4+ → 3  
+Where:
+Re = partner relevance 
+Ro = role clarity 
+Co = contribution depth 
+Ve = verification strength 
 
-STEP 3 — SECTOR DIVERSITY (0–2)
-One → 1, Two → 1.5, Three+ → 2  
+SCORING SCALE FOR ALL SUB-INDICATORS:
+1.00 = Excellent / fully demonstrated 
+0.75 = Good / mostly demonstrated 
+0.50 = Moderate / partially demonstrated 
+0.25 = Weak / minimally demonstrated 
+0.00 = Very weak / absent / unsupported 
 
-STEP 4 — ROLE DEPTH (0–2)
-Limited operational → 1, Active collaboration → 1.5, Strategic multi-role → 2  
+1) Re = PARTNER RELEVANCE
+Re = 0.25*Re1 + 0.20*Re2 + 0.20*Re3 + 0.20*Re4 + 0.15*Re5
+(Re1: relevance to problem, Re2: relevance to activities, Re3: relevance to beneficiaries, Re4: relevance to outcomes, Re5: non-decorative fit)
 
-STEP 5 — VERIFICATION (0–1)
-Self reported → 0, Verified → 1  
+2) Ro = ROLE CLARITY
+Ro = 0.20*Ro1 + 0.20*Ro2 + 0.20*Ro3 + 0.20*Ro4 + 0.20*Ro5
+(Ro1: role explicitly stated, Ro2: role is specific, Ro3: role linked to function, Ro4: role distinction from others, Ro5: overall clarity)
 
-STEP 6 — FORMALIZATION (0–1)
-None → 0, Letter/email → 0.5, MOU/Gov approval → 1  
+3) Co = CONTRIBUTION DEPTH
+Co = 0.20*Co1 + 0.20*Co2 + 0.20*Co3 + 0.20*Co4 + 0.20*Co5
+(Co1: type significance, Co2: usefulness to project, Co3: depth/intensity, Co4: effect on delivery, Co5: continuity/value)
 
-STEP 7 — FINAL SCORE
-Section 7 CII = Presence + Diversity + Sector + Role + Verification + Formalization (Max 10)
+4) Ve = VERIFICATION STRENGTH
+Ve = 0.20*Ve1 + 0.20*Ve2 + 0.20*Ve3 + 0.20*Ve4 + 0.20*Ve5
+(Ve1: evidence exists, Ve2: evidence is relevant, Ve3: external confirmation strength, Ve4: consistency with records, Ve5: overall credibility)
 
-------------------------------------------------
 OUTPUT FORMAT
-Partnership Overview
-Collaboration Profile
-Verification & Documentation
-Section 7 CII Score = _ / 10
-Quality Level: None / Basic / Moderate / Strong / Strategic
-Provide explanation (60–80 words).
-`;
+Return:
+Partner Relevance (Re) = ___
+Role Clarity (Ro) = ___
+Contribution Depth (Co) = ___
+Verification Strength (Ve) = ___
+
+Section 7 CII Score = ___ / 5
+Provide a brief explanation of the score.`;
                 break;
 
             // =====================================================
@@ -366,39 +633,60 @@ Write one concise paragraph (35–50 words).
             // SECTION 8 EVALUATION
             // =====================================================
             case "section8_evaluation":
-                prompt = `
-Evaluate Section 8 — Evidence, Verification & Ethical Compliance.
+                prompt = `Evaluate Section 8 — EVIDENCE RELIABILITY, ETHICS & VERIFICATION and calculate the Composite Impact Index (CII) score.
 
-Evidence Files: ${data.evidence_count}
-Evidence Types: ${JSON.stringify(data.evidence_types)}
-Description: ${data.description}
+INPUTS:
+Data: ${JSON.stringify(data)}
 
-------------------------------------------------
-STEP 1 — EVIDENCE PRESENCE (0–2)
-0 files → 0, 1 file → 1, 2+ files → 2  
+SECTION 8 — EVIDENCE RELIABILITY, ETHICS & VERIFICATION
+Weight = 5
+Core Formula
+S8=5×(0.30*C + 0.25*V + 0.20*R + 0.15*E + 0.10*X)
 
-STEP 2 — EVIDENCE QUANTITY (0–2)
-1 file → 1, 2–3 files → 1.5, 4+ files → 2  
+Where:
+C = cross-section consistency 
+V = external verification strength 
+R = relevance of uploaded proof 
+E = ethics compliance 
+X = absence of contradiction / suspicion 
 
-STEP 3 — EVIDENCE DIVERSITY (0–2)
-1 category → 1, 2 categories → 1.5, 3+ categories → 2  
+SCORING SCALE FOR ALL SUB-INDICATORS:
+1.00 = Excellent / fully reliable 
+0.75 = Good / mostly reliable 
+0.50 = Moderate / partially reliable 
+0.25 = Weak / doubtful 
+0.00 = Very weak / absent / strongly suspicious 
 
-STEP 4 — DESCRIPTION QUALITY (0–2)
-Vague → 0.5, Basic → 1, Clear → 1.5, Precise → 2  
+1) C = CROSS-SECTION CONSISTENCY
+C = 0.25*C1 + 0.25*C2 + 0.20*C3 + 0.15*C4 + 0.15*C5
+(C1: consistency with attendance, C2: consistency with activities, C3: consistency with outputs, C4: consistency with partners, C5: consistency with timeline)
 
-STEP 5 — EXTERNAL VERIFICATION (0–2)
-None → 0, Declared → 1, File uploaded → 2  
+2) V = EXTERNAL VERIFICATION STRENGTH
+V = 0.20*V1 + 0.20*V2 + 0.20*V3 + 0.20*V4 + 0.20*V5
+(V1: existence of external verification, V2: relevance, V3: specificity, V4: credibility of source, V5: strength of linkage to claims)
 
-FINAL SCORE
-Section 8 CII = Presence + Quantity + Diversity + Description + Verification (Max 10)
+3) R = RELEVANCE OF UPLOADED PROOF
+R = 0.25*R1 + 0.20*R2 + 0.20*R3 + 0.20*R4 + 0.15*R5
+(R1: relevance to activity, R2: relevance to output, R3: relevance to context, R4: interpretability of proof, R5: file-type appropriateness)
+
+4) E = ETHICS COMPLIANCE
+E = 0.25*E1 + 0.20*E2 + 0.20*E3 + 0.20*E4 + 0.15*E5
+(E1: no harmful sensitive exposure, E2: dignity maintained, E3: contextually appropriate use, E4: consent/permission logic, E5: no exploitative style)
+
+5) X = ABSENCE OF CONTRADICTION / SUSPICION
+X = 0.20*X1 + 0.20*X2 + 0.20*X3 + 0.20*X4 + 0.20*X5
+(X1: absence of duplication, X2: timeline alignment, X3: numerical consistency, X4: no inflation signals, X5: overall suspicion-free profile)
 
 OUTPUT FORMAT
-Evidence Overview
-Verification Profile
-Section 8 CII Score = _ / 10
-Quality Level: Minimal / Basic / Structured / Strong / Externally Verified
-Provide explanation (50–80 words).
-`;
+Return:
+Cross-Section Consistency (C) = ___
+External Verification (V) = ___
+Relevance of Proof (R) = ___
+Ethics Compliance (E) = ___
+Absence of Contradiction (X) = ___
+
+Section 8 CII Score = ___ / 5
+Provide a brief explanation of the score.`;
                 break;
 
             // =====================================================
@@ -430,39 +718,54 @@ Write one concise paragraph (35–50 words).
             // SECTION 9 EVALUATION
             // =====================================================
             case "section9_evaluation":
-                prompt = `Evaluate Section 9 — Reflection, Learning & Academic Integration and calculate the Composite Impact Index (CII) score.
+                prompt = `Evaluate Section 9 — REFLECTION, LEARNING & COMPETENCY DEVELOPMENT and calculate the Composite Impact Index (CII) score.
 
-INPUTS
-Step 1 — Academic Integration Level: ${data.integration_level}
-Step 2 — Personal Learning Reflection: ${data.reflection}
-Step 3 — Academic Application: ${data.academic_application}
-Step 4 — Sustainability Reflection: ${data.sustainability_reflection}
-Step 5 — Competency Ratings: ${JSON.stringify(data.competencies)}
+INPUTS:
+Data: ${JSON.stringify(data)}
 
-------------------------------------------------
-STEP 1 — ACADEMIC INTEGRATION SCORE (0–1)
-Voluntary → 0.25, Course-linked → 0.5, Credit-bearing → 0.75, Capstone/Thesis → 1, Research-integrated → 1
+SECTION 9 — REFLECTION, LEARNING & COMPETENCY DEVELOPMENT
+Weight = 5
+Core Formula
+S9=5×(0.30*L + 0.25*A + 0.25*C + 0.20*T)
 
-STEP 2 — REFLECTION DEPTH (0–1.5)
-Basic activities → 0.5, Basic reflection → 1, Clear insights → 1.25, Deep reflection → 1.5
+Where:
+L = learning depth 
+A = academic application 
+C = competency insight 
+T = transformative understanding 
 
-STEP 3 — ACADEMIC APPLICATION (0–1)
-Generic → 0, Basic → 0.5, Clear application of methods/frameworks → 1
+SCORING SCALE FOR ALL SUB-INDICATORS:
+1.00 = Excellent / fully demonstrated 
+0.75 = Good / mostly demonstrated 
+0.50 = Moderate / partially demonstrated 
+0.25 = Weak / minimally demonstrated 
+0.00 = Very weak / absent / unsupported 
 
-STEP 4 — SUSTAINABILITY & SYSTEMS THINKING (0–0.5)
-No → 0, Basic → 0.25, Clear analysis → 0.5
+1) L = LEARNING DEPTH
+L = 0.20*L1 + 0.20*L2 + 0.20*L3 + 0.20*L4 + 0.20*L5
+(L1: lesson identified clearly, L2: lesson specific to project, L3: reflection beyond description, L4: connected to real experience, L5: depth and maturity)
 
-STEP 5 — COMPETENCY DEVELOPMENT (0–1)
-Avg 1-2 → 0.25, 2.1-3 → 0.5, 3.1-4 → 0.75, 4.1-5 → 1
+2) A = ACADEMIC APPLICATION
+A = 0.20*A1 + 0.20*A2 + 0.20*A3 + 0.20*A4 + 0.20*A5
+(A1: academic field identified, A2: concept/tool referenced, A3: applied meaningfully, A4: relevant to project, A5: explanation clear and specific)
 
-------------------------------------------------
+3) C = COMPETENCY INSIGHT
+C = 0.20*C1 + 0.20*C2 + 0.20*C3 + 0.20*C4 + 0.20*C5
+(C1: competency identified, C2: relevant to project, C3: development explained, C4: supported by examples, C5: self-awareness shown)
+
+4) T = TRANSFORMATIVE UNDERSTANDING
+T = 0.20*T1 + 0.20*T2 + 0.20*T3 + 0.20*T4 + 0.20*T5
+(T1: perspective shift identified, T2: social/ethical understanding deepened, T3: personal/professional growth insight, T4: connected to community realities, T5: durable meaning)
+
 OUTPUT FORMAT
-Learning Overview
-Reflection Assessment
-Section 9 CII Score = _ / 5
-Learning Level: Minimal / Basic / Good / Strong / Excellent
-Provide brief explanation (60–80 words).
-`;
+Return:
+Learning Depth (L) = ___
+Academic Application (A) = ___
+Competency Insight (C) = ___
+Transformative Understanding (T) = ___
+
+Section 9 CII Score = ___ / 5
+Provide a brief explanation of the score.`;
                 break;
 
             // =====================================================
@@ -495,38 +798,54 @@ Write one concise paragraph (35–50 words).
             // SECTION 10 EVALUATION
             // =====================================================
             case "section10_evaluation":
-                prompt = `Evaluate Section 10 — Sustainability & Continuation and calculate the Composite Impact Index (CII) score.
+                prompt = `Evaluate Section 10 — SUSTAINABILITY, CONTINUATION & SCALING and calculate the Composite Impact Index (CII) score.
 
-INPUTS
-Step 1 — Continuation Status: ${data.status}
-Step 2 — Continuation Explanation: ${data.explanation}
-Step 3 — Sustainability Mechanisms: ${JSON.stringify(data.mechanisms)}
-Step 4 — Scaling Potential: ${data.scaling}
-Step 5 — Policy / Institutional Influence: ${data.policy}
+INPUTS:
+Data: ${JSON.stringify(data)}
 
-------------------------------------------------
-STEP 1 — CONTINUATION STATUS (0–2)
-No → 0.5, Partial → 1.25, Yes → 2
+SECTION 10 — SUSTAINABILITY, CONTINUATION & SCALING
+Weight = 5
+Core Formula
+S10=5×(0.30*C + 0.25*M + 0.25*S + 0.20*P)
 
-STEP 2 — CONTINUATION EXPLANATION QUALITY (0–1)
-Vague → 0.25, Basic → 0.5, Clear → 0.75, Strong logic → 1
+Where:
+C = continuation realism 
+M = sustainability mechanism strength 
+S = scaling potential 
+P = policy/system relevance 
 
-STEP 3 — SUSTAINABILITY MECHANISMS (0–1)
-0 → 0, 1 → 0.4, 2 → 0.7, 3+ → 1
+SCORING SCALE FOR ALL SUB-INDICATORS:
+1.00 = Excellent / fully demonstrated 
+0.75 = Good / mostly demonstrated 
+0.50 = Moderate / partially demonstrated 
+0.25 = Weak / minimally demonstrated 
+0.00 = Very weak / absent / unsupported 
 
-STEP 4 — SCALING & SYSTEM INFLUENCE (0–1)
-Scaling Base: Not → 0.1, Institution → 0.4, Community → 0.7, Policy → 0.8
-Influence Bonus: None → 0, Inst → +0.1, Comm → +0.15, Policy → +0.2
-Max Score = 1
+1) C = CONTINUATION REALISM
+C = 0.20*C1 + 0.20*C2 + 0.20*C3 + 0.20*C4 + 0.20*C5
+(C1: continuation plan stated, C2: what will continue is identified, C3: limits/stops acknowledged, C4: support requirements identified, C5: claim is realistic)
 
-------------------------------------------------
+2) M = SUSTAINABILITY MECHANISM STRENGTH
+M = 0.20*M1 + 0.20*M2 + 0.20*M3 + 0.20*M4 + 0.20*M5
+(M1: mechanism exists, M2: mechanism relevance, M3: mechanism clarity, M4: mechanism feasibility, M5: mechanism strength/dependability)
+
+3) S = SCALING POTENTIAL
+S = 0.20*S1 + 0.20*S2 + 0.20*S3 + 0.20*S4 + 0.20*S5
+(S1: scaling possibility identified, S2: replicability of project model, S3: transferability, S4: enabling conditions exist, S5: scaling claim is realistic)
+
+4) P = POLICY / SYSTEM RELEVANCE
+P = 0.20*P1 + 0.20*P2 + 0.20*P3 + 0.20*P4 + 0.20*P5
+(P1: system/policy relevance identified, P2: connection to issue, P3: practical value beyond immediate project, P4: broader usefulness, P5: realism of claim)
+
 OUTPUT FORMAT
-Sustainability Overview
-Scaling & Influence
-Section 10 CII Score = _ / 5
-Sustainability Level: Weak / Basic / Moderate / Strong / Excellent
-Provide short explanation (50–80 words).
-`;
+Return:
+Continuation Realism (C) = ___
+Sustainability Mechanism Strength (M) = ___
+Scaling Potential (S) = ___
+Policy/System Relevance (P) = ___
+
+Section 10 CII Score = ___ / 5
+Provide a brief explanation of the score.`;
                 break;
 
             // =====================================================

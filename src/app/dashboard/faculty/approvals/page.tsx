@@ -18,21 +18,16 @@ export default function FacultyApprovalsPage() {
 
     const fetchPendingProjects = async () => {
         try {
-            const res = await authenticatedFetch(`/api/v1/faculty/reports?status=pending`);
-            if (res && res.ok) {
-                const data = await res.json();
-                if (data.success) {
-                    setPendingProjects(data.data || []);
+            // Student-created opportunities awaiting faculty (IDs here are opportunity UUIDs for approve/reject).
+            const approvalsRes = await authenticatedFetch(`/api/v1/faculty/approvals?status=pending`);
+            if (approvalsRes && approvalsRes.ok) {
+                const approvalsData = await approvalsRes.json();
+                if (approvalsData.success) {
+                    setPendingProjects(approvalsData.data || []);
                 }
             } else {
-                // Fallback to old endpoint if new one isn't ready
-                const oldRes = await authenticatedFetch(`/api/v1/faculty/approvals?status=pending`);
-                if (oldRes && oldRes.ok) {
-                    const oldData = await oldRes.json();
-                    setPendingProjects(oldData.data || []);
-                }
+                toast.error("Could not load faculty approvals");
             }
-
         } catch (error) {
             console.error("Failed to fetch approvals", error);
             toast.error("Failed to load pending projects");
@@ -41,7 +36,7 @@ export default function FacultyApprovalsPage() {
         }
     };
 
-    const handleApprove = async (id: number) => {
+    const handleApprove = async (id: string) => {
         try {
             const res = await authenticatedFetch(`/api/v1/faculty/approvals/${id}/approve`, {
                 method: 'POST'
@@ -58,7 +53,7 @@ export default function FacultyApprovalsPage() {
         }
     };
 
-    const handleReject = async (id: number) => {
+    const handleReject = async (id: string) => {
         try {
             const res = await authenticatedFetch(`/api/v1/faculty/approvals/${id}/reject`, {
                 method: 'POST',

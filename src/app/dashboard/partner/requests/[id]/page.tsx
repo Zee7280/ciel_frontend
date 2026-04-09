@@ -7,7 +7,7 @@ import Link from "next/link";
 import { authenticatedFetch } from "@/utils/api";
 import { toast } from "sonner";
 import dynamic from "next/dynamic";
-import { sdgData } from "@/utils/sdgData";
+import { findSdgById, opportunityFormSdgList } from "@/utils/sdgData";
 import { pakistaniUniversities } from "@/utils/universityData";
 
 const LocationPicker = dynamic(() => import("@/components/ui/LocationPicker"), {
@@ -168,11 +168,11 @@ function OpportunityDetailsContent() {
                                 hours: opp.timeline?.expected_hours?.toString() || "",
                                 volunteers: opp.timeline?.volunteers_required?.toString() || ""
                             },
-                            sdg: opp.sdg_info?.sdg_id?.toString() || "",
+                            sdg: findSdgById(opp.sdg_info?.sdg_id)?.id || (opp.sdg_info?.sdg_id != null ? String(opp.sdg_info.sdg_id).trim() : ""),
                             target: opp.sdg_info?.target_id?.toString() || "",
                             indicator: opp.sdg_info?.indicator_id?.toString() || "",
                             secondarySdgs: (opp.secondary_sdgs || []).map((s: any) => ({
-                                sdgId: s.sdg_id || "",
+                                sdgId: findSdgById(s.sdg_id)?.id || (s.sdg_id != null ? String(s.sdg_id).trim() : ""),
                                 targetId: s.target_id || "",
                                 indicatorId: s.indicator_id || "",
                                 justification: s.justification || ""
@@ -284,13 +284,6 @@ function OpportunityDetailsContent() {
             toast.error("Please select a Timeline Type (Section B)");
             return false;
         }
-        if (formData.timelineType === 'Fixed dates') {
-            if (!formData.dates.start || !formData.dates.end) {
-                toast.error("Please select both Start and End dates (Section B)");
-                return false;
-            }
-        }
-
         // Section C
         if (!formData.sdg) {
             toast.error("Please select a Primary SDG (Section C)");
@@ -857,23 +850,26 @@ function OpportunityDetailsContent() {
                                     ))}
                                 </div>
 
-                                {(formData.timelineType === 'Fixed dates' || formData.dates.start) && (
-                                    <div className="flex gap-2 animate-in fade-in zoom-in-95">
-                                        <input
-                                            type="date"
-
-                                            className="flex-1 px-3 py-2 border border-slate-200 rounded-lg text-sm disabled:bg-slate-50"
-                                            value={formData.dates.start}
-                                            onChange={(e) => setFormData({ ...formData, dates: { ...formData.dates, start: e.target.value } })}
-                                        />
-                                        <span className="self-center text-slate-400">-</span>
-                                        <input
-                                            type="date"
-
-                                            className="flex-1 px-3 py-2 border border-slate-200 rounded-lg text-sm disabled:bg-slate-50"
-                                            value={formData.dates.end}
-                                            onChange={(e) => setFormData({ ...formData, dates: { ...formData.dates, end: e.target.value } })}
-                                        />
+                                {["Fixed dates", "Flexible", "Ongoing"].includes(formData.timelineType) && (
+                                    <div className="space-y-2 animate-in fade-in zoom-in-95">
+                                        <p className="text-xs text-slate-500">
+                                            Start and end dates are optional for all timeline types.
+                                        </p>
+                                        <div className="flex gap-2">
+                                            <input
+                                                type="date"
+                                                className="flex-1 px-3 py-2 border border-slate-200 rounded-lg text-sm disabled:bg-slate-50"
+                                                value={formData.dates.start}
+                                                onChange={(e) => setFormData({ ...formData, dates: { ...formData.dates, start: e.target.value } })}
+                                            />
+                                            <span className="self-center text-slate-400">-</span>
+                                            <input
+                                                type="date"
+                                                className="flex-1 px-3 py-2 border border-slate-200 rounded-lg text-sm disabled:bg-slate-50"
+                                                value={formData.dates.end}
+                                                onChange={(e) => setFormData({ ...formData, dates: { ...formData.dates, end: e.target.value } })}
+                                            />
+                                        </div>
                                     </div>
                                 )}
                             </div>
@@ -935,7 +931,7 @@ function OpportunityDetailsContent() {
                             onChange={(e) => setFormData({ ...formData, sdg: e.target.value, target: "", indicator: "" })}
                         >
                             <option value="">Select an SDG...</option>
-                            {sdgData.map((sdg) => (
+                            {opportunityFormSdgList.map((sdg) => (
                                 <option key={sdg.id} value={sdg.id}>
                                     SDG {sdg.number} — {sdg.title}
                                 </option>
@@ -953,7 +949,7 @@ function OpportunityDetailsContent() {
                             onChange={(e) => setFormData({ ...formData, target: e.target.value, indicator: "" })}
                         >
                             <option value="">Select a Target...</option>
-                            {formData.sdg && sdgData.find(sdg => sdg.id === formData.sdg)?.targets.map((target) => (
+                            {formData.sdg && findSdgById(formData.sdg)?.targets.map((target) => (
                                 <option key={target.id} value={target.id}>
                                     Target {target.id} — {target.description}
                                 </option>
@@ -970,8 +966,8 @@ function OpportunityDetailsContent() {
                             onChange={(e) => setFormData({ ...formData, indicator: e.target.value })}
                         >
                             <option value="">Select an Indicator...</option>
-                            {formData.sdg && formData.target && sdgData
-                                .find(sdg => sdg.id === formData.sdg)?.targets
+                            {formData.sdg && formData.target && findSdgById(formData.sdg)
+                                ?.targets
                                 .find(target => target.id === formData.target)?.indicators.map((indicator) => (
                                     <option key={indicator.id} value={indicator.id}>
                                         Indicator {indicator.id} — {indicator.description}
@@ -1000,7 +996,7 @@ function OpportunityDetailsContent() {
                                 }}
                             >
                                 <option value="">Add a Secondary SDG...</option>
-                                {sdgData
+                                {opportunityFormSdgList
                                     .filter(sdg => sdg.id !== formData.sdg && !formData.secondarySdgs.find(s => s.sdgId === sdg.id))
                                     .map((sdg) => (
                                         <option key={sdg.id} value={sdg.id}>
@@ -1011,7 +1007,7 @@ function OpportunityDetailsContent() {
 
                             <div className="grid grid-cols-1 gap-4">
                                 {formData.secondarySdgs.map((s, idx) => {
-                                    const sdgDetail = sdgData.find(d => d.id === s.sdgId);
+                                    const sdgDetail = findSdgById(s.sdgId);
                                     return (
                                         <div key={s.sdgId} className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 space-y-4 animate-in fade-in zoom-in-95">
                                             <div className="flex justify-between items-start">
@@ -1073,19 +1069,7 @@ function OpportunityDetailsContent() {
                                                 </div>
                                             </div>
 
-                                            <div>
-                                                <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">Justification</label>
-                                                <textarea
-                                                    placeholder="How does this project contribute to this goal?"
-                                                    className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs outline-none focus:border-purple-500 bg-white h-16 resize-none"
-                                                    value={s.justification}
-                                                    onChange={(e) => {
-                                                        const newList = [...formData.secondarySdgs];
-                                                        newList[idx].justification = e.target.value;
-                                                        setFormData({ ...formData, secondarySdgs: newList });
-                                                    }}
-                                                />
-                                            </div>
+                                         
                                         </div>
                                     );
                                 })}

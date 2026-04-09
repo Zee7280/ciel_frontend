@@ -63,6 +63,7 @@ export default function Sidebar() {
         ...(isPartner ? [
             { label: "My Organization", href: "/dashboard/partner/organization", icon: Building2 },
             { label: "My Opportunities", href: "/dashboard/partner/requests", icon: Briefcase },
+            { label: "Create Opportunity", href: "/dashboard/partner/requests/new", icon: Plus },
 
             { label: "Verify Work", href: "/dashboard/partner/verification", icon: CheckCircle },
             { label: "Reports", href: "/dashboard/partner/reports", icon: FileText },
@@ -75,7 +76,9 @@ export default function Sidebar() {
         // Faculty
         ...(isFaculty ? [
             // { label: "My Courses", href: "/dashboard/faculty/courses", icon: BookOpen },
+            { label: "My Profile", href: "/dashboard/faculty/profile", icon: User },
             { label: "Project Approvals", href: "/dashboard/faculty/approvals", icon: CheckCircle },
+            { label: "My Opportunities", href: "/dashboard/faculty/my-opportunities", icon: Briefcase },
             { label: "Create Opportunity", href: "/dashboard/faculty/create-opportunity", icon: Plus },
             { label: "Student Grading", href: "/dashboard/faculty/grading", icon: FileText },
             { label: "Messages", href: "/dashboard/faculty/messages", icon: MessageSquare },

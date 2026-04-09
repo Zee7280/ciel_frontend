@@ -7,6 +7,7 @@ import { ArrowRight, Mail, Lock, AlertCircle, Loader2, ArrowLeft, CheckCircle, E
 
 import Image from "next/image";
 import clsx from "clsx";
+import { isPartnerRole, profileCompletionRedirectPath } from "@/utils/profileCompletion";
 
 function LoginContent() {
     const router = useRouter();
@@ -187,8 +188,21 @@ function LoginContent() {
             }
 
             let targetPath = `/dashboard/${role}`;
-            if (['university', 'ngo', 'corporate', 'organization_admin'].includes(role)) {
-                targetPath = '/dashboard/partner';
+            if (isPartnerRole(String(role))) {
+                targetPath = "/dashboard/partner";
+            }
+
+            if (payload.access_token || payload.token) {
+                try {
+                    const uStr = localStorage.getItem("ciel_user");
+                    if (uStr) {
+                        const u = JSON.parse(uStr) as Record<string, unknown>;
+                        const profilePath = profileCompletionRedirectPath(String(role), u);
+                        if (profilePath) targetPath = profilePath;
+                    }
+                } catch {
+                    /* keep default dashboard path */
+                }
             }
 
             router.push(targetPath);

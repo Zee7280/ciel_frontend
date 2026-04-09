@@ -5,6 +5,10 @@ import { Button } from "../report/components/ui/button";
 import Link from "next/link";
 import { Badge } from "../report/components/ui/badge";
 import { authenticatedFetch } from "@/utils/api";
+import {
+    isStudentOpportunityLiveForReporting,
+    resolveStudentOpportunityWorkflow,
+} from "@/utils/opportunityWorkflow";
 import { Loader2, Plus, Users, Eye, Mail, Phone, GraduationCap } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "../report/components/ui/dialog";
 
@@ -30,6 +34,15 @@ interface Project {
     report_status?: 'none' | 'draft' | 'continue' | 'submitted' | 'verified' | 'rejected' | 'pending_payment' | 'payment_under_review' | 'paid';
     report_id?: string;
     report_feedback?: string;
+    /** When API sends these, the UI shows the correct approval stage. */
+    workflow_stage?: string;
+    approval_stage?: string;
+    faculty_approval_status?: string;
+    partner_approval_status?: string;
+    admin_approval_status?: string;
+    is_student_created?: boolean;
+    created_by_role?: string;
+    source?: string;
 }
 
 export default function MyProjectsPage() {
@@ -49,7 +62,7 @@ export default function MyProjectsPage() {
                     studentId = userObj.id || userObj.studentId || userObj.userId;
                 }
 
-                const res = await authenticatedFetch(`/api/v1/students/projects`, {
+                const res = await authenticatedFetch(`/api/v1/student/projects`, {
                     method: 'POST',
                     body: JSON.stringify({ studentId })
                 });
@@ -135,7 +148,21 @@ export default function MyProjectsPage() {
                 </div>
             ) : (
                 <div className="grid gap-6">
-                    {projects.map((project) => (
+                    {projects.map((project) => {
+                        const pRecord = project as unknown as Record<string, unknown>;
+                        const live = isStudentOpportunityLiveForReporting(pRecord);
+                        const workflow = resolveStudentOpportunityWorkflow(pRecord);
+                        const statusBadgeClass = live
+                            ? project.status === "completed"
+                                ? "bg-slate-100 text-slate-700"
+                                : "bg-green-100 text-green-700"
+                            : workflow.stage === "rejected"
+                                ? "bg-red-100 text-red-700"
+                                : workflow.stage === "revision"
+                                    ? "bg-orange-100 text-orange-800"
+                                    : "bg-amber-100 text-amber-700";
+
+                        return (
                         <div key={project.id} className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                             <div className="flex items-start gap-4">
                                 <div className="w-16 h-16 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600 font-bold text-xl shrink-0">
@@ -144,12 +171,8 @@ export default function MyProjectsPage() {
                                 <div className="space-y-1">
                                     <div className="flex items-center gap-2 flex-wrap">
                                         <h3 className="font-bold text-lg text-slate-800">{project.title}</h3>
-                                        <Badge className={`
-                                            ${project.status === 'active' ? 'bg-green-100 text-green-700' :
-                                                project.status === 'pending_approval' ? 'bg-amber-100 text-amber-700' :
-                                                    project.status === 'completed' ? 'bg-slate-100 text-slate-700' : 'bg-blue-50 text-blue-700'}
-                                        `}>
-                                            {project.status?.replace('_', ' ') || "Active"}
+                                        <Badge className={statusBadgeClass}>
+                                            {workflow.badgeLabel}
                                         </Badge>
 
                                         {/* Report Status Badge */}
@@ -222,6 +245,11 @@ export default function MyProjectsPage() {
                                             </p>
                                         </div>
                                     )}
+                                    {!live && (
+                                        <p className="text-xs text-amber-800 bg-amber-50/80 border border-amber-100 rounded-lg px-3 py-2 mt-2 max-w-2xl">
+                                            {workflow.queueMessage}
+                                        </p>
+                                    )}
                                 </div>
                             </div>
                             <div className="flex items-center gap-3 w-full md:w-auto">
@@ -231,7 +259,7 @@ export default function MyProjectsPage() {
                                     </Button>
                                 )}
 
-                                {['active', 'completed'].includes(project.status) && (
+                                {live && (
                                     <>
                                         {project.report_status === 'none' || project.report_status === 'continue' || project.report_status === 'draft' ? (
                                             <Link href={`/dashboard/student/report?projectId=${project.id}`} className="w-full md:w-auto">
@@ -255,12 +283,6 @@ export default function MyProjectsPage() {
                                     </>
                                 )}
 
-                                {['pending', 'pending_approval', 'applied'].includes(project.status) && (
-                                    <span className="text-xs font-bold text-amber-600 bg-amber-50 px-3 py-2 rounded-md border border-amber-100 italic w-full md:w-auto text-center">
-                                        Pending Admin Approval
-                                    </span>
-                                )}
-
                                 <Link
                                     href={(project.report_status === 'verified' || project.report_status === 'paid')
                                         ? `/dashboard/student/report?projectId=${project.id}`
@@ -271,7 +293,8 @@ export default function MyProjectsPage() {
                                 </Link>
                             </div>
                         </div>
-                    ))}
+                        );
+                    })}
                 </div>
             )}
 

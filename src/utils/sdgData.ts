@@ -1223,3 +1223,14 @@ export const sdgData: SDG[] = [
         ]
     },
 ];
+
+/** Match form/API values whether they are string ids or numbers (e.g. sdg_id: 15 vs "15"). */
+export function findSdgById(id: string | number | null | undefined): SDG | undefined {
+    if (id === null || id === undefined) return undefined;
+    const key = String(id).trim();
+    if (!key) return undefined;
+    return sdgData.find((s) => s.id === key || String(s.number) === key);
+}
+
+/** SDGs 1–17 in numeric order for opportunity create/edit dropdowns. */
+export const opportunityFormSdgList: SDG[] = [...sdgData].sort((a, b) => a.number - b.number);

@@ -1,5 +1,6 @@
 import Sidebar from "@/components/Sidebar";
 import DashboardHeader from "@/components/DashboardHeader";
+import ProfileCompletionGate from "@/components/ProfileCompletionGate";
 
 export default function DashboardLayout({
     children,
@@ -16,7 +17,7 @@ export default function DashboardLayout({
                     <DashboardHeader />
                 </div>
                 <main className="ml-64 p-8 flex-1 print:ml-0 print:p-0 print:w-full">
-                    {children}
+                    <ProfileCompletionGate>{children}</ProfileCompletionGate>
                 </main>
             </div>
         </div>

@@ -2,13 +2,18 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Info, MapPin, Calendar, Clock, CheckCircle, AlertCircle, ChevronDown, ChevronUp, Users, Loader2 } from "lucide-react";
+import { Info, MapPin, Calendar, Clock, CheckCircle, AlertCircle, ChevronDown, ChevronUp, Users, Loader2, Plus } from "lucide-react";
 import { X } from "lucide-react";
 import { authenticatedFetch } from "@/utils/api";
 import { toast } from "sonner";
 import dynamic from "next/dynamic";
-import { sdgData } from "@/utils/sdgData";
+import { findSdgById, opportunityFormSdgList } from "@/utils/sdgData";
 import { pakistaniUniversities } from "@/utils/universityData";
+import { isPartnerProfileComplete, pickProfileContact, pickProfileEmail } from "@/utils/profileCompletion";
+
+function isValidEmail(value: string) {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+}
 
 const LocationPicker = dynamic(() => import("@/components/ui/LocationPicker"), {
     ssr: false,
@@ -34,7 +39,7 @@ export default function OpportunityPostingPage() {
         title: "",
         opportunityType: [] as string[],
         isOtherTypeChecked: false,
-        otherType: "",
+        otherTypeSpecs: [""] as string[],
         mode: "", // on-site, remote, hybrid
         location: { city: "", venue: "", pin: "" },
         timelineType: "", // fixed, flexible, ongoing
@@ -64,13 +69,35 @@ export default function OpportunityPostingPage() {
             otherSkill: ""
         },
 
-        // Section F
-        supervision: {
-            name: "",
-            role: "",
-            contact: "",
-            isHarmful: false,
-            isSupervised: false
+        // Section F — Verification & safety (executing org, partner, declarations, confirmations)
+        verificationSafety: {
+            executingOrg: {
+                contactPersonName: "",
+                officialEmail: "",
+            },
+            partnerOrg: {
+                hasPartner: false,
+                orgName: "",
+                contactPerson: "",
+                officialEmail: "",
+            },
+            safety: {
+                siteSafeSuitable: false,
+                lawfulNoHazards: false,
+                supervisedThroughout: false,
+                basicEmergencyMeasures: false,
+            },
+            submissionConfirmations: {
+                genuineAccurate: false,
+                orgResponsibleExecution: false,
+                environmentSafe: false,
+                informationVerifiable: false,
+            },
+        },
+        restrictedFacultyLinkage: {
+            representativeName: "",
+            designation: "",
+            officialEmail: "",
         },
 
         // Section G
@@ -92,9 +119,12 @@ export default function OpportunityPostingPage() {
             toast.error("Please select at least one Opportunity Type (Section B)");
             return false;
         }
-        if (formData.isOtherTypeChecked && !formData.otherType.trim()) {
-            toast.error("Please specify the other opportunity type (Section B)");
-            return false;
+        if (formData.isOtherTypeChecked) {
+            const otherSpecs = formData.otherTypeSpecs.map((s) => s.trim()).filter(Boolean);
+            if (otherSpecs.length === 0) {
+                toast.error("Please add at least one Other opportunity type description (Section B)");
+                return false;
+            }
         }
         if (!formData.mode) {
             toast.error("Please select a Mode of Engagement (Section B)");
@@ -114,13 +144,6 @@ export default function OpportunityPostingPage() {
             toast.error("Please select a Timeline Type (Section B)");
             return false;
         }
-        if (formData.timelineType === 'Fixed dates') {
-            if (!formData.dates.start || !formData.dates.end) {
-                toast.error("Please select both Start and End dates (Section B)");
-                return false;
-            }
-        }
-
         // Section C
         if (!formData.sdg) {
             toast.error("Please select a Primary SDG (Section C)");
@@ -143,10 +166,62 @@ export default function OpportunityPostingPage() {
             return false;
         }
 
-        // Section H
-        if (formData.visibility === 'restricted' && formData.restrictedUniversities.length === 0) {
-            toast.error("Please select at least one university for restricted visibility (Section H)");
+        const vs = formData.verificationSafety;
+        if (!vs.executingOrg.contactPersonName.trim()) {
+            toast.error("Please enter Contact Person Name for the executing organization (Section F1)");
             return false;
+        }
+        if (!vs.executingOrg.officialEmail.trim() || !isValidEmail(vs.executingOrg.officialEmail)) {
+            toast.error("Please enter a valid official email for the executing organization (Section F1)");
+            return false;
+        }
+        if (vs.partnerOrg.hasPartner) {
+            if (!vs.partnerOrg.orgName.trim()) {
+                toast.error("Please enter Partner Organization Name (Section F2)");
+                return false;
+            }
+            if (!vs.partnerOrg.contactPerson.trim()) {
+                toast.error("Please enter Partner Contact Person Name (Section F2)");
+                return false;
+            }
+            if (!vs.partnerOrg.officialEmail.trim() || !isValidEmail(vs.partnerOrg.officialEmail)) {
+                toast.error("Please enter a valid official email for the partner organization (Section F2)");
+                return false;
+            }
+        }
+        if (!vs.safety.siteSafeSuitable || !vs.safety.lawfulNoHazards || !vs.safety.supervisedThroughout || !vs.safety.basicEmergencyMeasures) {
+            toast.error("Please confirm all safety & supervision declarations (Section F3)");
+            return false;
+        }
+        if (
+            !vs.submissionConfirmations.genuineAccurate ||
+            !vs.submissionConfirmations.orgResponsibleExecution ||
+            !vs.submissionConfirmations.environmentSafe ||
+            !vs.submissionConfirmations.informationVerifiable
+        ) {
+            toast.error("Please confirm all required statements before submitting (Section F6)");
+            return false;
+        }
+
+        // Section H (+ F5 academic linkage when restricted)
+        if (formData.visibility === 'restricted') {
+            if (formData.restrictedUniversities.length === 0) {
+                toast.error("Please select at least one university for restricted visibility (Section H)");
+                return false;
+            }
+            const fl = formData.restrictedFacultyLinkage;
+            if (!fl.representativeName.trim()) {
+                toast.error("Please enter Faculty / Institutional Representative Name (Section H — restricted visibility)");
+                return false;
+            }
+            if (!fl.designation.trim()) {
+                toast.error("Please enter Representative Designation (Section H — restricted visibility)");
+                return false;
+            }
+            if (!fl.officialEmail.trim() || !isValidEmail(fl.officialEmail)) {
+                toast.error("Please enter a valid official email for the institutional representative (Section H)");
+                return false;
+            }
         }
 
         return true;
@@ -158,11 +233,15 @@ export default function OpportunityPostingPage() {
         setIsSubmitting(true);
         try {
             // Transform state to match API Spec
+            const otherTypeLabels = formData.isOtherTypeChecked
+                ? formData.otherTypeSpecs.map((s) => s.trim()).filter(Boolean).map((s) => `Other: ${s}`)
+                : [];
             const payload = {
                 title: formData.title,
-                types: formData.isOtherTypeChecked && formData.otherType.trim()
-                    ? [...formData.opportunityType, formData.otherType.trim()]
-                    : formData.opportunityType,
+                types:
+                    otherTypeLabels.length > 0
+                        ? [...formData.opportunityType, ...otherTypeLabels]
+                        : formData.opportunityType,
                 mode: formData.mode,
                 location: formData.mode === 'Remote' ? null : formData.location,
                 timeline: {
@@ -198,13 +277,58 @@ export default function OpportunityPostingPage() {
                         ? [...formData.activity.skills, formData.activity.otherSkill.trim()]
                         : formData.activity.skills
                 },
+                // Legacy shape — keep for older backends; mirrors executing-org contact + safety flags
                 supervision: {
-                    supervisor_name: formData.supervision.name,
-                    role: formData.supervision.role,
-                    contact: formData.supervision.contact,
-                    safe_environment: formData.supervision.isHarmful, // Note: Logic check needed here, assumes checkbox means "Confirmed Safe"
-                    supervised: formData.supervision.isSupervised
+                    supervisor_name: formData.verificationSafety.executingOrg.contactPersonName.trim(),
+                    role: "Executing organization — official contact",
+                    contact: formData.verificationSafety.executingOrg.officialEmail.trim(),
+                    safe_environment: formData.verificationSafety.safety.siteSafeSuitable,
+                    supervised: formData.verificationSafety.safety.supervisedThroughout,
                 },
+                executing_organization: {
+                    name: orgDetails.organizationName.trim(),
+                    contact_person_name: formData.verificationSafety.executingOrg.contactPersonName.trim(),
+                    official_email: formData.verificationSafety.executingOrg.officialEmail.trim(),
+                },
+                partner_organization: formData.verificationSafety.partnerOrg.hasPartner
+                    ? {
+                        organization_name: formData.verificationSafety.partnerOrg.orgName.trim(),
+                        contact_person_name: formData.verificationSafety.partnerOrg.contactPerson.trim(),
+                        official_email: formData.verificationSafety.partnerOrg.officialEmail.trim(),
+                    }
+                    : null,
+                safety_supervision_declaration: {
+                    site_safe_and_suitable: formData.verificationSafety.safety.siteSafeSuitable,
+                    lawful_and_free_from_hazards: formData.verificationSafety.safety.lawfulNoHazards,
+                    students_properly_supervised: formData.verificationSafety.safety.supervisedThroughout,
+                    basic_safety_and_emergency_measures: formData.verificationSafety.safety.basicEmergencyMeasures,
+                },
+                visibility_and_academic_linkage: {
+                    visibility_type:
+                        formData.visibility === "restricted"
+                            ? "restricted_universities"
+                            : "open_all_universities",
+                    restricted_university_names:
+                        formData.visibility === "restricted" ? formData.restrictedUniversities : [],
+                    faculty_institutional_representative:
+                        formData.visibility === "restricted"
+                            ? {
+                                name: formData.restrictedFacultyLinkage.representativeName.trim(),
+                                designation: formData.restrictedFacultyLinkage.designation.trim(),
+                                official_email: formData.restrictedFacultyLinkage.officialEmail.trim(),
+                            }
+                            : null,
+                },
+                submission_confirmations: {
+                    genuine_and_accurate: formData.verificationSafety.submissionConfirmations.genuineAccurate,
+                    organization_responsible_for_execution:
+                        formData.verificationSafety.submissionConfirmations.orgResponsibleExecution,
+                    environment_safe_and_appropriate:
+                        formData.verificationSafety.submissionConfirmations.environmentSafe,
+                    information_correct_and_verifiable:
+                        formData.verificationSafety.submissionConfirmations.informationVerifiable,
+                },
+                admin_approval_required: true,
                 verification_method: formData.isOtherVerificationChecked && formData.otherVerification.trim()
                     ? [...formData.verification, formData.otherVerification.trim()]
                     : formData.verification,
@@ -278,17 +402,35 @@ export default function OpportunityPostingPage() {
                     return;
                 }
 
-                const res = await authenticatedFetch(`/api/v1/organisation/profile/detail`, {
-                    method: 'POST',
-                    body: JSON.stringify({ userId })
-                });
+                const [orgRes, userRes] = await Promise.all([
+                    authenticatedFetch(`/api/v1/organisation/profile/detail`, {
+                        method: 'POST',
+                        body: JSON.stringify({ userId })
+                    }),
+                    authenticatedFetch(`/api/v1/profile`),
+                ]);
 
-                if (res && res.ok) {
-                    const data = await res.json();
-                    // Check if it's a wrapped response or direct object
+                let userEmail = "";
+                if (userRes && userRes.ok) {
+                    try {
+                        const userJson = await userRes.json();
+                        const u = userJson.data || userJson;
+                        userEmail = (u.email as string) || "";
+                    } catch {
+                        /* ignore */
+                    }
+                }
+
+                let orgNameGate = "";
+                let orgCityGate = "";
+
+                if (orgRes && orgRes.ok) {
+                    const data = await orgRes.json();
                     const apiData = data.data || data;
 
                     if (apiData) {
+                        orgNameGate = apiData.name || "";
+                        orgCityGate = apiData.city || "";
                         setOrgDetails({
                             organizationName: apiData.name || "",
                             organizationType: apiData.orgType || "",
@@ -298,7 +440,41 @@ export default function OpportunityPostingPage() {
                                 contact: apiData.contactPhone || ""
                             }
                         });
+                        setFormData((prev) => ({
+                            ...prev,
+                            verificationSafety: {
+                                ...prev.verificationSafety,
+                                executingOrg: {
+                                    contactPersonName:
+                                        apiData.contactName?.trim() ||
+                                        prev.verificationSafety.executingOrg.contactPersonName,
+                                    officialEmail:
+                                        userEmail.trim() ||
+                                        prev.verificationSafety.executingOrg.officialEmail,
+                                },
+                            },
+                        }));
                     }
+                }
+
+                try {
+                    const ls = storedUser ? (JSON.parse(storedUser) as Record<string, unknown>) : {};
+                    const merged: Record<string, unknown> = {
+                        ...ls,
+                        email: userEmail || pickProfileEmail(ls),
+                        phone: pickProfileContact(ls),
+                        contact: pickProfileContact(ls),
+                        organization: orgNameGate ? { name: orgNameGate } : ls.organization,
+                        org_name: orgNameGate || ls.org_name,
+                        city: orgCityGate || (typeof ls.city === "string" ? ls.city : ""),
+                    };
+                    if (!isPartnerProfileComplete(merged)) {
+                        router.replace("/dashboard/partner/profile");
+                        return;
+                    }
+                } catch {
+                    router.replace("/dashboard/partner/profile");
+                    return;
                 }
             } catch (error) {
                 console.error("Failed to fetch profile", error);
@@ -309,7 +485,7 @@ export default function OpportunityPostingPage() {
         };
 
         fetchProfile();
-    }, []);
+    }, [router]);
 
     const toggleSection = (section: string) => {
         setExpandedSections(prev =>
@@ -419,18 +595,68 @@ export default function OpportunityPostingPage() {
                                     type="checkbox"
                                     className="rounded text-blue-600 focus:ring-blue-500"
                                     checked={formData.isOtherTypeChecked}
-                                    onChange={(e) => setFormData({ ...formData, isOtherTypeChecked: e.target.checked })}
+                                    onChange={(e) =>
+                                        setFormData({
+                                            ...formData,
+                                            isOtherTypeChecked: e.target.checked,
+                                            otherTypeSpecs: e.target.checked ? formData.otherTypeSpecs : [""],
+                                        })
+                                    }
                                 />
                                 <span className={`text-sm font-medium ${formData.isOtherTypeChecked ? 'text-blue-700' : 'text-slate-600'}`}>Other</span>
                             </label>
                             {formData.isOtherTypeChecked && (
-                                <input
-                                    type="text"
-                                    placeholder="Please specify other opportunity type..."
-                                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 outline-none text-sm transition-all"
-                                    value={formData.otherType}
-                                    onChange={(e) => setFormData({ ...formData, otherType: e.target.value })}
-                                />
+                                <div className="mt-4 space-y-3 pl-4 border-l-2 border-blue-100">
+                                    <p className="text-xs font-bold text-slate-500 uppercase">
+                                        Specify each &quot;Other&quot; type (add as many as needed)
+                                    </p>
+                                    {formData.otherTypeSpecs.map((spec, idx) => (
+                                        <div key={idx} className="flex gap-2">
+                                            <div className="relative flex-1">
+                                                <input
+                                                    type="text"
+                                                    placeholder="Describe this opportunity type…"
+                                                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 outline-none text-sm transition-all"
+                                                    value={spec}
+                                                    onChange={(e) => {
+                                                        const next = [...formData.otherTypeSpecs];
+                                                        next[idx] = e.target.value;
+                                                        setFormData({ ...formData, otherTypeSpecs: next });
+                                                    }}
+                                                />
+                                                {formData.otherTypeSpecs.length > 1 && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            const next = formData.otherTypeSpecs.filter((_, i) => i !== idx);
+                                                            setFormData({
+                                                                ...formData,
+                                                                otherTypeSpecs: next.length ? next : [""],
+                                                            });
+                                                        }}
+                                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-red-500 transition-colors"
+                                                        aria-label="Remove row"
+                                                    >
+                                                        <X className="w-4 h-4" />
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))}
+                                    <button
+                                        type="button"
+                                        onClick={() =>
+                                            setFormData({
+                                                ...formData,
+                                                otherTypeSpecs: [...formData.otherTypeSpecs, ""],
+                                            })
+                                        }
+                                        className="text-xs font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1.5 px-2 py-1"
+                                    >
+                                        <Plus className="w-3.5 h-3.5" />
+                                        Add another Other
+                                    </button>
+                                </div>
                             )}
                         </div>
                     </div>
@@ -529,21 +755,26 @@ export default function OpportunityPostingPage() {
                                     ))}
                                 </div>
 
-                                {formData.timelineType === 'Fixed dates' && (
-                                    <div className="flex gap-2 animate-in fade-in zoom-in-95">
-                                        <input
-                                            type="date"
-                                            className="flex-1 px-3 py-2 border border-slate-200 rounded-lg text-sm"
-                                            value={formData.dates.start}
-                                            onChange={(e) => setFormData({ ...formData, dates: { ...formData.dates, start: e.target.value } })}
-                                        />
-                                        <span className="self-center text-slate-400">-</span>
-                                        <input
-                                            type="date"
-                                            className="flex-1 px-3 py-2 border border-slate-200 rounded-lg text-sm"
-                                            value={formData.dates.end}
-                                            onChange={(e) => setFormData({ ...formData, dates: { ...formData.dates, end: e.target.value } })}
-                                        />
+                                {["Fixed dates", "Flexible", "Ongoing"].includes(formData.timelineType) && (
+                                    <div className="space-y-2 animate-in fade-in zoom-in-95">
+                                        <p className="text-xs text-slate-500">
+                                            Start and end dates are optional for all timeline types.
+                                        </p>
+                                        <div className="flex gap-2">
+                                            <input
+                                                type="date"
+                                                className="flex-1 px-3 py-2 border border-slate-200 rounded-lg text-sm"
+                                                value={formData.dates.start}
+                                                onChange={(e) => setFormData({ ...formData, dates: { ...formData.dates, start: e.target.value } })}
+                                            />
+                                            <span className="self-center text-slate-400">-</span>
+                                            <input
+                                                type="date"
+                                                className="flex-1 px-3 py-2 border border-slate-200 rounded-lg text-sm"
+                                                value={formData.dates.end}
+                                                onChange={(e) => setFormData({ ...formData, dates: { ...formData.dates, end: e.target.value } })}
+                                            />
+                                        </div>
                                     </div>
                                 )}
                             </div>
@@ -616,7 +847,7 @@ export default function OpportunityPostingPage() {
                             onChange={(e) => setFormData({ ...formData, sdg: e.target.value, target: "", indicator: "" })}
                         >
                             <option value="">Select an SDG...</option>
-                            {sdgData.map((sdg) => (
+                            {opportunityFormSdgList.map((sdg) => (
                                 <option key={sdg.id} value={sdg.id}>
                                     SDG {sdg.number} — {sdg.title}
                                 </option>
@@ -633,7 +864,7 @@ export default function OpportunityPostingPage() {
                             onChange={(e) => setFormData({ ...formData, target: e.target.value, indicator: "" })}
                         >
                             <option value="">Select a Target...</option>
-                            {formData.sdg && sdgData.find(sdg => sdg.id === formData.sdg)?.targets.map((target) => (
+                            {formData.sdg && findSdgById(formData.sdg)?.targets.map((target) => (
                                 <option key={target.id} value={target.id}>
                                     Target {target.id} — {target.description}
                                 </option>
@@ -650,8 +881,8 @@ export default function OpportunityPostingPage() {
                             onChange={(e) => setFormData({ ...formData, indicator: e.target.value })}
                         >
                             <option value="">Select an Indicator...</option>
-                            {formData.sdg && formData.target && sdgData
-                                .find(sdg => sdg.id === formData.sdg)?.targets
+                            {formData.sdg && formData.target && findSdgById(formData.sdg)
+                                ?.targets
                                 .find(target => target.id === formData.target)?.indicators.map((indicator) => (
                                     <option key={indicator.id} value={indicator.id}>
                                         Indicator {indicator.id} — {indicator.description}
@@ -696,7 +927,7 @@ export default function OpportunityPostingPage() {
                                 }}
                             >
                                 <option value="">Add a Secondary SDG...</option>
-                                {sdgData
+                                {opportunityFormSdgList
                                     .filter(sdg => sdg.id !== formData.sdg && !formData.secondarySdgs.find(s => s.sdgId === sdg.id))
                                     .map((sdg) => (
                                         <option key={sdg.id} value={sdg.id}>
@@ -707,7 +938,7 @@ export default function OpportunityPostingPage() {
 
                             <div className="grid grid-cols-1 gap-4">
                                 {formData.secondarySdgs.map((item, index) => {
-                                    const sdg = sdgData.find(s => s.id === item.sdgId);
+                                    const sdg = findSdgById(item.sdgId);
                                     const availableTargets = sdg?.targets || [];
                                     const availableIndicators = availableTargets.find(t => t.id === item.targetId)?.indicators || [];
 
@@ -775,20 +1006,6 @@ export default function OpportunityPostingPage() {
                                                 </div>
                                             </div>
 
-                                            {/* Justification */}
-                                            <div>
-                                                <label className="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-wider">Justification</label>
-                                                <textarea
-                                                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-purple-500 outline-none text-xs h-24 bg-white font-medium"
-                                                    placeholder="Briefly explain the contribution to this SDG..."
-                                                    value={item.justification}
-                                                    onChange={(e) => {
-                                                        const newSecondary = [...formData.secondarySdgs];
-                                                        newSecondary[index].justification = e.target.value;
-                                                        setFormData({ ...formData, secondarySdgs: newSecondary });
-                                                    }}
-                                                />
-                                            </div>
                                         </div>
                                     );
                                 })}
@@ -1005,7 +1222,7 @@ export default function OpportunityPostingPage() {
                 </div>
             </div>
 
-            {/* SECTION F: SUPERVISION */}
+            {/* SECTION F: VERIFICATION & SAFETY (NGO / CORPORATE) */}
             <div className={`bg-white rounded-2xl border transition-all duration-300 ${expandedSections.includes('F') ? 'border-orange-500 shadow-xl ring-1 ring-orange-500' : 'border-slate-200 shadow-sm'}`}>
                 <div
                     className="p-6 border-b border-slate-100 flex justify-between items-center cursor-pointer hover:bg-slate-50 transition-colors"
@@ -1013,118 +1230,314 @@ export default function OpportunityPostingPage() {
                 >
                     <h2 className={`text-lg font-bold flex items-center gap-2 ${expandedSections.includes('F') ? 'text-orange-600' : 'text-slate-800'}`}>
                         <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${expandedSections.includes('F') ? 'bg-orange-600 text-white' : 'bg-slate-200 text-slate-600'}`}>F</div>
-                        Section F — Institutional Verification & Safety
+                        Section F — Verification & Safety
                     </h2>
                     {expandedSections.includes('F') ? <ChevronUp className="w-5 h-5 text-slate-400" /> : <ChevronDown className="w-5 h-5 text-slate-400" />}
                 </div>
                 <div className={`p-8 space-y-8 ${!expandedSections.includes('F') ? 'hidden' : ''}`}>
-                    <div className="text-sm text-slate-600">
-                        To ensure safe, credible, and institutionally recognized engagement, the following confirmations are required.
+                    <p className="text-sm text-slate-600">
+                        The organization posting this opportunity is the <strong>Executing Organization</strong>. This section establishes accountability, verification, and a safe environment for students.
+                    </p>
+
+                    {/* F1 */}
+                    <div className="rounded-xl border border-slate-200 p-6 space-y-4">
+                        <h3 className="text-sm font-black text-orange-700 uppercase tracking-wide">F1. Executing organization verification (required)</h3>
+                        <p className="text-xs text-slate-500">
+                            Organization name is taken from your registered profile (Section A). A verification email will be sent to the official email below. The opportunity will not become active until that step is completed.
+                        </p>
+                        <div>
+                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Organization name</label>
+                            <input
+                                type="text"
+                                readOnly
+                                value={orgDetails.organizationName}
+                                className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 text-slate-700 text-sm"
+                            />
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-bold text-slate-900 mb-1">Contact person name <span className="text-red-500">*</span></label>
+                                <input
+                                    type="text"
+                                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-orange-500 outline-none text-sm"
+                                    value={formData.verificationSafety.executingOrg.contactPersonName}
+                                    onChange={(e) =>
+                                        setFormData({
+                                            ...formData,
+                                            verificationSafety: {
+                                                ...formData.verificationSafety,
+                                                executingOrg: {
+                                                    ...formData.verificationSafety.executingOrg,
+                                                    contactPersonName: e.target.value,
+                                                },
+                                            },
+                                        })
+                                    }
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-bold text-slate-900 mb-1">Official email address <span className="text-red-500">*</span></label>
+                                <input
+                                    type="email"
+                                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-orange-500 outline-none text-sm"
+                                    placeholder="name@organization.org"
+                                    value={formData.verificationSafety.executingOrg.officialEmail}
+                                    onChange={(e) =>
+                                        setFormData({
+                                            ...formData,
+                                            verificationSafety: {
+                                                ...formData.verificationSafety,
+                                                executingOrg: {
+                                                    ...formData.verificationSafety.executingOrg,
+                                                    officialEmail: e.target.value,
+                                                },
+                                            },
+                                        })
+                                    }
+                                />
+                            </div>
+                        </div>
                     </div>
 
-                    <div className="space-y-6">
-                        <div className="border-t border-slate-100 pt-6">
-                            <h3 className="text-md font-bold text-slate-900 mb-3">1️⃣ Institutional Liaison</h3>
-                            <p className="text-sm text-slate-600 mb-4">
-                                Opportunities must be developed in coordination with the relevant School, College, or University.
-                            </p>
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                    {/* F2 */}
+                    <div className="rounded-xl border border-slate-200 p-6 space-y-4">
+                        <h3 className="text-sm font-black text-orange-700 uppercase tracking-wide">F2. Additional partner organization (optional)</h3>
+                        <p className="text-xs text-slate-500">If another organization collaborates on this activity, you may record their details. Partner verification does not block activation.</p>
+                        <div className="flex flex-wrap gap-4">
+                            <label className="flex items-center gap-2 cursor-pointer">
+                                <input
+                                    type="radio"
+                                    name="hasPartnerOrg"
+                                    className="text-orange-600"
+                                    checked={!formData.verificationSafety.partnerOrg.hasPartner}
+                                    onChange={() =>
+                                        setFormData({
+                                            ...formData,
+                                            verificationSafety: {
+                                                ...formData.verificationSafety,
+                                                partnerOrg: {
+                                                    ...formData.verificationSafety.partnerOrg,
+                                                    hasPartner: false,
+                                                },
+                                            },
+                                        })
+                                    }
+                                />
+                                <span className="text-sm font-medium text-slate-800">No</span>
+                            </label>
+                            <label className="flex items-center gap-2 cursor-pointer">
+                                <input
+                                    type="radio"
+                                    name="hasPartnerOrg"
+                                    className="text-orange-600"
+                                    checked={formData.verificationSafety.partnerOrg.hasPartner}
+                                    onChange={() =>
+                                        setFormData({
+                                            ...formData,
+                                            verificationSafety: {
+                                                ...formData.verificationSafety,
+                                                partnerOrg: {
+                                                    ...formData.verificationSafety.partnerOrg,
+                                                    hasPartner: true,
+                                                },
+                                            },
+                                        })
+                                    }
+                                />
+                                <span className="text-sm font-medium text-slate-800">Yes</span>
+                            </label>
+                        </div>
+                        {formData.verificationSafety.partnerOrg.hasPartner && (
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2 animate-in fade-in duration-200">
                                 <div>
-                                    <h4 className="text-sm font-bold text-slate-800 mb-2">The Partner Organization must:</h4>
-                                    <ul className="text-sm text-slate-600 list-disc pl-5 space-y-1">
-                                        <li>Add an Official Institutional Representative</li>
-                                        <li>Provide name, designation, and contact details</li>
-                                        <li>Ensure institutional verification of the activity</li>
-                                    </ul>
+                                    <label className="block text-xs font-bold text-slate-600 mb-1">Partner organization name <span className="text-red-500">*</span></label>
+                                    <input
+                                        type="text"
+                                        className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-orange-500 outline-none text-sm"
+                                        value={formData.verificationSafety.partnerOrg.orgName}
+                                        onChange={(e) =>
+                                            setFormData({
+                                                ...formData,
+                                                verificationSafety: {
+                                                    ...formData.verificationSafety,
+                                                    partnerOrg: {
+                                                        ...formData.verificationSafety.partnerOrg,
+                                                        orgName: e.target.value,
+                                                    },
+                                                },
+                                            })
+                                        }
+                                    />
                                 </div>
                                 <div>
-                                    <h4 className="text-sm font-bold text-slate-800 mb-2">The Institutional Representative will confirm:</h4>
-                                    <ul className="text-sm text-slate-600 list-disc pl-5 space-y-1">
-                                        <li>The activity is institutionally recognized</li>
-                                        <li>Student participation is valid</li>
-                                        <li>Reported hours are accurate</li>
-                                    </ul>
+                                    <label className="block text-xs font-bold text-slate-600 mb-1">Contact person <span className="text-red-500">*</span></label>
+                                    <input
+                                        type="text"
+                                        className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-orange-500 outline-none text-sm"
+                                        value={formData.verificationSafety.partnerOrg.contactPerson}
+                                        onChange={(e) =>
+                                            setFormData({
+                                                ...formData,
+                                                verificationSafety: {
+                                                    ...formData.verificationSafety,
+                                                    partnerOrg: {
+                                                        ...formData.verificationSafety.partnerOrg,
+                                                        contactPerson: e.target.value,
+                                                    },
+                                                },
+                                            })
+                                        }
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-600 mb-1">Official email <span className="text-red-500">*</span></label>
+                                    <input
+                                        type="email"
+                                        className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-orange-500 outline-none text-sm"
+                                        value={formData.verificationSafety.partnerOrg.officialEmail}
+                                        onChange={(e) =>
+                                            setFormData({
+                                                ...formData,
+                                                verificationSafety: {
+                                                    ...formData.verificationSafety,
+                                                    partnerOrg: {
+                                                        ...formData.verificationSafety.partnerOrg,
+                                                        officialEmail: e.target.value,
+                                                    },
+                                                },
+                                            })
+                                        }
+                                    />
                                 </div>
                             </div>
+                        )}
+                    </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                <input
-                                    type="text"
-                                    placeholder="Representative Name"
-                                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-orange-500 outline-none text-sm"
-                                    value={formData.supervision.name}
-                                    onChange={(e) => setFormData({ ...formData, supervision: { ...formData.supervision, name: e.target.value } })}
-                                />
-                                <input
-                                    type="text"
-                                    placeholder="Designation"
-                                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-orange-500 outline-none text-sm"
-                                    value={formData.supervision.role}
-                                    onChange={(e) => setFormData({ ...formData, supervision: { ...formData.supervision, role: e.target.value } })}
-                                />
-                                <input
-                                    type="text"
-                                    placeholder="Contact Details"
-                                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-orange-500 outline-none text-sm"
-                                    value={formData.supervision.contact}
-                                    onChange={(e) => setFormData({ ...formData, supervision: { ...formData.supervision, contact: e.target.value } })}
-                                />
-                            </div>
-                        </div>
-
-                        <div className="border-t border-slate-100 pt-6">
-                            <h3 className="text-md font-bold text-slate-900 mb-3">2️⃣ Supervision & Site Responsibility</h3>
-                            <p className="text-sm text-slate-600 mb-2">The Partner Organization confirms that:</p>
-                            <ul className="text-sm text-slate-600 list-disc pl-5 space-y-1 mb-4">
-                                <li>The project site is suitable and safe for student participation</li>
-                                <li>Activities are lawful and free from hazardous elements</li>
-                                <li>Students will be appropriately supervised</li>
-                                <li>Necessary safety and emergency measures are in place</li>
-                            </ul>
-                            <p className="text-sm text-slate-600 font-medium">
-                                Operational supervision and on-ground management remain the responsibility of the Partner Organization.
-                            </p>
-                        </div>
-
-                        <div className="border-t border-slate-100 pt-6">
-                            <h3 className="text-md font-bold text-slate-900 mb-3">3️⃣ Role of CIEL PK</h3>
-                            <div className="text-sm text-slate-600 space-y-2">
-                                <p>CIEL PK functions as a verification and reporting platform.</p>
-                                <p>CIEL PK does not directly supervise field activities or manage on-site operations.</p>
-                                <p>Responsibility for execution and safety rests with the Partner Organization and the participating institution.</p>
-                            </div>
-                        </div>
-
-                        <div className="border-t border-slate-100 pt-6">
-                            <h3 className="text-md font-bold text-slate-900 mb-4 flex items-center gap-2">
-                                <CheckCircle className="w-5 h-5 text-green-500" /> Required Confirmations
-                            </h3>
-                            <div className="space-y-4 bg-orange-50 p-6 rounded-xl border border-orange-100">
-                                <label className="flex items-start gap-3 cursor-pointer group">
+                    {/* F3 */}
+                    <div className="rounded-xl border border-slate-200 p-6 space-y-4">
+                        <h3 className="text-sm font-black text-orange-700 uppercase tracking-wide">F3. Safety & supervision declaration (required)</h3>
+                        <p className="text-sm text-slate-600">The Executing Organization confirms that:</p>
+                        <div className="space-y-3">
+                            {(
+                                [
+                                    {
+                                        key: "siteSafeSuitable" as const,
+                                        label: "The activity site is safe and suitable for student participation",
+                                    },
+                                    {
+                                        key: "lawfulNoHazards" as const,
+                                        label: "Activities are lawful and free from hazardous elements",
+                                    },
+                                    {
+                                        key: "supervisedThroughout" as const,
+                                        label: "Students will be properly supervised throughout the activity",
+                                    },
+                                    {
+                                        key: "basicEmergencyMeasures" as const,
+                                        label: "Basic safety and emergency measures are in place",
+                                    },
+                                ] as const
+                            ).map(({ key, label }) => (
+                                <label key={key} className="flex items-start gap-3 cursor-pointer group">
                                     <input
                                         type="checkbox"
-                                        className="mt-1 rounded text-orange-600 focus:ring-orange-500 transition-colors"
-                                        checked={formData.supervision.isSupervised}
-                                        onChange={(e) => setFormData({ ...formData, supervision: { ...formData.supervision, isSupervised: e.target.checked } })}
+                                        className="mt-1 rounded text-orange-600 focus:ring-orange-500"
+                                        checked={formData.verificationSafety.safety[key]}
+                                        onChange={(e) =>
+                                            setFormData({
+                                                ...formData,
+                                                verificationSafety: {
+                                                    ...formData.verificationSafety,
+                                                    safety: {
+                                                        ...formData.verificationSafety.safety,
+                                                        [key]: e.target.checked,
+                                                    },
+                                                },
+                                            })
+                                        }
                                     />
-                                    <span className="text-sm font-medium text-orange-900 group-hover:text-orange-950 transition-colors">
-                                        I confirm this opportunity is created in liaison with my institution and an official representative has been added.
-                                    </span>
+                                    <span className="text-sm text-slate-800">{label}</span>
                                 </label>
-                                <label className="flex items-start gap-3 cursor-pointer group">
-                                    <input
-                                        type="checkbox"
-                                        className="mt-1 rounded text-orange-600 focus:ring-orange-500 transition-colors"
-                                        checked={formData.supervision.isHarmful}
-                                        onChange={(e) => setFormData({ ...formData, supervision: { ...formData.supervision, isHarmful: e.target.checked } })}
-                                    />
-                                    <span className="text-sm font-medium text-orange-900 group-hover:text-orange-950 transition-colors">
-                                        I confirm that the site and activities meet safety and supervision requirements as stated above.
-                                    </span>
-                                </label>
-                            </div>
+                            ))}
                         </div>
+                        <p className="text-xs text-slate-600 border-t border-slate-100 pt-4">
+                            <strong>Responsibility:</strong> All on-ground execution, supervision, and participant safety remain the responsibility of the Executing Organization.
+                        </p>
+                    </div>
+
+                    {/* F4 */}
+                    <div className="rounded-xl border border-blue-200 bg-blue-50/80 p-6 space-y-2">
+                        <h3 className="text-sm font-black text-blue-800 uppercase tracking-wide">F4. Admin approval (platform validation)</h3>
+                        <p className="text-sm text-blue-900/90">
+                            CIEL Admin will review this opportunity for realistic scope, SDG alignment, accuracy, and ethical engagement. Platform approval supports quality standards and does not replace field responsibility by the Executing Organization.
+                        </p>
+                    </div>
+
+                    {/* F5 note — inputs live in Section H with visibility */}
+                    <div className="rounded-xl border border-dashed border-slate-300 p-5 bg-slate-50">
+                        <h3 className="text-sm font-black text-slate-700 uppercase tracking-wide mb-1">F5. Visibility & academic linkage</h3>
+                        <p className="text-xs text-slate-600">
+                            Configure visibility in <strong>Section H</strong>. If you choose restricted universities, you will provide faculty / institutional representative details there for academic supervision and controlled access.
+                        </p>
+                    </div>
+
+                    {/* F6 */}
+                    <div className="rounded-xl border border-orange-200 bg-orange-50/60 p-6 space-y-3">
+                        <h3 className="text-sm font-black text-orange-800 uppercase tracking-wide flex items-center gap-2">
+                            <CheckCircle className="w-5 h-5 text-orange-600" /> F6. Required confirmations
+                        </h3>
+                        <p className="text-xs text-slate-600">By submitting, the Executing Organization confirms that:</p>
+                        {(
+                            [
+                                {
+                                    key: "genuineAccurate" as const,
+                                    label: "The opportunity is genuine and accurately described",
+                                },
+                                {
+                                    key: "orgResponsibleExecution" as const,
+                                    label: "The organization is responsible for execution and supervision",
+                                },
+                                {
+                                    key: "environmentSafe" as const,
+                                    label: "The activity environment is safe and appropriate for students",
+                                },
+                                {
+                                    key: "informationVerifiable" as const,
+                                    label: "All information provided is correct and verifiable",
+                                },
+                            ] as const
+                        ).map(({ key, label }) => (
+                            <label key={key} className="flex items-start gap-3 cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    className="mt-1 rounded text-orange-600 focus:ring-orange-500"
+                                    checked={formData.verificationSafety.submissionConfirmations[key]}
+                                    onChange={(e) =>
+                                        setFormData({
+                                            ...formData,
+                                            verificationSafety: {
+                                                ...formData.verificationSafety,
+                                                submissionConfirmations: {
+                                                    ...formData.verificationSafety.submissionConfirmations,
+                                                    [key]: e.target.checked,
+                                                },
+                                            },
+                                        })
+                                    }
+                                />
+                                <span className="text-sm font-medium text-orange-950">{label}</span>
+                            </label>
+                        ))}
+                    </div>
+
+                    <div className="rounded-xl border border-slate-800 bg-slate-900 text-slate-100 p-5 text-sm space-y-2">
+                        <p className="font-bold text-white flex items-center gap-2">
+                            <AlertCircle className="w-5 h-5 text-amber-400" /> Activation rule
+                        </p>
+                        <ul className="list-disc pl-5 space-y-1 text-slate-300 text-xs">
+                            <li>Active only after executing-organization email verification, safety declaration (F3), and admin approval.</li>
+                            <li>Partner details (F2) and faculty linkage (Section H, when restricted) are not required for activation.</li>
+                        </ul>
                     </div>
                 </div>
             </div>
@@ -1224,75 +1637,127 @@ export default function OpportunityPostingPage() {
                     </label>
 
                     {formData.visibility === 'restricted' && (
-                        <div className="p-6 bg-pink-50 rounded-2xl border border-pink-100 space-y-4 animate-in fade-in slide-in-from-top-2">
-                            <label className="block text-xs font-black text-pink-600 uppercase tracking-widest">Select Target Universities</label>
-                            <select
-                                className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-pink-500 outline-none text-sm font-bold bg-white"
-                                onChange={(e) => {
-                                    const val = e.target.value;
-                                    if (val && !formData.restrictedUniversities.includes(val)) {
-                                        setFormData({
-                                            ...formData,
-                                            restrictedUniversities: [...formData.restrictedUniversities, val]
-                                        });
-                                    }
-                                    e.target.value = "";
-                                }}
-                            >
-                                <option value="">Add University...</option>
-                                {pakistaniUniversities
-                                    .filter(u => !formData.restrictedUniversities.includes(u))
-                                    .map(u => (
-                                        <option key={u} value={u}>{u}</option>
-                                    ))}
-                            </select>
-
-                            <div className="flex flex-wrap gap-2">
-                                {formData.restrictedUniversities.map(u => (
-                                    <div key={u} className="bg-white px-3 py-1.5 rounded-lg border border-pink-200 flex items-center gap-2 shadow-sm animate-in zoom-in-95">
-                                        <span className="text-xs font-bold text-slate-700">{u}</span>
-                                        <button
-                                            onClick={() => setFormData({
+                        <div className="p-6 bg-pink-50 rounded-2xl border border-pink-100 space-y-6 animate-in fade-in slide-in-from-top-2">
+                            <div className="space-y-4">
+                                <label className="block text-xs font-black text-pink-600 uppercase tracking-widest">H1. Select target universities</label>
+                                <p className="text-xs text-slate-600">Restricted visibility (Section F5): only students from these institutions see the opportunity.</p>
+                                <select
+                                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-pink-500 outline-none text-sm font-bold bg-white"
+                                    onChange={(e) => {
+                                        const val = e.target.value;
+                                        if (val && !formData.restrictedUniversities.includes(val)) {
+                                            setFormData({
                                                 ...formData,
-                                                restrictedUniversities: formData.restrictedUniversities.filter(item => item !== u)
-                                            })}
-                                            className="text-slate-400 hover:text-red-500 transition-colors"
-                                        >
-                                            <X className="w-3.5 h-3.5" />
-                                        </button>
+                                                restrictedUniversities: [...formData.restrictedUniversities, val]
+                                            });
+                                        }
+                                        e.target.value = "";
+                                    }}
+                                >
+                                    <option value="">Add University...</option>
+                                    {pakistaniUniversities
+                                        .filter(u => !formData.restrictedUniversities.includes(u))
+                                        .map(u => (
+                                            <option key={u} value={u}>{u}</option>
+                                        ))}
+                                </select>
+
+                                <div className="flex flex-wrap gap-2">
+                                    {formData.restrictedUniversities.map(u => (
+                                        <div key={u} className="bg-white px-3 py-1.5 rounded-lg border border-pink-200 flex items-center gap-2 shadow-sm animate-in zoom-in-95">
+                                            <span className="text-xs font-bold text-slate-700">{u}</span>
+                                            <button
+                                                type="button"
+                                                onClick={() => setFormData({
+                                                    ...formData,
+                                                    restrictedUniversities: formData.restrictedUniversities.filter(item => item !== u)
+                                                })}
+                                                className="text-slate-400 hover:text-red-500 transition-colors"
+                                            >
+                                                <X className="w-3.5 h-3.5" />
+                                            </button>
+                                        </div>
+                                    ))}
+                                    {formData.restrictedUniversities.length === 0 && (
+                                        <p className="text-xs text-pink-400 italic font-medium">No universities selected yet.</p>
+                                    )}
+                                </div>
+                            </div>
+
+                            <div className="border-t border-pink-200 pt-6 space-y-4">
+                                <label className="block text-xs font-black text-pink-600 uppercase tracking-widest">H2. Faculty / institutional representative (required if restricted)</label>
+                                <p className="text-xs text-slate-600">Supports academic supervision, credit mapping, and MoU-style programs.</p>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-600 mb-1">Name <span className="text-red-500">*</span></label>
+                                        <input
+                                            type="text"
+                                            className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-pink-500 outline-none text-sm bg-white"
+                                            value={formData.restrictedFacultyLinkage.representativeName}
+                                            onChange={(e) =>
+                                                setFormData({
+                                                    ...formData,
+                                                    restrictedFacultyLinkage: {
+                                                        ...formData.restrictedFacultyLinkage,
+                                                        representativeName: e.target.value,
+                                                    },
+                                                })
+                                            }
+                                        />
                                     </div>
-                                ))}
-                                {formData.restrictedUniversities.length === 0 && (
-                                    <p className="text-xs text-pink-400 italic font-medium">No universities selected yet.</p>
-                                )}
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-600 mb-1">Designation <span className="text-red-500">*</span></label>
+                                        <input
+                                            type="text"
+                                            className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-pink-500 outline-none text-sm bg-white"
+                                            value={formData.restrictedFacultyLinkage.designation}
+                                            onChange={(e) =>
+                                                setFormData({
+                                                    ...formData,
+                                                    restrictedFacultyLinkage: {
+                                                        ...formData.restrictedFacultyLinkage,
+                                                        designation: e.target.value,
+                                                    },
+                                                })
+                                            }
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-600 mb-1">Official email <span className="text-red-500">*</span></label>
+                                        <input
+                                            type="email"
+                                            className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-pink-500 outline-none text-sm bg-white"
+                                            value={formData.restrictedFacultyLinkage.officialEmail}
+                                            onChange={(e) =>
+                                                setFormData({
+                                                    ...formData,
+                                                    restrictedFacultyLinkage: {
+                                                        ...formData.restrictedFacultyLinkage,
+                                                        officialEmail: e.target.value,
+                                                    },
+                                                })
+                                            }
+                                        />
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     )}
                 </div>
             </div>
 
-            {/* SECTION I: DECLARATION */}
-            <div className="bg-slate-900 rounded-2xl text-white p-8">
-                <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
-                    <CheckCircle className="w-6 h-6 text-green-400" /> Section I: Final Declaration
+            {/* SECTION I: SUBMIT CONTEXT */}
+            <div className="bg-slate-900 rounded-2xl text-white p-8 space-y-4">
+                <h2 className="text-xl font-bold flex items-center gap-2">
+                    <CheckCircle className="w-6 h-6 text-green-400" /> Section I: Before you submit
                 </h2>
-                <label className="flex items-start gap-4 mb-8 cursor-pointer opacity-90 hover:opacity-100">
-                    <input type="checkbox" className="mt-1 w-5 h-5 rounded border-slate-600 text-green-500 focus:ring-offset-slate-900 focus:ring-green-500" />
-                    <span className="text-sm leading-relaxed">
-                        We confirm that this opportunity is genuine, ethically sound, and aligned with the selected SDG and target.
-                        We agree to supervise students and verify participation as stated.
-                    </span>
-                </label>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
-                    <div>
-                        <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Authorized Representative</label>
-                        <input type="text" placeholder="Full Name" className="w-full bg-slate-800 border-none rounded-lg px-4 py-3 text-white placeholder-slate-500 focus:ring-1 focus:ring-green-500" />
-                    </div>
-                    <div>
-                        <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Digital Signature</label>
-                        <input type="text" placeholder="Type Name to Sign" className="w-full bg-slate-800 border-none rounded-lg px-4 py-3 text-white placeholder-slate-500 focus:ring-1 focus:ring-green-500 font-serif italic" />
-                    </div>
-                </div>
+                <p className="text-sm text-slate-300 leading-relaxed">
+                    Required declarations are captured in <strong className="text-white">Section F</strong> (F3 safety, F6 confirmations). Participation verification methods are in <strong className="text-white">Section G</strong>.
+                    Submitting sends the opportunity for <strong className="text-white">admin review</strong>; it becomes active only after executing-organization email verification, those confirmations, and approval.
+                </p>
+                <p className="text-xs text-slate-500">
+                    Open visibility does not require faculty linkage. Restricted visibility requires universities and representative details in Section H.
+                </p>
             </div>
 
             <div className="fixed bottom-0 left-0 md:left-64 right-0 p-4 bg-white border-t border-slate-200 z-50 flex justify-end gap-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
