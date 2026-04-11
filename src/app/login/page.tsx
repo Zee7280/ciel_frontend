@@ -8,6 +8,10 @@ import { ArrowRight, Mail, Lock, AlertCircle, Loader2, ArrowLeft, CheckCircle, E
 import Image from "next/image";
 import clsx from "clsx";
 import { isPartnerRole, profileCompletionRedirectPath } from "@/utils/profileCompletion";
+import {
+    consumePersistedVerificationReturn,
+    isSafeInternalReturnPath,
+} from "@/utils/verificationReturnUrl";
 
 function LoginContent() {
     const router = useRouter();
@@ -192,17 +196,35 @@ function LoginContent() {
                 targetPath = "/dashboard/partner";
             }
 
+            let profilePath: string | null = null;
             if (payload.access_token || payload.token) {
                 try {
                     const uStr = localStorage.getItem("ciel_user");
                     if (uStr) {
                         const u = JSON.parse(uStr) as Record<string, unknown>;
-                        const profilePath = profileCompletionRedirectPath(String(role), u);
+                        profilePath = profileCompletionRedirectPath(String(role), u);
                         if (profilePath) targetPath = profilePath;
                     }
                 } catch {
                     /* keep default dashboard path */
                 }
+            }
+
+            if (profilePath) {
+                router.push(profilePath);
+                return;
+            }
+
+            const verificationResume = consumePersistedVerificationReturn();
+            if (verificationResume) {
+                router.push(verificationResume);
+                return;
+            }
+
+            const nextParam = searchParams.get("next");
+            if (nextParam && isSafeInternalReturnPath(nextParam)) {
+                router.push(nextParam);
+                return;
             }
 
             router.push(targetPath);

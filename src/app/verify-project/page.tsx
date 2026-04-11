@@ -1,20 +1,36 @@
 "use client";
 
 import { useEffect, useState, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
-import { CheckCircle2, XCircle, Loader2, Home, ExternalLink } from "lucide-react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { CheckCircle2, XCircle, Loader2, Home, ExternalLink, LogIn } from "lucide-react";
 import Link from "next/link";
-import { friendlyVerificationVerifyMessage } from "@/utils/verificationVerifyUx";
+import { verificationRequireAuth } from "@/config/verification";
+import {
+    fetchVerificationVerify,
+    outcomeFromVerificationResponse,
+} from "@/utils/verificationVerifyUx";
+import {
+    buildVerificationSignupHref,
+    clearPersistedVerificationReturn,
+    isSafeInternalReturnPath,
+    persistVerificationReturnFromWindow,
+} from "@/utils/verificationReturnUrl";
+import {
+    VERIFY_CTA_PROJECT_BODY,
+    VERIFY_EMAIL_MATCH_HINT,
+} from "@/config/verificationPageCopy";
 
 /**
  * CIEL verification landing (faculty, partner, or liaison — role is in the token only).
- * Always calls same-origin GET /api/v1/verifications/verify?token=… (Next proxy → backend).
+ * Calls same-origin `/api/v1/verifications/verify` (GET `?token=` or POST `{ token }` via env).
  */
 function VerifyProjectContent() {
+    const router = useRouter();
+    const pathname = usePathname();
     const searchParams = useSearchParams();
     const token = searchParams.get("token");
 
-    const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
+    const [status, setStatus] = useState<"loading" | "auth_required" | "success" | "error">("loading");
     const [message, setMessage] = useState("Verifying your project claim...");
 
     useEffect(() => {
@@ -24,34 +40,56 @@ function VerifyProjectContent() {
             return;
         }
 
+        const postAuthReturn =
+            pathname && token ? `${pathname}?${searchParams.toString()}` : "";
+        const loginUrl =
+            postAuthReturn && isSafeInternalReturnPath(postAuthReturn)
+                ? `/login?next=${encodeURIComponent(postAuthReturn)}`
+                : "/login";
+
         const verifyToken = async () => {
             try {
-                // Always hit Next proxy (correct /api/v1 path + same-origin); avoids wrong BACKEND_BASE_URL in browser.
-                const response = await fetch(`/api/v1/verifications/verify?token=${encodeURIComponent(token)}`, {
-                    method: "GET",
-                    headers: { Accept: "application/json" },
-                });
+                const bearer =
+                    typeof window !== "undefined" ? localStorage.getItem("ciel_token") : null;
+                const strict = verificationRequireAuth();
+
+                if (!bearer) {
+                    persistVerificationReturnFromWindow();
+                    if (strict) {
+                        router.replace(loginUrl);
+                        return;
+                    }
+                }
+
+                setStatus("loading");
+                setMessage("Verifying your project claim...");
+                const response = await fetchVerificationVerify(token, bearer);
 
                 const data = (await response.json().catch(() => ({}))) as {
                     success?: boolean;
                     message?: string;
                 };
 
-                if (response.ok && data.success === true) {
+                const out = outcomeFromVerificationResponse(
+                    response,
+                    data,
+                    "Verification completed. Thank you.",
+                );
+
+                if (out.kind === "success") {
+                    clearPersistedVerificationReturn();
                     setStatus("success");
-                    setMessage(
-                        typeof data.message === "string" && data.message.trim()
-                            ? data.message
-                            : "Verification completed. Thank you.",
-                    );
-                } else {
-                    setStatus("error");
-                    const raw =
-                        typeof data.message === "string" && data.message.trim()
-                            ? data.message
-                            : "Failed to verify. The link may have expired or was already used.";
-                    setMessage(friendlyVerificationVerifyMessage(raw, response.status) || raw);
+                    setMessage(out.message);
+                    return;
                 }
+                if (out.kind === "auth_required") {
+                    persistVerificationReturnFromWindow();
+                    setStatus("auth_required");
+                    setMessage(out.message);
+                    return;
+                }
+                setStatus("error");
+                setMessage(out.message);
             } catch (error) {
                 console.error("Verification error:", error);
                 setStatus("error");
@@ -59,10 +97,27 @@ function VerifyProjectContent() {
             }
         };
 
-        // Delay slightly for better UX/Animation feel
-        const timer = setTimeout(verifyToken, 1000);
+        const bearerNow =
+            typeof window !== "undefined" ? localStorage.getItem("ciel_token") : null;
+        const delayMs =
+            bearerNow || !verificationRequireAuth() ? 600 : 0;
+
+        const timer = setTimeout(verifyToken, delayMs);
         return () => clearTimeout(timer);
-    }, [token]);
+    }, [token, pathname, searchParams, router]);
+
+    const postAuthReturn =
+        token && pathname
+            ? `${pathname}?${searchParams.toString()}`
+            : "";
+    const loginHref =
+        postAuthReturn && isSafeInternalReturnPath(postAuthReturn)
+            ? `/login?next=${encodeURIComponent(postAuthReturn)}`
+            : "/login";
+    const signupHref =
+        postAuthReturn && isSafeInternalReturnPath(postAuthReturn)
+            ? buildVerificationSignupHref(postAuthReturn)
+            : "/signup";
 
     return (
         <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6 font-outfit">
@@ -82,6 +137,13 @@ function VerifyProjectContent() {
 
                     {/* Status Illustration */}
                     <div className="mb-8 flex justify-center">
+                        {status === "auth_required" && (
+                            <div className="relative">
+                                <div className="w-24 h-24 bg-amber-50 rounded-[2rem] flex items-center justify-center">
+                                    <LogIn className="w-10 h-10 text-amber-600" />
+                                </div>
+                            </div>
+                        )}
                         {status === "loading" && (
                             <div className="relative">
                                 <div className="w-24 h-24 bg-blue-50 rounded-[2rem] flex items-center justify-center">
@@ -104,17 +166,59 @@ function VerifyProjectContent() {
 
                     {/* Messaging */}
                     <h1 className="text-2xl font-black text-slate-900 mb-3 tracking-tight">
-                        {status === "loading" ? "Validating Claim..." :
-                            status === "success" ? "Verification Successful" : "Validation Failed"}
+                        {status === "loading"
+                            ? "Validating Claim..."
+                            : status === "auth_required"
+                              ? "Login zaroori hai"
+                              : status === "success"
+                                ? "Verification Successful"
+                                : "Validation Failed"}
                     </h1>
 
-                    <p className="text-slate-500 font-medium leading-relaxed mb-10 px-4">
+                    <p className="text-slate-500 font-medium leading-relaxed px-4 mb-4">
                         {message}
                     </p>
 
+                    {status === "error" && postAuthReturn && isSafeInternalReturnPath(postAuthReturn) && (
+                        <div className="px-4 mb-6">
+                            <Link
+                                href={loginHref}
+                                className="text-sm font-semibold text-blue-600 hover:text-blue-700 underline underline-offset-2"
+                            >
+                                Login / account badlein
+                            </Link>
+                        </div>
+                    )}
+
+                    {status === "auth_required" && (
+                        <div className="text-left space-y-3 mb-8 px-2">
+                            <p className="text-xs font-medium text-amber-900/90 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2.5 leading-relaxed">
+                                {VERIFY_EMAIL_MATCH_HINT}
+                            </p>
+                            <p className="text-sm text-slate-600 leading-relaxed">{VERIFY_CTA_PROJECT_BODY}</p>
+                        </div>
+                    )}
+
                     {/* Actions */}
                     <div className="space-y-3">
-                        {status !== "loading" && (
+                        {status === "auth_required" && (
+                            <>
+                                <Link
+                                    href={loginHref}
+                                    className="flex items-center justify-center gap-2 w-full bg-slate-900 hover:bg-blue-600 text-white font-bold py-4 px-6 rounded-2xl transition-all duration-300 shadow-lg shadow-slate-200 hover:shadow-blue-200 group"
+                                >
+                                    <LogIn className="w-4 h-4 group-hover:scale-110 transition-transform" />
+                                    Login karein (mera account hai)
+                                </Link>
+                                <Link
+                                    href={signupHref}
+                                    className="flex items-center justify-center gap-2 w-full bg-white border-2 border-slate-200 hover:border-slate-300 text-slate-800 font-bold py-4 px-6 rounded-2xl transition-all duration-300"
+                                >
+                                    Sign up — naya account
+                                </Link>
+                            </>
+                        )}
+                        {status !== "loading" && status !== "auth_required" && (
                             <Link
                                 href="/"
                                 className="flex items-center justify-center gap-2 w-full bg-slate-900 hover:bg-blue-600 text-white font-bold py-4 px-6 rounded-2xl transition-all duration-300 shadow-lg shadow-slate-200 hover:shadow-blue-200 group"

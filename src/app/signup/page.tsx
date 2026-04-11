@@ -8,6 +8,7 @@ import { ArrowRight, Mail, Lock, AlertCircle, Loader2, CheckCircle, School, Land
 import Image from "next/image";
 import clsx from "clsx";
 import { pakistaniUniversities } from "@/utils/universityData";
+import { isSafeInternalReturnPath } from "@/utils/verificationReturnUrl";
 
 import { Suspense } from "react";
 
@@ -18,6 +19,8 @@ function SignUpContent() {
     const [hoveredRole, setHoveredRole] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [formError, setFormError] = useState<string | null>(null);
+    /** After signup, send user to login with this `next` (e.g. magic-link verify page). */
+    const [postAuthRedirectNext, setPostAuthRedirectNext] = useState<string | null>(null);
     const [showPassword, setShowPassword] = useState(false);
     const [errors, setErrors] = useState<Record<string, string>>({});
     const searchParams = useSearchParams();
@@ -49,6 +52,10 @@ function SignUpContent() {
         const emailParam = searchParams.get('email');
         const roleParam = searchParams.get('role');
         const tokenParam = searchParams.get('token');
+        const nextParam = searchParams.get("next");
+        if (nextParam && isSafeInternalReturnPath(nextParam)) {
+            setPostAuthRedirectNext(nextParam);
+        }
 
         if (roleParam && roles.find(r => r.id === roleParam)) {
             setRole(roleParam);
@@ -206,11 +213,12 @@ function SignUpContent() {
                 throw new Error(err.message || err.error || "Signup failed");
             }
             const signupData = await signupRes.json();
-            if (signupData.user?.status === "pending") {
-                router.push("/login?signup=pending");
-            } else {
-                router.push("/login?signup=success");
+            const loginQs = new URLSearchParams();
+            loginQs.set("signup", signupData.user?.status === "pending" ? "pending" : "success");
+            if (postAuthRedirectNext) {
+                loginQs.set("next", postAuthRedirectNext);
             }
+            router.push(`/login?${loginQs.toString()}`);
         } catch (error) {
             setOtpError(error instanceof Error ? error.message : "Verification failed");
         } finally {
