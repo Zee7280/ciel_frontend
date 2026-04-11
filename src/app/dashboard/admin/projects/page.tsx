@@ -1,120 +1,342 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Search, Filter, MoreVertical, Briefcase, Calendar, MapPin, Users, Loader2 } from "lucide-react";
-import { PaginationControls } from "@/components/ui/PaginationControls";
+import { useState, useEffect, useMemo, useCallback } from "react";
+import Link from "next/link";
+import DataTable from "react-data-table-component";
+import type { TableColumn } from "react-data-table-component";
+import { Search, Filter, MoreVertical, Briefcase, MapPin, Loader2, Eye, FileDown } from "lucide-react";
 import { authenticatedFetch } from "@/utils/api";
+import { toast } from "sonner";
+
+type AdminProjectRow = {
+    id: string;
+    title: string;
+    subtitle: string;
+    displayStatus: string;
+    statusKey: string;
+    locationLabel: string;
+    locationKey: string;
+    volunteers: number;
+    hours: number;
+    raw: Record<string, unknown>;
+};
+
+function lower(v: unknown): string {
+    if (v == null) return "";
+    return String(v).trim().toLowerCase();
+}
+
+function extractAdminProjectsList(body: unknown): Record<string, unknown>[] {
+    if (Array.isArray(body)) return body as Record<string, unknown>[];
+    if (body && typeof body === "object") {
+        const o = body as Record<string, unknown>;
+        if (o.success === false && !Array.isArray(o.data)) return [];
+        for (const k of ["data", "projects", "opportunities", "items", "results", "rows"] as const) {
+            const v = o[k];
+            if (Array.isArray(v)) return v as Record<string, unknown>[];
+        }
+    }
+    return [];
+}
+
+function pickLocation(p: Record<string, unknown>): string {
+    const loc = p.location;
+    if (typeof loc === "string" && loc.trim()) return loc.trim();
+    if (loc && typeof loc === "object") {
+        const l = loc as Record<string, unknown>;
+        const city = typeof l.city === "string" ? l.city : "";
+        const venue = typeof l.venue === "string" ? l.venue : "";
+        const joined = [venue, city].filter(Boolean).join(", ");
+        if (joined) return joined;
+    }
+    if (typeof p.city === "string" && p.city.trim()) return p.city.trim();
+    return "Unknown";
+}
+
+function subtitleFromRaw(raw: Record<string, unknown>): string {
+    const c = raw.creator && typeof raw.creator === "object" ? (raw.creator as Record<string, unknown>) : null;
+    const fromCreator = c && typeof c.name === "string" ? c.name.trim() : "";
+    return (
+        (typeof raw.partner_name === "string" && raw.partner_name.trim()) ||
+        (typeof raw.org === "string" && raw.org.trim()) ||
+        (typeof raw.organization_name === "string" && raw.organization_name.trim()) ||
+        fromCreator ||
+        "—"
+    );
+}
+
+function normalizeAdminProjectRow(raw: Record<string, unknown>): AdminProjectRow | null {
+    const id = String(raw.id ?? raw.opportunity_id ?? "").trim();
+    if (!id) return null;
+    const title = typeof raw.title === "string" && raw.title.trim() ? raw.title.trim() : "Untitled";
+    const workflow = lower(raw.workflow_stage ?? raw.approval_stage);
+    const status = lower(raw.status);
+    const fac = lower(raw.faculty_approval_status);
+    const part = lower(raw.partner_approval_status);
+
+    let statusKey = workflow || status || "unknown";
+    if (!workflow && status === "pending" && fac === "pending") statusKey = "pending_faculty";
+    if (!workflow && fac === "approved" && part === "pending") statusKey = "pending_partner";
+
+    let displayStatus = statusKey.replace(/_/g, " ").trim() || "unknown";
+    if (workflow) displayStatus = String(raw.workflow_stage ?? raw.approval_stage ?? displayStatus).replace(/_/g, " ");
+    else if (status) displayStatus = String(raw.status).replace(/_/g, " ");
+    displayStatus = displayStatus.toUpperCase();
+
+    const timeline = raw.timeline && typeof raw.timeline === "object" ? (raw.timeline as Record<string, unknown>) : null;
+    const volunteers =
+        Number(raw.volunteers ?? raw.volunteers_count ?? raw.volunteers_required ?? timeline?.volunteers_required) || 0;
+    const hours =
+        Number(raw.hours ?? raw.total_hours ?? raw.verified_hours ?? timeline?.expected_hours ?? raw.impact_hours) || 0;
+
+    return {
+        id,
+        title,
+        subtitle: subtitleFromRaw(raw),
+        displayStatus,
+        statusKey,
+        locationLabel: pickLocation(raw),
+        locationKey: pickLocation(raw).toLowerCase(),
+        volunteers,
+        hours,
+        raw,
+    };
+}
+
+function statusBadgeClass(statusKey: string): string {
+    const s = statusKey.toLowerCase();
+    if (s === "active" || s === "live" || s === "approved") return "bg-emerald-50 text-emerald-700 border border-emerald-200";
+    if (s === "completed") return "bg-blue-50 text-blue-700 border border-blue-200";
+    if (s === "rejected") return "bg-rose-50 text-rose-700 border border-rose-200";
+    if (s.includes("pending_faculty") || s === "pending_faculty" || s.includes("faculty"))
+        return "bg-slate-100 text-slate-700 border border-slate-200";
+    if (s.includes("pending_partner") || s.includes("partner")) return "bg-violet-50 text-violet-800 border border-violet-200";
+    if (s.includes("pending_admin") || s.includes("pending_approval") || s.includes("admin"))
+        return "bg-amber-50 text-amber-800 border border-amber-200";
+    return "bg-slate-50 text-slate-600 border border-slate-200";
+}
 
 export default function AdminProjectsPage() {
-    const [projects, setProjects] = useState<any[]>([]);
+    const [rows, setRows] = useState<AdminProjectRow[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState("");
-    const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
-    const [currentPage, setCurrentPage] = useState(1);
-    const [itemsPerPage] = useState(10);
+    const [statusFilter, setStatusFilter] = useState("all");
+    const [locationFilter, setLocationFilter] = useState("all");
+    const [activeMenu, setActiveMenu] = useState<{ id: string; top: number; right: number } | null>(null);
 
-    useEffect(() => {
-        const fetchProjects = async () => {
-            setIsLoading(true);
-            try {
-                const res = await authenticatedFetch(`/api/v1/admin/projects`);
-                if (res && res.ok) {
-                    const data = await res.json();
-                    if (data.success || Array.isArray(data.data)) {
-                        setProjects(data.data || data);
-                    }
-                }
-            } catch (error) {
-                console.error("Failed to fetch projects", error);
-            } finally {
-                setIsLoading(false);
+    const loadProjects = useCallback(async () => {
+        setIsLoading(true);
+        try {
+            const res = await authenticatedFetch(`/api/v1/admin/projects`);
+            if (!res || !res.ok) {
+                const err = res ? await res.json().catch(() => ({})) : {};
+                toast.error(typeof (err as { error?: string }).error === "string" ? (err as { error: string }).error : "Could not load projects");
+                setRows([]);
+                return;
             }
-        };
-
-        fetchProjects();
+            const data = await res.json();
+            const list = extractAdminProjectsList(data);
+            const mapped = list.map(normalizeAdminProjectRow).filter(Boolean) as AdminProjectRow[];
+            setRows(mapped);
+        } catch (e) {
+            console.error(e);
+            toast.error("Failed to load projects");
+            setRows([]);
+        } finally {
+            setIsLoading(false);
+        }
     }, []);
 
-    const handleExport = () => {
-        if (!projects.length) return;
+    useEffect(() => {
+        void loadProjects();
+    }, [loadProjects]);
 
-        const headers = ["ID", "Title", "Organization", "Status", "Volunteers", "Total Hours", "Location"];
+    useEffect(() => {
+        if (!activeMenu) return;
+        if (!rows.some((r) => r.id === activeMenu.id)) {
+            setActiveMenu(null);
+            return;
+        }
+        const close = () => setActiveMenu(null);
+        window.addEventListener("scroll", close, true);
+        window.addEventListener("resize", close);
+        return () => {
+            window.removeEventListener("scroll", close, true);
+            window.removeEventListener("resize", close);
+        };
+    }, [activeMenu, rows]);
+
+    const statusOptions = useMemo(() => {
+        const set = new Set<string>();
+        rows.forEach((r) => set.add(r.statusKey));
+        return ["all", ...Array.from(set).sort()];
+    }, [rows]);
+
+    const locationOptions = useMemo(() => {
+        const set = new Set<string>();
+        rows.forEach((r) => {
+            if (r.locationLabel && r.locationLabel !== "Unknown") set.add(r.locationLabel);
+        });
+        return ["all", ...Array.from(set).sort()];
+    }, [rows]);
+
+    const filteredRows = useMemo(() => {
+        const q = searchQuery.trim().toLowerCase();
+        return rows.filter((r) => {
+            if (statusFilter !== "all" && r.statusKey !== statusFilter) return false;
+            if (locationFilter !== "all" && r.locationLabel !== locationFilter) return false;
+            if (!q) return true;
+            return (
+                r.title.toLowerCase().includes(q) ||
+                r.subtitle.toLowerCase().includes(q) ||
+                r.locationLabel.toLowerCase().includes(q) ||
+                r.displayStatus.toLowerCase().includes(q)
+            );
+        });
+    }, [rows, searchQuery, statusFilter, locationFilter]);
+
+    const handleExport = () => {
+        if (!filteredRows.length) {
+            toast.message("No rows to export");
+            return;
+        }
+        const headers = ["ID", "Title", "Organization / creator", "Status", "Volunteers", "Hours", "Location"];
         const csvContent = [
             headers.join(","),
-            ...projects.map(p => [
-                p.id,
-                `"${p.title?.replace(/"/g, '""')}"`,
-                `"${(p.org || p.partner_name || "").replace(/"/g, '""')}"`,
-                p.status,
-                p.volunteers || p.volunteers_count || 0,
-                p.hours || p.total_hours || 0,
-                `"${(p.location || "").replace(/"/g, '""')}"`
-            ].join(","))
+            ...filteredRows.map((r) =>
+                [
+                    r.id,
+                    `"${r.title.replace(/"/g, '""')}"`,
+                    `"${r.subtitle.replace(/"/g, '""')}"`,
+                    `"${r.displayStatus.replace(/"/g, '""')}"`,
+                    r.volunteers,
+                    r.hours,
+                    `"${r.locationLabel.replace(/"/g, '""')}"`,
+                ].join(","),
+            ),
         ].join("\n");
-
-        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
         const link = document.createElement("a");
         const url = URL.createObjectURL(blob);
-        link.setAttribute("href", url);
-        link.setAttribute("download", `projects_report_${new Date().toISOString().split('T')[0]}.csv`);
-        link.style.visibility = 'hidden';
-        document.body.appendChild(link);
+        link.href = url;
+        link.download = `projects_report_${new Date().toISOString().split("T")[0]}.csv`;
         link.click();
-        document.body.removeChild(link);
-    };
-
-    const getStatusColor = (status: string) => {
-        switch (status.toLowerCase()) {
-            case 'active': return 'bg-emerald-50 text-emerald-700 border border-emerald-200';
-            case 'completed': return 'bg-blue-50 text-blue-700 border border-blue-200';
-            case 'pending_approval': return 'bg-amber-50 text-amber-700 border border-amber-200';
-            default: return 'bg-slate-50 text-slate-600 border border-slate-200';
-        }
+        URL.revokeObjectURL(url);
+        toast.success("Export started");
     };
 
     const handleStatusUpdate = async (id: string, newStatus: string) => {
         try {
             const res = await authenticatedFetch(`/api/v1/admin/opportunities/${id}/status`, {
-                method: 'PUT',
-                body: JSON.stringify({ status: newStatus })
+                method: "PUT",
+                body: JSON.stringify({ status: newStatus }),
             });
-            if (res && res.ok) {
-                // Optimistic update
-                setProjects(prev => prev.map(p => p.id === id ? { ...p, status: newStatus } : p));
-                setActiveMenuId(null);
+            if (res?.ok) {
+                toast.success("Status updated");
+                setActiveMenu(null);
+                await loadProjects();
+            } else {
+                toast.error("Could not update status");
             }
-        } catch (error) {
-            console.error("Failed to update status", error);
+        } catch {
+            toast.error("Could not update status");
         }
     };
 
-    // Close menu when clicking outside
-    useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
-            if ((event.target as HTMLElement).closest('.menu-trigger')) return;
-            setActiveMenuId(null);
-        };
-        document.addEventListener('click', handleClickOutside);
-        return () => document.removeEventListener('click', handleClickOutside);
-    }, []);
+    const activeMenuRow = activeMenu ? rows.find((r) => r.id === activeMenu.id) : null;
 
-    const filteredProjects = projects.filter(project => {
-        const searchLower = searchQuery.toLowerCase();
-        return (
-            project.title?.toLowerCase().includes(searchLower) ||
-            (project.org || project.partner_name)?.toLowerCase().includes(searchLower) ||
-            project.location?.toLowerCase().includes(searchLower)
-        );
-    });
-
-    const totalPages = Math.ceil(filteredProjects.length / itemsPerPage);
-    const paginatedProjects = filteredProjects.slice(
-        (currentPage - 1) * itemsPerPage,
-        currentPage * itemsPerPage
-    );
-
-    useEffect(() => {
-        setCurrentPage(1);
-    }, [searchQuery]);
+    const columns: TableColumn<AdminProjectRow>[] = [
+        {
+            name: "Project",
+            grow: 2,
+            sortable: true,
+            selector: (r) => r.title,
+            cell: (r) => (
+                <div className="py-2 pr-2">
+                    <Link
+                        href={`/dashboard/student/browse/${encodeURIComponent(r.id)}`}
+                        className="font-bold text-slate-900 hover:text-blue-600 transition-colors line-clamp-1"
+                    >
+                        {r.title}
+                    </Link>
+                    <div className="text-xs text-slate-500 font-medium flex items-center gap-1.5 mt-0.5">
+                        <Briefcase className="w-3 h-3 shrink-0" />
+                        <span className="line-clamp-1">{r.subtitle}</span>
+                    </div>
+                </div>
+            ),
+        },
+        {
+            name: "Status",
+            sortable: true,
+            selector: (r) => r.displayStatus,
+            cell: (r) => (
+                <span
+                    className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${statusBadgeClass(r.statusKey)}`}
+                >
+                    {r.displayStatus}
+                </span>
+            ),
+        },
+        {
+            name: "Location",
+            sortable: true,
+            selector: (r) => r.locationLabel,
+            cell: (r) => (
+                <div className="flex items-center gap-1.5 text-xs text-slate-600 font-medium">
+                    <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                    <span className="line-clamp-2">{r.locationLabel}</span>
+                </div>
+            ),
+        },
+        {
+            name: "Volunteers",
+            sortable: true,
+            width: "120px",
+            selector: (r) => r.volunteers,
+            cell: (r) => (
+                <div className="text-center w-full">
+                    <span className="text-sm font-bold text-slate-900">{r.volunteers}</span>
+                </div>
+            ),
+        },
+        {
+            name: "Hours",
+            sortable: true,
+            width: "100px",
+            selector: (r) => r.hours,
+            cell: (r) => (
+                <div className="text-center w-full">
+                    <span className="text-sm font-bold text-slate-900">{r.hours}</span>
+                </div>
+            ),
+        },
+        {
+            name: "Actions",
+            width: "88px",
+            cell: (r) => (
+                <div className="relative flex justify-end py-1 w-full">
+                    <button
+                        type="button"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            const rect = e.currentTarget.getBoundingClientRect();
+                            setActiveMenu((prev) =>
+                                prev?.id === r.id
+                                    ? null
+                                    : { id: r.id, top: rect.bottom + 6, right: window.innerWidth - rect.right },
+                            );
+                        }}
+                        className="admin-project-menu-trigger text-slate-400 hover:text-slate-600 p-1.5 rounded-full hover:bg-slate-200 transition-colors"
+                        aria-label="Actions"
+                        aria-expanded={activeMenu?.id === r.id}
+                    >
+                        <MoreVertical className="w-4 h-4" />
+                    </button>
+                </div>
+            ),
+        },
+    ];
 
     return (
         <div className="p-8 max-w-7xl mx-auto">
@@ -124,152 +346,144 @@ export default function AdminProjectsPage() {
                     <p className="text-slate-500 mt-1 text-base">Monitor all active and past social impact projects.</p>
                 </div>
                 <button
+                    type="button"
                     onClick={handleExport}
-                    className="bg-slate-900 text-white px-5 py-2.5 rounded-xl font-bold text-sm hover:bg-slate-800 transition-all shadow-lg shadow-slate-200 flex items-center gap-2"
+                    disabled={!filteredRows.length}
+                    className="bg-slate-900 text-white px-5 py-2.5 rounded-xl font-bold text-sm hover:bg-slate-800 transition-all shadow-lg shadow-slate-200 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                    <Briefcase className="w-4 h-4" /> Export Report
+                    <FileDown className="w-4 h-4" /> Export report
                 </button>
             </div>
 
-            {/* Filters */}
-            <div className="bg-white p-2 rounded-2xl border border-slate-200 shadow-sm mb-8 flex flex-col md:flex-row gap-3">
-                <div className="relative flex-1">
+            <div className="bg-white p-2 rounded-2xl border border-slate-200 shadow-sm mb-6 flex flex-col lg:flex-row gap-3">
+                <div className="relative flex-1 min-w-0">
                     <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                     <input
-                        type="text"
+                        type="search"
                         placeholder="Search projects..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-50 border-transparent focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-50/50 transition-all outline-none font-medium text-slate-700 text-sm"
+                        className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-50 border border-transparent focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-50/50 transition-all outline-none font-medium text-slate-700 text-sm"
                     />
                 </div>
-                <div className="flex gap-3">
-                    <button className="flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-600 hover:bg-slate-50 hover:border-slate-300 font-bold text-xs transition-all uppercase tracking-wide">
-                        <Filter className="w-3.5 h-3.5" /> Status
-                    </button>
-                    <button className="flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-600 hover:bg-slate-50 hover:border-slate-300 font-bold text-xs transition-all uppercase tracking-wide">
-                        <MapPin className="w-3.5 h-3.5" /> Location
-                    </button>
+                <div className="flex flex-wrap gap-3 shrink-0">
+                    <div className="relative min-w-[160px]">
+                        <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
+                        <select
+                            value={statusFilter}
+                            onChange={(e) => setStatusFilter(e.target.value)}
+                            className="w-full pl-9 pr-8 py-2.5 rounded-xl border border-slate-200 text-xs font-bold uppercase tracking-wide text-slate-700 bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none appearance-none cursor-pointer"
+                            aria-label="Filter by status"
+                        >
+                            {statusOptions.map((opt) => (
+                                <option key={opt} value={opt}>
+                                    {opt === "all" ? "All statuses" : opt.replace(/_/g, " ")}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                    <div className="relative min-w-[160px]">
+                        <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
+                        <select
+                            value={locationFilter}
+                            onChange={(e) => setLocationFilter(e.target.value)}
+                            className="w-full pl-9 pr-8 py-2.5 rounded-xl border border-slate-200 text-xs font-bold uppercase tracking-wide text-slate-700 bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none appearance-none cursor-pointer"
+                            aria-label="Filter by location"
+                        >
+                            {locationOptions.map((opt) => (
+                                <option key={opt} value={opt}>
+                                    {opt === "all" ? "All locations" : opt}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
                 </div>
             </div>
 
-            {isLoading ? (
-                <div className="flex justify-center py-32">
-                    <Loader2 className="w-10 h-10 animate-spin text-blue-600" />
-                </div>
-            ) : filteredProjects.length === 0 ? (
-                <div className="text-center py-32 bg-slate-50 rounded-3xl border border-dashed border-slate-300">
-                    <Briefcase className="w-12 h-12 text-slate-300 mx-auto mb-4" />
-                    <h3 className="text-lg font-bold text-slate-900">No projects found</h3>
-                    <p className="text-slate-500">Try adjusting your filters or search query.</p>
-                </div>
-            ) : (
-                <>
-                    <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
-                        <table className="w-full text-left border-collapse">
-                            <thead>
-                                <tr className="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wider">
-                                    <th className="px-6 py-4">Project</th>
-                                    <th className="px-6 py-4">Status</th>
-                                    <th className="px-6 py-4">Location</th>
-                                    <th className="px-6 py-4 text-center">Volunteers</th>
-                                    <th className="px-6 py-4 text-center">Hours</th>
-                                    <th className="px-6 py-4 text-right">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100">
-                                {paginatedProjects.map((project) => (
-                                    <tr key={project.id} className="hover:bg-slate-50/80 transition-colors group">
-                                        <td className="px-6 py-4">
-                                            <div>
-                                                <div className="font-bold text-slate-900 line-clamp-1 group-hover:text-blue-600 transition-colors">
-                                                    {project.title}
-                                                </div>
-                                                <div className="text-xs text-slate-500 font-medium flex items-center gap-1.5 mt-0.5">
-                                                    <Briefcase className="w-3 h-3" />
-                                                    {project.org || project.partner_name || "Unknown Organization"}
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border ${getStatusColor(project.status || 'pending_approval')}`}>
-                                                {project.status?.replace('_', ' ') || 'Pending'}
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <div className="flex items-center gap-1.5 text-xs text-slate-600 font-medium">
-                                                <MapPin className="w-3.5 h-3.5 text-slate-400" />
-                                                {project.location || "N/A"}
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4 text-center">
-                                            <div className="text-sm font-bold text-slate-900">{project.volunteers || project.volunteers_count || 0}</div>
-                                        </td>
-                                        <td className="px-6 py-4 text-center">
-                                            <div className="text-sm font-bold text-slate-900">{project.hours || project.total_hours || 0}</div>
-                                        </td>
-                                        <td className="px-6 py-4 text-right relative">
-                                            <button
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    setActiveMenuId(activeMenuId === project.id ? null : project.id);
-                                                }}
-                                                className="menu-trigger text-slate-400 hover:text-slate-600 p-1.5 rounded-full hover:bg-slate-200 transition-colors"
-                                            >
-                                                <MoreVertical className="w-4 h-4" />
-                                            </button>
-
-                                            {/* Dropdown Menu */}
-                                            {activeMenuId === project.id && (
-                                                <div
-                                                    className="absolute right-8 top-8 w-48 bg-white rounded-xl shadow-xl border border-slate-100 z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-100"
-                                                    onClick={(e) => e.stopPropagation()}
-                                                >
-                                                    <div className="p-1">
-                                                        {project.status === 'active' && (
-                                                            <button
-                                                                onClick={() => handleStatusUpdate(project.id, 'pending_approval')}
-                                                                className="w-full text-left px-3 py-2 text-sm font-medium text-amber-600 hover:bg-amber-50 rounded-lg flex items-center gap-2"
-                                                            >
-                                                                Revert to Pending
-                                                            </button>
-                                                        )}
-                                                        {project.status === 'pending_approval' && (
-                                                            <button
-                                                                onClick={() => handleStatusUpdate(project.id, 'active')}
-                                                                className="w-full text-left px-3 py-2 text-sm font-medium text-green-600 hover:bg-green-50 rounded-lg flex items-center gap-2"
-                                                            >
-                                                                Approve Project
-                                                            </button>
-                                                        )}
-                                                        {project.status !== 'rejected' && (
-                                                            <button
-                                                                onClick={() => handleStatusUpdate(project.id, 'rejected')}
-                                                                className="w-full text-left px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50 rounded-lg flex items-center gap-2"
-                                                            >
-                                                                Reject Project
-                                                            </button>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-visible min-h-[320px]">
+                {filteredRows.length === 0 && !isLoading ? (
+                    <div className="text-center py-24 px-4">
+                        <Briefcase className="w-12 h-12 text-slate-300 mx-auto mb-4" />
+                        <h3 className="text-lg font-bold text-slate-900">No projects found</h3>
+                        <p className="text-slate-500 text-sm mt-1">Try adjusting search or filters, or check the API response.</p>
                     </div>
-
-                    {/* Pagination Controls */}
-                    <PaginationControls
-                        currentPage={currentPage}
-                        totalPages={totalPages}
-                        onPageChange={setCurrentPage}
-                        totalItems={filteredProjects.length}
-                        itemsPerPage={itemsPerPage}
+                ) : (
+                    <DataTable<AdminProjectRow>
+                        columns={columns}
+                        data={filteredRows}
+                        progressPending={isLoading}
+                        pagination
+                        paginationPerPage={10}
+                        paginationRowsPerPageOptions={[10, 25, 50, 100]}
+                        highlightOnHover
+                        responsive
+                        dense
+                        customStyles={{
+                            headRow: {
+                                style: {
+                                    backgroundColor: "#f8fafc",
+                                    borderBottomWidth: "1px",
+                                    borderBottomColor: "#e2e8f0",
+                                    fontSize: "11px",
+                                    fontWeight: 700,
+                                    textTransform: "uppercase",
+                                    letterSpacing: "0.05em",
+                                    color: "#64748b",
+                                },
+                            },
+                            table: { style: { overflow: "visible" } },
+                            tableWrapper: { style: { overflow: "visible" } },
+                            rows: { style: { overflow: "visible", position: "relative" } },
+                            cells: { style: { overflow: "visible" } },
+                        }}
                     />
-                </>
-            )}
+                )}
+                {activeMenu && activeMenuRow && (
+                    <>
+                        <div className="fixed inset-0 z-40" aria-hidden onClick={() => setActiveMenu(null)} />
+                        <div
+                            role="menu"
+                            className="admin-project-menu-panel fixed w-52 bg-white rounded-xl shadow-xl border border-slate-100 z-50 overflow-hidden text-left py-0.5"
+                            style={{ top: activeMenu.top, right: activeMenu.right }}
+                        >
+                            <Link
+                                href={`/dashboard/student/browse/${encodeURIComponent(activeMenuRow.id)}`}
+                                className="flex items-center gap-2 w-full px-3 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                                onClick={() => setActiveMenu(null)}
+                            >
+                                <Eye className="w-4 h-4" /> View details
+                            </Link>
+                            {lower(activeMenuRow.raw.status) === "active" && (
+                                <button
+                                    type="button"
+                                    onClick={() => void handleStatusUpdate(activeMenuRow.id, "pending_approval")}
+                                    className="w-full text-left px-3 py-2.5 text-sm font-medium text-amber-700 hover:bg-amber-50 flex items-center gap-2"
+                                >
+                                    Revert to pending
+                                </button>
+                            )}
+                            {lower(activeMenuRow.raw.status) === "pending_approval" && (
+                                <button
+                                    type="button"
+                                    onClick={() => void handleStatusUpdate(activeMenuRow.id, "active")}
+                                    className="w-full text-left px-3 py-2.5 text-sm font-medium text-green-700 hover:bg-green-50 flex items-center gap-2"
+                                >
+                                    Mark active
+                                </button>
+                            )}
+                            {lower(activeMenuRow.raw.status) !== "rejected" && (
+                                <button
+                                    type="button"
+                                    onClick={() => void handleStatusUpdate(activeMenuRow.id, "rejected")}
+                                    className="w-full text-left px-3 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50 flex items-center gap-2"
+                                >
+                                    Reject
+                                </button>
+                            )}
+                        </div>
+                    </>
+                )}
+            </div>
         </div>
     );
 }

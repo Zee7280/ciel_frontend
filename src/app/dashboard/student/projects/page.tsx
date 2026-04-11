@@ -23,6 +23,16 @@ interface TeamMember {
     is_verified?: boolean;
 }
 
+/** Raw approval fields from API — shown under journey copy for student–backend sync. */
+function formatStudentProjectApprovalLine(project: Project): string | null {
+    const bits: string[] = [];
+    if (project.workflow_stage) bits.push(`Workflow: ${project.workflow_stage}`);
+    if (project.faculty_approval_status) bits.push(`Faculty: ${project.faculty_approval_status}`);
+    if (project.partner_approval_status) bits.push(`Partner: ${project.partner_approval_status}`);
+    if (project.admin_approval_status) bits.push(`Admin: ${project.admin_approval_status}`);
+    return bits.length ? bits.join(" · ") : null;
+}
+
 interface Project {
     id: string;
     title: string;
@@ -152,6 +162,7 @@ export default function MyProjectsPage() {
                         const pRecord = project as unknown as Record<string, unknown>;
                         const live = isStudentOpportunityLiveForReporting(pRecord);
                         const workflow = resolveStudentOpportunityWorkflow(pRecord);
+                        const approvalLine = formatStudentProjectApprovalLine(project);
                         const statusBadgeClass = live
                             ? project.status === "completed"
                                 ? "bg-slate-100 text-slate-700"
@@ -246,9 +257,16 @@ export default function MyProjectsPage() {
                                         </div>
                                     )}
                                     {!live && (
-                                        <p className="text-xs text-amber-800 bg-amber-50/80 border border-amber-100 rounded-lg px-3 py-2 mt-2 max-w-2xl">
-                                            {workflow.queueMessage}
-                                        </p>
+                                        <div className="mt-2 max-w-2xl space-y-1">
+                                            <p className="text-xs text-amber-800 bg-amber-50/80 border border-amber-100 rounded-lg px-3 py-2">
+                                                {workflow.queueMessage}
+                                            </p>
+                                            {approvalLine ? (
+                                                <p className="text-[10px] text-slate-600 font-mono bg-slate-50 border border-slate-100 rounded-lg px-3 py-1.5">
+                                                    {approvalLine}
+                                                </p>
+                                            ) : null}
+                                        </div>
                                     )}
                                 </div>
                             </div>
@@ -283,13 +301,27 @@ export default function MyProjectsPage() {
                                     </>
                                 )}
 
+                                {/* Temporarily hidden — restore `isStudentCreatedOpp` + Pencil import when re-enabling
+                                {isStudentCreatedOpp && !live ? (
+                                    <Link
+                                        href={`/dashboard/student/create-opportunity?edit=${encodeURIComponent(project.id)}`}
+                                        className="w-full md:w-auto"
+                                    >
+                                        <Button variant="outline" className="w-full md:w-auto gap-1.5">
+                                            <Pencil className="w-4 h-4" /> Edit
+                                        </Button>
+                                    </Link>
+                                ) : null}
+                                */}
                                 <Link
                                     href={(project.report_status === 'verified' || project.report_status === 'paid')
                                         ? `/dashboard/student/report?projectId=${project.id}`
                                         : `/dashboard/student/browse/${project.id}`}
                                     className="w-full md:w-auto"
                                 >
-                                    <Button variant="outline" className="w-full md:w-auto">View Details</Button>
+                                    <Button variant="outline" className="w-full md:w-auto gap-1.5">
+                                        <Eye className="w-4 h-4" /> View Details
+                                    </Button>
                                 </Link>
                             </div>
                         </div>

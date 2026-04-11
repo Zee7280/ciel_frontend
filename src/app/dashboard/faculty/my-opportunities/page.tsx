@@ -64,7 +64,8 @@ export default function FacultyMyOpportunitiesPage() {
                 <div>
                     <h1 className="text-2xl font-bold text-slate-900">My Opportunities</h1>
                     <p className="text-slate-500 text-sm mt-1">
-                        Opportunities you created. Edit details or track approval status.
+                        Opportunities you created. Approval order: optional partner (if you added one) → CIEL Admin → LIVE.
+                        After approval, monitor applicants and use Student Grading for academic oversight.
                     </p>
                 </div>
                 <Link href="/dashboard/faculty/create-opportunity">

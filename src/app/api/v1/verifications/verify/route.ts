@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
+import { resolveBackendApiV1Base } from "@/utils/backendApiV1Base";
 
 /**
- * Proxy route for verification link from emails.
- * Handles GET /api/v1/verifications/verify?token=...
+ * Proxy: GET /api/v1/verifications/verify?token=…
+ *
+ * Backend emails should use the same public URL for faculty and partner magic links
+ * (token encodes role). Align `VERIFICATION_EMAIL_LINK` / API base in MailService with this route
+ * so the browser hits same-origin Next first, then this proxies to `{apiBase}/verifications/verify`.
  */
 export async function GET(req: NextRequest) {
     try {
@@ -16,9 +20,17 @@ export async function GET(req: NextRequest) {
             );
         }
 
-        const backendUrl = `${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/verifications/verify?token=${token}`;
+        const apiBase = resolveBackendApiV1Base();
+        if (!apiBase) {
+            return NextResponse.json(
+                { success: false, message: "Server misconfiguration: backend URL not set" },
+                { status: 500 },
+            );
+        }
 
-        console.log(`[Proxy] Verifying token: ${token} at ${backendUrl}`);
+        const backendUrl = `${apiBase}/verifications/verify?token=${encodeURIComponent(token)}`;
+
+        console.log(`[Proxy] Verifying token at ${apiBase}/verifications/verify`);
 
         const response = await fetch(backendUrl, {
             method: "GET",

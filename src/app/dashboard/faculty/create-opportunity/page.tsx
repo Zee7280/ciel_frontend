@@ -184,13 +184,7 @@ export default function FacultyOpportunityCreationPage() {
             toast.error("Please select an SDG Target (Section C)");
             return false;
         }
-        for (let i = 0; i < formData.secondarySdgs.length; i++) {
-            const s = formData.secondarySdgs[i];
-            if (s.sdgId && !s.targetId.trim()) {
-                toast.error(`Please select a target for Secondary SDG ${i + 1} (Section C)`);
-                return false;
-            }
-        }
+        // Secondary SDGs (C4): optional; rows without a target are not sent in secondary_sdgs (see payload filter).
 
         // Section D
         if (!formData.objectives.description.trim()) {
@@ -464,7 +458,11 @@ export default function FacultyOpportunityCreationPage() {
                 const data = await res.json();
                 // Check for success flag OR direct object return (id/title)
                 if (data.success || data.id || data.title) {
-                    toast.success(isEdit ? "Opportunity updated successfully!" : "Opportunity created successfully!");
+                    toast.success(
+                        isEdit
+                            ? "Opportunity updated successfully."
+                            : "Opportunity submitted. Track partner (if any) and admin approval under My Opportunities.",
+                    );
                     router.push(isEdit ? "/dashboard/faculty/my-opportunities" : "/dashboard/faculty");
                 } else {
                     toast.error(data.message || (isEdit ? "Failed to update opportunity" : "Failed to create opportunity"));
@@ -717,7 +715,7 @@ export default function FacultyOpportunityCreationPage() {
                 <p className="text-slate-500">
                     {editingOpportunityId
                         ? "Update your posting. Some fields may be restricted after approval."
-                        : "Post an SDG-aligned opportunity for students (same workflow as partner postings)."}
+                        : "Post an SDG-aligned opportunity for students. After you submit: if you added an external partner, they confirm first; then CIEL Admin gives final approval. When admin approves, the listing goes LIVE."}
                 </p>
                 {isLoadingEdit ? (
                     <div className="mt-3 flex items-center gap-2 text-sm text-slate-600">
@@ -1216,7 +1214,9 @@ export default function FacultyOpportunityCreationPage() {
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                                 {/* Target Dropdown */}
                                                 <div>
-                                                    <label className="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-wider">Select Target</label>
+                                                    <label className="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-wider">
+                                                        Select Target <span className="font-normal normal-case text-slate-400">(optional)</span>
+                                                    </label>
                                                     <select
                                                         className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-purple-500 outline-none text-xs font-bold bg-white"
                                                         value={item.targetId}
@@ -1236,7 +1236,9 @@ export default function FacultyOpportunityCreationPage() {
 
                                                 {/* Indicator Dropdown */}
                                                 <div className={!item.targetId ? "opacity-50 pointer-events-none" : ""}>
-                                                    <label className="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-wider">Select Indicator</label>
+                                                    <label className="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-wider">
+                                                        Select Indicator <span className="font-normal normal-case text-slate-400">(optional)</span>
+                                                    </label>
                                                     <select
                                                         className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-purple-500 outline-none text-xs font-bold bg-white"
                                                         value={item.indicatorId}

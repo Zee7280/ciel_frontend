@@ -4,10 +4,11 @@ import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { CheckCircle2, XCircle, Loader2, Home, ExternalLink } from "lucide-react";
 import Link from "next/link";
+import { friendlyVerificationVerifyMessage } from "@/utils/verificationVerifyUx";
 
 /**
- * CIEL Project Verification Page
- * Handles liaison verification via token-based URL.
+ * CIEL verification landing (faculty, partner, or liaison — role is in the token only).
+ * Always calls same-origin GET /api/v1/verifications/verify?token=… (Next proxy → backend).
  */
 function VerifyProjectContent() {
     const searchParams = useSearchParams();
@@ -25,24 +26,31 @@ function VerifyProjectContent() {
 
         const verifyToken = async () => {
             try {
-                // Using the local API proxy to handle the verification
-                const backendUrl = `${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/verifications/verify?token=${token}`;
-
-                const response = await fetch(backendUrl, {
+                // Always hit Next proxy (correct /api/v1 path + same-origin); avoids wrong BACKEND_BASE_URL in browser.
+                const response = await fetch(`/api/v1/verifications/verify?token=${encodeURIComponent(token)}`, {
                     method: "GET",
-                    headers: {
-                        "Content-Type": "application/json",
-                    },
+                    headers: { Accept: "application/json" },
                 });
 
-                const data = await response.json();
+                const data = (await response.json().catch(() => ({}))) as {
+                    success?: boolean;
+                    message?: string;
+                };
 
-                if (response.ok && data.success) {
+                if (response.ok && data.success === true) {
                     setStatus("success");
-                    setMessage(data.message || "Project verified successfully! Thank you for your contribution to the community.");
+                    setMessage(
+                        typeof data.message === "string" && data.message.trim()
+                            ? data.message
+                            : "Verification completed. Thank you.",
+                    );
                 } else {
                     setStatus("error");
-                    setMessage(data.message || "Failed to verify project. The link may have expired or is already used.");
+                    const raw =
+                        typeof data.message === "string" && data.message.trim()
+                            ? data.message
+                            : "Failed to verify. The link may have expired or was already used.";
+                    setMessage(friendlyVerificationVerifyMessage(raw, response.status) || raw);
                 }
             } catch (error) {
                 console.error("Verification error:", error);

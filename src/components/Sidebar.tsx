@@ -3,10 +3,15 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useLayoutEffect } from "react";
 import { LayoutDashboard, BookOpen, Users, Settings, PieChart, LogOut, FileText, Heart, Building2, CheckCircle, Briefcase, FileBarChart, ShieldAlert, Bell, User, Flag, MessageSquare, Plus, CreditCard } from "lucide-react";
 import clsx from "clsx";
 import { authenticatedFetch } from "@/utils/api";
+import {
+    dashboardNavRoleFromPathname,
+    readDashboardNavRoleFromStorage,
+    type DashboardNavRole,
+} from "@/utils/dashboardNavRole";
 
 export default function Sidebar() {
     const pathname = usePathname();
@@ -39,11 +44,18 @@ export default function Sidebar() {
         return () => clearInterval(interval);
     }, []);
 
-    // Determine role based on path (simple logic for now)
-    const isStudent = pathname.includes("/student");
-    const isPartner = pathname.includes("/partner");
-    const isFaculty = pathname.includes("/faculty");
-    const isAdmin = pathname.includes("/admin");
+    const [navRole, setNavRole] = useState<DashboardNavRole>(() => dashboardNavRoleFromPathname(pathname));
+
+    useLayoutEffect(() => {
+        const fromUser = readDashboardNavRoleFromStorage();
+        if (fromUser) setNavRole(fromUser);
+        else setNavRole(dashboardNavRoleFromPathname(pathname));
+    }, [pathname]);
+
+    const isStudent = navRole === "student";
+    const isPartner = navRole === "partner";
+    const isFaculty = navRole === "faculty";
+    const isAdmin = navRole === "admin";
 
     // Helper icons import
     function FolderOpen(props: any) { return <FileText {...props} /> }
@@ -90,7 +102,7 @@ export default function Sidebar() {
             { label: "Organizations", href: "/dashboard/admin/organizations", icon: Building2 },
             { label: "Approvals", href: "/dashboard/admin/approvals", icon: CheckCircle },
             { label: "Payments", href: "/dashboard/admin/payments", icon: CreditCard },
-            { label: "Projects", href: "/dashboard/admin/projects", icon: Briefcase },
+            { label: "All projects", href: "/dashboard/admin/projects", icon: Briefcase },
             { label: "Student Reports", href: "/dashboard/admin/reports/verify", icon: FileText },
             { label: "Impact", href: "/dashboard/admin/impact", icon: FileBarChart },
             { label: "Messages", href: "/dashboard/admin/messages", icon: MessageSquare },

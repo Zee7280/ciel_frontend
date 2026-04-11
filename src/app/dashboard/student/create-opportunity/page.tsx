@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import dynamic from 'next/dynamic';
 import { findSdgById, opportunityFormSdgList } from "@/utils/sdgData";
 import { isStudentProfileComplete, isValidEmailFormat, pickProfileEmail } from "@/utils/profileCompletion";
+import { mapOpportunityDetailToStudentForm } from "./mapDetailToStudentForm";
 
 // Dynamically import LocationPicker to avoid SSR issues with Leaflet
 const LocationPicker = dynamic(() => import('@/components/ui/LocationPicker'), {
@@ -23,6 +24,16 @@ const ACTIVITY_TYPES_MAIN = [
 /** Timeline modes that collect start/end date + daily from/to time (sent as timeline.* on create). */
 /** Show optional schedule fields for these timeline types. */
 const TIMELINES_WITH_SCHEDULE_UI = ["Fixed dates", "Flexible", "Ongoing"] as const;
+
+const BENEFICIARY_PREDEFINED = [
+    "Children",
+    "Youth",
+    "Women",
+    "Elderly",
+    "Persons with disabilities",
+    "Students",
+    "Community members",
+] as const;
 
 function isValidEmail(s: string): boolean {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s.trim());
@@ -48,10 +59,33 @@ function readCachedStudentUser(): unknown | null {
     }
 }
 
+const STUDENT_OPPORTUNITY_DRAFT_KEY = "ciel_student_create_opportunity_draft_v1";
+
+function isPlainObject(x: unknown): x is Record<string, unknown> {
+    return typeof x === "object" && x !== null && !Array.isArray(x);
+}
+
+/** Merge saved draft over current form state (nested objects, arrays replaced from draft). */
+function deepMergeDraft<T extends Record<string, unknown>>(target: T, source: Record<string, unknown>): T {
+    const out = { ...target } as Record<string, unknown>;
+    for (const key of Object.keys(source)) {
+        const s = source[key];
+        const t = out[key];
+        if (isPlainObject(s) && isPlainObject(t)) {
+            out[key] = deepMergeDraft(t, s);
+        } else if (s !== undefined) {
+            out[key] = s;
+        }
+    }
+    return out as T;
+}
+
 export default function StudentOpportunityCreationPage() {
     const router = useRouter();
     const [isLoadingProfile, setIsLoadingProfile] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [editingOpportunityId, setEditingOpportunityId] = useState<string | null>(null);
+    const [isLoadingEdit, setIsLoadingEdit] = useState(false);
 
     // Student Details State
     const [studentDetails, setStudentDetails] = useState({
@@ -87,7 +121,9 @@ export default function StudentOpportunityCreationPage() {
         objectives: {
             description: "",
             beneficiariesCount: "",
-            beneficiariesType: [] as string[]
+            beneficiariesType: [] as string[],
+            isOtherBeneficiaryChecked: false,
+            otherBeneficiarySpecs: [""] as string[],
         },
 
         // Section E
@@ -180,6 +216,29 @@ export default function StudentOpportunityCreationPage() {
             toast.error("Please select a Timeline Type (Section B)");
             return false;
         }
+        if (formData.timelineType === "Fixed dates") {
+            if (!formData.dates.start.trim() || !formData.dates.end.trim()) {
+                toast.error("Fixed dates requires both a start date and an end date (Section B5)");
+                return false;
+            }
+            if (formData.dates.start > formData.dates.end) {
+                toast.error("End date must be on or after the start date (Section B5)");
+                return false;
+            }
+        }
+
+        const hoursNum = parseInt(formData.capacity.hours, 10);
+        if (!formData.capacity.hours.trim() || Number.isNaN(hoursNum) || hoursNum <= 0) {
+            toast.error("Please enter expected hours per student as a positive number (Section B5)");
+            return false;
+        }
+
+        const volNum = parseInt(formData.capacity.volunteers, 10);
+        if (!formData.capacity.volunteers.trim() || Number.isNaN(volNum) || volNum < 2 || volNum > 20) {
+            toast.error("Team size must be between 2 and 20 (Section B5)");
+            return false;
+        }
+
         // Section C
         if (!formData.sdg) {
             toast.error("Please select a Primary SDG (Section C)");
@@ -205,10 +264,43 @@ export default function StudentOpportunityCreationPage() {
             toast.error("Please enter Project Objectives (Section D)");
             return false;
         }
+        const benStr = formData.objectives.beneficiariesCount.trim();
+        const benNum = parseInt(benStr, 10);
+        if (!benStr || Number.isNaN(benNum) || benNum < 1) {
+            toast.error("Please enter the expected number of beneficiaries (at least 1) in Section D2");
+            return false;
+        }
+        if (formData.objectives.isOtherBeneficiaryChecked) {
+            const ob = formData.objectives.otherBeneficiarySpecs.map((s) => s.trim()).filter(Boolean);
+            if (ob.length === 0) {
+                toast.error("Please add at least one other beneficiary type (Section D)");
+                return false;
+            }
+        }
+        const predefinedSelected = formData.objectives.beneficiariesType.filter((t) =>
+            (BENEFICIARY_PREDEFINED as readonly string[]).includes(t),
+        );
+        const otherFilled =
+            formData.objectives.isOtherBeneficiaryChecked &&
+            formData.objectives.otherBeneficiarySpecs.some((s) => s.trim().length > 0);
+        if (predefinedSelected.length === 0 && !otherFilled) {
+            toast.error("Select at least one beneficiary type or add an “Other” type (Section D)");
+            return false;
+        }
 
         // Section E
         if (!formData.activity.responsibilities.trim()) {
             toast.error("Please list Student Responsibilities (Section E)");
+            return false;
+        }
+        const mergedSkills = formData.activity.isOtherSkillChecked
+            ? [
+                  ...formData.activity.skills,
+                  ...formData.activity.otherSkills.map((s) => s.trim()).filter(Boolean),
+              ]
+            : formData.activity.skills;
+        if (mergedSkills.length === 0) {
+            toast.error("Select at least one skill to be gained, or add skills under Other (Section E)");
             return false;
         }
 
@@ -271,10 +363,16 @@ export default function StudentOpportunityCreationPage() {
             return false;
         }
 
+        if (formData.verification.length === 0) {
+            toast.error("Select at least one verification method in Section G");
+            return false;
+        }
+
         return true;
     };
 
     const handleSubmit = async () => {
+        if (isLoadingEdit) return;
         if (!validateForm()) return;
 
         setIsSubmitting(true);
@@ -286,6 +384,14 @@ export default function StudentOpportunityCreationPage() {
                     ...formData.otherActivitySpecs.map((s) => s.trim()).filter(Boolean).map((s) => `Other: ${s}`),
                 ]
                 : formData.opportunityType;
+
+            const predefinedBenef = BENEFICIARY_PREDEFINED as readonly string[];
+            const otherBeneficiaryMerged = formData.objectives.isOtherBeneficiaryChecked
+                ? [
+                      ...formData.objectives.beneficiariesType.filter((t) => predefinedBenef.includes(t)),
+                      ...formData.objectives.otherBeneficiarySpecs.map((s) => s.trim()).filter(Boolean),
+                  ]
+                : formData.objectives.beneficiariesType.filter((t) => predefinedBenef.includes(t));
 
             // Transform state to match API Spec
             const payload = {
@@ -327,7 +433,7 @@ export default function StudentOpportunityCreationPage() {
                 objectives: {
                     description: formData.objectives.description,
                     beneficiaries_count: parseInt(formData.objectives.beneficiariesCount) || 0,
-                    beneficiaries_type: formData.objectives.beneficiariesType
+                    beneficiaries_type: otherBeneficiaryMerged,
                 },
                 activity_details: {
                     student_responsibilities: formData.activity.responsibilities,
@@ -337,6 +443,8 @@ export default function StudentOpportunityCreationPage() {
                         : formData.activity.skills
                 },
                 // Legacy supervision block (keys preserved for existing admin/API consumers)
+                // Faculty-created flow also sends `external_partner_*` + `external_partner_collaboration`;
+                // backend email/verification jobs expect those names, so mirror them for student + partner.
                 supervision: {
                     supervisor_name: formData.supervision.facultyName.trim(),
                     role: formData.supervision.facultyDesignation.trim(),
@@ -348,6 +456,9 @@ export default function StudentOpportunityCreationPage() {
                               partner_org_name: formData.supervision.partnerOrgName.trim(),
                               partner_contact_person: formData.supervision.partnerContactPerson.trim(),
                               partner_email: formData.supervision.partnerEmail.trim(),
+                              external_partner_org_name: formData.supervision.partnerOrgName.trim(),
+                              external_partner_contact_person: formData.supervision.partnerContactPerson.trim(),
+                              external_partner_email: formData.supervision.partnerEmail.trim(),
                           }
                         : {}),
                     safe_environment:
@@ -359,6 +470,21 @@ export default function StudentOpportunityCreationPage() {
                         formData.sectionFConfirmations.genuineAccurate &&
                         formData.sectionFConfirmations.truthfulVerifiable,
                 },
+                ...(formData.supervision.executingContext === "partner"
+                    ? {
+                          external_partner_collaboration: {
+                              organization_name: formData.supervision.partnerOrgName.trim(),
+                              contact_person: formData.supervision.partnerContactPerson.trim(),
+                              official_email: formData.supervision.partnerEmail.trim(),
+                          },
+                          // Backend partner email resolution includes partner_organization.official_email
+                          partner_organization: {
+                              organization_name: formData.supervision.partnerOrgName.trim(),
+                              contact_person: formData.supervision.partnerContactPerson.trim(),
+                              official_email: formData.supervision.partnerEmail.trim(),
+                          },
+                      }
+                    : { external_partner_collaboration: null }),
                 executing_context: {
                     type: formData.supervision.executingContext,
                     ...(formData.supervision.executingContext === "partner"
@@ -377,17 +503,18 @@ export default function StudentOpportunityCreationPage() {
                               },
                           }),
                 },
+                // Must match ciel_backend OpportunitiesService.validateSafetyDeclaration / validateSubmissionConfirmations
                 safety_declaration: {
                     environment_safe_and_appropriate: formData.supervision.declSafeEnvironment,
-                    no_hazardous_or_high_risk_tasks: formData.supervision.declNoHazardous,
-                    faculty_oversight_ensured: formData.supervision.declFacultyOversight,
-                    ethical_and_lawful: formData.supervision.declEthicalLawful,
+                    students_guided_and_supervised: formData.supervision.declFacultyOversight,
+                    lawful_ethical_and_non_hazardous: formData.supervision.declEthicalLawful,
+                    precautions_and_basic_safety: formData.supervision.declNoHazardous,
                 },
                 submission_confirmations: {
-                    faculty_approval_obtained_or_will_obtain: formData.sectionFConfirmations.facultyApproval,
-                    opportunity_genuine_and_accurate: formData.sectionFConfirmations.genuineAccurate,
-                    activity_safe_and_appropriate: formData.sectionFConfirmations.safeAppropriate,
-                    information_truthful_and_verifiable: formData.sectionFConfirmations.truthfulVerifiable,
+                    academically_valid_and_accurately_described: formData.sectionFConfirmations.genuineAccurate,
+                    activity_properly_supervised: formData.sectionFConfirmations.facultyApproval,
+                    environment_safe_and_appropriate: formData.sectionFConfirmations.safeAppropriate,
+                    information_correct_and_verifiable: formData.sectionFConfirmations.truthfulVerifiable,
                 },
                 participation_scope: {
                     rule: "own_university_only",
@@ -406,22 +533,64 @@ export default function StudentOpportunityCreationPage() {
                 restricted_universities: [studentDetails.institution.trim()],
             };
 
-            // Use the NEW separate API endpoint for students
-            const res = await authenticatedFetch(`/api/v1/student/opportunity`, {
-                method: 'POST',
-                body: JSON.stringify(payload)
-            });
+            const isEdit = Boolean(editingOpportunityId);
+            const editId = editingOpportunityId ?? "";
+            const res = await authenticatedFetch(
+                isEdit
+                    ? `/api/v1/student/opportunity/${encodeURIComponent(editId)}`
+                    : `/api/v1/student/opportunity`,
+                {
+                    method: isEdit ? "PATCH" : "POST",
+                    body: JSON.stringify(payload),
+                },
+            );
 
-            if (res && res.ok) {
-                const data = await res.json();
-                if (data.success || data.id || data.title) {
-                    toast.success("Opportunity created successfully!");
-                    router.push("/dashboard/student/projects"); // Redirect to projects list
-                } else {
-                    toast.error(data.message || "Failed to create opportunity");
+            if (res == null) {
+                toast.error("Session expired or not authorized. Please log in again.");
+                return;
+            }
+
+            const data = await res.json().catch(() => ({} as Record<string, unknown>));
+            const created =
+                data.success === true &&
+                (Boolean((data as { data?: { id?: string } }).data?.id) ||
+                    Boolean((data as { data?: unknown }).data));
+            const legacyShape = Boolean((data as { id?: string }).id) || Boolean((data as { title?: string }).title);
+            const updateOk =
+                isEdit &&
+                (data.success === true ||
+                    Boolean((data as { id?: string }).id) ||
+                    Boolean((data as { title?: string }).title));
+
+            if (res.ok && (updateOk || (!isEdit && (created || legacyShape)))) {
+                try {
+                    localStorage.removeItem(STUDENT_OPPORTUNITY_DRAFT_KEY);
+                } catch {
+                    /* ignore */
                 }
+                toast.success(isEdit ? "Opportunity updated successfully!" : "Opportunity created successfully!");
+                router.push("/dashboard/student/projects");
             } else {
-                toast.error("Failed to connect to server");
+                const errObj = data as {
+                    message?: string;
+                    error?: string;
+                    statusCode?: number;
+                };
+                const fromNest = Array.isArray((data as { message?: unknown }).message)
+                    ? String((data as { message: string[] }).message[0])
+                    : undefined;
+                const msg =
+                    errObj.message ||
+                    fromNest ||
+                    (typeof errObj.error === "string" ? errObj.error : undefined) ||
+                    (res.status === 401 || res.status === 403
+                        ? "Not authorized. Please log in again."
+                        : res.status >= 500
+                          ? "Server error. Try again later or contact support."
+                          : isEdit
+                            ? `Could not update opportunity (${res.status}).`
+                            : `Could not create opportunity (${res.status}).`);
+                toast.error(msg);
             }
         } catch (error) {
             console.error("Error submitting form", error);
@@ -446,6 +615,25 @@ export default function StudentOpportunityCreationPage() {
     };
 
     const [expandedSections, setExpandedSections] = useState<string[]>(["A", "B"]);
+
+    const handleSaveDraft = () => {
+        try {
+            localStorage.setItem(
+                STUDENT_OPPORTUNITY_DRAFT_KEY,
+                JSON.stringify({
+                    v: 1,
+                    savedAt: Date.now(),
+                    formData,
+                    studentDetails,
+                    expandedSections,
+                }),
+            );
+            toast.success("Draft saved on this device.");
+        } catch (e) {
+            console.error("Draft save failed", e);
+            toast.error("Could not save draft. Check browser storage.");
+        }
+    };
 
     useEffect(() => {
         const fetchProfile = async () => {
@@ -548,6 +736,37 @@ export default function StudentOpportunityCreationPage() {
                     city,
                     contact,
                 });
+
+                const editParam =
+                    typeof window !== "undefined"
+                        ? new URLSearchParams(window.location.search).get("edit")?.trim()
+                        : "";
+                if (!editParam) {
+                    try {
+                        const draftRaw = localStorage.getItem(STUDENT_OPPORTUNITY_DRAFT_KEY);
+                        if (draftRaw) {
+                            const draft = JSON.parse(draftRaw) as {
+                                formData?: Record<string, unknown>;
+                                studentDetails?: Record<string, string>;
+                                expandedSections?: string[];
+                            };
+                            if (draft.formData && typeof draft.formData === "object") {
+                                setFormData((prev) =>
+                                    deepMergeDraft(prev as unknown as Record<string, unknown>, draft.formData!) as typeof prev,
+                                );
+                            }
+                            if (draft.studentDetails && typeof draft.studentDetails === "object") {
+                                setStudentDetails((prev) => ({ ...prev, ...draft.studentDetails }));
+                            }
+                            if (Array.isArray(draft.expandedSections) && draft.expandedSections.length > 0) {
+                                setExpandedSections(draft.expandedSections);
+                            }
+                            toast.success("Saved draft restored.");
+                        }
+                    } catch {
+                        /* ignore corrupt draft */
+                    }
+                }
             } catch (error) {
                 console.error("Failed to fetch profile", error);
             } finally {
@@ -557,6 +776,86 @@ export default function StudentOpportunityCreationPage() {
 
         fetchProfile();
     }, [router]);
+
+    useEffect(() => {
+        if (typeof window === "undefined") return;
+        const e = new URLSearchParams(window.location.search).get("edit")?.trim();
+        if (e) setEditingOpportunityId(e);
+    }, []);
+
+    useEffect(() => {
+        if (!editingOpportunityId || isLoadingProfile) return;
+        let cancelled = false;
+        (async () => {
+            setIsLoadingEdit(true);
+            try {
+                const res = await authenticatedFetch(`/api/v1/opportunities/detail`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ id: editingOpportunityId }),
+                });
+                if (!res?.ok) {
+                    toast.error("Could not load this opportunity");
+                    return;
+                }
+                const json = await res.json();
+                const d = json?.data as Record<string, unknown> | undefined;
+                if (!d) {
+                    toast.error("Opportunity not found");
+                    return;
+                }
+                let myId: string | null = null;
+                try {
+                    const raw = localStorage.getItem("ciel_user") || localStorage.getItem("user");
+                    if (raw) {
+                        const u = JSON.parse(raw) as { id?: string | number; userId?: string | number };
+                        const v = u.id ?? u.userId;
+                        myId = v != null ? String(v) : null;
+                    }
+                } catch {
+                    /* ignore */
+                }
+                const creatorRaw = d.creatorId ?? d.creator_id;
+                if (myId != null && creatorRaw != null && String(creatorRaw) !== myId) {
+                    toast.error("You can only edit opportunities you created");
+                    setEditingOpportunityId(null);
+                    return;
+                }
+                const { studentDetailsPatch, formDataPatch } = mapOpportunityDetailToStudentForm(d);
+                if (cancelled) return;
+                setStudentDetails((prev) => ({
+                    ...prev,
+                    ...(studentDetailsPatch.institution?.trim() ? { institution: studentDetailsPatch.institution } : {}),
+                    ...(studentDetailsPatch.contact?.trim() ? { contact: studentDetailsPatch.contact } : {}),
+                }));
+                setFormData((prev) => {
+                    const p = formDataPatch;
+                    return {
+                        ...prev,
+                        ...p,
+                        location: { ...prev.location, ...(p.location as typeof prev.location) },
+                        dates: { ...prev.dates, ...(p.dates as typeof prev.dates) },
+                        capacity: { ...prev.capacity, ...(p.capacity as typeof prev.capacity) },
+                        objectives: { ...prev.objectives, ...(p.objectives as typeof prev.objectives) },
+                        activity: { ...prev.activity, ...(p.activity as typeof prev.activity) },
+                        supervision: { ...prev.supervision, ...(p.supervision as typeof prev.supervision) },
+                        sectionFConfirmations: {
+                            ...prev.sectionFConfirmations,
+                            ...(p.sectionFConfirmations as typeof prev.sectionFConfirmations),
+                        },
+                        participation: { ...prev.participation, ...(p.participation as typeof prev.participation) },
+                    };
+                });
+            } catch {
+                if (!cancelled) toast.error("Could not load this opportunity");
+            } finally {
+                if (!cancelled) setIsLoadingEdit(false);
+            }
+        })();
+        return () => {
+            cancelled = true;
+        };
+    }, [editingOpportunityId, isLoadingProfile]);
 
     const toggleSection = (section: string) => {
         setExpandedSections(prev =>
@@ -569,8 +868,19 @@ export default function StudentOpportunityCreationPage() {
     return (
         <div className="max-w-8xl mx-auto p-4 space-y-4 pb-24">
             <div className="mb-4">
-                <h1 className="text-3xl font-bold text-slate-900">Create Student Opportunity</h1>
-                <p className="text-slate-500">Create an SDG-aligned volunteer opportunity or project.</p>
+                <h1 className="text-3xl font-bold text-slate-900">
+                    {editingOpportunityId ? "Edit student opportunity" : "Create Student Opportunity"}
+                </h1>
+                <p className="text-slate-500">
+                    {editingOpportunityId
+                        ? "Update your opportunity and submit again for review."
+                        : "Create an SDG-aligned volunteer opportunity or project."}
+                </p>
+                {isLoadingEdit ? (
+                    <p className="text-sm text-slate-500 mt-2 flex items-center gap-2">
+                        <Loader2 className="w-4 h-4 animate-spin" /> Loading opportunity…
+                    </p>
+                ) : null}
             </div>
 
             {/* SECTION A: STUDENT DETAILS */}
@@ -1097,7 +1407,7 @@ export default function StudentOpportunityCreationPage() {
                             <div>
                                 <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Type of Beneficiaries</label>
                                 <div className="h-40 overflow-y-auto border border-slate-200 rounded-lg bg-white p-2 space-y-2">
-                                    {["Children", "Youth", "Women", "Elderly", "Persons with disabilities", "Students", "Community members"].map(b => (
+                                    {BENEFICIARY_PREDEFINED.map((b) => (
                                         <label key={b} className="flex items-center gap-2 text-sm text-slate-600">
                                             <input
                                                 type="checkbox"
@@ -1105,55 +1415,111 @@ export default function StudentOpportunityCreationPage() {
                                                 checked={formData.objectives.beneficiariesType.includes(b)}
                                                 onChange={() => {
                                                     const types = formData.objectives.beneficiariesType.includes(b)
-                                                        ? formData.objectives.beneficiariesType.filter(t => t !== b)
+                                                        ? formData.objectives.beneficiariesType.filter((t) => t !== b)
                                                         : [...formData.objectives.beneficiariesType, b];
-                                                    setFormData({ ...formData, objectives: { ...formData.objectives, beneficiariesType: types } });
+                                                    setFormData({
+                                                        ...formData,
+                                                        objectives: { ...formData.objectives, beneficiariesType: types },
+                                                    });
                                                 }}
-                                            /> {b}
+                                            />{" "}
+                                            {b}
                                         </label>
                                     ))}
-                                    <label className="flex items-center gap-2 text-sm text-slate-600">
+                                </div>
+                                <div className="mt-3">
+                                    <label
+                                        className={`flex items-center gap-2 p-3 border rounded-xl hover:bg-slate-50 cursor-pointer transition-all ${formData.objectives.isOtherBeneficiaryChecked ? "bg-teal-50 border-teal-200" : "border-slate-100"}`}
+                                    >
                                         <input
                                             type="checkbox"
                                             className="rounded text-teal-600 focus:ring-teal-500"
-                                            checked={formData.objectives.beneficiariesType.some(t => !["Children", "Youth", "Women", "Elderly", "Persons with disabilities", "Students", "Community members"].includes(t))}
-                                            onChange={(e) => {
-                                                const predefined = ["Children", "Youth", "Women", "Elderly", "Persons with disabilities", "Students", "Community members"];
-                                                if (!e.target.checked) {
-                                                    setFormData({
-                                                        ...formData,
-                                                        objectives: { ...formData.objectives, beneficiariesType: formData.objectives.beneficiariesType.filter(t => predefined.includes(t)) }
-                                                    });
-                                                } else {
-                                                    setFormData({
-                                                        ...formData,
-                                                        objectives: { ...formData.objectives, beneficiariesType: [...formData.objectives.beneficiariesType, "Other"] }
-                                                    });
-                                                }
-                                            }}
-                                        /> Other (please specify)
+                                            checked={formData.objectives.isOtherBeneficiaryChecked}
+                                            onChange={(e) =>
+                                                setFormData({
+                                                    ...formData,
+                                                    objectives: {
+                                                        ...formData.objectives,
+                                                        isOtherBeneficiaryChecked: e.target.checked,
+                                                        ...(e.target.checked ? {} : { otherBeneficiarySpecs: [""] }),
+                                                    },
+                                                })
+                                            }
+                                        />
+                                        <span
+                                            className={`text-sm font-medium ${formData.objectives.isOtherBeneficiaryChecked ? "text-teal-700" : "text-slate-600"}`}
+                                        >
+                                            Other (please specify)
+                                        </span>
                                     </label>
-                                    {formData.objectives.beneficiariesType.some(t => !["Children", "Youth", "Women", "Elderly", "Persons with disabilities", "Students", "Community members"].includes(t)) && (
-                                        <div className="pl-6 animate-in fade-in slide-in-from-top-2">
-                                            <input
-                                                type="text"
-                                                placeholder="Please specify"
-                                                className="w-full px-3 py-1.5 rounded border border-teal-200 focus:border-teal-500 outline-none text-xs"
-                                                value={formData.objectives.beneficiariesType.find(t => !["Children", "Youth", "Women", "Elderly", "Persons with disabilities", "Students", "Community members"].includes(t)) !== "Other" ? formData.objectives.beneficiariesType.find(t => !["Children", "Youth", "Women", "Elderly", "Persons with disabilities", "Students", "Community members"].includes(t)) || "" : ""}
-                                                onChange={(e) => {
-                                                    const predefined = ["Children", "Youth", "Women", "Elderly", "Persons with disabilities", "Students", "Community members"];
-                                                    const cleanTypes = formData.objectives.beneficiariesType.filter(t => predefined.includes(t));
-                                                    if (e.target.value.trim() !== "") {
-                                                        cleanTypes.push(e.target.value);
-                                                    } else {
-                                                        cleanTypes.push("Other");
-                                                    }
+                                    {formData.objectives.isOtherBeneficiaryChecked && (
+                                        <div className="mt-3 space-y-3 pl-4 border-l-2 border-teal-100">
+                                            <p className="text-xs font-bold text-slate-500 uppercase">
+                                                Add one or more other beneficiary types
+                                            </p>
+                                            {formData.objectives.otherBeneficiarySpecs.map((spec, idx) => (
+                                                <div key={idx} className="flex gap-2">
+                                                    <div className="relative flex-1">
+                                                        <input
+                                                            type="text"
+                                                            placeholder="Specify beneficiary type…"
+                                                            className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-teal-500 outline-none text-sm transition-all"
+                                                            value={spec}
+                                                            onChange={(e) => {
+                                                                const next = [...formData.objectives.otherBeneficiarySpecs];
+                                                                next[idx] = e.target.value;
+                                                                setFormData({
+                                                                    ...formData,
+                                                                    objectives: {
+                                                                        ...formData.objectives,
+                                                                        otherBeneficiarySpecs: next,
+                                                                    },
+                                                                });
+                                                            }}
+                                                        />
+                                                        {formData.objectives.otherBeneficiarySpecs.length > 1 && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    const next = formData.objectives.otherBeneficiarySpecs.filter(
+                                                                        (_, i) => i !== idx,
+                                                                    );
+                                                                    setFormData({
+                                                                        ...formData,
+                                                                        objectives: {
+                                                                            ...formData.objectives,
+                                                                            otherBeneficiarySpecs: next.length ? next : [""],
+                                                                        },
+                                                                    });
+                                                                }}
+                                                                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-red-500 transition-colors"
+                                                                aria-label="Remove row"
+                                                            >
+                                                                <X className="w-4 h-4" />
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                            <button
+                                                type="button"
+                                                onClick={() =>
                                                     setFormData({
                                                         ...formData,
-                                                        objectives: { ...formData.objectives, beneficiariesType: cleanTypes }
-                                                    });
-                                                }}
-                                            />
+                                                        objectives: {
+                                                            ...formData.objectives,
+                                                            otherBeneficiarySpecs: [
+                                                                ...formData.objectives.otherBeneficiarySpecs,
+                                                                "",
+                                                            ],
+                                                        },
+                                                    })
+                                                }
+                                                className="text-xs font-bold text-teal-600 hover:text-teal-700 flex items-center gap-1.5 px-2 py-1"
+                                            >
+                                                <Plus className="w-3.5 h-3.5" />
+                                                Add another
+                                            </button>
                                         </div>
                                     )}
                                 </div>
@@ -1707,14 +2073,27 @@ export default function StudentOpportunityCreationPage() {
                 </div>
             </div>
 
-            <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-slate-200 z-50 flex justify-end gap-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+            <div className="fixed bottom-0 left-0 md:left-64 right-0 p-4 bg-white border-t border-slate-200 z-50 flex justify-end gap-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
                 <button
+                    type="button"
+                    onClick={handleSaveDraft}
+                    className="px-6 py-2 border border-slate-200 text-slate-600 font-bold rounded-xl hover:bg-slate-50 disabled:opacity-70 disabled:cursor-not-allowed"
+                    disabled={isSubmitting || isLoadingEdit || Boolean(editingOpportunityId)}
+                >
+                    Save Draft
+                </button>
+                <button
+                    type="button"
                     onClick={handleSubmit}
-                    disabled={isSubmitting}
+                    disabled={isSubmitting || isLoadingEdit}
                     className="px-6 py-2 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 shadow-lg shadow-blue-500/30 flex items-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
                 >
                     {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-                    {isSubmitting ? "Submitting..." : "Submit Project"}
+                    {isSubmitting
+                        ? "Submitting..."
+                        : editingOpportunityId
+                          ? "Save changes"
+                          : "Submit Project"}
                 </button>
             </div>
         </div>

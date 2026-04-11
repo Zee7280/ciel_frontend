@@ -1,16 +1,20 @@
 
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Button } from "../../report/components/ui/button";
 import { Badge } from "../../report/components/ui/badge";
 import { authenticatedFetch } from "@/utils/api";
+import { isStudentOpportunityLiveForReporting } from "@/utils/opportunityWorkflow";
+import { readDashboardNavRoleFromStorage, type DashboardNavRole } from "@/utils/dashboardNavRole";
 import { Loader2, MapPin, Calendar, Clock, Globe, ArrowLeft, Building2, Share2, CheckCircle2, User, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
 import ReportSummaryPopup from "../../report/components/ReportSummaryPopup";
 
+/** Student “Edit opportunity” from this detail page — off until the next release step. */
+const SHOW_STUDENT_OPPORTUNITY_EDIT_FROM_DETAIL = false;
 
 export default function OpportunityDetailsPage() {
     const params = useParams();
@@ -21,6 +25,11 @@ export default function OpportunityDetailsPage() {
     const [isLoading, setIsLoading] = useState(true);
     const [isApplying, setIsApplying] = useState(false);
     const [isPopupOpen, setIsPopupOpen] = useState(false);
+    const [viewerNavRole, setViewerNavRole] = useState<DashboardNavRole | null>(null);
+
+    useLayoutEffect(() => {
+        setViewerNavRole(readDashboardNavRoleFromStorage() ?? "student");
+    }, []);
 
     useEffect(() => {
         if (id) {
@@ -30,25 +39,67 @@ export default function OpportunityDetailsPage() {
 
     const fetchOpportunityDetails = async () => {
         try {
-            const res = await authenticatedFetch(`/api/v1/students/opportunities/${id}`);
-            if (res && res.ok) {
-                const data = await res.json();
-                if (data.success) {
-                    console.log(data.data);
-                    const opData = data.data;
-                    setOpportunity({
-                        ...opData,
-                        hasApplied: !!opData.application_status || opData.status === 'applied'
-                    });
-                } else {
-                    toast.error(data.message || "Failed to load opportunity details");
+            let opData: Record<string, unknown> | null = null;
+
+            const resBrowse = await authenticatedFetch(`/api/v1/students/opportunities/${id}`);
+            if (resBrowse?.ok) {
+                const dataBrowse = await resBrowse.json();
+                if (dataBrowse.success && dataBrowse.data) {
+                    opData = dataBrowse.data as Record<string, unknown>;
                 }
-            } else {
-                toast.error("Failed to fetch opportunity");
             }
+
+            // Student-created opportunities (pending approval) are not on the public browse API; use detail.
+            if (!opData) {
+                const resDetail = await authenticatedFetch(`/api/v1/opportunities/detail`, {
+                    method: "POST",
+                    body: JSON.stringify({ id }),
+                });
+                if (resDetail?.ok) {
+                    const dataDetail = await resDetail.json();
+                    if (dataDetail.success && dataDetail.data) {
+                        opData = dataDetail.data as Record<string, unknown>;
+                    }
+                }
+            }
+
+            if (!opData) {
+                toast.error("Failed to fetch opportunity");
+                setOpportunity(null);
+                return;
+            }
+
+            let myId: string | null = null;
+            try {
+                const raw = localStorage.getItem("ciel_user") || localStorage.getItem("user");
+                if (raw) {
+                    const u = JSON.parse(raw) as { id?: string | number; userId?: string | number };
+                    const v = u.id ?? u.userId;
+                    myId = v != null ? String(v) : null;
+                }
+            } catch {
+                /* ignore */
+            }
+
+            const creatorRaw = opData.creatorId ?? opData.creator_id;
+            const creatorStr = creatorRaw != null ? String(creatorRaw) : "";
+            const isStudentOwner =
+                Boolean(myId && creatorStr && creatorStr === myId) ||
+                opData.is_student_created === true ||
+                String(opData.created_by_role || "").toLowerCase() === "student";
+
+            setOpportunity({
+                ...opData,
+                hasApplied:
+                    isStudentOwner ||
+                    !!opData.application_status ||
+                    opData.status === "applied",
+                isStudentOwner,
+            });
         } catch (error) {
             console.error("Error fetching opportunity", error);
             toast.error("An error occurred while loading details");
+            setOpportunity(null);
         } finally {
             setIsLoading(false);
         }
@@ -136,19 +187,48 @@ export default function OpportunityDetailsPage() {
         );
     }
 
+    const opportunitiesListHref =
+        viewerNavRole === "admin" ? "/dashboard/admin/projects" : "/dashboard/student/browse";
+    const opportunitiesBackLabel = viewerNavRole === "admin" ? "Back to all projects" : "Back to Opportunities";
+    const hideStudentApplyActions = viewerNavRole === "admin" && !opportunity.isStudentOwner;
+
     return (
         <div className="w-full space-y-8 animate-in fade-in duration-500 pb-24">
             {/* Header Actions */}
             <div className="flex justify-between items-center print:hidden">
-                <Link href="/dashboard/student/browse" className="text-slate-500 hover:text-slate-800 flex items-center gap-2 font-medium">
-                    <ArrowLeft className="w-4 h-4" /> Back to Opportunities
+                <Link href={opportunitiesListHref} className="text-slate-500 hover:text-slate-800 flex items-center gap-2 font-medium">
+                    <ArrowLeft className="w-4 h-4" /> {opportunitiesBackLabel}
                 </Link>
-                <div className="flex gap-3">
+                <div className="flex gap-3 flex-wrap justify-end">
                     <button onClick={() => window.print()} className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 font-medium">
                         <Share2 className="w-4 h-4" /> Print / Save PDF
                     </button>
 
-                    {opportunity.hasApplied ? (
+                    {!hideStudentApplyActions && opportunity.isStudentOwner ? (
+                        <div className="flex flex-col items-end gap-2">
+                            <div className="flex flex-wrap gap-2 justify-end">
+                                <Link href="/dashboard/student/projects">
+                                    <Button
+                                        variant="outline"
+                                        className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg shadow-none font-medium"
+                                    >
+                                        My Projects
+                                    </Button>
+                                </Link>
+                                {SHOW_STUDENT_OPPORTUNITY_EDIT_FROM_DETAIL &&
+                                !isStudentOpportunityLiveForReporting(opportunity as Record<string, unknown>) ? (
+                                    <Link href={`/dashboard/student/create-opportunity?edit=${encodeURIComponent(id)}`}>
+                                        <Button className="flex items-center gap-2 px-6 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 font-medium shadow-sm">
+                                            Edit opportunity
+                                        </Button>
+                                    </Link>
+                                ) : null}
+                            </div>
+                            <p className="text-[10px] text-slate-500 max-w-xs text-right">
+                                You created this listing. It becomes visible to others after approvals.
+                            </p>
+                        </div>
+                    ) : !hideStudentApplyActions && opportunity.hasApplied ? (
                         <div className="flex flex-col items-end gap-2">
                             <div className="flex items-center gap-2">
                                 {['active', 'completed'].includes(opportunity.status) && (
@@ -169,7 +249,7 @@ export default function OpportunityDetailsPage() {
                                 </p>
                             )}
                         </div>
-                    ) : (
+                    ) : !hideStudentApplyActions ? (
                         <Button
                             onClick={handleApplyClick}
                             disabled={isApplying}
@@ -177,7 +257,7 @@ export default function OpportunityDetailsPage() {
                         >
                             {isApplying ? <Loader2 className="w-4 h-4 animate-spin" /> : "Apply Now"}
                         </Button>
-                    )}
+                    ) : null}
                 </div>
             </div>
 
@@ -291,7 +371,7 @@ export default function OpportunityDetailsPage() {
                                 <p className="text-slate-600 leading-relaxed whitespace-pre-line text-sm mb-4 border-l-4 border-slate-200 pl-4">
                                     {opportunity.activity_details?.student_responsibilities || "No specific responsibilities listed."}
                                 </p>
-                                {opportunity.activity_details?.skills_gained && (
+                                {Array.isArray(opportunity.activity_details?.skills_gained) && (
                                     <div>
                                         <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-2">Skills to be Gained</span>
                                         <div className="flex flex-wrap gap-2">

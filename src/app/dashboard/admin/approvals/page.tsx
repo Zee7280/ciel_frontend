@@ -1,10 +1,137 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { CheckCircle, XCircle, FileText, UserPlus, ArrowRight, Building2, TrendingUp, Users, Search, MessageSquare } from "lucide-react";
+import { useState, useEffect, useMemo } from "react";
+import {
+    CheckCircle,
+    XCircle,
+    FileText,
+    UserPlus,
+    ArrowRight,
+    Building2,
+    TrendingUp,
+    Users,
+    Search,
+    MessageSquare,
+    Eye,
+    Loader2,
+} from "lucide-react";
 import { PaginationControls } from "@/components/ui/PaginationControls";
 import { authenticatedFetch } from "@/utils/api";
 import { useRouter } from "next/navigation";
+
+function pickDetailStr(o: Record<string, unknown> | null | undefined, ...keys: string[]): string {
+    if (!o) return "";
+    for (const k of keys) {
+        const v = o[k];
+        if (typeof v === "string" && v.trim()) return v.trim();
+    }
+    return "";
+}
+
+function stakeholderRows(d: Record<string, unknown>): {
+    student: { name: string; email: string; id: string; university: string; department: string; phone: string };
+    facultyEmail: string;
+    facultyName: string;
+    partnerOrg: string;
+    partnerPerson: string;
+    partnerEmail: string;
+} {
+    const user = d.user && typeof d.user === "object" ? (d.user as Record<string, unknown>) : null;
+    const student = d.student && typeof d.student === "object" ? (d.student as Record<string, unknown>) : null;
+    const creator = d.creator && typeof d.creator === "object" ? (d.creator as Record<string, unknown>) : null;
+    const profile =
+        d.student_profile && typeof d.student_profile === "object"
+            ? (d.student_profile as Record<string, unknown>)
+            : d.creator_profile && typeof d.creator_profile === "object"
+              ? (d.creator_profile as Record<string, unknown>)
+              : null;
+
+    const studentName =
+        pickDetailStr(creator, "name", "full_name", "fullName") ||
+        pickDetailStr(d, "creator_name", "student_name", "submitted_by_name", "owner_name") ||
+        pickDetailStr(student, "name", "full_name", "fullName") ||
+        pickDetailStr(user, "name", "fullName") ||
+        pickDetailStr(profile, "name", "full_name");
+    const studentEmail =
+        pickDetailStr(creator, "email") ||
+        pickDetailStr(d, "creator_email", "student_email", "submitted_by_email", "owner_email") ||
+        pickDetailStr(student, "email") ||
+        pickDetailStr(user, "email") ||
+        pickDetailStr(profile, "email");
+    const studentId =
+        pickDetailStr(creator, "id", "user_id") ||
+        pickDetailStr(d, "creator_id", "student_id", "student_user_id", "created_by", "owner_id") ||
+        pickDetailStr(student, "id", "user_id") ||
+        pickDetailStr(user, "id") ||
+        pickDetailStr(profile, "id", "user_id");
+    const university =
+        pickDetailStr(creator, "university", "institution") ||
+        pickDetailStr(d, "creator_university", "student_university") ||
+        pickDetailStr(student, "university", "institution") ||
+        pickDetailStr(profile, "university", "institution");
+    const department =
+        pickDetailStr(creator, "department") ||
+        pickDetailStr(d, "creator_department", "student_department") ||
+        pickDetailStr(student, "department") ||
+        pickDetailStr(profile, "department");
+    const phone =
+        (typeof d.student_contact === "string" && d.student_contact.trim()) ||
+        pickDetailStr(creator, "phone", "contact", "mobile") ||
+        pickDetailStr(student, "phone", "contact", "mobile") ||
+        pickDetailStr(user, "phone", "contact", "mobile") ||
+        pickDetailStr(profile, "phone", "contact", "mobile");
+
+    const sup = d.supervision && typeof d.supervision === "object" ? (d.supervision as Record<string, unknown>) : null;
+    const ext =
+        d.external_partner_collaboration && typeof d.external_partner_collaboration === "object"
+            ? (d.external_partner_collaboration as Record<string, unknown>)
+            : null;
+    const ex =
+        d.executing_context && typeof d.executing_context === "object"
+            ? (d.executing_context as Record<string, unknown>)
+            : d.executingContext && typeof d.executingContext === "object"
+              ? (d.executingContext as Record<string, unknown>)
+              : null;
+    const exP = ex?.partner && typeof ex.partner === "object" ? (ex.partner as Record<string, unknown>) : null;
+    const po =
+        d.partner_organization && typeof d.partner_organization === "object"
+            ? (d.partner_organization as Record<string, unknown>)
+            : null;
+
+    const facultyEmail = pickDetailStr(sup, "contact", "official_email", "faculty_email");
+    const facultyName = pickDetailStr(sup, "supervisor_name", "supervisorName");
+    const partnerOrg =
+        pickDetailStr(sup, "partner_org_name", "external_partner_org_name") ||
+        pickDetailStr(ext, "organization_name") ||
+        pickDetailStr(exP, "organization_name") ||
+        pickDetailStr(po, "organization_name", "name");
+    const partnerPerson =
+        pickDetailStr(sup, "partner_contact_person", "external_partner_contact_person") ||
+        pickDetailStr(ext, "contact_person") ||
+        pickDetailStr(exP, "contact_person") ||
+        pickDetailStr(po, "contact_person");
+    const partnerEmail =
+        pickDetailStr(sup, "partner_email", "external_partner_email") ||
+        pickDetailStr(ext, "official_email") ||
+        pickDetailStr(exP, "official_email") ||
+        pickDetailStr(po, "official_email", "email");
+
+    return {
+        student: {
+            name: studentName,
+            email: studentEmail,
+            id: studentId,
+            university,
+            department,
+            phone,
+        },
+        facultyEmail,
+        facultyName,
+        partnerOrg,
+        partnerPerson,
+        partnerEmail,
+    };
+}
 
 export default function AdminApprovalsPage() {
     const router = useRouter();
@@ -21,6 +148,8 @@ export default function AdminApprovalsPage() {
     // Modal States
     const [selectedOpportunity, setSelectedOpportunity] = useState<any | null>(null);
     const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+    const [opportunityDetail, setOpportunityDetail] = useState<Record<string, unknown> | null>(null);
+    const [opportunityDetailLoading, setOpportunityDetailLoading] = useState(false);
 
     const [rejectId, setRejectId] = useState<string | null>(null);
     const [rejectType, setRejectType] = useState<'opportunity' | 'user'>('opportunity');
@@ -41,8 +170,22 @@ export default function AdminApprovalsPage() {
             const res = await authenticatedFetch(`/api/v1/admin/opportunities/pending`);
             if (res && res.ok) {
                 const data = await res.json();
-                if (data.success) {
-                    setOpportunities(data.data || []);
+                const raw =
+                    (Array.isArray(data.data) && data.data) ||
+                    (Array.isArray(data.opportunities) && data.opportunities) ||
+                    (Array.isArray(data.items) && data.items) ||
+                    (Array.isArray(data) ? data : []);
+                if (data.success !== false && Array.isArray(raw)) {
+                    setOpportunities(raw);
+                } else {
+                    setOpportunities([]);
+                }
+            } else if (res && !res.ok) {
+                try {
+                    const err = await res.json();
+                    console.error("Pending opportunities:", err?.message || res.status);
+                } catch {
+                    /* ignore */
                 }
             }
         } catch (error) {
@@ -189,6 +332,47 @@ export default function AdminApprovalsPage() {
         setCurrentPage(1);
     }, [activeTab, searchQuery]);
 
+    useEffect(() => {
+        if (!isDetailModalOpen || !selectedOpportunity?.id) {
+            setOpportunityDetail(null);
+            return;
+        }
+        let cancelled = false;
+        (async () => {
+            setOpportunityDetailLoading(true);
+            setOpportunityDetail(null);
+            try {
+                const res = await authenticatedFetch(`/api/v1/opportunities/detail`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ id: selectedOpportunity.id }),
+                });
+                if (!res?.ok || cancelled) return;
+                const json = await res.json();
+                const d = json?.data as Record<string, unknown> | undefined;
+                if (!cancelled && d && typeof d === "object") {
+                    setOpportunityDetail(d);
+                }
+            } catch {
+                if (!cancelled) setOpportunityDetail(null);
+            } finally {
+                if (!cancelled) setOpportunityDetailLoading(false);
+            }
+        })();
+        return () => {
+            cancelled = true;
+        };
+    }, [isDetailModalOpen, selectedOpportunity?.id]);
+
+    const adminDetailView = useMemo(() => {
+        if (!selectedOpportunity) return null;
+        const d = opportunityDetail;
+        if (d && typeof d === "object") {
+            return { ...selectedOpportunity, ...d } as Record<string, unknown>;
+        }
+        return selectedOpportunity as Record<string, unknown>;
+    }, [selectedOpportunity, opportunityDetail]);
+
     return (
         <div className="p-8">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
@@ -233,6 +417,16 @@ export default function AdminApprovalsPage() {
                     {activeTab === "projects" && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-blue-600 rounded-t-full"></div>}
                 </button>
             </div>
+
+            {activeTab === "projects" && (
+                <div className="mb-4 rounded-lg border border-blue-100 bg-blue-50/90 px-4 py-3 text-sm text-slate-700">
+                    <span className="font-semibold text-slate-900">CIEL final approval only.</span> This list is for
+                    opportunities in the admin queue (typically status{" "}
+                    <code className="text-xs bg-white/90 px-1.5 py-0.5 rounded border border-blue-100">pending_approval</code>
+                    ), after faculty and partner steps where they apply. Faculty and partner work happens in their own
+                    dashboards or email links — not missing from here by accident.
+                </div>
+            )}
 
             <div className="grid grid-cols-1 gap-4">
                 {activeTab === "registrations" ? (
@@ -283,15 +477,28 @@ export default function AdminApprovalsPage() {
                                     <span>• Submitted: {proj.submitted_at ? new Date(proj.submitted_at).toLocaleDateString() : "N/A"}</span>
                                 </div>
                             </div>
-                            <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-2 sm:gap-3 flex-wrap justify-end">
                                 <button
+                                    type="button"
+                                    title="View full opportunity details"
+                                    aria-label="View opportunity details"
                                     onClick={() => {
                                         setSelectedOpportunity(proj);
                                         setIsDetailModalOpen(true);
                                     }}
-                                    className="text-slate-400 hover:text-blue-600 text-sm font-bold flex items-center gap-1 mr-4"
+                                    className="p-2.5 rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-200 transition-colors shadow-sm"
                                 >
-                                    View Details <ArrowRight className="w-4 h-4" />
+                                    <Eye className="w-5 h-5" />
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setSelectedOpportunity(proj);
+                                        setIsDetailModalOpen(true);
+                                    }}
+                                    className="text-slate-500 hover:text-blue-600 text-sm font-bold hidden sm:flex items-center gap-1"
+                                >
+                                    Details <ArrowRight className="w-4 h-4" />
                                 </button>
                                 <button
                                     onClick={() => handleRejectClick(proj.id, 'opportunity')}
@@ -335,42 +542,191 @@ export default function AdminApprovalsPage() {
                 />
             )}
             {/* View Details Modal */}
-            {
-                isDetailModalOpen && selectedOpportunity && (
+            {isDetailModalOpen && selectedOpportunity && adminDetailView && (
                     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
                         <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6 shadow-2xl animate-in zoom-in-95 duration-200">
                             <div className="flex justify-between items-start mb-6 border-b border-slate-100 pb-4">
                                 <div>
-                                    <h2 className="text-2xl font-bold text-slate-900">{selectedOpportunity.title}</h2>
-                                    <p className="text-slate-500">{selectedOpportunity.partner_name}</p>
+                                    <h2 className="text-2xl font-bold text-slate-900">
+                                        {String(adminDetailView.title ?? selectedOpportunity.title ?? "Opportunity")}
+                                    </h2>
+                                    <p className="text-slate-500">
+                                        {String(
+                                            adminDetailView.partner_name ??
+                                                selectedOpportunity.partner_name ??
+                                                "Pending opportunity",
+                                        )}
+                                    </p>
                                 </div>
-                                <button onClick={() => setIsDetailModalOpen(false)} className="text-slate-400 hover:text-slate-600">
+                                <button
+                                    onClick={() => {
+                                        setIsDetailModalOpen(false);
+                                        setOpportunityDetail(null);
+                                    }}
+                                    className="text-slate-400 hover:text-slate-600"
+                                >
                                     <XCircle className="w-6 h-6" />
                                 </button>
                             </div>
 
-                            <div className="space-y-8 pr-2">
+                            {opportunityDetailLoading ? (
+                                <div className="flex flex-col items-center justify-center py-16 text-slate-500 gap-2">
+                                    <Loader2 className="w-10 h-10 animate-spin text-blue-500" />
+                                    <p className="text-sm font-medium">Loading full record (student, faculty, partner)…</p>
+                                </div>
+                            ) : null}
+
+                            <div className={`space-y-8 pr-2 ${opportunityDetailLoading ? "opacity-50 pointer-events-none" : ""}`}>
+                                {(() => {
+                                    const v = adminDetailView as Record<string, unknown>;
+                                    const sh = stakeholderRows(v);
+                                    const hasStudent =
+                                        sh.student.name ||
+                                        sh.student.email ||
+                                        sh.student.id ||
+                                        sh.student.university ||
+                                        sh.student.department ||
+                                        sh.student.phone;
+                                    const hasFaculty = sh.facultyName || sh.facultyEmail;
+                                    const hasPartner = sh.partnerOrg || sh.partnerPerson || sh.partnerEmail;
+                                    const wfBits = [
+                                        v.workflow_stage ? `Workflow: ${String(v.workflow_stage)}` : "",
+                                        v.faculty_approval_status ? `Faculty: ${String(v.faculty_approval_status)}` : "",
+                                        v.partner_approval_status ? `Partner: ${String(v.partner_approval_status)}` : "",
+                                        v.admin_approval_status ? `Admin: ${String(v.admin_approval_status)}` : "",
+                                    ].filter(Boolean);
+                                    return (
+                                        <>
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                            {hasStudent ? (
+                                                <div className="rounded-xl border border-blue-100 bg-blue-50/50 p-4 md:col-span-1">
+                                                    <h3 className="text-xs font-bold text-blue-800 uppercase tracking-wider mb-2">
+                                                        Student
+                                                    </h3>
+                                                    <ul className="text-sm text-slate-800 space-y-1">
+                                                        {sh.student.name ? (
+                                                            <li>
+                                                                <span className="text-slate-500">Name:</span> {sh.student.name}
+                                                            </li>
+                                                        ) : null}
+                                                        {sh.student.email ? (
+                                                            <li>
+                                                                <span className="text-slate-500">Email:</span> {sh.student.email}
+                                                            </li>
+                                                        ) : null}
+                                                        {sh.student.id ? (
+                                                            <li>
+                                                                <span className="text-slate-500">Id:</span> {sh.student.id}
+                                                            </li>
+                                                        ) : null}
+                                                        {sh.student.university ? (
+                                                            <li>
+                                                                <span className="text-slate-500">University:</span> {sh.student.university}
+                                                            </li>
+                                                        ) : null}
+                                                        {sh.student.department ? (
+                                                            <li>
+                                                                <span className="text-slate-500">Department:</span> {sh.student.department}
+                                                            </li>
+                                                        ) : null}
+                                                        {sh.student.phone ? (
+                                                            <li>
+                                                                <span className="text-slate-500">Contact:</span> {sh.student.phone}
+                                                            </li>
+                                                        ) : null}
+                                                    </ul>
+                                                </div>
+                                            ) : null}
+                                            {hasFaculty ? (
+                                                <div className="rounded-xl border border-orange-100 bg-orange-50/50 p-4 md:col-span-1">
+                                                    <h3 className="text-xs font-bold text-orange-900 uppercase tracking-wider mb-2">
+                                                        Faculty
+                                                    </h3>
+                                                    <ul className="text-sm text-slate-800 space-y-1">
+                                                        {sh.facultyName ? (
+                                                            <li>
+                                                                <span className="text-slate-500">Supervisor:</span> {sh.facultyName}
+                                                            </li>
+                                                        ) : null}
+                                                        {sh.facultyEmail ? (
+                                                            <li>
+                                                                <span className="text-slate-500">Official email:</span> {sh.facultyEmail}
+                                                            </li>
+                                                        ) : null}
+                                                    </ul>
+                                                </div>
+                                            ) : null}
+                                            {hasPartner ? (
+                                                <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-4 md:col-span-1">
+                                                    <h3 className="text-xs font-bold text-amber-900 uppercase tracking-wider mb-2">
+                                                        Partner
+                                                    </h3>
+                                                    <ul className="text-sm text-slate-800 space-y-1">
+                                                        {sh.partnerOrg ? (
+                                                            <li>
+                                                                <span className="text-slate-500">Organization:</span> {sh.partnerOrg}
+                                                            </li>
+                                                        ) : null}
+                                                        {sh.partnerPerson ? (
+                                                            <li>
+                                                                <span className="text-slate-500">Contact:</span> {sh.partnerPerson}
+                                                            </li>
+                                                        ) : null}
+                                                        {sh.partnerEmail ? (
+                                                            <li>
+                                                                <span className="text-slate-500">Email:</span> {sh.partnerEmail}
+                                                            </li>
+                                                        ) : null}
+                                                    </ul>
+                                                </div>
+                                            ) : (
+                                                <div className="rounded-xl border border-slate-100 bg-slate-50 p-4 md:col-span-1 flex items-center">
+                                                    <p className="text-xs text-slate-500">
+                                                        No external partner on this record (student-led or independent context).
+                                                    </p>
+                                                </div>
+                                            )}
+                                        </div>
+                                        {wfBits.length > 0 ? (
+                                            <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-slate-700">
+                                                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">
+                                                    Approval pipeline (backend fields)
+                                                </p>
+                                                <p className="text-xs font-mono leading-relaxed">{wfBits.join(" · ")}</p>
+                                                {v.is_student_created === true ? (
+                                                    <p className="text-[10px] text-slate-500 mt-2">Student-created opportunity</p>
+                                                ) : null}
+                                            </div>
+                                        ) : null}
+                                        </>
+                                    );
+                                })()}
+
                                 {/* Section 1: Overview & Logistics */}
                                 <div>
                                     <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 border-b border-slate-100 pb-2">Overview & Logistics</h3>
                                     <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
                                         <div>
                                             <span className="text-xs text-slate-500 block mb-1">Mode</span>
-                                            <span className="font-bold text-slate-900 bg-slate-100 px-2 py-1 rounded text-sm">{selectedOpportunity.mode || "N/A"}</span>
+                                            <span className="font-bold text-slate-900 bg-slate-100 px-2 py-1 rounded text-sm">{String(adminDetailView.mode ?? "N/A")}</span>
                                         </div>
                                         <div>
                                             <span className="text-xs text-slate-500 block mb-1">Location</span>
                                             <span className="font-bold text-slate-900 text-sm">
-                                                {selectedOpportunity.location ? `${selectedOpportunity.location.venue || ''}, ${selectedOpportunity.location.city || ''}` : "Remote"}
+                                                {adminDetailView.location
+                                                    ? `${(adminDetailView.location as { venue?: string }).venue || ""}, ${(adminDetailView.location as { city?: string }).city || ""}`
+                                                    : "Remote"}
                                             </span>
                                         </div>
                                         <div>
                                             <span className="text-xs text-slate-500 block mb-1">Timeline Type</span>
-                                            <span className="font-bold text-slate-900 text-sm">{selectedOpportunity.timeline?.type || "N/A"}</span>
+                                            <span className="font-bold text-slate-900 text-sm">
+                                                {String((adminDetailView.timeline as { type?: string } | undefined)?.type || "N/A")}
+                                            </span>
                                         </div>
                                         <div>
                                             <span className="text-xs text-slate-500 block mb-1">Visibility</span>
-                                            <span className="font-bold text-slate-900 text-sm capitalize">{selectedOpportunity.visibility || "Public"}</span>
+                                            <span className="font-bold text-slate-900 text-sm capitalize">{String(adminDetailView.visibility || "Public")}</span>
                                         </div>
                                     </div>
 
@@ -378,22 +734,35 @@ export default function AdminApprovalsPage() {
                                         <div>
                                             <span className="text-xs text-slate-500 block mb-1">Start Date</span>
                                             <span className="font-bold text-slate-900 text-sm">
-                                                {selectedOpportunity.timeline?.start_date ? new Date(selectedOpportunity.timeline.start_date).toLocaleDateString() : "TBD"}
+                                                {(adminDetailView.timeline as { start_date?: string } | undefined)?.start_date
+                                                    ? new Date(
+                                                          String((adminDetailView.timeline as { start_date?: string }).start_date),
+                                                      ).toLocaleDateString()
+                                                    : "TBD"}
                                             </span>
                                         </div>
                                         <div>
                                             <span className="text-xs text-slate-500 block mb-1">End Date</span>
                                             <span className="font-bold text-slate-900 text-sm">
-                                                {selectedOpportunity.timeline?.end_date ? new Date(selectedOpportunity.timeline.end_date).toLocaleDateString() : "TBD"}
+                                                {(adminDetailView.timeline as { end_date?: string } | undefined)?.end_date
+                                                    ? new Date(
+                                                          String((adminDetailView.timeline as { end_date?: string }).end_date),
+                                                      ).toLocaleDateString()
+                                                    : "TBD"}
                                             </span>
                                         </div>
                                         <div>
                                             <span className="text-xs text-slate-500 block mb-1">Expected Hours (Per Student)</span>
-                                            <span className="font-bold text-slate-900 text-sm">{selectedOpportunity.timeline?.expected_hours || 0} hrs/student</span>
+                                            <span className="font-bold text-slate-900 text-sm">
+                                                {Number((adminDetailView.timeline as { expected_hours?: number } | undefined)?.expected_hours) || 0}{" "}
+                                                hrs/student
+                                            </span>
                                         </div>
                                         <div>
                                             <span className="text-xs text-slate-500 block mb-1">Volunteers Needed</span>
-                                            <span className="font-bold text-slate-900 text-sm">{selectedOpportunity.timeline?.volunteers_required || 0}</span>
+                                            <span className="font-bold text-slate-900 text-sm">
+                                                {Number((adminDetailView.timeline as { volunteers_required?: number } | undefined)?.volunteers_required) || 0}
+                                            </span>
                                         </div>
                                     </div>
                                 </div>
@@ -407,20 +776,30 @@ export default function AdminApprovalsPage() {
                                         <div>
                                             <span className="text-xs text-slate-500 block mb-1">Project Objective</span>
                                             <p className="text-sm text-slate-700 bg-teal-50/50 p-3 rounded-lg border border-teal-100 whitespace-pre-wrap">
-                                                {selectedOpportunity.objectives?.description || selectedOpportunity.description || "No objective provided."}
+                                                {String(
+                                                    (adminDetailView.objectives as { description?: string } | undefined)?.description ||
+                                                        adminDetailView.description ||
+                                                        "No objective provided.",
+                                                )}
                                             </p>
                                         </div>
                                         <div className="grid grid-cols-2 gap-6">
                                             <div>
                                                 <span className="text-xs text-slate-500 block mb-1">Beneficiaries Count</span>
-                                                <span className="font-bold text-slate-900 text-sm">{selectedOpportunity.objectives?.beneficiaries_count || 0}</span>
+                                                <span className="font-bold text-slate-900 text-sm">
+                                                    {Number((adminDetailView.objectives as { beneficiaries_count?: number } | undefined)?.beneficiaries_count) || 0}
+                                                </span>
                                             </div>
                                             <div>
                                                 <span className="text-xs text-slate-500 block mb-1">Beneficiary Types</span>
                                                 <div className="flex flex-wrap gap-1">
-                                                    {selectedOpportunity.objectives?.beneficiaries_type?.map((t: string, i: number) => (
-                                                        <span key={i} className="text-xs bg-slate-100 px-2 py-0.5 rounded text-slate-600">{t}</span>
-                                                    )) || "N/A"}
+                                                    {(
+                                                        (adminDetailView.objectives as { beneficiaries_type?: string[] } | undefined)?.beneficiaries_type || []
+                                                    ).map((t: string, i: number) => (
+                                                        <span key={i} className="text-xs bg-slate-100 px-2 py-0.5 rounded text-slate-600">
+                                                            {t}
+                                                        </span>
+                                                    )) || <span className="text-xs text-slate-500">N/A</span>}
                                                 </div>
                                             </div>
                                         </div>
@@ -435,15 +814,21 @@ export default function AdminApprovalsPage() {
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                         <div className="bg-purple-50 p-3 rounded-xl border border-purple-100">
                                             <span className="text-xs text-purple-600 block mb-1 font-bold">Primary SDG</span>
-                                            <span className="font-bold text-slate-900 text-sm block">SDG {selectedOpportunity.sdg_info?.sdg_id || "N/A"}</span>
+                                            <span className="font-bold text-slate-900 text-sm block">
+                                                SDG {(adminDetailView.sdg_info as { sdg_id?: string | number } | undefined)?.sdg_id ?? "N/A"}
+                                            </span>
                                         </div>
                                         <div className="bg-purple-50 p-3 rounded-xl border border-purple-100">
                                             <span className="text-xs text-purple-600 block mb-1 font-bold">Target</span>
-                                            <span className="font-bold text-slate-900 text-sm block">{selectedOpportunity.sdg_info?.target_id || "N/A"}</span>
+                                            <span className="font-bold text-slate-900 text-sm block">
+                                                {(adminDetailView.sdg_info as { target_id?: string | number } | undefined)?.target_id ?? "N/A"}
+                                            </span>
                                         </div>
                                         <div className="bg-purple-50 p-3 rounded-xl border border-purple-100">
                                             <span className="text-xs text-purple-600 block mb-1 font-bold">Indicator</span>
-                                            <span className="font-bold text-slate-900 text-sm block">{selectedOpportunity.sdg_info?.indicator_id || "N/A"}</span>
+                                            <span className="font-bold text-slate-900 text-sm block">
+                                                {(adminDetailView.sdg_info as { indicator_id?: string | number } | undefined)?.indicator_id ?? "N/A"}
+                                            </span>
                                         </div>
                                     </div>
                                 </div>
@@ -457,17 +842,25 @@ export default function AdminApprovalsPage() {
                                         <div>
                                             <span className="text-xs text-slate-500 block mb-1">Student Responsibilities</span>
                                             <p className="text-sm text-slate-700 whitespace-pre-wrap pl-4 border-l-2 border-indigo-200">
-                                                {selectedOpportunity.activity_details?.student_responsibilities || "No details provided."}
+                                                {String(
+                                                    (adminDetailView.activity_details as { student_responsibilities?: string } | undefined)
+                                                        ?.student_responsibilities || "No details provided.",
+                                                )}
                                             </p>
                                         </div>
                                         <div>
                                             <span className="text-xs text-slate-500 block mb-2">Skills Gained</span>
                                             <div className="flex flex-wrap gap-2">
-                                                {selectedOpportunity.activity_details?.skills_gained?.map((skill: string, idx: number) => (
-                                                    <span key={idx} className="bg-indigo-50 text-indigo-700 px-3 py-1 rounded-lg text-xs font-bold border border-indigo-100">
+                                                {(
+                                                    (adminDetailView.activity_details as { skills_gained?: string[] } | undefined)?.skills_gained || []
+                                                ).map((skill: string, idx: number) => (
+                                                    <span
+                                                        key={idx}
+                                                        className="bg-indigo-50 text-indigo-700 px-3 py-1 rounded-lg text-xs font-bold border border-indigo-100"
+                                                    >
                                                         {skill}
                                                     </span>
-                                                )) || "None specified"}
+                                                )) || <span className="text-xs text-slate-500">None specified</span>}
                                             </div>
                                         </div>
                                     </div>
@@ -477,27 +870,37 @@ export default function AdminApprovalsPage() {
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                     <div>
                                         <h3 className="text-xs font-bold text-orange-600 uppercase tracking-wider mb-4 border-b border-orange-100 pb-2 flex items-center gap-2">
-                                            <Users className="w-4 h-4" /> Supervision
+                                            <Users className="w-4 h-4" /> Supervision (full)
                                         </h3>
                                         <div className="space-y-3 bg-orange-50/50 p-4 rounded-xl">
                                             <div>
                                                 <span className="text-xs text-slate-500 block">Supervisor</span>
-                                                <span className="font-bold text-slate-900 text-sm">{selectedOpportunity.supervision?.supervisor_name || "N/A"}</span>
+                                                <span className="font-bold text-slate-900 text-sm">
+                                                    {String((adminDetailView.supervision as { supervisor_name?: string } | undefined)?.supervisor_name || "N/A")}
+                                                </span>
                                             </div>
                                             <div>
                                                 <span className="text-xs text-slate-500 block">Role</span>
-                                                <span className="text-slate-900 text-sm">{selectedOpportunity.supervision?.role || "N/A"}</span>
+                                                <span className="text-slate-900 text-sm">
+                                                    {String((adminDetailView.supervision as { role?: string } | undefined)?.role || "N/A")}
+                                                </span>
                                             </div>
                                             <div>
                                                 <span className="text-xs text-slate-500 block">Contact</span>
-                                                <span className="text-slate-900 text-sm">{selectedOpportunity.supervision?.contact || "N/A"}</span>
+                                                <span className="text-slate-900 text-sm">
+                                                    {String((adminDetailView.supervision as { contact?: string } | undefined)?.contact || "N/A")}
+                                                </span>
                                             </div>
                                             <div className="flex gap-4 mt-2">
-                                                {selectedOpportunity.supervision?.safe_environment && (
-                                                    <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded flex items-center gap-1 font-bold"><CheckCircle className="w-3 h-3" /> Safe Env</span>
+                                                {(adminDetailView.supervision as { safe_environment?: boolean } | undefined)?.safe_environment && (
+                                                    <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded flex items-center gap-1 font-bold">
+                                                        <CheckCircle className="w-3 h-3" /> Safe Env
+                                                    </span>
                                                 )}
-                                                {selectedOpportunity.supervision?.supervised && (
-                                                    <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded flex items-center gap-1 font-bold"><CheckCircle className="w-3 h-3" /> Supervised</span>
+                                                {(adminDetailView.supervision as { supervised?: boolean } | undefined)?.supervised && (
+                                                    <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded flex items-center gap-1 font-bold">
+                                                        <CheckCircle className="w-3 h-3" /> Supervised
+                                                    </span>
                                                 )}
                                             </div>
                                         </div>
@@ -509,17 +912,24 @@ export default function AdminApprovalsPage() {
                                         </h3>
                                         <div className="bg-cyan-50/50 p-4 rounded-xl">
                                             <ul className="list-disc pl-5 space-y-1 text-sm text-slate-700">
-                                                {selectedOpportunity.verification_method?.map((method: string, i: number) => (
-                                                    <li key={i}>{method}</li>
-                                                )) || <li>No verification method specified</li>}
+                                                {Array.isArray(adminDetailView.verification_method) ? (
+                                                    (adminDetailView.verification_method as string[]).map((method: string, i: number) => (
+                                                        <li key={i}>{method}</li>
+                                                    ))
+                                                ) : (
+                                                    <li>No verification method specified</li>
+                                                )}
                                             </ul>
                                         </div>
                                     </div>
                                 </div>
                             </div>
-                            <div className="mt-8 pt-6 border-t border-slate-100 flex justify-end gap-3">
+                            <div className="mt-8 pt-6 border-t border-slate-100 flex flex-wrap justify-end gap-3">
                                 <button
-                                    onClick={() => setIsDetailModalOpen(false)}
+                                    onClick={() => {
+                                        setIsDetailModalOpen(false);
+                                        setOpportunityDetail(null);
+                                    }}
                                     className="px-4 py-2 text-slate-500 font-bold hover:text-slate-700"
                                 >
                                     Close
@@ -527,32 +937,28 @@ export default function AdminApprovalsPage() {
                                 <button
                                     onClick={() => {
                                         setIsDetailModalOpen(false);
-                                        handleRejectClick(selectedOpportunity.id, 'opportunity');
+                                        setOpportunityDetail(null);
+                                        handleRejectClick(selectedOpportunity.id, "opportunity");
                                     }}
                                     className="px-4 py-2 bg-red-50 text-red-600 rounded-lg font-bold hover:bg-red-100"
                                 >
                                     Reject
                                 </button>
-                                {/* <button
-                                    onClick={() => handleChatWithPartner(selectedOpportunity)}
-                                    className="px-4 py-2 bg-blue-50 text-blue-600 rounded-lg font-bold hover:bg-blue-100 flex items-center gap-2"
-                                >
-                                    <MessageSquare className="w-4 h-4" /> Chat with Partner
-                                </button> */}
                                 <button
                                     onClick={() => {
-                                        handleApprove(selectedOpportunity.id, 'opportunity');
+                                        handleApprove(selectedOpportunity.id, "opportunity");
                                         setIsDetailModalOpen(false);
+                                        setOpportunityDetail(null);
                                     }}
-                                    className="px-4 py-2 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700"
+                                    disabled={opportunityDetailLoading}
+                                    className="px-4 py-2 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     Approve
                                 </button>
                             </div>
                         </div>
                     </div>
-                )
-            }
+                )}
 
             {/* Reject Reason Modal */}
             {

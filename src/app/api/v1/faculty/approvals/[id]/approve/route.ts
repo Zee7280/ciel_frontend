@@ -1,20 +1,8 @@
 import { NextResponse } from "next/server";
 
-function extractPendingList(body: unknown): unknown[] {
-    if (Array.isArray(body)) return body;
-    if (body && typeof body === "object") {
-        const o = body as Record<string, unknown>;
-        for (const k of ["data", "opportunities", "items", "results", "rows"] as const) {
-            const v = o[k];
-            if (Array.isArray(v)) return v;
-        }
-    }
-    return [];
-}
-
-export async function GET(request: Request) {
+export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
     try {
-        const authHeader = request.headers.get("Authorization");
+        const { id } = await params;
         const backendBase = process.env.NEXT_PUBLIC_BACKEND_BASE_URL?.replace(/\/+$/, "");
         if (!backendBase) {
             return NextResponse.json(
@@ -23,7 +11,9 @@ export async function GET(request: Request) {
             );
         }
 
-        const response = await fetch(`${backendBase}/admin/opportunities/pending`, {
+        const authHeader = request.headers.get("Authorization");
+        const response = await fetch(`${backendBase}/faculty/approvals/${encodeURIComponent(id)}/approve`, {
+            method: "POST",
             headers: {
                 Authorization: authHeader || "",
                 "Content-Type": "application/json",
@@ -36,16 +26,20 @@ export async function GET(request: Request) {
             return NextResponse.json(
                 {
                     success: false,
-                    message: (data as { message?: string }).message || "Failed to fetch pending opportunities",
+                    message: (data as { message?: string }).message || "Failed to approve",
+                    ...((typeof data === "object" && data) || {}),
                 },
                 { status: response.status },
             );
         }
 
-        const list = extractPendingList(data);
-        return NextResponse.json({ success: true, data: list });
+        return NextResponse.json(
+            typeof data === "object" && data !== null && "success" in data
+                ? data
+                : { success: true, ...(typeof data === "object" ? data : {}) },
+        );
     } catch (error) {
-        console.error("Pending Opportunities Proxy Error:", error);
+        console.error("faculty/approvals approve proxy:", error);
         return NextResponse.json({ success: false, message: "Internal Server Error" }, { status: 500 });
     }
 }

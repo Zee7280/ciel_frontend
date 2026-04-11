@@ -1,14 +1,26 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useLayoutEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Bell, Search, User, LogOut } from "lucide-react";
 import { useRouter } from "next/navigation";
+import {
+    dashboardNavRoleFromPathname,
+    readDashboardNavRoleFromStorage,
+    type DashboardNavRole,
+} from "@/utils/dashboardNavRole";
 
 export default function DashboardHeader() {
     const pathname = usePathname();
     const router = useRouter();
+    const [navRole, setNavRole] = useState<DashboardNavRole>(() => dashboardNavRoleFromPathname(pathname));
+
+    useLayoutEffect(() => {
+        const fromUser = readDashboardNavRoleFromStorage();
+        if (fromUser) setNavRole(fromUser);
+        else setNavRole(dashboardNavRoleFromPathname(pathname));
+    }, [pathname]);
 
     const handleLogout = () => {
         localStorage.removeItem("ciel_user");
@@ -16,12 +28,11 @@ export default function DashboardHeader() {
         router.push("/login");
     };
 
-    // Clean up title from pathname
     const getTitle = () => {
-        if (pathname.includes("student")) return "Student Dashboard";
-        if (pathname.includes("partner")) return "Partner Portal";
-        if (pathname.includes("faculty")) return "Faculty Hub";
-        if (pathname.includes("admin")) return "Platform Admin";
+        if (navRole === "student") return "Student Dashboard";
+        if (navRole === "partner") return "Partner Portal";
+        if (navRole === "faculty") return "Faculty Hub";
+        if (navRole === "admin") return "Platform Admin";
         return "Dashboard";
     };
 
