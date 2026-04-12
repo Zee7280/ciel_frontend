@@ -160,12 +160,14 @@ function SignUpContent() {
 
         if (!validateForm()) return;
 
+        const normalizedEmail = formData.email.trim().toLowerCase();
+
         setIsLoading(true);
         try {
             const res = await fetch("/api/v1/auth/send-otp", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ email: formData.email }),
+                body: JSON.stringify({ email: normalizedEmail }),
             });
             const data = await res.json();
             if (!res.ok) throw new Error(data.error || "Failed to send OTP");
@@ -191,12 +193,13 @@ function SignUpContent() {
         }
         setOtpLoading(true);
         setOtpError(null);
+        const normalizedEmail = formData.email.trim().toLowerCase();
         try {
             // Verify OTP
             const verifyRes = await fetch("/api/v1/auth/verify-otp", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ email: formData.email, otp }),
+                body: JSON.stringify({ email: normalizedEmail, otp }),
             });
             const verifyData = await verifyRes.json();
             if (!verifyRes.ok) throw new Error(verifyData.error || "Invalid or expired OTP");
@@ -206,7 +209,7 @@ function SignUpContent() {
             const signupRes = await fetch(`${backendUrl}/auth/signup`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ ...formData, role }),
+                body: JSON.stringify({ ...formData, email: normalizedEmail, role }),
             });
             if (!signupRes.ok) {
                 const err = await signupRes.json();
@@ -259,7 +262,7 @@ function SignUpContent() {
             await fetch("/api/v1/auth/send-otp", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ email: formData.email }),
+                body: JSON.stringify({ email: formData.email.trim().toLowerCase() }),
             });
             setOtpDigits(["", "", "", "", "", ""]);
             setResendCooldown(30);

@@ -8,7 +8,6 @@ import { Suspense, useEffect, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { CheckCircle2, XCircle, Loader2, Home, LogIn } from "lucide-react";
 import Link from "next/link";
-import { verificationRequireAuth } from "@/config/verification";
 import { fetchVerificationVerify, outcomeFromVerificationResponse } from "@/utils/verificationVerifyUx";
 import {
     buildVerificationSignupHref,
@@ -48,14 +47,10 @@ function FacultyVerifyContent() {
             try {
                 const bearer =
                     typeof window !== "undefined" ? localStorage.getItem("ciel_token") : null;
-                const strict = verificationRequireAuth();
-
                 if (!bearer) {
                     persistVerificationReturnFromWindow();
-                    if (strict) {
-                        router.replace(loginUrl);
-                        return;
-                    }
+                    router.replace(loginUrl);
+                    return;
                 }
 
                 setStatus("loading");
@@ -91,7 +86,7 @@ function FacultyVerifyContent() {
 
         const bearerNow =
             typeof window !== "undefined" ? localStorage.getItem("ciel_token") : null;
-        const delayMs = bearerNow || !verificationRequireAuth() ? 400 : 0;
+        const delayMs = bearerNow ? 400 : 0;
         const t = setTimeout(run, delayMs);
         return () => clearTimeout(t);
     }, [token, pathname, searchParams, router]);
@@ -123,7 +118,7 @@ function FacultyVerifyContent() {
                     {status === "loading"
                         ? "Confirming…"
                         : status === "auth_required"
-                          ? "Login zaroori hai"
+                          ? "Sign in required"
                           : status === "success"
                             ? "Success"
                             : "Could not verify"}
@@ -135,7 +130,7 @@ function FacultyVerifyContent() {
                             href={loginHref}
                             className="text-sm font-semibold text-blue-600 hover:text-blue-700 underline underline-offset-2"
                         >
-                            Login / account badlein
+                            Sign in / use another account
                         </Link>
                     </div>
                 )}
@@ -154,7 +149,7 @@ function FacultyVerifyContent() {
                             className="inline-flex items-center justify-center gap-2 w-full bg-slate-900 text-white font-semibold py-3 rounded-xl hover:bg-slate-800"
                         >
                             <LogIn className="w-4 h-4" />
-                            Login karein (mera account hai)
+                            Sign in (I already have an account)
                         </Link>
                         <Link
                             href={signupHref}

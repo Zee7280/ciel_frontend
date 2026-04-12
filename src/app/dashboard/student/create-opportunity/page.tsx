@@ -540,7 +540,7 @@ export default function StudentOpportunityCreationPage() {
                     ? `/api/v1/student/opportunity/${encodeURIComponent(editId)}`
                     : `/api/v1/student/opportunity`,
                 {
-                    method: isEdit ? "PATCH" : "POST",
+                    method: "POST",
                     body: JSON.stringify(payload),
                 },
             );

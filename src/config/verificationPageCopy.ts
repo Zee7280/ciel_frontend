@@ -1,11 +1,11 @@
-/** Roman Urdu — magic-link verify pages (`/verify-project`, `/verify/faculty`). */
+/** Shared copy for magic-link verify pages (`/verify-project`, `/verify/faculty`). */
 
 export const VERIFY_EMAIL_MATCH_HINT =
-    "Approval ke liye usi email se CIEL par login karein jis par yeh email aayi hai.";
+    "To complete this approval, sign in to CIEL with the same email address this message was sent to.";
 
-/** Faculty + partner / liaison link (role token mein hota hai). */
+/** Faculty + partner / liaison link (role is carried in the token). */
 export const VERIFY_CTA_PROJECT_BODY =
-    "Agar CIEL par account pehle se hai to Login karein. Naya account banana ho to Sign up karein — faculty supervisors \"Faculty / Academic Staff\", partner organisations apne mutabiq NGO / Corporate / University option chunein.";
+    "If you already have a CIEL account, sign in. To create a new account, choose Sign up — faculty supervisors should select \"Faculty / Academic Staff\"; partner organisations should pick the NGO, Corporate, or University option that fits them.";
 
 export const VERIFY_CTA_FACULTY_BODY =
-    "Agar CIEL par account pehle se hai to Login karein. Naya account ke liye Sign up par \"Faculty / Academic Staff\" select karein.";
+    "If you already have a CIEL account, sign in. To create a new account, choose Sign up and select \"Faculty / Academic Staff\".";

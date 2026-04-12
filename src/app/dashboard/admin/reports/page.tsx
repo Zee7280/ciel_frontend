@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { Flag, Eye, MessageSquare, AlertTriangle, CheckCircle } from "lucide-react";
 import { authenticatedFetch } from "@/utils/api";
+import { formatDisplayId } from "@/utils/displayIds";
 import Link from "next/link";
 
 export default function AdminReportsPage() {
@@ -61,7 +62,9 @@ export default function AdminReportsPage() {
                                 <tr key={report.id} className="hover:bg-slate-50/50 transition-colors">
                                     <td className="p-6">
                                         <div className="font-bold text-slate-900">{report.subject}</div>
-                                        <div className="text-xs text-slate-500">ID: #{report.id}</div>
+                                        <div className="text-xs text-slate-500" title={String(report.id ?? "")}>
+                                            ID: {formatDisplayId(report.id, "RPT")}
+                                        </div>
                                     </td>
                                     <td className="p-6">
                                         <span className="flex items-center gap-2 text-sm font-medium text-slate-700">

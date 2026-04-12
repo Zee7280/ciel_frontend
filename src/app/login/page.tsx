@@ -56,7 +56,7 @@ function LoginContent() {
             const res = await fetch(`${backendUrl}/auth/forgot-password`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ email: forgotEmail }),
+                body: JSON.stringify({ email: forgotEmail.trim().toLowerCase() }),
             });
             const data = await res.json().catch(() => ({}));
             if (res.ok && data.success) {
@@ -115,7 +115,7 @@ function LoginContent() {
             const response = await fetch(loginUrl, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ email, password, isMobile }),
+                body: JSON.stringify({ email: email.trim().toLowerCase(), password, isMobile }),
             });
 
             console.log("Response Status:", response.status, response.statusText);

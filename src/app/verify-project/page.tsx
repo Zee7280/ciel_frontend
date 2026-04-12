@@ -4,7 +4,6 @@ import { useEffect, useState, Suspense } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { CheckCircle2, XCircle, Loader2, Home, ExternalLink, LogIn } from "lucide-react";
 import Link from "next/link";
-import { verificationRequireAuth } from "@/config/verification";
 import {
     fetchVerificationVerify,
     outcomeFromVerificationResponse,
@@ -51,14 +50,10 @@ function VerifyProjectContent() {
             try {
                 const bearer =
                     typeof window !== "undefined" ? localStorage.getItem("ciel_token") : null;
-                const strict = verificationRequireAuth();
-
                 if (!bearer) {
                     persistVerificationReturnFromWindow();
-                    if (strict) {
-                        router.replace(loginUrl);
-                        return;
-                    }
+                    router.replace(loginUrl);
+                    return;
                 }
 
                 setStatus("loading");
@@ -99,8 +94,7 @@ function VerifyProjectContent() {
 
         const bearerNow =
             typeof window !== "undefined" ? localStorage.getItem("ciel_token") : null;
-        const delayMs =
-            bearerNow || !verificationRequireAuth() ? 600 : 0;
+        const delayMs = bearerNow ? 600 : 0;
 
         const timer = setTimeout(verifyToken, delayMs);
         return () => clearTimeout(timer);
@@ -169,7 +163,7 @@ function VerifyProjectContent() {
                         {status === "loading"
                             ? "Validating Claim..."
                             : status === "auth_required"
-                              ? "Login zaroori hai"
+                              ? "Sign in required"
                               : status === "success"
                                 ? "Verification Successful"
                                 : "Validation Failed"}
@@ -185,7 +179,7 @@ function VerifyProjectContent() {
                                 href={loginHref}
                                 className="text-sm font-semibold text-blue-600 hover:text-blue-700 underline underline-offset-2"
                             >
-                                Login / account badlein
+                                Sign in / use another account
                             </Link>
                         </div>
                     )}
@@ -208,13 +202,13 @@ function VerifyProjectContent() {
                                     className="flex items-center justify-center gap-2 w-full bg-slate-900 hover:bg-blue-600 text-white font-bold py-4 px-6 rounded-2xl transition-all duration-300 shadow-lg shadow-slate-200 hover:shadow-blue-200 group"
                                 >
                                     <LogIn className="w-4 h-4 group-hover:scale-110 transition-transform" />
-                                    Login karein (mera account hai)
+                                    Sign in (I already have an account)
                                 </Link>
                                 <Link
                                     href={signupHref}
                                     className="flex items-center justify-center gap-2 w-full bg-white border-2 border-slate-200 hover:border-slate-300 text-slate-800 font-bold py-4 px-6 rounded-2xl transition-all duration-300"
                                 >
-                                    Sign up — naya account
+                                    Sign up — create an account
                                 </Link>
                             </>
                         )}

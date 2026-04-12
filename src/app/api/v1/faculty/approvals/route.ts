@@ -13,11 +13,15 @@ export async function GET(request: Request) {
 
         const { searchParams } = new URL(request.url);
         const status = searchParams.get("status") || "pending";
+        const facultyEmail = searchParams.get("faculty_email") || searchParams.get("email") || "";
         const authHeader = request.headers.get("Authorization");
+        const url = new URL(`${backendBase}/faculty/approvals`);
+        url.searchParams.set("status", status);
+        if (facultyEmail.trim()) {
+            url.searchParams.set("faculty_email", facultyEmail.trim().toLowerCase());
+        }
 
-        const url = `${backendBase}/faculty/approvals?status=${encodeURIComponent(status)}`;
-
-        const response = await fetch(url, {
+        const response = await fetch(url.toString(), {
             method: "GET",
             headers: {
                 "Content-Type": "application/json",

@@ -23,6 +23,93 @@ function truthyApproved(v: unknown): boolean {
     return s === "approved" || s === "yes" || s === "true" || v === true;
 }
 
+function reviewText(v: unknown): string | null {
+    if (typeof v === "string" && v.trim()) return v.trim();
+    if (Array.isArray(v)) {
+        const joined = v
+            .filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+            .join("\n");
+        return joined.trim() || null;
+    }
+    return null;
+}
+
+function pickFeedbackFromObject(obj: Record<string, unknown> | null | undefined): string | null {
+    if (!obj) return null;
+    const directKeys = [
+        "admin_remarks",
+        "admin_feedback",
+        "admin_comment",
+        "admin_comments",
+        "faculty_remarks",
+        "faculty_feedback",
+        "faculty_comment",
+        "faculty_comments",
+        "partner_remarks",
+        "partner_feedback",
+        "partner_comment",
+        "partner_comments",
+        "return_reason",
+        "returned_reason",
+        "rejection_reason",
+        "rejected_reason",
+        "review_comments",
+        "review_comment",
+        "review_feedback",
+        "feedback",
+        "remarks",
+        "comment",
+        "comments",
+        "reason",
+        "note",
+        "notes",
+    ] as const;
+    for (const key of directKeys) {
+        const text = reviewText(obj[key]);
+        if (text) return text;
+    }
+    return null;
+}
+
+export function extractOpportunityReviewFeedback(project: Record<string, unknown>): string | null {
+    const direct = pickFeedbackFromObject(project);
+    if (direct) return direct;
+    const nestedKeys = [
+        "review",
+        "latest_review",
+        "admin_review",
+        "faculty_review",
+        "partner_review",
+        "approval",
+        "approvals",
+        "decision",
+        "latest_decision",
+        "status_detail",
+        "status_details",
+        "workflow",
+        "workflow_state",
+    ] as const;
+    for (const key of nestedKeys) {
+        const value = project[key];
+        if (value && typeof value === "object" && !Array.isArray(value)) {
+            const text = pickFeedbackFromObject(value as Record<string, unknown>);
+            if (text) return text;
+        }
+    }
+    return null;
+}
+
+export function canEditReturnedOpportunity(project: Record<string, unknown>): boolean {
+    const states = [
+        lower(project.status),
+        lower(project.workflow_stage ?? project.approval_stage),
+        lower(project.admin_approval_status),
+        lower(project.faculty_approval_status),
+        lower(project.partner_approval_status),
+    ];
+    return states.some((state) => ["returned", "revision", "needs_revision", "rejected"].includes(state));
+}
+
 /** True when admin has cleared the opportunity; student may start report / tracking. */
 export function isStudentOpportunityLiveForReporting(project: Record<string, unknown>): boolean {
     const status = lower(project.status);
@@ -61,6 +148,21 @@ export function resolveStudentOpportunityWorkflow(project: Record<string, unknow
 
     const stage = lower(project.workflow_stage ?? project.approval_stage);
     const statusEarly = lower(project.status);
+    const adminStatus = lower(project.admin_approval_status);
+    const facultyStatus = lower(project.faculty_approval_status);
+    const partnerStatus = lower(project.partner_approval_status);
+
+    if (
+        [stage, statusEarly, adminStatus, facultyStatus, partnerStatus].some((value) =>
+            ["returned", "revision", "needs_revision"].includes(value),
+        )
+    ) {
+        return {
+            stage: "revision",
+            badgeLabel: "Revision requested",
+            queueMessage: "Your opportunity was returned for updates. Review the remarks, edit the details, and resubmit.",
+        };
+    }
 
     // Backend contract: status / stage `pending_approval` = CIEL admin final queue only (after faculty + partner when applicable).
     if (statusEarly === "pending_approval" || stage === "pending_approval") {
@@ -71,7 +173,7 @@ export function resolveStudentOpportunityWorkflow(project: Record<string, unknow
                 "Your opportunity is in the CIEL Admin queue (final step). Faculty and partner steps are already complete where they applied. You will be notified when it is Approved – LIVE.",
         };
     }
-    const partEarly = lower(project.partner_approval_status);
+    const partEarly = partnerStatus;
     const needsPartnerEarly =
         project.requires_partner_approval === true ||
         partEarly === "pending" ||
@@ -151,19 +253,12 @@ export function resolveStudentOpportunityWorkflow(project: Record<string, unknow
         return {
             stage: "rejected",
             badgeLabel: "Rejected",
-            queueMessage: "This opportunity was not approved. Check feedback from faculty, partner, or admin.",
-        };
-    }
-    if (stage === "revision" || lower(project.status) === "revision" || lower(project.status) === "needs_revision") {
-        return {
-            stage: "revision",
-            badgeLabel: "Revision requested",
-            queueMessage: "Please update your opportunity based on the feedback and resubmit.",
+            queueMessage: "This opportunity was returned. Check the remarks from faculty, partner, or admin, then edit and resubmit.",
         };
     }
 
-    const fac = lower(project.faculty_approval_status);
-    const part = lower(project.partner_approval_status);
+    const fac = facultyStatus;
+    const part = partnerStatus;
     const needsPartner = project.requires_partner_approval === true || part === "pending" || part === "required";
 
     if (fac === "pending" || fac === "awaiting") {

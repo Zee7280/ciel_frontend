@@ -5,7 +5,25 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FileText, Plus, Users, Calendar, MoreVertical, MapPin, Loader2, Edit, Trash2, ExternalLink } from "lucide-react";
 import { authenticatedFetch } from "@/utils/api";
+import { formatDisplayId } from "@/utils/displayIds";
+import { getStoredCurrentUserId } from "@/utils/currentUser";
 import { toast } from "sonner";
+
+function isOwnedByCurrentPartner(opportunity: Record<string, unknown>, currentUserId: string) {
+    const createdByRole = String(opportunity.created_by_role ?? opportunity.creator_role ?? "").toLowerCase();
+    const source = String(opportunity.source ?? "").toLowerCase();
+
+    if (opportunity.is_student_created === true || createdByRole === "student" || source === "student_created") {
+        return false;
+    }
+
+    const creatorId = opportunity.creatorId ?? opportunity.creator_id ?? opportunity.created_by ?? opportunity.owner_id;
+    if (!currentUserId || creatorId == null) {
+        return true;
+    }
+
+    return String(creatorId).trim() === currentUserId;
+}
 
 export default function PartnerRequestsPage() {
     const router = useRouter();
@@ -15,15 +33,25 @@ export default function PartnerRequestsPage() {
 
     const fetchOpportunities = async () => {
         try {
-            const storedUser = localStorage.getItem("ciel_user");
-            const user = storedUser ? JSON.parse(storedUser) : null;
-            const userId = user?.id || user?.userId;
+            const params = new URLSearchParams();
+            // Keep backend "me" matching, but only surface rows actually owned by this partner here.
+            params.set("partner_id", "me");
 
-            const res = await authenticatedFetch(`/api/v1/opportunities${userId ? `?partner_id=${userId}` : ''}`);
+            const res = await authenticatedFetch(
+                `/api/v1/opportunities${params.toString() ? `?${params.toString()}` : ""}`,
+            );
             if (res && res.ok) {
                 const data = await res.json();
                 if (data.success) {
-                    setRequests(data.data || []);
+                    const currentUserId = getStoredCurrentUserId();
+                    const rows = Array.isArray(data.data) ? data.data : [];
+                    setRequests(
+                        rows.filter((item) =>
+                            item && typeof item === "object"
+                                ? isOwnedByCurrentPartner(item as Record<string, unknown>, currentUserId)
+                                : false,
+                        ),
+                    );
                 }
             }
         } catch (error) {
@@ -135,7 +163,9 @@ export default function PartnerRequestsPage() {
                                                 <div className="flex items-center gap-3 text-xs text-slate-500">
                                                     <span className="flex items-center gap-1"><MapPin className="w-3 h-3" /> {req.location?.city || "N/A"}</span>
                                                     <span className="flex items-center gap-1"><Calendar className="w-3 h-3" /> Ends: {req.dates?.end || "N/A"}</span>
-                                                    <span className="font-mono text-slate-300">#{req.id?.toString().slice(0, 8)}...</span>
+                                                    <span className="font-mono text-slate-300" title={String(req.id ?? "")}>
+                                                        {formatDisplayId(req.id, "OPP")}
+                                                    </span>
                                                 </div>
                                             </div>
                                         </td>

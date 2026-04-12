@@ -21,6 +21,8 @@ import {
     type FacultyApprovalRow,
     normalizeFacultyApprovalsResponse,
 } from "@/utils/facultyApprovals";
+import { formatDisplayId } from "@/utils/displayIds";
+import { getStoredCurrentUserEmail } from "@/utils/currentUser";
 
 export default function FacultyApprovalsPage() {
     const [tab, setTab] = useState<"pending" | "history">("pending");
@@ -47,9 +49,17 @@ export default function FacultyApprovalsPage() {
     const loadLists = async () => {
         setIsLoading(true);
         try {
+            const facultyEmail = getStoredCurrentUserEmail();
+            const pendingParams = new URLSearchParams({ status: "pending" });
+            const historyParams = new URLSearchParams({ status: "history" });
+            if (facultyEmail) {
+                pendingParams.set("faculty_email", facultyEmail);
+                historyParams.set("faculty_email", facultyEmail);
+            }
+
             const [pendingRes, historyRes] = await Promise.all([
-                authenticatedFetch(`/api/v1/faculty/approvals?status=pending`),
-                authenticatedFetch(`/api/v1/faculty/approvals?status=history`),
+                authenticatedFetch(`/api/v1/faculty/approvals?${pendingParams.toString()}`),
+                authenticatedFetch(`/api/v1/faculty/approvals?${historyParams.toString()}`),
             ]);
 
             if (pendingRes?.ok) {
@@ -278,7 +288,7 @@ export default function FacultyApprovalsPage() {
                                             <p className="text-slate-500 text-sm flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4">
                                                 <span>
                                                     Student:{" "}
-                                                    <strong className="text-slate-700">{project.studentName}</strong> ({project.studentId})
+                                                    <strong className="text-slate-700">{project.studentName}</strong> ({formatDisplayId(project.studentId, "STU")})
                                                 </span>
                                                 {project.studentEmail ? (
                                                     <span className="text-slate-600">· {project.studentEmail}</span>
@@ -603,7 +613,7 @@ function FacultyOpportunityDetailBody({ d }: { d: Record<string, unknown> }) {
                         ) : null}
                         {studentRow.id ? (
                             <li>
-                                <span className="text-slate-500">User / student id:</span> {studentRow.id}
+                                <span className="text-slate-500">User / student id:</span> {formatDisplayId(studentRow.id, "STU")}
                             </li>
                         ) : null}
                         {studentRow.university ? (

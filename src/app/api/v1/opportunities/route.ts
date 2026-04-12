@@ -4,14 +4,12 @@ export async function GET(request: Request) {
     try {
         const authHeader = request.headers.get("Authorization");
         const { searchParams } = new URL(request.url);
-        const partner_id = searchParams.get("partner_id");
-
-        let backendUrl = `${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/opportunities`;
-        if (partner_id) {
-            backendUrl += `?partner_id=${partner_id}`;
+        const backendUrl = new URL(`${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/opportunities`);
+        for (const [key, value] of searchParams.entries()) {
+            if (value.trim()) backendUrl.searchParams.append(key, value);
         }
 
-        const response = await fetch(backendUrl, {
+        const response = await fetch(backendUrl.toString(), {
             method: "GET",
             headers: {
                 "Content-Type": "application/json",

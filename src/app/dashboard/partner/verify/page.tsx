@@ -1,281 +1,398 @@
-"use client"
+"use client";
 
-import { useEffect, useState } from 'react';
-import { authenticatedFetch } from '@/utils/api';
-import { CheckCircle2, XCircle, Clock, FileText, Search, CalendarDays, ExternalLink, User, Briefcase, Filter, ChevronRight } from 'lucide-react';
-import { useRouter } from 'next/navigation';
-import { toast } from 'sonner';
-import clsx from 'clsx';
+import { useEffect, useMemo, useState } from "react";
+import { Briefcase, CheckCircle, Clock, Eye, Filter, Loader2, User } from "lucide-react";
+import { authenticatedFetch } from "@/utils/api";
+import { toast } from "sonner";
+import { Button } from "@/app/dashboard/student/report/components/ui/button";
+import { Badge } from "@/app/dashboard/student/report/components/ui/badge";
+import { Card } from "@/app/dashboard/student/report/components/ui/card";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+} from "@/app/dashboard/student/report/components/ui/dialog";
+import {
+    extractFacultyApprovalsArray,
+    normalizeFacultyApprovalsResponse,
+    type FacultyApprovalRow,
+} from "@/utils/facultyApprovals";
+import { formatDisplayId } from "@/utils/displayIds";
+import { getStoredCurrentUserId } from "@/utils/currentUser";
+import { resolveStudentOpportunityWorkflow, type OpportunityWorkflowStage } from "@/utils/opportunityWorkflow";
 
-interface Report {
-    id: string;
-    student_name: string;
-    student_email: string;
-    project_title: string;
-    submission_date: string;
-    status: string;
-    partner_status: string;
-    admin_status: string;
-    created_at: string;
+type PartnerApprovalRow = FacultyApprovalRow & {
+    workflowStageKey: OpportunityWorkflowStage;
+    workflowLabel: string;
+    queueMessage: string;
+    partnerDecision: string;
+};
+
+function lower(value: unknown): string {
+    if (value == null) return "";
+    return String(value).trim().toLowerCase();
+}
+
+function pickStr(record: Record<string, unknown> | null, ...keys: string[]): string {
+    if (!record) return "";
+    for (const key of keys) {
+        const value = record[key];
+        if (typeof value === "string" && value.trim()) return value.trim();
+    }
+    return "";
+}
+
+function isOwnedByCurrentPartner(record: Record<string, unknown>, currentUserId: string) {
+    if (lower(record.created_by_role ?? record.creator_role) === "partner") return true;
+    const creatorId = record.creatorId ?? record.creator_id ?? record.created_by ?? record.owner_id;
+    return Boolean(currentUserId && creatorId != null && String(creatorId).trim() === currentUserId);
+}
+
+function hasPartnerSignal(record: Record<string, unknown>) {
+    const supervision =
+        record.supervision && typeof record.supervision === "object"
+            ? (record.supervision as Record<string, unknown>)
+            : null;
+
+    return (
+        record.requires_partner_approval === true ||
+        Boolean(lower(record.partner_approval_status ?? record.partner_status)) ||
+        lower(record.workflow_stage ?? record.approval_stage).includes("partner") ||
+        Boolean(record.external_partner_collaboration && typeof record.external_partner_collaboration === "object") ||
+        Boolean(record.partner_organization && typeof record.partner_organization === "object") ||
+        Boolean(
+            pickStr(
+                supervision,
+                "partner_org_name",
+                "external_partner_org_name",
+                "partner_email",
+                "external_partner_email",
+            ),
+        )
+    );
+}
+
+function isPendingPartnerDecision(row: PartnerApprovalRow) {
+    return row.workflowStageKey === "pending_partner" || ["pending", "awaiting", "required"].includes(row.partnerDecision);
+}
+
+function mapPartnerApprovalRows(payload: unknown, currentUserId: string): PartnerApprovalRow[] {
+    const rawRows = extractFacultyApprovalsArray(payload).filter(
+        (item): item is Record<string, unknown> => Boolean(item && typeof item === "object"),
+    );
+    const rawMap = new Map<string, Record<string, unknown>>();
+
+    for (const row of rawRows) {
+        const id = pickStr(row, "id", "opportunity_id", "project_id", "opportunityId");
+        if (id) rawMap.set(id, row);
+    }
+
+    return normalizeFacultyApprovalsResponse(payload)
+        .map((row) => {
+            const raw = rawMap.get(row.id) || {};
+            const workflow = resolveStudentOpportunityWorkflow(raw);
+            return {
+                ...row,
+                workflowStageKey: workflow.stage,
+                workflowLabel: workflow.badgeLabel,
+                queueMessage: workflow.queueMessage,
+                partnerDecision: lower(raw.partner_approval_status ?? raw.partner_status),
+            };
+        })
+        .filter((row) => {
+            const raw = rawMap.get(row.id) || {};
+            return !isOwnedByCurrentPartner(raw, currentUserId) && hasPartnerSignal(raw);
+        });
+}
+
+function detailPartnerBlock(detail: Record<string, unknown>) {
+    const supervision =
+        detail.supervision && typeof detail.supervision === "object"
+            ? (detail.supervision as Record<string, unknown>)
+            : null;
+    const ext =
+        detail.external_partner_collaboration && typeof detail.external_partner_collaboration === "object"
+            ? (detail.external_partner_collaboration as Record<string, unknown>)
+            : null;
+    const root =
+        detail.partner_organization && typeof detail.partner_organization === "object"
+            ? (detail.partner_organization as Record<string, unknown>)
+            : null;
+
+    return {
+        organization:
+            pickStr(supervision, "partner_org_name", "external_partner_org_name") ||
+            pickStr(ext, "organization_name") ||
+            pickStr(root, "organization_name"),
+        contact:
+            pickStr(supervision, "partner_contact_person", "external_partner_contact_person") ||
+            pickStr(ext, "contact_person") ||
+            pickStr(root, "contact_person"),
+        email:
+            pickStr(supervision, "partner_email", "external_partner_email") ||
+            pickStr(ext, "official_email") ||
+            pickStr(root, "official_email"),
+    };
 }
 
 export default function VerifyWorkPage() {
-    console.log('🚀 VerifyWorkPage component mounted!');
-
-    const router = useRouter();
-    const [reports, setReports] = useState<Report[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState<'all' | 'submitted' | 'verified' | 'rejected'>('all');
-    const [searchQuery, setSearchQuery] = useState('');
+    const [tab, setTab] = useState<"pending" | "history">("pending");
+    const [rows, setRows] = useState<PartnerApprovalRow[]>([]);
+    const [search, setSearch] = useState("");
+    const [isLoading, setIsLoading] = useState(true);
+    const [detailOpen, setDetailOpen] = useState(false);
+    const [detailLoading, setDetailLoading] = useState(false);
+    const [detailRecord, setDetailRecord] = useState<Record<string, unknown> | null>(null);
 
     useEffect(() => {
-        console.log('🔄 useEffect triggered! activeTab:', activeTab);
-        fetchReports();
-    }, [activeTab]);
+        void loadQueue();
+    }, []);
 
-    const fetchReports = async () => {
-        console.log('📞 fetchReports called!');
+    const loadQueue = async () => {
+        setIsLoading(true);
         try {
-            console.log('🔧 Setting loading to true...');
-            setLoading(true);
-
-            const userStr = localStorage.getItem('ciel_user');
-            console.log('🔍 User data from localStorage:', userStr);
-
-            if (!userStr) {
-                toast.error('User not found. Please login again.');
-                setLoading(false);
+            const res = await authenticatedFetch("/api/v1/opportunities?partner_id=me");
+            if (!res?.ok) {
+                toast.error("Could not load partner approval requests");
+                setRows([]);
                 return;
             }
 
-            const orgData = JSON.parse(userStr);
-            console.log('📦 Parsed user data:', orgData);
-
-            const orgId = orgData?.organizationId || orgData?.organization?.id;
-            console.log('🏢 Organization ID:', orgId);
-
-            if (!orgId) {
-                toast.error('Organization not found');
-                setLoading(false);
-                return;
-            }
-
-            const statusParam = activeTab !== 'all' ? `?status=${activeTab}` : '';
-            const apiUrl = `/api/v1/partners/student-reports${statusParam}`;
-
-            console.log('🌐 Calling API:', apiUrl);
-
-            const response = await authenticatedFetch(apiUrl);
-
-            console.log('📡 API Response:', response);
-            console.log('✅ Response OK?:', response?.ok);
-
-            if (response?.ok) {
-                const data = await response.json();
-                console.log('📊 Reports data:', data);
-
-                // Backend returns { success, data } not { reports }
-                if (data.success && data.data) {
-                    setReports(data.data);
-                } else {
-                    setReports([]);
-                }
-            } else {
-                const errorText = await response?.text().catch(() => 'No error text');
-                console.error('❌ API Error:', errorText);
-                toast.error('Failed to load reports');
-            }
+            const json = await res.json();
+            setRows(mapPartnerApprovalRows(json, getStoredCurrentUserId()));
         } catch (error) {
-            console.error('💥 Error fetching reports:', error);
-            toast.error('Failed to load reports');
+            console.error("Failed to load partner approval queue", error);
+            toast.error("Could not load partner approval requests");
+            setRows([]);
         } finally {
-            setLoading(false);
+            setIsLoading(false);
         }
     };
 
-    const getStatusBadge = (status: string) => {
-        const config = {
-            submitted: { color: 'bg-amber-50 text-amber-700 border-amber-200', icon: Clock, label: 'Pending Verification' },
-            partner_verified: { color: 'bg-indigo-50 text-indigo-700 border-indigo-200', icon: CheckCircle2, label: 'Verified by You' },
-            verified: { color: 'bg-emerald-50 text-emerald-700 border-emerald-200', icon: CheckCircle2, label: 'Fully Verified' },
-            rejected: { color: 'bg-rose-50 text-rose-700 border-rose-200', icon: XCircle, label: 'Rejected' },
-            draft: { color: 'bg-slate-50 text-slate-600 border-slate-200', icon: FileText, label: 'Draft' },
-            approved: { color: 'bg-emerald-50 text-emerald-600 border-emerald-200', icon: CheckCircle2, label: 'Approved' },
-            pending: { color: 'bg-slate-100 text-slate-500 border-slate-200', icon: Clock, label: 'Pending' },
-        };
+    const openDetails = async (id: string) => {
+        setDetailOpen(true);
+        setDetailLoading(true);
+        setDetailRecord(null);
+        try {
+            const res = await authenticatedFetch("/api/v1/opportunities/detail", {
+                method: "POST",
+                body: JSON.stringify({ id }),
+            });
 
-        const { color, icon: Icon, label } = config[status as keyof typeof config] || config.draft;
+            if (!res?.ok) {
+                toast.error("Could not load opportunity details");
+                setDetailOpen(false);
+                return;
+            }
 
-        return (
-            <span className={clsx('inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border font-bold text-[10px] uppercase tracking-wider', color)}>
-                <Icon className="w-3 h-3" />
-                {label}
-            </span>
-        );
+            const json = await res.json();
+            setDetailRecord((json?.data as Record<string, unknown>) || null);
+        } catch (error) {
+            console.error("Failed to load opportunity detail", error);
+            toast.error("Could not load opportunity details");
+            setDetailOpen(false);
+        } finally {
+            setDetailLoading(false);
+        }
     };
 
-    const filteredReports = reports.filter(report =>
-        report.student_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        report.project_title.toLowerCase().includes(searchQuery.toLowerCase())
-    );
+    const filtered = useMemo(() => {
+        const visible = tab === "pending" ? rows.filter(isPendingPartnerDecision) : rows.filter((row) => !isPendingPartnerDecision(row));
+        const q = search.trim().toLowerCase();
+        if (!q) return visible;
 
-    const tabs = [
-        { id: 'all', label: 'All Reports', count: reports.length },
-        { id: 'submitted', label: 'Submitted', count: reports.filter(r => r.status === 'submitted').length },
-        { id: 'verified', label: 'Verified', count: reports.filter(r => r.status === 'verified').length },
-        { id: 'rejected', label: 'Rejected', count: reports.filter(r => r.status === 'rejected').length },
-    ];
+        return visible.filter((row) =>
+            [
+                row.projectTitle,
+                row.studentName,
+                row.studentId,
+                row.studentEmail || "",
+                row.workflowLabel,
+                row.queueMessage,
+            ]
+                .join(" ")
+                .toLowerCase()
+                .includes(q),
+        );
+    }, [rows, search, tab]);
+
+    const partnerBlock = detailRecord ? detailPartnerBlock(detailRecord) : null;
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-50 p-8">
-            <div className="max-w-7xl mx-auto space-y-8">
-                {/* Header */}
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <div>
-                        <h1 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight flex items-center gap-3">
-                            Verification & Approval
-                        </h1>
-                        <p className="text-slate-500 mt-2 font-medium">
-                            Review and verify student activities to empower their journey.
+        <div className="space-y-6 max-w-7xl mx-auto p-4 pb-20">
+            <div>
+                <h1 className="text-3xl font-bold text-slate-900">Partner Opportunity Approvals</h1>
+                <p className="text-slate-500">
+                    Yahan woh opportunities aati hain jinhon ne create karte waqt aapki NGO ko partner ke taur par add kiya ho.
+                </p>
+                <p className="text-slate-500 text-sm mt-2">
+                    Ye report verification nahi hai. Ye partner approval queue hai, faculty approvals ke flow ki tarah.
+                </p>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+                <Button variant={tab === "pending" ? "default" : "outline"} size="sm" className="h-9" onClick={() => setTab("pending")}>
+                    Pending Requests
+                </Button>
+                <Button variant={tab === "history" ? "default" : "outline"} size="sm" className="h-9" onClick={() => setTab("history")}>
+                    Approval History
+                </Button>
+            </div>
+
+            <div className="flex gap-4 items-center bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                <div className="relative flex-1">
+                    <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    <input
+                        type="text"
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        placeholder="Search by student name, ID, email, or project title..."
+                        className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                    />
+                </div>
+            </div>
+
+            <div className="grid gap-6">
+                {isLoading ? (
+                    <div className="text-center py-12 text-slate-500 text-sm">
+                        <Loader2 className="w-8 h-8 animate-spin mx-auto" />
+                    </div>
+                ) : filtered.length === 0 ? (
+                    <div className="text-center py-12 bg-white rounded-xl border border-dashed border-slate-300">
+                        <div className="mx-auto w-12 h-12 bg-green-50 rounded-full flex items-center justify-center mb-4">
+                            <CheckCircle className="w-6 h-6 text-green-500" />
+                        </div>
+                        <h3 className="text-lg font-bold text-slate-900">
+                            {tab === "pending" ? "No pending partner approvals" : "No partner approval history yet"}
+                        </h3>
+                        <p className="text-slate-500">
+                            {tab === "pending"
+                                ? "Jab kisi opportunity mein aapki NGO partner ke taur par add hogi aur aapka step aayega, woh yahan nazar aayegi."
+                                : "Past partner-linked workflow items yahan appear hongi."}
                         </p>
                     </div>
-                    <div className="hidden md:flex items-center gap-2 text-sm font-bold text-slate-400 bg-white px-4 py-2 rounded-2xl border border-slate-100 italic">
-                        <Filter className="w-4 h-4" /> Filtering for your organization
-                    </div>
-                </div>
-
-                {/* Tabs */}
-                <div className="bg-slate-200/50 p-1 rounded-[22px] border border-slate-200/60 inline-flex flex-wrap gap-1">
-                    {tabs.map((tab) => (
-                        <button
-                            key={tab.id}
-                            onClick={() => setActiveTab(tab.id as any)}
-                            className={clsx(
-                                'px-6 py-2.5 rounded-[18px] font-bold text-sm transition-all duration-300 flex items-center gap-2',
-                                activeTab === tab.id
-                                    ? 'bg-white text-blue-600 shadow-[0_4px_12px_rgba(0,0,0,0.05)] ring-1 ring-slate-200/50'
-                                    : 'text-slate-500 hover:text-slate-800 hover:bg-white/50'
-                            )}
-                        >
-                            {tab.label}
-                            <span className={clsx(
-                                'px-2 py-0.5 rounded-lg text-[10px] font-black tracking-tight',
-                                activeTab === tab.id ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-600'
-                            )}>
-                                {tab.count}
-                            </span>
-                        </button>
-                    ))}
-                </div>
-
-                {/* Search Bar */}
-                <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm">
-                    <div className="relative">
-                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-                        <input
-                            type="text"
-                            placeholder="Search by student name or opportunity..."
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full pl-12 pr-4 py-3 rounded-2xl border border-slate-200 focus:outline-none focus:ring-4 focus:ring-blue-50 focus:border-blue-400 transition-all font-medium text-slate-700"
-                        />
-                    </div>
-                </div>
-
-                {/* Reports Grid */}
-                {loading ? (
-                    <div className="flex items-center justify-center py-20">
-                        <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-600 border-t-transparent"></div>
-                    </div>
-                ) : filteredReports.length === 0 ? (
-                    <div className="bg-white rounded-3xl p-16 border border-slate-200 text-center">
-                        <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                            <CheckCircle2 className="w-10 h-10 text-slate-400" />
-                        </div>
-                        <h3 className="text-xl font-bold text-slate-900 mb-2">All Caught Up!</h3>
-                        <p className="text-slate-500 font-medium">No pending items for verification.</p>
-                    </div>
                 ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                        {filteredReports.map((report) => (
-                            <div
-                                key={report.id}
-                                className="bg-white rounded-[32px] p-7 border border-slate-200 hover:border-blue-200 hover:shadow-[0_20px_40px_-15px_rgba(37,99,235,0.08)] transition-all duration-500 group relative flex flex-col"
-                            >
-                                <div className="flex items-start justify-between gap-4 mb-6">
-                                    <div className="flex items-center gap-4">
-                                        <div className="relative">
-                                            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-black text-xl shadow-lg shadow-blue-200 ring-4 ring-white">
-                                                {report.student_name.charAt(0)}
+                    filtered.map((row) => (
+                        <Card key={row.id} className="overflow-hidden">
+                            <div className="flex flex-col md:flex-row">
+                                <div className="p-6 flex-1 space-y-4">
+                                    <div className="flex justify-between items-start gap-4">
+                                        <div>
+                                            <div className="flex items-center gap-2 mb-2 flex-wrap">
+                                                <h3 className="font-bold text-lg text-slate-900">{row.projectTitle}</h3>
+                                                <Badge
+                                                    variant="outline"
+                                                    className={
+                                                        tab === "pending"
+                                                            ? "bg-amber-50 text-amber-700 border-amber-200"
+                                                            : "bg-slate-100 text-slate-700 border-slate-200"
+                                                    }
+                                                >
+                                                    {tab === "pending" ? "Pending partner review" : row.workflowLabel}
+                                                </Badge>
                                             </div>
-                                            <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-green-500 rounded-full border-2 border-white"></div>
+                                            <p className="text-slate-500 text-sm flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4">
+                                                <span className="inline-flex items-center gap-1">
+                                                    <User className="w-3.5 h-3.5" />
+                                                    <strong className="text-slate-700">{row.studentName}</strong> ({formatDisplayId(row.studentId, "STU")})
+                                                </span>
+                                                {row.studentEmail ? <span className="text-slate-600">· {row.studentEmail}</span> : null}
+                                                <span>Submitted {row.submittedDate}</span>
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-slate-50 p-4 rounded-lg border border-slate-100">
+                                        <div>
+                                            <p className="text-xs font-bold text-slate-500 uppercase mb-1">Workflow Stage</p>
+                                            <p className="font-medium text-slate-800 text-sm">{row.workflowLabel}</p>
                                         </div>
                                         <div>
-                                            <h3 className="font-bold text-slate-900 text-base group-hover:text-blue-600 transition-colors flex items-center gap-1">
-                                                {report.student_name}
-                                            </h3>
-                                            <div className="flex items-center gap-1.5 text-slate-400 mt-0.5">
-                                                <User className="w-3.5 h-3.5" />
-                                                <span className="text-[11px] font-bold uppercase tracking-wider truncate max-w-[120px]">{report.student_email.split('@')[0]}</span>
-                                            </div>
+                                            <p className="text-xs font-bold text-slate-500 uppercase mb-1">Impact Hours</p>
+                                            <p className="font-bold text-blue-600 text-lg">{row.totalHours ?? "—"}</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-xs font-bold text-slate-500 uppercase mb-1">Primary SDG</p>
+                                            <p className="font-medium text-slate-800 text-sm">{row.sdg || "—"}</p>
                                         </div>
                                     </div>
-                                    <div className="shrink-0">
-                                        {getStatusBadge(report.status)}
-                                    </div>
-                                </div>
 
-                                <div className="space-y-4 mb-8 flex-1">
-                                    <div className="bg-slate-50/80 rounded-[24px] p-5 border border-slate-100 group-hover:bg-blue-50/30 group-hover:border-blue-100 transition-colors duration-500">
+                                    <div className="rounded-lg border border-slate-100 bg-slate-50 p-4">
                                         <div className="flex items-center gap-2 mb-2">
-                                            <Briefcase className="w-3.5 h-3.5 text-blue-500" />
-                                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Project</p>
+                                            <Briefcase className="w-4 h-4 text-blue-600" />
+                                            <p className="text-xs font-bold text-slate-500 uppercase">Queue Note</p>
                                         </div>
-                                        <p className="text-sm font-bold text-slate-800 leading-relaxed line-clamp-2">
-                                            {report.project_title}
-                                        </p>
-                                    </div>
-
-                                    <div className="flex items-center gap-4 px-2">
-                                        <div className="flex items-center gap-2">
-                                            <CalendarDays className="w-4 h-4 text-slate-400" />
-                                            <div className="flex flex-col">
-                                                <span className="text-[9px] font-bold text-slate-300 uppercase tracking-wider">Submitted</span>
-                                                <span className="text-xs font-black text-slate-600">
-                                                    {new Date(report.submission_date).toLocaleDateString('en-US', {
-                                                        month: 'short',
-                                                        day: 'numeric',
-                                                        year: 'numeric'
-                                                    })}
-                                                </span>
-                                            </div>
-                                        </div>
+                                        <p className="text-sm text-slate-700">{row.queueMessage}</p>
                                     </div>
                                 </div>
 
-                                <div className="flex gap-3 mt-auto">
-                                    <button
-                                        onClick={() => router.push(`/dashboard/partner/verify/${report.id}`)}
-                                        className="flex-[2] bg-slate-900 hover:bg-blue-600 text-white rounded-2xl font-bold py-3.5 px-4 shadow-lg shadow-slate-200 hover:shadow-blue-200 transition-all duration-300 flex items-center justify-center gap-2 group/btn"
-                                    >
-                                        View Details
-                                        <ExternalLink className="w-4 h-4 group-hover/btn:translate-x-0.5 group-hover/btn:-translate-y-0.5 transition-transform" />
-                                    </button>
-                                    {report.status === 'submitted' && (
-                                        <button
-                                            onClick={() => router.push(`/dashboard/partner/verify/${report.id}#actions`)}
-                                            className="flex-1 rounded-2xl font-bold border-2 border-slate-100 text-slate-600 hover:border-blue-200 hover:text-blue-600 hover:bg-blue-50/50 py-3.5 px-4 transition-all duration-300 flex items-center justify-center"
-                                            title="Quick Verify"
-                                        >
-                                            <CheckCircle2 className="w-5 h-5" />
-                                        </button>
-                                    )}
+                                <div className="bg-slate-50 border-l border-slate-100 p-6 flex flex-row md:flex-col justify-center gap-3 w-full md:w-56">
+                                    <Button variant="outline" className="w-full" onClick={() => void openDetails(row.id)}>
+                                        <Eye className="w-4 h-4 mr-2" /> Review details
+                                    </Button>
                                 </div>
                             </div>
-                        ))}
-                    </div>
+                        </Card>
+                    ))
                 )}
             </div>
+
+            <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
+                <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+                    <DialogHeader>
+                        <DialogTitle>Partner approval request</DialogTitle>
+                        <DialogDescription>
+                            Opportunity summary shown for review. Existing backend approval actions are left untouched.
+                        </DialogDescription>
+                    </DialogHeader>
+                    {detailLoading ? (
+                        <div className="flex justify-center py-12 text-slate-500">
+                            <Loader2 className="w-8 h-8 animate-spin" />
+                        </div>
+                    ) : detailRecord ? (
+                        <div className="space-y-6 text-sm">
+                            <div>
+                                <h3 className="font-bold text-lg text-slate-900">{pickStr(detailRecord, "title") || "Student opportunity"}</h3>
+                                <p className="text-slate-500 mt-1">
+                                    {pickStr(detailRecord, "workflow_stage", "approval_stage").replace(/_/g, " ") || "Pending approval"}
+                                </p>
+                            </div>
+
+                            <div className="rounded-xl border border-blue-100 bg-blue-50/60 p-4">
+                                <p className="text-xs font-bold text-blue-800 uppercase mb-2">Student / creator</p>
+                                <ul className="space-y-1 text-slate-800">
+                                    <li><span className="text-slate-500">Name:</span> {pickStr(detailRecord, "creator_name", "student_name", "submitted_by_name", "owner_name") || "—"}</li>
+                                    <li><span className="text-slate-500">Email:</span> {pickStr(detailRecord, "creator_email", "student_email", "submitted_by_email", "owner_email") || "—"}</li>
+                                </ul>
+                            </div>
+
+                            {partnerBlock ? (
+                                <div className="rounded-xl border border-amber-100 bg-amber-50/60 p-4">
+                                    <p className="text-xs font-bold text-amber-900 uppercase mb-2">Partner block</p>
+                                    <ul className="space-y-1 text-slate-800">
+                                        <li><span className="text-slate-500">Organization:</span> {partnerBlock.organization || "—"}</li>
+                                        <li><span className="text-slate-500">Contact person:</span> {partnerBlock.contact || "—"}</li>
+                                        <li><span className="text-slate-500">Email:</span> {partnerBlock.email || "—"}</li>
+                                    </ul>
+                                </div>
+                            ) : null}
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="rounded-xl border border-slate-200 p-4">
+                                    <p className="text-xs font-bold text-slate-500 uppercase mb-2">Status</p>
+                                    <p className="text-slate-800">{pickStr(detailRecord, "status").replace(/_/g, " ") || "—"}</p>
+                                </div>
+                                <div className="rounded-xl border border-slate-200 p-4">
+                                    <p className="text-xs font-bold text-slate-500 uppercase mb-2">Workflow</p>
+                                    <p className="text-slate-800">{pickStr(detailRecord, "workflow_stage", "approval_stage").replace(/_/g, " ") || "—"}</p>
+                                </div>
+                            </div>
+                        </div>
+                    ) : null}
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

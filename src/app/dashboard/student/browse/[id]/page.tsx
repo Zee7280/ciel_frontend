@@ -6,15 +6,18 @@ import { useParams, useRouter } from "next/navigation";
 import { Button } from "../../report/components/ui/button";
 import { Badge } from "../../report/components/ui/badge";
 import { authenticatedFetch } from "@/utils/api";
-import { isStudentOpportunityLiveForReporting } from "@/utils/opportunityWorkflow";
+import {
+    canEditReturnedOpportunity,
+    extractOpportunityReviewFeedback,
+    isStudentOpportunityLiveForReporting,
+    resolveStudentOpportunityWorkflow,
+} from "@/utils/opportunityWorkflow";
 import { readDashboardNavRoleFromStorage, type DashboardNavRole } from "@/utils/dashboardNavRole";
-import { Loader2, MapPin, Calendar, Clock, Globe, ArrowLeft, Building2, Share2, CheckCircle2, User, AlertCircle } from "lucide-react";
+import { formatDisplayId } from "@/utils/displayIds";
+import { Loader2, MapPin, Calendar, Clock, Globe, ArrowLeft, Building2, Share2, CheckCircle2, User, AlertCircle, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
 import ReportSummaryPopup from "../../report/components/ReportSummaryPopup";
-
-/** Student “Edit opportunity” from this detail page — off until the next release step. */
-const SHOW_STUDENT_OPPORTUNITY_EDIT_FROM_DETAIL = false;
 
 export default function OpportunityDetailsPage() {
     const params = useParams();
@@ -191,6 +194,12 @@ export default function OpportunityDetailsPage() {
         viewerNavRole === "admin" ? "/dashboard/admin/projects" : "/dashboard/student/browse";
     const opportunitiesBackLabel = viewerNavRole === "admin" ? "Back to all projects" : "Back to Opportunities";
     const hideStudentApplyActions = viewerNavRole === "admin" && !opportunity.isStudentOwner;
+    const workflow = resolveStudentOpportunityWorkflow(opportunity as Record<string, unknown>);
+    const reviewFeedback = extractOpportunityReviewFeedback(opportunity as Record<string, unknown>);
+    const canEditReturned =
+        viewerNavRole !== "admin" &&
+        opportunity.isStudentOwner &&
+        canEditReturnedOpportunity(opportunity as Record<string, unknown>);
 
     return (
         <div className="w-full space-y-8 animate-in fade-in duration-500 pb-24">
@@ -215,11 +224,10 @@ export default function OpportunityDetailsPage() {
                                         My Projects
                                     </Button>
                                 </Link>
-                                {SHOW_STUDENT_OPPORTUNITY_EDIT_FROM_DETAIL &&
-                                !isStudentOpportunityLiveForReporting(opportunity as Record<string, unknown>) ? (
+                                {canEditReturned ? (
                                     <Link href={`/dashboard/student/create-opportunity?edit=${encodeURIComponent(id)}`}>
                                         <Button className="flex items-center gap-2 px-6 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 font-medium shadow-sm">
-                                            Edit opportunity
+                                            <Pencil className="w-4 h-4" /> Edit & Resubmit
                                         </Button>
                                     </Link>
                                 ) : null}
@@ -279,9 +287,30 @@ export default function OpportunityDetailsPage() {
                         </div>
                         <div className="text-right">
                             <div className="text-sm text-slate-400">Opportunity ID</div>
-                            <div className="font-mono font-bold text-slate-600">#{id.substring(0, 8)}...</div>
+                            <div className="font-mono font-bold text-slate-600" title={id}>
+                                {formatDisplayId(id, "OPP")}
+                            </div>
                         </div>
                     </div>
+                    {reviewFeedback && opportunity.isStudentOwner ? (
+                        <div className="mt-5 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-4">
+                            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                                <div>
+                                    <p className="text-xs font-bold uppercase tracking-wider text-rose-700">
+                                        Return remarks
+                                    </p>
+                                    <p className="mt-1 text-sm text-rose-900 whitespace-pre-wrap">{reviewFeedback}</p>
+                                </div>
+                                {canEditReturned ? (
+                                    <Link href={`/dashboard/student/create-opportunity?edit=${encodeURIComponent(id)}`}>
+                                        <Button variant="outline" className="gap-2 border-rose-200 text-rose-700 hover:bg-rose-100">
+                                            <Pencil className="w-4 h-4" /> Edit now
+                                        </Button>
+                                    </Link>
+                                ) : null}
+                            </div>
+                        </div>
+                    ) : null}
                 </div>
 
                 {/* Content Grid */}

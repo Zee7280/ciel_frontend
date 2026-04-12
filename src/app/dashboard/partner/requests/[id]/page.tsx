@@ -5,6 +5,7 @@ import { useState, useEffect } from "react";
 import { Info, MapPin, Calendar, Clock, CheckCircle, AlertCircle, ChevronDown, ChevronUp, Users, Loader2, Edit, ArrowLeft, Save, X, Trash2, Printer, Share2, Search } from "lucide-react";
 import Link from "next/link";
 import { authenticatedFetch } from "@/utils/api";
+import { formatDisplayId } from "@/utils/displayIds";
 import { toast } from "sonner";
 import dynamic from "next/dynamic";
 import { findSdgById, opportunityFormSdgList } from "@/utils/sdgData";
@@ -470,7 +471,9 @@ function OpportunityDetailsContent() {
                             </div>
                             <div className="text-right">
                                 <div className="text-sm text-slate-400">Opportunity ID</div>
-                                <div className="font-mono font-bold text-slate-600">#{id}</div>
+                                <div className="font-mono font-bold text-slate-600" title={String(id)}>
+                                    {formatDisplayId(id, "OPP")}
+                                </div>
                             </div>
                         </div>
                     </div>

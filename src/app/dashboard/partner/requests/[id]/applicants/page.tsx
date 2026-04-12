@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, CheckCircle, XCircle, Clock, MoreVertical, Loader2, Search, Filter, Users, Eye } from "lucide-react";
 import Link from "next/link";
 import { authenticatedFetch } from "@/utils/api";
+import { formatDisplayId } from "@/utils/displayIds";
 import { toast } from "sonner";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "../../../../student/report/components/ui/dialog";
@@ -138,7 +139,7 @@ export default function ManageApplicantsPage() {
                         <ArrowLeft className="w-4 h-4" /> Back to Opportunities
                     </Link>
                     <h1 className="text-3xl font-bold text-slate-900">Manage Applicants</h1>
-                    <p className="text-slate-500">Opportunity ID: <span className="font-mono text-xs bg-slate-100 px-2 py-1 rounded">{id}</span></p>
+                    <p className="text-slate-500">Opportunity ID: <span className="font-mono text-xs bg-slate-100 px-2 py-1 rounded" title={String(id)}>{formatDisplayId(id, "OPP")}</span></p>
                 </div>
                 <div className="flex gap-2">
                     <div className="relative">

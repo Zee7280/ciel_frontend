@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { authenticatedFetch } from '@/utils/api';
+import { formatDisplayId } from '@/utils/displayIds';
 import { CheckCircle2, Square, Loader2 } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -149,7 +150,7 @@ export default function StudentProgressTracker({ projectId }: StudentProgressTra
 
                 <div className="flex items-center gap-2 pt-2 text-[10px] font-bold text-slate-400">
                     <div className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse" />
-                    Tracking activity for Project ID: {projectId.substring(0, 8)}... — Complete all sections to generate Section 1 results.
+                    Tracking activity for Project ID: {formatDisplayId(projectId, "OPP")} — Complete all sections to generate Section 1 results.
                 </div>
             </div>
         </div>

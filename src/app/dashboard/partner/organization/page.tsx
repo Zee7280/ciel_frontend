@@ -5,6 +5,15 @@ import { Building2, MapPin, Mail, Phone, Edit, CheckCircle, Upload, Loader2 } fr
 import { authenticatedFetch } from "@/utils/api";
 import { toast } from "sonner";
 
+const normalizeText = (value: unknown) =>
+    typeof value === "string" ? value : value == null ? "" : String(value);
+
+const normalizeBoolean = (value: unknown) => {
+    if (typeof value === "boolean") return value;
+    if (typeof value === "string") return value.toLowerCase() === "true";
+    return Boolean(value);
+};
+
 export default function OrganizationProfilePage() {
     const [isEditing, setIsEditing] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
@@ -69,7 +78,7 @@ export default function OrganizationProfilePage() {
 
                     if (apiData) {
                         // Handle logo URL
-                        let logoUrl = apiData.logoUrl || apiData.image || "";
+                        let logoUrl = normalizeText(apiData.logoUrl ?? apiData.image);
                         if (logoUrl && logoUrl.startsWith("/")) {
                             // Force the base URL to localhost:3000 as explicitly requested
                             logoUrl = `http://localhost:3000${logoUrl}`;
@@ -77,23 +86,23 @@ export default function OrganizationProfilePage() {
 
                         setOrgData(prev => ({
                             ...prev,
-                            name: apiData.name,
-                            type: apiData.orgType,
-                            description: apiData.description,
-                            website: apiData.websiteUrl,
-                            city: apiData.city,
-                            region: apiData.region,
-                            address: apiData.address,
-                            country: apiData.country || "Pakistan",
+                            name: normalizeText(apiData.name),
+                            type: normalizeText(apiData.orgType),
+                            description: normalizeText(apiData.description),
+                            website: normalizeText(apiData.websiteUrl ?? apiData.website),
+                            city: normalizeText(apiData.city),
+                            region: normalizeText(apiData.region ?? apiData.province),
+                            address: normalizeText(apiData.address),
+                            country: normalizeText(apiData.country) || "Pakistan",
                             image: logoUrl,
-                            contactName: apiData.contactName,
-                            contactEmail: apiData.contactEmail,
-                            contactPhone: apiData.contactPhone,
-                            verificationStatus: apiData.verificationStatus,
-                            verificationScope: apiData.verificationScope,
-                            worksWithMinors: apiData.worksWithMinors,
-                            isSafeguardingAcknowledged: apiData.safeguardingAcknowledged,
-                            isDataPolicyAcknowledged: apiData.dataPolicyAcknowledged
+                            contactName: normalizeText(apiData.contactName),
+                            contactEmail: normalizeText(apiData.contactEmail),
+                            contactPhone: normalizeText(apiData.contactPhone),
+                            verificationStatus: normalizeText(apiData.verificationStatus),
+                            verificationScope: normalizeText(apiData.verificationScope),
+                            worksWithMinors: normalizeBoolean(apiData.worksWithMinors),
+                            isSafeguardingAcknowledged: normalizeBoolean(apiData.safeguardingAcknowledged),
+                            isDataPolicyAcknowledged: normalizeBoolean(apiData.dataPolicyAcknowledged)
                         }));
                     }
                 }

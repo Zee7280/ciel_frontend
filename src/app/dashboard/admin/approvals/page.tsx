@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { PaginationControls } from "@/components/ui/PaginationControls";
 import { authenticatedFetch } from "@/utils/api";
+import { formatDisplayId } from "@/utils/displayIds";
 import { useRouter } from "next/navigation";
 
 function pickDetailStr(o: Record<string, unknown> | null | undefined, ...keys: string[]): string {
@@ -26,6 +27,46 @@ function pickDetailStr(o: Record<string, unknown> | null | undefined, ...keys: s
         if (typeof v === "string" && v.trim()) return v.trim();
     }
     return "";
+}
+
+function pickDetailDate(o: Record<string, unknown> | null | undefined, ...keys: string[]): string {
+    if (!o) return "";
+    for (const k of keys) {
+        const v = o[k];
+        if (typeof v === "string" && v.trim()) return v.trim();
+    }
+    return "";
+}
+
+function formatDateTime(value: string | null | undefined): string {
+    if (!value) return "N/A";
+    const parsed = Date.parse(value);
+    if (Number.isNaN(parsed)) return value;
+    return new Date(parsed).toLocaleString(undefined, {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+    });
+}
+
+function normalizeApprovalState(value: unknown): string {
+    return typeof value === "string" ? value.trim().toLowerCase() : "";
+}
+
+function approvalPillClass(status: string): string {
+    if (status === "approved") return "border-emerald-200 bg-emerald-50 text-emerald-700";
+    if (status === "rejected" || status === "returned") return "border-rose-200 bg-rose-50 text-rose-700";
+    if (status === "pending" || status === "awaiting") return "border-amber-200 bg-amber-50 text-amber-700";
+    if (status === "not_applicable") return "border-slate-200 bg-slate-50 text-slate-500";
+    return "border-slate-200 bg-slate-50 text-slate-600";
+}
+
+function approvalLabel(status: string): string {
+    if (status === "not_applicable") return "Not required";
+    if (!status) return "Unknown";
+    return status.replace(/_/g, " ");
 }
 
 function stakeholderRows(d: Record<string, unknown>): {
@@ -138,6 +179,7 @@ export default function AdminApprovalsPage() {
     const [activeTab, setActiveTab] = useState("registrations");
 
     const [isLoading, setIsLoading] = useState(true);
+    const [didBootstrapCounts, setDidBootstrapCounts] = useState(false);
     const [opportunities, setOpportunities] = useState<any[]>([]);
     const [pendingUsers, setPendingUsers] = useState<any[]>([]);
 
@@ -157,15 +199,34 @@ export default function AdminApprovalsPage() {
     const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
 
     useEffect(() => {
+        let cancelled = false;
+        (async () => {
+            setIsLoading(true);
+            await Promise.all([
+                fetchPendingUsers({ withLoading: false }),
+                fetchPendingOpportunities({ withLoading: false }),
+            ]);
+            if (!cancelled) {
+                setDidBootstrapCounts(true);
+                setIsLoading(false);
+            }
+        })();
+        return () => {
+            cancelled = true;
+        };
+    }, []);
+
+    useEffect(() => {
+        if (!didBootstrapCounts) return;
         if (activeTab === 'projects') {
             fetchPendingOpportunities();
         } else if (activeTab === 'registrations') {
             fetchPendingUsers();
         }
-    }, [activeTab]);
+    }, [activeTab, didBootstrapCounts]);
 
-    const fetchPendingOpportunities = async () => {
-        setIsLoading(true);
+    const fetchPendingOpportunities = async (options?: { withLoading?: boolean }) => {
+        if (options?.withLoading !== false) setIsLoading(true);
         try {
             const res = await authenticatedFetch(`/api/v1/admin/opportunities/pending`);
             if (res && res.ok) {
@@ -191,12 +252,12 @@ export default function AdminApprovalsPage() {
         } catch (error) {
             console.error("Failed to fetch opportunities", error);
         } finally {
-            setIsLoading(false);
+            if (options?.withLoading !== false) setIsLoading(false);
         }
     };
 
-    const fetchPendingUsers = async () => {
-        setIsLoading(true);
+    const fetchPendingUsers = async (options?: { withLoading?: boolean }) => {
+        if (options?.withLoading !== false) setIsLoading(true);
         try {
             const res = await authenticatedFetch(`/api/v1/admin/users/pending`);
             if (res && res.ok) {
@@ -208,7 +269,7 @@ export default function AdminApprovalsPage() {
         } catch (error) {
             console.error("Failed to fetch users", error);
         } finally {
-            setIsLoading(false);
+            if (options?.withLoading !== false) setIsLoading(false);
         }
     };
 
@@ -449,7 +510,9 @@ export default function AdminApprovalsPage() {
                                         </span>
                                     )}
                                     <span>{req.email}</span>
-                                    <span>• Applied: {req.created_at ? new Date(req.created_at).toLocaleDateString() : "N/A"}</span>
+                                    <span>
+                                        • Applied: {formatDateTime(req.created_at || req.createdAt || req.submitted_at || req.submittedAt)}
+                                    </span>
                                 </div>
                             </div>
                             <div className="flex items-center gap-3">
@@ -474,7 +537,12 @@ export default function AdminApprovalsPage() {
                                 <div className="flex items-center gap-4 text-sm text-slate-500 mt-1">
                                     <span className="font-bold text-blue-600">{proj.partner_name || "Unknown Partner"}</span>
                                     <span className="bg-amber-50 text-amber-700 px-2 py-0.5 rounded">{proj.types?.[0] || "General"}</span>
-                                    <span>• Submitted: {proj.submitted_at ? new Date(proj.submitted_at).toLocaleDateString() : "N/A"}</span>
+                                    <span>
+                                        • Submitted:{" "}
+                                        {formatDateTime(
+                                            proj.submitted_at || proj.submittedAt || proj.created_at || proj.createdAt,
+                                        )}
+                                    </span>
                                 </div>
                             </div>
                             <div className="flex items-center gap-2 sm:gap-3 flex-wrap justify-end">
@@ -547,6 +615,21 @@ export default function AdminApprovalsPage() {
                         <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6 shadow-2xl animate-in zoom-in-95 duration-200">
                             <div className="flex justify-between items-start mb-6 border-b border-slate-100 pb-4">
                                 <div>
+                                    {(() => {
+                                        const submittedAt = pickDetailDate(
+                                            adminDetailView,
+                                            "submitted_at",
+                                            "submittedAt",
+                                            "created_at",
+                                            "createdAt",
+                                            "date_submitted",
+                                        );
+                                        return submittedAt ? (
+                                            <p className="text-xs text-slate-400 mb-1">
+                                                Submitted: {formatDateTime(submittedAt)}
+                                            </p>
+                                        ) : null;
+                                    })()}
                                     <h2 className="text-2xl font-bold text-slate-900">
                                         {String(adminDetailView.title ?? selectedOpportunity.title ?? "Opportunity")}
                                     </h2>
@@ -589,6 +672,50 @@ export default function AdminApprovalsPage() {
                                         sh.student.phone;
                                     const hasFaculty = sh.facultyName || sh.facultyEmail;
                                     const hasPartner = sh.partnerOrg || sh.partnerPerson || sh.partnerEmail;
+                                    const facultyStatus = normalizeApprovalState(v.faculty_approval_status);
+                                    const partnerStatus = normalizeApprovalState(v.partner_approval_status);
+                                    const adminStatus =
+                                        normalizeApprovalState(v.admin_approval_status) ||
+                                        (normalizeApprovalState(v.workflow_stage) === "pending_admin" ||
+                                        normalizeApprovalState(v.workflow_stage) === "pending_approval"
+                                            ? "pending"
+                                            : "");
+                                    const submittedAt = pickDetailDate(
+                                        v,
+                                        "submitted_at",
+                                        "submittedAt",
+                                        "created_at",
+                                        "createdAt",
+                                        "date_submitted",
+                                    );
+                                    const approvalStages = [
+                                        {
+                                            label: "Student",
+                                            helper: submittedAt ? `Submitted ${formatDateTime(submittedAt)}` : "Submission received",
+                                            status: "approved",
+                                        },
+                                        {
+                                            label: "Faculty",
+                                            helper: sh.facultyName || sh.facultyEmail || "Waiting for faculty review",
+                                            status: facultyStatus || "pending",
+                                        },
+                                        {
+                                            label: "Partner",
+                                            helper:
+                                                sh.partnerOrg || sh.partnerPerson || sh.partnerEmail
+                                                    ? sh.partnerOrg || sh.partnerPerson || sh.partnerEmail
+                                                    : "No partner step on this record",
+                                            status:
+                                                hasPartner || partnerStatus
+                                                    ? partnerStatus || "pending"
+                                                    : "not_applicable",
+                                        },
+                                        {
+                                            label: "Admin",
+                                            helper: "CIEL final approval",
+                                            status: adminStatus || "pending",
+                                        },
+                                    ];
                                     const wfBits = [
                                         v.workflow_stage ? `Workflow: ${String(v.workflow_stage)}` : "",
                                         v.faculty_approval_status ? `Faculty: ${String(v.faculty_approval_status)}` : "",
@@ -597,6 +724,56 @@ export default function AdminApprovalsPage() {
                                     ].filter(Boolean);
                                     return (
                                         <>
+                                        <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
+                                            <div className="flex items-center justify-between gap-3 mb-4">
+                                                <div>
+                                                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                                                        Approval Workflow
+                                                    </p>
+                                                    <p className="text-sm text-slate-600 mt-1">
+                                                        Track who has approved this opportunity so far.
+                                                    </p>
+                                                </div>
+                                                {v.workflow_stage ? (
+                                                    <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-600">
+                                                        {String(v.workflow_stage).replace(/_/g, " ")}
+                                                    </span>
+                                                ) : null}
+                                            </div>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                                {approvalStages.map((stage) => (
+                                                    <div key={stage.label} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                                                        <div className="flex items-start justify-between gap-3">
+                                                            <div>
+                                                                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                                                                    {stage.label}
+                                                                </p>
+                                                                <p className="mt-2 text-sm font-semibold text-slate-900 capitalize">
+                                                                    {approvalLabel(stage.status)}
+                                                                </p>
+                                                            </div>
+                                                            <span
+                                                                className={`inline-flex rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ${approvalPillClass(stage.status)}`}
+                                                            >
+                                                                {approvalLabel(stage.status)}
+                                                            </span>
+                                                        </div>
+                                                        <p className="mt-2 text-xs text-slate-500">{stage.helper}</p>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                            {wfBits.length > 0 ? (
+                                                <div className="mt-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-slate-700">
+                                                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">
+                                                        Approval pipeline (backend fields)
+                                                    </p>
+                                                    <p className="text-xs font-mono leading-relaxed">{wfBits.join(" · ")}</p>
+                                                    {v.is_student_created === true ? (
+                                                        <p className="text-[10px] text-slate-500 mt-2">Student-created opportunity</p>
+                                                    ) : null}
+                                                </div>
+                                            ) : null}
+                                        </div>
                                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                             {hasStudent ? (
                                                 <div className="rounded-xl border border-blue-100 bg-blue-50/50 p-4 md:col-span-1">
@@ -616,7 +793,7 @@ export default function AdminApprovalsPage() {
                                                         ) : null}
                                                         {sh.student.id ? (
                                                             <li>
-                                                                <span className="text-slate-500">Id:</span> {sh.student.id}
+                                                                <span className="text-slate-500">Id:</span> {formatDisplayId(sh.student.id, "STU")}
                                                             </li>
                                                         ) : null}
                                                         {sh.student.university ? (
@@ -687,17 +864,6 @@ export default function AdminApprovalsPage() {
                                                 </div>
                                             )}
                                         </div>
-                                        {wfBits.length > 0 ? (
-                                            <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-slate-700">
-                                                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">
-                                                    Approval pipeline (backend fields)
-                                                </p>
-                                                <p className="text-xs font-mono leading-relaxed">{wfBits.join(" · ")}</p>
-                                                {v.is_student_created === true ? (
-                                                    <p className="text-[10px] text-slate-500 mt-2">Student-created opportunity</p>
-                                                ) : null}
-                                            </div>
-                                        ) : null}
                                         </>
                                     );
                                 })()}

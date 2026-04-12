@@ -6,6 +6,7 @@ import { authenticatedFetch } from "@/utils/api";
 import { Button } from "@/app/dashboard/student/report/components/ui/button";
 import { Badge } from "@/app/dashboard/student/report/components/ui/badge";
 import { Loader2, Pencil, Plus } from "lucide-react";
+import { getStoredCurrentUserEmail } from "@/utils/currentUser";
 import { toast } from "sonner";
 
 type Row = {
@@ -36,7 +37,13 @@ export default function FacultyMyOpportunitiesPage() {
     useEffect(() => {
         const load = async () => {
             try {
-                const res = await authenticatedFetch("/api/v1/opportunities/faculty/mine");
+                const facultyEmail = getStoredCurrentUserEmail();
+                const params = new URLSearchParams();
+                if (facultyEmail) params.set("faculty_email", facultyEmail);
+
+                const res = await authenticatedFetch(
+                    `/api/v1/opportunities/faculty/mine${params.toString() ? `?${params.toString()}` : ""}`,
+                );
                 if (res?.ok) {
                     const data = await res.json();
                     if (data.success && Array.isArray(data.data)) {

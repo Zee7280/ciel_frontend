@@ -9,7 +9,11 @@ function resolveBackendStudentOpportunitiesBase(): string | null {
 }
 
 /** Student-owned opportunity updates (bypasses org-member check on generic PATCH /opportunities). */
-export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
+async function forwardStudentOpportunityUpdate(
+    request: Request,
+    { params }: { params: Promise<{ id: string }> },
+    method: "PATCH" | "POST",
+) {
     try {
         const { id } = await params;
         if (!id?.trim()) {
@@ -30,7 +34,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         const targetUrl = `${base}/${encodeURIComponent(id.trim())}`;
 
         const response = await fetch(targetUrl, {
-            method: "PATCH",
+            method,
             headers: {
                 "Content-Type": "application/json",
                 Authorization: authHeader || "",
@@ -51,7 +55,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
         return NextResponse.json(data);
     } catch (error) {
-        console.error("Error in student/opportunity/[id] PATCH proxy:", error);
+        console.error(`Error in student/opportunity/[id] ${method} proxy:`, error);
         return NextResponse.json(
             { success: false, message: "Could not reach the API server. Check your connection and backend URL." },
             { status: 502 },
@@ -59,6 +63,14 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     }
 }
 
+export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
+    return forwardStudentOpportunityUpdate(request, context, "POST");
+}
+
+export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
+    return forwardStudentOpportunityUpdate(request, context, "PATCH");
+}
+
 export async function PUT(request: Request, context: { params: Promise<{ id: string }> }) {
-    return PATCH(request, context);
+    return forwardStudentOpportunityUpdate(request, context, "PATCH");
 }

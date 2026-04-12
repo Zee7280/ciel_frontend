@@ -1,14 +1,13 @@
 import { verificationUsePost } from "@/config/verification";
 
 /**
- * Backend: faculty and partner both use GET /api/v1/verifications/verify?token=…
- * (same proxy path in this app). Role is encoded in the token only.
- * When the user is signed in, send `Authorization: Bearer …` (proxy forwards it).
- * Optional POST + JSON `{ token }` when `NEXT_PUBLIC_VERIFICATION_VERIFY_USE_POST=true`.
+ * Backend: GET `/verifications/verify?token=…` or POST body `{ token }` (see env below).
+ * Verify pages only call after login — send `Authorization: Bearer …` (proxy forwards it).
+ * Optional POST when `NEXT_PUBLIC_VERIFICATION_VERIFY_USE_POST=true`.
  *
  * Partner verify may return 400 until faculty has approved (sequential gate).
  */
-/** Faculty / partner project verification (Next proxy → backend). Sends Bearer when provided. */
+/** Faculty / partner project verification (Next proxy → backend). */
 export function fetchVerificationVerify(token: string, bearerToken: string | null): Promise<Response> {
     const headers: Record<string, string> = { Accept: "application/json" };
     if (bearerToken) headers.Authorization = `Bearer ${bearerToken}`;

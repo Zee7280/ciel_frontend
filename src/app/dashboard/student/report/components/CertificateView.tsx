@@ -1,5 +1,6 @@
 import React from 'react';
 import { useReportForm } from "../context/ReportContext";
+import { formatDisplayId } from "@/utils/displayIds";
 import { Award, ShieldCheck, Calendar, Globe, User, Building } from "lucide-react";
 
 export default function CertificateView() {
@@ -27,7 +28,9 @@ export default function CertificateView() {
                         <ShieldCheck className="w-4 h-4 text-slate-900" />
                         <span className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-900">Verified impact</span>
                     </div>
-                    <div className="text-[9px] font-bold text-slate-400">ID: {data.project_id || 'CIEL-REF-PENDING'}</div>
+                    <div className="text-[9px] font-bold text-slate-400">
+                        ID: {data.project_id ? formatDisplayId(data.project_id, "OPP") : 'CIEL-REF-PENDING'}
+                    </div>
                 </div>
             </div>
 

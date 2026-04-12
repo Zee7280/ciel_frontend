@@ -1,17 +1,67 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
 import { NextResponse } from "next/server";
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
-const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+// Gemini (paused): restore import + init + `model.generateContent(prompt)` below when using GEMINI_API_KEY again.
+// import { GoogleGenerativeAI } from "@google/generative-ai";
+// const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
+// const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+
+async function generateSummaryWithOpenAI(userPrompt: string): Promise<string> {
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) {
+        throw new Error("OPENAI_API_KEY missing");
+    }
+
+    const model = process.env.OPENAI_SUMMARY_MODEL?.trim() || "gpt-4o-mini";
+
+    const res = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+            model,
+            messages: [
+                {
+                    role: "system",
+                    content:
+                        "You are a precise analyst. Follow instructions exactly. Output plain text only unless a specific format is requested.",
+                },
+                { role: "user", content: userPrompt },
+            ],
+            temperature: 0.4,
+        }),
+    });
+
+    const payload = (await res.json()) as {
+        choices?: Array<{ message?: { content?: string | null } }>;
+        error?: { message?: string };
+    };
+
+    if (!res.ok) {
+        const err = new Error(payload.error?.message || `OpenAI error (${res.status})`) as Error & {
+            status?: number;
+        };
+        err.status = res.status;
+        throw err;
+    }
+
+    const text = payload.choices?.[0]?.message?.content?.trim();
+    if (!text) {
+        throw new Error("OpenAI returned empty content");
+    }
+
+    return text;
+}
 
 export async function POST(req: Request) {
     try {
 
         const { section, data } = await req.json();
 
-        if (!process.env.GEMINI_API_KEY) {
+        if (!process.env.OPENAI_API_KEY) {
             return NextResponse.json(
-                { error: "Gemini API Key is not configured" },
+                { error: "OpenAI API key is not configured" },
                 { status: 500 }
             );
         }
@@ -882,12 +932,7 @@ Provide a brief explanation of the score.`;
         }
 
 
-        const result = await model.generateContent(prompt);
-
-        const response = await result.response;
-
-        const text = response.text();
-
+        const text = await generateSummaryWithOpenAI(prompt);
 
         return NextResponse.json({
             summary: text.trim()
