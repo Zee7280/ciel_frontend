@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Info, MapPin, Clock, CheckCircle, AlertCircle, ChevronDown, ChevronUp, Users, Loader2, Plus } from "lucide-react";
 import { X } from "lucide-react";
@@ -11,6 +11,8 @@ import { findSdgById, opportunityFormSdgList } from "@/utils/sdgData";
 import { pakistaniUniversities } from "@/utils/universityData";
 import { isFacultyProfileComplete, pickProfileEmail } from "@/utils/profileCompletion";
 import { mapOpportunityDetailToFacultyForm } from "./mapDetailToForm";
+import PhoneConnectivityRow from "@/components/ui/PhoneConnectivityRow";
+import { parsePhoneForDisplay } from "@/utils/countryCallingCodes";
 
 const LocationPicker = dynamic(() => import("@/components/ui/LocationPicker"), {
     ssr: false,
@@ -136,6 +138,11 @@ export default function FacultyOpportunityCreationPage() {
             correctVerifiable: false,
         },
     });
+
+    const displayFacultyContact = useMemo(
+        () => parsePhoneForDisplay(facultyDetails.contact),
+        [facultyDetails.contact],
+    );
 
     const validateForm = () => {
         if (!facultyDetails.contact.trim()) {
@@ -755,7 +762,14 @@ export default function FacultyOpportunityCreationPage() {
                             </div>
                             <div>
                                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Contact <span className="text-red-500">*</span></label>
-                                <input type="text" value={facultyDetails.contact} readOnly className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2 text-slate-700 font-medium" />
+                                <PhoneConnectivityRow
+                                    phoneCountryKey={displayFacultyContact.phoneCountryKey}
+                                    nationalDigits={displayFacultyContact.national}
+                                    readOnly
+                                    placeholderNational="—"
+                                    selectClassName="rounded-lg border border-slate-200 bg-slate-50 py-2 text-xs font-medium text-slate-700"
+                                    inputClassName="rounded-lg border border-slate-200 bg-slate-50 py-2 text-sm font-medium text-slate-700"
+                                />
                             </div>
                         </>
                     )}

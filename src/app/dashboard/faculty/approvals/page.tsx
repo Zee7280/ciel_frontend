@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { CheckCircle, XCircle, Clock, Eye, Filter, Loader2 } from "lucide-react";
 import { authenticatedFetch } from "@/utils/api";
 import { Button } from "@/app/dashboard/student/report/components/ui/button";
@@ -36,11 +36,13 @@ export default function FacultyApprovalsPage() {
     const [detailRecord, setDetailRecord] = useState<Record<string, unknown> | null>(null);
     /** When set, detail dialog shows Approve/Reject for this opportunity id (pending tab only). */
     const [detailActionId, setDetailActionId] = useState<string | null>(null);
+    const [approveSubmittingId, setApproveSubmittingId] = useState<string | null>(null);
 
     const [rejectOpen, setRejectOpen] = useState(false);
     const [rejectTargetId, setRejectTargetId] = useState<string | null>(null);
     const [rejectComment, setRejectComment] = useState("");
     const [rejectSubmitting, setRejectSubmitting] = useState(false);
+    const autoOpenedIdRef = useRef<string | null>(null);
 
     useEffect(() => {
         void loadLists();
@@ -137,7 +139,33 @@ export default function FacultyApprovalsPage() {
         });
     }, [visibleList, search]);
 
+    useEffect(() => {
+        if (typeof window === "undefined") return;
+        const currentSearch = new URLSearchParams(window.location.search);
+        const nextTab = currentSearch.get("tab");
+        if (nextTab === "pending" || nextTab === "history") {
+            setTab(nextTab);
+        }
+    }, []);
+
+    useEffect(() => {
+        if (typeof window === "undefined") return;
+        if (isLoading) return;
+        const currentSearch = new URLSearchParams(window.location.search);
+        const opportunityId = currentSearch.get("opportunity") || currentSearch.get("id");
+        if (!opportunityId || autoOpenedIdRef.current === opportunityId) return;
+
+        const targetTab = currentSearch.get("tab") === "history" ? "history" : "pending";
+        const sourceRows = targetTab === "history" ? historyProjects : pendingProjects;
+        if (!sourceRows.some((row) => row.id === opportunityId)) return;
+
+        autoOpenedIdRef.current = opportunityId;
+        void openOpportunityDetail(opportunityId, { showActions: targetTab === "pending" });
+    }, [historyProjects, isLoading, pendingProjects]);
+
     const handleApprove = async (id: string) => {
+        if (approveSubmittingId === id) return;
+        setApproveSubmittingId(id);
         try {
             const res = await authenticatedFetch(`/api/v1/faculty/approvals/${id}/approve`, {
                 method: "POST",
@@ -154,6 +182,8 @@ export default function FacultyApprovalsPage() {
         } catch (error) {
             console.error("Failed to approve", error);
             toast.error("Error connecting to server");
+        } finally {
+            setApproveSubmittingId((prev) => (prev === id ? null : prev));
         }
     };
 
@@ -303,14 +333,14 @@ export default function FacultyApprovalsPage() {
                                         <div>
                                             <p className="text-xs font-bold text-slate-500 uppercase mb-1">Impact Hours</p>
                                             <p className="font-bold text-blue-600 text-lg">
-                                                {project.totalHours ?? "—"}{" "}
+                                                {formatApprovalMetric(project.totalHours)}{" "}
                                                 <span className="text-xs font-medium text-slate-400">(after verification)</span>
                                             </p>
                                         </div>
                                         <div>
                                             <p className="text-xs font-bold text-slate-500 uppercase mb-1">EIS Score</p>
                                             <p className="font-bold text-amber-600 text-lg">
-                                                {project.eisScore ?? "—"}
+                                                {formatApprovalMetric(project.eisScore)}
                                                 <span className="text-xs font-medium text-slate-400">/100</span>
                                             </p>
                                         </div>
@@ -324,8 +354,20 @@ export default function FacultyApprovalsPage() {
                                 <div className="bg-slate-50 border-l border-slate-100 p-6 flex flex-row md:flex-col justify-center gap-3 w-full md:w-48">
                                     {tab === "pending" ? (
                                         <>
-                                            <Button className="w-full bg-green-600 hover:bg-green-700" onClick={() => handleApprove(project.id)}>
-                                                <CheckCircle className="w-4 h-4 mr-2" /> Approve
+                                            <Button
+                                                className="w-full bg-green-600 hover:bg-green-700"
+                                                onClick={() => void handleApprove(project.id)}
+                                                disabled={approveSubmittingId === project.id}
+                                            >
+                                                {approveSubmittingId === project.id ? (
+                                                    <>
+                                                        <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Approving...
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <CheckCircle className="w-4 h-4 mr-2" /> Approve
+                                                    </>
+                                                )}
                                             </Button>
                                             <Button variant="destructive" className="w-full" onClick={() => openRejectDialog(project.id)}>
                                                 <XCircle className="w-4 h-4 mr-2" /> Reject
@@ -376,8 +418,20 @@ export default function FacultyApprovalsPage() {
                                     <Button variant="destructive" onClick={() => detailActionId && openRejectDialog(detailActionId)}>
                                         <XCircle className="w-4 h-4 mr-2" /> Reject
                                     </Button>
-                                    <Button className="bg-green-600 hover:bg-green-700" onClick={() => void handleApprove(detailActionId)}>
-                                        <CheckCircle className="w-4 h-4 mr-2" /> Approve
+                                    <Button
+                                        className="bg-green-600 hover:bg-green-700"
+                                        onClick={() => void handleApprove(detailActionId)}
+                                        disabled={approveSubmittingId === detailActionId}
+                                    >
+                                        {approveSubmittingId === detailActionId ? (
+                                            <>
+                                                <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Approving...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <CheckCircle className="w-4 h-4 mr-2" /> Approve
+                                            </>
+                                        )}
                                     </Button>
                                 </div>
                             ) : null}
@@ -434,6 +488,11 @@ function formatHistoryStatus(project: FacultyApprovalRow): string {
     if (ws) return ws;
     if (st) return st;
     return "In workflow";
+}
+
+function formatApprovalMetric(value?: number): string | number {
+    if (typeof value !== "number" || Number.isNaN(value) || value <= 0) return "—";
+    return value;
 }
 
 function pickNestedStr(o: Record<string, unknown> | null, ...keys: string[]): string {
@@ -768,14 +827,6 @@ function FacultyOpportunityDetailBody({ d }: { d: Record<string, unknown> }) {
                 </div>
             ) : null}
 
-            {executing && (executing.type || Object.keys(executing).length > 1) ? (
-                <div>
-                    <p className="text-xs font-bold text-slate-500 uppercase mb-1">Executing context (raw)</p>
-                    <pre className="text-xs bg-slate-50 p-3 rounded-lg border border-slate-100 overflow-x-auto whitespace-pre-wrap">
-                        {JSON.stringify(executing, null, 2)}
-                    </pre>
-                </div>
-            ) : null}
         </div>
     );
 }

@@ -197,6 +197,7 @@ export default function AdminApprovalsPage() {
     const [rejectType, setRejectType] = useState<'opportunity' | 'user'>('opportunity');
     const [rejectReason, setRejectReason] = useState("");
     const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
+    const [approveSubmittingKey, setApproveSubmittingKey] = useState<string | null>(null);
 
     useEffect(() => {
         let cancelled = false;
@@ -274,10 +275,13 @@ export default function AdminApprovalsPage() {
     };
 
     const handleApprove = async (id: string, type: 'opportunity' | 'user' = 'opportunity') => {
+        const submittingKey = `${type}:${id}`;
+        if (approveSubmittingKey === submittingKey) return;
         const endpoint = type === 'opportunity'
             ? `/api/v1/admin/opportunities/${id}/approve`
             : `/api/v1/admin/users/${id}/approve`;
 
+        setApproveSubmittingKey(submittingKey);
         try {
             const res = await authenticatedFetch(endpoint, {
                 method: 'POST'
@@ -291,6 +295,8 @@ export default function AdminApprovalsPage() {
             }
         } catch (error) {
             console.error("Failed to approve", error);
+        } finally {
+            setApproveSubmittingKey((prev) => (prev === submittingKey ? null : prev));
         }
     };
 
@@ -523,8 +529,17 @@ export default function AdminApprovalsPage() {
                                 </button>
                                 <button
                                     onClick={() => handleApprove(req.id, 'user')}
-                                    className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold hover:bg-blue-700 flex items-center gap-2 transition-colors shadow-lg shadow-blue-200">
-                                    <CheckCircle className="w-4 h-4" /> {req.opportunity ? 'Approve Participation' : 'Approve User'}
+                                    disabled={approveSubmittingKey === `user:${req.id}`}
+                                    className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold hover:bg-blue-700 flex items-center gap-2 transition-colors shadow-lg shadow-blue-200 disabled:opacity-60 disabled:cursor-not-allowed">
+                                    {approveSubmittingKey === `user:${req.id}` ? (
+                                        <>
+                                            <Loader2 className="w-4 h-4 animate-spin" /> Approving...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <CheckCircle className="w-4 h-4" /> {req.opportunity ? 'Approve Participation' : 'Approve User'}
+                                        </>
+                                    )}
                                 </button>
                             </div>
                         </div>
@@ -576,9 +591,18 @@ export default function AdminApprovalsPage() {
                                 </button>
                                 <button
                                     onClick={() => handleApprove(proj.id, 'opportunity')}
-                                    className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-bold hover:bg-green-700 flex items-center gap-2 transition-colors shadow-lg shadow-green-200"
+                                    disabled={approveSubmittingKey === `opportunity:${proj.id}`}
+                                    className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-bold hover:bg-green-700 flex items-center gap-2 transition-colors shadow-lg shadow-green-200 disabled:opacity-60 disabled:cursor-not-allowed"
                                 >
-                                    <CheckCircle className="w-4 h-4" /> Approve Project
+                                    {approveSubmittingKey === `opportunity:${proj.id}` ? (
+                                        <>
+                                            <Loader2 className="w-4 h-4 animate-spin" /> Approving...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <CheckCircle className="w-4 h-4" /> Approve Project
+                                        </>
+                                    )}
                                 </button>
                                 {/* <button
                                     onClick={() => handleChatWithPartner(proj)}
@@ -1116,10 +1140,17 @@ export default function AdminApprovalsPage() {
                                         setIsDetailModalOpen(false);
                                         setOpportunityDetail(null);
                                     }}
-                                    disabled={opportunityDetailLoading}
+                                    disabled={opportunityDetailLoading || approveSubmittingKey === `opportunity:${selectedOpportunity.id}`}
                                     className="px-4 py-2 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
-                                    Approve
+                                    {approveSubmittingKey === `opportunity:${selectedOpportunity.id}` ? (
+                                        <span className="inline-flex items-center gap-2">
+                                            <Loader2 className="w-4 h-4 animate-spin" />
+                                            Approving...
+                                        </span>
+                                    ) : (
+                                        "Approve"
+                                    )}
                                 </button>
                             </div>
                         </div>

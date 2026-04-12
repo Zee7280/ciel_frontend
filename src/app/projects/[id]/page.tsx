@@ -4,22 +4,72 @@ import Navbar from "@/components/Navbar";
 import PartnersFooter from "@/components/PartnersFooter";
 import FooterBanner from "@/components/FooterBanner";
 import Footer from "@/components/Footer";
-import { MapPin, Users, Calendar, Target, ArrowLeft, CheckCircle2, Loader2, Globe2, Sparkles, Building2, Tag } from "lucide-react";
+import { MapPin, Users, Target, ArrowLeft, CheckCircle2, Loader2, Globe2, Sparkles, Building2, Tag, Clock } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useState, useEffect } from "react";
+import { readStoredCurrentUser } from "@/utils/currentUser";
 
 interface ProjectDetails {
     id: string | number;
     title: string;
     partner_name?: string;
-    location?: string | { pin?: string; city?: string; venue?: string };
+    org?: string;
+    organization_name?: string;
+    organization?: {
+        name?: string;
+        city?: string;
+    };
+    location?: string | { pin?: string; city?: string; venue?: string; district?: string };
     status: string;
     participant_count?: number;
     description: string;
     types?: string[];
+    sdg?: string | number;
     sdg_info?: { sdg_id?: string; description?: string };
     submitted_at?: string;
+    start_date?: string;
+    end_date?: string;
+    timeline_type?: string;
+    hours?: string | number;
+    volunteers_needed?: string | number;
+    mode?: string;
+    timeline?: {
+        start_date?: string;
+        end_date?: string;
+        expected_hours?: string | number;
+        volunteers_required?: string | number;
+        type?: string;
+    };
+    objectives?: {
+        description?: string;
+        beneficiaries_count?: string | number;
+        beneficiaries_type?: string[] | string;
+    };
+    activity_details?: {
+        student_responsibilities?: string;
+        skills_gained?: string[];
+    };
+    supervision?: {
+        supervisor_name?: string;
+        role?: string;
+        safe_environment?: boolean;
+        supervised?: boolean;
+    };
+    verification_method?: string[];
+}
+
+function normalizeTextList(value?: string[] | string): string[] {
+    if (Array.isArray(value)) {
+        return value.filter((item): item is string => typeof item === "string" && item.trim().length > 0);
+    }
+    if (typeof value === "string" && value.trim()) {
+        return value
+            .split(/[,\n]/)
+            .map((item) => item.trim())
+            .filter(Boolean);
+    }
+    return [];
 }
 
 export default function ProjectDetailsPage() {
@@ -27,16 +77,28 @@ export default function ProjectDetailsPage() {
     const projectId = params.id as string;
     const [project, setProject] = useState<ProjectDetails | null>(null);
     const [isLoading, setIsLoading] = useState(true);
+    const [applyHref, setApplyHref] = useState("/login");
+    const [applyLabel, setApplyLabel] = useState("Log in to Apply");
 
     useEffect(() => {
         const fetchProjectDetails = async () => {
             try {
-                const backendUrl = process.env.NEXT_PUBLIC_BACKEND_BASE_URL;
-                const response = await fetch(`${backendUrl}/public/opportunities`);
-                const data = await response.json();
-                
-                if (data.success && Array.isArray(data.data)) {
-                    const found = data.data.find((p: any) => p.id.toString() === projectId);
+                const backendUrl = process.env.NEXT_PUBLIC_BACKEND_BASE_URL ?? "";
+                const baseUrl = backendUrl.endsWith("/api/v1") ? backendUrl.replace("/api/v1", "") : backendUrl;
+
+                const detailResponse = await fetch(`${baseUrl}/api/v1/public/opportunities/${projectId}`);
+                const detailData = await detailResponse.json().catch(() => ({}));
+
+                if (detailResponse.ok && detailData.success && detailData.data) {
+                    setProject(detailData.data);
+                    return;
+                }
+
+                const fallbackResponse = await fetch(`${backendUrl}/public/opportunities`);
+                const fallbackData = await fallbackResponse.json();
+
+                if (fallbackData.success && Array.isArray(fallbackData.data)) {
+                    const found = (fallbackData.data as ProjectDetails[]).find((p) => p.id.toString() === projectId);
                     if (found) {
                         setProject(found);
                     }
@@ -51,13 +113,41 @@ export default function ProjectDetailsPage() {
         fetchProjectDetails();
     }, [projectId]);
 
-    const getDisplayLocation = (loc: any) => {
+    useEffect(() => {
+        const nextPath = `/dashboard/student/browse/${projectId}`;
+
+        try {
+            const user = readStoredCurrentUser();
+            const role = String(user?.role ?? "").trim().toLowerCase();
+            const hasToken = typeof window !== "undefined" && Boolean(window.localStorage.getItem("ciel_token"));
+
+            if (hasToken && role === "student") {
+                setApplyHref(nextPath);
+                setApplyLabel("Open in Student Dashboard");
+                return;
+            }
+        } catch {
+            /* ignore CTA personalization errors */
+        }
+
+        setApplyHref(`/login?next=${encodeURIComponent(nextPath)}`);
+        setApplyLabel("Log in to Apply");
+    }, [projectId]);
+
+    const getDisplayLocation = (loc: ProjectDetails["location"]) => {
         if (!loc) return "Remote / Pakistan";
-        if (typeof loc === 'string') return loc;
+        if (typeof loc === "string") return loc;
         const parts = [];
         if (loc.city) parts.push(loc.city);
+        if (loc.district) parts.push(loc.district);
         if (loc.venue) parts.push(loc.venue);
         return parts.length > 0 ? parts.join(", ") : (loc.pin || "Pakistan");
+    };
+
+    const formatDate = (value?: string) => {
+        if (!value) return "Flexible";
+        const date = new Date(value);
+        return Number.isNaN(date.getTime()) ? "Flexible" : date.toLocaleDateString();
     };
 
     if (isLoading) {
@@ -91,6 +181,29 @@ export default function ProjectDetailsPage() {
     const category = (project.types && project.types.length > 0) ? project.types[0] : "Social Impact";
     const status = project.status || "Active";
     const displayLocation = getDisplayLocation(project.location);
+    const partnerName = project.organization?.name || project.organization_name || project.partner_name || project.org || "Verified Organization";
+    const primaryDescription = project.objectives?.description || project.description;
+    const skills = normalizeTextList(project.activity_details?.skills_gained);
+    const verificationMethods = normalizeTextList(project.verification_method);
+    const beneficiaryTypes = normalizeTextList(project.objectives?.beneficiaries_type);
+    const volunteersNeeded = project.timeline?.volunteers_required || project.volunteers_needed || project.participant_count || 0;
+    const expectedHours = project.timeline?.expected_hours || project.hours || 0;
+    const beneficiaries = project.objectives?.beneficiaries_count || "N/A";
+    const startDate = formatDate(project.timeline?.start_date || project.start_date || project.submitted_at);
+    const endDate = formatDate(project.timeline?.end_date || project.end_date);
+    const duration = project.timeline?.type || project.timeline_type || "Flexible";
+    const venue =
+        project.location && typeof project.location === "object"
+            ? (project.location.venue || "To be shared after login")
+            : displayLocation;
+    const orgCity =
+        project.organization?.city ||
+        (project.location && typeof project.location === "object"
+            ? project.location.city || project.location.district || ""
+            : "");
+    const sdgLabel = project.sdg_info?.sdg_id || (project.sdg ? `SDG ${project.sdg}` : "UN Global Goal");
+    const sdgDescription =
+        project.sdg_info?.description || "This opportunity supports measurable community impact goals.";
 
     return (
         <main className="min-h-screen bg-slate-50 font-sans selection:bg-blue-100 pb-20">
@@ -103,13 +216,18 @@ export default function ProjectDetailsPage() {
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                     <div>
                         <h1 className="text-4xl md:text-5xl font-black text-slate-900 mb-3 tracking-tight leading-tight">{project.title}</h1>
-                        <p className="text-lg font-bold text-[#4285F4]">{project.partner_name || "Verified Organization"}</p>
+                        <p className="text-lg font-bold text-[#4285F4]">{partnerName}</p>
                     </div>
                     <div className="flex items-center gap-3">
-                         <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest ${
-                                status.toLowerCase() === 'active' ? 'bg-green-50 text-green-700 border border-green-100' :
-                                status.toLowerCase() === 'recruiting' ? 'bg-blue-50 text-blue-700 border border-blue-100' :
-                                'bg-slate-50 text-slate-600 border border-slate-100'
+                        {project.mode ? (
+                            <span className="px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest bg-blue-50 text-blue-700 border border-blue-100">
+                                {project.mode}
+                            </span>
+                        ) : null}
+                        <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest ${
+                                status.toLowerCase() === "active" ? "bg-green-50 text-green-700 border border-green-100" :
+                                status.toLowerCase() === "recruiting" ? "bg-blue-50 text-blue-700 border border-blue-100" :
+                                "bg-slate-50 text-slate-600 border border-slate-100"
                             }`}>
                                 {status}
                         </span>
@@ -119,10 +237,10 @@ export default function ProjectDetailsPage() {
 
             {/* Consolidated Details Card */}
             <div className="px-6 max-w-5xl mx-auto">
-                <div className="bg-white rounded-[2.5rem] p-10 md:p-14 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05)] border border-slate-100 animate-fade-in-up">
+                <div className="bg-white rounded-[2.5rem] p-8 md:p-10 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05)] border border-slate-100 animate-fade-in-up">
                     
                     {/* Key Metrics Grid */}
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-8 pb-12 mb-12 border-b border-slate-50">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-6 pb-10 mb-10 border-b border-slate-100">
                         <div className="flex flex-col gap-1.5">
                             <div className="flex items-center gap-2 text-slate-400">
                                 <MapPin className="w-4 h-4" />
@@ -135,14 +253,14 @@ export default function ProjectDetailsPage() {
                                 <Users className="w-4 h-4" />
                                 <span className="text-[10px] font-black uppercase tracking-widest">Volunteers</span>
                             </div>
-                            <span className="text-sm font-bold text-slate-900">{project.participant_count || 0} Registered</span>
+                            <span className="text-sm font-bold text-slate-900">{volunteersNeeded} Needed</span>
                         </div>
                         <div className="flex flex-col gap-1.5">
                             <div className="flex items-center gap-2 text-slate-400">
-                                <Calendar className="w-4 h-4" />
-                                <span className="text-[10px] font-black uppercase tracking-widest">Posted on</span>
+                                <Clock className="w-4 h-4" />
+                                <span className="text-[10px] font-black uppercase tracking-widest">Hours</span>
                             </div>
-                            <span className="text-sm font-bold text-slate-900">{project.submitted_at ? new Date(project.submitted_at).toLocaleDateString() : "Just Now"}</span>
+                            <span className="text-sm font-bold text-slate-900">{expectedHours || 0} Hours</span>
                         </div>
                         <div className="flex flex-col gap-1.5">
                             <div className="flex items-center gap-2 text-slate-400">
@@ -154,34 +272,126 @@ export default function ProjectDetailsPage() {
                     </div>
 
                     {/* Description Section */}
-                    <div className="mb-14">
+                    <div className="mb-10">
                         <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-6">About the Project</h3>
-                        <p className="text-xl text-slate-600 font-medium leading-[1.8]">
-                            {project.description}
+                        <p className="text-base text-slate-600 leading-7 whitespace-pre-line">
+                            {primaryDescription}
                         </p>
                     </div>
 
-                    {/* SDG Section (Simplified) */}
-                    {project.sdg_info && (
-                        <div className="bg-slate-50 p-8 rounded-3xl border border-slate-100 flex flex-col md:flex-row items-start md:items-center gap-6 mb-14">
-                            <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center shadow-sm shrink-0">
-                                <Globe2 className="w-7 h-7 text-[#4285F4]" />
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+                        <div className="bg-slate-50 rounded-3xl border border-slate-100 p-6">
+                            <div className="flex items-center gap-3 mb-4">
+                                <Building2 className="w-5 h-5 text-[#4285F4]" />
+                                <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Organization</h3>
                             </div>
-                            <div>
-                                <h4 className="text-[10px] font-black text-[#4285F4] uppercase tracking-widest mb-1">{project.sdg_info.sdg_id || "UN GLOBAL GOAL"}</h4>
-                                <p className="text-sm font-bold text-slate-600 leading-relaxed max-w-2xl">{project.sdg_info.description || "Contributing to sustainable community development."}</p>
+                            <div className="space-y-2 text-sm text-slate-600">
+                                <p><span className="font-bold text-slate-900">Name:</span> {partnerName}</p>
+                                <p><span className="font-bold text-slate-900">City:</span> {orgCity || "Not provided"}</p>
+                                <p><span className="font-bold text-slate-900">Mode:</span> {project.mode || "Not provided"}</p>
+                            </div>
+                        </div>
+                        <div className="bg-slate-50 rounded-3xl border border-slate-100 p-6">
+                            <div className="flex items-center gap-3 mb-4">
+                                <Globe2 className="w-5 h-5 text-[#4285F4]" />
+                                <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">SDG Alignment</h3>
+                            </div>
+                            <div className="space-y-2 text-sm text-slate-600">
+                                <p><span className="font-bold text-slate-900">Goal:</span> {sdgLabel}</p>
+                                <p className="leading-6">{sdgDescription}</p>
+                            </div>
+                        </div>
+                        <div className="bg-slate-50 rounded-3xl border border-slate-100 p-6">
+                            <div className="flex items-center gap-3 mb-4">
+                                <Clock className="w-5 h-5 text-[#4285F4]" />
+                                <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Quick Info</h3>
+                            </div>
+                            <div className="space-y-2 text-sm text-slate-600">
+                                <p><span className="font-bold text-slate-900">Start:</span> {startDate}</p>
+                                <p><span className="font-bold text-slate-900">End:</span> {endDate}</p>
+                                <p><span className="font-bold text-slate-900">Duration:</span> {duration}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
+                        <div className="bg-slate-50 rounded-3xl border border-slate-100 p-6">
+                            <div className="flex items-center gap-3 mb-4">
+                                <Target className="w-5 h-5 text-[#4285F4]" />
+                                <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Student Responsibilities</h3>
+                            </div>
+                            <p className="text-sm text-slate-600 leading-7 whitespace-pre-line">
+                                {project.activity_details?.student_responsibilities || "Detailed student responsibilities will be shared after login through the student dashboard."}
+                            </p>
+                        </div>
+                        <div className="bg-slate-50 rounded-3xl border border-slate-100 p-6">
+                            <div className="flex items-center gap-3 mb-4">
+                                <Building2 className="w-5 h-5 text-[#4285F4]" />
+                                <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Timeline & Venue</h3>
+                            </div>
+                            <div className="space-y-3 text-sm text-slate-600">
+                                <p><span className="font-bold text-slate-900">Start:</span> {startDate}</p>
+                                <p><span className="font-bold text-slate-900">End:</span> {endDate}</p>
+                                <p><span className="font-bold text-slate-900">Venue:</span> {venue}</p>
+                                <p><span className="font-bold text-slate-900">Location:</span> {displayLocation}</p>
+                                <p><span className="font-bold text-slate-900">Beneficiaries:</span> {beneficiaries}</p>
+                                <p><span className="font-bold text-slate-900">Beneficiary Type:</span> {beneficiaryTypes.length > 0 ? beneficiaryTypes.join(", ") : "Not provided"}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {(skills.length > 0 || verificationMethods.length > 0 || project.supervision) && (
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+                            <div className="md:col-span-2 bg-white border border-slate-100 rounded-3xl p-6">
+                                <div className="flex items-center gap-3 mb-5">
+                                    <Sparkles className="w-5 h-5 text-[#4285F4]" />
+                                    <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Skills & Verification</h3>
+                                </div>
+                                {skills.length > 0 ? (
+                                    <div className="flex flex-wrap gap-3 mb-6">
+                                        {skills.map((skill) => (
+                                            <span key={skill} className="px-3 py-1.5 rounded-full bg-blue-50 border border-blue-100 text-xs font-bold text-blue-700">
+                                                {skill}
+                                            </span>
+                                        ))}
+                                    </div>
+                                ) : null}
+                                {verificationMethods.length > 0 ? (
+                                    <div className="space-y-2">
+                                        {verificationMethods.map((method) => (
+                                            <div key={method} className="flex items-start gap-2 text-sm text-slate-600">
+                                                <CheckCircle2 className="w-4 h-4 mt-0.5 text-emerald-500 shrink-0" />
+                                                <span>{method}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : null}
+                            </div>
+                            <div className="bg-slate-50 border border-slate-100 rounded-3xl p-6">
+                                <div className="flex items-center gap-3 mb-4">
+                                    <Globe2 className="w-5 h-5 text-[#4285F4]" />
+                                    <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Supervision</h3>
+                                </div>
+                                <div className="space-y-3 text-sm text-slate-600">
+                                    <p><span className="font-bold text-slate-900">Organization:</span> {partnerName}</p>
+                                    <p><span className="font-bold text-slate-900">Supervisor:</span> {project.supervision?.supervisor_name || "Assigned Coordinator"}</p>
+                                    <p><span className="font-bold text-slate-900">Role:</span> {project.supervision?.role || "Project Lead"}</p>
+                                    <p><span className="font-bold text-slate-900">Safe Environment:</span> {project.supervision?.safe_environment ? "Confirmed" : "Shared after onboarding"}</p>
+                                </div>
                             </div>
                         </div>
                     )}
 
                     {/* Apply Action */}
                     <Link 
-                        href="/signup"
-                        className="w-full flex items-center justify-center py-6 rounded-2xl bg-[#4285F4] text-white font-black text-base hover:scale-[1.02] active:scale-[0.98] transition-all shadow-2xl shadow-blue-100 tracking-widest uppercase"
+                        href={applyHref}
+                        className="w-full flex items-center justify-center py-4 rounded-2xl bg-[#4285F4] text-white font-bold text-sm hover:scale-[1.02] active:scale-[0.98] transition-all shadow-2xl shadow-blue-100 tracking-[0.2em] uppercase"
                     >
-                        Apply to Project
+                        {applyLabel}
                     </Link>
-                    <p className="text-[10px] text-center text-slate-400 font-black mt-6 tracking-widest uppercase italic">You must be a verified student to join this initiative.</p>
+                    <p className="text-[10px] text-center text-slate-400 font-black mt-6 tracking-widest uppercase italic">
+                        Apply flow student dashboard me available hai. Login karke Browse Opportunities se apply karein.
+                    </p>
                 </div>
             </div>
 

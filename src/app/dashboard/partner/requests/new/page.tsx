@@ -20,6 +20,9 @@ const LocationPicker = dynamic(() => import("@/components/ui/LocationPicker"), {
     loading: () => <div className="h-[300px] w-full bg-slate-50 animate-pulse rounded-xl flex items-center justify-center text-slate-400">Loading Map...</div>
 });
 
+/** Timeline modes that collect start/end date + optional daily from/to time (sent as timeline.* on create). */
+const TIMELINES_WITH_SCHEDULE_UI = ["Fixed dates", "Flexible", "Ongoing"] as const;
+
 export default function OpportunityPostingPage() {
     const router = useRouter();
     const [isLoadingProfile, setIsLoadingProfile] = useState(true);
@@ -43,7 +46,7 @@ export default function OpportunityPostingPage() {
         mode: "", // on-site, remote, hybrid
         location: { city: "", venue: "", pin: "" },
         timelineType: "", // fixed, flexible, ongoing
-        dates: { start: "", end: "" },
+        dates: { start: "", end: "", fromTime: "", endTime: "" },
         capacity: { hours: "", volunteers: "" },
 
         // Section C
@@ -248,6 +251,12 @@ export default function OpportunityPostingPage() {
                     type: formData.timelineType,
                     start_date: formData.dates.start,
                     end_date: formData.dates.end,
+                    ...((TIMELINES_WITH_SCHEDULE_UI as readonly string[]).includes(formData.timelineType)
+                        ? {
+                            ...(formData.dates.fromTime.trim() ? { from_time: formData.dates.fromTime.trim() } : {}),
+                            ...(formData.dates.endTime.trim() ? { to_time: formData.dates.endTime.trim() } : {}),
+                        }
+                        : {}),
                     expected_hours: parseInt(formData.capacity.hours) || 0,
                     volunteers_required: parseInt(formData.capacity.volunteers) || 0
                 },
@@ -257,12 +266,14 @@ export default function OpportunityPostingPage() {
                     target_id: formData.target,
                     indicator_id: formData.indicator,
                 },
-                secondary_sdgs: formData.secondarySdgs.map(s => ({
-                    sdg_id: s.sdgId,
-                    target_id: s.targetId,
-                    indicator_id: s.indicatorId,
-                    justification: s.justification
-                })),
+                secondary_sdgs: formData.secondarySdgs
+                    .filter((s) => s.sdgId && s.targetId)
+                    .map((s) => ({
+                        sdg_id: s.sdgId,
+                        target_id: s.targetId,
+                        indicator_id: s.indicatorId,
+                        justification: s.justification
+                    })),
                 objectives: {
                     description: formData.objectives.description,
                     beneficiaries_count: parseInt(formData.objectives.beneficiariesCount) || 0,
@@ -755,25 +766,55 @@ export default function OpportunityPostingPage() {
                                     ))}
                                 </div>
 
-                                {["Fixed dates", "Flexible", "Ongoing"].includes(formData.timelineType) && (
-                                    <div className="space-y-2 animate-in fade-in zoom-in-95">
+                                {(TIMELINES_WITH_SCHEDULE_UI as readonly string[]).includes(formData.timelineType) && (
+                                    <div className="space-y-3 animate-in fade-in zoom-in-95">
                                         <p className="text-xs text-slate-500">
-                                            Start and end dates are optional for all timeline types.
+                                            Start/end dates and daily times are optional for all timeline types.
                                         </p>
-                                        <div className="flex gap-2">
+                                        <div className="flex gap-2 flex-wrap">
                                             <input
                                                 type="date"
-                                                className="flex-1 px-3 py-2 border border-slate-200 rounded-lg text-sm"
+                                                className="flex-1 min-w-[140px] px-3 py-2 border border-slate-200 rounded-lg text-sm"
                                                 value={formData.dates.start}
                                                 onChange={(e) => setFormData({ ...formData, dates: { ...formData.dates, start: e.target.value } })}
                                             />
                                             <span className="self-center text-slate-400">-</span>
                                             <input
                                                 type="date"
-                                                className="flex-1 px-3 py-2 border border-slate-200 rounded-lg text-sm"
+                                                className="flex-1 min-w-[140px] px-3 py-2 border border-slate-200 rounded-lg text-sm"
                                                 value={formData.dates.end}
                                                 onChange={(e) => setFormData({ ...formData, dates: { ...formData.dates, end: e.target.value } })}
                                             />
+                                        </div>
+                                        <div className="flex gap-2 flex-wrap items-center">
+                                            <div className="flex-1 min-w-[140px]">
+                                                <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">From time</label>
+                                                <input
+                                                    type="time"
+                                                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
+                                                    value={formData.dates.fromTime}
+                                                    onChange={(e) =>
+                                                        setFormData({
+                                                            ...formData,
+                                                            dates: { ...formData.dates, fromTime: e.target.value },
+                                                        })
+                                                    }
+                                                />
+                                            </div>
+                                            <div className="flex-1 min-w-[140px]">
+                                                <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">To time</label>
+                                                <input
+                                                    type="time"
+                                                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
+                                                    value={formData.dates.endTime}
+                                                    onChange={(e) =>
+                                                        setFormData({
+                                                            ...formData,
+                                                            dates: { ...formData.dates, endTime: e.target.value },
+                                                        })
+                                                    }
+                                                />
+                                            </div>
                                         </div>
                                     </div>
                                 )}
@@ -914,16 +955,22 @@ export default function OpportunityPostingPage() {
 
                         <div className="space-y-4">
                             <select
+                                key={formData.secondarySdgs.map((s) => s.sdgId).join("|")}
                                 className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-purple-500 outline-none font-medium text-sm"
+                                defaultValue=""
                                 onChange={(e) => {
                                     const val = e.target.value;
-                                    if (val && !formData.secondarySdgs.find(s => s.sdgId === val)) {
-                                        setFormData({
-                                            ...formData,
-                                            secondarySdgs: [...formData.secondarySdgs, { sdgId: val, targetId: "", indicatorId: "", justification: "" }]
-                                        });
-                                    }
-                                    e.target.value = "";
+                                    if (!val) return;
+                                    setFormData((prev) => {
+                                        if (prev.secondarySdgs.some((s) => s.sdgId === val)) return prev;
+                                        return {
+                                            ...prev,
+                                            secondarySdgs: [
+                                                ...prev.secondarySdgs,
+                                                { sdgId: val, targetId: "", indicatorId: "", justification: "" },
+                                            ],
+                                        };
+                                    });
                                 }}
                             >
                                 <option value="">Add a Secondary SDG...</option>
@@ -945,6 +992,7 @@ export default function OpportunityPostingPage() {
                                     return (
                                         <div key={item.sdgId} className="bg-slate-50 p-6 rounded-2xl border border-slate-200 flex flex-col gap-4 relative animate-in fade-in slide-in-from-top-2">
                                             <button
+                                                type="button"
                                                 onClick={() => setFormData({
                                                     ...formData,
                                                     secondarySdgs: formData.secondarySdgs.filter(s => s.sdgId !== item.sdgId)
@@ -973,10 +1021,15 @@ export default function OpportunityPostingPage() {
                                                         className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-purple-500 outline-none text-xs font-bold bg-white"
                                                         value={item.targetId}
                                                         onChange={(e) => {
-                                                            const newSecondary = [...formData.secondarySdgs];
-                                                            newSecondary[index].targetId = e.target.value;
-                                                            newSecondary[index].indicatorId = ""; // Reset indicator
-                                                            setFormData({ ...formData, secondarySdgs: newSecondary });
+                                                            const selectedTargetId = e.target.value;
+                                                            setFormData((prev) => ({
+                                                                ...prev,
+                                                                secondarySdgs: prev.secondarySdgs.map((entry, entryIndex) =>
+                                                                    entryIndex === index
+                                                                        ? { ...entry, targetId: selectedTargetId, indicatorId: "" }
+                                                                        : entry
+                                                                ),
+                                                            }));
                                                         }}
                                                     >
                                                         <option value="">Choose Target...</option>
@@ -993,9 +1046,15 @@ export default function OpportunityPostingPage() {
                                                         className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-purple-500 outline-none text-xs font-bold bg-white"
                                                         value={item.indicatorId}
                                                         onChange={(e) => {
-                                                            const newSecondary = [...formData.secondarySdgs];
-                                                            newSecondary[index].indicatorId = e.target.value;
-                                                            setFormData({ ...formData, secondarySdgs: newSecondary });
+                                                            const selectedIndicatorId = e.target.value;
+                                                            setFormData((prev) => ({
+                                                                ...prev,
+                                                                secondarySdgs: prev.secondarySdgs.map((entry, entryIndex) =>
+                                                                    entryIndex === index
+                                                                        ? { ...entry, indicatorId: selectedIndicatorId }
+                                                                        : entry
+                                                                ),
+                                                            }));
                                                         }}
                                                     >
                                                         <option value="">Choose Indicator...</option>

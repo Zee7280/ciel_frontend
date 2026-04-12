@@ -7,7 +7,6 @@ import {
     isPartnerProfileComplete,
     isStudentProfileComplete,
 } from "@/utils/profileCompletion";
-import { consumePersistedVerificationReturn } from "@/utils/verificationReturnUrl";
 
 /**
  * Redirects student/partner/faculty to their profile until required fields exist on the cached user
@@ -45,10 +44,6 @@ export default function ProfileCompletionGate({ children }: { children: React.Re
                 router.replace("/dashboard/partner/profile");
                 return;
             }
-            const resumeVerify = consumePersistedVerificationReturn();
-            if (resumeVerify) {
-                router.replace(resumeVerify);
-            }
             return;
         }
 
@@ -57,10 +52,6 @@ export default function ProfileCompletionGate({ children }: { children: React.Re
             if (!isFacultyProfileComplete(user)) {
                 router.replace("/dashboard/faculty/profile");
                 return;
-            }
-            const resumeVerifyFaculty = consumePersistedVerificationReturn();
-            if (resumeVerifyFaculty) {
-                router.replace(resumeVerifyFaculty);
             }
         }
     }, [pathname, router]);

@@ -38,24 +38,57 @@ function pickFeedbackFromObject(obj: Record<string, unknown> | null | undefined)
     if (!obj) return null;
     const directKeys = [
         "admin_remarks",
+        "adminRemarks",
         "admin_feedback",
+        "adminFeedback",
         "admin_comment",
         "admin_comments",
+        "adminComment",
+        "adminComments",
         "faculty_remarks",
+        "facultyRemarks",
         "faculty_feedback",
+        "facultyFeedback",
         "faculty_comment",
         "faculty_comments",
+        "facultyComment",
+        "facultyComments",
         "partner_remarks",
+        "partnerRemarks",
         "partner_feedback",
+        "partnerFeedback",
         "partner_comment",
         "partner_comments",
+        "partnerComment",
+        "partnerComments",
         "return_reason",
+        "returnReason",
+        "return_remarks",
+        "returnRemarks",
         "returned_reason",
+        "returnedReason",
+        "returned_remarks",
+        "returnedRemarks",
         "rejection_reason",
+        "rejectionReason",
+        "rejection_remarks",
+        "rejectionRemarks",
         "rejected_reason",
+        "rejectedReason",
+        "rejected_remarks",
+        "rejectedRemarks",
         "review_comments",
         "review_comment",
         "review_feedback",
+        "reviewComments",
+        "reviewComment",
+        "reviewFeedback",
+        "remarks_text",
+        "remarksText",
+        "feedback_text",
+        "feedbackText",
+        "decision_note",
+        "decisionNote",
         "feedback",
         "remarks",
         "comment",
@@ -71,32 +104,68 @@ function pickFeedbackFromObject(obj: Record<string, unknown> | null | undefined)
     return null;
 }
 
-export function extractOpportunityReviewFeedback(project: Record<string, unknown>): string | null {
-    const direct = pickFeedbackFromObject(project);
+function pickFeedbackFromUnknown(value: unknown, depth = 0): string | null {
+    if (depth > 4 || value == null) return null;
+    if (typeof value === "string") return reviewText(value);
+    if (Array.isArray(value)) {
+        const inlineText = reviewText(value);
+        if (inlineText) return inlineText;
+        for (const item of value) {
+            const fromItem = pickFeedbackFromUnknown(item, depth + 1);
+            if (fromItem) return fromItem;
+        }
+        return null;
+    }
+    if (typeof value !== "object") return null;
+
+    const asRecord = value as Record<string, unknown>;
+    const direct = pickFeedbackFromObject(asRecord);
     if (direct) return direct;
+
     const nestedKeys = [
         "review",
+        "reviews",
         "latest_review",
+        "latestReview",
         "admin_review",
+        "adminReview",
         "faculty_review",
+        "facultyReview",
         "partner_review",
+        "partnerReview",
         "approval",
         "approvals",
         "decision",
+        "decisions",
         "latest_decision",
+        "latestDecision",
         "status_detail",
         "status_details",
+        "statusDetail",
+        "statusDetails",
         "workflow",
         "workflow_state",
+        "workflowState",
+        "history",
     ] as const;
+
     for (const key of nestedKeys) {
-        const value = project[key];
-        if (value && typeof value === "object" && !Array.isArray(value)) {
-            const text = pickFeedbackFromObject(value as Record<string, unknown>);
-            if (text) return text;
+        if (Object.prototype.hasOwnProperty.call(asRecord, key)) {
+            const fromNested = pickFeedbackFromUnknown(asRecord[key], depth + 1);
+            if (fromNested) return fromNested;
         }
     }
+
+    for (const key of Object.keys(asRecord)) {
+        const fromAnyNested = pickFeedbackFromUnknown(asRecord[key], depth + 1);
+        if (fromAnyNested) return fromAnyNested;
+    }
+
     return null;
+}
+
+export function extractOpportunityReviewFeedback(project: Record<string, unknown>): string | null {
+    return pickFeedbackFromUnknown(project);
 }
 
 export function canEditReturnedOpportunity(project: Record<string, unknown>): boolean {

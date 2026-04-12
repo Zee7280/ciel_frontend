@@ -363,7 +363,10 @@ export default function MyProjectsPage() {
     }, [isDetailModalOpen, selectedProject?.id]);
 
     const detailView = selectedProject
-        ? ((projectDetail ? { ...selectedProject, ...projectDetail } : selectedProject) as Record<string, unknown>)
+        ? ((projectDetail ? { ...selectedProject, ...projectDetail } : selectedProject) as unknown as Record<
+              string,
+              unknown
+          >)
         : null;
 
     return (

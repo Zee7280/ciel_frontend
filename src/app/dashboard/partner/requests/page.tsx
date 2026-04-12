@@ -3,10 +3,11 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FileText, Plus, Users, Calendar, MoreVertical, MapPin, Loader2, Edit, Trash2, ExternalLink } from "lucide-react";
+import { FileText, Plus, Users, Calendar, MoreVertical, MapPin, Loader2, Edit, Trash2, ExternalLink, ShieldCheck } from "lucide-react";
 import { authenticatedFetch } from "@/utils/api";
 import { formatDisplayId } from "@/utils/displayIds";
 import { getStoredCurrentUserId } from "@/utils/currentUser";
+import { peekPersistedVerificationReturn } from "@/utils/verificationReturnUrl";
 import { toast } from "sonner";
 
 function isOwnedByCurrentPartner(opportunity: Record<string, unknown>, currentUserId: string) {
@@ -30,6 +31,7 @@ export default function PartnerRequestsPage() {
     const [isLoading, setIsLoading] = useState(true);
     const [requests, setRequests] = useState<any[]>([]);
     const [activeMenu, setActiveMenu] = useState<{ id: string | number; top: number; right: number } | null>(null);
+    const [hasPendingVerificationLink, setHasPendingVerificationLink] = useState(false);
 
     const fetchOpportunities = async () => {
         try {
@@ -46,7 +48,7 @@ export default function PartnerRequestsPage() {
                     const currentUserId = getStoredCurrentUserId();
                     const rows = Array.isArray(data.data) ? data.data : [];
                     setRequests(
-                        rows.filter((item) =>
+                        rows.filter((item: unknown) =>
                             item && typeof item === "object"
                                 ? isOwnedByCurrentPartner(item as Record<string, unknown>, currentUserId)
                                 : false,
@@ -64,6 +66,10 @@ export default function PartnerRequestsPage() {
 
     useEffect(() => {
         fetchOpportunities();
+    }, []);
+
+    useEffect(() => {
+        setHasPendingVerificationLink(Boolean(peekPersistedVerificationReturn()));
     }, []);
 
     // Close menu on scroll
@@ -99,6 +105,25 @@ export default function PartnerRequestsPage() {
             console.error("Delete failed", error);
             setRequests(originalRequests);
             toast.error("Failed to delete opportunity");
+        }
+    };
+
+    const handleVerifyFromOpportunity = (id: string | number) => {
+        const verificationUrl = peekPersistedVerificationReturn();
+        if (!verificationUrl) {
+            toast.error("No pending verification link found.");
+            return;
+        }
+
+        try {
+            const parsed = new URL(verificationUrl, window.location.origin);
+            const returnTo = `/dashboard/partner/requests/${id}`;
+            parsed.searchParams.set("returnTo", returnTo);
+            const pathWithQuery = `${parsed.pathname}${parsed.search}`;
+            router.push(pathWithQuery);
+            setActiveMenu(null);
+        } catch {
+            toast.error("Invalid verification link.");
         }
     };
 
@@ -247,6 +272,14 @@ export default function PartnerRequestsPage() {
                         >
                             <Edit className="w-3.5 h-3.5 text-slate-400" /> Edit Opportunity
                         </button>
+                        {hasPendingVerificationLink ? (
+                            <button
+                                onClick={() => handleVerifyFromOpportunity(activeRequest.id)}
+                                className="w-full text-left px-4 py-2.5 text-xs text-slate-700 hover:bg-slate-50 flex items-center gap-3 font-medium transition-colors"
+                            >
+                                <ShieldCheck className="w-3.5 h-3.5 text-slate-400" /> Verify
+                            </button>
+                        ) : null}
                         <div className="h-px bg-slate-100 my-1 mx-2"></div>
                         <button
                             onClick={() => handleDelete(activeRequest.id)}

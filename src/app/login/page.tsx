@@ -13,6 +13,49 @@ import {
     isSafeInternalReturnPath,
 } from "@/utils/verificationReturnUrl";
 
+function toRecord(value: unknown): Record<string, unknown> | null {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+    return value as Record<string, unknown>;
+}
+
+function extractProfileUser(profileResponse: unknown): Record<string, unknown> | null {
+    const root = toRecord(profileResponse);
+    if (!root) return null;
+    const data = toRecord(root.data);
+    if (!data) return null;
+
+    const nestedUser = toRecord(data.user);
+    if (nestedUser) return nestedUser;
+
+    return data;
+}
+
+function flattenProfilePayload(userRecord: Record<string, unknown>): Record<string, unknown> {
+    const nestedProfile = toRecord(userRecord.profile);
+    if (!nestedProfile) return userRecord;
+    const merged: Record<string, unknown> = { ...nestedProfile, ...userRecord };
+    Object.keys(nestedProfile).forEach((key) => {
+        const topLevelValue = userRecord[key];
+        if (topLevelValue == null || (typeof topLevelValue === "string" && !topLevelValue.trim())) {
+            merged[key] = nestedProfile[key];
+        }
+    });
+    return merged;
+}
+
+function mergeMeaningfulFields(
+    base: Record<string, unknown>,
+    incoming: Record<string, unknown>
+): Record<string, unknown> {
+    const merged: Record<string, unknown> = { ...base };
+    Object.entries(incoming).forEach(([key, value]) => {
+        if (value == null) return;
+        if (typeof value === "string" && !value.trim()) return;
+        merged[key] = value;
+    });
+    return merged;
+}
+
 function LoginContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
@@ -170,7 +213,13 @@ function LoginContent() {
                     if (profileRes.ok) {
                         const profileData = await profileRes.json();
                         if (profileData.success) {
-                            const fullUser = { ...payload.user, ...profileData.data, role };
+                            const profileUser = extractProfileUser(profileData);
+                            const normalizedProfileUser = profileUser ? flattenProfilePayload(profileUser) : {};
+                            const baseUser = toRecord(payload.user) || {};
+                            const fullUser = {
+                                ...mergeMeaningfulFields(baseUser, normalizedProfileUser),
+                                role,
+                            };
                             localStorage.setItem("ciel_user", JSON.stringify(fullUser));
                             localStorage.setItem("user", JSON.stringify(fullUser)); // Keep legacy sync
                         } else {

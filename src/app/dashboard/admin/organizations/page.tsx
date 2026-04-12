@@ -155,7 +155,7 @@ export default function AdminOrganizationsPage() {
             </div>
 
             {/* Table */}
-            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden min-h-[400px]">
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm min-h-[400px]">
                 {isLoading ? (
                     <div className="flex items-center justify-center h-64">
                         <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
@@ -221,7 +221,7 @@ export default function AdminOrganizationsPage() {
 
                                             {/* Action Dropdown */}
                                             {activeActionMenu === org.id && (
-                                                <div className="absolute right-8 top-12 w-48 bg-white rounded-lg shadow-xl border border-slate-100 z-10 py-1 text-left">
+                                                <div className="absolute right-8 top-12 w-48 bg-white rounded-lg shadow-xl border border-slate-100 z-50 py-1 text-left">
                                                     <button
                                                         onClick={() => handleAction(org.id, 'approve')}
                                                         className="w-full text-left px-4 py-2 text-sm text-green-600 hover:bg-green-50 font-medium"

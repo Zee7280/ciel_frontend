@@ -2,42 +2,147 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { GraduationCap, School, Check } from "lucide-react";
+import { Check } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { useCounter } from "@/hooks/useCounter";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import clsx from "clsx";
 
-// Stat Hook Helper (modified to handle string values for "Pilot")
-function StatItem({ label, value, icon, delay }: { label: string, value: number | string, icon: any | string, delay: number }) {
-    const isNumber = typeof value === 'number';
-    const count = useCounter(isNumber ? value as number : 0, 2000);
-    const formattedValue = isNumber
-        ? count.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",") + (label.includes("Student") ? "+" : "")
-        : value;
+type PlatformStats = {
+    contributors: number;
+    impact_hours: number | null;
+    impact_hours_label?: string | null;
+    universities: number;
+    sdgs_impacted: number;
+};
 
-    const isImagePath = typeof icon === 'string';
+/** Mirrors server fallback in `api/v1/public/platform-stats` if the client fetch fails. */
+const DEFAULT_PLATFORM_STATS: PlatformStats = {
+    contributors: 50,
+    impact_hours: null,
+    impact_hours_label: "Launching Pilot",
+    universities: 24,
+    sdgs_impacted: 17,
+};
+
+type StatIcon = LucideIcon | string;
+
+function formatCount(n: number): string {
+    return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+}
+
+/** Homepage metric card — supports numeric (animated) or string fallback (e.g. pilot phase). */
+function StatItem({
+    label,
+    value,
+    icon,
+    delay,
+    valueSuffix = "",
+}: {
+    label: string;
+    value: number | string;
+    icon: StatIcon;
+    delay: number;
+    /** Appended after numeric value, e.g. "+" for hours */
+    valueSuffix?: string;
+}) {
+    const isNumber = typeof value === "number";
+    const count = useCounter(isNumber ? (value as number) : 0, 2000);
+    const formattedValue = isNumber ? `${formatCount(count)}${valueSuffix}` : value;
+
+    const isImagePath = typeof icon === "string";
 
     return (
-        <div className="flex flex-col items-center sm:items-start text-center sm:text-left gap-1 animate-fade-in-up" style={{ animationDelay: `${delay}ms` }}>
-            <div className="flex items-center gap-3 mb-1">
-                <div className="w-8 h-8 rounded-full bg-slate-50 border border-slate-100 shadow-sm flex items-center justify-center text-slate-500 shrink-0">
+        <div
+            className="group relative flex flex-col rounded-2xl border border-slate-200/90 bg-gradient-to-b from-white to-slate-50/95 p-5 sm:p-6 shadow-sm shadow-slate-200/40 transition-all duration-300 hover:border-slate-300 hover:shadow-md hover:shadow-slate-200/60 animate-fade-in-up"
+            style={{ animationDelay: `${delay}ms` }}
+        >
+            <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-blue-200/60 to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
+            <div className="flex items-start gap-3">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-slate-200/80 bg-white shadow-sm ring-1 ring-slate-100">
                     {isImagePath ? (
-                        <Image src={icon} alt={label} width={14} height={14} className="w-3.5 h-3.5 object-contain" />
+                        <Image src={icon} alt="" width={20} height={20} className="h-5 w-5 object-contain opacity-90" />
                     ) : (
-                        (() => { const Icon = icon; return <Icon className="w-3.5 h-3.5" strokeWidth={2.5} />; })()
+                        (() => {
+                            const Icon = icon as LucideIcon;
+                            return <Icon className="h-5 w-5 text-slate-600" strokeWidth={2} />;
+                        })()
                     )}
                 </div>
-                <h3 className={clsx("font-black text-slate-900 tracking-tight leading-none", typeof value === 'string' ? "text-xl lg:text-[22px]" : "text-3xl lg:text-[32px]")}>
-                    {isNumber ? formattedValue : value}
-                </h3>
+                <div className="min-w-0 flex-1 text-left">
+                    <p
+                        className={clsx(
+                            "font-black tracking-tight text-slate-900 tabular-nums",
+                            isNumber ? "text-2xl sm:text-3xl lg:text-[2rem] leading-none" : "text-lg sm:text-xl leading-snug",
+                        )}
+                    >
+                        {isNumber ? formattedValue : value}
+                    </p>
+                    <p className="mt-2 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500">{label}</p>
+                </div>
             </div>
-            <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.1em] pl-1">{label}</p>
+        </div>
+    );
+}
+
+function StatsSkeleton() {
+    return (
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4 lg:gap-6">
+            {Array.from({ length: 4 }).map((_, i) => (
+                <div
+                    key={i}
+                    className="h-[118px] animate-pulse rounded-2xl border border-slate-200/80 bg-slate-100/80"
+                />
+            ))}
+        </div>
+    );
+}
+
+function HomeStatsRow({ stats: s }: { stats: PlatformStats }) {
+    return (
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4 lg:gap-6">
+            <StatItem label="Contributors" value={s.contributors} icon="/icon-planting.jpg" delay={100} />
+            <StatItem
+                label="Impact Hours"
+                value={
+                    s.impact_hours != null && s.impact_hours >= 0
+                        ? s.impact_hours
+                        : s.impact_hours_label?.trim() || "Launching Pilot"
+                }
+                icon="/icon-globe.jpg"
+                delay={200}
+                valueSuffix={typeof s.impact_hours === "number" && s.impact_hours >= 0 ? "+" : ""}
+            />
+            <StatItem label="Universities" value={s.universities} icon="/icon-gears.jpg" delay={300} />
+            <StatItem label="SDGs Impacted" value={s.sdgs_impacted} icon="/icon-graph.jpg" delay={400} />
         </div>
     );
 }
 
 export default function Hero() {
     const [activeRole, setActiveRole] = useState<'student' | 'faculty' | 'partner'>('student');
+    const [stats, setStats] = useState<PlatformStats | null>(null);
+    const [statsLoading, setStatsLoading] = useState(true);
+
+    useEffect(() => {
+        let cancelled = false;
+        (async () => {
+            try {
+                const res = await fetch("/api/v1/public/platform-stats", { cache: "no-store" });
+                const json = (await res.json().catch(() => null)) as { success?: boolean; data?: PlatformStats } | null;
+                if (!cancelled) {
+                    setStats(json?.success && json.data ? json.data : DEFAULT_PLATFORM_STATS);
+                }
+            } catch {
+                if (!cancelled) setStats(DEFAULT_PLATFORM_STATS);
+            } finally {
+                if (!cancelled) setStatsLoading(false);
+            }
+        })();
+        return () => {
+            cancelled = true;
+        };
+    }, []);
 
     const roleContent = {
         student: {
@@ -128,12 +233,12 @@ export default function Hero() {
 
             {/* FULL WIDTH STATS BANNER */}
             <div className="relative w-full max-w-7xl mx-auto mt-4 pt-2">
-                {/* Stats Container */}
-                <div className="flex flex-wrap justify-between items-center gap-10 lg:gap-16 relative z-10 px-4 md:px-12 pb-16">
-                    <StatItem label="Contributors" value={50} icon="/icon-planting.jpg" delay={100} />
-                    <StatItem label="Impact Hours" value="Launching Pilot" icon="/icon-globe.jpg" delay={200} />
-                    <StatItem label="Universities" value={24} icon="/icon-gears.jpg" delay={300} />
-                    <StatItem label="SDGs Impacted" value={17} icon="/icon-graph.jpg" delay={400} />
+                <div className="relative z-10 px-4 pb-16 md:px-12">
+                    {statsLoading ? (
+                        <StatsSkeleton />
+                    ) : (
+                        <HomeStatsRow stats={stats ?? DEFAULT_PLATFORM_STATS} />
+                    )}
                 </div>
 
                 {/* Vertical Background Grid */}
@@ -147,28 +252,4 @@ export default function Hero() {
             </div>
         </section>
     );
-}
-
-function HandshakeIcon(props: any) {
-    return (
-        <svg
-            {...props}
-            xmlns="http://www.w3.org/2000/svg"
-            width="24"
-            height="24"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-        >
-            <path d="m11 17 2 2a1 1 0 1 0 3-3" />
-            <path d="m22 22-5-10-5 10" />
-            <path d="M14 11.22V5c0-1.1.9-2 2-2h3.5a1 1 0 0 1 1 1v2.5" />
-            <path d="M9 11.22V5c0-1.1-.9-2-2-2H3.5a1 1 0 0 0-1 1v2.5" />
-            <path d="m2 22 5-10 5 10" />
-            <path d="m19 19-3-3" />
-        </svg>
-    )
 }

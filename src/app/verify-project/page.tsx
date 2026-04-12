@@ -28,6 +28,9 @@ function VerifyProjectContent() {
     const pathname = usePathname();
     const searchParams = useSearchParams();
     const token = searchParams.get("token");
+    const returnToParam = searchParams.get("returnTo");
+    const safeReturnTo =
+        returnToParam && isSafeInternalReturnPath(returnToParam) ? returnToParam : null;
 
     const [status, setStatus] = useState<"loading" | "auth_required" | "success" | "error">("loading");
     const [message, setMessage] = useState("Verifying your project claim...");
@@ -75,6 +78,11 @@ function VerifyProjectContent() {
                     clearPersistedVerificationReturn();
                     setStatus("success");
                     setMessage(out.message);
+                    if (safeReturnTo) {
+                        window.setTimeout(() => {
+                            router.replace(safeReturnTo);
+                        }, 900);
+                    }
                     return;
                 }
                 if (out.kind === "auth_required") {
@@ -98,7 +106,7 @@ function VerifyProjectContent() {
 
         const timer = setTimeout(verifyToken, delayMs);
         return () => clearTimeout(timer);
-    }, [token, pathname, searchParams, router]);
+    }, [token, pathname, safeReturnTo, searchParams, router]);
 
     const postAuthReturn =
         token && pathname

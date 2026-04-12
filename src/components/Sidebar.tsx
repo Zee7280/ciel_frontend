@@ -69,6 +69,7 @@ export default function Sidebar() {
             { label: "Browse Opportunities", href: "/dashboard/student/browse", icon: Globe },
             { label: "Impact History", href: "/dashboard/student/impact", icon: PieChart },
             { label: "Messages", href: "/dashboard/student/messages", icon: MessageSquare },
+            { label: "Notifications", href: "/dashboard/student/notifications", icon: Bell },
             { label: "My Profile", href: "/dashboard/student/profile", icon: User },
         ] : []),
         // Partner
@@ -92,7 +93,7 @@ export default function Sidebar() {
             { label: "Project Approvals", href: "/dashboard/faculty/approvals", icon: CheckCircle },
             { label: "My Opportunities", href: "/dashboard/faculty/my-opportunities", icon: Briefcase },
             { label: "Create Opportunity", href: "/dashboard/faculty/create-opportunity", icon: Plus },
-            { label: "Student Grading", href: "/dashboard/faculty/grading", icon: FileText },
+            // { label: "Student Grading", href: "/dashboard/faculty/grading", icon: FileText },
             { label: "Messages", href: "/dashboard/faculty/messages", icon: MessageSquare },
             { label: "Impact Analytics", href: "/dashboard/faculty/analytics", icon: PieChart },
         ] : []),

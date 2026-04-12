@@ -1,22 +1,33 @@
 const BASE_URL = process.env.NEXT_PUBLIC_APP_API_BASE_URL || process.env.NEXT_PUBLIC_BACKEND_BASE_URL || "http://localhost:3000";
 
+/** Decode JWT payload segment (base64url per RFC 7519). Plain `atob` fails on `-` / `_` and unpadded segments. */
+function decodeJwtPayloadJson(token: string): { exp?: number } | null {
+    const parts = token.split(".");
+    if (parts.length !== 3) return null;
+    let b64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const pad = b64.length % 4;
+    if (pad === 2) b64 += "==";
+    else if (pad === 3) b64 += "=";
+    else if (pad === 1) return null;
+    try {
+        const json = atob(b64);
+        return JSON.parse(json) as { exp?: number };
+    } catch {
+        return null;
+    }
+}
+
 /**
  * Decode a JWT token and check if it has expired.
  * Returns true if token is valid and NOT expired, false otherwise.
  */
 function isTokenValid(token: string | null): boolean {
     if (!token) return false;
-    try {
-        const parts = token.split(".");
-        if (parts.length !== 3) return false;
-        // JWT payload is base64 encoded (the middle part)
-        const payload = JSON.parse(atob(parts[1]));
-        if (!payload.exp) return true; // No expiry set → assume valid
-        // exp is in seconds, Date.now() is in ms
-        return payload.exp * 1000 > Date.now();
-    } catch {
-        return false;
-    }
+    const payload = decodeJwtPayloadJson(token);
+    if (!payload) return false;
+    if (payload.exp == null) return true; // No expiry set → assume valid
+    // exp is in seconds, Date.now() is in ms
+    return payload.exp * 1000 > Date.now();
 }
 
 export async function authenticatedFetch(url: string, options: RequestInit = {}, config: { redirectToLogin?: boolean } = { redirectToLogin: true }) {

@@ -45,6 +45,20 @@ export function mapOpportunityDetailToFacultyForm(d: Record<string, unknown>): {
     const scope = (d.participation_scope && typeof d.participation_scope === "object"
         ? d.participation_scope
         : {}) as Record<string, unknown>;
+    const extC =
+        d.external_partner_collaboration && typeof d.external_partner_collaboration === "object"
+            ? (d.external_partner_collaboration as Record<string, unknown>)
+            : {};
+    const po =
+        d.partner_organization && typeof d.partner_organization === "object"
+            ? (d.partner_organization as Record<string, unknown>)
+            : {};
+    const ex =
+        d.executing_context && typeof d.executing_context === "object"
+            ? (d.executing_context as Record<string, unknown>)
+            : {};
+    const exPartner =
+        ex.partner && typeof ex.partner === "object" ? (ex.partner as Record<string, unknown>) : {};
     const deptRest =
         scope.department_restriction && typeof scope.department_restriction === "object"
             ? (scope.department_restriction as Record<string, unknown>)
@@ -58,9 +72,24 @@ export function mapOpportunityDetailToFacultyForm(d: Record<string, unknown>): {
             ? (d.submission_confirmations as Record<string, unknown>)
             : {};
 
-    const extOrg = sup.external_partner_org_name || sup.partner_org_name;
-    const extContact = sup.external_partner_contact_person || sup.partner_contact_person;
-    const extEmail = sup.external_partner_email || sup.partner_email;
+    const extOrg =
+        sup.external_partner_org_name ||
+        sup.partner_org_name ||
+        exPartner.organization_name ||
+        extC.organization_name ||
+        po.organization_name;
+    const extContact =
+        sup.external_partner_contact_person ||
+        sup.partner_contact_person ||
+        exPartner.contact_person ||
+        extC.contact_person ||
+        po.contact_person;
+    const extEmail =
+        sup.external_partner_email ||
+        sup.partner_email ||
+        exPartner.official_email ||
+        extC.official_email ||
+        po.official_email;
     const hasPartner = Boolean(
         (typeof extOrg === "string" && extOrg.trim()) ||
             (typeof extContact === "string" && extContact.trim()) ||

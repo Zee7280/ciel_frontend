@@ -986,16 +986,22 @@ function OpportunityDetailsContent() {
 
                         <div className="space-y-4">
                             <select
+                                key={formData.secondarySdgs.map((s) => s.sdgId).join("|")}
                                 className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-purple-500 outline-none font-medium text-sm"
+                                defaultValue=""
                                 onChange={(e) => {
                                     const val = e.target.value;
-                                    if (val && !formData.secondarySdgs.find(s => s.sdgId === val)) {
-                                        setFormData({
-                                            ...formData,
-                                            secondarySdgs: [...formData.secondarySdgs, { sdgId: val, targetId: "", indicatorId: "", justification: "" }]
-                                        });
-                                    }
-                                    e.target.value = "";
+                                    if (!val) return;
+                                    setFormData((prev) => {
+                                        if (prev.secondarySdgs.some((s) => s.sdgId === val)) return prev;
+                                        return {
+                                            ...prev,
+                                            secondarySdgs: [
+                                                ...prev.secondarySdgs,
+                                                { sdgId: val, targetId: "", indicatorId: "", justification: "" },
+                                            ],
+                                        };
+                                    });
                                 }}
                             >
                                 <option value="">Add a Secondary SDG...</option>
@@ -1024,6 +1030,7 @@ function OpportunityDetailsContent() {
                                                     </div>
                                                 </div>
                                                 <button
+                                                    type="button"
                                                     onClick={() => setFormData({
                                                         ...formData,
                                                         secondarySdgs: formData.secondarySdgs.filter(item => item.sdgId !== s.sdgId)
@@ -1041,10 +1048,15 @@ function OpportunityDetailsContent() {
                                                         className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs outline-none focus:border-purple-500 bg-white"
                                                         value={s.targetId}
                                                         onChange={(e) => {
-                                                            const newList = [...formData.secondarySdgs];
-                                                            newList[idx].targetId = e.target.value;
-                                                            newList[idx].indicatorId = "";
-                                                            setFormData({ ...formData, secondarySdgs: newList });
+                                                            const selectedTargetId = e.target.value;
+                                                            setFormData((prev) => ({
+                                                                ...prev,
+                                                                secondarySdgs: prev.secondarySdgs.map((entry, i) =>
+                                                                    i === idx
+                                                                        ? { ...entry, targetId: selectedTargetId, indicatorId: "" }
+                                                                        : entry
+                                                                ),
+                                                            }));
                                                         }}
                                                     >
                                                         <option value="">Select Target...</option>
@@ -1059,9 +1071,15 @@ function OpportunityDetailsContent() {
                                                         className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs outline-none focus:border-purple-500 bg-white"
                                                         value={s.indicatorId}
                                                         onChange={(e) => {
-                                                            const newList = [...formData.secondarySdgs];
-                                                            newList[idx].indicatorId = e.target.value;
-                                                            setFormData({ ...formData, secondarySdgs: newList });
+                                                            const selectedIndicatorId = e.target.value;
+                                                            setFormData((prev) => ({
+                                                                ...prev,
+                                                                secondarySdgs: prev.secondarySdgs.map((entry, i) =>
+                                                                    i === idx
+                                                                        ? { ...entry, indicatorId: selectedIndicatorId }
+                                                                        : entry
+                                                                ),
+                                                            }));
                                                         }}
                                                     >
                                                         <option value="">Select Indicator...</option>

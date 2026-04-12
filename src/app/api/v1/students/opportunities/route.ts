@@ -4,11 +4,12 @@ export async function POST(request: Request) {
     try {
         const authHeader = request.headers.get("Authorization");
         const { searchParams } = new URL(request.url);
-        const status = searchParams.get("status") || "approved";
+        const status = searchParams.get("status")?.trim() || "";
 
-        // Proxy request to backend API
-        // Append status to the backend URL
-        const backendUrl = `${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/students/opportunities?status=${status}`;
+        const backendUrl = new URL(`${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/students/opportunities`);
+        if (status) {
+            backendUrl.searchParams.set("status", status);
+        }
 
         const response = await fetch(backendUrl, {
             method: "POST",

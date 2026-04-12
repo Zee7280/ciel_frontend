@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { MapPin, Clock, CheckCircle, AlertCircle, ChevronDown, ChevronUp, Users, Loader2, X, Plus, Lock } from "lucide-react";
 import { authenticatedFetch } from "@/utils/api";
@@ -9,6 +9,12 @@ import dynamic from 'next/dynamic';
 import { findSdgById, opportunityFormSdgList } from "@/utils/sdgData";
 import { isStudentProfileComplete, isValidEmailFormat, pickProfileEmail } from "@/utils/profileCompletion";
 import { mapOpportunityDetailToStudentForm } from "./mapDetailToStudentForm";
+import PhoneConnectivityRow from "@/components/ui/PhoneConnectivityRow";
+import {
+    composeInternationalPhone,
+    DEFAULT_PHONE_COUNTRY_KEY,
+    parsePhoneForDisplay,
+} from "@/utils/countryCallingCodes";
 
 // Dynamically import LocationPicker to avoid SSR issues with Leaflet
 const LocationPicker = dynamic(() => import('@/components/ui/LocationPicker'), {
@@ -66,6 +72,22 @@ function isPlainObject(x: unknown): x is Record<string, unknown> {
 }
 
 /** Merge saved draft over current form state (nested objects, arrays replaced from draft). */
+function normalizeSupervisionIndependentPhone<T extends { supervision: Record<string, unknown> }>(fd: T): T {
+    const s = fd.supervision as { independentContactPhoneKey?: unknown; independentContactPhone?: unknown };
+    const key = typeof s.independentContactPhoneKey === "string" ? s.independentContactPhoneKey : "";
+    if (key.includes("|")) return fd;
+    const raw = typeof s.independentContactPhone === "string" ? s.independentContactPhone : "";
+    const parsed = parsePhoneForDisplay(raw.trim());
+    return {
+        ...fd,
+        supervision: {
+            ...fd.supervision,
+            independentContactPhoneKey: parsed.phoneCountryKey,
+            independentContactPhone: parsed.national,
+        },
+    };
+}
+
 function deepMergeDraft<T extends Record<string, unknown>>(target: T, source: Record<string, unknown>): T {
     const out = { ...target } as Record<string, unknown>;
     for (const key of Object.keys(source)) {
@@ -146,6 +168,7 @@ export default function StudentOpportunityCreationPage() {
             partnerEmail: "",
             independentSiteDescription: "",
             independentLocalContact: "",
+            independentContactPhoneKey: DEFAULT_PHONE_COUNTRY_KEY,
             independentContactPhone: "",
             declSafeEnvironment: false,
             declNoHazardous: false,
@@ -335,7 +358,11 @@ export default function StudentOpportunityCreationPage() {
                 return false;
             }
         } else {
-            if (!s.independentSiteDescription.trim() || !s.independentLocalContact.trim() || !s.independentContactPhone.trim()) {
+            const independentPhoneFull = composeInternationalPhone(
+                s.independentContactPhoneKey || DEFAULT_PHONE_COUNTRY_KEY,
+                s.independentContactPhone,
+            ).trim();
+            if (!s.independentSiteDescription.trim() || !s.independentLocalContact.trim() || !independentPhoneFull) {
                 toast.error("Please provide activity site, local contact, and contact number for your independent activity (Section F2)");
                 return false;
             }
@@ -499,7 +526,10 @@ export default function StudentOpportunityCreationPage() {
                               independent_community_activity: {
                                   activity_site_description: formData.supervision.independentSiteDescription.trim(),
                                   local_contact_person: formData.supervision.independentLocalContact.trim(),
-                                  contact_number: formData.supervision.independentContactPhone.trim(),
+                                  contact_number: composeInternationalPhone(
+                                      formData.supervision.independentContactPhoneKey || DEFAULT_PHONE_COUNTRY_KEY,
+                                      formData.supervision.independentContactPhone,
+                                  ).trim(),
                               },
                           }),
                 },
@@ -615,6 +645,11 @@ export default function StudentOpportunityCreationPage() {
     };
 
     const [expandedSections, setExpandedSections] = useState<string[]>(["A", "B"]);
+
+    const displayStudentContact = useMemo(
+        () => parsePhoneForDisplay(studentDetails.contact),
+        [studentDetails.contact],
+    );
 
     const handleSaveDraft = () => {
         try {
@@ -752,7 +787,12 @@ export default function StudentOpportunityCreationPage() {
                             };
                             if (draft.formData && typeof draft.formData === "object") {
                                 setFormData((prev) =>
-                                    deepMergeDraft(prev as unknown as Record<string, unknown>, draft.formData!) as typeof prev,
+                                    normalizeSupervisionIndependentPhone(
+                                        deepMergeDraft(
+                                            prev as unknown as Record<string, unknown>,
+                                            draft.formData!,
+                                        ) as typeof prev,
+                                    ),
                                 );
                             }
                             if (draft.studentDetails && typeof draft.studentDetails === "object") {
@@ -830,7 +870,7 @@ export default function StudentOpportunityCreationPage() {
                 }));
                 setFormData((prev) => {
                     const p = formDataPatch;
-                    return {
+                    const merged = {
                         ...prev,
                         ...p,
                         location: { ...prev.location, ...(p.location as typeof prev.location) },
@@ -845,6 +885,7 @@ export default function StudentOpportunityCreationPage() {
                         },
                         participation: { ...prev.participation, ...(p.participation as typeof prev.participation) },
                     };
+                    return normalizeSupervisionIndependentPhone(merged);
                 });
             } catch {
                 if (!cancelled) toast.error("Could not load this opportunity");
@@ -919,15 +960,15 @@ export default function StudentOpportunityCreationPage() {
                                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">City / Province</label>
                                 <input type="text" value={studentDetails.city} readOnly tabIndex={-1} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2 text-slate-700 font-medium pointer-events-none" />
                             </div>
-                            <div className="opacity-75">
+                            <div className="opacity-75 pointer-events-none">
                                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Contact No. <span className="text-red-500">*</span></label>
-                                <input
-                                    type="text"
+                                <PhoneConnectivityRow
+                                    phoneCountryKey={displayStudentContact.phoneCountryKey}
+                                    nationalDigits={displayStudentContact.national}
                                     readOnly
-                                    tabIndex={-1}
-                                    value={studentDetails.contact}
-                                    placeholder={studentDetails.contact ? undefined : "—"}
-                                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2 text-slate-700 font-medium pointer-events-none"
+                                    placeholderNational="—"
+                                    selectClassName="rounded-lg border border-slate-200 bg-slate-50 py-2 text-xs font-medium text-slate-700"
+                                    inputClassName="rounded-lg border border-slate-200 bg-slate-50 py-2 text-sm font-medium text-slate-700"
                                 />
                             </div>
                         </>
@@ -1804,13 +1845,30 @@ export default function StudentOpportunityCreationPage() {
                                         value={formData.supervision.independentLocalContact}
                                         onChange={(e) => setFormData({ ...formData, supervision: { ...formData.supervision, independentLocalContact: e.target.value } })}
                                     />
-                                    <input
-                                        type="text"
-                                        placeholder="Contact number *"
-                                        className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-orange-500 outline-none text-sm"
-                                        value={formData.supervision.independentContactPhone}
-                                        onChange={(e) => setFormData({ ...formData, supervision: { ...formData.supervision, independentContactPhone: e.target.value } })}
-                                    />
+                                    <div className="space-y-1.5">
+                                        <span className="block text-xs font-bold text-slate-500 uppercase">
+                                            Contact number <span className="text-red-500">*</span>
+                                        </span>
+                                        <PhoneConnectivityRow
+                                            phoneCountryKey={formData.supervision.independentContactPhoneKey}
+                                            nationalDigits={formData.supervision.independentContactPhone}
+                                            onPhoneCountryKeyChange={(independentContactPhoneKey) =>
+                                                setFormData({
+                                                    ...formData,
+                                                    supervision: { ...formData.supervision, independentContactPhoneKey },
+                                                })
+                                            }
+                                            onNationalDigitsChange={(independentContactPhone) =>
+                                                setFormData({
+                                                    ...formData,
+                                                    supervision: { ...formData.supervision, independentContactPhone },
+                                                })
+                                            }
+                                            maxNationalDigits={15}
+                                            selectClassName="rounded-xl border border-slate-200 py-3 text-xs font-semibold focus:border-orange-500"
+                                            inputClassName="rounded-xl border border-slate-200 py-3 text-sm font-medium focus:border-orange-500 focus:ring-2 focus:ring-orange-500/15"
+                                        />
+                                    </div>
                                 </div>
                             </div>
                         )}

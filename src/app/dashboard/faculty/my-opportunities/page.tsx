@@ -8,6 +8,7 @@ import { Badge } from "@/app/dashboard/student/report/components/ui/badge";
 import { Loader2, Pencil, Plus } from "lucide-react";
 import { getStoredCurrentUserEmail } from "@/utils/currentUser";
 import { toast } from "sonner";
+import { canEditReturnedOpportunity, extractOpportunityReviewFeedback } from "@/utils/opportunityWorkflow";
 
 type Row = {
     id: string;
@@ -20,6 +21,7 @@ type Row = {
     applicants_count?: number;
     remaining_seats?: number;
     organization_name?: string | null;
+    review_feedback?: string | null;
 };
 
 function statusBadgeClass(status: string) {
@@ -28,6 +30,24 @@ function statusBadgeClass(status: string) {
     if (s === "rejected") return "bg-red-100 text-red-800 border-red-200";
     if (s.includes("pending") || s === "draft") return "bg-amber-100 text-amber-800 border-amber-200";
     return "bg-slate-100 text-slate-700 border-slate-200";
+}
+
+function isLikelyMachineId(text: string): boolean {
+    const value = text.trim();
+    if (!value) return false;
+    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)) {
+        return true;
+    }
+    if (/^[0-9a-f]{24,}$/i.test(value)) return true;
+    if (!/\s/.test(value) && /[0-9]/.test(value) && value.length >= 20 && /[-_]/.test(value)) return true;
+    return false;
+}
+
+function sanitizeReviewFeedback(value: string | null | undefined): string | null {
+    if (!value) return null;
+    const normalized = value.trim();
+    if (!normalized) return null;
+    return isLikelyMachineId(normalized) ? null : normalized;
 }
 
 export default function FacultyMyOpportunitiesPage() {
@@ -47,7 +67,38 @@ export default function FacultyMyOpportunitiesPage() {
                 if (res?.ok) {
                     const data = await res.json();
                     if (data.success && Array.isArray(data.data)) {
-                        setRows(data.data);
+                        const baseRows = data.data as Row[];
+                        const rowsWithRemarks = await Promise.all(
+                            baseRows.map(async (row) => {
+                                const feedbackFromList = extractOpportunityReviewFeedback(
+                                    row as unknown as Record<string, unknown>,
+                                );
+                                const safeListFeedback = sanitizeReviewFeedback(feedbackFromList);
+                                if (safeListFeedback) {
+                                    return { ...row, review_feedback: safeListFeedback };
+                                }
+                                if (!canEditReturnedOpportunity(row as unknown as Record<string, unknown>)) {
+                                    return row;
+                                }
+                                try {
+                                    const detailRes = await authenticatedFetch(`/api/v1/opportunities/detail`, {
+                                        method: "POST",
+                                        headers: { "Content-Type": "application/json" },
+                                        body: JSON.stringify({ id: row.id }),
+                                    });
+                                    if (!detailRes?.ok) return row;
+                                    const detailJson = await detailRes.json();
+                                    const detail = detailJson?.data as Record<string, unknown> | undefined;
+                                    if (!detail) return row;
+                                    const feedbackFromDetail = extractOpportunityReviewFeedback(detail);
+                                    const safeDetailFeedback = sanitizeReviewFeedback(feedbackFromDetail);
+                                    return safeDetailFeedback ? { ...row, review_feedback: safeDetailFeedback } : row;
+                                } catch {
+                                    return row;
+                                }
+                            }),
+                        );
+                        setRows(rowsWithRemarks);
                     } else {
                         setRows([]);
                     }
@@ -131,6 +182,16 @@ export default function FacultyMyOpportunitiesPage() {
                                         ? ` · Seats left: ${r.remaining_seats}`
                                         : ""}
                                 </p>
+                                {r.review_feedback ? (
+                                    <div className="mt-2 rounded-md border border-rose-200 bg-rose-50 px-3 py-2">
+                                        <p className="text-[11px] font-semibold uppercase tracking-wide text-rose-700">
+                                            Rejection remarks
+                                        </p>
+                                        <p className="mt-1 text-xs text-rose-900 whitespace-pre-wrap">
+                                            {r.review_feedback}
+                                        </p>
+                                    </div>
+                                ) : null}
                             </div>
                             <div className="flex shrink-0 gap-2">
                                 <Link href={`/dashboard/faculty/create-opportunity?edit=${encodeURIComponent(r.id)}`}>

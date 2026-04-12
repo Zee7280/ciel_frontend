@@ -1,3 +1,5 @@
+import { parsePhoneForDisplay } from "@/utils/countryCallingCodes";
+
 /**
  * Maps opportunity detail API shape into student create-opportunity form state.
  */
@@ -223,7 +225,14 @@ export function mapOpportunityDetailToStudentForm(d: Record<string, unknown>): {
                 typeof indBlock.activity_site_description === "string" ? indBlock.activity_site_description : "",
             independentLocalContact:
                 typeof indBlock.local_contact_person === "string" ? indBlock.local_contact_person : "",
-            independentContactPhone: typeof indBlock.contact_number === "string" ? indBlock.contact_number : "",
+            ...(() => {
+                const raw = typeof indBlock.contact_number === "string" ? indBlock.contact_number : "";
+                const parsed = parsePhoneForDisplay(raw);
+                return {
+                    independentContactPhoneKey: parsed.phoneCountryKey,
+                    independentContactPhone: parsed.national,
+                };
+            })(),
             declSafeEnvironment: safety.environment_safe_and_appropriate === true,
             declNoHazardous: safety.precautions_and_basic_safety === true,
             declFacultyOversight: safety.students_guided_and_supervised === true,

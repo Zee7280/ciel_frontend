@@ -55,6 +55,13 @@ export default function DashboardHeader() {
         return user?.image || user?.logoUrl;
     };
 
+    const notificationHref =
+        navRole === "student"
+            ? "/dashboard/student/notifications"
+            : navRole === "partner"
+              ? "/dashboard/partner/notifications"
+              : null;
+
     return (
         <header className="h-20 bg-white border-b border-slate-200 flex items-center justify-between px-8 sticky top-0 z-30 ml-64 font-sans">
             <div>
@@ -72,12 +79,21 @@ export default function DashboardHeader() {
                     />
                 </div>
 
-                <button className="relative p-2.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all group">
-                    <Bell className="w-5 h-5 group-hover:scale-110 transition-transform" />
-                    {user?.notifications_count ? (
-                        <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-blue-600 rounded-full border-2 border-white"></span>
-                    ) : null}
-                </button>
+                {notificationHref ? (
+                    <Link href={notificationHref} className="relative p-2.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all group">
+                        <Bell className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                        {user?.notifications_count ? (
+                            <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-blue-600 rounded-full border-2 border-white"></span>
+                        ) : null}
+                    </Link>
+                ) : (
+                    <button className="relative p-2.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all group">
+                        <Bell className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                        {user?.notifications_count ? (
+                            <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-blue-600 rounded-full border-2 border-white"></span>
+                        ) : null}
+                    </button>
+                )}
 
                 <div className="flex items-center gap-4 pl-6 border-l border-slate-100">
                     <div className="text-right hidden md:block">

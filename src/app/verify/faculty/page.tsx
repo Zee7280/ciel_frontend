@@ -25,6 +25,9 @@ function FacultyVerifyContent() {
     const pathname = usePathname();
     const searchParams = useSearchParams();
     const token = searchParams.get("token");
+    const returnToParam = searchParams.get("returnTo");
+    const safeReturnTo =
+        returnToParam && isSafeInternalReturnPath(returnToParam) ? returnToParam : null;
 
     const [status, setStatus] = useState<"loading" | "auth_required" | "success" | "error">("loading");
     const [message, setMessage] = useState("Verifying faculty approval…");
@@ -68,6 +71,11 @@ function FacultyVerifyContent() {
                     clearPersistedVerificationReturn();
                     setStatus("success");
                     setMessage(out.message);
+                    if (safeReturnTo) {
+                        window.setTimeout(() => {
+                            router.replace(safeReturnTo);
+                        }, 900);
+                    }
                     return;
                 }
                 if (out.kind === "auth_required") {
@@ -89,7 +97,7 @@ function FacultyVerifyContent() {
         const delayMs = bearerNow ? 400 : 0;
         const t = setTimeout(run, delayMs);
         return () => clearTimeout(t);
-    }, [token, pathname, searchParams, router]);
+    }, [token, pathname, safeReturnTo, searchParams, router]);
 
     const postAuthReturn =
         token && pathname

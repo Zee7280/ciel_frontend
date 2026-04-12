@@ -17,7 +17,7 @@ export default function FooterBanner() {
                 </p>
 
                 <div className="flex justify-center">
-                    <Link href="/register" className="px-12 py-4 bg-white text-[#0d9488] rounded-lg font-bold text-xl hover:bg-slate-50 transition-all shadow-xl hover:-translate-y-1">
+                    <Link href="/signup" className="px-12 py-4 bg-white text-[#0d9488] rounded-lg font-bold text-xl hover:bg-slate-50 transition-all shadow-xl hover:-translate-y-1">
                         Join Now
                     </Link>
                 </div>

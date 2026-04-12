@@ -7,6 +7,8 @@ import Link from "next/link";
 import { ArrowRight, Mail, Lock, AlertCircle, Loader2, CheckCircle, School, Landmark, ArrowLeft, Building2, User, GraduationCap, Phone, Globe, Heart, Eye, EyeOff, ShieldCheck } from "lucide-react";
 import Image from "next/image";
 import clsx from "clsx";
+import PhoneConnectivityRow from "@/components/ui/PhoneConnectivityRow";
+import { DEFAULT_PHONE_COUNTRY_KEY, dialFromPhoneCountryKey } from "@/utils/countryCallingCodes";
 import { pakistaniUniversities } from "@/utils/universityData";
 import { isSafeInternalReturnPath } from "@/utils/verificationReturnUrl";
 
@@ -42,7 +44,7 @@ function SignUpContent() {
         orgName: "",
         orgType: "",
         contactPerson: "",
-        countryCode: "+92",
+        phoneCountryKey: DEFAULT_PHONE_COUNTRY_KEY,
         phone: "",
         cnic: "",
         token: "",
@@ -86,13 +88,6 @@ function SignUpContent() {
         }
         setStep("form");
         setErrors({});
-    };
-
-    const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        let value = e.target.value.replace(/[^0-9]/g, "");
-        if (value.length > 11) value = value.slice(0, 11);
-        setFormData({ ...formData, phone: value });
-        if (errors.phone) setErrors({ ...errors, phone: "" });
     };
 
     const handleCnicChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -206,10 +201,16 @@ function SignUpContent() {
 
             // OTP verified — now create account
             const backendUrl = process.env.NEXT_PUBLIC_BACKEND_BASE_URL;
+            const { phoneCountryKey, ...signupFields } = formData;
             const signupRes = await fetch(`${backendUrl}/auth/signup`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ ...formData, email: normalizedEmail, role }),
+                body: JSON.stringify({
+                    ...signupFields,
+                    countryCode: dialFromPhoneCountryKey(phoneCountryKey),
+                    email: normalizedEmail,
+                    role,
+                }),
             });
             if (!signupRes.ok) {
                 const err = await signupRes.json();
@@ -522,30 +523,22 @@ function SignUpContent() {
 
                                     <div className="space-y-1.5">
                                         <label className="text-[11px] font-black uppercase tracking-widest text-slate-400 ml-1">Phone Connectivity</label>
-                                        <div className="flex gap-2">
-                                            <select
-                                                value={formData.countryCode}
-                                                onChange={(e) => setFormData({ ...formData, countryCode: e.target.value })}
-                                                className="w-32 px-3 py-4 rounded-2xl border-2 border-slate-100 bg-slate-50/50 font-bold text-xs outline-none focus:border-emerald-600"
-                                            >
-                                                <option value="+92">PK +92</option>
-                                                <option value="+1">US +1</option>
-                                                <option value="+44">UK +44</option>
-                                                <option value="+971">UAE +971</option>
-                                                <option value="+966">SA +966</option>
-                                            </select>
-                                            <input
-                                                type="tel"
-                                                value={formData.phone}
-                                                onChange={handlePhoneChange}
-                                                className={clsx(
-                                                    "flex-1 px-5 py-4 rounded-2xl border-2 bg-slate-50/50 focus:bg-white outline-none transition-all font-bold text-slate-800 placeholder:text-slate-300",
-                                                    errors.phone ? "border-red-500 focus:border-red-500" : "border-slate-100 focus:border-emerald-600"
-                                                )}
-                                                placeholder="3001234567"
-                                            />
-                                        </div>
-                                        {errors.phone && <p className="text-[10px] text-red-500 font-black uppercase tracking-widest ml-1">{errors.phone}</p>}
+                                        <PhoneConnectivityRow
+                                            phoneCountryKey={formData.phoneCountryKey}
+                                            nationalDigits={formData.phone}
+                                            onPhoneCountryKeyChange={(phoneCountryKey) =>
+                                                setFormData({ ...formData, phoneCountryKey })
+                                            }
+                                            onNationalDigitsChange={(phone) => {
+                                                setFormData({ ...formData, phone });
+                                                if (errors.phone) setErrors({ ...errors, phone: "" });
+                                            }}
+                                            errorText={errors.phone}
+                                            maxNationalDigits={15}
+                                            inputClassName={clsx(
+                                                errors.phone ? "border-red-500 focus:border-red-500" : "border-slate-100 focus:border-emerald-600",
+                                            )}
+                                        />
                                     </div>
 
                                     <div className="space-y-1.5">

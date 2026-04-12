@@ -4,9 +4,24 @@ import { useEffect, useState } from "react";
 import { Button } from "../report/components/ui/button";
 import { Badge } from "../report/components/ui/badge";
 import { authenticatedFetch } from "@/utils/api";
-import { Loader2, MapPin, Calendar, Clock, Globe, ArrowRight, CheckCircle2, LayoutGrid, List, Users, Mail, Phone, GraduationCap } from "lucide-react";
+import { getStoredCurrentUserId } from "@/utils/currentUser";
+import { isStudentOpportunityLiveForReporting } from "@/utils/opportunityWorkflow";
+import type { CreatorBucket, ModeBucket, VisibilityBucket } from "@/utils/opportunityListing";
+import {
+    buildSdgFilterLabel,
+    computeSeatsRemaining,
+    creatorMenuLabel,
+    modeMenuLabel,
+    normalizeModeBucket,
+    passesSeatsFilter,
+    pickCreatorBucket,
+    pickOpportunityTypes,
+    pickUniversityLabel,
+    pickVisibilityBucket,
+    visibilityMenuLabel,
+} from "@/utils/opportunityListing";
+import { Loader2, MapPin, Calendar, Clock, Globe, CheckCircle2, LayoutGrid, List, Users, Mail, Phone, GraduationCap } from "lucide-react";
 import Link from "next/link";
-import { toast } from "sonner";
 import ApplicationDialog from "./components/ApplicationDialog";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "../report/components/ui/dialog";
 
@@ -21,31 +36,173 @@ interface TeamMember {
     is_verified?: boolean;
 }
 
+interface BrowseOpportunity {
+    id: string;
+    title?: string;
+    description?: string;
+    status?: string;
+    application_status?: string;
+    hasApplied?: boolean;
+    has_applied?: boolean;
+    category?: string;
+    types?: string[];
+    city?: string;
+    mode?: string;
+    hours?: string | number;
+    start_date?: string;
+    remaining_seats?: number;
+    volunteersNeeded?: number;
+    organization_name?: string;
+    teamMembers?: TeamMember[];
+    sdg_info?: {
+        description?: string;
+    };
+    location?: {
+        city?: string;
+        district?: string;
+    };
+    organization?: {
+        city?: string;
+    };
+    /** Normalized for listing filters */
+    universityLabel?: string;
+    creatorBucket?: CreatorBucket;
+    modeBucket?: ModeBucket;
+    visibilityBucket?: VisibilityBucket;
+    opportunityTypes?: string[];
+    sdgLabel?: string;
+    seatsRemaining?: number | null;
+}
+
+function lower(value: unknown): string {
+    return typeof value === "string" ? value.trim().toLowerCase() : "";
+}
+
+function normalizeOpportunity(op: BrowseOpportunity): BrowseOpportunity {
+    const applicationStatus = lower(op.application_status);
+    const opportunityStatus = lower(op.status);
+    const hasApplied = Boolean(
+        applicationStatus ||
+        op.hasApplied ||
+        op.has_applied ||
+        opportunityStatus === "applied",
+    );
+
+    const city =
+        op.city ||
+        op.location?.city ||
+        op.location?.district ||
+        op.organization?.city ||
+        "Remote";
+
+    const category =
+        op.category ||
+        op.types?.[0] ||
+        op.sdg_info?.description ||
+        "Social Impact";
+
+    const raw = op as unknown as Record<string, unknown>;
+    const opportunityTypes =
+        pickOpportunityTypes(raw).length > 0
+            ? pickOpportunityTypes(raw)
+            : (op.types || []).filter((x): x is string => typeof x === "string" && Boolean(x.trim()));
+
+    const seatsFromCompute = computeSeatsRemaining(raw);
+    const seatsRemaining =
+        seatsFromCompute ??
+        (typeof op.remaining_seats === "number" ? op.remaining_seats : null) ??
+        (typeof op.volunteersNeeded === "number" ? op.volunteersNeeded : null);
+
+    return {
+        ...op,
+        city,
+        category,
+        hasApplied,
+        application_status: applicationStatus || undefined,
+        universityLabel: pickUniversityLabel(raw),
+        creatorBucket: pickCreatorBucket(raw),
+        modeBucket: normalizeModeBucket(op.mode ?? raw.mode),
+        visibilityBucket: pickVisibilityBucket(raw),
+        opportunityTypes,
+        sdgLabel: buildSdgFilterLabel(raw),
+        seatsRemaining,
+    };
+}
+
+function shouldShowInBrowse(op: BrowseOpportunity): boolean {
+    if (op.hasApplied) return true;
+    if (isStudentOpportunityLiveForReporting(op as unknown as Record<string, unknown>)) return true;
+
+    const opportunityStatus = lower(op.status);
+    const applicationStatus = lower(op.application_status);
+
+    return (
+        ["active", "live", "approved", "verified", "open", "recruiting"].includes(opportunityStatus) ||
+        ["pending", "pending_approval", "applied", "approved", "verified", "accepted", "active"].includes(applicationStatus)
+    );
+}
+
 export default function StudentBrowseOpportunitiesPage() {
-    const [opportunities, setOpportunities] = useState<any[]>([]);
+    const [opportunities, setOpportunities] = useState<BrowseOpportunity[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [applyingId, setApplyingId] = useState<string | null>(null);
     const [applyingTitle, setApplyingTitle] = useState<string | undefined>(undefined);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
 
     // Team Dialog
-    const [selectedTeamOpp, setSelectedTeamOpp] = useState<any | null>(null);
+    const [selectedTeamOpp, setSelectedTeamOpp] = useState<BrowseOpportunity | null>(null);
     const [isTeamDialogOpen, setIsTeamDialogOpen] = useState(false);
 
     // Filters & View State
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-    const [sdgFilter, setSdgFilter] = useState<string>('all');
-    const [cityFilter, setCityFilter] = useState<string>('all');
+    const [universityFilter, setUniversityFilter] = useState("all");
+    const [creatorFilter, setCreatorFilter] = useState<"all" | CreatorBucket>("all");
+    const [modeFilter, setModeFilter] = useState<"all" | ModeBucket>("all");
+    const [oppTypeFilter, setOppTypeFilter] = useState("all");
+    const [sdgFilter, setSdgFilter] = useState("all");
+    const [locationFilter, setLocationFilter] = useState("all");
+    const [seatsFilter, setSeatsFilter] = useState<"all" | "1" | "5" | "10">("all");
+    const [visibilityFilter, setVisibilityFilter] = useState<"all" | VisibilityBucket>("all");
 
     // Derived Data
-    const uniqueSDGs = Array.from(new Set(opportunities.map(op => op.category || "Social Impact"))).sort();
-    const uniqueCities = Array.from(new Set(opportunities.map(op => op.city || "Remote"))).sort();
+    const universityOptions = Array.from(
+        new Set(opportunities.map((op) => op.universityLabel || "Unspecified")),
+    ).sort((a, b) => a.localeCompare(b));
+    const oppTypeOptions = Array.from(
+        new Set(opportunities.flatMap((op) => op.opportunityTypes || [])),
+    ).sort((a, b) => a.localeCompare(b));
+    const sdgOptions = Array.from(
+        new Set(opportunities.map((op) => op.sdgLabel || "Unspecified SDG")),
+    ).sort((a, b) => a.localeCompare(b));
+    const locationOptions = Array.from(new Set(opportunities.map((op) => op.city || "Remote"))).sort((a, b) =>
+        a.localeCompare(b),
+    );
 
-    const filteredOpportunities = opportunities.filter(op => {
-        const matchSDG = sdgFilter === 'all' || (op.category || "Social Impact") === sdgFilter;
-        const matchCity = cityFilter === 'all' || (op.city || "Remote") === cityFilter;
-        return matchSDG && matchCity;
+    const filteredOpportunities = opportunities.filter((op) => {
+        if (universityFilter !== "all" && (op.universityLabel || "Unspecified") !== universityFilter) return false;
+        if (creatorFilter !== "all" && (op.creatorBucket || "unspecified") !== creatorFilter) return false;
+        if (modeFilter !== "all" && (op.modeBucket || "unspecified") !== modeFilter) return false;
+        if (oppTypeFilter !== "all" && !(op.opportunityTypes || []).includes(oppTypeFilter)) return false;
+        if (sdgFilter !== "all" && (op.sdgLabel || "Unspecified SDG") !== sdgFilter) return false;
+        if (locationFilter !== "all" && (op.city || "Remote") !== locationFilter) return false;
+        if (!passesSeatsFilter(op.seatsRemaining ?? null, seatsFilter)) return false;
+        if (visibilityFilter !== "all" && (op.visibilityBucket || "unspecified") !== visibilityFilter) return false;
+        return true;
     });
+
+    const clearListingFilters = () => {
+        setUniversityFilter("all");
+        setCreatorFilter("all");
+        setModeFilter("all");
+        setOppTypeFilter("all");
+        setSdgFilter("all");
+        setLocationFilter("all");
+        setSeatsFilter("all");
+        setVisibilityFilter("all");
+    };
+
+    const filterSelectClass =
+        "h-9 min-w-[130px] max-w-[220px] px-2 text-sm rounded-md border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20";
 
     const openApplicationDialog = (id: string, title: string) => {
         setApplyingId(id);
@@ -62,25 +219,20 @@ export default function StudentBrowseOpportunitiesPage() {
     };
 
     useEffect(() => {
-        fetchOpportunities();
+        void fetchOpportunities();
+        const intervalId = window.setInterval(() => {
+            void fetchOpportunities({ silent: true });
+        }, 30000);
+        return () => window.clearInterval(intervalId);
     }, []);
 
-    const fetchOpportunities = async () => {
+    const fetchOpportunities = async (options?: { silent?: boolean }) => {
+        if (!options?.silent) {
+            setIsLoading(true);
+        }
         try {
-            // Get user info first to get the ID
-            const storedUser = localStorage.getItem("ciel_user");
-            let userId = null;
-            if (storedUser) {
-                try {
-                    const parsedUser = JSON.parse(storedUser);
-                    userId = parsedUser.id;
-                } catch (e) {
-                    console.error("Failed to parse user from local storage");
-                }
-            }
-
-            // Fetching all approved opportunities using the requested endpoint
-            const res = await authenticatedFetch(`/api/v1/students/opportunities?status=approved`, {
+            const userId = getStoredCurrentUserId() || null;
+            const res = await authenticatedFetch(`/api/v1/students/opportunities`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -91,53 +243,22 @@ export default function StudentBrowseOpportunitiesPage() {
             if (res && res.ok) {
                 const data = await res.json();
                 if (data.success) {
-                    console.log("Browse API Response:", data.data); // DEBUG: Check if teamMembers and status are present
-                    const mappedOps = (data.data || []).map((op: any) => ({
-                        ...op,
-                        // If application_status exists, it means the student has applied
-                        // Status 'applied' means the current student application is pending
-                        hasApplied: !!op.application_status || op.status === 'applied'
-                    }));
+                    const mappedOps = ((data.data || []) as BrowseOpportunity[])
+                        .map((op) => normalizeOpportunity(op))
+                        .filter((op) => shouldShowInBrowse(op));
                     setOpportunities(mappedOps);
                 }
             }
         } catch (error) {
             console.error("Failed to fetch opportunities", error);
         } finally {
-            setIsLoading(false);
-        }
-    };
-
-    const handleApply = async (opportunityId: string) => {
-        setApplyingId(opportunityId);
-        try {
-            const res = await authenticatedFetch(`/api/v1/students/opportunities/${opportunityId}/apply`, {
-                method: 'POST'
-            });
-
-            if (res && res.ok) {
-                const data = await res.json();
-                if (data.success) {
-                    toast.success("Application submitted successfully!");
-                    // Refresh list or update local state
-                    setOpportunities(prev => prev.map(op =>
-                        op.id === opportunityId ? { ...op, hasApplied: true, application_status: 'pending' } : op
-                    ));
-                } else {
-                    toast.error(data.message || "Failed to submit application");
-                }
-            } else {
-                toast.error("Failed to connect to server");
+            if (!options?.silent) {
+                setIsLoading(false);
             }
-        } catch (error) {
-            console.error("Error applying", error);
-            toast.error("An error occurred while applying");
-        } finally {
-            setApplyingId(null);
         }
     };
 
-    const openTeamDialog = (opportunity: any) => {
+    const openTeamDialog = (opportunity: BrowseOpportunity) => {
         setSelectedTeamOpp(opportunity);
         setIsTeamDialogOpen(true);
     };
@@ -158,25 +279,112 @@ export default function StudentBrowseOpportunitiesPage() {
                     <p className="text-slate-500">Discover and apply to volunteer projects from our partners.</p>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-3">
-                    {/* Filters */}
+                <div className="flex flex-wrap items-center gap-2">
+                    <select
+                        value={universityFilter}
+                        onChange={(e) => setUniversityFilter(e.target.value)}
+                        className={filterSelectClass}
+                        title="University"
+                    >
+                        <option value="all">All universities</option>
+                        {universityOptions.map((u) => (
+                            <option key={u} value={u}>
+                                {u}
+                            </option>
+                        ))}
+                    </select>
+                    <select
+                        value={creatorFilter}
+                        onChange={(e) => setCreatorFilter(e.target.value as "all" | CreatorBucket)}
+                        className={filterSelectClass}
+                        title="Creator type"
+                    >
+                        <option value="all">All creators</option>
+                        {(["student", "faculty", "partner", "unspecified"] as const).map((b) => (
+                            <option key={b} value={b}>
+                                {creatorMenuLabel(b)}
+                            </option>
+                        ))}
+                    </select>
+                    <select
+                        value={modeFilter}
+                        onChange={(e) => setModeFilter(e.target.value as "all" | ModeBucket)}
+                        className={filterSelectClass}
+                        title="Mode"
+                    >
+                        <option value="all">All modes</option>
+                        {(["on-site", "hybrid", "remote", "unspecified"] as const).map((b) => (
+                            <option key={b} value={b}>
+                                {modeMenuLabel(b)}
+                            </option>
+                        ))}
+                    </select>
+                    <select
+                        value={oppTypeFilter}
+                        onChange={(e) => setOppTypeFilter(e.target.value)}
+                        className={filterSelectClass}
+                        title="Opportunity type"
+                    >
+                        <option value="all">All types</option>
+                        {oppTypeOptions.map((t) => (
+                            <option key={t} value={t}>
+                                {t}
+                            </option>
+                        ))}
+                    </select>
                     <select
                         value={sdgFilter}
                         onChange={(e) => setSdgFilter(e.target.value)}
-                        className="h-9 px-3 text-sm rounded-md border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                        className={filterSelectClass}
+                        title="SDG"
                     >
-                        <option value="all">All Categories</option>
-                        {uniqueSDGs.map(sdg => <option key={sdg} value={sdg}>{sdg}</option>)}
+                        <option value="all">All SDGs</option>
+                        {sdgOptions.map((s) => (
+                            <option key={s} value={s}>
+                                {s}
+                            </option>
+                        ))}
                     </select>
-
                     <select
-                        value={cityFilter}
-                        onChange={(e) => setCityFilter(e.target.value)}
-                        className="h-9 px-3 text-sm rounded-md border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                        value={locationFilter}
+                        onChange={(e) => setLocationFilter(e.target.value)}
+                        className={filterSelectClass}
+                        title="Location"
                     >
-                        <option value="all">All Cities</option>
-                        {uniqueCities.map(city => <option key={city} value={city}>{city}</option>)}
+                        <option value="all">All locations</option>
+                        {locationOptions.map((loc) => (
+                            <option key={loc} value={loc}>
+                                {loc}
+                            </option>
+                        ))}
                     </select>
+                    <select
+                        value={seatsFilter}
+                        onChange={(e) => setSeatsFilter(e.target.value as "all" | "1" | "5" | "10")}
+                        className={filterSelectClass}
+                        title="Seats available"
+                    >
+                        <option value="all">Any seats</option>
+                        <option value="1">1+ seats</option>
+                        <option value="5">5+ seats</option>
+                        <option value="10">10+ seats</option>
+                    </select>
+                    <select
+                        value={visibilityFilter}
+                        onChange={(e) => setVisibilityFilter(e.target.value as "all" | VisibilityBucket)}
+                        className={filterSelectClass}
+                        title="Visibility"
+                    >
+                        <option value="all">All visibility</option>
+                        {(["open", "restricted", "unspecified"] as const).map((b) => (
+                            <option key={b} value={b}>
+                                {visibilityMenuLabel(b)}
+                            </option>
+                        ))}
+                    </select>
+                    <Button variant="outline" size="sm" className="h-9 text-xs shrink-0" onClick={clearListingFilters}>
+                        Clear
+                    </Button>
 
                     <div className="w-px h-6 bg-slate-200 mx-1 hidden md:block" />
 
@@ -205,7 +413,9 @@ export default function StudentBrowseOpportunitiesPage() {
                     <Globe className="w-12 h-12 text-slate-300 mx-auto mb-4" />
                     <h3 className="text-lg font-bold text-slate-700">No Opportunities Found</h3>
                     <p className="text-slate-500 mb-6">Try adjusting your filters.</p>
-                    <Button variant="outline" onClick={() => { setSdgFilter('all'); setCityFilter('all'); }}>Clear Filters</Button>
+                    <Button variant="outline" onClick={clearListingFilters}>
+                        Clear Filters
+                    </Button>
                 </div>
             ) : (
                 <div className={viewMode === 'grid'
@@ -222,7 +432,9 @@ export default function StudentBrowseOpportunitiesPage() {
                                             {op.category || "Social Impact"}
                                         </Badge>
                                         <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-                                            {op.mode || "On Site"}
+                                            {op.modeBucket && op.modeBucket !== "unspecified"
+                                                ? modeMenuLabel(op.modeBucket)
+                                                : op.mode || "On Site"}
                                         </span>
                                     </div>
 
@@ -254,7 +466,7 @@ export default function StudentBrowseOpportunitiesPage() {
                                         </div>
                                         <div className="flex items-center gap-2 text-xs font-bold text-orange-600">
                                             <Users className="w-3.5 h-3.5" />
-                                            {op.remaining_seats ?? op.volunteersNeeded ?? 0} Seats Remaining
+                                            {op.seatsRemaining ?? op.remaining_seats ?? op.volunteersNeeded ?? 0} Seats Remaining
                                         </div>
                                     </div>
                                 </div>
@@ -266,7 +478,8 @@ export default function StudentBrowseOpportunitiesPage() {
                                     {op.hasApplied ? (
                                         <div className="flex items-center gap-2">
                                             {/* Report Button - Only show if APPLICATION is approved/active */}
-                                            {['approved', 'verified'].includes(op.application_status) && (
+                                            {op.application_status != null &&
+                                                ["approved", "verified"].includes(op.application_status) && (
                                                 <Link href={`/dashboard/student/report?projectId=${op.id}`}>
                                                     <Button size="sm" variant="outline" className="text-xs h-8">
                                                         Start Report
@@ -274,7 +487,8 @@ export default function StudentBrowseOpportunitiesPage() {
                                                 </Link>
                                             )}
 
-                                            {(!op.application_status || ['pending', 'pending_approval', 'applied'].includes(op.application_status)) && (
+                                            {(!op.application_status ||
+                                                ["pending", "pending_approval", "applied"].includes(op.application_status)) && (
                                                 <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-1 rounded-md border border-amber-100 italic">
                                                     Pending Admin Approval
                                                 </span>
@@ -295,7 +509,7 @@ export default function StudentBrowseOpportunitiesPage() {
                                         <Button
                                             size="sm"
                                             className="bg-slate-900 hover:bg-blue-600 text-white transition-colors"
-                                            onClick={() => openApplicationDialog(op.id, op.title)}
+                                            onClick={() => openApplicationDialog(op.id, op.title ?? "Opportunity")}
                                             disabled={op.hasApplied}
                                         >
                                             Apply Now
@@ -312,7 +526,9 @@ export default function StudentBrowseOpportunitiesPage() {
                                             {op.category || "Social Impact"}
                                         </Badge>
                                         <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-                                            {op.mode || "On Site"}
+                                            {op.modeBucket && op.modeBucket !== "unspecified"
+                                                ? modeMenuLabel(op.modeBucket)
+                                                : op.mode || "On Site"}
                                         </span>
                                     </div>
 
@@ -325,7 +541,7 @@ export default function StudentBrowseOpportunitiesPage() {
                                         <span className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5" /> {op.city || "Remote"}</span>
                                         <span className="flex items-center gap-1"><Calendar className="w-3.5 h-3.5" /> {op.start_date ? new Date(op.start_date).toLocaleDateString() : "Flexible Dates"}</span>
                                         <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5" /> {op.hours || "0"} Hours</span>
-                                        <span className="flex items-center gap-1 font-bold text-orange-600"><Users className="w-3.5 h-3.5" /> {op.remaining_seats ?? op.volunteersNeeded ?? 0} Seats left</span>
+                                        <span className="flex items-center gap-1 font-bold text-orange-600"><Users className="w-3.5 h-3.5" /> {op.seatsRemaining ?? op.remaining_seats ?? op.volunteersNeeded ?? 0} Seats left</span>
                                     </div>
                                 </div>
 
@@ -336,7 +552,8 @@ export default function StudentBrowseOpportunitiesPage() {
                                     {op.hasApplied ? (
                                         <div className="flex items-center gap-2 flex-1 md:flex-none justify-end">
                                             {/* Report Button - Only show if APPLICATION is approved/active */}
-                                            {['approved', 'verified'].includes(op.application_status) && (
+                                            {op.application_status != null &&
+                                                ["approved", "verified"].includes(op.application_status) && (
                                                 <Link href={`/dashboard/student/report?projectId=${op.id}`}>
                                                     <Button size="sm" variant="outline" className="text-xs h-9">
                                                         Start Report
@@ -344,7 +561,8 @@ export default function StudentBrowseOpportunitiesPage() {
                                                 </Link>
                                             )}
 
-                                            {(!op.application_status || ['pending', 'pending_approval', 'applied'].includes(op.application_status)) && (
+                                            {(!op.application_status ||
+                                                ["pending", "pending_approval", "applied"].includes(op.application_status)) && (
                                                 <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-3 py-1.5 rounded-md border border-amber-100 italic">
                                                     Pending Admin Approval
                                                 </span>
@@ -364,7 +582,7 @@ export default function StudentBrowseOpportunitiesPage() {
                                     ) : (
                                         <Button
                                             className="bg-slate-900 hover:bg-blue-600 text-white transition-colors flex-1 md:flex-none"
-                                            onClick={() => openApplicationDialog(op.id, op.title)}
+                                            onClick={() => openApplicationDialog(op.id, op.title ?? "Opportunity")}
                                             disabled={op.hasApplied}
                                         >
                                             Apply Now
