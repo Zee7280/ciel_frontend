@@ -424,6 +424,10 @@ interface ReportContextType {
     setParticipationUnlocked: (unlocked: boolean) => void;
     setRequiredHours: (hours: number) => void;
     isEligibleForSubmission: boolean;
+    /** Sections 1–10 pass validation (summary step excluded). */
+    areAllSectionsComplete: boolean;
+    /** Hours + all sections valid — final submit allowed. */
+    canSubmitReport: boolean;
 }
 
 
@@ -441,6 +445,27 @@ export function ReportProvider({ children }: { children: React.ReactNode }) {
         const metHours = (data.section1.metrics?.total_verified_hours || 0) >= (data.required_hours || 16);
         return metHours;
     }, [data.section1.metrics?.total_verified_hours, data.required_hours]);
+
+    const areAllSectionsComplete = useMemo(() => {
+        const checks = [
+            validateSection1(data.section1),
+            validateSection2(data.section2),
+            validateSection3(data.section3),
+            validateSection4(data.section4),
+            validateSection5(data.section5),
+            validateSection6(data.section6),
+            validateSection7(data.section7),
+            validateSection8(data.section8),
+            validateSection9(data.section9),
+            validateSection10(data.section10),
+        ];
+        return checks.every((r) => r.isValid);
+    }, [data]);
+
+    const canSubmitReport = useMemo(
+        () => isEligibleForSubmission && areAllSectionsComplete,
+        [isEligibleForSubmission, areAllSectionsComplete],
+    );
 
     // Auto-calculate Section 1 metrics whenever attendance logs change
     useEffect(() => {
@@ -614,7 +639,9 @@ export function ReportProvider({ children }: { children: React.ReactNode }) {
         isParticipationUnlocked,
         setParticipationUnlocked,
         setRequiredHours,
-        isEligibleForSubmission
+        isEligibleForSubmission,
+        areAllSectionsComplete,
+        canSubmitReport
     }), [
         data,
         updateSection,
@@ -633,7 +660,9 @@ export function ReportProvider({ children }: { children: React.ReactNode }) {
         isParticipationUnlocked,
         setParticipationUnlocked,
         setRequiredHours,
-        isEligibleForSubmission
+        isEligibleForSubmission,
+        areAllSectionsComplete,
+        canSubmitReport
     ]);
 
 

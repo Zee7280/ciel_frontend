@@ -1,5 +1,5 @@
 "use client"
-import React from 'react';
+import React, { Suspense } from 'react';
 import { useReportForm, ReportProvider } from './context/ReportContext';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { authenticatedFetch } from '@/utils/api';
@@ -48,7 +48,9 @@ function ReportFormContent() {
         updateSection,
         setReadOnly,
         isReadOnly,
-        isEligibleForSubmission
+        isEligibleForSubmission,
+        areAllSectionsComplete,
+        canSubmitReport
     } = useReportForm();
 
     const [isSaving, setIsSaving] = React.useState(false);
@@ -161,11 +163,13 @@ function ReportFormContent() {
             nextStep();
             window.scrollTo(0, 0);
         } else {
-            // Final step: enforce strict validation or eligibility
-            if (isValid && isEligibleForSubmission) {
+            // Final step: require verified hours and valid sections 1–10
+            if (canSubmitReport && isValid) {
                 handleSubmit();
             } else if (!isEligibleForSubmission) {
                 toast.error("You are not yet eligible for submission. Check requirements on the summary page.");
+            } else if (!areAllSectionsComplete) {
+                toast.error("Complete all report sections (steps 1–10) before submitting.");
             } else {
                 toast.error("Please fix all errors before final submission.");
             }
@@ -203,8 +207,10 @@ function ReportFormContent() {
             e.stopPropagation();
         }
         if (isReadOnly) return;
-
-        // Final validation check for all sections could go here
+        if (!canSubmitReport) {
+            toast.error("Complete all sections and meet hour requirements before submitting.");
+            return;
+        }
 
         setIsConfirmOpen(true);
     };
@@ -287,25 +293,31 @@ function ReportFormContent() {
                     {!isReadOnly && (
                         <div className={clsx(
                             "hidden md:flex items-center gap-3 px-6 py-2.5 rounded-2xl border transition-all animate-in fade-in zoom-in duration-500",
-                            isEligibleForSubmission 
-                                ? "bg-emerald-50 border-emerald-100 text-emerald-700 shadow-sm" 
+                            canSubmitReport
+                                ? "bg-emerald-50 border-emerald-100 text-emerald-700 shadow-sm"
                                 : "bg-amber-50 border-amber-100 text-amber-700"
                         )}>
                             <div className={clsx(
                                 "w-2.5 h-2.5 rounded-full animate-pulse",
-                                isEligibleForSubmission ? "bg-emerald-500" : "bg-amber-500"
+                                canSubmitReport ? "bg-emerald-500" : "bg-amber-500"
                             )} />
                             <div className="flex flex-col">
                                 <span className="text-[10px] font-black uppercase tracking-widest leading-none mb-0.5">
-                                    {isEligibleForSubmission ? "Submission Mode Ready" : "Progress Mode"}
+                                    {canSubmitReport
+                                        ? "Submission Mode Ready"
+                                        : isEligibleForSubmission
+                                          ? "Almost there"
+                                          : "Progress Mode"}
                                 </span>
                                 <span className="text-[9px] font-bold opacity-70 leading-none">
-                                    {isEligibleForSubmission 
-                                        ? "All eligibility criteria met. Finalize and submit." 
-                                        : `Verification in progress: ${data.section1.metrics?.total_verified_hours || 0}/${data.required_hours || 16} hours met.`}
+                                    {canSubmitReport
+                                        ? "All sections complete. You can submit from the summary step."
+                                        : isEligibleForSubmission
+                                          ? "Finish steps 1–10; then you can submit on the summary."
+                                          : `Verification in progress: ${data.section1.metrics?.total_verified_hours || 0}/${data.required_hours || 16} hours met.`}
                                 </span>
                             </div>
-                            {isEligibleForSubmission && <CheckCircle2 className="w-4 h-4 text-emerald-500 ml-1" />}
+                            {canSubmitReport && <CheckCircle2 className="w-4 h-4 text-emerald-500 ml-1" />}
                         </div>
                     )}
                     <div className="flex items-center gap-3">
@@ -427,11 +439,17 @@ function ReportFormContent() {
                             <Button
                                 type="button"
                                 onClick={handleNext}
-                                disabled={isSaving}
-                                className="h-11 rounded-xl bg-blue-600 hover:bg-blue-700 text-white px-6 md:px-8 font-semibold shadow-md shadow-blue-600/20 transition-all w-full sm:w-auto"
+                                disabled={isSaving || (activeStep === 11 && !canSubmitReport)}
+                                className="h-11 rounded-xl bg-blue-600 hover:bg-blue-700 text-white px-6 md:px-8 font-semibold shadow-md shadow-blue-600/20 transition-all w-full sm:w-auto disabled:opacity-50"
                             >
                                 {isSaving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
-                                {activeStep === 11 ? (isSaving ? 'Submitting...' : 'Submit Report') : (aiStatus || 'Next Step')}
+                                {activeStep === 11
+                                    ? isSaving
+                                        ? 'Submitting...'
+                                        : canSubmitReport
+                                          ? 'Submit Report'
+                                          : 'Complete all sections'
+                                    : (aiStatus || 'Next Step')}
                                 {activeStep !== 11 && !isSaving && <ChevronRight className="w-4 h-4 ml-2" />}
                             </Button>
                         )}
@@ -462,10 +480,6 @@ function ReportFormContent() {
         </div>
     );
 }
-
-import { Suspense } from 'react';
-
-// ... (existing imports)
 
 export default function ReportPage() {
     return (

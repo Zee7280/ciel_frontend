@@ -10,7 +10,7 @@ import { toast } from "sonner";
 import clsx from "clsx";
 
 export default function Section11Summary() {
-    const { data, updateSection, isEligibleForSubmission } = useReportForm();
+    const { data, updateSection, isEligibleForSubmission, areAllSectionsComplete } = useReportForm();
     const { section1, section2, section3, section4, section5, section8, section9, section10 } = data;
 
     const [showPreview, setShowPreview] = useState(false);
@@ -264,11 +264,13 @@ export default function Section11Summary() {
                                         <p className="text-xs font-bold">{verifiedHours} / {data.required_hours || 16} Hours</p>
                                     </div>
                                 </div>
-                                <div className="p-5 rounded-2xl border-2 bg-slate-50 border-slate-100 text-slate-400 flex items-center gap-4 transition-all">
-                                    <div className="w-8 h-8 rounded-full bg-slate-200 text-slate-400 flex items-center justify-center shrink-0">2</div>
+                                <div className={clsx("p-5 rounded-2xl border-2 flex items-center gap-4 transition-all", areAllSectionsComplete ? "bg-slate-50 border-slate-100 text-slate-700" : "bg-slate-50 border-slate-100 text-slate-400")}>
+                                    <div className={clsx("w-8 h-8 rounded-full flex items-center justify-center shrink-0", areAllSectionsComplete ? "bg-emerald-500 text-white" : "bg-slate-200 text-slate-400")}>
+                                        {areAllSectionsComplete ? <CheckCircle className="w-5 h-5" /> : "2"}
+                                    </div>
                                     <div className="space-y-0.5 text-left">
                                         <p className="text-[10px] font-black uppercase tracking-widest leading-none">Mandatory Sections</p>
-                                        <p className="text-xs font-bold">In Progress</p>
+                                        <p className="text-xs font-bold">{areAllSectionsComplete ? "Complete" : "In Progress"}</p>
                                     </div>
                                 </div>
                             </div>
@@ -280,6 +282,38 @@ export default function Section11Summary() {
                             </div>
                         </div>
                     </>
+                ) : isEligibleForSubmission && !areAllSectionsComplete ? (
+                    <>
+                        <div className="w-16 h-16 bg-amber-50 rounded-3xl flex items-center justify-center shadow-inner">
+                            <AlertTriangle className="w-8 h-8 text-amber-500" />
+                        </div>
+                        <div className="flex-1 space-y-6 max-w-lg">
+                            <div>
+                                <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight mb-2">Hours met — finish all sections</h3>
+                                <p className="text-sm font-bold text-slate-400">
+                                    Use the steps above to complete and validate sections 1–10. Submit appears only when every section is complete.
+                                </p>
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div className="p-5 rounded-2xl border-2 flex items-center gap-4 bg-slate-50 border-slate-100 text-slate-700">
+                                    <div className="w-8 h-8 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0">
+                                        <CheckCircle className="w-5 h-5" />
+                                    </div>
+                                    <div className="space-y-0.5 text-left">
+                                        <p className="text-[10px] font-black uppercase tracking-widest leading-none">Min. Hours Met</p>
+                                        <p className="text-xs font-bold">{verifiedHours} / {data.required_hours || 16} Hours</p>
+                                    </div>
+                                </div>
+                                <div className="p-5 rounded-2xl border-2 border-amber-100 bg-amber-50/50 flex items-center gap-4">
+                                    <div className="w-8 h-8 rounded-full bg-amber-200 text-amber-700 flex items-center justify-center shrink-0 font-bold text-sm">!</div>
+                                    <div className="space-y-0.5 text-left">
+                                        <p className="text-[10px] font-black uppercase tracking-widest leading-none text-amber-900">Sections 1–10</p>
+                                        <p className="text-xs font-bold text-amber-800">Complete required fields on each step</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </>
                 ) : (
                     <>
                         <div className="w-16 h-16 bg-blue-100 rounded-2xl flex items-center justify-center animate-bounce shadow-lg shadow-blue-100">
@@ -287,10 +321,14 @@ export default function Section11Summary() {
                         </div>
                         <div className="max-w-md space-y-4">
                             <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">Ready for Final Submission</h3>
-                            <p className="text-sm font-bold text-slate-400 leading-relaxed">Requirement of 16-hour engagement met. Please review carefully.</p>
+                            <p className="text-sm font-bold text-slate-400 leading-relaxed">
+                                All sections are complete and hour requirements are met. Review and submit when ready.
+                            </p>
                             <Button
                                 onClick={() => {
-                                    const footerSubmitBtn = Array.from(document.querySelectorAll('button')).find(btn => btn.textContent?.includes('Submit Report'));
+                                    const footerSubmitBtn = Array.from(document.querySelectorAll("button")).find((btn) =>
+                                        btn.textContent?.includes("Submit Report"),
+                                    );
                                     if (footerSubmitBtn) footerSubmitBtn.click();
                                 }}
                                 className="bg-slate-900 hover:bg-slate-800 text-white px-10 h-12 rounded-xl w-full text-xs font-black uppercase tracking-widest transition-all shadow-md shadow-report-primary-shadow flex items-center justify-center gap-3"

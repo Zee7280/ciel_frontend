@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState } from 'react';
 import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -113,26 +113,39 @@ export default function LocationPicker({ onLocationSelect, initialLocation }: Lo
     };
 
     const handleSearch = async () => {
-        if (!searchQuery.trim()) return;
+        const q = searchQuery.trim();
+        if (!q) return;
 
         setIsSearching(true);
         try {
-            // Use Nominatim for free geocoding (OpenStreetMap)
-            const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}`);
+            // Browser calls to Nominatim often fail (403 / no CORS on errors) because a real
+            // User-Agent is required and fetch cannot set it. Photon matches our autocomplete
+            // API and works reliably from the client.
+            const response = await fetch(
+                `https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=5`
+            );
+            if (!response.ok) throw new Error(`Geocode HTTP ${response.status}`);
             const data = await response.json();
-
-            if (data && data.length > 0) {
-                const result = data[0];
-                const newLat = parseFloat(result.lat);
-                const newLng = parseFloat(result.lon);
-                const newPos = new L.LatLng(newLat, newLng);
+            const feature = data.features?.[0];
+            if (feature?.geometry?.coordinates) {
+                const [lng, lat] = feature.geometry.coordinates;
+                const newPos = new L.LatLng(lat, lng);
+                const address = [
+                    feature.properties?.name,
+                    feature.properties?.city,
+                    feature.properties?.country
+                ]
+                    .filter(Boolean)
+                    .join(", ");
 
                 setPosition(newPos);
                 onLocationSelect({
-                    lat: newLat,
-                    lng: newLng,
-                    address: result.display_name
+                    lat,
+                    lng,
+                    address: address || q
                 });
+                setSuggestions([]);
+                setShowSuggestions(false);
             }
         } catch (error) {
             console.error("Geocoding failed", error);

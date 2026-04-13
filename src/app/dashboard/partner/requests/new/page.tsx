@@ -948,34 +948,28 @@ export default function OpportunityPostingPage() {
                         </div>
                     </div>
 
-                    {/* C4. Secondary SDGs */}
+                    {/* C4. Secondary SDG */}
                     <div className="pt-6 border-t border-slate-100">
-                        <label className="block text-sm font-bold text-slate-900 mb-2">C4. Secondary SDGs (Optional)</label>
-                        <p className="text-xs text-slate-500 mb-4">Select other SDGs this project contributes to and provide a brief justification.</p>
+                        <label className="block text-sm font-bold text-slate-900 mb-2">C4. Secondary SDG (Optional)</label>
+                        <p className="text-xs text-slate-500 mb-4">If this project also contributes to another SDG, select it below.</p>
 
                         <div className="space-y-4">
                             <select
-                                key={formData.secondarySdgs.map((s) => s.sdgId).join("|")}
-                                className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-purple-500 outline-none font-medium text-sm"
-                                defaultValue=""
+                                className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-purple-500 focus:ring-4 focus:ring-purple-500/10 outline-none font-medium"
+                                value={formData.secondarySdgs[0]?.sdgId || ""}
                                 onChange={(e) => {
                                     const val = e.target.value;
-                                    if (!val) return;
-                                    setFormData((prev) => {
-                                        if (prev.secondarySdgs.some((s) => s.sdgId === val)) return prev;
-                                        return {
-                                            ...prev,
-                                            secondarySdgs: [
-                                                ...prev.secondarySdgs,
-                                                { sdgId: val, targetId: "", indicatorId: "", justification: "" },
-                                            ],
-                                        };
+                                    setFormData({
+                                        ...formData,
+                                        secondarySdgs: val
+                                            ? [{ sdgId: val, targetId: "", indicatorId: "", justification: "" }]
+                                            : [],
                                     });
                                 }}
                             >
-                                <option value="">Add a Secondary SDG...</option>
+                                <option value="">Select a Secondary SDG...</option>
                                 {opportunityFormSdgList
-                                    .filter(sdg => sdg.id !== formData.sdg && !formData.secondarySdgs.find(s => s.sdgId === sdg.id))
+                                    .filter((sdg) => sdg.id !== formData.sdg)
                                     .map((sdg) => (
                                         <option key={sdg.id} value={sdg.id}>
                                             SDG {sdg.number} — {sdg.title}
@@ -983,91 +977,67 @@ export default function OpportunityPostingPage() {
                                     ))}
                             </select>
 
-                            <div className="grid grid-cols-1 gap-4">
-                                {formData.secondarySdgs.map((item, index) => {
-                                    const sdg = findSdgById(item.sdgId);
-                                    const availableTargets = sdg?.targets || [];
-                                    const availableIndicators = availableTargets.find(t => t.id === item.targetId)?.indicators || [];
+                            <div className={!formData.secondarySdgs[0]?.sdgId ? "opacity-50 pointer-events-none space-y-4" : "space-y-4"}>
+                                <div>
+                                    <label className="block text-sm font-bold text-slate-900 mb-2">C5. Select SDG Target</label>
+                                    <select
+                                        className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-purple-500 focus:ring-4 focus:ring-purple-500/10 outline-none font-medium"
+                                        value={formData.secondarySdgs[0]?.targetId || ""}
+                                        onChange={(e) =>
+                                            setFormData({
+                                                ...formData,
+                                                secondarySdgs: formData.secondarySdgs[0]
+                                                    ? [{
+                                                        ...formData.secondarySdgs[0],
+                                                        targetId: e.target.value,
+                                                        indicatorId: "",
+                                                    }]
+                                                    : [],
+                                            })
+                                        }
+                                    >
+                                        <option value="">Select a Target...</option>
+                                        {(formData.secondarySdgs[0]?.sdgId
+                                            ? findSdgById(formData.secondarySdgs[0].sdgId)?.targets
+                                            : []
+                                        )?.map((target) => (
+                                            <option key={target.id} value={target.id}>
+                                                Target {target.id} — {target.description}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
 
-                                    return (
-                                        <div key={item.sdgId} className="bg-slate-50 p-6 rounded-2xl border border-slate-200 flex flex-col gap-4 relative animate-in fade-in slide-in-from-top-2">
-                                            <button
-                                                type="button"
-                                                onClick={() => setFormData({
-                                                    ...formData,
-                                                    secondarySdgs: formData.secondarySdgs.filter(s => s.sdgId !== item.sdgId)
-                                                })}
-                                                className="absolute top-4 right-4 text-slate-400 hover:text-red-500 transition-colors"
-                                            >
-                                                <X className="w-5 h-5" />
-                                            </button>
-
-                                            {/* SDG Header */}
-                                            <div className="flex items-center gap-3 pb-2 border-b border-slate-200/60">
-                                                <div className="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center font-bold text-purple-600 shadow-sm">
-                                                    {sdg?.number}
-                                                </div>
-                                                <div>
-                                                    <span className="text-sm font-black text-slate-800 uppercase tracking-tight">Secondary SDG {sdg?.number}</span>
-                                                    <p className="text-xs text-slate-500">{sdg?.title}</p>
-                                                </div>
-                                            </div>
-
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                {/* Target Dropdown */}
-                                                <div>
-                                                    <label className="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-wider">Select Target</label>
-                                                    <select
-                                                        className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-purple-500 outline-none text-xs font-bold bg-white"
-                                                        value={item.targetId}
-                                                        onChange={(e) => {
-                                                            const selectedTargetId = e.target.value;
-                                                            setFormData((prev) => ({
-                                                                ...prev,
-                                                                secondarySdgs: prev.secondarySdgs.map((entry, entryIndex) =>
-                                                                    entryIndex === index
-                                                                        ? { ...entry, targetId: selectedTargetId, indicatorId: "" }
-                                                                        : entry
-                                                                ),
-                                                            }));
-                                                        }}
-                                                    >
-                                                        <option value="">Choose Target...</option>
-                                                        {availableTargets.map(t => (
-                                                            <option key={t.id} value={t.id}>Target {t.id} — {t.description.substring(0, 60)}...</option>
-                                                        ))}
-                                                    </select>
-                                                </div>
-
-                                                {/* Indicator Dropdown */}
-                                                <div className={!item.targetId ? "opacity-50 pointer-events-none" : ""}>
-                                                    <label className="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-wider">Select Indicator</label>
-                                                    <select
-                                                        className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-purple-500 outline-none text-xs font-bold bg-white"
-                                                        value={item.indicatorId}
-                                                        onChange={(e) => {
-                                                            const selectedIndicatorId = e.target.value;
-                                                            setFormData((prev) => ({
-                                                                ...prev,
-                                                                secondarySdgs: prev.secondarySdgs.map((entry, entryIndex) =>
-                                                                    entryIndex === index
-                                                                        ? { ...entry, indicatorId: selectedIndicatorId }
-                                                                        : entry
-                                                                ),
-                                                            }));
-                                                        }}
-                                                    >
-                                                        <option value="">Choose Indicator...</option>
-                                                        {availableIndicators.map(i => (
-                                                            <option key={i.id} value={i.id}>Indicator {i.id} — {i.description.substring(0, 60)}...</option>
-                                                        ))}
-                                                    </select>
-                                                </div>
-                                            </div>
-
-                                        </div>
-                                    );
-                                })}
+                                <div className={!formData.secondarySdgs[0]?.targetId ? "opacity-50 pointer-events-none" : ""}>
+                                    <label className="block text-sm font-bold text-slate-900 mb-2">C6. SDG Indicator</label>
+                                    <select
+                                        className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-purple-500 focus:ring-4 focus:ring-purple-500/10 outline-none font-medium"
+                                        value={formData.secondarySdgs[0]?.indicatorId || ""}
+                                        onChange={(e) =>
+                                            setFormData({
+                                                ...formData,
+                                                secondarySdgs: formData.secondarySdgs[0]
+                                                    ? [{
+                                                        ...formData.secondarySdgs[0],
+                                                        indicatorId: e.target.value,
+                                                    }]
+                                                    : [],
+                                            })
+                                        }
+                                    >
+                                        <option value="">Select an Indicator...</option>
+                                        {(formData.secondarySdgs[0]?.sdgId && formData.secondarySdgs[0]?.targetId
+                                            ? findSdgById(formData.secondarySdgs[0].sdgId)
+                                                ?.targets.find((target) => target.id === formData.secondarySdgs[0].targetId)
+                                                ?.indicators
+                                            : []
+                                        )?.map((indicator) => (
+                                            <option key={indicator.id} value={indicator.id}>
+                                                Indicator {indicator.id} — {indicator.description}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
                             </div>
                         </div>
                     </div>

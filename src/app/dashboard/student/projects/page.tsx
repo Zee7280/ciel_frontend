@@ -576,7 +576,7 @@ export default function MyProjectsPage() {
                                         {project.report_status === 'none' || project.report_status === 'continue' || project.report_status === 'draft' ? (
                                             <Link href={`/dashboard/student/report?projectId=${project.id}`} className="w-full md:w-auto">
                                                 <Button className="w-full md:w-auto">
-                                                    {project.report_status === 'continue' || project.report_status === 'draft' ? 'Continue Report' : 'Submit Report'}
+                                                    {project.report_status === 'continue' || project.report_status === 'draft' ? 'Continue Report' : 'Start Report'}
                                                 </Button>
                                             </Link>
                                         ) : project.report_status === 'rejected' ? (
