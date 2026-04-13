@@ -1,13 +1,14 @@
 
 "use client";
 
-import { useEffect, useLayoutEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Button } from "../../report/components/ui/button";
 import { Badge } from "../../report/components/ui/badge";
 import { authenticatedFetch } from "@/utils/api";
 import {
     canEditReturnedOpportunity,
+    extractOpportunityReturnRemarkSections,
     extractOpportunityReviewFeedback,
     isStudentOpportunityLiveForReporting,
     resolveStudentOpportunityWorkflow,
@@ -18,6 +19,18 @@ import { Loader2, MapPin, Calendar, Clock, Globe, ArrowLeft, Building2, Share2, 
 import { toast } from "sonner";
 import Link from "next/link";
 import ReportSummaryPopup from "../../report/components/ReportSummaryPopup";
+import {
+    readStudentInstitutionFromBrowserStorage,
+    resolveStudentUniversityApplyEligibility,
+} from "@/utils/studentOpportunityApplyEligibility";
+import {
+    canStudentShowStartReportCta,
+    isJoinApplicationRejectedStatus,
+    joinApplicationLocksApplyButton,
+    joinApplicationPendingLabel,
+    pickJoinApplicationId,
+    pickJoinApplicationStage,
+} from "@/utils/studentJoinApplication";
 
 export default function OpportunityDetailsPage() {
     const params = useParams();
@@ -39,6 +52,22 @@ export default function OpportunityDetailsPage() {
             fetchOpportunityDetails();
         }
     }, [id]);
+
+    const applyEligibility = useMemo(() => {
+        if (!opportunity) {
+            return {
+                canApply: true,
+                isUniversityRestricted: false,
+                blockedReason: null,
+                listingRestrictionLabel: null,
+                allowedUniversities: [] as string[],
+            };
+        }
+        return resolveStudentUniversityApplyEligibility(
+            opportunity as Record<string, unknown>,
+            readStudentInstitutionFromBrowserStorage(),
+        );
+    }, [opportunity]);
 
     const fetchOpportunityDetails = async () => {
         try {
@@ -91,12 +120,34 @@ export default function OpportunityDetailsPage() {
                 opData.is_student_created === true ||
                 String(opData.created_by_role || "").toLowerCase() === "student";
 
+            const appRaw = opData.application_status ?? opData.applicationStatus;
+            const application_status =
+                typeof appRaw === "string" && appRaw.trim() ? String(appRaw).trim().toLowerCase() : "";
+            const application_id = pickJoinApplicationId(opData);
+            const application_stage = pickJoinApplicationStage(opData);
+
+            const rawForApplyLock: Record<string, unknown> = {
+                ...opData,
+                application_status: application_status || opData.application_status,
+                applicationStatus: opData.applicationStatus ?? application_status,
+                has_applied: opData.has_applied,
+                hasApplied: opData.hasApplied,
+                status: opData.status,
+            };
+            const applyLocked = !isStudentOwner && joinApplicationLocksApplyButton(rawForApplyLock);
+
             setOpportunity({
                 ...opData,
+                application_status: application_status || undefined,
+                application_id: application_id || undefined,
+                application_stage: application_stage ?? undefined,
                 hasApplied:
                     isStudentOwner ||
-                    !!opData.application_status ||
-                    opData.status === "applied",
+                    Boolean(application_status) ||
+                    String(opData.status || "").toLowerCase() === "applied" ||
+                    opData.has_applied === true ||
+                    opData.hasApplied === true,
+                applyLocked,
                 isStudentOwner,
             });
         } catch (error) {
@@ -109,6 +160,10 @@ export default function OpportunityDetailsPage() {
     };
 
     const handleApplyClick = () => {
+        if (!applyEligibility.canApply) {
+            toast.error(applyEligibility.blockedReason || "You cannot apply to this opportunity.");
+            return;
+        }
         setIsPopupOpen(true);
     };
 
@@ -158,7 +213,13 @@ export default function OpportunityDetailsPage() {
             if (res && res.ok) {
                 toast.success("Application submitted successfully! Awaiting CIEL & Faculty approval.");
                 setIsPopupOpen(false);
-                setOpportunity((prev: any) => ({ ...prev, hasApplied: true, status: 'pending_approval' }));
+                setOpportunity((prev: any) => ({
+                    ...prev,
+                    hasApplied: true,
+                    applyLocked: true,
+                    status: "pending_approval",
+                    application_status: "pending_approval",
+                }));
             } else {
                 const err = await res?.json().catch(() => ({}));
                 toast.error(err?.message || "Failed to submit application");
@@ -195,14 +256,32 @@ export default function OpportunityDetailsPage() {
     const opportunitiesBackLabel = viewerNavRole === "admin" ? "Back to all projects" : "Back to Opportunities";
     const hideStudentApplyActions = viewerNavRole === "admin" && !opportunity.isStudentOwner;
     const workflow = resolveStudentOpportunityWorkflow(opportunity as Record<string, unknown>);
-    const reviewFeedback = extractOpportunityReviewFeedback(opportunity as Record<string, unknown>);
+    const oppRecord = opportunity as Record<string, unknown>;
+    const remarkSections = extractOpportunityReturnRemarkSections(oppRecord);
+    const reviewFeedback =
+        remarkSections.length === 0 ? extractOpportunityReviewFeedback(oppRecord) : null;
     const canEditReturned =
         viewerNavRole !== "admin" &&
         opportunity.isStudentOwner &&
         canEditReturnedOpportunity(opportunity as Record<string, unknown>);
 
+    const applyBlockedByUniversity =
+        !hideStudentApplyActions &&
+        !opportunity.isStudentOwner &&
+        !opportunity.applyLocked &&
+        !applyEligibility.canApply;
+
     return (
         <div className="w-full space-y-8 animate-in fade-in duration-500 pb-24">
+            {applyBlockedByUniversity ? (
+                <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900 flex gap-3 items-start print:hidden">
+                    <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
+                    <div>
+                        <p className="font-semibold">Applications are not open for your university on this listing</p>
+                        <p className="text-rose-900/90 mt-1">{applyEligibility.blockedReason}</p>
+                    </div>
+                </div>
+            ) : null}
             {/* Header Actions */}
             <div className="flex justify-between items-center print:hidden">
                 <Link href={opportunitiesListHref} className="text-slate-500 hover:text-slate-800 flex items-center gap-2 font-medium">
@@ -236,10 +315,12 @@ export default function OpportunityDetailsPage() {
                                 You created this listing. It becomes visible to others after approvals.
                             </p>
                         </div>
-                    ) : !hideStudentApplyActions && opportunity.hasApplied ? (
+                    ) : !hideStudentApplyActions && opportunity.applyLocked ? (
                         <div className="flex flex-col items-end gap-2">
                             <div className="flex items-center gap-2">
-                                {['active', 'completed'].includes(opportunity.status) && (
+                                {canStudentShowStartReportCta(oppRecord, {
+                                    isStudentOwner: Boolean(opportunity.isStudentOwner),
+                                }) && (
                                     <Button
                                         onClick={() => router.push(`/dashboard/student/report?projectId=${id}`)}
                                         className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 font-medium"
@@ -251,19 +332,58 @@ export default function OpportunityDetailsPage() {
                                     <CheckCircle2 className="w-4 h-4" /> Applied
                                 </Button>
                             </div>
-                            {['pending', 'pending_approval', 'applied'].includes(opportunity.status) && (
-                                <p className="text-[10px] text-amber-600 font-bold italic bg-amber-50 px-2 py-1 rounded border border-amber-100">
-                                    Report access will be enabled after admin approval.
-                                </p>
-                            )}
+                            {opportunity.application_status &&
+                                ["pending", "pending_approval", "applied"].includes(opportunity.application_status) && (
+                                    <p className="text-[10px] text-amber-600 font-bold italic bg-amber-50 px-2 py-1 rounded border border-amber-100">
+                                        {joinApplicationPendingLabel(oppRecord)}
+                                    </p>
+                                )}
+                        </div>
+                    ) : !hideStudentApplyActions && opportunity.hasApplied && !opportunity.applyLocked ? (
+                        <div className="flex flex-col items-end gap-2">
+                            {opportunity.application_status &&
+                                isJoinApplicationRejectedStatus(opportunity.application_status) && (
+                                    <p className="text-[10px] text-rose-700 font-bold italic bg-rose-50 px-2 py-1 rounded border border-rose-100">
+                                        Application not approved. You can submit a new request.
+                                    </p>
+                                )}
+                            <Button
+                                onClick={handleApplyClick}
+                                disabled={isApplying || !applyEligibility.canApply}
+                                title={applyEligibility.blockedReason || undefined}
+                                className={
+                                    applyEligibility.canApply
+                                        ? "flex items-center gap-2 px-6 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 font-medium shadow-sm"
+                                        : "flex items-center gap-2 px-6 py-2 bg-slate-300 text-slate-600 rounded-lg font-medium shadow-sm cursor-not-allowed"
+                                }
+                            >
+                                {isApplying ? (
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : applyEligibility.canApply ? (
+                                    "Apply again"
+                                ) : (
+                                    "Not eligible"
+                                )}
+                            </Button>
                         </div>
                     ) : !hideStudentApplyActions ? (
                         <Button
                             onClick={handleApplyClick}
-                            disabled={isApplying}
-                            className="flex items-center gap-2 px-6 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 font-medium shadow-sm"
+                            disabled={isApplying || !applyEligibility.canApply}
+                            title={applyEligibility.blockedReason || undefined}
+                            className={
+                                applyEligibility.canApply
+                                    ? "flex items-center gap-2 px-6 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 font-medium shadow-sm"
+                                    : "flex items-center gap-2 px-6 py-2 bg-slate-300 text-slate-600 rounded-lg font-medium shadow-sm cursor-not-allowed"
+                            }
                         >
-                            {isApplying ? <Loader2 className="w-4 h-4 animate-spin" /> : "Apply Now"}
+                            {isApplying ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : applyEligibility.canApply ? (
+                                "Apply Now"
+                            ) : (
+                                "Not eligible"
+                            )}
                         </Button>
                     ) : null}
                 </div>
@@ -280,6 +400,11 @@ export default function OpportunityDetailsPage() {
                                 <span className="flex items-center gap-1.5"><MapPin className="w-4 h-4" /> {opportunity.location?.city || opportunity.city || "Remote"}</span>
                                 <span className="flex items-center gap-1.5"><Calendar className="w-4 h-4" /> Start: {opportunity.timeline?.start_date ? new Date(opportunity.timeline.start_date).toLocaleDateString() : (opportunity.start_date ? new Date(opportunity.start_date).toLocaleDateString() : "Flexible")}</span>
                                 <span className="bg-blue-50 text-blue-700 px-2.5 py-0.5 rounded-full text-xs font-bold uppercase">{opportunity.mode || "On Site"}</span>
+                                {applyEligibility.listingRestrictionLabel ? (
+                                    <span className="bg-amber-50 text-amber-900 px-2.5 py-0.5 rounded-full text-xs font-bold border border-amber-200">
+                                        {applyEligibility.listingRestrictionLabel}
+                                    </span>
+                                ) : null}
                                 {opportunity.status === 'active' && (
                                     <span className="bg-emerald-50 text-emerald-700 px-2.5 py-0.5 rounded-full text-xs font-bold uppercase">Active</span>
                                 )}
@@ -292,14 +417,27 @@ export default function OpportunityDetailsPage() {
                             </div>
                         </div>
                     </div>
-                    {reviewFeedback && opportunity.isStudentOwner ? (
+                    {(remarkSections.length > 0 || reviewFeedback) && opportunity.isStudentOwner ? (
                         <div className="mt-5 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-4">
                             <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                                <div>
+                                <div className="min-w-0 flex-1">
                                     <p className="text-xs font-bold uppercase tracking-wider text-rose-700">
                                         Return remarks
                                     </p>
-                                    <p className="mt-1 text-sm text-rose-900 whitespace-pre-wrap">{reviewFeedback}</p>
+                                    {remarkSections.length > 0 ? (
+                                        <div className="mt-2 space-y-3">
+                                            {remarkSections.map((s) => (
+                                                <div key={s.label}>
+                                                    <p className="text-[10px] font-semibold text-rose-700">{s.label}</p>
+                                                    <p className="mt-0.5 text-sm text-rose-900 whitespace-pre-wrap">
+                                                        {s.text}
+                                                    </p>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ) : reviewFeedback ? (
+                                        <p className="mt-1 text-sm text-rose-900 whitespace-pre-wrap">{reviewFeedback}</p>
+                                    ) : null}
                                 </div>
                                 {canEditReturned ? (
                                     <Link href={`/dashboard/student/create-opportunity?edit=${encodeURIComponent(id)}`}>

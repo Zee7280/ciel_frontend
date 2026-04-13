@@ -4,7 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { useState, useEffect, useLayoutEffect } from "react";
-import { LayoutDashboard, BookOpen, Users, Settings, PieChart, LogOut, FileText, Heart, Building2, CheckCircle, Briefcase, FileBarChart, ShieldAlert, Bell, User, Flag, MessageSquare, Plus, CreditCard } from "lucide-react";
+import { LayoutDashboard, BookOpen, Users, Settings, PieChart, LogOut, FileText, Heart, Building2, CheckCircle, Briefcase, FileBarChart, ShieldAlert, Bell, User, Flag, MessageSquare, Plus, CreditCard, ClipboardList } from "lucide-react";
 import clsx from "clsx";
 import { authenticatedFetch } from "@/utils/api";
 import {
@@ -91,6 +91,7 @@ export default function Sidebar() {
             // { label: "My Courses", href: "/dashboard/faculty/courses", icon: BookOpen },
             { label: "My Profile", href: "/dashboard/faculty/profile", icon: User },
             { label: "Project Approvals", href: "/dashboard/faculty/approvals", icon: CheckCircle },
+            { label: "Join applications", href: "/dashboard/faculty/join-applications", icon: ClipboardList },
             { label: "My Opportunities", href: "/dashboard/faculty/my-opportunities", icon: Briefcase },
             { label: "Create Opportunity", href: "/dashboard/faculty/create-opportunity", icon: Plus },
             // { label: "Student Grading", href: "/dashboard/faculty/grading", icon: FileText },
@@ -102,6 +103,7 @@ export default function Sidebar() {
             { label: "Users", href: "/dashboard/admin/users", icon: Users },
             { label: "Organizations", href: "/dashboard/admin/organizations", icon: Building2 },
             { label: "Approvals", href: "/dashboard/admin/approvals", icon: CheckCircle },
+            { label: "Join applications", href: "/dashboard/admin/join-applications", icon: ClipboardList },
             { label: "Payments", href: "/dashboard/admin/payments", icon: CreditCard },
             { label: "All projects", href: "/dashboard/admin/projects", icon: Briefcase },
             { label: "Student Reports", href: "/dashboard/admin/reports/verify", icon: FileText },

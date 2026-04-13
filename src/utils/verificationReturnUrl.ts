@@ -1,4 +1,14 @@
-import { isFrontendVerificationPath } from "@/config/verification";
+import { FRONTEND_VERIFY_FACULTY_PATH, isFrontendVerificationPath } from "@/config/verification";
+
+const FACULTY_APPROVALS_RESUME = "/dashboard/faculty/approvals?tab=pending";
+
+function mapStoredFacultyVerifyToApprovals(url: string): string {
+    const pathOnly = url.split("?")[0] || url;
+    if (pathOnly === FRONTEND_VERIFY_FACULTY_PATH || pathOnly.startsWith(`${FRONTEND_VERIFY_FACULTY_PATH}/`)) {
+        return FACULTY_APPROVALS_RESUME;
+    }
+    return url;
+}
 
 /** Same-origin paths only — blocks open redirects. */
 export function isSafeInternalReturnPath(path: string): boolean {
@@ -17,6 +27,11 @@ type Stored = { url: string; t: number };
 
 export function persistVerificationReturnFromWindow(): void {
     if (typeof window === "undefined") return;
+    const pathOnly = window.location.pathname;
+    /** Faculty approvals happen in-dashboard; do not resume the magic-link verify URL after login. */
+    if (pathOnly === FRONTEND_VERIFY_FACULTY_PATH || pathOnly.startsWith(`${FRONTEND_VERIFY_FACULTY_PATH}/`)) {
+        return;
+    }
     const url = `${window.location.pathname}${window.location.search}`;
     if (!isFrontendVerificationPath(window.location.pathname)) return;
     if (!window.location.search.includes("token=")) return;
@@ -56,7 +71,7 @@ function readStored(): Stored | null {
         if (!isFrontendVerificationPath(pathOnly)) {
             return null;
         }
-        return o;
+        return { ...o, url: mapStoredFacultyVerifyToApprovals(o.url) };
     } catch {
         return null;
     }

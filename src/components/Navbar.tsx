@@ -3,10 +3,19 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 import clsx from "clsx";
+import { isTokenValid } from "@/utils/api";
+import { readStoredCurrentUser } from "@/utils/currentUser";
 
 export default function Navbar() {
     const pathname = usePathname();
+    const [isLoggedIn, setIsLoggedIn] = useState(false);
+
+    useEffect(() => {
+        const token = typeof window !== "undefined" ? localStorage.getItem("ciel_token") : null;
+        setIsLoggedIn(isTokenValid(token) && !!readStoredCurrentUser());
+    }, [pathname]);
 
     const navItems = [
         { name: "Home", href: "/" },
@@ -54,18 +63,29 @@ export default function Navbar() {
 
                 {/* Actions */}
                 <div className="flex items-center gap-3">
-                    <Link
-                        href="/login"
-                        className="hidden sm:inline-flex items-center px-6 py-2.5 rounded-full text-sm font-bold text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-all duration-200"
-                    >
-                        Login
-                    </Link>
-                    <Link
-                        href="/signup"
-                        className="inline-flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-emerald-500 to-sky-500 text-white rounded-full text-sm font-black hover:scale-105 hover:shadow-xl hover:shadow-emerald-500/25 transition-all duration-300"
-                    >
-                        Register
-                    </Link>
+                    {isLoggedIn ? (
+                        <Link
+                            href="/dashboard"
+                            className="inline-flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-emerald-500 to-sky-500 text-white rounded-full text-sm font-black hover:scale-105 hover:shadow-xl hover:shadow-emerald-500/25 transition-all duration-300"
+                        >
+                            Dashboard
+                        </Link>
+                    ) : (
+                        <>
+                            <Link
+                                href="/login"
+                                className="hidden sm:inline-flex items-center px-6 py-2.5 rounded-full text-sm font-bold text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-all duration-200"
+                            >
+                                Login
+                            </Link>
+                            <Link
+                                href="/signup"
+                                className="inline-flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-emerald-500 to-sky-500 text-white rounded-full text-sm font-black hover:scale-105 hover:shadow-xl hover:shadow-emerald-500/25 transition-all duration-300"
+                            >
+                                Register
+                            </Link>
+                        </>
+                    )}
                 </div>
             </div>
         </nav>

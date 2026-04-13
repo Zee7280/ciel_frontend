@@ -23,15 +23,182 @@ function truthyApproved(v: unknown): boolean {
     return s === "approved" || s === "yes" || s === "true" || v === true;
 }
 
+/** Whole-string UUID or Mongo-style ObjectId — not human remarks (API sometimes echoes IDs in generic keys). */
+function isOpaqueTechnicalIdentifier(s: string): boolean {
+    const t = s.trim();
+    if (!t) return false;
+    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(t)) return true;
+    if (/^[0-9a-f]{24}$/i.test(t)) return true;
+    return false;
+}
+
 function reviewText(v: unknown): string | null {
-    if (typeof v === "string" && v.trim()) return v.trim();
+    if (typeof v === "string") {
+        const t = v.trim();
+        if (!t || isOpaqueTechnicalIdentifier(t)) return null;
+        return t;
+    }
     if (Array.isArray(v)) {
-        const joined = v
+        const parts = v
             .filter((item): item is string => typeof item === "string" && item.trim().length > 0)
-            .join("\n");
+            .map((item) => item.trim())
+            .filter((item) => !isOpaqueTechnicalIdentifier(item));
+        const joined = parts.join("\n");
         return joined.trim() || null;
     }
     return null;
+}
+
+function sameNormalizedText(a: string, b: string): boolean {
+    return a.trim().toLowerCase() === b.trim().toLowerCase();
+}
+
+/** Ignore API echoes where a generic remarks field repeats the listing title or description. */
+function textLooksLikeEchoOfProject(text: string, project: Record<string, unknown>): boolean {
+    const title = typeof project.title === "string" ? project.title.trim() : "";
+    const desc = typeof project.description === "string" ? project.description.trim() : "";
+    if (title && sameNormalizedText(text, title)) return true;
+    if (desc && sameNormalizedText(text, desc)) return true;
+    return false;
+}
+
+const REVIEW_LIKE_INNER_KEYS = [
+    "remarks",
+    "remark",
+    "comment",
+    "comments",
+    "feedback",
+    "text",
+    "message",
+    "note",
+    "notes",
+    "decision_note",
+    "decisionNote",
+    "reason",
+    "review_feedback",
+    "reviewFeedback",
+] as const;
+
+function pickFromReviewLikeObject(nested: Record<string, unknown>): string | null {
+    for (const key of REVIEW_LIKE_INNER_KEYS) {
+        const text = reviewText(nested[key]);
+        if (text) return text;
+    }
+    return null;
+}
+
+const FACULTY_REMARK_KEYS = [
+    "faculty_remarks",
+    "facultyRemarks",
+    "faculty_feedback",
+    "facultyFeedback",
+    "faculty_comment",
+    "faculty_comments",
+    "facultyComment",
+    "facultyComments",
+    "liaison_remarks",
+    "liaisonRemarks",
+    "liaison_feedback",
+    "liaisonFeedback",
+    "liaison_comment",
+    "liaison_comments",
+    "liaisonComment",
+    "liaisonComments",
+    "supervisor_remarks",
+    "supervisorRemarks",
+    "supervisor_feedback",
+    "supervisorFeedback",
+] as const;
+
+const PARTNER_REMARK_KEYS = [
+    "partner_remarks",
+    "partnerRemarks",
+    "partner_feedback",
+    "partnerFeedback",
+    "partner_comment",
+    "partner_comments",
+    "partnerComment",
+    "partnerComments",
+    "external_partner_remarks",
+    "externalPartnerRemarks",
+    "external_partner_feedback",
+    "externalPartnerFeedback",
+] as const;
+
+const ADMIN_REMARK_KEYS = [
+    "admin_remarks",
+    "adminRemarks",
+    "admin_feedback",
+    "adminFeedback",
+    "admin_comment",
+    "admin_comments",
+    "adminComment",
+    "adminComments",
+    "ciel_remarks",
+    "cielRemarks",
+] as const;
+
+const FACULTY_NESTED_REVIEW_KEYS = ["faculty_review", "facultyReview", "faculty_decision", "facultyDecision"] as const;
+const PARTNER_NESTED_REVIEW_KEYS = ["partner_review", "partnerReview", "partner_decision", "partnerDecision"] as const;
+const ADMIN_NESTED_REVIEW_KEYS = ["admin_review", "adminReview", "admin_decision", "adminDecision"] as const;
+
+function pickStakeholderRemarks(project: Record<string, unknown>, role: "faculty" | "partner" | "admin"): string | null {
+    const directKeys =
+        role === "faculty" ? FACULTY_REMARK_KEYS : role === "partner" ? PARTNER_REMARK_KEYS : ADMIN_REMARK_KEYS;
+    for (const key of directKeys) {
+        const text = reviewText(project[key]);
+        if (text) return text;
+    }
+    const nestedKeys =
+        role === "faculty"
+            ? FACULTY_NESTED_REVIEW_KEYS
+            : role === "partner"
+              ? PARTNER_NESTED_REVIEW_KEYS
+              : ADMIN_NESTED_REVIEW_KEYS;
+    for (const nk of nestedKeys) {
+        const nested = project[nk];
+        if (nested && typeof nested === "object" && !Array.isArray(nested)) {
+            const fromInner = pickFromReviewLikeObject(nested as Record<string, unknown>);
+            if (fromInner) return fromInner;
+        }
+    }
+    return null;
+}
+
+export type OpportunityReturnRemarkSection = {
+    label: "Faculty" | "Partner" | "Admin";
+    text: string;
+};
+
+/**
+ * Pulls return/rejection notes per gate (Faculty → Partner → Admin) when the API stores them separately.
+ * Skips text that only echoes the opportunity title/description (common bad payload shape).
+ */
+export function extractOpportunityReturnRemarkSections(project: Record<string, unknown>): OpportunityReturnRemarkSection[] {
+    const out: OpportunityReturnRemarkSection[] = [];
+    const seenNorm = new Set<string>();
+    const roles: Array<{ label: OpportunityReturnRemarkSection["label"]; role: "faculty" | "partner" | "admin" }> = [
+        { label: "Faculty", role: "faculty" },
+        { label: "Partner", role: "partner" },
+        { label: "Admin", role: "admin" },
+    ];
+    for (const { label, role } of roles) {
+        const text = pickStakeholderRemarks(project, role);
+        if (!text) continue;
+        if (textLooksLikeEchoOfProject(text, project)) continue;
+        const norm = text.trim().toLowerCase();
+        if (seenNorm.has(norm)) continue;
+        seenNorm.add(norm);
+        out.push({ label, text });
+    }
+    return out;
+}
+
+function extractGenericOpportunityReviewFeedback(project: Record<string, unknown>): string | null {
+    const candidate = pickFeedbackFromUnknown(project);
+    if (!candidate) return null;
+    if (textLooksLikeEchoOfProject(candidate, project)) return null;
+    return candidate;
 }
 
 function pickFeedbackFromObject(obj: Record<string, unknown> | null | undefined): string | null {
@@ -165,7 +332,11 @@ function pickFeedbackFromUnknown(value: unknown, depth = 0): string | null {
 }
 
 export function extractOpportunityReviewFeedback(project: Record<string, unknown>): string | null {
-    return pickFeedbackFromUnknown(project);
+    const sections = extractOpportunityReturnRemarkSections(project);
+    if (sections.length > 0) {
+        return sections.map((s) => `${s.label}: ${s.text}`).join("\n\n");
+    }
+    return extractGenericOpportunityReviewFeedback(project);
 }
 
 export function canEditReturnedOpportunity(project: Record<string, unknown>): boolean {

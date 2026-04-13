@@ -20,6 +20,18 @@ import {
     pickVisibilityBucket,
     visibilityMenuLabel,
 } from "@/utils/opportunityListing";
+import {
+    readStudentInstitutionFromBrowserStorage,
+    resolveStudentUniversityApplyEligibility,
+} from "@/utils/studentOpportunityApplyEligibility";
+import {
+    isJoinApplicationRejectedStatus,
+    joinApplicationLocksApplyButton,
+    joinApplicationPendingLabel,
+    mergeHasAppliedFields,
+    pickJoinApplicationId,
+    pickJoinApplicationStage,
+} from "@/utils/studentJoinApplication";
 import { Loader2, MapPin, Calendar, Clock, Globe, CheckCircle2, LayoutGrid, List, Users, Mail, Phone, GraduationCap } from "lucide-react";
 import Link from "next/link";
 import ApplicationDialog from "./components/ApplicationDialog";
@@ -42,6 +54,8 @@ interface BrowseOpportunity {
     description?: string;
     status?: string;
     application_status?: string;
+    application_id?: string;
+    application_stage?: string | null;
     hasApplied?: boolean;
     has_applied?: boolean;
     category?: string;
@@ -72,6 +86,8 @@ interface BrowseOpportunity {
     opportunityTypes?: string[];
     sdgLabel?: string;
     seatsRemaining?: number | null;
+    /** True while a join application is pending or approved; false when rejected so student can re-apply. */
+    applyLocked?: boolean;
 }
 
 function lower(value: unknown): string {
@@ -79,14 +95,23 @@ function lower(value: unknown): string {
 }
 
 function normalizeOpportunity(op: BrowseOpportunity): BrowseOpportunity {
-    const applicationStatus = lower(op.application_status);
+    const raw = op as unknown as Record<string, unknown>;
+    const applicationStatus = lower(op.application_status ?? raw.applicationStatus);
     const opportunityStatus = lower(op.status);
-    const hasApplied = Boolean(
-        applicationStatus ||
-        op.hasApplied ||
-        op.has_applied ||
-        opportunityStatus === "applied",
-    );
+    const hasApplied = mergeHasAppliedFields({
+        ...raw,
+        application_status: applicationStatus || raw.application_status,
+        has_applied: op.has_applied,
+        hasApplied: op.hasApplied,
+        status: op.status,
+    });
+    const applyLocked = joinApplicationLocksApplyButton({
+        ...raw,
+        application_status: applicationStatus || raw.application_status,
+        has_applied: op.has_applied,
+        hasApplied: op.hasApplied,
+        status: op.status,
+    });
 
     const city =
         op.city ||
@@ -101,7 +126,6 @@ function normalizeOpportunity(op: BrowseOpportunity): BrowseOpportunity {
         op.sdg_info?.description ||
         "Social Impact";
 
-    const raw = op as unknown as Record<string, unknown>;
     const opportunityTypes =
         pickOpportunityTypes(raw).length > 0
             ? pickOpportunityTypes(raw)
@@ -113,11 +137,18 @@ function normalizeOpportunity(op: BrowseOpportunity): BrowseOpportunity {
         (typeof op.remaining_seats === "number" ? op.remaining_seats : null) ??
         (typeof op.volunteersNeeded === "number" ? op.volunteersNeeded : null);
 
+    const application_id = pickJoinApplicationId(raw) || op.application_id;
+    const application_stage = (pickJoinApplicationStage(raw) ?? op.application_stage ?? null) as string | null;
+
     return {
         ...op,
         city,
         category,
         hasApplied,
+        has_applied: hasApplied,
+        applyLocked,
+        application_id: application_id || undefined,
+        application_stage: application_stage || undefined,
         application_status: applicationStatus || undefined,
         universityLabel: pickUniversityLabel(raw),
         creatorBucket: pickCreatorBucket(raw),
@@ -138,12 +169,22 @@ function shouldShowInBrowse(op: BrowseOpportunity): boolean {
 
     return (
         ["active", "live", "approved", "verified", "open", "recruiting"].includes(opportunityStatus) ||
-        ["pending", "pending_approval", "applied", "approved", "verified", "accepted", "active"].includes(applicationStatus)
+        [
+            "pending",
+            "pending_approval",
+            "applied",
+            "approved",
+            "verified",
+            "accepted",
+            "active",
+            "rejected",
+        ].includes(applicationStatus)
     );
 }
 
 export default function StudentBrowseOpportunitiesPage() {
     const [opportunities, setOpportunities] = useState<BrowseOpportunity[]>([]);
+    const [studentInstitution, setStudentInstitution] = useState("");
     const [isLoading, setIsLoading] = useState(true);
     const [applyingId, setApplyingId] = useState<string | null>(null);
     const [applyingTitle, setApplyingTitle] = useState<string | undefined>(undefined);
@@ -210,15 +251,27 @@ export default function StudentBrowseOpportunitiesPage() {
         setIsDialogOpen(true);
     };
 
-    const handleSuccess = (id: string) => {
-        setOpportunities(prev => prev.map(op =>
-            op.id === id ? { ...op, hasApplied: true, application_status: 'pending' } : op
-        ));
+    const handleSuccess = (id: string, meta?: { applicationId?: string; applicationStatus?: string }) => {
+        setOpportunities((prev) =>
+            prev.map((op) =>
+                op.id === id
+                    ? {
+                          ...op,
+                          hasApplied: true,
+                          has_applied: true,
+                          applyLocked: true,
+                          application_id: meta?.applicationId ?? op.application_id,
+                          application_status: meta?.applicationStatus ?? "pending_approval",
+                      }
+                    : op,
+            ),
+        );
         setApplyingId(null);
         setApplyingTitle(undefined);
     };
 
     useEffect(() => {
+        setStudentInstitution(readStudentInstitutionFromBrowserStorage());
         void fetchOpportunities();
         const intervalId = window.setInterval(() => {
             void fetchOpportunities({ silent: true });
@@ -422,16 +475,27 @@ export default function StudentBrowseOpportunitiesPage() {
                     ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
                     : "space-y-4"
                 }>
-                    {filteredOpportunities.map((op) => (
-                        viewMode === 'grid' ? (
+                    {filteredOpportunities.map((op) => {
+                        const applyEligibility = resolveStudentUniversityApplyEligibility(
+                            op as unknown as Record<string, unknown>,
+                            studentInstitution,
+                        );
+                        return viewMode === 'grid' ? (
                             // GRID VIEW CARD
                             <div key={op.id} className="bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-all flex flex-col h-full group">
                                 <div className="p-6 flex-1 space-y-4">
-                                    <div className="flex justify-between items-start">
-                                        <Badge className="bg-blue-50 text-blue-700 hover:bg-blue-100 border-none">
-                                            {op.category || "Social Impact"}
-                                        </Badge>
-                                        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                                    <div className="flex justify-between items-start gap-2 flex-wrap">
+                                        <div className="flex flex-wrap gap-2 items-center min-w-0">
+                                            <Badge className="bg-blue-50 text-blue-700 hover:bg-blue-100 border-none">
+                                                {op.category || "Social Impact"}
+                                            </Badge>
+                                            {applyEligibility.listingRestrictionLabel ? (
+                                                <Badge className="bg-amber-50 text-amber-900 border border-amber-200 shadow-none hover:bg-amber-50 max-w-full whitespace-normal text-left leading-snug">
+                                                    {applyEligibility.listingRestrictionLabel}
+                                                </Badge>
+                                            ) : null}
+                                        </div>
+                                        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider shrink-0">
                                             {op.modeBucket && op.modeBucket !== "unspecified"
                                                 ? modeMenuLabel(op.modeBucket)
                                                 : op.mode || "On Site"}
@@ -475,7 +539,7 @@ export default function StudentBrowseOpportunitiesPage() {
                                     <Link href={`/dashboard/student/browse/${op.id}`} className="text-sm font-bold text-slate-600 hover:text-slate-900">
                                         View Details
                                     </Link>
-                                    {op.hasApplied ? (
+                                    {op.applyLocked ? (
                                         <div className="flex items-center gap-2">
                                             {/* Report Button - Only show if APPLICATION is approved/active */}
                                             {op.application_status != null &&
@@ -488,11 +552,13 @@ export default function StudentBrowseOpportunitiesPage() {
                                             )}
 
                                             {(!op.application_status ||
-                                                ["pending", "pending_approval", "applied"].includes(op.application_status)) && (
-                                                <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-1 rounded-md border border-amber-100 italic">
-                                                    Pending Admin Approval
-                                                </span>
-                                            )}
+                                                ["pending", "pending_approval", "applied"].includes(
+                                                    op.application_status,
+                                                )) && (
+                                                    <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-1 rounded-md border border-amber-100 italic">
+                                                        {joinApplicationPendingLabel(op as unknown as Record<string, unknown>)}
+                                                    </span>
+                                                )}
 
                                             {/* Team Button */}
                                             {op.teamMembers && op.teamMembers.length > 0 && (
@@ -505,14 +571,47 @@ export default function StudentBrowseOpportunitiesPage() {
                                                 <CheckCircle2 className="w-4 h-4 mr-1" /> Applied
                                             </Button>
                                         </div>
+                                    ) : op.hasApplied ? (
+                                        <div className="flex items-center gap-2 flex-wrap justify-end max-w-[min(100%,14rem)] sm:max-w-none">
+                                            {op.application_status &&
+                                                isJoinApplicationRejectedStatus(op.application_status) && (
+                                                    <span className="text-[10px] font-bold text-rose-700 bg-rose-50 px-2 py-1 rounded-md border border-rose-100 italic">
+                                                        Application not approved
+                                                    </span>
+                                                )}
+                                            <Button
+                                                size="sm"
+                                                className={
+                                                    applyEligibility.canApply
+                                                        ? "bg-slate-900 hover:bg-blue-600 text-white transition-colors"
+                                                        : "bg-slate-300 text-slate-600 hover:bg-slate-300 cursor-not-allowed"
+                                                }
+                                                onClick={() =>
+                                                    applyEligibility.canApply &&
+                                                    openApplicationDialog(op.id, op.title ?? "Opportunity")
+                                                }
+                                                disabled={!applyEligibility.canApply}
+                                                title={applyEligibility.blockedReason || undefined}
+                                            >
+                                                {applyEligibility.canApply ? "Apply again" : "Not eligible"}
+                                            </Button>
+                                        </div>
                                     ) : (
                                         <Button
                                             size="sm"
-                                            className="bg-slate-900 hover:bg-blue-600 text-white transition-colors"
-                                            onClick={() => openApplicationDialog(op.id, op.title ?? "Opportunity")}
-                                            disabled={op.hasApplied}
+                                            className={
+                                                applyEligibility.canApply
+                                                    ? "bg-slate-900 hover:bg-blue-600 text-white transition-colors"
+                                                    : "bg-slate-300 text-slate-600 hover:bg-slate-300 cursor-not-allowed"
+                                            }
+                                            onClick={() =>
+                                                applyEligibility.canApply &&
+                                                openApplicationDialog(op.id, op.title ?? "Opportunity")
+                                            }
+                                            disabled={!applyEligibility.canApply}
+                                            title={applyEligibility.blockedReason || undefined}
                                         >
-                                            Apply Now
+                                            {applyEligibility.canApply ? "Apply Now" : "Not eligible"}
                                         </Button>
                                     )}
                                 </div>
@@ -521,10 +620,15 @@ export default function StudentBrowseOpportunitiesPage() {
                             // LIST VIEW CARD
                             <div key={op.id} className="bg-white rounded-xl border border-slate-100 shadow-sm p-5 hover:shadow-md transition-all group flex flex-col md:flex-row gap-6 items-start md:items-center">
                                 <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-3 mb-2">
+                                    <div className="flex flex-wrap items-center gap-3 mb-2">
                                         <Badge className="bg-blue-50 text-blue-700 hover:bg-blue-100 border-none">
                                             {op.category || "Social Impact"}
                                         </Badge>
+                                        {applyEligibility.listingRestrictionLabel ? (
+                                            <Badge className="bg-amber-50 text-amber-900 border border-amber-200 shadow-none hover:bg-amber-50">
+                                                {applyEligibility.listingRestrictionLabel}
+                                            </Badge>
+                                        ) : null}
                                         <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
                                             {op.modeBucket && op.modeBucket !== "unspecified"
                                                 ? modeMenuLabel(op.modeBucket)
@@ -549,7 +653,7 @@ export default function StudentBrowseOpportunitiesPage() {
                                     <Link href={`/dashboard/student/browse/${op.id}`} className="flex-1 md:flex-none">
                                         <Button variant="outline" className="w-full">Details</Button>
                                     </Link>
-                                    {op.hasApplied ? (
+                                    {op.applyLocked ? (
                                         <div className="flex items-center gap-2 flex-1 md:flex-none justify-end">
                                             {/* Report Button - Only show if APPLICATION is approved/active */}
                                             {op.application_status != null &&
@@ -562,11 +666,13 @@ export default function StudentBrowseOpportunitiesPage() {
                                             )}
 
                                             {(!op.application_status ||
-                                                ["pending", "pending_approval", "applied"].includes(op.application_status)) && (
-                                                <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-3 py-1.5 rounded-md border border-amber-100 italic">
-                                                    Pending Admin Approval
-                                                </span>
-                                            )}
+                                                ["pending", "pending_approval", "applied"].includes(
+                                                    op.application_status,
+                                                )) && (
+                                                    <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-3 py-1.5 rounded-md border border-amber-100 italic">
+                                                        {joinApplicationPendingLabel(op as unknown as Record<string, unknown>)}
+                                                    </span>
+                                                )}
 
                                             {/* Team Button */}
                                             {op.teamMembers && op.teamMembers.length > 0 && (
@@ -579,19 +685,51 @@ export default function StudentBrowseOpportunitiesPage() {
                                                 <CheckCircle2 className="w-4 h-4 mr-2" /> Applied
                                             </Button>
                                         </div>
+                                    ) : op.hasApplied ? (
+                                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 flex-1 md:flex-none justify-end">
+                                            {op.application_status &&
+                                                isJoinApplicationRejectedStatus(op.application_status) && (
+                                                    <span className="text-[10px] font-bold text-rose-700 bg-rose-50 px-3 py-1.5 rounded-md border border-rose-100 italic text-center sm:text-left">
+                                                        Application not approved
+                                                    </span>
+                                                )}
+                                            <Button
+                                                className={
+                                                    applyEligibility.canApply
+                                                        ? "bg-slate-900 hover:bg-blue-600 text-white transition-colors flex-1 md:flex-none"
+                                                        : "bg-slate-300 text-slate-600 hover:bg-slate-300 cursor-not-allowed flex-1 md:flex-none"
+                                                }
+                                                onClick={() =>
+                                                    applyEligibility.canApply &&
+                                                    openApplicationDialog(op.id, op.title ?? "Opportunity")
+                                                }
+                                                disabled={!applyEligibility.canApply}
+                                                title={applyEligibility.blockedReason || undefined}
+                                            >
+                                                {applyEligibility.canApply ? "Apply again" : "Not eligible"}
+                                            </Button>
+                                        </div>
                                     ) : (
                                         <Button
-                                            className="bg-slate-900 hover:bg-blue-600 text-white transition-colors flex-1 md:flex-none"
-                                            onClick={() => openApplicationDialog(op.id, op.title ?? "Opportunity")}
-                                            disabled={op.hasApplied}
+                                            className={
+                                                applyEligibility.canApply
+                                                    ? "bg-slate-900 hover:bg-blue-600 text-white transition-colors flex-1 md:flex-none"
+                                                    : "bg-slate-300 text-slate-600 hover:bg-slate-300 cursor-not-allowed flex-1 md:flex-none"
+                                            }
+                                            onClick={() =>
+                                                applyEligibility.canApply &&
+                                                openApplicationDialog(op.id, op.title ?? "Opportunity")
+                                            }
+                                            disabled={!applyEligibility.canApply}
+                                            title={applyEligibility.blockedReason || undefined}
                                         >
-                                            Apply Now
+                                            {applyEligibility.canApply ? "Apply Now" : "Not eligible"}
                                         </Button>
                                     )}
                                 </div>
                             </div>
-                        )
-                    ))}
+                        );
+                    })}
                 </div>
             )}
 

@@ -15,6 +15,7 @@ import {
     DialogTitle,
 } from "./components/ui/dialog";
 import clsx from 'clsx';
+import { canStudentAccessReportForProjectPayload } from '@/utils/studentJoinApplication';
 
 // Import New Sections
 import Section1Participation from './components/Section1Participation';
@@ -79,12 +80,9 @@ function ReportFormContent() {
                 const pInfo = projectData.data || projectData;
                 setProjectDetails(pInfo);
 
-                // 🚨 SECURITY CHECK: Ensure project is approved before allowing report access
-                const allowedStatuses = ['active', 'completed', 'approved', 'verified'];
-                const currentStatus = pInfo.status?.toLowerCase() || '';
-
-                if (!allowedStatuses.includes(currentStatus)) {
-                    toast.error('Admin approval is required to start/edit a report for this project.');
+                // 🚨 SECURITY CHECK: project status + join application (when API sends application_status)
+                if (!canStudentAccessReportForProjectPayload(pInfo as Record<string, unknown>)) {
+                    toast.error('Approval is required to start/edit a report for this project.');
                     router.push('/dashboard/student');
                     return;
                 }
@@ -267,15 +265,19 @@ function ReportFormContent() {
                         <Button variant="ghost" size="sm" onClick={() => router.back()} className="mb-1 -ml-2 text-slate-400 hover:text-slate-600 h-7 text-[11px] font-bold">
                             <ArrowLeft className="w-3.5 h-3.5 mr-1" /> Back to Dashboard
                         </Button>
-                        <div className="flex items-center gap-3">
-                            <h1 className="text-xl font-bold text-slate-900 tracking-tight shrink-0">Community Engagement Report</h1>
-                            <span className="px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 text-[10px] font-bold border border-blue-100 uppercase tracking-wider">
+                        <div className="flex items-center gap-3 flex-wrap">
+                            <h1 className="text-2xl md:text-3xl font-extrabold text-slate-900 tracking-tight shrink-0">
+                                Community Engagement Report
+                            </h1>
+                            <span className="px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 text-[10px] font-bold border border-blue-100 uppercase tracking-wider">
                                 Step {activeStep} of 11
                             </span>
                         </div>
-                        <div className="flex items-center gap-1.5 mt-0.5 group">
-                            <div className="w-1 h-1 rounded-full bg-slate-400" />
-                            <p className="text-xs font-semibold text-slate-500 truncate group-hover:text-slate-900 transition-colors">
+                        <div className="flex items-center gap-2 mt-1.5 group min-w-0">
+                            <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 shrink-0 hidden sm:inline">
+                                Project
+                            </span>
+                            <p className="text-sm md:text-base font-bold text-slate-800 truncate group-hover:text-slate-950 transition-colors">
                                 {projectDetails?.title || 'Loading Project...'}
                             </p>
                         </div>
@@ -389,43 +391,51 @@ function ReportFormContent() {
 
 
             {/* Footer Navigation */}
-            <div className="flex items-center justify-between pt-6 border-t border-slate-200">
-                <div className="flex-1">
-                    {!isReadOnly && (
-                        <Button type="button" variant="outline" onClick={prevStep} disabled={activeStep === 1}>
-                            Previous Step
-                        </Button>
-                    )}
-                </div>
-
-                {!isReadOnly && activeStep < 11 && (
-                    <div className="flex-1 flex justify-center">
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => handleSave(false)}
-                            disabled={isSaving}
-                            className="bg-white hover:bg-slate-50 text-slate-700 h-12 px-6 rounded-xl border-2 border-slate-200 font-bold text-xs uppercase tracking-widest transition-all shadow-sm flex items-center gap-2"
-                        >
-                            {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4 text-slate-400" />}
-                            <span>Save Section {activeStep} Progress</span>
-                        </Button>
+            <div className="mt-8 rounded-2xl border border-slate-200/80 bg-white/90 shadow-sm shadow-slate-200/50 backdrop-blur-sm px-4 py-4 md:px-6 md:py-5">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between max-w-[1600px] mx-auto">
+                    <div className="flex justify-start sm:flex-1">
+                        {!isReadOnly && (
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={prevStep}
+                                disabled={activeStep === 1}
+                                className="h-11 rounded-xl border-slate-200 text-slate-700 font-semibold px-5 hover:bg-slate-50 disabled:opacity-40"
+                            >
+                                Previous Step
+                            </Button>
+                        )}
                     </div>
-                )}
 
-                <div className="flex-1 flex justify-end">
-                    {!(activeStep === 11 && (data?.status === 'submitted' || data?.status === 'approved')) && (
-                        <Button
-                            type="button"
-                            onClick={handleNext}
-                            disabled={isSaving}
-                            className="bg-blue-600 hover:bg-blue-700 text-white px-8 transition-all"
-                        >
-                            {isSaving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
-                            {activeStep === 11 ? (isSaving ? 'Submitting...' : 'Submit Report') : (aiStatus || 'Next Step')}
-                            {activeStep !== 11 && !isSaving && <ChevronRight className="w-4 h-4 ml-2" />}
-                        </Button>
+                    {!isReadOnly && activeStep < 11 && (
+                        <div className="flex justify-center sm:flex-1 sm:order-none order-2">
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => handleSave(false)}
+                                disabled={isSaving}
+                                className="bg-slate-50 hover:bg-slate-100 text-slate-800 h-11 px-5 rounded-xl border border-slate-200 font-semibold text-xs uppercase tracking-wide transition-all flex items-center gap-2 w-full sm:w-auto justify-center"
+                            >
+                                {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4 text-slate-500" />}
+                                <span>Save Section {activeStep} Progress</span>
+                            </Button>
+                        </div>
                     )}
+
+                    <div className="flex justify-end sm:flex-1 order-3">
+                        {!(activeStep === 11 && (data?.status === 'submitted' || data?.status === 'approved')) && (
+                            <Button
+                                type="button"
+                                onClick={handleNext}
+                                disabled={isSaving}
+                                className="h-11 rounded-xl bg-blue-600 hover:bg-blue-700 text-white px-6 md:px-8 font-semibold shadow-md shadow-blue-600/20 transition-all w-full sm:w-auto"
+                            >
+                                {isSaving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                                {activeStep === 11 ? (isSaving ? 'Submitting...' : 'Submit Report') : (aiStatus || 'Next Step')}
+                                {activeStep !== 11 && !isSaving && <ChevronRight className="w-4 h-4 ml-2" />}
+                            </Button>
+                        )}
+                    </div>
                 </div>
             </div>
 

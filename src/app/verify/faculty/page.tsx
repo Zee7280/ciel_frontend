@@ -2,35 +2,27 @@
 
 /**
  * Legacy emails may use FRONTEND_URL/verify/faculty?token=…
- * Same verification contract as /verify-project: call Next proxy → backend /verifications/verify.
+ * Faculty complete the request from Dashboard → Approvals (no auto-call to /verifications/verify).
  */
 import { Suspense, useEffect, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { CheckCircle2, XCircle, Loader2, Home, LogIn } from "lucide-react";
+import { XCircle, Loader2, Home, LogIn, ClipboardList } from "lucide-react";
 import Link from "next/link";
-import { fetchVerificationVerify, outcomeFromVerificationResponse } from "@/utils/verificationVerifyUx";
 import {
     buildVerificationSignupHref,
-    clearPersistedVerificationReturn,
     isSafeInternalReturnPath,
-    persistVerificationReturnFromWindow,
 } from "@/utils/verificationReturnUrl";
-import {
-    VERIFY_CTA_FACULTY_BODY,
-    VERIFY_EMAIL_MATCH_HINT,
-} from "@/config/verificationPageCopy";
+
+const FACULTY_APPROVALS_HREF = "/dashboard/faculty/approvals?tab=pending";
 
 function FacultyVerifyContent() {
     const router = useRouter();
     const pathname = usePathname();
     const searchParams = useSearchParams();
     const token = searchParams.get("token");
-    const returnToParam = searchParams.get("returnTo");
-    const safeReturnTo =
-        returnToParam && isSafeInternalReturnPath(returnToParam) ? returnToParam : null;
 
-    const [status, setStatus] = useState<"loading" | "auth_required" | "success" | "error">("loading");
-    const [message, setMessage] = useState("Verifying faculty approval…");
+    const [status, setStatus] = useState<"loading" | "portal" | "error">("loading");
+    const [message, setMessage] = useState("");
 
     useEffect(() => {
         if (!token) {
@@ -39,125 +31,58 @@ function FacultyVerifyContent() {
             return;
         }
 
-        const postAuthReturn =
-            pathname && token ? `${pathname}?${searchParams.toString()}` : "";
-        const loginUrl =
-            postAuthReturn && isSafeInternalReturnPath(postAuthReturn)
-                ? `/login?next=${encodeURIComponent(postAuthReturn)}`
-                : "/login";
+        const bearer =
+            typeof window !== "undefined" ? window.localStorage.getItem("ciel_token") : null;
+        if (!bearer) {
+            const loginUrl = `/login?next=${encodeURIComponent(FACULTY_APPROVALS_HREF)}`;
+            router.replace(loginUrl);
+            return;
+        }
 
-        const run = async () => {
-            try {
-                const bearer =
-                    typeof window !== "undefined" ? localStorage.getItem("ciel_token") : null;
-                if (!bearer) {
-                    persistVerificationReturnFromWindow();
-                    router.replace(loginUrl);
-                    return;
-                }
+        setStatus("portal");
+        setMessage(
+            "You are signed in. Open Approvals to review and approve or reject this request in the portal — nothing is confirmed automatically from this link.",
+        );
+    }, [token, router]);
 
-                setStatus("loading");
-                setMessage("Verifying faculty approval…");
-                const response = await fetchVerificationVerify(token, bearer);
-                const data = (await response.json().catch(() => ({}))) as { success?: boolean; message?: string };
-
-                const out = outcomeFromVerificationResponse(
-                    response,
-                    data,
-                    "Faculty verification completed. Thank you.",
-                );
-
-                if (out.kind === "success") {
-                    clearPersistedVerificationReturn();
-                    setStatus("success");
-                    setMessage(out.message);
-                    if (safeReturnTo) {
-                        window.setTimeout(() => {
-                            router.replace(safeReturnTo);
-                        }, 900);
-                    }
-                    return;
-                }
-                if (out.kind === "auth_required") {
-                    persistVerificationReturnFromWindow();
-                    setStatus("auth_required");
-                    setMessage(out.message);
-                    return;
-                }
-                setStatus("error");
-                setMessage(out.message);
-            } catch {
-                setStatus("error");
-                setMessage("Could not reach CIEL. Please try again later.");
-            }
-        };
-
-        const bearerNow =
-            typeof window !== "undefined" ? localStorage.getItem("ciel_token") : null;
-        const delayMs = bearerNow ? 400 : 0;
-        const t = setTimeout(run, delayMs);
-        return () => clearTimeout(t);
-    }, [token, pathname, safeReturnTo, searchParams, router]);
-
-    const postAuthReturn =
-        token && pathname
-            ? `${pathname}?${searchParams.toString()}`
-            : "";
-    const loginHref =
-        postAuthReturn && isSafeInternalReturnPath(postAuthReturn)
-            ? `/login?next=${encodeURIComponent(postAuthReturn)}`
-            : "/login";
-    const signupHref =
-        postAuthReturn && isSafeInternalReturnPath(postAuthReturn)
-            ? buildVerificationSignupHref(postAuthReturn, { presetRole: "faculty" })
-            : "/signup";
+    const signupHref = buildVerificationSignupHref(FACULTY_APPROVALS_HREF, { presetRole: "faculty" });
 
     return (
         <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
             <div className="max-w-md w-full bg-white rounded-2xl shadow-lg border border-slate-100 p-10 text-center">
                 <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">Faculty verification</p>
                 <div className="flex justify-center mb-6">
-                    {status === "auth_required" && <LogIn className="w-12 h-12 text-amber-600" />}
                     {status === "loading" && <Loader2 className="w-12 h-12 text-blue-500 animate-spin" />}
-                    {status === "success" && <CheckCircle2 className="w-12 h-12 text-emerald-500" />}
+                    {status === "portal" && <ClipboardList className="w-12 h-12 text-emerald-600" />}
                     {status === "error" && <XCircle className="w-12 h-12 text-rose-500" />}
                 </div>
                 <h1 className="text-xl font-bold text-slate-900 mb-2">
                     {status === "loading"
-                        ? "Confirming…"
-                        : status === "auth_required"
-                          ? "Sign in required"
-                          : status === "success"
-                            ? "Success"
-                            : "Could not verify"}
+                        ? "Opening CIEL…"
+                        : status === "portal"
+                          ? "Complete in Approvals"
+                          : "Could not open link"}
                 </h1>
                 <p className="text-slate-600 text-sm leading-relaxed mb-4">{message}</p>
-                {status === "error" && postAuthReturn && isSafeInternalReturnPath(postAuthReturn) && (
-                    <div className="mb-4">
+                {status === "portal" && (
+                    <div className="space-y-3 mb-2">
                         <Link
-                            href={loginHref}
-                            className="text-sm font-semibold text-blue-600 hover:text-blue-700 underline underline-offset-2"
+                            href={FACULTY_APPROVALS_HREF}
+                            className="inline-flex items-center justify-center gap-2 w-full bg-slate-900 text-white font-semibold py-3 rounded-xl hover:bg-slate-800"
                         >
-                            Sign in / use another account
+                            <ClipboardList className="w-4 h-4" />
+                            Go to Approvals
                         </Link>
                     </div>
                 )}
-                {status === "auth_required" && (
-                    <div className="text-left space-y-3 mb-6">
-                        <p className="text-xs font-medium text-amber-900/90 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2.5 leading-relaxed">
-                            {VERIFY_EMAIL_MATCH_HINT}
-                        </p>
-                        <p className="text-sm text-slate-600 leading-relaxed">{VERIFY_CTA_FACULTY_BODY}</p>
-                    </div>
-                )}
-                {status === "auth_required" && (
-                    <div className="space-y-3 mb-2">
+                {status === "error" && token && pathname && isSafeInternalReturnPath(pathname) && (
+                    <div className="space-y-3 mb-4">
                         <Link
-                            href={loginHref}
+                            href={`/login?next=${encodeURIComponent(FACULTY_APPROVALS_HREF)}`}
                             className="inline-flex items-center justify-center gap-2 w-full bg-slate-900 text-white font-semibold py-3 rounded-xl hover:bg-slate-800"
                         >
                             <LogIn className="w-4 h-4" />
-                            Sign in (I already have an account)
+                            Sign in
                         </Link>
                         <Link
                             href={signupHref}
@@ -167,10 +92,10 @@ function FacultyVerifyContent() {
                         </Link>
                     </div>
                 )}
-                {status !== "loading" && status !== "auth_required" && (
+                {status !== "loading" && (
                     <Link
                         href="/"
-                        className="inline-flex items-center justify-center gap-2 w-full bg-slate-900 text-white font-semibold py-3 rounded-xl hover:bg-slate-800"
+                        className="inline-flex items-center justify-center gap-2 w-full bg-white border border-slate-200 text-slate-800 font-semibold py-3 rounded-xl hover:bg-slate-50 mt-2"
                     >
                         <Home className="w-4 h-4" />
                         Return home

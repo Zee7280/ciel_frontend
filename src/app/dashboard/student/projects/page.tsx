@@ -7,10 +7,17 @@ import { Badge } from "../report/components/ui/badge";
 import { authenticatedFetch } from "@/utils/api";
 import {
     canEditReturnedOpportunity,
+    extractOpportunityReturnRemarkSections,
     extractOpportunityReviewFeedback,
     isStudentOpportunityLiveForReporting,
     resolveStudentOpportunityWorkflow,
 } from "@/utils/opportunityWorkflow";
+import {
+    canStudentAccessReportForProjectPayload,
+    isJoinApplicationPendingStatus,
+    joinApplicationPendingLabel,
+    pickJoinApplicationStatus,
+} from "@/utils/studentJoinApplication";
 import { formatDisplayId } from "@/utils/displayIds";
 import { Loader2, Plus, Users, Eye, Mail, Phone, GraduationCap, Pencil, CheckCircle, FileText, Building2, TrendingUp, XCircle } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "../report/components/ui/dialog";
@@ -211,6 +218,11 @@ interface Project {
     faculty_approval_status?: string;
     partner_approval_status?: string;
     admin_approval_status?: string;
+    application_status?: string;
+    application_stage?: string | null;
+    application_id?: string;
+    has_applied?: boolean;
+    hasApplied?: boolean;
     is_student_created?: boolean;
     created_by_role?: string;
     source?: string;
@@ -393,21 +405,30 @@ export default function MyProjectsPage() {
                 <div className="grid gap-6">
                     {projects.map((project) => {
                         const pRecord = project as unknown as Record<string, unknown>;
-                        const live = isStudentOpportunityLiveForReporting(pRecord);
-                        const workflow = resolveStudentOpportunityWorkflow(pRecord);
-                        const approvalLine = formatStudentProjectApprovalLine(project);
-                        const reviewFeedback = extractOpportunityReviewFeedback(pRecord);
                         const isStudentOwnedOpportunity =
                             project.is_student_created === true ||
                             String(project.created_by_role || "").toLowerCase() === "student" ||
                             String(project.source || "").toLowerCase() === "student_created";
+                        const live = isStudentOpportunityLiveForReporting(pRecord);
+                        const joinAppStatus = pickJoinApplicationStatus(pRecord);
+                        const joinPending =
+                            !isStudentOwnedOpportunity &&
+                            Boolean(joinAppStatus && isJoinApplicationPendingStatus(joinAppStatus));
+                        const reportUnlocked = canStudentAccessReportForProjectPayload(pRecord);
+                        const workflow = resolveStudentOpportunityWorkflow(pRecord);
+                        const approvalLine = formatStudentProjectApprovalLine(project);
+                        const remarkSections = extractOpportunityReturnRemarkSections(pRecord);
+                        const reviewFeedback =
+                            remarkSections.length === 0 ? extractOpportunityReviewFeedback(pRecord) : null;
                         const canReviseOpportunity =
                             isStudentOwnedOpportunity && !live && canEditReturnedOpportunity(pRecord);
-                        const statusBadgeClass = live
-                            ? project.status === "completed"
-                                ? "bg-slate-100 text-slate-700"
-                                : "bg-green-100 text-green-700"
-                            : workflow.stage === "rejected"
+                        const statusBadgeClass = joinPending
+                            ? "bg-amber-100 text-amber-800"
+                            : live
+                              ? project.status === "completed"
+                                  ? "bg-slate-100 text-slate-700"
+                                  : "bg-green-100 text-green-700"
+                              : workflow.stage === "rejected"
                                 ? "bg-red-100 text-red-700"
                                 : workflow.stage === "revision"
                                     ? "bg-orange-100 text-orange-800"
@@ -423,7 +444,7 @@ export default function MyProjectsPage() {
                                     <div className="flex items-center gap-2 flex-wrap">
                                         <h3 className="font-bold text-lg text-slate-800">{project.title}</h3>
                                         <Badge className={statusBadgeClass}>
-                                            {workflow.badgeLabel}
+                                            {joinPending ? joinApplicationPendingLabel(pRecord) : workflow.badgeLabel}
                                         </Badge>
 
                                         {/* Report Status Badge */}
@@ -496,19 +517,42 @@ export default function MyProjectsPage() {
                                             </p>
                                         </div>
                                     )}
+                                    {joinPending && (
+                                        <div className="mt-2 max-w-2xl">
+                                            <p className="text-xs text-amber-900 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 font-medium">
+                                                {joinApplicationPendingLabel(pRecord)} — you will be notified when your
+                                                application moves forward.
+                                            </p>
+                                        </div>
+                                    )}
                                     {!live && (
                                         <div className="mt-2 max-w-2xl space-y-1">
                                             <p className="text-xs text-amber-800 bg-amber-50/80 border border-amber-100 rounded-lg px-3 py-2">
                                                 {workflow.queueMessage}
                                             </p>
-                                            {reviewFeedback ? (
+                                            {remarkSections.length > 0 || reviewFeedback ? (
                                                 <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2">
                                                     <p className="text-[11px] font-bold uppercase tracking-wide text-rose-700">
                                                         Return remarks
                                                     </p>
-                                                    <p className="mt-1 text-sm text-rose-800 whitespace-pre-wrap">
-                                                        {reviewFeedback}
-                                                    </p>
+                                                    {remarkSections.length > 0 ? (
+                                                        <div className="mt-2 space-y-2">
+                                                            {remarkSections.map((s) => (
+                                                                <div key={s.label}>
+                                                                    <p className="text-[10px] font-semibold text-rose-700">
+                                                                        {s.label}
+                                                                    </p>
+                                                                    <p className="text-sm text-rose-800 whitespace-pre-wrap">
+                                                                        {s.text}
+                                                                    </p>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    ) : reviewFeedback ? (
+                                                        <p className="mt-1 text-sm text-rose-800 whitespace-pre-wrap">
+                                                            {reviewFeedback}
+                                                        </p>
+                                                    ) : null}
                                                 </div>
                                             ) : null}
                                             {approvalLine ? (
@@ -527,7 +571,7 @@ export default function MyProjectsPage() {
                                     </Button>
                                 )}
 
-                                {live && (
+                                {reportUnlocked && (
                                     <>
                                         {project.report_status === 'none' || project.report_status === 'continue' || project.report_status === 'draft' ? (
                                             <Link href={`/dashboard/student/report?projectId=${project.id}`} className="w-full md:w-auto">
@@ -759,7 +803,9 @@ export default function MyProjectsPage() {
                                     "createdAt",
                                     "date_submitted",
                                 );
-                                const reviewFeedback = extractOpportunityReviewFeedback(v);
+                                const remarkSections = extractOpportunityReturnRemarkSections(v);
+                                const reviewFeedback =
+                                    remarkSections.length === 0 ? extractOpportunityReviewFeedback(v) : null;
                                 const objectives = (v.objectives as Record<string, unknown> | undefined) ?? {};
                                 const timeline = (v.timeline as Record<string, unknown> | undefined) ?? {};
                                 const location = (v.location as Record<string, unknown> | undefined) ?? {};
@@ -802,12 +848,29 @@ export default function MyProjectsPage() {
 
                                 return (
                                     <>
-                                        {reviewFeedback ? (
+                                        {remarkSections.length > 0 || reviewFeedback ? (
                                             <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-4">
                                                 <p className="text-xs font-bold uppercase tracking-wider text-rose-700">
                                                     Return remarks
                                                 </p>
-                                                <p className="mt-2 text-sm text-rose-900 whitespace-pre-wrap">{reviewFeedback}</p>
+                                                {remarkSections.length > 0 ? (
+                                                    <div className="mt-2 space-y-3">
+                                                        {remarkSections.map((s) => (
+                                                            <div key={s.label}>
+                                                                <p className="text-[10px] font-semibold text-rose-700">
+                                                                    {s.label}
+                                                                </p>
+                                                                <p className="mt-0.5 text-sm text-rose-900 whitespace-pre-wrap">
+                                                                    {s.text}
+                                                                </p>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                ) : reviewFeedback ? (
+                                                    <p className="mt-2 text-sm text-rose-900 whitespace-pre-wrap">
+                                                        {reviewFeedback}
+                                                    </p>
+                                                ) : null}
                                             </div>
                                         ) : null}
 

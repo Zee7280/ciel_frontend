@@ -6,17 +6,27 @@ import { Button } from "../../report/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "../../report/components/ui/radio-group";
 import { Label } from "../../report/components/ui/label";
 import { Input } from "../../report/components/ui/input";
-import { Select } from "../../report/components/ui/select";
 import { Plus, Trash2, Loader2, Users, User } from "lucide-react";
 import { toast } from "sonner";
 import { authenticatedFetch } from "@/utils/api";
 import { pakistaniUniversities } from "@/utils/universityData";
+import PhoneConnectivityRow from "@/components/ui/PhoneConnectivityRow";
+import {
+    DEFAULT_PHONE_COUNTRY_KEY,
+    composeInternationalPhone,
+    parsePhoneForDisplay,
+} from "@/utils/countryCallingCodes";
+
+export type ApplySuccessMeta = {
+    applicationId?: string;
+    applicationStatus?: string;
+};
 
 interface ApplicationDialogProps {
     opportunityId: string | null;
     open: boolean;
     onOpenChange: (open: boolean) => void;
-    onSuccess: (id: string) => void;
+    onSuccess: (id: string, meta?: ApplySuccessMeta) => void;
     opportunityTitle?: string;
 }
 
@@ -49,6 +59,8 @@ export default function ApplicationDialog({ opportunityId, open, onOpenChange, o
     const [teamMembers, setTeamMembers] = useState<TeamMember[]>([
         { name: "", cnic: "", mobile: "", email: "", university: "", program: "", role: "Member", verificationStatus: 'unverified' }
     ]);
+    const [applicantPhoneCountryKey, setApplicantPhoneCountryKey] = useState(DEFAULT_PHONE_COUNTRY_KEY);
+    const [applicantPhoneNational, setApplicantPhoneNational] = useState("");
 
     // Reset state when dialog opens/closes
     useEffect(() => {
@@ -80,6 +92,9 @@ export default function ApplicationDialog({ opportunityId, open, onOpenChange, o
             }
 
             setTeamMembers([initialMember]);
+            const parsed = parsePhoneForDisplay(initialMember.mobile);
+            setApplicantPhoneCountryKey(parsed.phoneCountryKey);
+            setApplicantPhoneNational(parsed.national);
         }
     }, [open, opportunityId]);
 
@@ -227,6 +242,15 @@ export default function ApplicationDialog({ opportunityId, open, onOpenChange, o
             return;
         }
 
+        const applicantPhoneE164 = composeInternationalPhone(applicantPhoneCountryKey, applicantPhoneNational);
+        if (participationType === "individual") {
+            const n = applicantPhoneNational.replace(/\D/g, "");
+            if (!applicantPhoneE164 || n.length < 8) {
+                toast.error("Please enter a valid mobile number with country code.");
+                return;
+            }
+        }
+
         // Validation for team
         if (participationType === "team") {
             for (let i = 0; i < teamMembers.length; i++) {
@@ -257,7 +281,10 @@ export default function ApplicationDialog({ opportunityId, open, onOpenChange, o
                 team_id: participationType === 'team' ? teamId : undefined,
                 primary_faculty_email: primaryFacultyEmail,
                 secondary_faculty_email: secondaryFacultyEmail || undefined,
-                team_members: participationType === "team" ? teamMembers : undefined
+                team_members: participationType === "team" ? teamMembers : undefined,
+                ...(applicantPhoneE164
+                    ? { contact_phone_e164: applicantPhoneE164 }
+                    : {}),
             };
 
             const res = await authenticatedFetch(`/api/v1/students/opportunities/${opportunityId}/apply`, {
@@ -271,8 +298,24 @@ export default function ApplicationDialog({ opportunityId, open, onOpenChange, o
             if (res && res.ok) {
                 const data = await res.json();
                 if (data.success) {
-                    toast.success("Application submitted successfully!");
-                    onSuccess(opportunityId);
+                    const d = (data.data ?? {}) as Record<string, unknown>;
+                    const applicationId =
+                        typeof d.application_id === "string"
+                            ? d.application_id
+                            : typeof d.applicationId === "string"
+                              ? d.applicationId
+                              : undefined;
+                    const applicationStatus =
+                        typeof d.application_status === "string"
+                            ? d.application_status
+                            : typeof d.applicationStatus === "string"
+                              ? d.applicationStatus
+                              : undefined;
+                    toast.success(typeof data.message === "string" ? data.message : "Application submitted successfully!");
+                    onSuccess(opportunityId!, {
+                        applicationId,
+                        applicationStatus: applicationStatus ?? "pending_approval",
+                    });
                     onOpenChange(false);
                 } else {
                     toast.error(data.message || "Failed to submit application");
@@ -372,6 +415,35 @@ export default function ApplicationDialog({ opportunityId, open, onOpenChange, o
                                 Added for collaboration only. They can view but cannot approve or own analytics.
                             </p>
                         </div>
+
+                        <div className="p-5 rounded-2xl border border-slate-100 bg-white space-y-3">
+                            <div className="flex items-center justify-between gap-2">
+                                <Label className="text-xs font-black text-slate-700 uppercase tracking-widest">
+                                    Your mobile number
+                                    {participationType === "individual" ? (
+                                        <span className="text-red-500 ml-1">*</span>
+                                    ) : null}
+                                </Label>
+                                <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full shrink-0">
+                                    {participationType === "individual" ? "Required" : "Optional"}
+                                </span>
+                            </div>
+                            <PhoneConnectivityRow
+                                usePortalCountryPicker
+                                phoneCountryKey={applicantPhoneCountryKey}
+                                nationalDigits={applicantPhoneNational}
+                                onPhoneCountryKeyChange={setApplicantPhoneCountryKey}
+                                onNationalDigitsChange={setApplicantPhoneNational}
+                                maxNationalDigits={15}
+                                placeholderNational="3001234567"
+                                selectClassName="border-indigo-200 focus-visible:border-indigo-400"
+                                inputClassName="border-indigo-200"
+                                rowClassName="items-stretch"
+                            />
+                            <p className="text-[10px] text-slate-400 font-medium">
+                                Country code and number for project coordinators to reach you.
+                            </p>
+                        </div>
                     </div>
 
                     {/* ───────────────────────────────────────────────
@@ -419,7 +491,12 @@ export default function ApplicationDialog({ opportunityId, open, onOpenChange, o
                                     </div>
                                     <div className="space-y-1">
                                         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Contact</p>
-                                        <p className="font-bold text-slate-700">{teamMembers[0].mobile || teamMembers[0].cnic || "Not provided"}</p>
+                                        <p className="font-bold text-slate-700">
+                                            {composeInternationalPhone(applicantPhoneCountryKey, applicantPhoneNational) ||
+                                                teamMembers[0].mobile ||
+                                                teamMembers[0].cnic ||
+                                                "Not provided"}
+                                        </p>
                                     </div>
                                 </div>
                             </div>

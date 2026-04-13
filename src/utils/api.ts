@@ -21,7 +21,7 @@ function decodeJwtPayloadJson(token: string): { exp?: number } | null {
  * Decode a JWT token and check if it has expired.
  * Returns true if token is valid and NOT expired, false otherwise.
  */
-function isTokenValid(token: string | null): boolean {
+export function isTokenValid(token: string | null): boolean {
     if (!token) return false;
     const payload = decodeJwtPayloadJson(token);
     if (!payload) return false;

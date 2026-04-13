@@ -55,6 +55,22 @@ function normalizeApprovalState(value: unknown): string {
     return typeof value === "string" ? value.trim().toLowerCase() : "";
 }
 
+/** Pending list API: only block approve when the backend explicitly sets false. */
+function readAdminCanApprove(row: Record<string, unknown> | null | undefined): boolean {
+    if (!row) return true;
+    const v = row.admin_can_approve ?? row.adminCanApprove;
+    return v !== false;
+}
+
+function readFlowStatus(row: Record<string, unknown> | null | undefined): string {
+    if (!row) return "";
+    const raw = row.flow_status ?? row.flowStatus;
+    if (typeof raw !== "string") return "";
+    const t = raw.trim();
+    if (!t) return "";
+    return t.replace(/_/g, " ");
+}
+
 function approvalPillClass(status: string): string {
     if (status === "approved") return "border-emerald-200 bg-emerald-50 text-emerald-700";
     if (status === "rejected" || status === "returned") return "border-rose-200 bg-rose-50 text-rose-700";
@@ -277,6 +293,10 @@ export default function AdminApprovalsPage() {
     const handleApprove = async (id: string, type: 'opportunity' | 'user' = 'opportunity') => {
         const submittingKey = `${type}:${id}`;
         if (approveSubmittingKey === submittingKey) return;
+        if (type === "opportunity") {
+            const row = opportunities.find((o) => String(o?.id) === String(id)) as Record<string, unknown> | undefined;
+            if (row && !readAdminCanApprove(row)) return;
+        }
         const endpoint = type === 'opportunity'
             ? `/api/v1/admin/opportunities/${id}/approve`
             : `/api/v1/admin/users/${id}/approve`;
@@ -376,7 +396,8 @@ export default function AdminApprovalsPage() {
             if (activeTab === 'projects') {
                 return (
                     item.title?.toLowerCase().includes(lowerQuery) ||
-                    item.partner_name?.toLowerCase().includes(lowerQuery)
+                    item.partner_name?.toLowerCase().includes(lowerQuery) ||
+                    readFlowStatus(item as Record<string, unknown>).toLowerCase().includes(lowerQuery)
                 );
             } else {
                 return (
@@ -545,13 +566,25 @@ export default function AdminApprovalsPage() {
                         </div>
                     ))
                 ) : (
-                    paginatedItems.map((proj) => (
+                    paginatedItems.map((proj) => {
+                        const projRow = proj as Record<string, unknown>;
+                        const flowLabel = readFlowStatus(projRow);
+                        const canAdminApprove = readAdminCanApprove(projRow);
+                        return (
                         <div key={proj.id} className="bg-white p-6 rounded-xl border border-slate-100 shadow-sm flex items-center justify-between">
                             <div>
                                 <h3 className="text-lg font-bold text-slate-900">{proj.title}</h3>
-                                <div className="flex items-center gap-4 text-sm text-slate-500 mt-1">
+                                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-slate-500 mt-1">
                                     <span className="font-bold text-blue-600">{proj.partner_name || "Unknown Partner"}</span>
                                     <span className="bg-amber-50 text-amber-700 px-2 py-0.5 rounded">{proj.types?.[0] || "General"}</span>
+                                    {flowLabel ? (
+                                        <span
+                                            className="bg-violet-50 text-violet-800 px-2 py-0.5 rounded font-bold text-[10px] uppercase tracking-wider border border-violet-100"
+                                            title="Workflow position in the approval chain"
+                                        >
+                                            {flowLabel}
+                                        </span>
+                                    ) : null}
                                     <span>
                                         • Submitted:{" "}
                                         {formatDateTime(
@@ -591,8 +624,19 @@ export default function AdminApprovalsPage() {
                                 </button>
                                 <button
                                     onClick={() => handleApprove(proj.id, 'opportunity')}
-                                    disabled={approveSubmittingKey === `opportunity:${proj.id}`}
-                                    className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-bold hover:bg-green-700 flex items-center gap-2 transition-colors shadow-lg shadow-green-200 disabled:opacity-60 disabled:cursor-not-allowed"
+                                    disabled={
+                                        !canAdminApprove || approveSubmittingKey === `opportunity:${proj.id}`
+                                    }
+                                    title={
+                                        !canAdminApprove
+                                            ? "Final admin approval is not available until earlier steps complete."
+                                            : undefined
+                                    }
+                                    className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors shadow-lg disabled:cursor-not-allowed ${
+                                        canAdminApprove
+                                            ? "bg-green-600 text-white hover:bg-green-700 shadow-green-200 disabled:opacity-60"
+                                            : "bg-slate-200 text-slate-500 shadow-none cursor-not-allowed opacity-70"
+                                    }`}
                                 >
                                     {approveSubmittingKey === `opportunity:${proj.id}` ? (
                                         <>
@@ -613,7 +657,8 @@ export default function AdminApprovalsPage() {
                                 </button> */}
                             </div>
                         </div>
-                    ))
+                        );
+                    })
                 )}
 
                 {filteredItems.length === 0 && !isLoading && (
@@ -664,6 +709,19 @@ export default function AdminApprovalsPage() {
                                                 "Pending opportunity",
                                         )}
                                     </p>
+                                    {(() => {
+                                        const flow = readFlowStatus(adminDetailView as Record<string, unknown>);
+                                        return flow ? (
+                                            <p className="mt-2">
+                                                <span
+                                                    className="inline-flex items-center bg-violet-50 text-violet-800 px-2 py-0.5 rounded font-bold text-[10px] uppercase tracking-wider border border-violet-100"
+                                                    title="Workflow position in the approval chain"
+                                                >
+                                                    {flow}
+                                                </span>
+                                            </p>
+                                        ) : null;
+                                    })()}
                                 </div>
                                 <button
                                     onClick={() => {
@@ -1140,8 +1198,21 @@ export default function AdminApprovalsPage() {
                                         setIsDetailModalOpen(false);
                                         setOpportunityDetail(null);
                                     }}
-                                    disabled={opportunityDetailLoading || approveSubmittingKey === `opportunity:${selectedOpportunity.id}`}
-                                    className="px-4 py-2 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    disabled={
+                                        !readAdminCanApprove(adminDetailView as Record<string, unknown>) ||
+                                        opportunityDetailLoading ||
+                                        approveSubmittingKey === `opportunity:${selectedOpportunity.id}`
+                                    }
+                                    title={
+                                        !readAdminCanApprove(adminDetailView as Record<string, unknown>)
+                                            ? "Final admin approval is not available until earlier steps complete."
+                                            : undefined
+                                    }
+                                    className={`px-4 py-2 rounded-lg font-bold disabled:cursor-not-allowed ${
+                                        readAdminCanApprove(adminDetailView as Record<string, unknown>)
+                                            ? "bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
+                                            : "bg-slate-200 text-slate-500 cursor-not-allowed opacity-70"
+                                    }`}
                                 >
                                     {approveSubmittingKey === `opportunity:${selectedOpportunity.id}` ? (
                                         <span className="inline-flex items-center gap-2">
