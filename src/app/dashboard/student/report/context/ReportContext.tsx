@@ -1,7 +1,7 @@
 "use client"
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
-import { ValidationError, validateSection1, validateSection2, validateSection3, validateSection4, validateSection5, validateSection6, validateSection7, validateSection8, validateSection9, validateSection10 } from '../utils/validation';
+import { ValidationError, validateSection1, validateSection2, validateSection3, validateSection4, validateSection5, validateSection6, validateSection7, validateSection8, validateSection9, validateSection10, getIncompleteSectionsSummary, type SectionIncompleteInfo } from '../utils/validation';
 import { calculateEngagementMetrics } from '../utils/engagementMetrics';
 
 // Define the shape of the report data matches the 11 sections (plus summary)
@@ -10,6 +10,9 @@ export interface ReportData {
     status?: string;
     admin_status?: string;
     partner_status?: string;
+    /** When backend sends project/report payment state separately from `status`. */
+    report_status?: string;
+    payment_verified?: boolean;
     // Section 1: Participation (Was Section 2)
     section1: {
         participation_type: 'individual' | 'team';
@@ -89,6 +92,7 @@ export interface ReportData {
             indicator_id: string;
         };
         contribution_intent_statement: string;
+        student_contribution_intent_statement: string;
         secondary_sdgs: Array<{
             goal_number: number | string | null;
             target_id?: string;
@@ -184,7 +188,7 @@ export interface ReportData {
             sources: string[];       // multi-select
             source_other?: string;
             purpose: string;
-            verification: string;
+            verification: string[];  // 6.2.6 multi-select
         }>;
         evidence_files: File[];
         summary_text?: string;
@@ -196,7 +200,7 @@ export interface ReportData {
             name: string;
             type: string;
             type_other?: string;
-            role: string;
+            role: string[]; // Multi-select — role in project
             contribution: string[]; // Multi-select
             verification: string;
         }>;
@@ -301,6 +305,7 @@ const defaultReportData: ReportData = {
             indicator_id: ''
         },
         contribution_intent_statement: '',
+        student_contribution_intent_statement: '',
         secondary_sdgs: [],
         validation_status: 'pending',
         summary_stage: 'preliminary',
@@ -428,6 +433,13 @@ interface ReportContextType {
     areAllSectionsComplete: boolean;
     /** Hours + all sections valid — final submit allowed. */
     canSubmitReport: boolean;
+    /** Sections 1–10 that fail validation, with messages (for summary / submit UX). */
+    incompleteSectionsSummary: SectionIncompleteInfo[];
+    /**
+     * Intelligence strip (CII / hours / beneficiaries / SDG) may be shown only after
+     * payment is recorded and an admin has verified (or legacy `status` indicates full clearance).
+     */
+    showVerifiedImpactScores: boolean;
 }
 
 
@@ -466,6 +478,28 @@ export function ReportProvider({ children }: { children: React.ReactNode }) {
         () => isEligibleForSubmission && areAllSectionsComplete,
         [isEligibleForSubmission, areAllSectionsComplete],
     );
+
+    const incompleteSectionsSummary = useMemo(
+        () => getIncompleteSectionsSummary(data),
+        [data],
+    );
+
+    const showVerifiedImpactScores = useMemo(() => {
+        const st = String(data.status || '').toLowerCase();
+        const rs = String(data.report_status || '').toLowerCase();
+        const adm = String(data.admin_status || '').toLowerCase();
+        const reportFullyVerified =
+            st === 'verified' || st === 'approved' || st === 'finalized';
+        const adminDone =
+            adm === 'verified' || adm === 'approved' || reportFullyVerified;
+        const paymentCleared =
+            st === 'paid' ||
+            rs === 'paid' ||
+            data.payment_verified === true ||
+            // End-state report implies fee + review completed in this product flow
+            reportFullyVerified;
+        return adminDone && paymentCleared;
+    }, [data.status, data.report_status, data.admin_status, data.payment_verified]);
 
     // Auto-calculate Section 1 metrics whenever attendance logs change
     useEffect(() => {
@@ -523,6 +557,34 @@ export function ReportProvider({ children }: { children: React.ReactNode }) {
             if (newData.section9) merged.section9 = { ...defaultReportData.section9, ...prev.section9, ...newData.section9 };
             if (newData.section10) merged.section10 = { ...defaultReportData.section10, ...prev.section10, ...newData.section10 };
             if (newData.section11) merged.section11 = { ...defaultReportData.section11, ...prev.section11, ...newData.section11 };
+            // Section 6: resource verification is multi-select (string[]); normalize legacy string values
+            if (merged.section6?.resources?.length) {
+                merged.section6 = {
+                    ...merged.section6,
+                    resources: merged.section6.resources.map((r: any) => ({
+                        ...r,
+                        verification: Array.isArray(r.verification)
+                            ? r.verification
+                            : r.verification != null && String(r.verification).trim() !== ''
+                                ? [String(r.verification)]
+                                : [],
+                    })),
+                };
+            }
+            // Section 7: partner role is multi-select (string[]); normalize legacy string values
+            if (merged.section7?.partners?.length) {
+                merged.section7 = {
+                    ...merged.section7,
+                    partners: merged.section7.partners.map((p: any) => ({
+                        ...p,
+                        role: Array.isArray(p.role)
+                            ? p.role
+                            : p.role != null && String(p.role).trim() !== ''
+                                ? [String(p.role)]
+                                : [],
+                    })),
+                };
+            }
             return merged;
         });
     }, []);
@@ -641,7 +703,9 @@ export function ReportProvider({ children }: { children: React.ReactNode }) {
         setRequiredHours,
         isEligibleForSubmission,
         areAllSectionsComplete,
-        canSubmitReport
+        canSubmitReport,
+        incompleteSectionsSummary,
+        showVerifiedImpactScores
     }), [
         data,
         updateSection,
@@ -662,7 +726,9 @@ export function ReportProvider({ children }: { children: React.ReactNode }) {
         setRequiredHours,
         isEligibleForSubmission,
         areAllSectionsComplete,
-        canSubmitReport
+        canSubmitReport,
+        incompleteSectionsSummary,
+        showVerifiedImpactScores
     ]);
 
 

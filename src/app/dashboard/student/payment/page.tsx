@@ -20,6 +20,9 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { FileUpload } from '../report/components/ui/file-upload';
 import clsx from 'clsx';
 
+/** Reporting fee charged per student for this flow (PKR). */
+const REPORTING_FEE_PKR_PER_STUDENT = 200;
+
 function PaymentContent() {
     const searchParams = useSearchParams();
     const router = useRouter();
@@ -33,7 +36,7 @@ function PaymentContent() {
         accountTitle: "CIEL International",
         accountNumber: "1234 5678 9012 3456",
         iban: "PK70 HABB 0012 3456 7890 1234",
-        amount: "5,000 PKR"
+        amount: `${REPORTING_FEE_PKR_PER_STUDENT} PKR`,
     });
     const [proofFile, setProofFile] = useState<File | null>(null);
     const [paymentSubmitted, setPaymentSubmitted] = useState(false);
@@ -174,7 +177,9 @@ function PaymentContent() {
                         <ArrowLeft className="w-4 h-4 mr-1" /> Back
                     </Button>
                     <h1 className="text-3xl font-black text-slate-900 tracking-tight">Complete Payment</h1>
-                    <p className="text-slate-500 font-medium">Please transfer the reporting fee to the account below and upload the proof.</p>
+                    <p className="text-slate-500 font-medium">
+                        Please transfer <span className="font-semibold text-slate-700">{REPORTING_FEE_PKR_PER_STUDENT} PKR</span> per student to the account below and upload the proof.
+                    </p>
                 </div>
                 <div className="bg-blue-50 text-blue-700 px-4 py-2 rounded-2xl border border-blue-100 flex items-center gap-2">
                     <CreditCard className="w-5 h-5" />
@@ -311,7 +316,7 @@ function PaymentContent() {
                     </div>
                     <div className="flex items-center gap-6">
                         <div className="text-right">
-                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Amount Due</p>
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Amount Due (per student)</p>
                             <p className="text-xl font-black text-slate-900">{bankInfo.amount}</p>
                         </div>
                         <div className="w-px h-10 bg-slate-200 hidden md:block" />

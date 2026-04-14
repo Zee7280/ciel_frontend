@@ -97,11 +97,22 @@ function PartnerCard({
     getFieldError: (key: string) => string | undefined;
 }) {
     const contribution: string[] = p.contribution || [];
+    const roles: string[] = Array.isArray(p.role)
+        ? p.role
+        : typeof p.role === 'string' && p.role
+            ? [p.role]
+            : [];
 
     const toggleContribution = (opt: string) => {
         onUpdate('contribution', contribution.includes(opt)
             ? contribution.filter(c => c !== opt)
             : [...contribution, opt]);
+    };
+
+    const toggleRole = (opt: string) => {
+        onUpdate('role', roles.includes(opt)
+            ? roles.filter(r => r !== opt)
+            : [...roles, opt]);
     };
 
     return (
@@ -165,22 +176,29 @@ function PartnerCard({
                         <FieldError message={getFieldError(`partners.${idx}.type`)} />
                     </div>
 
-                    {/* Role in Project */}
+                    {/* Role in Project — multi-select */}
                     <div className="space-y-3">
-                        <Label className="report-label">Role in Project (Primary Role)</Label>
+                        <Label className="report-label">Role in Project (Select All That Apply)</Label>
+                        <p className="report-help">At least one must be selected.</p>
                         <div className="grid grid-cols-1 gap-1.5">
                             {roleOptions.map(opt => (
                                 <button
                                     key={opt}
                                     type="button"
-                                    onClick={() => onUpdate('role', opt)}
+                                    onClick={() => toggleRole(opt)}
                                     className={clsx(
-                                        "px-3 py-2 rounded-xl border-2 report-label !text-[9px] text-left transition-all",
-                                        p.role === opt
+                                        "flex items-center gap-2 px-3 py-2 rounded-xl border-2 report-label !text-[9px] text-left transition-all",
+                                        roles.includes(opt)
                                             ? "border-report-primary bg-report-primary-soft/50 text-slate-900 shadow-sm"
                                             : "border-slate-100 bg-white"
                                     )}
                                 >
+                                    <div className={clsx(
+                                        "w-3 h-3 rounded-sm border-2 flex items-center justify-center flex-shrink-0",
+                                        roles.includes(opt) ? "border-report-primary bg-report-primary shadow-lg shadow-report-primary-shadow" : "border-slate-300"
+                                    )}>
+                                        {roles.includes(opt) && <CheckCircle2 className="w-2 h-2 text-white" />}
+                                    </div>
                                     {opt}
                                 </button>
                             ))}
@@ -261,7 +279,7 @@ export default function Section7Partnerships() {
     const update = (field: string, val: any) => updateSection('section7', { [field]: val });
 
     const addPartner = () =>
-        update('partners', [...partners, { name: '', type: '', role: '', contribution: [], verification: '' }]);
+        update('partners', [...partners, { name: '', type: '', role: [], contribution: [], verification: '' }]);
     const removePartner = (i: number) =>
         update('partners', partners.filter((_, idx) => idx !== i));
     const updatePartner = (i: number, field: string, val: any) => {

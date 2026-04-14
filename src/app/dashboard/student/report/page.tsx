@@ -16,6 +16,7 @@ import {
 } from "./components/ui/dialog";
 import clsx from 'clsx';
 import { canStudentAccessReportForProjectPayload } from '@/utils/studentJoinApplication';
+import { getIncompleteSectionsSummary } from './utils/validation';
 
 // Import New Sections
 import Section1Participation from './components/Section1Participation';
@@ -50,7 +51,8 @@ function ReportFormContent() {
         isReadOnly,
         isEligibleForSubmission,
         areAllSectionsComplete,
-        canSubmitReport
+        canSubmitReport,
+        incompleteSectionsSummary
     } = useReportForm();
 
     const [isSaving, setIsSaving] = React.useState(false);
@@ -163,16 +165,18 @@ function ReportFormContent() {
             nextStep();
             window.scrollTo(0, 0);
         } else {
-            // Final step: require verified hours and valid sections 1–10
-            if (canSubmitReport && isValid) {
-                handleSubmit();
-            } else if (!isEligibleForSubmission) {
-                toast.error("You are not yet eligible for submission. Check requirements on the summary page.");
-            } else if (!areAllSectionsComplete) {
-                toast.error("Complete all report sections (steps 1–10) before submitting.");
-            } else {
-                toast.error("Please fix all errors before final submission.");
+            if (!canSubmitReport) {
+                if (!isEligibleForSubmission) {
+                    toast.error(
+                        `Minimum verified hours not met (${data.section1.metrics?.total_verified_hours || 0}/${data.required_hours || 16}). Complete Section 1 first.`,
+                    );
+                } else {
+                    toast.error('Complete all required fields in steps 1–10 before submitting.');
+                }
+                setBlockedSubmitOpen(true);
+                return;
             }
+            handleSubmit();
         }
     };
 
@@ -200,6 +204,7 @@ function ReportFormContent() {
     };
 
     const [isConfirmOpen, setIsConfirmOpen] = React.useState(false);
+    const [blockedSubmitOpen, setBlockedSubmitOpen] = React.useState(false);
 
     const handleSubmit = async (e?: React.MouseEvent) => {
         if (e) {
@@ -207,15 +212,21 @@ function ReportFormContent() {
             e.stopPropagation();
         }
         if (isReadOnly) return;
-        if (!canSubmitReport) {
-            toast.error("Complete all sections and meet hour requirements before submitting.");
-            return;
-        }
 
         setIsConfirmOpen(true);
     };
 
     const confirmSubmit = async () => {
+        const hoursOk =
+            (data.section1.metrics?.total_verified_hours || 0) >= (data.required_hours || 16);
+        const stillIncomplete = getIncompleteSectionsSummary(data);
+        if (!hoursOk || stillIncomplete.length > 0) {
+            toast.error('Report is not ready to submit. Fix the items below and try again.');
+            setIsConfirmOpen(false);
+            setBlockedSubmitOpen(true);
+            return;
+        }
+
         setIsConfirmOpen(false);
         setIsSaving(true);
         try {
@@ -439,16 +450,14 @@ function ReportFormContent() {
                             <Button
                                 type="button"
                                 onClick={handleNext}
-                                disabled={isSaving || (activeStep === 11 && !canSubmitReport)}
+                                disabled={isSaving}
                                 className="h-11 rounded-xl bg-blue-600 hover:bg-blue-700 text-white px-6 md:px-8 font-semibold shadow-md shadow-blue-600/20 transition-all w-full sm:w-auto disabled:opacity-50"
                             >
                                 {isSaving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
                                 {activeStep === 11
                                     ? isSaving
                                         ? 'Submitting...'
-                                        : canSubmitReport
-                                          ? 'Submit Report'
-                                          : 'Complete all sections'
+                                        : 'Submit Report'
                                     : (aiStatus || 'Next Step')}
                                 {activeStep !== 11 && !isSaving && <ChevronRight className="w-4 h-4 ml-2" />}
                             </Button>
@@ -473,6 +482,52 @@ function ReportFormContent() {
                         <Button className="bg-blue-600 hover:bg-blue-700 text-white" onClick={confirmSubmit} disabled={isSaving}>
                             {isSaving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
                             Yes, Submit Report
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog open={blockedSubmitOpen} onOpenChange={setBlockedSubmitOpen}>
+                <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+                    <DialogHeader>
+                        <DialogTitle>Cannot submit yet</DialogTitle>
+                        <DialogDescription className="sr-only">
+                            The report cannot be submitted until minimum verified hours and all required steps are complete.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-3 text-left text-sm text-slate-600">
+                        {!isEligibleForSubmission && (
+                            <p>
+                                Verified hours:{" "}
+                                <span className="font-semibold text-slate-900">
+                                    {data.section1.metrics?.total_verified_hours || 0} / {data.required_hours || 16}
+                                </span>
+                                . Complete and verify attendance in Section 1 until the minimum is met.
+                            </p>
+                        )}
+                        {incompleteSectionsSummary.length > 0 && (
+                            <div className="space-y-3">
+                                <p className="font-medium text-slate-800">Steps that still need attention:</p>
+                                <ul className="space-y-3 border border-slate-200 rounded-xl p-3 bg-slate-50/80">
+                                    {incompleteSectionsSummary.map((block) => (
+                                        <li key={block.section} className="text-sm">
+                                            <span className="font-bold text-slate-900">
+                                                Step {block.section} — {block.label}
+                                            </span>
+                                            <ul className="mt-1.5 ml-3 list-disc text-slate-600 space-y-1">
+                                                {block.errors.map((err, i) => (
+                                                    <li key={`${err.field}-${i}`}>{err.message}</li>
+                                                ))}
+                                            </ul>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                        )}
+                    </div>
+                    <DialogFooter>
+                        <Button className="w-full sm:w-auto" onClick={() => setBlockedSubmitOpen(false)}>
+                            Close
                         </Button>
                     </DialogFooter>
                 </DialogContent>

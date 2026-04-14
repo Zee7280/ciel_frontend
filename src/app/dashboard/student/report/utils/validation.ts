@@ -27,6 +27,7 @@ function countWords(str: string): number {
  */
 export function validateSection1(data: any): ValidationResult {
     const errors: ValidationError[] = [];
+    const hasPrivacyConsent = Boolean(data.privacy_consent || data.review_checked?.[2]);
 
     if (data.metrics?.hec_compliance === 'below') {
         errors.push({ 
@@ -35,7 +36,8 @@ export function validateSection1(data: any): ValidationResult {
         });
     }
 
-    if (!data.privacy_consent) {
+    // Older drafts store the consent only in the final review checklist.
+    if (!hasPrivacyConsent) {
         errors.push({ field: 'privacy_consent', message: 'You must provide privacy consent to proceed.' });
     }
 
@@ -80,6 +82,12 @@ export function validateSection2(data: any): ValidationResult {
 export function validateSection3(data: any): ValidationResult {
     const errors: ValidationError[] = [];
     const intentWords = countWords(data.contribution_intent_statement || '');
+    const hasStudentMappingSelection = Boolean(
+        data.primary_sdg?.goal_number ||
+        data.primary_sdg?.target_id ||
+        data.primary_sdg?.indicator_id
+    );
+    const studentIntentWords = countWords(data.student_contribution_intent_statement || '');
 
     if (intentWords < 100) {
         errors.push({ field: 'contribution_intent_statement', message: `Contribution logic is too short (${intentWords}/100 words min)` });
@@ -93,6 +101,20 @@ export function validateSection3(data: any): ValidationResult {
             errors.push({ field: 'contribution_intent_statement', message: `Avoid outcome claims like "${phrase}". Focus on intent.` });
         }
     });
+
+    if (hasStudentMappingSelection) {
+        if (studentIntentWords < 100) {
+            errors.push({ field: 'student_contribution_intent_statement', message: `Student contribution logic is too short (${studentIntentWords}/100 words min)` });
+        } else if (studentIntentWords > 200) {
+            errors.push({ field: 'student_contribution_intent_statement', message: `Student contribution logic is too long (${studentIntentWords}/200 words max)` });
+        }
+
+        forbiddenPhrases.forEach(phrase => {
+            if (data.student_contribution_intent_statement?.toLowerCase().includes(phrase.toLowerCase())) {
+                errors.push({ field: 'student_contribution_intent_statement', message: `Avoid outcome claims like "${phrase}". Focus on intent.` });
+            }
+        });
+    }
 
     if (data.secondary_sdgs && data.secondary_sdgs.length > 0) {
         data.secondary_sdgs.forEach((sdg: any, index: number) => {
@@ -272,8 +294,9 @@ export function validateSection7(data: any): ValidationResult {
         if (!p.type) {
             errors.push({ field: `partners.${index}.type`, message: `Partner ${index + 1}: Partner type is required` });
         }
-        if (!p.role) {
-            errors.push({ field: `partners.${index}.role`, message: `Partner ${index + 1}: Role in project is required` });
+        const roleList = Array.isArray(p.role) ? p.role : (p.role ? [String(p.role)] : []);
+        if (!roleList.length) {
+            errors.push({ field: `partners.${index}.role`, message: `Partner ${index + 1}: At least one role in project is required` });
         }
         if (!p.contribution?.length) {
             errors.push({ field: `partners.${index}.contribution`, message: `Partner ${index + 1}: At least one contribution type is required` });
@@ -354,4 +377,61 @@ export function validateSection10(data: any): ValidationResult {
         errors.push({ field: 'mechanisms', message: 'Identify at least one sustainability mechanism' });
     }
     return { isValid: errors.length === 0, errors };
+}
+
+/** Step labels aligned with the report wizard (steps 1–10; step 11 is summary). */
+export const REPORT_SECTION_LABELS: Record<number, string> = {
+    1: 'Participation',
+    2: 'Context',
+    3: 'SDG Mapping',
+    4: 'Activities',
+    5: 'Outcomes',
+    6: 'Resources',
+    7: 'Partnerships',
+    8: 'Evidence',
+    9: 'Reflection',
+    10: 'Sustainability',
+};
+
+export type SectionIncompleteInfo = {
+    section: number;
+    label: string;
+    errors: ValidationError[];
+};
+
+/**
+ * Returns each of sections 1–10 that still fail validation, with field-level messages
+ * (used on the summary step and before submit).
+ */
+export function getIncompleteSectionsSummary(data: {
+    section1: any;
+    section2: any;
+    section3: any;
+    section4: any;
+    section5: any;
+    section6: any;
+    section7: any;
+    section8: any;
+    section9: any;
+    section10: any;
+}): SectionIncompleteInfo[] {
+    const rows: Array<{ section: number; result: ValidationResult }> = [
+        { section: 1, result: validateSection1(data.section1) },
+        { section: 2, result: validateSection2(data.section2) },
+        { section: 3, result: validateSection3(data.section3) },
+        { section: 4, result: validateSection4(data.section4) },
+        { section: 5, result: validateSection5(data.section5) },
+        { section: 6, result: validateSection6(data.section6) },
+        { section: 7, result: validateSection7(data.section7) },
+        { section: 8, result: validateSection8(data.section8) },
+        { section: 9, result: validateSection9(data.section9) },
+        { section: 10, result: validateSection10(data.section10) },
+    ];
+    return rows
+        .filter((r) => !r.result.isValid)
+        .map((r) => ({
+            section: r.section,
+            label: REPORT_SECTION_LABELS[r.section] || `Section ${r.section}`,
+            errors: r.result.errors,
+        }));
 }

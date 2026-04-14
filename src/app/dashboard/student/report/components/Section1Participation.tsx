@@ -948,7 +948,8 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                                         newChecked[i] = !newChecked[i];
 
                                                         updateSection('section1', {
-                                                            review_checked: newChecked
+                                                            review_checked: newChecked,
+                                                            ...(i === 2 ? { privacy_consent: newChecked[i] } : {})
                                                         });
                                                     }}
                                                     className="mt-1 w-5 h-5 rounded border border-slate-300 text-report-primary focus:ring-report-primary cursor-pointer"
@@ -989,6 +990,7 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                         }}
                                         isTeam={participation_type === 'team'}
                                         participantNames={participantNamesMap}
+                                        hideIntensityHero
                                     />
 
 

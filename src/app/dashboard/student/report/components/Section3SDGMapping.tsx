@@ -40,7 +40,11 @@ const dropdownClass = "w-full px-4 py-3 rounded-xl border border-slate-200 focus
 export default function Section3SDGMapping({ projectData }: Section3Props) {
     const { data, updateSection, getFieldError, validationErrors } = useReportForm();
     const { section3 } = data;
-    const { contribution_intent_statement, secondary_sdgs } = section3;
+    const {
+        contribution_intent_statement,
+        student_contribution_intent_statement,
+        secondary_sdgs
+    } = section3;
 
     const sectionErrors = validationErrors['section3'] || [];
     const hasErrors = sectionErrors.length > 0;
@@ -96,7 +100,8 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
 
 
 
-    const wordCount = (contribution_intent_statement || "").trim().split(/\s+/).filter((w: string) => w).length;
+    const primaryWordCount = (contribution_intent_statement || "").trim().split(/\s+/).filter((w: string) => w).length;
+    const studentWordCount = (student_contribution_intent_statement || "").trim().split(/\s+/).filter((w: string) => w).length;
 
     return (
         <div className="space-y-10 pb-16">
@@ -466,16 +471,16 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
                                     <div
                                         className={clsx(
                                             "h-full transition-all",
-                                            wordCount < 100 ? "bg-amber-400"
-                                                : wordCount > 200 ? "bg-red-500"
+                                            primaryWordCount < 100 ? "bg-amber-400"
+                                                : primaryWordCount > 200 ? "bg-red-500"
                                                     : "bg-emerald-500"
                                         )}
-                                        style={{ width: `${Math.min((wordCount / 200) * 100, 100)}%` }}
+                                        style={{ width: `${Math.min((primaryWordCount / 200) * 100, 100)}%` }}
                                     />
                                 </div>
 
                                 <span className="text-[10px] font-bold text-slate-500 uppercase tracking-tight">
-                                    {wordCount} / 200 Words
+                                    {primaryWordCount} / 200 Words
                                 </span>
                             </div>
                         </div>
@@ -645,10 +650,10 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
                                 placeholder="Describe the planned contribution pathway..."
                                 className={clsx(
                                     "min-h-[160px] rounded-xl border border-slate-200 bg-slate-50/30 p-4 text-sm focus:bg-white transition-all focus:ring-8 focus:ring-report-primary-soft/50 focus:border-report-primary-border",
-                                    getFieldError('contribution_intent_statement') && "border-red-300"
+                                    getFieldError('student_contribution_intent_statement') && "border-red-300"
                                 )}
-                                value={contribution_intent_statement || ''}
-                                onChange={(e) => updateSection('section3', { contribution_intent_statement: e.target.value })}
+                                value={student_contribution_intent_statement || ''}
+                                onChange={(e) => updateSection('section3', { student_contribution_intent_statement: e.target.value })}
                             />
 
                             <div className="absolute bottom-4 right-4 flex items-center gap-3 bg-white/80 backdrop-blur px-3 py-1.5 rounded-lg border border-slate-200 shadow-sm">
@@ -656,21 +661,21 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
                                     <div
                                         className={clsx(
                                             "h-full transition-all",
-                                            wordCount < 100 ? "bg-amber-400"
-                                                : wordCount > 200 ? "bg-red-500"
+                                            studentWordCount < 100 ? "bg-amber-400"
+                                                : studentWordCount > 200 ? "bg-red-500"
                                                     : "bg-emerald-500"
                                         )}
-                                        style={{ width: `${Math.min((wordCount / 200) * 100, 100)}%` }}
+                                        style={{ width: `${Math.min((studentWordCount / 200) * 100, 100)}%` }}
                                     />
                                 </div>
 
                                 <span className="text-[10px] font-bold text-slate-500 uppercase tracking-tight">
-                                    {wordCount} / 200 Words
+                                    {studentWordCount} / 200 Words
                                 </span>
                             </div>
                         </div>
 
-                        <FieldError message={getFieldError('contribution_intent_statement')} />
+                        <FieldError message={getFieldError('student_contribution_intent_statement')} />
 
                     </div>
 

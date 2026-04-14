@@ -146,6 +146,7 @@ const metricHierarchy: Record<string, string[]> = {
 };
 
 const metricCategories = Object.keys(metricHierarchy);
+const METRIC_CATEGORY_OTHER = "🔹 Other";
 
 const confidenceLevels = ["Directly Measured", "Partner Confirmed", "Observed", "Estimated"];
 
@@ -260,7 +261,7 @@ function OutcomeCard({
                     </div>
 
                     {/* Specific Metric Unit */}
-                    {outcome.metric_category && outcome.metric_category !== " Other" && (
+                    {outcome.metric_category && outcome.metric_category !== METRIC_CATEGORY_OTHER && (
                         <div className="space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
                             <Label className="report-label text-emerald-600">5.2.2.b Specific Metric Unit</Label>
                             <select
@@ -283,16 +284,20 @@ function OutcomeCard({
                     )}
 
                     {/* Other Metric Unit Explanation */}
-                    {outcome.metric_category === " Other" && (
+                    {outcome.metric_category === METRIC_CATEGORY_OTHER && (
                         <div className="space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
                             <Label className="report-label text-amber-600">Define Custom Metric Unit</Label>
                             <Input
                                 placeholder="e.g. Number of Solar Panels installed"
-                                value={outcome.metric_other}
-                                onChange={e => onUpdateFields({
-                                    metric: 'Other',
-                                    metric_other: e.target.value
-                                })}
+                                value={outcome.metric_other ?? ''}
+                                onChange={e => {
+                                    const v = e.target.value;
+                                    onUpdateFields({
+                                        metric: v.trim() ? v : 'Other',
+                                        metric_other: v,
+                                        unit: v.trim(),
+                                    });
+                                }}
                                 className="h-14 bg-white border-2 border-amber-200 rounded-2xl px-6 font-bold text-slate-700 focus:border-amber-400"
                             />
                         </div>

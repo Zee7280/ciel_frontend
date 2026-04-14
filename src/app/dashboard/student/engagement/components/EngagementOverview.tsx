@@ -26,10 +26,12 @@ interface EngagementMetrics {
     isNonCompliant?: boolean;
 }
 
-export default function EngagementOverview({ metrics, isTeam = false, participantNames = {} }: { 
+export default function EngagementOverview({ metrics, isTeam = false, participantNames = {}, hideIntensityHero = false }: { 
     metrics: EngagementMetrics, 
     isTeam?: boolean,
-    participantNames?: Record<string, string>
+    participantNames?: Record<string, string>,
+    /** When true, hides the dark intensity / HEC compliance hero (used in report Section 1 only). */
+    hideIntensityHero?: boolean,
 }) {
     const requiredHours = metrics.requiredHours || 16;
     
@@ -44,6 +46,7 @@ export default function EngagementOverview({ metrics, isTeam = false, participan
     return (
         <div className="space-y-8">
             {/* ── Engagement Intensity Hero (Image-Fidelity Version) ── */}
+            {!hideIntensityHero && (
             <div className="bg-gradient-to-br from-[#0c143d] via-[#101962] to-[#070b24] rounded-[2.5rem] p-12 text-white shadow-2xl relative overflow-hidden border border-white/5 group">
                 {/* Neon Glow Accents */}
                 <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-blue-500/10 rounded-full blur-[120px] -mr-40 -mt-40 group-hover:bg-blue-400/20 transition-colors duration-1000" />
@@ -156,6 +159,7 @@ export default function EngagementOverview({ metrics, isTeam = false, participan
                     </div>
                 )}
             </div>
+            )}
 
             {/* ── Analytics Highlighters (Institutional Summary) ── */}
             <div className="space-y-6">

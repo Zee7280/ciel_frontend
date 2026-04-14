@@ -71,7 +71,7 @@ const evidenceDocTypes = [
 // ─── Empty resource factory ────────────────────────────────────────────────────
 const emptyResource = () => ({
     type: '', type_other: '', amount: '', unit: '', unit_other: '',
-    sources: [] as string[], source_other: '', purpose: '', verification: ''
+    sources: [] as string[], source_other: '', purpose: '', verification: [] as string[]
 });
 
 // ─── File Preview ──────────────────────────────────────────────────────────────
@@ -155,9 +155,18 @@ function ResourceCard({
 }) {
     const purposeWords = (res.purpose || '').trim().split(/\s+/).filter((w: string) => w.length > 0).length;
     const sources: string[] = res.sources || [];
+    const verifications: string[] = Array.isArray(res.verification)
+        ? res.verification
+        : typeof res.verification === 'string' && res.verification
+            ? [res.verification]
+            : [];
 
     const toggleSource = (s: string) => {
         onUpdate('sources', sources.includes(s) ? sources.filter(x => x !== s) : [...sources, s]);
+    };
+
+    const toggleVerification = (v: string) => {
+        onUpdate('verification', verifications.includes(v) ? verifications.filter(x => x !== v) : [...verifications, v]);
     };
 
     return (
@@ -259,21 +268,27 @@ function ResourceCard({
                         </div>
                     )}
 
-                    {/* 6.2.6 Verification */}
+                    {/* 6.2.6 Verification — multi-select */}
                     <div className="space-y-3">
-                        <Label className="report-label">6.2.6 — Verification Status</Label>
-                        <div className="grid grid-cols-2 gap-2">
+                        <Label className="report-label">6.2.6 — Verification Status (Select All That Apply)</Label>
+                        <div className="grid grid-cols-1 gap-1.5">
                             {verificationOptions.map(v => (
                                 <button
                                     key={v} type="button"
-                                    onClick={() => onUpdate('verification', v)}
+                                    onClick={() => toggleVerification(v)}
                                     className={clsx(
-                                        "px-3 py-2 rounded-xl border-2 report-label !text-[9px] text-left transition-all",
-                                        res.verification === v
-                                            ? "border-report-primary bg-report-primary-soft text-report-primary shadow-sm shadow-report-primary-shadow"
-                                            : "border-slate-100 bg-slate-50 text-slate-500 hover:bg-slate-100"
+                                        "flex items-center gap-2 px-3 py-2 rounded-xl border-2 report-label !text-[9px] text-left transition-all",
+                                        verifications.includes(v)
+                                            ? "border-report-primary bg-report-primary-soft text-report-primary"
+                                            : "border-slate-50 bg-slate-50 text-slate-500 hover:bg-slate-100"
                                     )}
                                 >
+                                    <div className={clsx(
+                                        "w-3 h-3 rounded-sm border-2 flex items-center justify-center flex-shrink-0",
+                                        verifications.includes(v) ? "border-report-primary bg-report-primary" : "border-slate-300"
+                                    )}>
+                                        {verifications.includes(v) && <CheckCircle2 className="w-2 h-2 text-white" />}
+                                    </div>
                                     {v}
                                 </button>
                             ))}
@@ -286,7 +301,6 @@ function ResourceCard({
                     {/* 6.2.4 Source — multi-select */}
                     <div className="space-y-3">
                         <Label className="report-label">6.2.4 — Source of Resource (Select All That Apply)</Label>
-                        pocket-sized
                         <div className="grid grid-cols-1 gap-1.5">
                             {sourceOptions.map(s => (
                                 <button

@@ -1,4 +1,4 @@
-import { BarChart3, PieChart, ShieldAlert, Sparkles, Loader2, Quote, Award, Clock, Users, Target, ShieldCheck, Download, TrendingUp, X, Printer, CheckCircle, Eye, AlertTriangle, Lock } from "lucide-react";
+import { BarChart3, ShieldAlert, Sparkles, Loader2, Quote, Award, Clock, Users, Target, ShieldCheck, Download, TrendingUp, X, Printer, CheckCircle, Eye, AlertTriangle, Lock } from "lucide-react";
 import { Button } from "./ui/button";
 import { useReportForm } from "../context/ReportContext";
 import React, { useState, useMemo, useEffect } from "react";
@@ -10,14 +10,27 @@ import { toast } from "sonner";
 import clsx from "clsx";
 
 export default function Section11Summary() {
-    const { data, updateSection, isEligibleForSubmission, areAllSectionsComplete } = useReportForm();
+    const {
+        data,
+        updateSection,
+        isEligibleForSubmission,
+        areAllSectionsComplete,
+        showVerifiedImpactScores,
+        incompleteSectionsSummary,
+    } = useReportForm();
     const { section1, section2, section3, section4, section5, section8, section9, section10 } = data;
 
     const [showPreview, setShowPreview] = useState(false);
     const [showCertificate, setShowCertificate] = useState(false);
 
-    const beneficiaries = section4.project_summary?.distinct_total_beneficiaries || 0;
-    const engagementScore = section1.metrics?.eis_score || 72;
+    const beneficiariesRaw = section4.project_summary?.distinct_total_beneficiaries;
+    const beneficiaries =
+        beneficiariesRaw !== undefined &&
+        beneficiariesRaw !== null &&
+        String(beneficiariesRaw).trim() !== ""
+            ? String(beneficiariesRaw)
+            : "0";
+    const engagementScore = section1.metrics?.eis_score ?? 0;
     const verifiedHours = section1.metrics?.total_verified_hours || 0;
 
     const [isGenerating, setIsGenerating] = useState(false);
@@ -70,11 +83,37 @@ export default function Section11Summary() {
         window.print();
     };
 
+    const primaryGoalNum = section3.primary_sdg?.goal_number;
+    const hasPrimarySdg =
+        primaryGoalNum !== null &&
+        primaryGoalNum !== undefined &&
+        String(primaryGoalNum).trim() !== "";
+
     const stats = [
-        { label: "CII Index Score", val: engagementScore, suffix: "/100", icon: Award },
-        { label: "Verified Hours", val: verifiedHours, suffix: "hrs", icon: Clock },
-        { label: "Beneficiaries", val: beneficiaries, suffix: "pax", icon: Users },
-        { label: "SDG Priority", val: `Goal ${section3.primary_sdg?.goal_number || "—"}`, suffix: "", icon: Target },
+        {
+            label: "CII Index Score",
+            icon: Award,
+            display: `${engagementScore} / 100`,
+            suffix: "" as string,
+        },
+        {
+            label: "Verified Hours",
+            icon: Clock,
+            display: `${verifiedHours}`,
+            suffix: "HRS",
+        },
+        {
+            label: "Beneficiaries",
+            icon: Users,
+            display: `${beneficiaries}`,
+            suffix: "PAX",
+        },
+        {
+            label: "SDG Priority",
+            icon: Target,
+            display: hasPrimarySdg ? `Goal ${primaryGoalNum}` : "—",
+            suffix: "",
+        },
     ];
 
     const complianceItems = [
@@ -103,37 +142,85 @@ export default function Section11Summary() {
 
     return (
         <div className="space-y-14 pb-20">
-            {/* ── Section Header ── */}
-            <div className="space-y-8">
-                <div className="flex items-center gap-4">
-                    <div className="w-14 h-14 rounded-2xl bg-report-primary text-white flex items-center justify-center shadow-xl shadow-report-primary-shadow ring-4 ring-report-primary-soft">
-                        <BarChart3 className="w-7 h-7" />
+            {/* ── Section Header — Intelligence strip ── */}
+            <div className="space-y-6">
+                <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-6 rounded-3xl border border-slate-200/80 bg-gradient-to-br from-white via-slate-50/40 to-white px-6 py-6 md:px-8 md:py-7 shadow-sm">
+                    <div className="flex items-start gap-4 min-w-0">
+                        <div className="w-14 h-14 shrink-0 rounded-2xl bg-report-primary text-white flex items-center justify-center shadow-lg shadow-report-primary-shadow ring-4 ring-report-primary-soft">
+                            <BarChart3 className="w-7 h-7" />
+                        </div>
+                        <div className="min-w-0 space-y-1">
+                            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-report-primary">
+                                Section 11 — Intelligence
+                            </p>
+                            <h2 className="report-h2 text-slate-900">Institutional impact dashboard</h2>
+                            <p className="report-label text-slate-500">
+                                Final preview, compliance signals, and submission readiness
+                            </p>
+                        </div>
                     </div>
-                    <div>
-                        <h2 className="report-h2">Section 11 — Intelligence</h2>
-                        <p className="report-label">Institutional Impact Dashboard &amp; Final Preview</p>
-                    </div>
+                    {!showVerifiedImpactScores && (
+                        <div className="flex items-start gap-2 rounded-2xl border border-amber-100 bg-amber-50/60 px-4 py-3 text-left max-w-md">
+                            <Lock className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+                            <p className="text-[11px] font-semibold text-amber-900 leading-snug">
+                                Quantified scores (CII index, hours, beneficiaries, SDG priority) unlock after your reporting fee is confirmed and an administrator verifies your submission.
+                            </p>
+                        </div>
+                    )}
                 </div>
 
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
                     {stats.map((stat, i) => (
-                        <div key={i} className="group bg-white border-2 border-slate-100 rounded-2xl p-6 flex flex-col gap-4 transition-all duration-300 hover:border-report-primary-border hover:shadow-xl hover:shadow-report-primary-shadow">
-                            <div className="w-10 h-10 rounded-xl bg-report-primary-soft text-report-primary flex items-center justify-center group-hover:scale-105 transition-transform">
-                                <stat.icon className="w-4.5 h-4.5" />
+                        <div
+                            key={i}
+                            className={clsx(
+                                "group relative overflow-hidden rounded-2xl border bg-white p-5 md:p-6 flex flex-col gap-3 transition-all duration-300",
+                                showVerifiedImpactScores
+                                    ? "border-slate-200/90 shadow-sm hover:border-report-primary-border hover:shadow-lg hover:shadow-report-primary-shadow"
+                                    : "border-slate-100 shadow-inner",
+                            )}
+                        >
+                            <div
+                                className={clsx(
+                                    "w-10 h-10 rounded-xl flex items-center justify-center transition-transform",
+                                    showVerifiedImpactScores
+                                        ? "bg-report-primary-soft text-report-primary group-hover:scale-105"
+                                        : "bg-slate-100 text-slate-400",
+                                )}
+                            >
+                                <stat.icon className="w-[18px] h-[18px]" />
                             </div>
-                            <div>
-                                <p className="report-h3 !text-2xl font-black">
-                                    {stat.val}
-                                    {stat.suffix && <span className="text-xs font-bold text-slate-400 ml-1 uppercase tracking-wider">{stat.suffix}</span>}
+                            <div className="space-y-1.5">
+                                {showVerifiedImpactScores ? (
+                                    <p className="report-h3 !text-xl md:!text-2xl font-black tracking-tight text-slate-900">
+                                        {stat.display}
+                                        {stat.suffix ? (
+                                            <span className="text-[10px] md:text-xs font-bold text-slate-400 ml-1.5 uppercase tracking-widest align-middle">
+                                                {stat.suffix}
+                                            </span>
+                                        ) : null}
+                                    </p>
+                                ) : (
+                                    <div className="flex flex-col gap-1">
+                                        <span className="inline-flex items-center gap-2 text-sm font-bold text-slate-400">
+                                            <Lock className="w-3.5 h-3.5" />
+                                            Locked
+                                        </span>
+                                        <span className="text-[10px] font-semibold text-slate-400 leading-snug">
+                                            Available after payment + admin verification
+                                        </span>
+                                    </div>
+                                )}
+                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                                    {stat.label}
                                 </p>
-                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-2">{stat.label}</p>
                             </div>
                         </div>
                     ))}
                 </div>
             </div>
 
-            {(data?.status === 'submitted' || data?.status === 'under_review' || data?.status === 'approved' || data?.status === 'verified' || data?.admin_status === 'verified' || data?.admin_status === 'approved') && (
+            {showVerifiedImpactScores && (
                 <div className="w-full flex justify-center">
                     <CIIDashboardMeter />
                 </div>
@@ -277,7 +364,8 @@ export default function Section11Summary() {
                             <div className="p-5 bg-amber-50/50 border border-amber-100 rounded-2xl flex items-start gap-4">
                                 <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
                                 <p className="text-xs font-bold text-amber-700 leading-relaxed text-left">
-                                    Final submission and **Section 10 (Sustainability)** will remain locked until all 16 hours are verified.
+                                    Final submission and <strong>Section 10 (Sustainability)</strong> will remain locked until all{" "}
+                                    {data.required_hours || 16} hours are verified.
                                 </p>
                             </div>
                         </div>
@@ -304,12 +392,36 @@ export default function Section11Summary() {
                                         <p className="text-xs font-bold">{verifiedHours} / {data.required_hours || 16} Hours</p>
                                     </div>
                                 </div>
-                                <div className="p-5 rounded-2xl border-2 border-amber-100 bg-amber-50/50 flex items-center gap-4">
-                                    <div className="w-8 h-8 rounded-full bg-amber-200 text-amber-700 flex items-center justify-center shrink-0 font-bold text-sm">!</div>
-                                    <div className="space-y-0.5 text-left">
-                                        <p className="text-[10px] font-black uppercase tracking-widest leading-none text-amber-900">Sections 1–10</p>
-                                        <p className="text-xs font-bold text-amber-800">Complete required fields on each step</p>
+                                <div className="p-5 rounded-2xl border-2 border-amber-100 bg-amber-50/50 flex flex-col gap-3 text-left">
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-8 h-8 rounded-full bg-amber-200 text-amber-700 flex items-center justify-center shrink-0 font-bold text-sm">
+                                            !
+                                        </div>
+                                        <div className="space-y-0.5 min-w-0">
+                                            <p className="text-[10px] font-black uppercase tracking-widest leading-none text-amber-900">
+                                                Sections 1–10
+                                            </p>
+                                            <p className="text-xs font-bold text-amber-800">
+                                                Fix the items below, then return to this step to submit.
+                                            </p>
+                                        </div>
                                     </div>
+                                    {incompleteSectionsSummary.length > 0 && (
+                                        <ul className="max-h-48 overflow-y-auto space-y-2.5 pl-1 border-t border-amber-100/80 pt-3 text-[11px] text-amber-950">
+                                            {incompleteSectionsSummary.map((block) => (
+                                                <li key={block.section} className="rounded-lg bg-white/70 px-2.5 py-2 border border-amber-100/90">
+                                                    <span className="font-black text-amber-900">
+                                                        Step {block.section} — {block.label}
+                                                    </span>
+                                                    <ul className="mt-1 ml-3 list-disc text-amber-900/85 font-medium space-y-0.5">
+                                                        {block.errors.map((err, j) => (
+                                                            <li key={`${block.section}-${err.field}-${j}`}>{err.message}</li>
+                                                        ))}
+                                                    </ul>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    )}
                                 </div>
                             </div>
                         </div>
