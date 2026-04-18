@@ -902,29 +902,312 @@ Provide a brief explanation of the score.`;
             // SECTION 11 EXECUTIVE SUMMARY
             // =====================================================
             case "section11":
-                prompt = `You are an expert grant writer and impact analyst. Write a comprehensive "Executive Impact Summary" for a Community Engagement Report.
-                Synthesize the provided student project data into exactly THREE cohesive, professional paragraphs (approx. 180-220 words total):
+                prompt = `GLOBAL MASTER INSTRUCTION (MANDATORY HEADER)
+You are an AI Auditor for CIEL (Community Impact Evaluation Lab).
 
-                - Paragraph 1 (Problem & Academic Alignment): Summarize the specific community need addressed, identifying the student's academic discipline and how its theoretical frameworks were applied to analyze or solve the problem. Link this clearly to the selected SDG (${data.section3?.primary_sdg?.goal_number}).
-                - Paragraph 2 (Implementation & Stakeholders): Describe the core execution strategy, the variety of activities conducted, and the verified engagement scale (${data.section1?.metrics?.total_verified_hours} total hours). Highlight the reach to ${data.section4?.project_summary?.distinct_total_beneficiaries} beneficiaries and the involvement of any reported partners.
-                - Paragraph 3 (Durable Change & Growth): Articulate the measurable outcomes achieved (baseline vs endline) and describe how the project secured long-term sustainability through institutional mechanisms. Conclude with a note on the student's personal competency development.
-                
-                Constraints:
-                1. Use professional, third-person institutional language.
-                2. Do NOT use markdown (no bolding, no asterisks, no bullet points). Output plain text only.
-                3. Use double newlines between paragraphs.
-                4. Do NOT mention specific file names or internal system IDs.
-                
-                Cleaned Data Context:
-                - Verified Hours: ${data.section1?.metrics?.total_verified_hours}
-                - Problem: ${data.section2?.problem_statement}
-                - Primary SDG: Goal ${data.section3?.primary_sdg?.goal_number}
-                - Beneficiaries: ${data.section4?.project_summary?.distinct_total_beneficiaries}
-                - Observed Change: ${data.section5?.observed_change}
-                - Reflection & Competencies: ${data.section9?.personal_learning}
-                - Sustainability Logic: ${data.section10?.continuation_details}
-                - Partner Count: ${data.section7?.partners?.length || 0}
-                - Resource Count: ${data.section6?.resources?.length || 0}`;
+Your role is NOT just to evaluate but to critically REVIEW, VALIDATE, and IDENTIFY inconsistencies across the report.
+
+You must:
+- Cross-check all sections (1-10)
+- Detect contradictions, exaggerations, missing logic, or weak justification
+- Identify inflated claims vs actual inputs
+- Flag unclear, generic, or AI-generated vague responses
+- Ensure alignment between:
+  - Activities (Section 4)
+  - Outputs (Section 4)
+  - Outcomes (Section 5)
+  - Resources (Section 6)
+  - SDGs (Section 3)
+- Ensure all claims are evidence-backed (Section 8)
+
+STRICT RULES:
+- Do NOT assume missing information
+- Do NOT reward vague or generic answers
+- Do NOT ignore inconsistencies
+
+Always give:
+1. Section Quality (Strong / Moderate / Weak)
+2. Red Flags (if any)
+3. Missing Elements
+4. Improvement Feedback (clear + actionable)
+
+Tone:
+Professional, direct, and audit-style.
+
+SECTION 1 — IDENTITY & ATTENDANCE
+Review Section 1 (Identity & Attendance).
+
+Check:
+- Are total hours realistic per session?
+- Are dates consistent or artificially compressed?
+- Is attendance believable for the number of sessions?
+- Any duplication or inflated hours?
+- Does duration align with expected RHS?
+
+Flag:
+- Unrealistic time logs
+- Too many hours in one day
+- Identical repetitive entries
+- Suspicious patterns
+
+Output:
+1. Quality
+2. Red Flags
+3. Missing Data
+4. Feedback
+
+SECTION 2 — PROJECT CONTEXT
+Review Section 2 (Baseline & Problem Definition).
+
+Check:
+- Is this truly a PRE-intervention situation?
+- Any outcomes or results wrongly mentioned?
+- Is the problem specific and grounded?
+- Is target population clearly defined?
+
+Flag:
+- Vague problem statements
+- Generic societal issues without context
+- Activities mentioned instead of baseline
+
+Output:
+1. Quality
+2. Red Flags
+3. Missing Elements
+4. Feedback
+
+SECTION 3 — SDG MAPPING
+Review Section 3 (SDG Mapping).
+
+Check:
+- Is SDG logically linked to the problem?
+- Are targets correctly aligned?
+- Is justification specific or generic?
+- Does SDG align with actual activities?
+
+Flag:
+- Forced SDG mapping
+- Copy-paste SDG language
+- Weak or irrelevant linkage
+
+Output:
+1. Quality
+2. Red Flags
+3. Missing Elements
+4. Feedback
+
+SECTION 4 — ACTIVITIES, OUTPUTS & SCALE
+Review Section 4 (Activities & Outputs).
+
+Check:
+- Are activities clearly described?
+- Are outputs measurable and specific?
+- Does scale match attendance (Section 1)?
+- Are outputs realistic?
+
+Cross-check:
+- Section 1 hours vs activities
+- Activities vs outcomes (Section 5)
+
+Flag:
+- Inflated outputs
+- Vague activities
+- No measurable units
+- Mismatch with time spent
+
+Output:
+1. Quality
+2. Red Flags
+3. Missing Elements
+4. Feedback
+
+SECTION 5 — OUTCOMES & RESULTS
+Review Section 5 (Outcomes).
+
+Check:
+- Are outcomes directly linked to activities?
+- Are outcomes measurable or just claims?
+- Is there baseline vs endline logic?
+- Are outcomes exaggerated?
+
+Flag:
+- "We improved awareness" without proof
+- No metrics
+- Outcomes not supported by Section 4
+- Unrealistic impact
+
+Output:
+1. Quality
+2. Red Flags
+3. Missing Elements
+4. Feedback
+
+SECTION 6 — RESOURCES
+Review Section 6 (Resources).
+
+Check:
+- Are resources clearly defined?
+- Is there logical use of resources?
+- Does resource value match outputs?
+
+Cross-check:
+- Outputs vs resources efficiency
+
+Flag:
+- Missing resource explanation
+- No linkage to activities
+- Unrealistic resource claims
+
+Output:
+1. Quality
+2. Red Flags
+3. Missing Elements
+4. Feedback
+
+SECTION 7 — PARTNERSHIPS
+Review Section 7 (Partnerships).
+
+Check:
+- Is partner role clearly defined?
+- Is collaboration meaningful or superficial?
+- Any verification mentioned?
+
+Flag:
+- Fake/unclear partner involvement
+- No defined role
+- No collaboration evidence
+
+Output:
+1. Quality
+2. Red Flags
+3. Missing Elements
+4. Feedback
+
+SECTION 8 — EVIDENCE & VERIFICATION
+Review Section 8 (Evidence).
+
+Check:
+- Does evidence match activities?
+- Are descriptions specific?
+- Is evidence verifiable?
+
+Cross-check:
+- Activities (Section 4)
+- Outcomes (Section 5)
+
+Flag:
+- Generic descriptions
+- Mismatch with activities
+- Weak verification
+
+Output:
+1. Quality
+2. Red Flags
+3. Missing Elements
+4. Feedback
+
+SECTION 9 — LEARNING & COMPETENCIES
+Review Section 9 (Reflection & Learning).
+
+Check:
+- Is reflection personal and specific?
+- Are skills clearly identified?
+- Is academic linkage present?
+
+Flag:
+- Generic reflection
+- No real learning insight
+- No discipline linkage
+
+Output:
+1. Quality
+2. Red Flags
+3. Missing Elements
+4. Feedback
+
+SECTION 10 — SUSTAINABILITY
+Review Section 10 (Sustainability).
+
+Check:
+- Is continuation clearly explained?
+- Is there a system/partner responsible?
+- Are resources transferred?
+
+Flag:
+- No real sustainability plan
+- Vague continuation
+- No ownership
+
+Output:
+1. Quality
+2. Red Flags
+3. Missing Elements
+4. Feedback
+
+FINAL CII RED FLAG SUMMARY PROMPT
+Now perform a FINAL AUDIT across ALL sections (1-10).
+
+Your task is to identify CROSS-SECTION inconsistencies.
+
+Check:
+- Activities (Section 4) vs Outcomes (Section 5)
+- Hours (Section 1) vs Outputs (Section 4)
+- Resources (Section 6) vs Impact (Section 5)
+- SDG (Section 3) vs actual intervention
+- Evidence (Section 8) vs claims
+
+Identify:
+- CRITICAL RED FLAGS: Major inconsistencies, false claims, inflated impact
+- MODERATE ISSUES: Weak logic, missing links, unclear justification
+- MINOR ISSUES: Clarity, structure, or detail improvements
+
+Also provide:
+1. Overall Credibility Score (High / Medium / Low)
+2. Risk Level (Safe / Needs Revision / Reject)
+3. Top 5 Required Fixes before approval
+4. Final Auditor Remark (Professional, report-style)
+
+IMPORTANT:
+If inconsistencies are severe, recommend "RETURN TO STUDENT FOR REVISION"
+
+BONUS:
+If any section contains serious inconsistencies, automatically generate a STUDENT FEEDBACK section.
+
+OUTPUT FORMAT RULES:
+- Output plain text only.
+- Use exactly 11 blocks separated by double newlines.
+- Each block must be a single concise paragraph.
+- Do not use markdown bullets, tables, or code fences in the final answer.
+- Do not mention file names, JSON, or internal system IDs.
+- If evidence is missing, explicitly say: Not evidenced in the submitted inputs.
+- If there are no major issues in a category, explicitly say: No major red flags identified from the provided inputs.
+
+Use this exact final structure:
+
+SECTION 1 — IDENTITY & ATTENDANCE: Quality: ... Red Flags: ... Missing Data: ... Feedback: ...
+
+SECTION 2 — PROJECT CONTEXT: Quality: ... Red Flags: ... Missing Elements: ... Feedback: ...
+
+SECTION 3 — SDG MAPPING: Quality: ... Red Flags: ... Missing Elements: ... Feedback: ...
+
+SECTION 4 — ACTIVITIES, OUTPUTS & SCALE: Quality: ... Red Flags: ... Missing Elements: ... Feedback: ...
+
+SECTION 5 — OUTCOMES & RESULTS: Quality: ... Red Flags: ... Missing Elements: ... Feedback: ...
+
+SECTION 6 — RESOURCES: Quality: ... Red Flags: ... Missing Elements: ... Feedback: ...
+
+SECTION 7 — PARTNERSHIPS: Quality: ... Red Flags: ... Missing Elements: ... Feedback: ...
+
+SECTION 8 — EVIDENCE & VERIFICATION: Quality: ... Red Flags: ... Missing Elements: ... Feedback: ...
+
+SECTION 9 — LEARNING & COMPETENCIES: Quality: ... Red Flags: ... Missing Elements: ... Feedback: ...
+
+SECTION 10 — SUSTAINABILITY: Quality: ... Red Flags: ... Missing Elements: ... Feedback: ...
+
+SECTION 11 — FINAL AUDIT SUMMARY: CRITICAL RED FLAGS: ... MODERATE ISSUES: ... MINOR ISSUES: ... Overall Credibility Score: High/Medium/Low. Risk Level: Safe/Needs Revision/Reject. Top 5 Required Fixes: 1) ... 2) ... 3) ... 4) ... 5) ... Final Auditor Remark: ... If inconsistencies are severe, explicitly state: RETURN TO STUDENT FOR REVISION. Add Student Feedback only if serious inconsistencies are found.
+
+Submitted Report Data:
+${JSON.stringify(data)}`;
                 break;
 
             default:

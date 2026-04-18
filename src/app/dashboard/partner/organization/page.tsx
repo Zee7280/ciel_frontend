@@ -14,6 +14,30 @@ const normalizeBoolean = (value: unknown) => {
     return Boolean(value);
 };
 
+/** Keep `ciel_user` aligned with organisation profile so partner profile / gates see NGO dashboard data. */
+function syncStoredUserFromOrganisation(apiData: Record<string, unknown>) {
+    try {
+        const city = normalizeText(apiData.city);
+        const orgName = normalizeText(apiData.name);
+        const contactPhone = normalizeText(apiData.contactPhone);
+        const raw = localStorage.getItem("ciel_user") || localStorage.getItem("user");
+        const prev = raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
+        const merged: Record<string, unknown> = { ...prev };
+        if (city) merged.city = city;
+        if (orgName) merged.organization = orgName;
+        if (contactPhone) {
+            merged.phone = contactPhone;
+            merged.contact = contactPhone;
+            merged.contactPhone = contactPhone;
+        }
+        const s = JSON.stringify(merged);
+        localStorage.setItem("ciel_user", s);
+        localStorage.setItem("user", s);
+    } catch {
+        /* ignore */
+    }
+}
+
 export default function OrganizationProfilePage() {
     const [isEditing, setIsEditing] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
@@ -77,6 +101,7 @@ export default function OrganizationProfilePage() {
                     const apiData = data.data || data;
 
                     if (apiData) {
+                        syncStoredUserFromOrganisation(apiData as Record<string, unknown>);
                         // Handle logo URL
                         let logoUrl = normalizeText(apiData.logoUrl ?? apiData.image);
                         if (logoUrl && logoUrl.startsWith("/")) {
@@ -257,6 +282,11 @@ export default function OrganizationProfilePage() {
                 // Allow success flag OR if data is returned directly (implied success via res.ok)
                 if (data.success || data.id || data.userId) {
                     setIsEditing(false);
+                    syncStoredUserFromOrganisation({
+                        city: orgData.city,
+                        name: orgData.name,
+                        contactPhone: orgData.contactPhone,
+                    });
                     // Optionally update state with response data if API returns updated object
                     // Note: If API returns the mapped object, we might need to map it back to state if we use the response
                     toast.success("Profile updated successfully!");

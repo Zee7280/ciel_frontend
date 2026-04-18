@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { User, Mail, Phone, Building, Camera, Lock, Loader2, Save, MapPin } from "lucide-react";
 import { authenticatedFetch } from "@/utils/api";
 import { toast } from "sonner";
@@ -67,7 +68,9 @@ function mapRawToProfile(raw: Record<string, unknown>): Profile {
         id: Number.isFinite(idNum) ? idNum : 0,
         name: str(raw.name || raw.full_name || raw.fullName).trim(),
         email: str(raw.email).trim(),
-        phone: str(raw.phone || raw.contact || raw.mobile || raw.phone_number).trim(),
+        phone: str(
+            raw.phone || raw.contact || raw.mobile || raw.phone_number || raw.contactPhone || raw.contact_phone
+        ).trim(),
         avatar: str(raw.avatar || raw.avatar_url || raw.image).trim(),
         role: str(raw.role).trim(),
         organization: pickOrganizationName(raw),
@@ -98,7 +101,46 @@ function formatMemberSince(isoOrDate: string): string | null {
     return Number.isNaN(d.getTime()) ? null : d.toLocaleDateString();
 }
 
+/** NGO / partner org city & contacts live on organisation APIs; merge into session cache for profile completion. */
+async function fetchOrganisationProfilePatch(): Promise<Partial<Profile> | null> {
+    try {
+        const storedUser = localStorage.getItem("ciel_user") || localStorage.getItem("user");
+        if (!storedUser) return null;
+        const userObj = JSON.parse(storedUser) as Record<string, unknown>;
+        const userId = userObj.id ?? userObj.userId;
+        if (userId == null || userId === "") return null;
+        const orgRes = await authenticatedFetch(`/api/v1/organisation/profile/detail`, {
+            method: "POST",
+            body: JSON.stringify({ userId }),
+        });
+        if (!orgRes?.ok) return null;
+        const data = (await orgRes.json()) as Record<string, unknown>;
+        const apiData = (data.data ?? data) as Record<string, unknown>;
+        if (!apiData || typeof apiData !== "object") return null;
+        const city = String(apiData.city ?? "").trim();
+        const orgName = String(apiData.name ?? "").trim();
+        const contactPhone = String(apiData.contactPhone ?? "").trim();
+        const patch: Partial<Profile> = {};
+        if (city) patch.city = city;
+        if (orgName) patch.organization = orgName;
+        if (contactPhone) patch.phone = contactPhone;
+        return Object.keys(patch).length ? patch : null;
+    } catch {
+        return null;
+    }
+}
+
+function mergePartnerProfileFromOrgPatch(base: Profile, patch: Partial<Profile>): Profile {
+    return {
+        ...base,
+        city: base.city.trim() || patch.city || "",
+        organization: base.organization.trim() || patch.organization || "",
+        phone: base.phone.trim() || patch.phone || "",
+    };
+}
+
 export default function PartnerProfilePage() {
+    const router = useRouter();
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
     const [profile, setProfile] = useState<Profile | null>(null);
@@ -111,45 +153,65 @@ export default function PartnerProfilePage() {
     });
 
     useEffect(() => {
+        router.replace("/dashboard/partner/organization");
+    }, [router]);
+
+    useEffect(() => {
         fetchProfile();
     }, []);
 
     const fetchProfile = async () => {
         try {
+            let fromLs: Profile | null = null;
             try {
                 const raw = localStorage.getItem("ciel_user") || localStorage.getItem("user");
                 if (raw) {
                     const stored = JSON.parse(raw) as Record<string, unknown>;
-                    setProfile(mapRawToProfile(stored));
+                    fromLs = mapRawToProfile(stored);
+                    setProfile(fromLs);
                 }
             } catch {
                 /* ignore */
             }
 
+            let merged: Profile | null = fromLs;
+            let lastRecord: Record<string, unknown> | null = null;
             const res = await authenticatedFetch(`/api/v1/profile`);
             if (res && res.ok) {
                 const json = await res.json();
                 const record = extractProfileRecord(json);
                 if (record && Object.keys(record).length > 0) {
+                    lastRecord = record;
                     const mapped = mapRawToProfile(record);
-                    setProfile((prev) => mergeProfiles(prev, mapped));
-                    try {
-                        const prevRaw = localStorage.getItem("ciel_user") || localStorage.getItem("user");
-                        const prev = prevRaw ? (JSON.parse(prevRaw) as Record<string, unknown>) : {};
-                        const merged = {
-                            ...prev,
-                            ...record,
-                            name: mapped.name || prev.name,
-                            phone: mapped.phone || prev.phone,
-                            contact: mapped.phone || prev.contact || prev.phone,
-                            email: mapped.email || prev.email,
-                            city: mapped.city || prev.city,
-                        };
-                        localStorage.setItem("ciel_user", JSON.stringify(merged));
-                        localStorage.setItem("user", JSON.stringify(merged));
-                    } catch {
-                        /* ignore cache sync errors */
-                    }
+                    merged = mergeProfiles(fromLs, mapped);
+                }
+            }
+
+            if (merged) {
+                const needsOrg =
+                    !merged.city.trim() || !merged.phone.trim() || !merged.organization.trim();
+                if (needsOrg) {
+                    const patch = await fetchOrganisationProfilePatch();
+                    if (patch) merged = mergePartnerProfileFromOrgPatch(merged, patch);
+                }
+                setProfile(merged);
+                try {
+                    const prevRaw = localStorage.getItem("ciel_user") || localStorage.getItem("user");
+                    const prev = prevRaw ? (JSON.parse(prevRaw) as Record<string, unknown>) : {};
+                    const mergedLs = {
+                        ...prev,
+                        ...(lastRecord || {}),
+                        name: merged.name || prev.name,
+                        phone: merged.phone || prev.phone,
+                        contact: merged.phone || prev.contact || prev.phone,
+                        email: merged.email || prev.email,
+                        city: merged.city || prev.city,
+                        organization: merged.organization || prev.organization,
+                    };
+                    localStorage.setItem("ciel_user", JSON.stringify(mergedLs));
+                    localStorage.setItem("user", JSON.stringify(mergedLs));
+                } catch {
+                    /* ignore cache sync errors */
                 }
             }
         } catch (error) {

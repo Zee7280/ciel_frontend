@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import dynamic from "next/dynamic";
 import { findSdgById, opportunityFormSdgList } from "@/utils/sdgData";
 import { pakistaniUniversities } from "@/utils/universityData";
+import { formatOpportunityDetailStatusBadge } from "@/utils/opportunityWorkflow";
 
 const LocationPicker = dynamic(() => import("@/components/ui/LocationPicker"), {
     ssr: false,
@@ -92,6 +93,9 @@ function OpportunityDetailsContent() {
         focalPerson: { name: "", contact: "" }
     });
 
+    /** Top-level fields from detail API for status badge (not inferred from `workflow_stage`). */
+    const [opportunityApiRecord, setOpportunityApiRecord] = useState<Record<string, unknown> | null>(null);
+
     const toggleSection = (section: string) => {
         setExpandedSections(prev =>
             prev.includes(section)
@@ -124,6 +128,9 @@ function OpportunityDetailsContent() {
                     const data = await res.json().catch(() => ({}));
                     if (data.success || data.id) {
                         const opp = data.data || data;
+                        setOpportunityApiRecord(
+                            opp && typeof opp === "object" && !Array.isArray(opp) ? (opp as Record<string, unknown>) : null,
+                        );
 
                         // Set Org Details from Opportunity Response if available
                         if (opp.organization) {
@@ -435,6 +442,14 @@ function OpportunityDetailsContent() {
     /*                                VIEW MODE UI                                */
     /* -------------------------------------------------------------------------- */
     if (!isEditing) {
+        const partnerDetailStatusBadge = opportunityApiRecord
+            ? formatOpportunityDetailStatusBadge(opportunityApiRecord)
+            : "";
+        const partnerDetailWorkflowRaw =
+            opportunityApiRecord &&
+            typeof (opportunityApiRecord.workflow_stage ?? opportunityApiRecord.workflowStage) === "string"
+                ? String(opportunityApiRecord.workflow_stage ?? opportunityApiRecord.workflowStage).trim()
+                : "";
         return (
             <div className="w-full space-y-8 animate-in fade-in duration-500 pb-24">
                 {/* Header Actions */}
@@ -462,11 +477,32 @@ function OpportunityDetailsContent() {
                         <div className="flex justify-between items-start mb-4">
                             <div>
                                 <h1 className="text-3xl font-bold text-slate-900 mb-2">{formData.title}</h1>
-                                <div className="flex items-center gap-4 text-sm text-slate-500">
-                                    <span className="flex items-center gap-1.5"><MapPin className="w-4 h-4" /> {formData.location.city || "Remote"}</span>
-                                    <span className="flex items-center gap-1.5"><Calendar className="w-4 h-4" /> Last Updated: {new Date().toLocaleDateString()}</span>
-                                    <span className="bg-blue-50 text-blue-700 px-2.5 py-0.5 rounded-full text-xs font-bold uppercase">{formData.mode}</span>
-                                    <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold uppercase ${formData.visibility === 'public' ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700'}`}>{formData.visibility}</span>
+                                <div className="flex flex-col gap-2">
+                                    <div className="flex flex-wrap items-center gap-2 text-sm text-slate-500">
+                                        <span className="flex items-center gap-1.5"><MapPin className="w-4 h-4" /> {formData.location.city || "Remote"}</span>
+                                        <span className="flex items-center gap-1.5"><Calendar className="w-4 h-4" /> Last Updated: {new Date().toLocaleDateString()}</span>
+                                        <span className="bg-blue-50 text-blue-700 px-2.5 py-0.5 rounded-full text-xs font-bold uppercase">{formData.mode}</span>
+                                        <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold uppercase ${formData.visibility === 'public' ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700'}`}>{formData.visibility}</span>
+                                        {partnerDetailStatusBadge ? (
+                                            <span
+                                                className={`px-2.5 py-0.5 rounded-full text-xs font-bold uppercase border ${
+                                                    partnerDetailStatusBadge === "Live"
+                                                        ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+                                                        : partnerDetailStatusBadge === "Rejected"
+                                                          ? "bg-rose-50 text-rose-800 border-rose-200"
+                                                          : "bg-slate-50 text-slate-700 border-slate-200"
+                                                }`}
+                                            >
+                                                {partnerDetailStatusBadge}
+                                            </span>
+                                        ) : null}
+                                    </div>
+                                    {partnerDetailWorkflowRaw ? (
+                                        <p className="text-[11px] text-slate-500">
+                                            <span className="font-semibold text-slate-600">Pipeline step:</span>{" "}
+                                            {partnerDetailWorkflowRaw.replace(/_/g, " ")}
+                                        </p>
+                                    ) : null}
                                 </div>
                             </div>
                             <div className="text-right">

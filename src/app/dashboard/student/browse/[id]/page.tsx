@@ -4,14 +4,12 @@
 import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Button } from "../../report/components/ui/button";
-import { Badge } from "../../report/components/ui/badge";
 import { authenticatedFetch } from "@/utils/api";
 import {
     canEditReturnedOpportunity,
     extractOpportunityReturnRemarkSections,
     extractOpportunityReviewFeedback,
-    isStudentOpportunityLiveForReporting,
-    resolveStudentOpportunityWorkflow,
+    formatOpportunityDetailStatusBadge,
 } from "@/utils/opportunityWorkflow";
 import { readDashboardNavRoleFromStorage, type DashboardNavRole } from "@/utils/dashboardNavRole";
 import { formatDisplayId } from "@/utils/displayIds";
@@ -255,8 +253,12 @@ export default function OpportunityDetailsPage() {
         viewerNavRole === "admin" ? "/dashboard/admin/projects" : "/dashboard/student/browse";
     const opportunitiesBackLabel = viewerNavRole === "admin" ? "Back to all projects" : "Back to Opportunities";
     const hideStudentApplyActions = viewerNavRole === "admin" && !opportunity.isStudentOwner;
-    const workflow = resolveStudentOpportunityWorkflow(opportunity as Record<string, unknown>);
     const oppRecord = opportunity as Record<string, unknown>;
+    const detailStatusBadgeLabel = formatOpportunityDetailStatusBadge(oppRecord);
+    const detailWorkflowStageRaw =
+        typeof (oppRecord.workflow_stage ?? oppRecord.workflowStage) === "string"
+            ? String(oppRecord.workflow_stage ?? oppRecord.workflowStage).trim()
+            : "";
     const remarkSections = extractOpportunityReturnRemarkSections(oppRecord);
     const reviewFeedback =
         remarkSections.length === 0 ? extractOpportunityReviewFeedback(oppRecord) : null;
@@ -405,10 +407,26 @@ export default function OpportunityDetailsPage() {
                                         {applyEligibility.listingRestrictionLabel}
                                     </span>
                                 ) : null}
-                                {opportunity.status === 'active' && (
-                                    <span className="bg-emerald-50 text-emerald-700 px-2.5 py-0.5 rounded-full text-xs font-bold uppercase">Active</span>
-                                )}
+                                <span
+                                    className={`px-2.5 py-0.5 rounded-full text-xs font-bold uppercase border ${
+                                        detailStatusBadgeLabel === "Live"
+                                            ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+                                            : detailStatusBadgeLabel === "Completed"
+                                              ? "bg-slate-100 text-slate-800 border-slate-200"
+                                              : detailStatusBadgeLabel === "Rejected"
+                                                ? "bg-rose-50 text-rose-800 border-rose-200"
+                                                : "bg-amber-50 text-amber-900 border border-amber-200"
+                                    }`}
+                                >
+                                    {detailStatusBadgeLabel}
+                                </span>
                             </div>
+                            {detailWorkflowStageRaw ? (
+                                <p className="text-[11px] text-slate-500 mt-2">
+                                    <span className="font-semibold text-slate-600">Pipeline step:</span>{" "}
+                                    {detailWorkflowStageRaw.replace(/_/g, " ")}
+                                </p>
+                            ) : null}
                         </div>
                         <div className="text-right">
                             <div className="text-sm text-slate-400">Opportunity ID</div>

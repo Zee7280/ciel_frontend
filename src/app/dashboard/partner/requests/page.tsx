@@ -8,6 +8,7 @@ import { authenticatedFetch } from "@/utils/api";
 import { formatDisplayId } from "@/utils/displayIds";
 import { getStoredCurrentUserId } from "@/utils/currentUser";
 import { peekPersistedVerificationReturn } from "@/utils/verificationReturnUrl";
+import { resolvePartnerOpportunityListLabels } from "@/utils/opportunityWorkflow";
 import { toast } from "sonner";
 
 function isOwnedByCurrentPartner(opportunity: Record<string, unknown>, currentUserId: string) {
@@ -169,22 +170,35 @@ export default function PartnerRequestsPage() {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
-                                {requests.map((req) => (
+                                {requests.map((req) => {
+                                    const listLabels = resolvePartnerOpportunityListLabels(req as Record<string, unknown>);
+                                    const listToneClass =
+                                        listLabels.badgeTone === "live"
+                                            ? "bg-green-50 text-green-700 border-green-100"
+                                            : listLabels.badgeTone === "review"
+                                              ? "bg-amber-50 text-amber-700 border-amber-100"
+                                              : listLabels.badgeTone === "rejected"
+                                                ? "bg-red-50 text-red-700 border-red-100"
+                                                : "bg-slate-50 text-slate-600 border-slate-100";
+                                    return (
                                     <tr key={req.id} className="hover:bg-slate-50 transition-colors group">
                                         <td className="px-6 py-4">
                                             <div className="flex flex-col">
-                                                <div className="flex items-center gap-2 mb-1">
+                                                <div className="flex items-center gap-2 mb-1 flex-wrap">
                                                     <h3 className="font-bold text-slate-900 cursor-pointer hover:text-blue-600 transition-colors" onClick={() => router.push(`/dashboard/partner/requests/${req.id}`)}>
                                                         {req.title}
                                                     </h3>
-                                                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide border
-                                                        ${req.status === 'active' ? 'bg-green-50 text-green-700 border-green-100' :
-                                                            req.status === 'pending_approval' ? 'bg-amber-50 text-amber-700 border-amber-100' :
-                                                                req.status === 'rejected' ? 'bg-red-50 text-red-700 border-red-100' :
-                                                                    'bg-slate-50 text-slate-600 border-slate-100'}`}>
-                                                        {req.status?.replace('_', ' ')}
+                                                    <span
+                                                        className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide border ${listToneClass}`}
+                                                    >
+                                                        {listLabels.primaryLabel}
                                                     </span>
                                                 </div>
+                                                {listLabels.workflowSubtitle ? (
+                                                    <p className="text-[10px] text-slate-400 font-medium mb-1">
+                                                        Pipeline: {listLabels.workflowSubtitle}
+                                                    </p>
+                                                ) : null}
                                                 <div className="flex items-center gap-3 text-xs text-slate-500">
                                                     <span className="flex items-center gap-1"><MapPin className="w-3 h-3" /> {req.location?.city || "N/A"}</span>
                                                     <span className="flex items-center gap-1"><Calendar className="w-3 h-3" /> Ends: {req.dates?.end || "N/A"}</span>
@@ -242,7 +256,8 @@ export default function PartnerRequestsPage() {
                                             </div>
                                         </td>
                                     </tr>
-                                ))}
+                                    );
+                                })}
                             </tbody>
                         </table>
                     </div>

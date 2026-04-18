@@ -9,7 +9,7 @@ import { toast } from "sonner";
 import dynamic from "next/dynamic";
 import { findSdgById, opportunityFormSdgList } from "@/utils/sdgData";
 import { pakistaniUniversities } from "@/utils/universityData";
-import { isPartnerProfileComplete, pickProfileContact, pickProfileEmail } from "@/utils/profileCompletion";
+import { isPartnerOrganizationComplete } from "@/utils/profileCompletion";
 
 function isValidEmail(value: string) {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
@@ -22,6 +22,7 @@ const LocationPicker = dynamic(() => import("@/components/ui/LocationPicker"), {
 
 /** Timeline modes that collect start/end date + optional daily from/to time (sent as timeline.* on create). */
 const TIMELINES_WITH_SCHEDULE_UI = ["Fixed dates", "Flexible", "Ongoing"] as const;
+const PARTNER_OPPORTUNITY_DRAFT_KEY = "ciel_partner_create_opportunity_draft_v1";
 
 export default function OpportunityPostingPage() {
     const router = useRouter();
@@ -308,6 +309,12 @@ export default function OpportunityPostingPage() {
                         official_email: formData.verificationSafety.partnerOrg.officialEmail.trim(),
                     }
                     : null,
+                safety_declaration: {
+                    environment_safe_and_appropriate: formData.verificationSafety.safety.siteSafeSuitable,
+                    students_guided_and_supervised: formData.verificationSafety.safety.supervisedThroughout,
+                    lawful_ethical_and_non_hazardous: formData.verificationSafety.safety.lawfulNoHazards,
+                    precautions_and_basic_safety: formData.verificationSafety.safety.basicEmergencyMeasures,
+                },
                 safety_supervision_declaration: {
                     site_safe_and_suitable: formData.verificationSafety.safety.siteSafeSuitable,
                     lawful_and_free_from_hazards: formData.verificationSafety.safety.lawfulNoHazards,
@@ -331,12 +338,18 @@ export default function OpportunityPostingPage() {
                             : null,
                 },
                 submission_confirmations: {
-                    genuine_and_accurate: formData.verificationSafety.submissionConfirmations.genuineAccurate,
-                    organization_responsible_for_execution:
+                    academically_valid_and_accurately_described:
+                        formData.verificationSafety.submissionConfirmations.genuineAccurate,
+                    activity_properly_supervised:
                         formData.verificationSafety.submissionConfirmations.orgResponsibleExecution,
                     environment_safe_and_appropriate:
                         formData.verificationSafety.submissionConfirmations.environmentSafe,
                     information_correct_and_verifiable:
+                        formData.verificationSafety.submissionConfirmations.informationVerifiable,
+                    genuine_and_accurate: formData.verificationSafety.submissionConfirmations.genuineAccurate,
+                    organization_responsible_for_execution:
+                        formData.verificationSafety.submissionConfirmations.orgResponsibleExecution,
+                    information_accurate_and_verifiable:
                         formData.verificationSafety.submissionConfirmations.informationVerifiable,
                 },
                 admin_approval_required: true,
@@ -356,13 +369,25 @@ export default function OpportunityPostingPage() {
                 const data = await res.json();
                 // Check for success flag OR direct object return (id/title)
                 if (data.success || data.id || data.title) {
-                    toast.success("Opportunity created successfully!");
+                    toast.success("Submitted for review. Your opportunity will appear as Live after admin approval.");
                     router.push("/dashboard/partner/requests"); // Redirect to list
                 } else {
-                    toast.error(data.message || "Failed to create opportunity");
+                    toast.error(data.message || data.error || "Failed to create opportunity");
                 }
+            } else if (!res) {
+                toast.error("Your session may have expired. Please sign in again.");
             } else {
-                toast.error("Failed to connect to server");
+                let detail = "Could not create the opportunity. Please try again.";
+                try {
+                    const errJson = (await res.json()) as { message?: unknown; error?: unknown };
+                    const m =
+                        (typeof errJson.message === "string" && errJson.message) ||
+                        (typeof errJson.error === "string" && errJson.error);
+                    if (m) detail = m;
+                } catch {
+                    if (res.statusText) detail = `${detail} (${res.status} ${res.statusText})`;
+                }
+                toast.error(detail);
             }
         } catch (error) {
             console.error("Error submitting form", error);
@@ -373,9 +398,22 @@ export default function OpportunityPostingPage() {
     };
 
     const handleSaveDraft = () => {
-        // For now, treat draft as a submit but maybe with a 'draft' status if supported later.
-        // The user just wants it to work.
-        handleSubmit();
+        try {
+            localStorage.setItem(
+                PARTNER_OPPORTUNITY_DRAFT_KEY,
+                JSON.stringify({
+                    v: 1,
+                    savedAt: Date.now(),
+                    formData,
+                    orgDetails,
+                    expandedSections,
+                }),
+            );
+            toast.success("Draft saved on this device.");
+        } catch (error) {
+            console.error("Partner draft save failed", error);
+            toast.error("Could not save draft. Check browser storage.");
+        }
     };
 
     const toggleType = (type: string) => {
@@ -401,7 +439,7 @@ export default function OpportunityPostingPage() {
                 if (storedUser) {
                     try {
                         const userObj = JSON.parse(storedUser);
-                        userId = userObj.id || userObj.userId;
+                        userId = userObj.id || userObj.userId || userObj.user_id;
                     } catch (e) {
                         console.error("Failed to parse user data");
                     }
@@ -434,12 +472,14 @@ export default function OpportunityPostingPage() {
 
                 let orgNameGate = "";
                 let orgCityGate = "";
+                let orgRecordGate: Record<string, unknown> | null = null;
 
                 if (orgRes && orgRes.ok) {
                     const data = await orgRes.json();
                     const apiData = data.data || data;
 
                     if (apiData) {
+                        orgRecordGate = apiData as Record<string, unknown>;
                         orgNameGate = apiData.name || "";
                         orgCityGate = apiData.city || "";
                         setOrgDetails({
@@ -468,23 +508,8 @@ export default function OpportunityPostingPage() {
                     }
                 }
 
-                try {
-                    const ls = storedUser ? (JSON.parse(storedUser) as Record<string, unknown>) : {};
-                    const merged: Record<string, unknown> = {
-                        ...ls,
-                        email: userEmail || pickProfileEmail(ls),
-                        phone: pickProfileContact(ls),
-                        contact: pickProfileContact(ls),
-                        organization: orgNameGate ? { name: orgNameGate } : ls.organization,
-                        org_name: orgNameGate || ls.org_name,
-                        city: orgCityGate || (typeof ls.city === "string" ? ls.city : ""),
-                    };
-                    if (!isPartnerProfileComplete(merged)) {
-                        router.replace("/dashboard/partner/profile");
-                        return;
-                    }
-                } catch {
-                    router.replace("/dashboard/partner/profile");
+                if (!orgRecordGate || !isPartnerOrganizationComplete(orgRecordGate)) {
+                    router.replace("/dashboard/partner/organization");
                     return;
                 }
             } catch (error) {
@@ -1791,12 +1816,14 @@ export default function OpportunityPostingPage() {
 
             <div className="fixed bottom-0 left-0 md:left-64 right-0 p-4 bg-white border-t border-slate-200 z-50 flex justify-end gap-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
                 <button
+                    type="button"
                     onClick={() => router.push("/dashboard/partner/requests")}
                     className="px-6 py-2 border border-slate-200 text-slate-600 font-bold rounded-xl hover:bg-slate-50 flex items-center gap-2"
                 >
                     <X className="w-4 h-4" /> Cancel
                 </button>
                 <button
+                    type="button"
                     onClick={handleSaveDraft}
                     className="px-6 py-2 border border-slate-200 text-slate-600 font-bold rounded-xl hover:bg-slate-50"
                     disabled={isSubmitting}
@@ -1804,6 +1831,7 @@ export default function OpportunityPostingPage() {
                     Save Draft
                 </button>
                 <button
+                    type="button"
                     onClick={handleSubmit}
                     disabled={isSubmitting}
                     className="px-6 py-2 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 shadow-lg shadow-blue-500/30 flex items-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"

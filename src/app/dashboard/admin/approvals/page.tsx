@@ -19,6 +19,7 @@ import { PaginationControls } from "@/components/ui/PaginationControls";
 import { authenticatedFetch } from "@/utils/api";
 import { formatDisplayId } from "@/utils/displayIds";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
 function pickDetailStr(o: Record<string, unknown> | null | undefined, ...keys: string[]): string {
     if (!o) return "";
@@ -312,9 +313,21 @@ export default function AdminApprovalsPage() {
                 } else {
                     setPendingUsers(prev => prev.filter(c => c.id !== id));
                 }
+            } else if (res?.status === 403) {
+                toast.error("Not authorized to perform this approval.");
+            } else if (res) {
+                let msg = "Approval request failed.";
+                try {
+                    const err = (await res.json()) as { message?: unknown };
+                    if (typeof err?.message === "string" && err.message.trim()) msg = err.message.trim();
+                } catch {
+                    /* ignore */
+                }
+                toast.error(msg);
             }
         } catch (error) {
             console.error("Failed to approve", error);
+            toast.error("Approval request failed.");
         } finally {
             setApproveSubmittingKey((prev) => (prev === submittingKey ? null : prev));
         }
@@ -629,7 +642,7 @@ export default function AdminApprovalsPage() {
                                     }
                                     title={
                                         !canAdminApprove
-                                            ? "Final admin approval is not available until earlier steps complete."
+                                            ? "Executing organization verification pending"
                                             : undefined
                                     }
                                     className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors shadow-lg disabled:cursor-not-allowed ${
@@ -1205,7 +1218,7 @@ export default function AdminApprovalsPage() {
                                     }
                                     title={
                                         !readAdminCanApprove(adminDetailView as Record<string, unknown>)
-                                            ? "Final admin approval is not available until earlier steps complete."
+                                            ? "Executing organization verification pending"
                                             : undefined
                                     }
                                     className={`px-4 py-2 rounded-lg font-bold disabled:cursor-not-allowed ${

@@ -84,7 +84,6 @@ export default function Sidebar() {
             { label: "Messages", href: "/dashboard/partner/messages", icon: MessageSquare },
             { label: "Funding", href: "/dashboard/partner/funding", icon: PieChart },
             { label: "Notifications", href: "/dashboard/partner/notifications", icon: Bell },
-            { label: "My Profile", href: "/dashboard/partner/profile", icon: User },
         ] : []),
         // Faculty
         ...(isFaculty ? [

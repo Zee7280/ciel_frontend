@@ -2,9 +2,10 @@
 
 import { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import { authenticatedFetch } from "@/utils/api";
 import {
     isFacultyProfileComplete,
-    isPartnerProfileComplete,
+    isPartnerOrganizationComplete,
     isStudentProfileComplete,
 } from "@/utils/profileCompletion";
 
@@ -39,11 +40,39 @@ export default function ProfileCompletionGate({ children }: { children: React.Re
         }
 
         if (pathname.startsWith("/dashboard/partner")) {
-            if (pathname.startsWith("/dashboard/partner/profile")) return;
-            if (!isPartnerProfileComplete(user)) {
-                router.replace("/dashboard/partner/profile");
+            if (pathname.startsWith("/dashboard/partner/organization")) return;
+            const token = localStorage.getItem("ciel_token");
+            const userId = user.id ?? user.userId ?? user.user_id;
+            if (!token || userId == null || userId === "") {
+                router.replace("/dashboard/partner/organization");
                 return;
             }
+            void (async () => {
+                try {
+                    const res = await authenticatedFetch("/api/v1/organisation/profile/detail", {
+                        method: "POST",
+                        body: JSON.stringify({ userId }),
+                    }, { redirectToLogin: false });
+                    if (!res?.ok) {
+                        router.replace("/dashboard/partner/organization");
+                        return;
+                    }
+                    const body = await res.json().catch(() => null);
+                    const root =
+                        body && typeof body === "object" && !Array.isArray(body)
+                            ? (body as Record<string, unknown>)
+                            : null;
+                    const org =
+                        root?.data && typeof root.data === "object" && !Array.isArray(root.data)
+                            ? (root.data as Record<string, unknown>)
+                            : root;
+                    if (!org || !isPartnerOrganizationComplete(org)) {
+                        router.replace("/dashboard/partner/organization");
+                    }
+                } catch {
+                    router.replace("/dashboard/partner/organization");
+                }
+            })();
             return;
         }
 

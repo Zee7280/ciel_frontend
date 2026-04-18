@@ -12,7 +12,19 @@ export function isValidEmailFormat(value: string): boolean {
 }
 
 export function pickProfileContact(user: Record<string, unknown>): string {
-    const raw = user.contact ?? user.phone ?? user.mobile ?? user.phone_number;
+    const raw =
+        user.contact ??
+        user.phone ??
+        user.mobile ??
+        user.phone_number ??
+        user.contactPhone ??
+        user.contact_phone;
+    if (raw == null) return "";
+    return String(raw).trim();
+}
+
+export function pickProfileName(user: Record<string, unknown>): string {
+    const raw = user.name ?? user.full_name ?? user.fullName;
     if (raw == null) return "";
     return String(raw).trim();
 }
@@ -31,6 +43,8 @@ export function pickDepartment(user: Record<string, unknown>): string {
 }
 
 function pickOrganizationLabel(user: Record<string, unknown>): string {
+    const directName = user.name ?? user.organization_name ?? user.organisation_label;
+    if (typeof directName === "string" && directName.trim()) return directName.trim();
     const o = user.organization ?? user.organisation;
     if (typeof o === "string") return o.trim();
     if (o && typeof o === "object" && o !== null && "name" in o) {
@@ -43,8 +57,50 @@ function pickOrganizationLabel(user: Record<string, unknown>): string {
     return String(alt).trim();
 }
 
+function pickOrganizationDescription(org: Record<string, unknown>): string {
+    const raw = org.description ?? org.about ?? org.summary;
+    if (raw == null) return "";
+    return String(raw).trim();
+}
+
+function pickOrganizationWebsite(org: Record<string, unknown>): string {
+    const raw = org.websiteUrl ?? org.website ?? org.website_url;
+    if (raw == null) return "";
+    return String(raw).trim();
+}
+
+function pickOrganizationRegion(org: Record<string, unknown>): string {
+    const raw = org.region ?? org.province ?? org.state;
+    if (raw == null) return "";
+    return String(raw).trim();
+}
+
+function pickOrganizationContactName(org: Record<string, unknown>): string {
+    const raw = org.contactName ?? org.contact_name ?? org.contactPersonName;
+    if (raw == null) return "";
+    return String(raw).trim();
+}
+
+function pickOrganizationContactEmail(org: Record<string, unknown>): string {
+    const raw = org.contactEmail ?? org.contact_email ?? org.officialEmail;
+    if (raw == null) return "";
+    return String(raw).trim();
+}
+
+function pickOrganizationContactPhone(org: Record<string, unknown>): string {
+    const raw = org.contactPhone ?? org.contact_phone ?? org.phone ?? org.mobile;
+    if (raw == null) return "";
+    return String(raw).trim();
+}
+
 function pickCity(user: Record<string, unknown>): string {
     if (nonEmptyString(user.city)) return String(user.city).trim();
+    if (nonEmptyString(user.location)) return String(user.location).trim();
+    const loc = user.location;
+    if (loc && typeof loc === "object" && loc !== null && !Array.isArray(loc) && "city" in loc) {
+        const c = (loc as { city?: unknown }).city;
+        if (typeof c === "string" && c.trim()) return c.trim();
+    }
     const o = user.organization ?? user.organisation;
     if (o && typeof o === "object" && o !== null && "city" in o) {
         const c = (o as { city?: unknown }).city;
@@ -77,7 +133,7 @@ function institutionPresent(user: Record<string, unknown>): boolean {
 /** Student & faculty: aligned with profile forms and opportunity Section A. */
 export function isStudentProfileComplete(user: Record<string, unknown>): boolean {
     return (
-        nonEmptyString(user.name) &&
+        nonEmptyString(pickProfileName(user)) &&
         isValidEmailFormat(pickProfileEmail(user)) &&
         nonEmptyString(pickProfileContact(user)) &&
         institutionPresent(user) &&
@@ -94,13 +150,26 @@ export function isFacultyProfileComplete(user: Record<string, unknown>): boolean
 
 export function isPartnerProfileComplete(user: Record<string, unknown>): boolean {
     return (
-        nonEmptyString(user.name) &&
+        nonEmptyString(pickProfileName(user)) &&
         isValidEmailFormat(pickProfileEmail(user)) &&
         nonEmptyString(pickProfileContact(user)) &&
         nonEmptyString(pickOrganizationLabel(user)) &&
         nonEmptyString(pickCity(user)) &&
         isCnicRequirementSatisfied(user) &&
         isProfileVerificationSatisfied(user)
+    );
+}
+
+export function isPartnerOrganizationComplete(org: Record<string, unknown>): boolean {
+    return (
+        nonEmptyString(pickOrganizationLabel(org)) &&
+        nonEmptyString(pickOrganizationDescription(org)) &&
+        nonEmptyString(pickOrganizationWebsite(org)) &&
+        nonEmptyString(pickCity(org)) &&
+        nonEmptyString(pickOrganizationRegion(org)) &&
+        nonEmptyString(pickOrganizationContactName(org)) &&
+        isValidEmailFormat(pickOrganizationContactEmail(org)) &&
+        nonEmptyString(pickOrganizationContactPhone(org))
     );
 }
 
@@ -115,7 +184,7 @@ export function profileCompletionRedirectPath(role: string, user: Record<string,
         return "/dashboard/student/profile";
     }
     if (isPartnerRole(r) && !isPartnerProfileComplete(user)) {
-        return "/dashboard/partner/profile";
+        return "/dashboard/partner/organization";
     }
     if (r === "faculty" && !isFacultyProfileComplete(user)) {
         return "/dashboard/faculty/profile";
@@ -132,7 +201,7 @@ export function missingProfileFieldsForRole(
     const missing: string[] = [];
 
     const pushStudentFaculty = () => {
-        if (!nonEmptyString(user.name)) missing.push("Full name");
+        if (!nonEmptyString(pickProfileName(user))) missing.push("Full name");
         if (!isValidEmailFormat(pickProfileEmail(user))) missing.push("Email");
         if (!nonEmptyString(pickProfileContact(user))) missing.push("Phone number");
         if (!institutionPresent(user)) missing.push("Institution / university");
@@ -147,7 +216,7 @@ export function missingProfileFieldsForRole(
         return missing;
     }
     if (isPartnerRole(r)) {
-        if (!nonEmptyString(user.name)) missing.push("Full name");
+        if (!nonEmptyString(pickProfileName(user))) missing.push("Full name");
         if (!isValidEmailFormat(pickProfileEmail(user))) missing.push("Email");
         if (!nonEmptyString(pickProfileContact(user))) missing.push("Phone number");
         if (!nonEmptyString(pickOrganizationLabel(user))) missing.push("Organization");

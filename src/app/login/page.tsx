@@ -7,7 +7,12 @@ import { ArrowRight, Mail, Lock, AlertCircle, Loader2, ArrowLeft, CheckCircle, E
 
 import Image from "next/image";
 import clsx from "clsx";
-import { isPartnerRole, profileCompletionRedirectPath } from "@/utils/profileCompletion";
+import { authenticatedFetch } from "@/utils/api";
+import {
+    isPartnerOrganizationComplete,
+    isPartnerRole,
+    profileCompletionRedirectPath,
+} from "@/utils/profileCompletion";
 import {
     consumePersistedVerificationReturn,
     isSafeInternalReturnPath,
@@ -54,6 +59,102 @@ function mergeMeaningfulFields(
         merged[key] = value;
     });
     return merged;
+}
+
+function pickUserId(record: Record<string, unknown>): string | number | null {
+    const direct = record.id ?? record.userId ?? record.user_id;
+    if (direct != null && direct !== "") return direct as string | number;
+
+    const nestedUser = toRecord(record.user);
+    if (!nestedUser) return null;
+    const nested = nestedUser.id ?? nestedUser.userId ?? nestedUser.user_id;
+    return nested != null && nested !== "" ? (nested as string | number) : null;
+}
+
+function buildStoredUser(payloadValue: unknown, role: unknown): Record<string, unknown> {
+    const payload = toRecord(payloadValue) ?? {};
+    const payloadUser = toRecord(payload.user) ?? {};
+    const merged = mergeMeaningfulFields(payload, payloadUser);
+
+    delete merged.access_token;
+    delete merged.token;
+    delete merged.refresh_token;
+    delete merged.user;
+
+    const resolvedUserId = pickUserId(payload) ?? pickUserId(payloadUser);
+    if (resolvedUserId != null) {
+        if (merged.id == null || merged.id === "") merged.id = resolvedUserId;
+        if (merged.userId == null || merged.userId === "") merged.userId = resolvedUserId;
+    }
+
+    if (role != null && role !== "") merged.role = role;
+    return merged;
+}
+
+function syncStoredUser(user: Record<string, unknown>) {
+    const s = JSON.stringify(user);
+    localStorage.setItem("ciel_user", s);
+    localStorage.setItem("user", s);
+}
+
+function normalizeNonEmptyString(value: unknown): string {
+    if (typeof value !== "string") return "";
+    const trimmed = value.trim();
+    return trimmed;
+}
+
+async function hydratePartnerUserFromOrganisation(
+    token: string,
+    user: Record<string, unknown>,
+    orgData?: Record<string, unknown> | null
+): Promise<Record<string, unknown> | null> {
+    try {
+        const data = orgData ?? await fetchPartnerOrganisationProfile(token, user);
+        if (!data) return null;
+
+        const orgName = normalizeNonEmptyString(data.name);
+        const city = normalizeNonEmptyString(data.city);
+        const contactPhone = normalizeNonEmptyString(data.contactPhone);
+
+        const patch: Record<string, unknown> = {};
+        if (orgName) patch.organization = orgName;
+        if (city) patch.city = city;
+        if (contactPhone) {
+            patch.phone = contactPhone;
+            patch.contact = contactPhone;
+            patch.contactPhone = contactPhone;
+        }
+
+        if (Object.keys(patch).length === 0) return null;
+        return mergeMeaningfulFields(user, patch);
+    } catch (error) {
+        console.error("Failed to hydrate partner organisation profile during login", error);
+        return null;
+    }
+}
+
+async function fetchPartnerOrganisationProfile(
+    _token: string,
+    user: Record<string, unknown>
+): Promise<Record<string, unknown> | null> {
+    const userId = pickUserId(user);
+    if (userId == null || userId === "") return null;
+
+    try {
+        const res = await authenticatedFetch("/api/v1/organisation/profile/detail", {
+            method: "POST",
+            body: JSON.stringify({ userId }),
+        }, { redirectToLogin: false });
+
+        if (!res?.ok) return null;
+
+        const body = await res.json().catch(() => null);
+        const root = toRecord(body);
+        return toRecord(root?.data) ?? root;
+    } catch (error) {
+        console.error("Failed to fetch partner organisation profile during login", error);
+        return null;
+    }
 }
 
 function LoginContent() {
@@ -195,9 +296,12 @@ function LoginContent() {
                 return;
             }
 
+            const authToken = payload.access_token || payload.token;
+            const loginUser = buildStoredUser(payload, role);
+
             // Store token if available (for future API calls)
-            if (payload.access_token || payload.token) {
-                const token = payload.access_token || payload.token;
+            if (authToken) {
+                const token = authToken;
                 localStorage.setItem("ciel_token", token);
 
                 // Fetch full user profile immediately to cache it
@@ -215,28 +319,30 @@ function LoginContent() {
                         if (profileData.success) {
                             const profileUser = extractProfileUser(profileData);
                             const normalizedProfileUser = profileUser ? flattenProfilePayload(profileUser) : {};
-                            const baseUser = toRecord(payload.user) || {};
-                            const fullUser = {
+                            const baseUser = loginUser;
+                            const fullUser: Record<string, unknown> = {
                                 ...mergeMeaningfulFields(baseUser, normalizedProfileUser),
                                 role,
                             };
-                            localStorage.setItem("ciel_user", JSON.stringify(fullUser));
-                            localStorage.setItem("user", JSON.stringify(fullUser)); // Keep legacy sync
+                            const resolvedUserId =
+                                pickUserId(fullUser) ?? pickUserId(baseUser) ?? pickUserId(normalizedProfileUser);
+                            if (resolvedUserId != null) {
+                                if (fullUser.id == null || fullUser.id === "") fullUser.id = resolvedUserId;
+                                if (fullUser.userId == null || fullUser.userId === "") fullUser.userId = resolvedUserId;
+                            }
+                            syncStoredUser(fullUser);
                         } else {
                             // Fallback to basic data
-                            localStorage.setItem("ciel_user", JSON.stringify(payload.user || { role }));
-                            localStorage.setItem("user", JSON.stringify(payload.user || { role }));
+                            syncStoredUser(loginUser);
                         }
                     } else {
                         // Fallback to basic data
-                        localStorage.setItem("ciel_user", JSON.stringify(payload.user || { role }));
-                        localStorage.setItem("user", JSON.stringify(payload.user || { role }));
+                        syncStoredUser(loginUser);
                     }
                 } catch (e) {
                     console.error("Failed to pre-fetch profile", e);
                     // Fallback to basic data
-                    localStorage.setItem("ciel_user", JSON.stringify(payload.user || { role }));
-                    localStorage.setItem("user", JSON.stringify(payload.user || { role }));
+                    syncStoredUser(loginUser);
                 }
             }
 
@@ -246,12 +352,24 @@ function LoginContent() {
             }
 
             let profilePath: string | null = null;
-            if (payload.access_token || payload.token) {
+            if (authToken) {
                 try {
                     const uStr = localStorage.getItem("ciel_user");
                     if (uStr) {
-                        const u = JSON.parse(uStr) as Record<string, unknown>;
-                        profilePath = profileCompletionRedirectPath(String(role), u);
+                        let u = JSON.parse(uStr) as Record<string, unknown>;
+                        if (isPartnerRole(String(role))) {
+                            const orgData = await fetchPartnerOrganisationProfile(String(authToken), u);
+                            const hydratedUser = await hydratePartnerUserFromOrganisation(String(authToken), u, orgData);
+                            if (hydratedUser) {
+                                u = hydratedUser;
+                                syncStoredUser(u);
+                            }
+                            profilePath = !orgData || !isPartnerOrganizationComplete(orgData)
+                                ? "/dashboard/partner/organization"
+                                : null;
+                        } else {
+                            profilePath = profileCompletionRedirectPath(String(role), u);
+                        }
                         if (profilePath) targetPath = profilePath;
                     }
                 } catch {

@@ -22,6 +22,15 @@ interface LocationPickerProps {
     initialLocation?: { lat: number; lng: number };
 }
 
+type LocationSuggestion = {
+    id: string;
+    lat: number;
+    lng: number;
+    title: string;
+    subtitle: string;
+    address: string;
+};
+
 function LocationMarker({ position, setPosition, onLocationSelect }: {
     position: L.LatLng | null,
     setPosition: (pos: L.LatLng) => void,
@@ -53,7 +62,6 @@ export default function LocationPicker({ onLocationSelect, initialLocation }: Lo
 
     // Ensure we only render map on client
     const [isMounted, setIsMounted] = useState(false);
-    const [mapInstance, setMapInstance] = useState<L.Map | null>(null);
 
     useEffect(() => {
         setIsMounted(true);
@@ -63,9 +71,18 @@ export default function LocationPicker({ onLocationSelect, initialLocation }: Lo
         initialLocation ? new L.LatLng(initialLocation.lat, initialLocation.lng) : new L.LatLng(defaultCenter.lat, defaultCenter.lng)
     );
     const [searchQuery, setSearchQuery] = useState("");
-    const [suggestions, setSuggestions] = useState<any[]>([]);
+    const [suggestions, setSuggestions] = useState<LocationSuggestion[]>([]);
     const [isSearching, setIsSearching] = useState(false);
     const [showSuggestions, setShowSuggestions] = useState(false);
+
+    const getSearchUrl = (query: string) => {
+        const params = new URLSearchParams({
+            q: query,
+            lat: String(position?.lat ?? defaultCenter.lat),
+            lng: String(position?.lng ?? defaultCenter.lng),
+        });
+        return `/api/location/search?${params.toString()}`;
+    };
 
     // Debounced search for suggestions
     useEffect(() => {
@@ -77,36 +94,31 @@ export default function LocationPicker({ onLocationSelect, initialLocation }: Lo
             }
 
             try {
-                const response = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(searchQuery)}&limit=5`);
+                const response = await fetch(getSearchUrl(searchQuery));
+                if (!response.ok) throw new Error(`Search HTTP ${response.status}`);
                 const data = await response.json();
-                if (data.features) {
-                    setSuggestions(data.features);
+                if (Array.isArray(data.results)) {
+                    setSuggestions(data.results);
                     setShowSuggestions(true);
                 }
             } catch (error) {
-                console.error("Photon API suggestions failed", error);
+                console.error("Location suggestions failed", error);
             }
         };
 
         const timeoutId = setTimeout(fetchSuggestions, 300);
         return () => clearTimeout(timeoutId);
-    }, [searchQuery]);
+    }, [searchQuery, position]);
 
-    const handleSelectSuggestion = (feature: any) => {
-        const [lng, lat] = feature.geometry.coordinates;
-        const newPos = new L.LatLng(lat, lng);
-        const address = [
-            feature.properties.name,
-            feature.properties.city,
-            feature.properties.country
-        ].filter(Boolean).join(", ");
+    const handleSelectSuggestion = (suggestion: LocationSuggestion) => {
+        const newPos = new L.LatLng(suggestion.lat, suggestion.lng);
 
-        setSearchQuery(address);
+        setSearchQuery(suggestion.address);
         setPosition(newPos);
         onLocationSelect({
-            lat,
-            lng,
-            address
+            lat: suggestion.lat,
+            lng: suggestion.lng,
+            address: suggestion.address
         });
         setSuggestions([]);
         setShowSuggestions(false);
@@ -118,32 +130,20 @@ export default function LocationPicker({ onLocationSelect, initialLocation }: Lo
 
         setIsSearching(true);
         try {
-            // Browser calls to Nominatim often fail (403 / no CORS on errors) because a real
-            // User-Agent is required and fetch cannot set it. Photon matches our autocomplete
-            // API and works reliably from the client.
-            const response = await fetch(
-                `https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=5`
-            );
+            const response = await fetch(getSearchUrl(q));
             if (!response.ok) throw new Error(`Geocode HTTP ${response.status}`);
             const data = await response.json();
-            const feature = data.features?.[0];
-            if (feature?.geometry?.coordinates) {
-                const [lng, lat] = feature.geometry.coordinates;
-                const newPos = new L.LatLng(lat, lng);
-                const address = [
-                    feature.properties?.name,
-                    feature.properties?.city,
-                    feature.properties?.country
-                ]
-                    .filter(Boolean)
-                    .join(", ");
+            const suggestion = Array.isArray(data.results) ? data.results[0] : null;
+            if (suggestion) {
+                const newPos = new L.LatLng(suggestion.lat, suggestion.lng);
 
                 setPosition(newPos);
                 onLocationSelect({
-                    lat,
-                    lng,
-                    address: address || q
+                    lat: suggestion.lat,
+                    lng: suggestion.lng,
+                    address: suggestion.address || q
                 });
+                setSearchQuery(suggestion.address || q);
                 setSuggestions([]);
                 setShowSuggestions(false);
             }
@@ -181,7 +181,7 @@ export default function LocationPicker({ onLocationSelect, initialLocation }: Lo
                         <div className="absolute top-full left-0 right-0 mt-2 bg-white/90 backdrop-blur-xl border border-slate-200/60 rounded-[1.5rem] shadow-2xl shadow-slate-200/50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
                             {suggestions.map((s, idx) => (
                                 <button
-                                    key={idx}
+                                    key={`${s.id}-${idx}`}
                                     type="button"
                                     onClick={() => handleSelectSuggestion(s)}
                                     className="w-full text-left px-5 py-4 hover:bg-blue-50 transition-colors flex items-start gap-4 border-b border-slate-50 last:border-none group/item"
@@ -191,10 +191,10 @@ export default function LocationPicker({ onLocationSelect, initialLocation }: Lo
                                     </div>
                                     <div className="min-w-0">
                                         <p className="text-xs font-black text-slate-900 group-hover/item:text-blue-700 transition-colors truncate">
-                                            {s.properties.name || "Unknown Location"}
+                                            {s.title || "Unknown Location"}
                                         </p>
                                         <p className="text-[10px] font-bold text-slate-400 truncate mt-0.5">
-                                            {[s.properties.city, s.properties.state, s.properties.country].filter(Boolean).join(", ")}
+                                            {s.subtitle}
                                         </p>
                                     </div>
                                 </button>
@@ -216,21 +216,16 @@ export default function LocationPicker({ onLocationSelect, initialLocation }: Lo
                     center={position || defaultCenter}
                     zoom={13}
                     style={{ height: '300px', width: '100%' }}
-                    ref={setMapInstance}
                 >
-                    {mapInstance && (
-                        <>
-                            <TileLayer
-                                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                            />
-                            <LocationMarker
-                                position={position}
-                                setPosition={setPosition}
-                                onLocationSelect={(pos) => onLocationSelect({ lat: pos.lat, lng: pos.lng })}
-                            />
-                        </>
-                    )}
+                    <TileLayer
+                        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                    />
+                    <LocationMarker
+                        position={position}
+                        setPosition={setPosition}
+                        onLocationSelect={(pos) => onLocationSelect({ lat: pos.lat, lng: pos.lng })}
+                    />
                 </MapContainer>
 
                 {/* Floating Indicators */}

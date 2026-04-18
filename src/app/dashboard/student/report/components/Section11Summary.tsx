@@ -45,17 +45,17 @@ export default function Section11Summary() {
                     summary_text: executiveSummary,
                     is_ai_generated: false 
                 });
-                toast.info("Generated report summary.");
+                toast.info("Generated audit summary.");
             } else if (result.summary) {
                 updateSection('section11', { 
                     summary_text: result.summary,
                     is_ai_generated: true 
                 });
-                toast.success("AI Executive Summary generated!");
+                toast.success("AI audit summary generated!");
             }
         } catch (err) {
             updateSection('section11', { summary_text: executiveSummary });
-            toast.info("Generated report summary.");
+            toast.info("Generated audit summary.");
         } finally {
             setIsGenerating(false);
         }
@@ -67,7 +67,7 @@ export default function Section11Summary() {
         }
 
         const primaryGoalTitle = section3.primary_sdg?.goal_title || "Sustainable Development";
-        return `Project synthesized academic theory with community impact, primarily addressing ${primaryGoalTitle}. Through ${verifiedHours} verified hours, the initiative delivered measurable change for ${beneficiaries} beneficiaries. Collaborative efforts ensured structured delivery, while impact is secured via ${section10.mechanisms?.length || 0} sustainability mechanisms.`;
+        return `Audit summary pending detailed review. Based on the submitted inputs, the project references ${verifiedHours} verified hours, ${beneficiaries} reported beneficiaries, alignment with ${primaryGoalTitle}, and ${section10.mechanisms?.length || 0} sustainability mechanisms. Final credibility still depends on consistency across attendance, activities, outcomes, resources, evidence, and continuity claims.`;
     }, [section1, section2, section3, section4, section5, section10, verifiedHours, beneficiaries, data.section11?.summary_text]);
 
     useEffect(() => {
@@ -239,7 +239,7 @@ export default function Section11Summary() {
                             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
                                 {data.section11?.is_ai_generated ? "AI-Generated" : "System-Generated"}
                             </p>
-                            <h3 className="text-sm font-black text-slate-900">Comprehensive Impact Profile</h3>
+                            <h3 className="text-sm font-black text-slate-900">Comprehensive Audit Review</h3>
                         </div>
                     </div>
                     <button type="button" onClick={handleGenerateAISummary} disabled={isGenerating} className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-report-primary text-white text-[10px] font-black uppercase tracking-widest hover:opacity-90 disabled:opacity-40 transition-all shadow-md shadow-report-primary-shadow">

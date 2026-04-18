@@ -8,7 +8,11 @@ import { Badge } from "@/app/dashboard/student/report/components/ui/badge";
 import { Loader2, Pencil, Plus } from "lucide-react";
 import { getStoredCurrentUserEmail } from "@/utils/currentUser";
 import { toast } from "sonner";
-import { canEditReturnedOpportunity, extractOpportunityReviewFeedback } from "@/utils/opportunityWorkflow";
+import {
+    canEditReturnedOpportunity,
+    extractOpportunityReviewFeedback,
+    resolvePartnerOpportunityListLabels,
+} from "@/utils/opportunityWorkflow";
 
 type Row = {
     id: string;
@@ -23,14 +27,6 @@ type Row = {
     organization_name?: string | null;
     review_feedback?: string | null;
 };
-
-function statusBadgeClass(status: string) {
-    const s = status?.toLowerCase() || "";
-    if (s === "active" || s === "live") return "bg-emerald-100 text-emerald-800 border-emerald-200";
-    if (s === "rejected") return "bg-red-100 text-red-800 border-red-200";
-    if (s.includes("pending") || s === "draft") return "bg-amber-100 text-amber-800 border-amber-200";
-    return "bg-slate-100 text-slate-700 border-slate-200";
-}
 
 function isLikelyMachineId(text: string): boolean {
     const value = text.trim();
@@ -147,7 +143,17 @@ export default function FacultyMyOpportunitiesPage() {
                 </div>
             ) : (
                 <ul className="space-y-3">
-                    {rows.map((r) => (
+                    {rows.map((r) => {
+                        const listLabels = resolvePartnerOpportunityListLabels(r as unknown as Record<string, unknown>);
+                        const listToneClass =
+                            listLabels.badgeTone === "live"
+                                ? "bg-emerald-100 text-emerald-800 border-emerald-200"
+                                : listLabels.badgeTone === "review"
+                                  ? "bg-amber-100 text-amber-800 border-amber-200"
+                                  : listLabels.badgeTone === "rejected"
+                                    ? "bg-red-100 text-red-800 border-red-200"
+                                    : "bg-slate-100 text-slate-700 border-slate-200";
+                        return (
                         <li
                             key={r.id}
                             className="bg-white rounded-xl border border-slate-100 shadow-sm p-5 flex flex-col md:flex-row md:items-center md:justify-between gap-4"
@@ -155,15 +161,15 @@ export default function FacultyMyOpportunitiesPage() {
                             <div className="space-y-1 min-w-0">
                                 <div className="flex flex-wrap items-center gap-2">
                                     <h2 className="font-semibold text-slate-900 truncate">{r.title}</h2>
-                                    <Badge variant="outline" className={statusBadgeClass(r.status)}>
-                                        {r.status?.replace(/_/g, " ") || "—"}
+                                    <Badge variant="outline" className={listToneClass}>
+                                        {listLabels.primaryLabel}
                                     </Badge>
-                                    {r.workflow_stage ? (
-                                        <Badge variant="outline" className="text-xs font-normal text-slate-600">
-                                            {String(r.workflow_stage).replace(/_/g, " ")}
-                                        </Badge>
-                                    ) : null}
                                 </div>
+                                {listLabels.workflowSubtitle ? (
+                                    <p className="text-[10px] text-slate-500 font-medium">
+                                        Pipeline: {listLabels.workflowSubtitle}
+                                    </p>
+                                ) : null}
                                 <p className="text-xs text-slate-500">
                                     {r.created_at
                                         ? new Date(r.created_at).toLocaleDateString(undefined, {
@@ -202,7 +208,8 @@ export default function FacultyMyOpportunitiesPage() {
                                 </Link>
                             </div>
                         </li>
-                    ))}
+                        );
+                    })}
                 </ul>
             )}
         </div>

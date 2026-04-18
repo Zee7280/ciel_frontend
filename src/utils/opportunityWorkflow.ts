@@ -350,14 +350,81 @@ export function canEditReturnedOpportunity(project: Record<string, unknown>): bo
     return states.some((state) => ["returned", "revision", "needs_revision", "rejected"].includes(state));
 }
 
-/** True when admin has cleared the opportunity; student may start report / tracking. */
+/** True when the listing is publicly live: API-aligned `status` plus final admin approval (do not infer from `workflow_stage`). */
+export function isOpportunityPubliclyLive(project: Record<string, unknown>): boolean {
+    if (lower(project.status) !== "live") return false;
+    const adminFlag = project.admin_approved ?? project.adminApproved;
+    return truthyApproved(adminFlag) || adminFlag === true;
+}
+
+/**
+ * Student may treat the project as in the post-approval / reporting phase: completed projects,
+ * or opportunities that are publicly live (`status === "live"` and admin approved).
+ */
 export function isStudentOpportunityLiveForReporting(project: Record<string, unknown>): boolean {
     const status = lower(project.status);
-    if (["active", "live", "approved", "verified", "completed"].includes(status)) return true;
-    const stage = lower(project.workflow_stage ?? project.approval_stage);
-    if (stage === "live" || stage === "active" || stage === "approved") return true;
-    if (truthyApproved(project.admin_approved)) return true;
-    return false;
+    if (status === "completed") return true;
+    return isOpportunityPubliclyLive(project);
+}
+
+function adminApprovedExplicitlyFalse(project: Record<string, unknown>): boolean {
+    const v = project.admin_approved ?? project.adminApproved;
+    if (v === false) return true;
+    return lower(v) === "false" || lower(v) === "no";
+}
+
+export type PartnerOpportunityListLabels = {
+    primaryLabel: string;
+    badgeTone: "live" | "review" | "rejected" | "neutral";
+    /** Pipeline position only — not used as the primary “live” signal. */
+    workflowSubtitle: string | null;
+};
+
+/** Partner dashboard list/table: primary label from `status` + `admin_approved`; subtitle from `workflow_stage`. */
+export function resolvePartnerOpportunityListLabels(project: Record<string, unknown>): PartnerOpportunityListLabels {
+    const wfRaw = project.workflow_stage ?? project.workflowStage ?? project.approval_stage;
+    const wf = typeof wfRaw === "string" && wfRaw.trim() ? wfRaw.trim().replace(/_/g, " ") : null;
+
+    if (isOpportunityPubliclyLive(project)) {
+        return { primaryLabel: "Live", badgeTone: "live", workflowSubtitle: wf };
+    }
+
+    const st = lower(project.status);
+    if (st === "rejected") {
+        return { primaryLabel: "Rejected", badgeTone: "rejected", workflowSubtitle: wf };
+    }
+
+    if (adminApprovedExplicitlyFalse(project)) {
+        return { primaryLabel: "Under review", badgeTone: "review", workflowSubtitle: wf };
+    }
+
+    if (
+        ["pending_verification", "pending_approval", "pending_execution", "pending", "draft"].includes(st) ||
+        st.includes("pending")
+    ) {
+        const label = st === "pending_approval" ? "Pending approval" : "Under review";
+        return { primaryLabel: label, badgeTone: "review", workflowSubtitle: wf };
+    }
+
+    if (st === "live") {
+        return { primaryLabel: "Under review", badgeTone: "review", workflowSubtitle: wf };
+    }
+
+    return {
+        primaryLabel: st ? st.replace(/_/g, " ") : "—",
+        badgeTone: "neutral",
+        workflowSubtitle: wf,
+    };
+}
+
+/** Human-readable top-level status for detail headers (use API `status`, not `workflow_stage`). */
+export function formatOpportunityDetailStatusBadge(project: Record<string, unknown>): string {
+    if (isOpportunityPubliclyLive(project)) return "Live";
+    const st = lower(project.status);
+    if (st === "completed") return "Completed";
+    if (st === "rejected") return "Rejected";
+    if (st) return st.replace(/_/g, " ");
+    return "—";
 }
 
 /**
@@ -380,7 +447,7 @@ export function resolveStudentOpportunityWorkflow(project: Record<string, unknow
         }
         return {
             stage: "live",
-            badgeLabel: "Approved – LIVE",
+            badgeLabel: "Live",
             queueMessage:
                 "Your opportunity is now live. You can start or continue your report and project tracking.",
         };
