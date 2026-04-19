@@ -38,7 +38,7 @@ export function calculateCII(data: ReportData): CIIResult {
         },
         attendanceLogs: data.section1?.attendance_logs || [],
         studentVerifiedHours: data.section1?.metrics?.total_verified_hours || 0,
-        requiredHours: (data as any).requiredHoursPerStudent || 16,
+        requiredHours: (data as any).requiredHoursPerStudent || data.required_hours || 16,
         studentActiveDays: data.section1?.metrics?.total_active_days || 0,
         studentEngagementSpan: data.section1?.metrics?.engagement_span || 0,
         teamSize: data.section1?.team_members?.length ? data.section1.team_members.length + 1 : 1,

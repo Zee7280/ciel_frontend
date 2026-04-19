@@ -19,6 +19,35 @@ const LocationPicker = dynamic(() => import("@/components/ui/LocationPicker"), {
 
 import { Suspense } from "react";
 
+function readStoredUserEmail(): string {
+    if (typeof window === "undefined") return "";
+    try {
+        const raw = localStorage.getItem("ciel_user");
+        if (!raw) return "";
+        const j = JSON.parse(raw) as { email?: string };
+        return typeof j.email === "string" ? j.email.trim().toLowerCase() : "";
+    } catch {
+        return "";
+    }
+}
+
+function getExecutingOrgOfficialEmail(opp: Record<string, unknown> | null): string {
+    if (!opp) return "";
+    const raw = opp.executing_organization ?? opp.executingOrganization;
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) return "";
+    const o = raw as Record<string, unknown>;
+    const v = o.official_email ?? o.officialEmail;
+    return typeof v === "string" ? v.trim().toLowerCase() : "";
+}
+
+function needsExecutingOrgPortalConfirm(opp: Record<string, unknown> | null): boolean {
+    if (!opp) return false;
+    const tok = opp.execution_verification_token ?? opp.executionVerificationToken;
+    const hasTok = typeof tok === "string" && tok.trim().length > 0;
+    const verified = opp.execution_verified === true || opp.executionVerified === true;
+    return hasTok && !verified;
+}
+
 function OpportunityDetailsContent() {
     const params = useParams();
     const router = useRouter();
@@ -30,7 +59,7 @@ function OpportunityDetailsContent() {
     const [isLoading, setIsLoading] = useState(true);
     const [isEditing, setIsEditing] = useState(isEditMode);
     const [isSubmitting, setIsSubmitting] = useState(false);
-
+    const [execVerifySubmitting, setExecVerifySubmitting] = useState(false);
 
     const [expandedSections, setExpandedSections] = useState<string[]>(["A", "B", "C", "D", "E", "F", "G", "H", "I"]);
 
@@ -434,6 +463,39 @@ function OpportunityDetailsContent() {
         window.print();
     };
 
+    const handleConfirmExecution = async () => {
+        const oppId = typeof id === "string" ? id : Array.isArray(id) ? id[0] : "";
+        if (!oppId || execVerifySubmitting) return;
+        setExecVerifySubmitting(true);
+        try {
+            const res = await authenticatedFetch(`/api/v1/opportunities/verify-executing-org`, {
+                method: "POST",
+                body: JSON.stringify({ id: oppId }),
+            });
+            if (res?.ok) {
+                toast.success("Execution details confirmed.");
+                const res2 = await authenticatedFetch(`/api/v1/opportunities/detail`, {
+                    method: "POST",
+                    body: JSON.stringify({ id: oppId }),
+                });
+                if (res2?.ok) {
+                    const data = await res2.json().catch(() => ({}));
+                    const opp = data.data ?? data;
+                    if (opp && typeof opp === "object" && !Array.isArray(opp)) {
+                        setOpportunityApiRecord(opp as Record<string, unknown>);
+                    }
+                }
+            } else {
+                const data = await res?.json().catch(() => ({}));
+                toast.error((data as { message?: string }).message || "Could not confirm execution details");
+            }
+        } catch {
+            toast.error("Could not confirm execution details");
+        } finally {
+            setExecVerifySubmitting(false);
+        }
+    };
+
     if (isLoading) {
         return <div className="min-h-screen flex items-center justify-center"><Loader2 className="w-10 h-10 animate-spin text-blue-600" /></div>;
     }
@@ -450,6 +512,10 @@ function OpportunityDetailsContent() {
             typeof (opportunityApiRecord.workflow_stage ?? opportunityApiRecord.workflowStage) === "string"
                 ? String(opportunityApiRecord.workflow_stage ?? opportunityApiRecord.workflowStage).trim()
                 : "";
+        const userEmail = readStoredUserEmail();
+        const execOfficial = getExecutingOrgOfficialEmail(opportunityApiRecord);
+        const needsExecConfirm = needsExecutingOrgPortalConfirm(opportunityApiRecord);
+        const canExecConfirm = needsExecConfirm && !!userEmail && !!execOfficial && userEmail === execOfficial;
         return (
             <div className="w-full space-y-8 animate-in fade-in duration-500 pb-24">
                 {/* Header Actions */}
@@ -502,6 +568,33 @@ function OpportunityDetailsContent() {
                                             <span className="font-semibold text-slate-600">Pipeline step:</span>{" "}
                                             {partnerDetailWorkflowRaw.replace(/_/g, " ")}
                                         </p>
+                                    ) : null}
+                                    {needsExecConfirm ? (
+                                        <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50/90 p-4 text-left text-sm text-amber-950">
+                                            <p className="font-semibold text-amber-900 mb-1">Executing organization confirmation</p>
+                                            <p className="text-amber-900/90 mb-3">
+                                                {canExecConfirm
+                                                    ? "Review the opportunity below, then confirm so CIEL Admin can proceed with final approval."
+                                                    : `This step must be completed in the portal by the official executing-organization contact${
+                                                          execOfficial ? ` (${execOfficial})` : ""
+                                                      } after signing in with that CIEL account.`}
+                                            </p>
+                                            {canExecConfirm ? (
+                                                <button
+                                                    type="button"
+                                                    disabled={execVerifySubmitting}
+                                                    onClick={() => void handleConfirmExecution()}
+                                                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 text-white font-semibold hover:bg-emerald-700 disabled:opacity-60"
+                                                >
+                                                    {execVerifySubmitting ? (
+                                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                                    ) : (
+                                                        <CheckCircle className="w-4 h-4" />
+                                                    )}
+                                                    Confirm execution details
+                                                </button>
+                                            ) : null}
+                                        </div>
                                     ) : null}
                                 </div>
                             </div>

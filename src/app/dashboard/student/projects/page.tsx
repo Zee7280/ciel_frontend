@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "../report/components/ui/button";
 import Link from "next/link";
 import { Badge } from "../report/components/ui/badge";
@@ -19,7 +19,24 @@ import {
     pickJoinApplicationStatus,
 } from "@/utils/studentJoinApplication";
 import { formatDisplayId } from "@/utils/displayIds";
-import { Loader2, Plus, Users, Eye, Mail, Phone, GraduationCap, Pencil, CheckCircle, FileText, Building2, TrendingUp, XCircle } from "lucide-react";
+import {
+    Loader2,
+    Users,
+    Eye,
+    Mail,
+    Phone,
+    GraduationCap,
+    Pencil,
+    CheckCircle,
+    FileText,
+    Building2,
+    TrendingUp,
+    MapPin,
+    Clock,
+    BarChart3,
+    ChevronRight,
+    FileStack,
+} from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "../report/components/ui/dialog";
 
 interface TeamMember {
@@ -201,6 +218,18 @@ function stakeholderRows(d: Record<string, unknown>): {
     };
 }
 
+function isStudentCreatedOpportunity(v: Record<string, unknown>): boolean {
+    const raw = v.is_student_created ?? v.isStudentCreated;
+    return raw === true || String(raw).toLowerCase() === "true";
+}
+
+function facultyApprovalPipelineApplies(v: Record<string, unknown>): boolean {
+    if (isStudentCreatedOpportunity(v)) return true;
+    if (typeof v.faculty_verification_token === "string" && v.faculty_verification_token.trim()) return true;
+    if (typeof v.liaisonToken === "string" && v.liaisonToken.trim()) return true;
+    return false;
+}
+
 interface Project {
     id: string;
     title: string;
@@ -229,8 +258,77 @@ interface Project {
     review_feedback?: string;
 }
 
+type ProjectTab =
+    | "all"
+    | "in_progress"
+    | "pending_approvals"
+    | "pending_payments"
+    | "under_review"
+    | "completed"
+    | "drafts";
+
+interface ProjectRow {
+    project: Project;
+    pRecord: Record<string, unknown>;
+    isStudentOwnedOpportunity: boolean;
+    live: boolean;
+    joinPending: boolean;
+    reportUnlocked: boolean;
+    workflow: ReturnType<typeof resolveStudentOpportunityWorkflow>;
+    approvalLine: string | null;
+    remarkSections: ReturnType<typeof extractOpportunityReturnRemarkSections>;
+    reviewFeedback: string | null;
+    canReviseOpportunity: boolean;
+    statusBadgeClass: string;
+}
+
+function matchesProjectTab(row: ProjectRow, tab: ProjectTab): boolean {
+    const { project, live, joinPending, workflow, reportUnlocked } = row;
+    const rs = project.report_status || "none";
+    const st = (project.status || "").toLowerCase();
+
+    switch (tab) {
+        case "all":
+            return true;
+        case "in_progress":
+            return live && st !== "completed";
+        case "pending_approvals":
+            return (
+                joinPending ||
+                (!live &&
+                    ["pending_faculty", "pending_partner", "pending_admin", "pending_unknown"].includes(workflow.stage))
+            );
+        case "pending_payments":
+            return rs === "pending_payment";
+        case "under_review":
+            return rs === "submitted" || rs === "payment_under_review";
+        case "completed":
+            return st === "completed" || rs === "verified" || rs === "paid";
+        case "drafts":
+            return (
+                rs === "draft" ||
+                rs === "continue" ||
+                (rs === "none" && reportUnlocked && live) ||
+                workflow.stage === "revision"
+            );
+        default:
+            return true;
+    }
+}
+
+const PROJECT_TABS: { id: ProjectTab; label: string }[] = [
+    { id: "all", label: "All Projects" },
+    { id: "in_progress", label: "In Progress" },
+    { id: "pending_approvals", label: "Pending Approvals" },
+    { id: "pending_payments", label: "Pending Payments" },
+    { id: "under_review", label: "Under Review" },
+    { id: "completed", label: "Completed" },
+    { id: "drafts", label: "Drafts" },
+];
+
 export default function MyProjectsPage() {
     const [projects, setProjects] = useState<Project[]>([]);
+    const [activeTab, setActiveTab] = useState<ProjectTab>("all");
     const [isLoading, setIsLoading] = useState(true);
     const [selectedTeamProject, setSelectedTeamProject] = useState<Project | null>(null);
     const [isTeamDialogOpen, setIsTeamDialogOpen] = useState(false);
@@ -381,240 +479,524 @@ export default function MyProjectsPage() {
           >)
         : null;
 
+    const projectRows: ProjectRow[] = useMemo(
+        () =>
+            projects.map((project) => {
+                const pRecord = project as unknown as Record<string, unknown>;
+                const isStudentOwnedOpportunity =
+                    project.is_student_created === true ||
+                    String(project.created_by_role || "").toLowerCase() === "student" ||
+                    String(project.source || "").toLowerCase() === "student_created";
+                const live = isStudentOpportunityLiveForReporting(pRecord);
+                const joinAppStatus = pickJoinApplicationStatus(pRecord);
+                const joinPending =
+                    !isStudentOwnedOpportunity &&
+                    Boolean(joinAppStatus && isJoinApplicationPendingStatus(joinAppStatus));
+                const reportUnlocked = canStudentAccessReportForProjectPayload(pRecord);
+                const workflow = resolveStudentOpportunityWorkflow(pRecord);
+                const approvalLine = formatStudentProjectApprovalLine(project);
+                const remarkSections = extractOpportunityReturnRemarkSections(pRecord);
+                const reviewFeedback =
+                    remarkSections.length === 0 ? extractOpportunityReviewFeedback(pRecord) : null;
+                const canReviseOpportunity =
+                    isStudentOwnedOpportunity && !live && canEditReturnedOpportunity(pRecord);
+                const statusBadgeClass = joinPending
+                    ? "bg-amber-100 text-amber-800 border-amber-200/80"
+                    : live
+                      ? project.status === "completed"
+                          ? "bg-slate-100 text-slate-700 border-slate-200"
+                          : "bg-emerald-50 text-emerald-800 border-emerald-200/80"
+                      : workflow.stage === "rejected"
+                        ? "bg-red-50 text-red-800 border-red-200/80"
+                        : workflow.stage === "revision"
+                          ? "bg-orange-50 text-orange-800 border-orange-200/80"
+                          : "bg-amber-50 text-amber-900 border-amber-200/80";
+
+                return {
+                    project,
+                    pRecord,
+                    isStudentOwnedOpportunity,
+                    live,
+                    joinPending,
+                    reportUnlocked,
+                    workflow,
+                    approvalLine,
+                    remarkSections,
+                    reviewFeedback,
+                    canReviseOpportunity,
+                    statusBadgeClass,
+                };
+            }),
+        [projects],
+    );
+
+    const filteredRows = useMemo(
+        () => projectRows.filter((row) => matchesProjectTab(row, activeTab)),
+        [projectRows, activeTab],
+    );
+
+    const firstContinueRow = useMemo(
+        () =>
+            projectRows.find(
+                (r) =>
+                    r.reportUnlocked &&
+                    (r.project.report_status === undefined ||
+                        r.project.report_status === "none" ||
+                        r.project.report_status === "draft" ||
+                        r.project.report_status === "continue"),
+            ),
+        [projectRows],
+    );
+
+    const firstPaymentRow = useMemo(
+        () => projectRows.find((r) => r.project.report_status === "pending_payment"),
+        [projectRows],
+    );
+
     return (
-        <div className="space-y-8 p-6">
-            <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-2xl font-bold text-slate-900">My Projects</h1>
-                    <p className="text-slate-500">Manage your active and completed social impact projects.</p>
-                </div>
-            </div>
+        <div className="space-y-4 bg-slate-50/90 px-4 py-4 sm:px-6 sm:py-5 lg:px-8">
+            <header className="border-b border-slate-200/70 pb-3">
+                <h1 className="text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">My Projects</h1>
+                <p className="mt-1 max-w-2xl text-sm leading-snug text-slate-500">
+                    <span className="font-medium text-slate-600">Manage all your projects here</span>
+                    <span className="text-slate-400"> · </span>
+                    Track, update, and manage the full lifecycle of all your projects.
+                </p>
+            </header>
+
+            {!isLoading && projects.length > 0 ? (
+                <>
+                    <div className="-mx-4 border-b border-slate-200/80 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+                        <nav
+                            className="flex gap-1 overflow-x-auto pb-0"
+                            aria-label="Project filters"
+                        >
+                            {PROJECT_TABS.map((tab) => {
+                                const active = activeTab === tab.id;
+                                return (
+                                    <button
+                                        key={tab.id}
+                                        type="button"
+                                        onClick={() => setActiveTab(tab.id)}
+                                        className={`relative shrink-0 whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
+                                            active
+                                                ? "border-blue-600 text-blue-700"
+                                                : "border-transparent text-slate-500 hover:text-slate-800"
+                                        }`}
+                                    >
+                                        {tab.label}
+                                    </button>
+                                );
+                            })}
+                        </nav>
+                    </div>
+
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                        <div className="flex flex-wrap gap-2">
+                            {firstContinueRow ? (
+                                <Link
+                                    href={`/dashboard/student/report?projectId=${firstContinueRow.project.id}`}
+                                    className="inline-flex"
+                                    title={`Open report for “${firstContinueRow.project.title}”`}
+                                >
+                                    <Button
+                                        variant="outline"
+                                        className="h-11 gap-2 rounded-xl border-blue-200/80 bg-white text-blue-700 shadow-sm hover:bg-blue-50"
+                                    >
+                                        <FileText className="h-4 w-4" />
+                                        Continue Report
+                                    </Button>
+                                </Link>
+                            ) : (
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    disabled
+                                    className="h-11 gap-2 rounded-xl border-slate-200 bg-white text-slate-400 shadow-sm"
+                                >
+                                    <FileText className="h-4 w-4" />
+                                    Continue Report
+                                </Button>
+                            )}
+                            <Button
+                                type="button"
+                                variant="outline"
+                                disabled
+                                title="Submit from the report flow when all sections are complete."
+                                className="h-11 gap-2 rounded-xl border-amber-200/80 bg-white text-amber-800 shadow-sm disabled:opacity-60"
+                            >
+                                <FileStack className="h-4 w-4" />
+                                Submit Report
+                            </Button>
+                            <Link href="/dashboard/student/impact" className="inline-flex">
+                                <Button
+                                    variant="outline"
+                                    className="h-11 gap-2 rounded-xl border-violet-200/80 bg-white text-violet-800 shadow-sm hover:bg-violet-50"
+                                >
+                                    <BarChart3 className="h-4 w-4" />
+                                    View Submissions
+                                </Button>
+                            </Link>
+                            <Link
+                                href="/dashboard/student/browse"
+                                className="inline-flex h-11 items-center gap-1 rounded-xl px-3 text-sm font-semibold text-blue-700 hover:bg-blue-50/80 hover:text-blue-900"
+                            >
+                                View saved opportunities
+                                <ChevronRight className="h-4 w-4 shrink-0" />
+                            </Link>
+                        </div>
+                        {firstPaymentRow ? (
+                            <Link
+                                href={`/dashboard/student/payment?projectId=${firstPaymentRow.project.id}`}
+                                className="inline-flex shrink-0"
+                            >
+                                <Button className="h-11 rounded-xl bg-blue-600 px-5 text-white shadow-sm hover:bg-blue-700">
+                                    Pay pending invoice
+                                </Button>
+                            </Link>
+                        ) : null}
+                    </div>
+                </>
+            ) : null}
 
             {isLoading ? (
-                <div className="flex justify-center py-20">
-                    <Loader2 className="w-8 h-8 animate-spin text-slate-400" />
+                <div className="flex justify-center py-24">
+                    <Loader2 className="h-9 w-9 animate-spin text-slate-400" />
                 </div>
             ) : projects.length === 0 ? (
-                <div className="text-center py-20 bg-white rounded-xl border border-slate-100">
-                    <p className="text-slate-500 mb-4">You haven't joined or created any projects yet.</p>
+                <div className="rounded-2xl border border-slate-200/80 bg-white py-20 text-center shadow-sm">
+                    <p className="mb-4 text-slate-500">You haven&apos;t joined or created any projects yet.</p>
                     <Link href="/dashboard/student/create-opportunity">
                         <Button>Get Started</Button>
                     </Link>
                 </div>
+            ) : filteredRows.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-slate-200 bg-white py-16 text-center shadow-sm">
+                    <p className="text-slate-600">No projects in this tab.</p>
+                    <p className="mt-1 text-sm text-slate-500">Try another tab or switch back to All Projects.</p>
+                    <Button type="button" variant="outline" className="mt-4" onClick={() => setActiveTab("all")}>
+                        All Projects
+                    </Button>
+                </div>
             ) : (
-                <div className="grid gap-6">
-                    {projects.map((project) => {
-                        const pRecord = project as unknown as Record<string, unknown>;
-                        const isStudentOwnedOpportunity =
-                            project.is_student_created === true ||
-                            String(project.created_by_role || "").toLowerCase() === "student" ||
-                            String(project.source || "").toLowerCase() === "student_created";
-                        const live = isStudentOpportunityLiveForReporting(pRecord);
-                        const joinAppStatus = pickJoinApplicationStatus(pRecord);
-                        const joinPending =
-                            !isStudentOwnedOpportunity &&
-                            Boolean(joinAppStatus && isJoinApplicationPendingStatus(joinAppStatus));
-                        const reportUnlocked = canStudentAccessReportForProjectPayload(pRecord);
-                        const workflow = resolveStudentOpportunityWorkflow(pRecord);
-                        const approvalLine = formatStudentProjectApprovalLine(project);
-                        const remarkSections = extractOpportunityReturnRemarkSections(pRecord);
-                        const reviewFeedback =
-                            remarkSections.length === 0 ? extractOpportunityReviewFeedback(pRecord) : null;
-                        const canReviseOpportunity =
-                            isStudentOwnedOpportunity && !live && canEditReturnedOpportunity(pRecord);
-                        const statusBadgeClass = joinPending
-                            ? "bg-amber-100 text-amber-800"
-                            : live
-                              ? project.status === "completed"
-                                  ? "bg-slate-100 text-slate-700"
-                                  : "bg-green-100 text-green-700"
-                              : workflow.stage === "rejected"
-                                ? "bg-red-100 text-red-700"
-                                : workflow.stage === "revision"
-                                    ? "bg-orange-100 text-orange-800"
-                                    : "bg-amber-100 text-amber-700";
+                <div className="grid gap-5">
+                    {filteredRows.map(
+                        ({
+                            project,
+                            pRecord,
+                            live,
+                            joinPending,
+                            reportUnlocked,
+                            workflow,
+                            approvalLine,
+                            remarkSections,
+                            reviewFeedback,
+                            canReviseOpportunity,
+                            statusBadgeClass,
+                        }) => {
+                            const submittedLabel = project.submitted_at
+                                ? new Date(project.submitted_at).toLocaleDateString(undefined, {
+                                      day: "2-digit",
+                                      month: "short",
+                                      year: "numeric",
+                                  })
+                                : "—";
+                            const footerSource =
+                                project.is_student_created === true ||
+                                String(project.created_by_role || "").toLowerCase() === "student"
+                                    ? "My university"
+                                    : project.source && String(project.source).trim()
+                                      ? String(project.source)
+                                      : "Joined opportunity";
 
-                        return (
-                        <div key={project.id} className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-                            <div className="flex items-start gap-4">
-                                <div className="w-16 h-16 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600 font-bold text-xl shrink-0">
-                                    {(project.title || "P").substring(0, 2).toUpperCase()}
-                                </div>
-                                <div className="space-y-1">
-                                    <div className="flex items-center gap-2 flex-wrap">
-                                        <h3 className="font-bold text-lg text-slate-800">{project.title}</h3>
-                                        <Badge className={statusBadgeClass}>
-                                            {joinPending ? joinApplicationPendingLabel(pRecord) : workflow.badgeLabel}
-                                        </Badge>
-
-                                        {/* Report Status Badge */}
-                                        {project.report_status && project.report_status !== 'none' && (
-                                            <Badge className={`
-                                                ${project.report_status === 'continue' || project.report_status === 'draft' ? 'bg-slate-100 text-slate-700' :
-                                                    project.report_status === 'submitted' ? 'bg-yellow-100 text-yellow-700' :
-                                                        project.report_status === 'pending_payment' ? 'bg-indigo-100 text-indigo-700 border-indigo-200' :
-                                                            project.report_status === 'payment_under_review' ? 'bg-blue-100 text-blue-700 border-blue-200' :
-                                                                project.report_status === 'verified' || project.report_status === 'paid' ? 'bg-green-100 text-green-700' :
-                                                                    'bg-red-100 text-red-700'}
-                                            `}>
-                                                {project.report_status === 'pending_payment' ? 'Payment Due' : 
-                                                 project.report_status === 'payment_under_review' ? 'Payment Verifying' :
-                                                 project.report_status.charAt(0).toUpperCase() + project.report_status.slice(1).replace('_', ' ')}
-                                            </Badge>
-                                        )}
-                                    </div>
-                                    <p className="text-sm text-slate-500">{project.category || "Social Impact"} • {project.submitted_at ? new Date(project.submitted_at).toLocaleDateString() : "Just now"}</p>
-                                    <p className="text-sm text-slate-600 max-w-2xl">
-                                        {project.description || "No description provided."}
-                                    </p>
-
-                                    {/* Payment Required Alert */}
-                                    {project.report_status === 'pending_payment' && (
-                                        <div className="mt-2 p-3 bg-indigo-50 border border-indigo-200 rounded-lg flex items-center justify-between">
-                                            <p className="text-sm font-bold text-indigo-800">💳 Payment Proof Required</p>
-                                            <Link href={`/dashboard/student/payment?projectId=${project.id}`}>
-                                                <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs h-7 px-4">Pay Now</Button>
-                                            </Link>
+                            return (
+                                <article
+                                    key={project.id}
+                                    className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm"
+                                >
+                                    <div className="flex flex-col gap-5 p-5 sm:p-6 lg:flex-row lg:gap-6">
+                                        <div className="relative h-24 w-full shrink-0 overflow-hidden rounded-xl bg-gradient-to-br from-sky-100 via-blue-50 to-indigo-100 sm:h-28 sm:w-40">
+                                            <div className="absolute inset-0 flex items-center justify-center text-lg font-bold tracking-tight text-blue-700">
+                                                {(project.title || "P").substring(0, 2).toUpperCase()}
+                                            </div>
                                         </div>
-                                    )}
 
-                                    {/* Verification Feedback */}
-                                    {(project.report_status === 'verified' || project.report_status === 'paid') && (
-                                        <div className="mt-2 p-3 bg-green-50 border border-green-200 rounded-lg space-y-3">
-                                            <div className="flex items-center justify-between">
-                                                <p className="text-sm font-bold text-green-800">✅ Fully Verified & Paid!</p>
-                                                <div className="flex items-center gap-2">
-                                                    <Button size="sm" variant="outline" className="text-xs h-7 border-green-200 text-green-700 hover:bg-green-100">
-                                                        Download cii (Certificate)
-                                                    </Button>
-                                                    <Link href={`/dashboard/student/report?projectId=${project.id}`}>
-                                                        <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white text-xs h-7">
-                                                            View Final Report
+                                        <div className="min-w-0 flex-1 space-y-3">
+                                            <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
+                                                <div className="min-w-0 space-y-2">
+                                                    <h3 className="text-lg font-bold leading-snug text-slate-900">
+                                                        {project.title}
+                                                    </h3>
+                                                    <div className="flex flex-wrap items-center gap-2">
+                                                        <Badge
+                                                            variant="outline"
+                                                            className={`rounded-full border px-2.5 py-0.5 text-xs font-semibold ${statusBadgeClass}`}
+                                                        >
+                                                            {joinPending
+                                                                ? joinApplicationPendingLabel(pRecord)
+                                                                : workflow.badgeLabel}
+                                                        </Badge>
+                                                        {project.report_status &&
+                                                            project.report_status !== "none" && (
+                                                                <Badge
+                                                                    variant="outline"
+                                                                    className={`rounded-full border px-2.5 py-0.5 text-xs font-semibold ${
+                                                                        project.report_status === "continue" ||
+                                                                        project.report_status === "draft"
+                                                                            ? "border-slate-200 bg-slate-50 text-slate-700"
+                                                                            : project.report_status === "submitted"
+                                                                              ? "border-amber-200 bg-amber-50 text-amber-900"
+                                                                              : project.report_status ===
+                                                                                  "pending_payment"
+                                                                                ? "border-indigo-200 bg-indigo-50 text-indigo-800"
+                                                                                : project.report_status ===
+                                                                                    "payment_under_review"
+                                                                                  ? "border-blue-200 bg-blue-50 text-blue-800"
+                                                                                  : project.report_status ===
+                                                                                        "verified" ||
+                                                                                      project.report_status === "paid"
+                                                                                    ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                                                                                    : "border-rose-200 bg-rose-50 text-rose-800"
+                                                                    }`}
+                                                                >
+                                                                    {project.report_status === "pending_payment"
+                                                                        ? "Payment due"
+                                                                        : project.report_status ===
+                                                                            "payment_under_review"
+                                                                          ? "Payment verifying"
+                                                                          : project.report_status
+                                                                                .charAt(0)
+                                                                                .toUpperCase() +
+                                                                            project.report_status
+                                                                                .slice(1)
+                                                                                .replace("_", " ")}
+                                                                </Badge>
+                                                            )}
+                                                    </div>
+                                                    <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
+                                                        <span className="inline-flex items-center gap-1">
+                                                            <Building2 className="h-3.5 w-3.5 text-slate-400" />
+                                                            {project.category || "Social impact"}
+                                                        </span>
+                                                        <span className="inline-flex items-center gap-1">
+                                                            <MapPin className="h-3.5 w-3.5 text-slate-400" />
+                                                            Listing
+                                                        </span>
+                                                        <span className="inline-flex items-center gap-1">
+                                                            <Clock className="h-3.5 w-3.5 text-slate-400" />
+                                                            {submittedLabel}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <p className="line-clamp-2 text-sm leading-relaxed text-slate-600">
+                                                {project.description || "No description provided."}
+                                            </p>
+
+                                            {!live ? (
+                                                <p className="rounded-lg border border-amber-100 bg-amber-50/90 px-3 py-2 text-xs leading-relaxed text-amber-950">
+                                                    {workflow.queueMessage}
+                                                </p>
+                                            ) : null}
+
+                                            {project.report_status === "pending_payment" && (
+                                                <div className="flex flex-col gap-3 rounded-xl border border-indigo-200 bg-indigo-50/90 p-3 sm:flex-row sm:items-center sm:justify-between">
+                                                    <p className="text-sm font-semibold text-indigo-900">
+                                                        Payment proof required
+                                                    </p>
+                                                    <Link href={`/dashboard/student/payment?projectId=${project.id}`}>
+                                                        <Button
+                                                            size="sm"
+                                                            className="h-9 bg-indigo-600 px-4 text-white hover:bg-indigo-700"
+                                                        >
+                                                            Pay now
                                                         </Button>
                                                     </Link>
                                                 </div>
-                                            </div>
-                                            {project.report_feedback && (
-                                                <p className="text-sm text-green-700 border-t border-green-100 pt-2">{project.report_feedback}</p>
                                             )}
-                                        </div>
-                                    )}
-                                    {project.report_status === 'rejected' && (
-                                        <div className="mt-2 p-3 bg-red-50 border border-red-200 rounded-lg">
-                                            <p className="text-sm font-bold text-red-800">❌ Report Needs Revision</p>
-                                            {project.report_feedback && (
-                                                <p className="text-sm text-red-700 mt-1">{project.report_feedback}</p>
-                                            )}
-                                        </div>
-                                    )}
-                                    {(project.report_status === 'submitted' || project.report_status === 'payment_under_review') && (
-                                        <div className="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                                            <p className="text-sm font-bold text-yellow-800">
-                                                {project.report_status === 'payment_under_review' ? '⏳ Payment Under Review' : '⏳ Report Under Review'}
-                                            </p>
-                                            <p className="text-sm text-yellow-700">
-                                                {project.report_status === 'payment_under_review' ? 'Your payment slip is being verified by the admin team.' : 'Your report is being reviewed by the organization.'}
-                                            </p>
-                                        </div>
-                                    )}
-                                    {joinPending && (
-                                        <div className="mt-2 max-w-2xl">
-                                            <p className="text-xs text-amber-900 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 font-medium">
-                                                {joinApplicationPendingLabel(pRecord)} — you will be notified when your
-                                                application moves forward.
-                                            </p>
-                                        </div>
-                                    )}
-                                    {!live && (
-                                        <div className="mt-2 max-w-2xl space-y-1">
-                                            <p className="text-xs text-amber-800 bg-amber-50/80 border border-amber-100 rounded-lg px-3 py-2">
-                                                {workflow.queueMessage}
-                                            </p>
-                                            {remarkSections.length > 0 || reviewFeedback ? (
-                                                <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2">
-                                                    <p className="text-[11px] font-bold uppercase tracking-wide text-rose-700">
-                                                        Return remarks
-                                                    </p>
-                                                    {remarkSections.length > 0 ? (
-                                                        <div className="mt-2 space-y-2">
-                                                            {remarkSections.map((s) => (
-                                                                <div key={s.label}>
-                                                                    <p className="text-[10px] font-semibold text-rose-700">
-                                                                        {s.label}
-                                                                    </p>
-                                                                    <p className="text-sm text-rose-800 whitespace-pre-wrap">
-                                                                        {s.text}
-                                                                    </p>
-                                                                </div>
-                                                            ))}
+
+                                            {(project.report_status === "verified" ||
+                                                project.report_status === "paid") && (
+                                                <div className="space-y-3 rounded-xl border border-emerald-200 bg-emerald-50/90 p-3">
+                                                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                                                        <p className="text-sm font-semibold text-emerald-900">
+                                                            Fully verified
+                                                        </p>
+                                                        <div className="flex flex-wrap gap-2">
+                                                            <Button
+                                                                size="sm"
+                                                                variant="outline"
+                                                                className="h-8 border-emerald-200 text-emerald-800 hover:bg-emerald-100"
+                                                            >
+                                                                Download cii (Certificate)
+                                                            </Button>
+                                                            <Link href={`/dashboard/student/report?projectId=${project.id}`}>
+                                                                <Button
+                                                                    size="sm"
+                                                                    className="h-8 bg-emerald-600 text-white hover:bg-emerald-700"
+                                                                >
+                                                                    View final report
+                                                                </Button>
+                                                            </Link>
                                                         </div>
-                                                    ) : reviewFeedback ? (
-                                                        <p className="mt-1 text-sm text-rose-800 whitespace-pre-wrap">
-                                                            {reviewFeedback}
+                                                    </div>
+                                                    {project.report_feedback ? (
+                                                        <p className="border-t border-emerald-100 pt-2 text-sm text-emerald-900">
+                                                            {project.report_feedback}
                                                         </p>
                                                     ) : null}
                                                 </div>
-                                            ) : null}
-                                            {approvalLine ? (
-                                                <p className="text-[10px] text-slate-600 font-mono bg-slate-50 border border-slate-100 rounded-lg px-3 py-1.5">
-                                                    {approvalLine}
+                                            )}
+                                            {project.report_status === "rejected" && (
+                                                <div className="rounded-xl border border-rose-200 bg-rose-50 p-3">
+                                                    <p className="text-sm font-semibold text-rose-900">
+                                                        Report needs revision
+                                                    </p>
+                                                    {project.report_feedback ? (
+                                                        <p className="mt-1 text-sm text-rose-800">
+                                                            {project.report_feedback}
+                                                        </p>
+                                                    ) : null}
+                                                </div>
+                                            )}
+                                            {(project.report_status === "submitted" ||
+                                                project.report_status === "payment_under_review") && (
+                                                <div className="rounded-xl border border-amber-200 bg-amber-50 p-3">
+                                                    <p className="text-sm font-semibold text-amber-950">
+                                                        {project.report_status === "payment_under_review"
+                                                            ? "Payment under review"
+                                                            : "Report under review"}
+                                                    </p>
+                                                    <p className="mt-1 text-sm text-amber-900/90">
+                                                        {project.report_status === "payment_under_review"
+                                                            ? "Your payment slip is being verified by the admin team."
+                                                            : "Your report is being reviewed by the organization."}
+                                                    </p>
+                                                </div>
+                                            )}
+                                            {joinPending && (
+                                                <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-950">
+                                                    {joinApplicationPendingLabel(pRecord)} — you will be notified when
+                                                    your application moves forward.
                                                 </p>
-                                            ) : null}
+                                            )}
+                                            {!live && (
+                                                <div className="space-y-2">
+                                                    {remarkSections.length > 0 || reviewFeedback ? (
+                                                        <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2">
+                                                            <p className="text-[11px] font-bold uppercase tracking-wide text-rose-800">
+                                                                Return remarks
+                                                            </p>
+                                                            {remarkSections.length > 0 ? (
+                                                                <div className="mt-2 space-y-2">
+                                                                    {remarkSections.map((s) => (
+                                                                        <div key={s.label}>
+                                                                            <p className="text-[10px] font-semibold text-rose-800">
+                                                                                {s.label}
+                                                                            </p>
+                                                                            <p className="whitespace-pre-wrap text-sm text-rose-900">
+                                                                                {s.text}
+                                                                            </p>
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+                                                            ) : reviewFeedback ? (
+                                                                <p className="mt-1 whitespace-pre-wrap text-sm text-rose-900">
+                                                                    {reviewFeedback}
+                                                                </p>
+                                                            ) : null}
+                                                        </div>
+                                                    ) : null}
+                                                    {approvalLine ? (
+                                                        <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 font-mono text-[10px] text-slate-600">
+                                                            {approvalLine}
+                                                        </p>
+                                                    ) : null}
+                                                </div>
+                                            )}
                                         </div>
-                                    )}
-                                </div>
-                            </div>
-                            <div className="flex items-center gap-3 w-full md:w-auto">
-                                {project.teamMembers && project.teamMembers.length > 0 && (
-                                    <Button variant="outline" onClick={() => openTeamDialog(project)} className="w-full md:w-auto flex items-center gap-2">
-                                        <Users className="w-4 h-4" /> View Team
-                                    </Button>
-                                )}
 
-                                {reportUnlocked && (
-                                    <>
-                                        {project.report_status === 'none' || project.report_status === 'continue' || project.report_status === 'draft' ? (
-                                            <Link href={`/dashboard/student/report?projectId=${project.id}`} className="w-full md:w-auto">
-                                                <Button className="w-full md:w-auto">
-                                                    {project.report_status === 'continue' || project.report_status === 'draft' ? 'Continue Report' : 'Start Report'}
+                                        <div className="flex w-full shrink-0 flex-col gap-2 border-t border-slate-100 pt-4 lg:w-56 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
+                                            {reportUnlocked &&
+                                            (project.report_status === "none" ||
+                                                project.report_status === "continue" ||
+                                                project.report_status === "draft") ? (
+                                                <Link
+                                                    href={`/dashboard/student/report?projectId=${project.id}`}
+                                                    className="w-full"
+                                                >
+                                                    <Button className="h-10 w-full rounded-xl bg-blue-600 text-white hover:bg-blue-700">
+                                                        {project.report_status === "continue" ||
+                                                        project.report_status === "draft"
+                                                            ? "Continue report"
+                                                            : "Start report"}
+                                                    </Button>
+                                                </Link>
+                                            ) : null}
+                                            {reportUnlocked && project.report_status === "rejected" ? (
+                                                <Link
+                                                    href={`/dashboard/student/report?projectId=${project.id}`}
+                                                    className="w-full"
+                                                >
+                                                    <Button
+                                                        variant="destructive"
+                                                        className="h-10 w-full rounded-xl"
+                                                    >
+                                                        Revise report
+                                                    </Button>
+                                                </Link>
+                                            ) : null}
+                                            {reportUnlocked && project.report_status === "submitted" ? (
+                                                <Link
+                                                    href={`/dashboard/student/payment?projectId=${project.id}`}
+                                                    className="w-full"
+                                                >
+                                                    <Button className="h-10 w-full rounded-xl bg-indigo-600 text-white hover:bg-indigo-700">
+                                                        Complete payment
+                                                    </Button>
+                                                </Link>
+                                            ) : null}
+                                            {project.teamMembers && project.teamMembers.length > 0 ? (
+                                                <Button
+                                                    variant="outline"
+                                                    onClick={() => openTeamDialog(project)}
+                                                    className="h-10 w-full gap-2 rounded-xl border-slate-200"
+                                                >
+                                                    <Users className="h-4 w-4" /> View team
                                                 </Button>
-                                            </Link>
-                                        ) : project.report_status === 'rejected' ? (
-                                            <Link href={`/dashboard/student/report?projectId=${project.id}`} className="w-full md:w-auto">
-                                                <Button variant="destructive" className="w-full md:w-auto">
-                                                    Revise Report
-                                                </Button>
-                                            </Link>
-                                        ) : project.report_status === 'submitted' ? (
-                                            <Link href={`/dashboard/student/payment?projectId=${project.id}`} className="w-full md:w-auto">
-                                                <Button className="w-full md:w-auto bg-indigo-600 hover:bg-indigo-700">
-                                                    Complete Payment
-                                                </Button>
-                                            </Link>
-                                        ) : null}
-                                    </>
-                                )}
-                                {canReviseOpportunity ? (
-                                    <Link
-                                        href={`/dashboard/student/create-opportunity?edit=${encodeURIComponent(project.id)}`}
-                                        className="w-full md:w-auto"
-                                    >
-                                        <Button variant="outline" className="w-full md:w-auto gap-1.5">
-                                            <Pencil className="w-4 h-4" /> Edit & Resubmit
-                                        </Button>
-                                    </Link>
-                                ) : null}
-                                <Button
-                                    variant="outline"
-                                    className="w-full md:w-auto gap-1.5"
-                                    onClick={() => openProjectDetailDialog(project)}
-                                >
-                                    <Eye className="w-4 h-4" /> View Details
-                                </Button>
-                            </div>
-                        </div>
-                        );
-                    })}
+                                            ) : null}
+                                            {canReviseOpportunity ? (
+                                                <Link
+                                                    href={`/dashboard/student/create-opportunity?edit=${encodeURIComponent(project.id)}`}
+                                                    className="w-full"
+                                                >
+                                                    <Button
+                                                        variant="outline"
+                                                        className="h-10 w-full gap-2 rounded-xl border-slate-200"
+                                                    >
+                                                        <Pencil className="h-4 w-4" /> Edit & Resubmit
+                                                    </Button>
+                                                </Link>
+                                            ) : null}
+                                            <Button
+                                                variant="outline"
+                                                className="h-10 w-full gap-2 rounded-xl border-slate-200 text-slate-700"
+                                                onClick={() => openProjectDetailDialog(project)}
+                                            >
+                                                <Eye className="h-4 w-4" /> View details
+                                            </Button>
+                                        </div>
+                                    </div>
+
+                                    <footer className="flex flex-col gap-1 border-t border-slate-100 bg-slate-50/70 px-5 py-3 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+                                        <span>{submittedLabel}</span>
+                                        <span className="font-medium text-slate-600">{footerSource}</span>
+                                    </footer>
+                                </article>
+                            );
+                        },
+                    )}
                 </div>
             )}
 
@@ -785,7 +1167,8 @@ export default function MyProjectsPage() {
                                     sh.student.university ||
                                     sh.student.department ||
                                     sh.student.phone;
-                                const hasFaculty = sh.facultyName || sh.facultyEmail;
+                                const facultyPipeline = facultyApprovalPipelineApplies(v);
+                                const hasFaculty = facultyPipeline && !!(sh.facultyName || sh.facultyEmail);
                                 const hasPartner = sh.partnerOrg || sh.partnerPerson || sh.partnerEmail;
                                 const facultyStatus = normalizeApprovalState(v.faculty_approval_status);
                                 const partnerStatus = normalizeApprovalState(v.partner_approval_status);
@@ -803,6 +1186,22 @@ export default function MyProjectsPage() {
                                     "createdAt",
                                     "date_submitted",
                                 );
+                                const execToken =
+                                    typeof v.execution_verification_token === "string"
+                                        ? v.execution_verification_token.trim()
+                                        : typeof v.executionVerificationToken === "string"
+                                          ? v.executionVerificationToken.trim()
+                                          : "";
+                                const execVerified = v.execution_verified === true || v.executionVerified === true;
+                                const needsExecutingOrgVerify = !!execToken && !execVerified;
+
+                                const facultyGateStatus = facultyPipeline ? facultyStatus || "pending" : "not_applicable";
+                                const facultyGateHelper = facultyPipeline
+                                    ? sh.facultyName || sh.facultyEmail || "Waiting for faculty review"
+                                    : sh.facultyName || sh.facultyEmail
+                                      ? "Supervision / executing contact on file (not a separate faculty approval gate for this posting type)"
+                                      : "No separate faculty approval gate for this posting type";
+
                                 const remarkSections = extractOpportunityReturnRemarkSections(v);
                                 const reviewFeedback =
                                     remarkSections.length === 0 ? extractOpportunityReviewFeedback(v) : null;
@@ -828,16 +1227,21 @@ export default function MyProjectsPage() {
                                     },
                                     {
                                         label: "Faculty",
-                                        helper: sh.facultyName || sh.facultyEmail || "Waiting for faculty review",
-                                        status: facultyStatus || "pending",
+                                        helper: facultyGateHelper,
+                                        status: facultyGateStatus,
                                     },
                                     {
                                         label: "Partner",
-                                        helper:
-                                            sh.partnerOrg || sh.partnerPerson || sh.partnerEmail
+                                        helper: needsExecutingOrgVerify
+                                            ? "Executing organization email verification pending"
+                                            : sh.partnerOrg || sh.partnerPerson || sh.partnerEmail
                                                 ? sh.partnerOrg || sh.partnerPerson || sh.partnerEmail
                                                 : "No partner step on this record",
-                                        status: hasPartner || partnerStatus ? partnerStatus || "pending" : "not_applicable",
+                                        status: needsExecutingOrgVerify
+                                            ? "pending"
+                                            : hasPartner || partnerStatus
+                                                ? partnerStatus || "pending"
+                                                : "not_applicable",
                                     },
                                     {
                                         label: "Admin",

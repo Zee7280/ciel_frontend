@@ -1589,7 +1589,9 @@ export default function OpportunityPostingPage() {
                             <AlertCircle className="w-5 h-5 text-amber-400" /> Activation rule
                         </p>
                         <ul className="list-disc pl-5 space-y-1 text-slate-300 text-xs">
-                            <li>Active only after executing-organization email verification, safety declaration (F3), and admin approval.</li>
+                            <li>
+                                If you add an <strong>additional partner organization (F2)</strong>, the official executing-organization contact must sign in and confirm execution on the opportunity detail page before admin approval. Otherwise only CIEL admin approval applies (plus F3 confirmations).
+                            </li>
                             <li>Partner details (F2) and faculty linkage (Section H, when restricted) are not required for activation.</li>
                         </ul>
                     </div>
@@ -1807,7 +1809,7 @@ export default function OpportunityPostingPage() {
                 </h2>
                 <p className="text-sm text-slate-300 leading-relaxed">
                     Required declarations are captured in <strong className="text-white">Section F</strong> (F3 safety, F6 confirmations). Participation verification methods are in <strong className="text-white">Section G</strong>.
-                    Submitting sends the opportunity for <strong className="text-white">admin review</strong>; it becomes active only after executing-organization email verification, those confirmations, and approval.
+                    Submitting sends the opportunity for <strong className="text-white">admin review</strong>. If F2 (extra partner NGO) is enabled, the executing-organization official contact confirms details in the portal after sign-in; otherwise it goes straight to admin review once requirements are met.
                 </p>
                 <p className="text-xs text-slate-500">
                     Open visibility does not require faculty linkage. Restricted visibility requires universities and representative details in Section H.

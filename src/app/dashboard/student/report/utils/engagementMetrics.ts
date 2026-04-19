@@ -6,9 +6,35 @@
 export interface AttendanceLog {
     id?: string;
     date: string;
-    hours: number;
+    hours?: number;
+    start_time?: string;
+    end_time?: string;
+    startTime?: string;
+    endTime?: string;
     evidence_file?: any;
     participantId?: string;
+}
+
+function parseClockToMinutes(t: string | undefined): number | null {
+    if (!t || typeof t !== "string") return null;
+    const m = t.trim().match(/^(\d{1,2}):(\d{2})/);
+    if (!m) return null;
+    return parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
+}
+
+/** Prefer stored `hours`; otherwise derive from start/end clock times on the same day. */
+export function effectiveHoursFromLog(log: AttendanceLog): number {
+    const direct = Number(log.hours);
+    if (Number.isFinite(direct) && direct > 0) return direct;
+    const startRaw = log.start_time || log.startTime;
+    const endRaw = log.end_time || log.endTime;
+    const a = parseClockToMinutes(startRaw);
+    const b = parseClockToMinutes(endRaw);
+    if (a === null || b === null) return 0;
+    let diffMin = b - a;
+    if (diffMin < 0) diffMin += 24 * 60;
+    const h = diffMin / 60;
+    return Math.round(h * 10) / 10;
 }
 
 export interface IndividualMetric {
@@ -65,7 +91,7 @@ export function calculateEngagementMetrics(
     const N = teamSize > 0 ? teamSize : 1;
     const projectGoal = RHS * N;
     
-    const totalHours = logs.reduce((sum, log) => sum + (Number(log.hours) || 0), 0);
+    const totalHours = logs.reduce((sum, log) => sum + effectiveHoursFromLog(log), 0);
     const uniqueDays = new Set(logs.map(log => log.date)).size;
 
     // --- AUDIT: Red Flag Detection ---
@@ -73,11 +99,11 @@ export function calculateEngagementMetrics(
     const patterns: Record<string, number> = {};
     
     logs.forEach(log => {
-        const h = Number(log.hours) || 0;
+        const h = effectiveHoursFromLog(log);
         hoursPerDay[log.date] = (hoursPerDay[log.date] || 0) + h;
-        
+
         // Pattern detection (e.g., exact same hours or times)
-        const p = `${log.hours}`; 
+        const p = `${effectiveHoursFromLog(log)}`;
         patterns[p] = (patterns[p] || 0) + 1;
     });
 
@@ -139,7 +165,7 @@ export function calculateEngagementMetrics(
     const studentEvidenceMap: Record<string, boolean> = {};
     logs.forEach(log => {
         const pId = log.participantId || 'unknown';
-        studentHoursMap[pId] = (studentHoursMap[pId] || 0) + (Number(log.hours) || 0);
+        studentHoursMap[pId] = (studentHoursMap[pId] || 0) + effectiveHoursFromLog(log);
         if (log.evidence_file) studentEvidenceMap[pId] = true;
     });
 

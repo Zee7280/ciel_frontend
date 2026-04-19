@@ -7,6 +7,8 @@ import { calculateEngagementMetrics } from '../utils/engagementMetrics';
 // Define the shape of the report data matches the 11 sections (plus summary)
 export interface ReportData {
     project_id: string;
+    /** Short official name from opportunity / API; preferred over long problem statements on certificates. */
+    project_title?: string;
     status?: string;
     admin_status?: string;
     partner_status?: string;
@@ -268,6 +270,7 @@ export interface ReportData {
 
 const defaultReportData: ReportData = {
     project_id: '',
+    project_title: '',
     section1: {
         participation_type: 'individual',
         team_lead: { name: '', cnic: '', mobile: '', email: '', university: '', degree: '', year: '', role: '', hours: '' },

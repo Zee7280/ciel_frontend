@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none" role="img" aria-labelledby="cielMarkTitle">
+  <title id="cielMarkTitle">CIEL</title>
+  <defs>
+    <linearGradient id="cielMarkAccent" x1="8" y1="8" x2="40" y2="40" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#38bdf8"/>
+      <stop offset="1" stop-color="#0369a1"/>
+    </linearGradient>
+  </defs>
+  <path
+    fill="#0f172a"
+    d="M24 3 45 11v16.5C45 36.5 36.8 45.2 24 50 11.2 45.2 3 36.5 3 27.5V11L24 3Z"
+  />
+  <path
+    fill="#ffffff"
+    fill-opacity="0.12"
+    d="M24 8.5 40 14.5v12.5c0 7.2-6.2 14-16 17.5L24 46.5 8 44.5C8 44.5 8 34.5 8 27V14.5L24 8.5Z"
+  />
+  <path
+    d="M31 18.5c-5.2 0-9.5 4.3-9.5 9.5s4.3 9.5 9.5 9.5"
+    stroke="#ffffff"
+    stroke-width="3.2"
+    stroke-linecap="round"
+    fill="none"
+  />
+  <circle cx="33.5" cy="28" r="3.2" fill="url(#cielMarkAccent)"/>
+</svg>

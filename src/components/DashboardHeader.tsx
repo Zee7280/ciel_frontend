@@ -28,6 +28,8 @@ export default function DashboardHeader() {
         router.push("/login");
     };
 
+    const [user, setUser] = useState<{ name: string; role: string; email: string; image?: string; logoUrl?: string; notifications_count?: number } | null>(null);
+
     const getTitle = () => {
         if (navRole === "student") return "Student Dashboard";
         if (navRole === "partner") return "Partner Portal";
@@ -36,7 +38,8 @@ export default function DashboardHeader() {
         return "Dashboard";
     };
 
-    const [user, setUser] = useState<{ name: string; role: string; email: string; image?: string; logoUrl?: string; notifications_count?: number } | null>(null);
+    const isStudentHome = navRole === "student" && pathname === "/dashboard/student";
+    const firstName = user?.name?.split(/\s+/)[0] || "User";
 
     useEffect(() => {
         try {
@@ -65,8 +68,12 @@ export default function DashboardHeader() {
     return (
         <header className="h-20 bg-white border-b border-slate-200 flex items-center justify-between px-8 sticky top-0 z-30 ml-64 font-sans">
             <div>
-                <h1 className="text-xl font-black text-slate-900 tracking-tight">{getTitle()}</h1>
-                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Welcome back, {user?.name?.split(' ')[0] || "User"}</p>
+                <h1 className="text-xl font-black tracking-tight text-slate-900">
+                    {isStudentHome ? `Welcome back, ${firstName}!` : getTitle()}
+                </h1>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                    {isStudentHome ? "Overview" : `Welcome back, ${firstName}`}
+                </p>
             </div>
 
             <div className="flex items-center gap-6">

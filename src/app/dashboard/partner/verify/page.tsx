@@ -172,6 +172,35 @@ function normalizeStrArray(value: unknown): string[] {
     return value.filter((item): item is string => typeof item === "string" && item.trim().length > 0).map((item) => item.trim());
 }
 
+function readStoredUserEmail(): string {
+    if (typeof window === "undefined") return "";
+    try {
+        const raw = localStorage.getItem("ciel_user");
+        if (!raw) return "";
+        const j = JSON.parse(raw) as { email?: string };
+        return typeof j.email === "string" ? j.email.trim().toLowerCase() : "";
+    } catch {
+        return "";
+    }
+}
+
+function getExecutingOrgOfficialEmail(opp: Record<string, unknown> | null): string {
+    if (!opp) return "";
+    const raw = opp.executing_organization ?? opp.executingOrganization;
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) return "";
+    const o = raw as Record<string, unknown>;
+    const v = o.official_email ?? o.officialEmail;
+    return typeof v === "string" ? v.trim().toLowerCase() : "";
+}
+
+function needsExecutingOrgPortalConfirm(opp: Record<string, unknown> | null): boolean {
+    if (!opp) return false;
+    const tok = opp.execution_verification_token ?? opp.executionVerificationToken;
+    const hasTok = typeof tok === "string" && tok.trim().length > 0;
+    const verified = opp.execution_verified === true || opp.executionVerified === true;
+    return hasTok && !verified;
+}
+
 export default function VerifyWorkPage() {
     const [tab, setTab] = useState<"pending" | "history">("pending");
     const [rows, setRows] = useState<PartnerApprovalRow[]>([]);
@@ -187,6 +216,7 @@ export default function VerifyWorkPage() {
     const [rejectTargetId, setRejectTargetId] = useState<string | null>(null);
     const [rejectComment, setRejectComment] = useState("");
     const [rejectSubmitting, setRejectSubmitting] = useState(false);
+    const [execVerifySubmitting, setExecVerifySubmitting] = useState(false);
     const autoOpenedIdRef = useRef<string | null>(null);
 
     useEffect(() => {
@@ -308,6 +338,38 @@ export default function VerifyWorkPage() {
         setRejectComment("");
     };
 
+    const handleConfirmExecutingOrg = async (opportunityId: string) => {
+        if (!opportunityId || execVerifySubmitting) return;
+        setExecVerifySubmitting(true);
+        try {
+            const res = await authenticatedFetch(`/api/v1/opportunities/verify-executing-org`, {
+                method: "POST",
+                body: JSON.stringify({ id: opportunityId }),
+            });
+            if (res?.ok) {
+                toast.success("Execution details confirmed.");
+                if (detailRecord && pickStr(detailRecord, "id", "opportunity_id", "opportunityId") === opportunityId) {
+                    const res2 = await authenticatedFetch("/api/v1/opportunities/detail", {
+                        method: "POST",
+                        body: JSON.stringify({ id: opportunityId }),
+                    });
+                    if (res2?.ok) {
+                        const json = await res2.json().catch(() => ({}));
+                        setDetailRecord((json?.data as Record<string, unknown>) || null);
+                    }
+                }
+                void loadQueue();
+            } else {
+                const data = await res?.json().catch(() => ({}));
+                toast.error(pickStr(data as Record<string, unknown>, "message", "error", "detail") || "Could not confirm");
+            }
+        } catch {
+            toast.error("Could not confirm execution details");
+        } finally {
+            setExecVerifySubmitting(false);
+        }
+    };
+
     const confirmReject = async () => {
         if (!rejectTargetId) return;
         const reason = rejectComment.trim();
@@ -365,6 +427,12 @@ export default function VerifyWorkPage() {
     const detailCreatorId = detailRecord
         ? pickStr(detailRecord, "creatorId", "creator_id", "student_id", "studentId", "created_by")
         : "";
+    const detailOppId = detailRecord ? pickStr(detailRecord, "id", "opportunity_id", "opportunityId") : "";
+    const execOfficialDialog = getExecutingOrgOfficialEmail(detailRecord);
+    const needsExecDialog = needsExecutingOrgPortalConfirm(detailRecord);
+    const userEmailDialog = readStoredUserEmail();
+    const canExecDialog =
+        needsExecDialog && !!userEmailDialog && !!execOfficialDialog && userEmailDialog === execOfficialDialog;
 
     useEffect(() => {
         if (typeof window === "undefined") return;
@@ -686,6 +754,33 @@ export default function VerifyWorkPage() {
                                     </div>
                                 );
                             })()}
+                            {needsExecDialog && detailOppId ? (
+                                <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-4">
+                                    <p className="text-xs font-bold text-emerald-900 uppercase mb-2">Executing organization confirmation</p>
+                                    <p className="text-slate-800 mb-3">
+                                        {canExecDialog
+                                            ? "Confirm that you have reviewed this opportunity as the official executing-organization contact."
+                                            : `Only the official executing-organization contact (${execOfficialDialog || "email on file"}) can complete this step — sign in with that CIEL account.`}
+                                    </p>
+                                    {canExecDialog ? (
+                                        <Button
+                                            className="bg-emerald-600 hover:bg-emerald-700"
+                                            disabled={execVerifySubmitting}
+                                            onClick={() => void handleConfirmExecutingOrg(detailOppId)}
+                                        >
+                                            {execVerifySubmitting ? (
+                                                <>
+                                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Confirming…
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <CheckCircle className="w-4 h-4 mr-2" /> Confirm execution details
+                                                </>
+                                            )}
+                                        </Button>
+                                    ) : null}
+                                </div>
+                            ) : null}
                             {detailActionId ? (
                                 <div className="flex flex-wrap justify-end gap-2 pt-4 border-t border-slate-200">
                                     <Button variant="destructive" onClick={() => detailActionId && openRejectDialog(detailActionId)}>

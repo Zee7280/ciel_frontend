@@ -189,3 +189,19 @@ body {
     font-style: italic;
   }
 }
+
+@media print {
+  /* CII certificate modal is portaled to body; hide the rest of the app so Save PDF is certificate-only */
+  body.cii-certificate-printing > *:not(.cii-certificate-print-root) {
+    display: none !important;
+  }
+
+  body.cii-certificate-printing .cii-certificate-print-root {
+    display: block !important;
+  }
+
+  body.cii-certificate-printing .certificate-one-page {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+}

@@ -191,6 +191,18 @@ function stakeholderRows(d: Record<string, unknown>): {
     };
 }
 
+function isStudentCreatedOpportunity(v: Record<string, unknown>): boolean {
+    const raw = v.is_student_created ?? v.isStudentCreated;
+    return raw === true || String(raw).toLowerCase() === "true";
+}
+
+function facultyApprovalPipelineApplies(v: Record<string, unknown>): boolean {
+    if (isStudentCreatedOpportunity(v)) return true;
+    if (typeof v.faculty_verification_token === "string" && v.faculty_verification_token.trim()) return true;
+    if (typeof v.liaisonToken === "string" && v.liaisonToken.trim()) return true;
+    return false;
+}
+
 export default function AdminApprovalsPage() {
     const router = useRouter();
     const [activeTab, setActiveTab] = useState("registrations");
@@ -765,7 +777,8 @@ export default function AdminApprovalsPage() {
                                         sh.student.university ||
                                         sh.student.department ||
                                         sh.student.phone;
-                                    const hasFaculty = sh.facultyName || sh.facultyEmail;
+                                    const facultyPipeline = facultyApprovalPipelineApplies(v);
+                                    const hasFaculty = facultyPipeline && !!(sh.facultyName || sh.facultyEmail);
                                     const hasPartner = sh.partnerOrg || sh.partnerPerson || sh.partnerEmail;
                                     const facultyStatus = normalizeApprovalState(v.faculty_approval_status);
                                     const partnerStatus = normalizeApprovalState(v.partner_approval_status);
@@ -783,6 +796,24 @@ export default function AdminApprovalsPage() {
                                         "createdAt",
                                         "date_submitted",
                                     );
+                                    const execToken =
+                                        typeof v.execution_verification_token === "string"
+                                            ? v.execution_verification_token.trim()
+                                            : typeof v.executionVerificationToken === "string"
+                                              ? v.executionVerificationToken.trim()
+                                              : "";
+                                    const execVerified = v.execution_verified === true || v.executionVerified === true;
+                                    const needsExecutingOrgVerify = !!execToken && !execVerified;
+
+                                    const facultyGateStatus = facultyPipeline
+                                        ? facultyStatus || "pending"
+                                        : "not_applicable";
+                                    const facultyGateHelper = facultyPipeline
+                                        ? sh.facultyName || sh.facultyEmail || "Waiting for faculty review"
+                                        : sh.facultyName || sh.facultyEmail
+                                          ? "Supervision / executing contact on file (not a separate faculty approval gate for this posting type)"
+                                          : "No separate faculty approval gate for this posting type";
+
                                     const approvalStages = [
                                         {
                                             label: "Student",
@@ -791,17 +822,19 @@ export default function AdminApprovalsPage() {
                                         },
                                         {
                                             label: "Faculty",
-                                            helper: sh.facultyName || sh.facultyEmail || "Waiting for faculty review",
-                                            status: facultyStatus || "pending",
+                                            helper: facultyGateHelper,
+                                            status: facultyGateStatus,
                                         },
                                         {
                                             label: "Partner",
-                                            helper:
-                                                sh.partnerOrg || sh.partnerPerson || sh.partnerEmail
+                                            helper: needsExecutingOrgVerify
+                                                ? "Executing organization email verification pending"
+                                                : sh.partnerOrg || sh.partnerPerson || sh.partnerEmail
                                                     ? sh.partnerOrg || sh.partnerPerson || sh.partnerEmail
                                                     : "No partner step on this record",
-                                            status:
-                                                hasPartner || partnerStatus
+                                            status: needsExecutingOrgVerify
+                                                ? "pending"
+                                                : hasPartner || partnerStatus
                                                     ? partnerStatus || "pending"
                                                     : "not_applicable",
                                         },

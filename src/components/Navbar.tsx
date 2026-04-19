@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import clsx from "clsx";
@@ -29,8 +28,8 @@ export default function Navbar() {
             <div className="max-w-[1600px] mx-auto px-6 h-24 flex items-center justify-between">
                 {/* Logo */}
                 <Link href="/" className="flex items-center gap-4 group cursor-pointer">
-                    <div className="relative w-20 h-20 flex items-center justify-center group-hover:scale-105 transition-all duration-300">
-                        <Image src="/ciel-logo-final.png" alt="CIEL Logo" width={160} height={160} className="object-contain" />
+                    <div className="relative flex h-16 w-16 items-center justify-center transition-all duration-300 group-hover:scale-105">
+                        <img src="/ciel-mark.svg" alt="CIEL" className="h-14 w-14 object-contain" width={56} height={56} />
                     </div>
                     <div className="flex flex-col">
                         <span className="text-[18px] font-black tracking-tight text-slate-800 leading-tight">

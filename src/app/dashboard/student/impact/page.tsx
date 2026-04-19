@@ -5,7 +5,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "../report/components/u
 import { Badge } from "../report/components/ui/badge";
 import { authenticatedFetch } from "@/utils/api";
 import { Loader2 } from "lucide-react";
-import { toast } from "sonner";
 
 interface Activity {
     id: string;
@@ -26,6 +25,86 @@ interface ImpactStats {
     activities: Activity[];
 }
 
+function pickNum(obj: Record<string, unknown>, keys: string[]): number {
+    for (const k of keys) {
+        const v = obj[k];
+        if (typeof v === "number" && Number.isFinite(v)) return v;
+        if (typeof v === "string" && v.trim() !== "") {
+            const n = Number(v);
+            if (Number.isFinite(n)) return n;
+        }
+    }
+    return 0;
+}
+
+function pickStr(obj: Record<string, unknown>, keys: string[], fallback = ""): string {
+    for (const k of keys) {
+        const v = obj[k];
+        if (typeof v === "string" && v.trim() !== "") return v;
+    }
+    return fallback;
+}
+
+function normalizeActivity(row: Record<string, unknown>, index: number): Activity {
+    return {
+        id: pickStr(row, ["id", "recordId", "record_id"]) || String(index),
+        title: pickStr(row, ["title", "name", "projectTitle", "project_title", "recordType", "record_type"]) || "Activity",
+        organization: pickStr(row, [
+            "organization",
+            "orgName",
+            "organization_name",
+            "partnerName",
+            "partner_name",
+            "verifiedBy",
+            "verified_by",
+        ]),
+        date: pickStr(row, [
+            "date",
+            "occurredAt",
+            "occurred_at",
+            "completedAt",
+            "completed_at",
+            "createdAt",
+            "created_at",
+        ]) || new Date().toISOString(),
+        hours: pickNum(row, ["hours", "verifiedHours", "verified_hours", "totalHours", "total_hours"]),
+        sdg: pickStr(row, ["sdg", "sdgGoal", "sdg_goal", "sdgCode", "sdg_code"]),
+        status: pickStr(row, ["status", "recordStatus", "record_state", "record_status"], "verified"),
+    };
+}
+
+function normalizeImpactPayload(payload: unknown): ImpactStats | null {
+    if (!payload || typeof payload !== "object") return null;
+    const root = payload as Record<string, unknown>;
+    let raw: unknown = root.data;
+    if (raw == null || typeof raw !== "object") {
+        const r = root as Record<string, unknown>;
+        const hasList = Array.isArray(r.activities ?? r.records ?? r.items ?? r.entries);
+        const hasTotals = ["total_hours", "totalHours", "impact_score", "impactScore", "projects_completed", "projectsCompleted"].some(
+            (k) => r[k] != null && r[k] !== "",
+        );
+        if (hasList || hasTotals) raw = root;
+        else return null;
+    }
+    const o = raw as Record<string, unknown>;
+
+    const activitiesRaw = o.activities ?? o.records ?? o.items ?? o.entries;
+    const activities: Activity[] = Array.isArray(activitiesRaw)
+        ? activitiesRaw.map((item, i) =>
+              item && typeof item === "object" ? normalizeActivity(item as Record<string, unknown>, i) : normalizeActivity({}, i),
+          )
+        : [];
+
+    return {
+        total_hours: pickNum(o, ["total_hours", "totalHours"]),
+        hours_this_month: pickNum(o, ["hours_this_month", "hoursThisMonth"]),
+        projects_completed: pickNum(o, ["projects_completed", "projectsCompleted"]),
+        impact_score: pickNum(o, ["impact_score", "impactScore", "ciiScore", "cii_score"]),
+        impact_percentile: pickStr(o, ["impact_percentile", "impactPercentile", "percentileLabel", "percentile_label"], "Keep contributing!"),
+        activities,
+    };
+}
+
 export default function ImpactHistoryPage() {
     const [stats, setStats] = useState<ImpactStats | null>(null);
     const [isLoading, setIsLoading] = useState(true);
@@ -35,37 +114,38 @@ export default function ImpactHistoryPage() {
 
         const fetchData = async () => {
             try {
-                // Safety timeout
-                const timeoutDetails = new Promise((_, reject) => {
+                const timeoutDetails = new Promise<Response | null>((_, reject) => {
                     setTimeout(() => reject(new Error("Request timed out")), 10000);
                 });
 
-                const userStr = localStorage.getItem('user');
-                if (!userStr) {
-                    console.log("No user found in storage");
-                    if (isMounted) setIsLoading(false);
-                    return;
+                const path = `/api/v1/students/impact/history`;
+
+                const tryGet = authenticatedFetch(path, { method: "GET" });
+                let res = (await Promise.race([tryGet, timeoutDetails])) as Response | null;
+
+                if (res?.status === 405) {
+                    const userStr = localStorage.getItem("user");
+                    if (userStr) {
+                        try {
+                            const user = JSON.parse(userStr) as { id?: string };
+                            res = await authenticatedFetch(path, {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ student_id: user.id }),
+                            });
+                        } catch {
+                            /* ignore */
+                        }
+                    }
                 }
 
-                const user = JSON.parse(userStr);
-                const fetchPromise = authenticatedFetch(`/api/v1/students/impact/history`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ student_id: user.id })
-                });
-
-                // Race fetch against timeout
-                const res = await Promise.race([fetchPromise, timeoutDetails]) as Response | null;
-
                 if (isMounted && res && res.ok) {
-                    const data = await res.json();
-                    if (data.success) {
-                        setStats(data.data);
-                    }
+                    const json = await res.json().catch(() => null);
+                    const normalized = normalizeImpactPayload(json);
+                    if (normalized) setStats(normalized);
                 }
             } catch (error) {
                 console.error("Error fetching impact history", error);
-                // Don't annoy user with toast on load if it's just empty
             } finally {
                 if (isMounted) setIsLoading(false);
             }
@@ -73,11 +153,17 @@ export default function ImpactHistoryPage() {
 
         fetchData();
 
-        return () => { isMounted = false; };
+        return () => {
+            isMounted = false;
+        };
     }, []);
 
     if (isLoading) {
-        return <div className="flex justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-slate-300" /></div>;
+        return (
+            <div className="flex justify-center py-20">
+                <Loader2 className="w-8 h-8 animate-spin text-slate-300" />
+            </div>
+        );
     }
 
     return (
@@ -122,26 +208,41 @@ export default function ImpactHistoryPage() {
                     <CardTitle>Activity Log</CardTitle>
                 </CardHeader>
                 <CardContent>
-                    {(!stats?.activities || stats.activities.length === 0) ? (
+                    {!stats?.activities || stats.activities.length === 0 ? (
                         <p className="text-slate-500 text-sm py-4">No verified activities yet.</p>
                     ) : (
                         <div className="relative ml-4 space-y-0 before:absolute before:inset-0 before:ml-2 before:h-full before:w-0.5 before:-translate-x-px before:bg-slate-200 before:content-['']">
                             {stats.activities.map((activity, i) => (
                                 <div key={activity.id || i} className="relative pb-8 pl-8 last:pb-0">
-                                    <span className={`absolute left-0 top-1 h-4 w-4 rounded-full ring-4 ring-white ${i === 0 ? 'bg-blue-600' : 'bg-slate-300'}`}></span>
+                                    <span
+                                        className={`absolute left-0 top-1 h-4 w-4 rounded-full ring-4 ring-white ${i === 0 ? "bg-blue-600" : "bg-slate-300"}`}
+                                    ></span>
                                     <div className="flex flex-col gap-1">
                                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                                             <div>
                                                 <h4 className="text-sm font-bold text-slate-900 leading-none">{activity.title}</h4>
-                                                <p className="text-xs text-slate-500 mt-1">Verified by {activity.organization}</p>
+                                                {activity.organization ? (
+                                                    <p className="text-xs text-slate-500 mt-1">Verified by {activity.organization}</p>
+                                                ) : null}
                                             </div>
                                             <span className="text-xs text-slate-400 font-medium">
                                                 {new Date(activity.date).toLocaleDateString()}
                                             </span>
                                         </div>
-                                        <div className="mt-3 flex items-center gap-2">
-                                            <Badge variant="outline" className="bg-white text-slate-600 border-slate-200">+{activity.hours} Hours</Badge>
-                                            {activity.sdg && <Badge variant="secondary" className="bg-blue-50 text-blue-700 hover:bg-blue-100">{activity.sdg}</Badge>}
+                                        <div className="mt-3 flex flex-wrap items-center gap-2">
+                                            <Badge variant="outline" className="bg-white text-slate-600 border-slate-200">
+                                                +{activity.hours} Hours
+                                            </Badge>
+                                            {activity.sdg ? (
+                                                <Badge variant="secondary" className="bg-blue-50 text-blue-700 hover:bg-blue-100">
+                                                    {activity.sdg}
+                                                </Badge>
+                                            ) : null}
+                                            {activity.status ? (
+                                                <Badge variant="outline" className="capitalize text-slate-600 border-slate-200">
+                                                    {activity.status}
+                                                </Badge>
+                                            ) : null}
                                         </div>
                                     </div>
                                 </div>
@@ -151,5 +252,5 @@ export default function ImpactHistoryPage() {
                 </CardContent>
             </Card>
         </div>
-    )
+    );
 }

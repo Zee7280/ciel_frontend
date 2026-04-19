@@ -243,7 +243,7 @@ export default function StudentBrowseOpportunitiesPage() {
     };
 
     const filterSelectClass =
-        "h-9 min-w-[130px] max-w-[220px] px-2 text-sm rounded-md border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20";
+        "h-10 w-full min-w-0 px-3 text-sm rounded-lg border border-slate-200 bg-white text-slate-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-300";
 
     const openApplicationDialog = (id: string, title: string) => {
         setApplyingId(id);
@@ -318,21 +318,27 @@ export default function StudentBrowseOpportunitiesPage() {
 
     if (isLoading) {
         return (
-            <div className="flex justify-center items-center h-full min-h-[500px]">
+            <div className="flex flex-col justify-center items-center h-full min-h-[480px] gap-3">
                 <Loader2 className="w-8 h-8 animate-spin text-slate-400" />
+                <p className="text-sm text-slate-500">Loading opportunities…</p>
             </div>
         );
     }
 
     return (
         <div className="max-w-7xl mx-auto space-y-8 pb-20">
-            <div className="flex flex-col md:flex-row justify-between items-end gap-4">
-                <div>
-                    <h1 className="text-2xl font-bold text-slate-900">Browse Opportunities</h1>
-                    <p className="text-slate-500">Discover and apply to volunteer projects from our partners.</p>
-                </div>
+            <header className="space-y-1">
+                <h1 className="text-3xl font-semibold tracking-tight text-slate-900">Browse Opportunities</h1>
+                <p className="text-sm text-slate-500 max-w-2xl leading-relaxed">
+                    Discover and apply to volunteer projects from our partners.
+                </p>
+            </header>
 
-                <div className="flex flex-wrap items-center gap-2">
+            <section
+                className="rounded-xl border border-slate-200 bg-white p-5 sm:p-6 shadow-sm"
+                aria-label="Filters"
+            >
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
                     <select
                         value={universityFilter}
                         onChange={(e) => setUniversityFilter(e.target.value)}
@@ -398,81 +404,99 @@ export default function StudentBrowseOpportunitiesPage() {
                             </option>
                         ))}
                     </select>
-                    <select
-                        value={locationFilter}
-                        onChange={(e) => setLocationFilter(e.target.value)}
-                        className={filterSelectClass}
-                        title="Location"
-                    >
-                        <option value="all">All locations</option>
-                        {locationOptions.map((loc) => (
-                            <option key={loc} value={loc}>
-                                {loc}
-                            </option>
-                        ))}
-                    </select>
-                    <select
-                        value={seatsFilter}
-                        onChange={(e) => setSeatsFilter(e.target.value as "all" | "1" | "5" | "10")}
-                        className={filterSelectClass}
-                        title="Seats available"
-                    >
-                        <option value="all">Any seats</option>
-                        <option value="1">1+ seats</option>
-                        <option value="5">5+ seats</option>
-                        <option value="10">10+ seats</option>
-                    </select>
-                    <select
-                        value={visibilityFilter}
-                        onChange={(e) => setVisibilityFilter(e.target.value as "all" | VisibilityBucket)}
-                        className={filterSelectClass}
-                        title="Visibility"
-                    >
-                        <option value="all">All visibility</option>
-                        {(["open", "restricted", "unspecified"] as const).map((b) => (
-                            <option key={b} value={b}>
-                                {visibilityMenuLabel(b)}
-                            </option>
-                        ))}
-                    </select>
-                    <Button variant="outline" size="sm" className="h-9 text-xs shrink-0" onClick={clearListingFilters}>
-                        Clear
-                    </Button>
+                </div>
 
-                    <div className="w-px h-6 bg-slate-200 mx-1 hidden md:block" />
+                <div className="mt-4 flex flex-col gap-4 lg:flex-row lg:items-stretch lg:justify-between">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 lg:flex-1 lg:max-w-3xl">
+                        <select
+                            value={locationFilter}
+                            onChange={(e) => setLocationFilter(e.target.value)}
+                            className={filterSelectClass}
+                            title="Location"
+                        >
+                            <option value="all">All locations</option>
+                            {locationOptions.map((loc) => (
+                                <option key={loc} value={loc}>
+                                    {loc}
+                                </option>
+                            ))}
+                        </select>
+                        <select
+                            value={seatsFilter}
+                            onChange={(e) => setSeatsFilter(e.target.value as "all" | "1" | "5" | "10")}
+                            className={filterSelectClass}
+                            title="Seats available"
+                        >
+                            <option value="all">Any seats</option>
+                            <option value="1">1+ seats</option>
+                            <option value="5">5+ seats</option>
+                            <option value="10">10+ seats</option>
+                        </select>
+                        <select
+                            value={visibilityFilter}
+                            onChange={(e) => setVisibilityFilter(e.target.value as "all" | VisibilityBucket)}
+                            className={filterSelectClass}
+                            title="Visibility"
+                        >
+                            <option value="all">All visibility</option>
+                            {(["open", "restricted", "unspecified"] as const).map((b) => (
+                                <option key={b} value={b}>
+                                    {visibilityMenuLabel(b)}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
 
-                    {/* View Toggle */}
-                    <div className="flex bg-slate-100 p-1 rounded-lg border border-slate-200">
-                        <button
-                            onClick={() => setViewMode('grid')}
-                            className={`p-1.5 rounded-md transition-all ${viewMode === 'grid' ? 'bg-white shadow text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}
-                            title="Grid View"
+                    <div className="flex flex-wrap items-center justify-end gap-2 shrink-0">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-10 px-4 text-sm border-slate-200 text-slate-700 hover:bg-slate-50"
+                            onClick={clearListingFilters}
                         >
-                            <LayoutGrid className="w-4 h-4" />
-                        </button>
-                        <button
-                            onClick={() => setViewMode('list')}
-                            className={`p-1.5 rounded-md transition-all ${viewMode === 'list' ? 'bg-white shadow text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}
-                            title="List View"
-                        >
-                            <List className="w-4 h-4" />
-                        </button>
+                            Clear
+                        </Button>
+                        <div className="flex rounded-lg border border-slate-200 bg-slate-50 p-1 shadow-sm">
+                            <button
+                                type="button"
+                                onClick={() => setViewMode("grid")}
+                                className={`rounded-md p-2 transition-colors ${viewMode === "grid" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-800"}`}
+                                title="Grid view"
+                            >
+                                <LayoutGrid className="h-4 w-4" />
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setViewMode("list")}
+                                className={`rounded-md p-2 transition-colors ${viewMode === "list" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-800"}`}
+                                title="List view"
+                            >
+                                <List className="h-4 w-4" />
+                            </button>
+                        </div>
                     </div>
                 </div>
-            </div>
+            </section>
+
+            {filteredOpportunities.length > 0 ? (
+                <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
+                    {filteredOpportunities.length}{" "}
+                    {filteredOpportunities.length === 1 ? "opportunity" : "opportunities"}
+                </p>
+            ) : null}
 
             {filteredOpportunities.length === 0 ? (
-                <div className="text-center py-20 bg-white rounded-xl border border-slate-100">
-                    <Globe className="w-12 h-12 text-slate-300 mx-auto mb-4" />
-                    <h3 className="text-lg font-bold text-slate-700">No Opportunities Found</h3>
-                    <p className="text-slate-500 mb-6">Try adjusting your filters.</p>
-                    <Button variant="outline" onClick={clearListingFilters}>
-                        Clear Filters
+                <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/40 py-16 text-center">
+                    <Globe className="mx-auto mb-4 h-12 w-12 text-slate-300" />
+                    <h3 className="text-lg font-semibold text-slate-800">No opportunities match</h3>
+                    <p className="mt-1 text-sm text-slate-500">Try adjusting your filters or check back later.</p>
+                    <Button variant="outline" className="mt-6 border-slate-200" onClick={clearListingFilters}>
+                        Clear filters
                     </Button>
                 </div>
             ) : (
                 <div className={viewMode === 'grid'
-                    ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+                    ? "grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3"
                     : "space-y-4"
                 }>
                     {filteredOpportunities.map((op) => {
@@ -482,20 +506,20 @@ export default function StudentBrowseOpportunitiesPage() {
                         );
                         return viewMode === 'grid' ? (
                             // GRID VIEW CARD
-                            <div key={op.id} className="bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-all flex flex-col h-full group">
-                                <div className="p-6 flex-1 space-y-4">
-                                    <div className="flex justify-between items-start gap-2 flex-wrap">
-                                        <div className="flex flex-wrap gap-2 items-center min-w-0">
-                                            <Badge className="bg-blue-50 text-blue-700 hover:bg-blue-100 border-none">
+                            <div key={op.id} className="group flex h-full flex-col rounded-xl border border-slate-200 bg-white shadow-sm transition-all hover:border-slate-300 hover:shadow-md">
+                                <div className="flex flex-1 flex-col space-y-4 p-5">
+                                    <div className="flex flex-wrap items-start justify-between gap-2">
+                                        <div className="flex min-w-0 flex-wrap items-center gap-2">
+                                            <Badge className="border-0 bg-slate-100 font-medium text-slate-700 hover:bg-slate-100">
                                                 {op.category || "Social Impact"}
                                             </Badge>
                                             {applyEligibility.listingRestrictionLabel ? (
-                                                <Badge className="bg-amber-50 text-amber-900 border border-amber-200 shadow-none hover:bg-amber-50 max-w-full whitespace-normal text-left leading-snug">
+                                                <Badge className="max-w-full whitespace-normal border border-amber-200 bg-amber-50 text-left text-amber-900 shadow-none hover:bg-amber-50 leading-snug">
                                                     {applyEligibility.listingRestrictionLabel}
                                                 </Badge>
                                             ) : null}
                                         </div>
-                                        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider shrink-0">
+                                        <span className="shrink-0 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
                                             {op.modeBucket && op.modeBucket !== "unspecified"
                                                 ? modeMenuLabel(op.modeBucket)
                                                 : op.mode || "On Site"}
@@ -503,41 +527,41 @@ export default function StudentBrowseOpportunitiesPage() {
                                     </div>
 
                                     <div>
-                                        <h3 className="text-lg font-bold text-slate-900 group-hover:text-blue-600 transition-colors line-clamp-2">
+                                        <h3 className="line-clamp-2 text-lg font-semibold tracking-tight text-slate-900 transition-colors group-hover:text-slate-700">
                                             {op.title}
                                         </h3>
-                                        <p className="text-sm font-medium text-slate-500 mt-1 line-clamp-1">
+                                        <p className="mt-1 line-clamp-1 text-sm text-slate-500">
                                             by {op.organization_name || "Partner Organization"}
                                         </p>
                                     </div>
 
-                                    <p className="text-sm text-slate-500 line-clamp-3 leading-relaxed">
+                                    <p className="line-clamp-3 text-sm leading-relaxed text-slate-500">
                                         {op.description}
                                     </p>
 
-                                    <div className="space-y-2 pt-2">
+                                    <div className="space-y-2.5 border-t border-slate-100 pt-3">
                                         <div className="flex items-center gap-2 text-xs text-slate-500">
-                                            <MapPin className="w-3.5 h-3.5" />
+                                            <MapPin className="h-3.5 w-3.5 shrink-0 text-slate-400" />
                                             {op.city || "Remote"}
                                         </div>
                                         <div className="flex items-center gap-2 text-xs text-slate-500">
-                                            <Calendar className="w-3.5 h-3.5" />
+                                            <Calendar className="h-3.5 w-3.5 shrink-0 text-slate-400" />
                                             {op.start_date ? new Date(op.start_date).toLocaleDateString() : "Flexible Dates"}
                                         </div>
                                         <div className="flex items-center gap-2 text-xs text-slate-500">
-                                            <Clock className="w-3.5 h-3.5" />
-                                            {op.hours || "0"} Hours Credit
+                                            <Clock className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+                                            {op.hours || "0"} hours credit
                                         </div>
-                                        <div className="flex items-center gap-2 text-xs font-bold text-orange-600">
-                                            <Users className="w-3.5 h-3.5" />
-                                            {op.seatsRemaining ?? op.remaining_seats ?? op.volunteersNeeded ?? 0} Seats Remaining
+                                        <div className="flex items-center gap-2 text-xs font-semibold text-amber-700">
+                                            <Users className="h-3.5 w-3.5 shrink-0 text-amber-600/80" />
+                                            {op.seatsRemaining ?? op.remaining_seats ?? op.volunteersNeeded ?? 0} seats remaining
                                         </div>
                                     </div>
                                 </div>
 
-                                <div className="p-4 border-t border-slate-50 bg-slate-50/50 rounded-b-2xl flex justify-between items-center">
-                                    <Link href={`/dashboard/student/browse/${op.id}`} className="text-sm font-bold text-slate-600 hover:text-slate-900">
-                                        View Details
+                                <div className="flex items-center justify-between gap-2 rounded-b-xl border-t border-slate-100 bg-white px-5 py-4">
+                                    <Link href={`/dashboard/student/browse/${op.id}`} className="text-sm font-medium text-slate-600 underline-offset-4 hover:text-slate-900 hover:underline">
+                                        View details
                                     </Link>
                                     {op.applyLocked ? (
                                         <div className="flex items-center gap-2">
@@ -545,7 +569,7 @@ export default function StudentBrowseOpportunitiesPage() {
                                             {op.application_status != null &&
                                                 ["approved", "verified"].includes(op.application_status) && (
                                                 <Link href={`/dashboard/student/report?projectId=${op.id}`}>
-                                                    <Button size="sm" variant="outline" className="text-xs h-8">
+                                                    <Button size="sm" variant="outline" className="h-8 border-slate-200 text-xs font-medium">
                                                         Start Report
                                                     </Button>
                                                 </Link>
@@ -562,13 +586,13 @@ export default function StudentBrowseOpportunitiesPage() {
 
                                             {/* Team Button */}
                                             {op.teamMembers && op.teamMembers.length > 0 && (
-                                                <Button size="sm" variant="outline" className="text-xs h-8" onClick={() => openTeamDialog(op)}>
-                                                    <Users className="w-3.5 h-3.5 mr-1" /> Team
+                                                <Button size="sm" variant="outline" className="h-8 border-slate-200 text-xs font-medium" onClick={() => openTeamDialog(op)}>
+                                                    <Users className="mr-1 h-3.5 w-3.5" /> Team
                                                 </Button>
                                             )}
 
-                                            <Button size="sm" variant="ghost" className="text-green-600 hover:text-green-700 hover:bg-green-50 pointer-events-none">
-                                                <CheckCircle2 className="w-4 h-4 mr-1" /> Applied
+                                            <Button size="sm" variant="ghost" className="pointer-events-none text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800">
+                                                <CheckCircle2 className="mr-1 h-4 w-4" /> Applied
                                             </Button>
                                         </div>
                                     ) : op.hasApplied ? (
@@ -583,8 +607,8 @@ export default function StudentBrowseOpportunitiesPage() {
                                                 size="sm"
                                                 className={
                                                     applyEligibility.canApply
-                                                        ? "bg-slate-900 hover:bg-blue-600 text-white transition-colors"
-                                                        : "bg-slate-300 text-slate-600 hover:bg-slate-300 cursor-not-allowed"
+                                                        ? "bg-slate-900 font-medium text-white transition-colors hover:bg-slate-800"
+                                                        : "cursor-not-allowed bg-slate-200 text-slate-600 hover:bg-slate-200"
                                                 }
                                                 onClick={() =>
                                                     applyEligibility.canApply &&
@@ -601,8 +625,8 @@ export default function StudentBrowseOpportunitiesPage() {
                                             size="sm"
                                             className={
                                                 applyEligibility.canApply
-                                                    ? "bg-slate-900 hover:bg-blue-600 text-white transition-colors"
-                                                    : "bg-slate-300 text-slate-600 hover:bg-slate-300 cursor-not-allowed"
+                                                    ? "bg-slate-900 font-medium text-white transition-colors hover:bg-slate-800"
+                                                    : "cursor-not-allowed bg-slate-200 text-slate-600 hover:bg-slate-200"
                                             }
                                             onClick={() =>
                                                 applyEligibility.canApply &&
@@ -618,40 +642,40 @@ export default function StudentBrowseOpportunitiesPage() {
                             </div>
                         ) : (
                             // LIST VIEW CARD
-                            <div key={op.id} className="bg-white rounded-xl border border-slate-100 shadow-sm p-5 hover:shadow-md transition-all group flex flex-col md:flex-row gap-6 items-start md:items-center">
-                                <div className="flex-1 min-w-0">
-                                    <div className="flex flex-wrap items-center gap-3 mb-2">
-                                        <Badge className="bg-blue-50 text-blue-700 hover:bg-blue-100 border-none">
+                            <div key={op.id} className="group flex flex-col items-start gap-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition-all hover:border-slate-300 hover:shadow-md md:flex-row md:items-center">
+                                <div className="min-w-0 flex-1">
+                                    <div className="mb-2 flex flex-wrap items-center gap-2">
+                                        <Badge className="border-0 bg-slate-100 font-medium text-slate-700 hover:bg-slate-100">
                                             {op.category || "Social Impact"}
                                         </Badge>
                                         {applyEligibility.listingRestrictionLabel ? (
-                                            <Badge className="bg-amber-50 text-amber-900 border border-amber-200 shadow-none hover:bg-amber-50">
+                                            <Badge className="border border-amber-200 bg-amber-50 text-amber-900 shadow-none hover:bg-amber-50">
                                                 {applyEligibility.listingRestrictionLabel}
                                             </Badge>
                                         ) : null}
-                                        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                                        <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
                                             {op.modeBucket && op.modeBucket !== "unspecified"
                                                 ? modeMenuLabel(op.modeBucket)
                                                 : op.mode || "On Site"}
                                         </span>
                                     </div>
 
-                                    <h3 className="text-lg font-bold text-slate-900 group-hover:text-blue-600 transition-colors truncate">
+                                    <h3 className="truncate text-lg font-semibold tracking-tight text-slate-900 transition-colors group-hover:text-slate-700">
                                         {op.title}
                                     </h3>
 
-                                    <div className="flex flex-wrap gap-x-6 gap-y-2 mt-3 text-sm text-slate-500">
+                                    <div className="mt-3 flex flex-wrap gap-x-6 gap-y-2 text-sm text-slate-500">
                                         <span className="font-medium text-slate-600">by {op.organization_name || "Partner Organization"}</span>
-                                        <span className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5" /> {op.city || "Remote"}</span>
-                                        <span className="flex items-center gap-1"><Calendar className="w-3.5 h-3.5" /> {op.start_date ? new Date(op.start_date).toLocaleDateString() : "Flexible Dates"}</span>
-                                        <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5" /> {op.hours || "0"} Hours</span>
-                                        <span className="flex items-center gap-1 font-bold text-orange-600"><Users className="w-3.5 h-3.5" /> {op.seatsRemaining ?? op.remaining_seats ?? op.volunteersNeeded ?? 0} Seats left</span>
+                                        <span className="flex items-center gap-1"><MapPin className="h-3.5 w-3.5 text-slate-400" /> {op.city || "Remote"}</span>
+                                        <span className="flex items-center gap-1"><Calendar className="h-3.5 w-3.5 text-slate-400" /> {op.start_date ? new Date(op.start_date).toLocaleDateString() : "Flexible Dates"}</span>
+                                        <span className="flex items-center gap-1"><Clock className="h-3.5 w-3.5 text-slate-400" /> {op.hours || "0"} hours</span>
+                                        <span className="flex items-center gap-1 font-semibold text-amber-700"><Users className="h-3.5 w-3.5 text-amber-600/80" /> {op.seatsRemaining ?? op.remaining_seats ?? op.volunteersNeeded ?? 0} seats left</span>
                                     </div>
                                 </div>
 
-                                <div className="flex gap-3 w-full md:w-auto mt-2 md:mt-0">
+                                <div className="mt-2 flex w-full gap-3 md:mt-0 md:w-auto">
                                     <Link href={`/dashboard/student/browse/${op.id}`} className="flex-1 md:flex-none">
-                                        <Button variant="outline" className="w-full">Details</Button>
+                                        <Button variant="outline" className="w-full border-slate-200 font-medium">Details</Button>
                                     </Link>
                                     {op.applyLocked ? (
                                         <div className="flex items-center gap-2 flex-1 md:flex-none justify-end">
@@ -659,7 +683,7 @@ export default function StudentBrowseOpportunitiesPage() {
                                             {op.application_status != null &&
                                                 ["approved", "verified"].includes(op.application_status) && (
                                                 <Link href={`/dashboard/student/report?projectId=${op.id}`}>
-                                                    <Button size="sm" variant="outline" className="text-xs h-9">
+                                                    <Button size="sm" variant="outline" className="h-9 border-slate-200 text-xs font-medium">
                                                         Start Report
                                                     </Button>
                                                 </Link>
@@ -676,13 +700,13 @@ export default function StudentBrowseOpportunitiesPage() {
 
                                             {/* Team Button */}
                                             {op.teamMembers && op.teamMembers.length > 0 && (
-                                                <Button size="sm" variant="outline" className="text-xs h-9" onClick={() => openTeamDialog(op)}>
-                                                    <Users className="w-3.5 h-3.5 mr-1" /> Team
+                                                <Button size="sm" variant="outline" className="h-9 border-slate-200 text-xs font-medium" onClick={() => openTeamDialog(op)}>
+                                                    <Users className="mr-1 h-3.5 w-3.5" /> Team
                                                 </Button>
                                             )}
 
-                                            <Button variant="ghost" className="text-green-600 bg-green-50 pointer-events-none">
-                                                <CheckCircle2 className="w-4 h-4 mr-2" /> Applied
+                                            <Button variant="ghost" className="pointer-events-none bg-emerald-50 text-emerald-800">
+                                                <CheckCircle2 className="mr-2 h-4 w-4" /> Applied
                                             </Button>
                                         </div>
                                     ) : op.hasApplied ? (
@@ -696,8 +720,8 @@ export default function StudentBrowseOpportunitiesPage() {
                                             <Button
                                                 className={
                                                     applyEligibility.canApply
-                                                        ? "bg-slate-900 hover:bg-blue-600 text-white transition-colors flex-1 md:flex-none"
-                                                        : "bg-slate-300 text-slate-600 hover:bg-slate-300 cursor-not-allowed flex-1 md:flex-none"
+                                                        ? "flex-1 bg-slate-900 font-medium text-white transition-colors hover:bg-slate-800 md:flex-none"
+                                                        : "flex-1 cursor-not-allowed bg-slate-200 text-slate-600 hover:bg-slate-200 md:flex-none"
                                                 }
                                                 onClick={() =>
                                                     applyEligibility.canApply &&
@@ -713,8 +737,8 @@ export default function StudentBrowseOpportunitiesPage() {
                                         <Button
                                             className={
                                                 applyEligibility.canApply
-                                                    ? "bg-slate-900 hover:bg-blue-600 text-white transition-colors flex-1 md:flex-none"
-                                                    : "bg-slate-300 text-slate-600 hover:bg-slate-300 cursor-not-allowed flex-1 md:flex-none"
+                                                    ? "flex-1 bg-slate-900 font-medium text-white transition-colors hover:bg-slate-800 md:flex-none"
+                                                    : "flex-1 cursor-not-allowed bg-slate-200 text-slate-600 hover:bg-slate-200 md:flex-none"
                                             }
                                             onClick={() =>
                                                 applyEligibility.canApply &&

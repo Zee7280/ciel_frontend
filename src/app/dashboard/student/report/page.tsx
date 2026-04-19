@@ -79,9 +79,12 @@ function ReportFormContent() {
                 authenticatedFetch(`/api/v1/student/reports/${projectId}`)
             ]);
 
+            let projectPayload: Record<string, unknown> | null = null;
+
             if (projectRes && projectRes.ok) {
                 const projectData = await projectRes.json();
                 const pInfo = projectData.data || projectData;
+                projectPayload = pInfo as Record<string, unknown>;
                 setProjectDetails(pInfo);
 
                 // 🚨 SECURITY CHECK: project status + join application (when API sends application_status)
@@ -92,19 +95,38 @@ function ReportFormContent() {
                 }
             }
 
+            const pickOpportunityTitle = (p: Record<string, unknown> | null): string => {
+                if (!p) return "";
+                const keys = ["title", "name", "opportunity_title", "project_title", "opportunity_name"] as const;
+                for (const k of keys) {
+                    const v = p[k];
+                    if (typeof v === "string" && v.trim()) return v.trim();
+                }
+                return "";
+            };
+
             if (reportRes && reportRes.ok) {
                 const reportData = await reportRes.json();
                 const actualReportData = reportData.data || reportData; // Handle potential wrapper
                 if (actualReportData && Object.keys(actualReportData).length > 0) {
-                    setFullData(actualReportData);
-                    const isSubmitted = ['submitted', 'approved', 'under_review'].includes(actualReportData.status) || 
-                                       ['verified', 'approved'].includes(actualReportData.admin_status);
+                    const existingTitle = String(
+                        (actualReportData as { project_title?: string }).project_title || "",
+                    ).trim();
+                    const titleFromProject = pickOpportunityTitle(projectPayload);
+                    const mergedReport = {
+                        ...actualReportData,
+                        ...(!existingTitle && titleFromProject ? { project_title: titleFromProject } : {}),
+                    };
+                    setFullData(mergedReport);
+                    const isSubmitted =
+                        ["submitted", "approved", "under_review"].includes(mergedReport.status) ||
+                        ["verified", "approved"].includes(mergedReport.admin_status || "");
                     if (isSubmitted) {
                         // Report already submitted — skip guide, go straight to summary
                         setShowGuide(false);
                         setStep(11);
                         setReadOnly(true);
-                    } else if (actualReportData.status === 'continue' || Object.keys(actualReportData).length > 2) {
+                    } else if (mergedReport.status === "continue" || Object.keys(mergedReport).length > 2) {
                         setShowGuide(false);
                     }
                 }
