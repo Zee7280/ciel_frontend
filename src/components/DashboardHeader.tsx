@@ -1,15 +1,24 @@
 "use client";
 
-import { useState, useEffect, useLayoutEffect } from "react";
-import Link from "next/link";
+import { useState, useEffect, useLayoutEffect, useRef, useCallback } from "react";
 import { usePathname } from "next/navigation";
-import { Bell, Search, User, LogOut } from "lucide-react";
+import { AlertCircle, Bell, CheckCircle, Clock, Info, Loader2, LogOut, Search, User } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
     dashboardNavRoleFromPathname,
     readDashboardNavRoleFromStorage,
     type DashboardNavRole,
 } from "@/utils/dashboardNavRole";
+import { authenticatedFetch } from "@/utils/api";
+
+type HeaderNotification = {
+    id: number;
+    type: "approval" | "reminder" | "update" | "alert";
+    title: string;
+    message: string;
+    isRead: boolean;
+    createdAt: string;
+};
 
 export default function DashboardHeader() {
     const pathname = usePathname();
@@ -65,6 +74,110 @@ export default function DashboardHeader() {
               ? "/dashboard/partner/notifications"
               : null;
 
+    const [notifOpen, setNotifOpen] = useState(false);
+    const [notifLoading, setNotifLoading] = useState(false);
+    const [notifPreview, setNotifPreview] = useState<HeaderNotification[]>([]);
+    const notifWrapRef = useRef<HTMLDivElement>(null);
+
+    const loadHeaderNotifications = useCallback(async () => {
+        if (!notificationHref) return;
+        setNotifLoading(true);
+        try {
+            const res = await authenticatedFetch("/api/v1/notifications", {}, { redirectToLogin: false });
+            if (res?.ok) {
+                const data = (await res.json()) as { success?: boolean; data?: HeaderNotification[] };
+                if (data.success && Array.isArray(data.data)) {
+                    const sorted = [...data.data].sort(
+                        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+                    );
+                    setNotifPreview(sorted.slice(0, 3));
+                } else {
+                    setNotifPreview([]);
+                }
+            } else {
+                setNotifPreview([]);
+            }
+        } catch {
+            setNotifPreview([]);
+        } finally {
+            setNotifLoading(false);
+        }
+    }, [notificationHref]);
+
+    useEffect(() => {
+        if (notifOpen && notificationHref) {
+            void loadHeaderNotifications();
+        }
+    }, [notifOpen, notificationHref, loadHeaderNotifications]);
+
+    useEffect(() => {
+        if (!notifOpen) return;
+        const onDocMouseDown = (e: MouseEvent) => {
+            if (!notifWrapRef.current?.contains(e.target as Node)) {
+                setNotifOpen(false);
+            }
+        };
+        document.addEventListener("mousedown", onDocMouseDown);
+        return () => document.removeEventListener("mousedown", onDocMouseDown);
+    }, [notifOpen]);
+
+    useEffect(() => {
+        setNotifOpen(false);
+    }, [pathname]);
+
+    const goNotifications = () => {
+        if (!notificationHref) return;
+        setNotifOpen(false);
+        router.push(notificationHref);
+    };
+
+    const formatNotifDate = (iso: string) => {
+        try {
+            return new Date(iso).toLocaleDateString(undefined, {
+                month: "short",
+                day: "numeric",
+                year: "numeric",
+            });
+        } catch {
+            return "";
+        }
+    };
+
+    const getTypeVisual = (type: HeaderNotification["type"]) => {
+        switch (type) {
+            case "approval":
+                return {
+                    bar: "bg-emerald-500",
+                    iconWrap: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100/80",
+                    icon: <CheckCircle className="h-4 w-4" strokeWidth={2} />,
+                };
+            case "reminder":
+                return {
+                    bar: "bg-sky-500",
+                    iconWrap: "bg-sky-50 text-sky-700 ring-1 ring-sky-100/80",
+                    icon: <Clock className="h-4 w-4" strokeWidth={2} />,
+                };
+            case "update":
+                return {
+                    bar: "bg-violet-500",
+                    iconWrap: "bg-violet-50 text-violet-700 ring-1 ring-violet-100/80",
+                    icon: <Info className="h-4 w-4" strokeWidth={2} />,
+                };
+            case "alert":
+                return {
+                    bar: "bg-amber-500",
+                    iconWrap: "bg-amber-50 text-amber-700 ring-1 ring-amber-100/80",
+                    icon: <AlertCircle className="h-4 w-4" strokeWidth={2} />,
+                };
+            default:
+                return {
+                    bar: "bg-slate-400",
+                    iconWrap: "bg-slate-100 text-slate-600 ring-1 ring-slate-200/80",
+                    icon: <Bell className="h-4 w-4" strokeWidth={2} />,
+                };
+        }
+    };
+
     return (
         <header className="h-20 bg-white border-b border-slate-200 flex items-center justify-between px-8 sticky top-0 z-30 ml-64 font-sans">
             <div>
@@ -87,14 +200,113 @@ export default function DashboardHeader() {
                 </div>
 
                 {notificationHref ? (
-                    <Link href={notificationHref} className="relative p-2.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all group">
-                        <Bell className="w-5 h-5 group-hover:scale-110 transition-transform" />
-                        {user?.notifications_count ? (
-                            <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-blue-600 rounded-full border-2 border-white"></span>
+                    <div className="relative" ref={notifWrapRef}>
+                        <button
+                            type="button"
+                            onClick={() => setNotifOpen((o) => !o)}
+                            className="relative p-2.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all group"
+                            aria-expanded={notifOpen}
+                            aria-haspopup="dialog"
+                            aria-label="Notifications"
+                        >
+                            <Bell className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                            {user?.notifications_count ? (
+                                <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-blue-600 rounded-full border-2 border-white" />
+                            ) : null}
+                        </button>
+                        {notifOpen ? (
+                            <div
+                                className="absolute right-0 top-full z-50 mt-2 w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-xl shadow-slate-900/10 ring-1 ring-slate-900/[0.04]"
+                                role="dialog"
+                                aria-label="Recent notifications"
+                            >
+                                <div className="border-b border-slate-100 bg-slate-50/80 px-4 py-3">
+                                    <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Recent</p>
+                                    <p className="text-sm font-semibold text-slate-900">Notifications</p>
+                                </div>
+                                <div className="max-h-[min(24rem,70vh)] overflow-y-auto p-2">
+                                    {notifLoading ? (
+                                        <div className="flex flex-col items-center justify-center gap-2 py-10">
+                                            <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+                                            <p className="text-xs font-medium text-slate-500">Loading…</p>
+                                        </div>
+                                    ) : notifPreview.length === 0 ? (
+                                        <div className="px-3 py-8 text-center">
+                                            <p className="text-sm font-medium text-slate-600">No notifications yet</p>
+                                            <p className="mt-1 text-xs text-slate-500">You&apos;re all caught up.</p>
+                                        </div>
+                                    ) : (
+                                        <ul className="space-y-2" role="list">
+                                            {notifPreview.map((notification) => {
+                                                const visual = getTypeVisual(notification.type);
+                                                const unread = !notification.isRead;
+                                                return (
+                                                    <li key={notification.id}>
+                                                        <button
+                                                            type="button"
+                                                            onClick={goNotifications}
+                                                            className={`flex w-full overflow-hidden rounded-xl border bg-white text-left shadow-sm transition hover:shadow-md ${
+                                                                unread
+                                                                    ? "border-slate-200/90 ring-1 ring-slate-900/[0.04]"
+                                                                    : "border-slate-200/70 opacity-[0.97] hover:opacity-100"
+                                                            }`}
+                                                        >
+                                                            <div
+                                                                className={`w-1 shrink-0 self-stretch ${unread ? visual.bar : "bg-slate-200/80"}`}
+                                                                aria-hidden
+                                                            />
+                                                            <div className="flex min-w-0 flex-1 gap-3 p-3">
+                                                                <div
+                                                                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${visual.iconWrap}`}
+                                                                >
+                                                                    {visual.icon}
+                                                                </div>
+                                                                <div className="min-w-0 flex-1">
+                                                                    <div className="flex items-start justify-between gap-2">
+                                                                        <div className="flex min-w-0 items-center gap-1.5">
+                                                                            {unread ? (
+                                                                                <span
+                                                                                    className="h-1.5 w-1.5 shrink-0 rounded-full bg-blue-500"
+                                                                                    title="Unread"
+                                                                                />
+                                                                            ) : null}
+                                                                            <span className="truncate text-sm font-semibold text-slate-900">
+                                                                                {notification.title}
+                                                                            </span>
+                                                                        </div>
+                                                                        <time
+                                                                            className="shrink-0 text-[10px] font-medium tabular-nums text-slate-400"
+                                                                            dateTime={notification.createdAt}
+                                                                        >
+                                                                            {formatNotifDate(notification.createdAt)}
+                                                                        </time>
+                                                                    </div>
+                                                                    <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-slate-600">
+                                                                        {notification.message}
+                                                                    </p>
+                                                                </div>
+                                                            </div>
+                                                        </button>
+                                                    </li>
+                                                );
+                                            })}
+                                        </ul>
+                                    )}
+                                </div>
+                                <div className="border-t border-slate-100 bg-slate-50/50 p-2">
+                                    <button
+                                        type="button"
+                                        onClick={goNotifications}
+                                        className="w-full rounded-xl bg-blue-600 px-3 py-2.5 text-center text-sm font-semibold text-white transition hover:bg-blue-700"
+                                    >
+                                        View all notifications
+                                    </button>
+                                </div>
+                            </div>
                         ) : null}
-                    </Link>
+                    </div>
                 ) : (
-                    <button className="relative p-2.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all group">
+                    <button type="button" className="relative p-2.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all group">
                         <Bell className="w-5 h-5 group-hover:scale-110 transition-transform" />
                         {user?.notifications_count ? (
                             <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-blue-600 rounded-full border-2 border-white"></span>

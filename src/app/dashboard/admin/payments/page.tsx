@@ -27,6 +27,41 @@ import { Input } from '../../student/report/components/ui/input';
 
 type PaymentStatusTab = 'pending' | 'approved' | 'rejected';
 
+/** Uses API `paid_amount` (int|null) when set; else legacy `amount` string (e.g. "5,000 PKR"). */
+function resolvePaidAmountDisplay(raw: Record<string, unknown>): string {
+    const keys = [
+        'paid_amount',
+        'paidAmount',
+        'amount_paid',
+        'amountPaid',
+        'transferred_amount',
+        'transferredAmount',
+        'submitted_amount',
+        'submittedAmount',
+        'actual_amount',
+        'actualAmount',
+        'transfer_amount',
+        'transferAmount',
+        'amount',
+    ];
+    let val: unknown;
+    for (const k of keys) {
+        const v = raw[k];
+        if (v != null && String(v).trim() !== '') {
+            val = v;
+            break;
+        }
+    }
+    if (val == null) return '—';
+    const str = String(val).trim();
+    if (!str) return '—';
+    if (/pkr/i.test(str) || /(^|\s)rs\.?\s*/i.test(str)) return str;
+    const normalized = str.replace(/,/g, '');
+    const num = Number(normalized);
+    if (!Number.isFinite(num) || Number.isNaN(num)) return str;
+    return `${Math.round(num).toLocaleString('en-PK')} PKR`;
+}
+
 interface Payment {
     id: string;
     studentName: string;
@@ -50,7 +85,7 @@ function normalizePayment(raw: Record<string, unknown>, fallbackStatus: PaymentS
     const studentEmail = String(raw.studentEmail ?? raw.student_email ?? '');
     const projectTitle = String(raw.projectTitle ?? raw.project_title ?? '');
     const projectId = String(raw.projectId ?? raw.project_id ?? '');
-    const amount = String(raw.amount ?? '');
+    const amount = resolvePaidAmountDisplay(raw);
     const date = String(raw.date ?? raw.submitted_at ?? raw.created_at ?? raw.submittedAt ?? '');
     const proofUrl = String(raw.proofUrl ?? raw.proof_url ?? '');
     const statusRaw = String(raw.status ?? fallbackStatus).toLowerCase();

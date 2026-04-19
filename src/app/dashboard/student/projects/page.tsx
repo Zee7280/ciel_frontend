@@ -9,15 +9,22 @@ import {
     canEditReturnedOpportunity,
     extractOpportunityReturnRemarkSections,
     extractOpportunityReviewFeedback,
+    formatOpportunityDetailStatusBadge,
     isStudentOpportunityLiveForReporting,
     resolveStudentOpportunityWorkflow,
 } from "@/utils/opportunityWorkflow";
 import {
     canStudentAccessReportForProjectPayload,
+    canStudentShowStartReportCta,
     isJoinApplicationPendingStatus,
     joinApplicationPendingLabel,
     pickJoinApplicationStatus,
 } from "@/utils/studentJoinApplication";
+import {
+    buildStudentReportsCheckMap,
+    pickReportStatusFromCheckRow,
+    resolveStudentBrowseReportCta,
+} from "@/utils/studentBrowseReportCta";
 import { formatDisplayId } from "@/utils/displayIds";
 import {
     Loader2,
@@ -89,6 +96,35 @@ function formatDateTime(value: string | null | undefined): string {
         hour: "numeric",
         minute: "2-digit",
     });
+}
+
+/** Case-insensitive lookup for `/students/reports/check` rows (IDs may differ in casing). */
+function extendReportsCheckMapForLookup(base: Map<string, Record<string, unknown>>): Map<string, Record<string, unknown>> {
+    const m = new Map(base);
+    for (const [k, v] of base) {
+        const lk = k.toLowerCase();
+        if (!m.has(lk)) m.set(lk, v);
+    }
+    return m;
+}
+
+function reportCheckRowForProject(
+    reportsMap: Map<string, Record<string, unknown>>,
+    projectId: string,
+): Record<string, unknown> | undefined {
+    const id = projectId.trim();
+    if (!id) return undefined;
+    return reportsMap.get(id) ?? reportsMap.get(id.toLowerCase());
+}
+
+function dedupeProjectsById(list: Project[]): Project[] {
+    const byKey = new Map<string, Project>();
+    for (const p of list) {
+        const key = String(p.id ?? "").trim().toLowerCase();
+        if (!key) continue;
+        if (!byKey.has(key)) byKey.set(key, p);
+    }
+    return Array.from(byKey.values());
 }
 
 function toStringList(value: unknown): string[] {
@@ -274,43 +310,70 @@ interface ProjectRow {
     live: boolean;
     joinPending: boolean;
     reportUnlocked: boolean;
+    reportCta: ReturnType<typeof resolveStudentBrowseReportCta> | null;
     workflow: ReturnType<typeof resolveStudentOpportunityWorkflow>;
     approvalLine: string | null;
     remarkSections: ReturnType<typeof extractOpportunityReturnRemarkSections>;
     reviewFeedback: string | null;
     canReviseOpportunity: boolean;
+    detailStatusLabel: string;
     statusBadgeClass: string;
 }
 
 function matchesProjectTab(row: ProjectRow, tab: ProjectTab): boolean {
     const { project, live, joinPending, workflow, reportUnlocked } = row;
-    const rs = project.report_status || "none";
+    const rs = (project.report_status || "none").toLowerCase();
     const st = (project.status || "").toLowerCase();
+
+    /** Mutually prioritized buckets so one card maps cleanly to tabs (aligned with report/status workflow). */
+    const completedTab = st === "completed" || rs === "verified" || rs === "paid";
+    const pendingPaymentsTab = !completedTab && rs === "pending_payment";
+    const underReviewTab =
+        !completedTab && !pendingPaymentsTab && (rs === "submitted" || rs === "payment_under_review");
+    const draftsTab =
+        !completedTab &&
+        !pendingPaymentsTab &&
+        !underReviewTab &&
+        !joinPending &&
+        (rs === "draft" ||
+            rs === "continue" ||
+            rs === "rejected" ||
+            (rs === "none" && reportUnlocked && live) ||
+            workflow.stage === "revision");
+    const pendingApprovalsTab =
+        !completedTab &&
+        !pendingPaymentsTab &&
+        !underReviewTab &&
+        !draftsTab &&
+        (joinPending ||
+            (!live &&
+                ["pending_faculty", "pending_partner", "pending_admin", "pending_unknown", "rejected"].includes(
+                    workflow.stage,
+                )));
+    const inProgressTab =
+        !completedTab &&
+        !pendingPaymentsTab &&
+        !underReviewTab &&
+        !draftsTab &&
+        !pendingApprovalsTab &&
+        live &&
+        !joinPending;
 
     switch (tab) {
         case "all":
             return true;
         case "in_progress":
-            return live && st !== "completed";
+            return inProgressTab;
         case "pending_approvals":
-            return (
-                joinPending ||
-                (!live &&
-                    ["pending_faculty", "pending_partner", "pending_admin", "pending_unknown"].includes(workflow.stage))
-            );
+            return pendingApprovalsTab;
         case "pending_payments":
-            return rs === "pending_payment";
+            return pendingPaymentsTab;
         case "under_review":
-            return rs === "submitted" || rs === "payment_under_review";
+            return underReviewTab;
         case "completed":
-            return st === "completed" || rs === "verified" || rs === "paid";
+            return completedTab;
         case "drafts":
-            return (
-                rs === "draft" ||
-                rs === "continue" ||
-                (rs === "none" && reportUnlocked && live) ||
-                workflow.stage === "revision"
-            );
+            return draftsTab;
         default:
             return true;
     }
@@ -358,8 +421,8 @@ export default function MyProjectsPage() {
                     if (data.success) {
                         const projectsData = data.data || [];
 
-                        // 🚀 OPTIMIZATION: Fetch all report statuses at once
-                        let reportsMap = new Map<string, any>();
+                        // 🚀 OPTIMIZATION: Fetch all report statuses at once (same map/status rules as Browse)
+                        let reportsMap = new Map<string, Record<string, unknown>>();
 
                         try {
                             const reportsRes = await authenticatedFetch(`/api/v1/students/reports/check?studentId=${studentId}`
@@ -370,13 +433,7 @@ export default function MyProjectsPage() {
                                 console.log('📊 Bulk report statuses:', reportsData);
 
                                 if (reportsData.success && Array.isArray(reportsData.data)) {
-                                    reportsData.data.forEach((report: any) => {
-                                        // The backend returns opportunityId or project_title (which is ID)
-                                        const key = report.opportunityId || report.opportunity_id || report.projectId || report.project_id || report.project_title;
-                                        if (key) {
-                                            reportsMap.set(key, report);
-                                        }
-                                    });
+                                    reportsMap = extendReportsCheckMapForLookup(buildStudentReportsCheckMap(reportsData.data));
                                 }
                             }
                         } catch (error) {
@@ -385,12 +442,17 @@ export default function MyProjectsPage() {
 
                         // Map statuses to projects
                         const projectsWithReportStatus = projectsData.map((project: Project) => {
-                            const report = reportsMap.get(project.id);
+                            const row = reportCheckRowForProject(reportsMap, String(project.id ?? ""));
+                            const report_status = pickReportStatusFromCheckRow(row);
+                            const rid = row?.report_id ?? row?.id;
+                            const report_id = typeof rid === "string" ? rid : rid != null ? String(rid) : undefined;
+                            const feedback = row?.feedback;
+                            const report_feedback = typeof feedback === "string" ? feedback : undefined;
                             return {
                                 ...project,
-                                report_status: report ? (report.status || 'none') : 'none',
-                                report_id: report ? (report.report_id || report.id) : undefined,
-                                report_feedback: report ? report.feedback : undefined
+                                report_status,
+                                report_id,
+                                report_feedback,
                             };
                         });
 
@@ -419,7 +481,7 @@ export default function MyProjectsPage() {
                             }),
                         );
 
-                        setProjects(projectsWithRemarks);
+                        setProjects(dedupeProjectsById(projectsWithRemarks));
                     }
                 }
             } catch (error) {
@@ -500,17 +562,23 @@ export default function MyProjectsPage() {
                     remarkSections.length === 0 ? extractOpportunityReviewFeedback(pRecord) : null;
                 const canReviseOpportunity =
                     isStudentOwnedOpportunity && !live && canEditReturnedOpportunity(pRecord);
+                const detailStatusLabel = formatOpportunityDetailStatusBadge(pRecord);
                 const statusBadgeClass = joinPending
                     ? "bg-amber-100 text-amber-800 border-amber-200/80"
-                    : live
-                      ? project.status === "completed"
-                          ? "bg-slate-100 text-slate-700 border-slate-200"
-                          : "bg-emerald-50 text-emerald-800 border-emerald-200/80"
-                      : workflow.stage === "rejected"
-                        ? "bg-red-50 text-red-800 border-red-200/80"
-                        : workflow.stage === "revision"
-                          ? "bg-orange-50 text-orange-800 border-orange-200/80"
+                    : detailStatusLabel === "Live"
+                      ? "bg-emerald-50 text-emerald-800 border-emerald-200/80"
+                      : detailStatusLabel === "Completed"
+                        ? "bg-slate-100 text-slate-700 border-slate-200"
+                        : detailStatusLabel === "Rejected"
+                          ? "bg-red-50 text-red-800 border-red-200/80"
                           : "bg-amber-50 text-amber-900 border-amber-200/80";
+                const reportCta =
+                    reportUnlocked &&
+                    canStudentShowStartReportCta(pRecord, {
+                        isStudentOwner: isStudentOwnedOpportunity,
+                    })
+                        ? resolveStudentBrowseReportCta(project.id, project.report_status)
+                        : null;
 
                 return {
                     project,
@@ -519,11 +587,13 @@ export default function MyProjectsPage() {
                     live,
                     joinPending,
                     reportUnlocked,
+                    reportCta,
                     workflow,
                     approvalLine,
                     remarkSections,
                     reviewFeedback,
                     canReviseOpportunity,
+                    detailStatusLabel,
                     statusBadgeClass,
                 };
             }),
@@ -549,7 +619,10 @@ export default function MyProjectsPage() {
     );
 
     const firstPaymentRow = useMemo(
-        () => projectRows.find((r) => r.project.report_status === "pending_payment"),
+        () =>
+            projectRows.find(
+                (r) => (r.project.report_status || "").trim().toLowerCase() === "pending_payment",
+            ),
         [projectRows],
     );
 
@@ -686,12 +759,13 @@ export default function MyProjectsPage() {
                             pRecord,
                             live,
                             joinPending,
-                            reportUnlocked,
+                            reportCta,
                             workflow,
                             approvalLine,
                             remarkSections,
                             reviewFeedback,
                             canReviseOpportunity,
+                            detailStatusLabel,
                             statusBadgeClass,
                         }) => {
                             const submittedLabel = project.submitted_at
@@ -734,7 +808,7 @@ export default function MyProjectsPage() {
                                                         >
                                                             {joinPending
                                                                 ? joinApplicationPendingLabel(pRecord)
-                                                                : workflow.badgeLabel}
+                                                                : detailStatusLabel}
                                                         </Badge>
                                                         {project.report_status &&
                                                             project.report_status !== "none" && (
@@ -763,7 +837,7 @@ export default function MyProjectsPage() {
                                                                         ? "Payment due"
                                                                         : project.report_status ===
                                                                             "payment_under_review"
-                                                                          ? "Payment verifying"
+                                                                          ? "Payment pending"
                                                                           : project.report_status
                                                                                 .charAt(0)
                                                                                 .toUpperCase() +
@@ -918,42 +992,27 @@ export default function MyProjectsPage() {
                                         </div>
 
                                         <div className="flex w-full shrink-0 flex-col gap-2 border-t border-slate-100 pt-4 lg:w-56 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
-                                            {reportUnlocked &&
-                                            (project.report_status === "none" ||
-                                                project.report_status === "continue" ||
-                                                project.report_status === "draft") ? (
-                                                <Link
-                                                    href={`/dashboard/student/report?projectId=${project.id}`}
-                                                    className="w-full"
-                                                >
-                                                    <Button className="h-10 w-full rounded-xl bg-blue-600 text-white hover:bg-blue-700">
-                                                        {project.report_status === "continue" ||
-                                                        project.report_status === "draft"
-                                                            ? "Continue report"
-                                                            : "Start report"}
-                                                    </Button>
-                                                </Link>
-                                            ) : null}
-                                            {reportUnlocked && project.report_status === "rejected" ? (
-                                                <Link
-                                                    href={`/dashboard/student/report?projectId=${project.id}`}
-                                                    className="w-full"
-                                                >
+                                            {reportCta ? (
+                                                <Link href={reportCta.href} className="w-full">
                                                     <Button
-                                                        variant="destructive"
-                                                        className="h-10 w-full rounded-xl"
+                                                        variant={
+                                                            reportCta.label === "CII index score" ||
+                                                            reportCta.label === "Submitted" ||
+                                                            reportCta.label === "Payment pending"
+                                                                ? "outline"
+                                                                : "default"
+                                                        }
+                                                        className={`h-10 w-full rounded-xl font-medium ${
+                                                            reportCta.label === "CII index score" ||
+                                                            reportCta.label === "Submitted" ||
+                                                            reportCta.label === "Payment pending"
+                                                                ? "border-slate-200 text-slate-800 hover:bg-slate-50"
+                                                                : reportCta.href.includes("/payment")
+                                                                  ? "bg-indigo-600 text-white hover:bg-indigo-700"
+                                                                  : "bg-blue-600 text-white hover:bg-blue-700"
+                                                        }`}
                                                     >
-                                                        Revise report
-                                                    </Button>
-                                                </Link>
-                                            ) : null}
-                                            {reportUnlocked && project.report_status === "submitted" ? (
-                                                <Link
-                                                    href={`/dashboard/student/payment?projectId=${project.id}`}
-                                                    className="w-full"
-                                                >
-                                                    <Button className="h-10 w-full rounded-xl bg-indigo-600 text-white hover:bg-indigo-700">
-                                                        Complete payment
+                                                        {reportCta.label}
                                                     </Button>
                                                 </Link>
                                             ) : null}

@@ -43,7 +43,10 @@ export function resolveStudentBrowseReportCta(projectId: string, reportStatus: s
     const paymentHref = `/dashboard/student/payment?projectId=${encodeURIComponent(projectId)}`;
 
     if (st === "verified" || st === "paid") {
-        return { label: "CII index score", href: reportHref };
+        return {
+            label: "CII index score",
+            href: `${reportHref}&focus=summary`,
+        };
     }
     if (st === "payment_under_review") {
         return { label: "Payment pending", href: paymentHref };

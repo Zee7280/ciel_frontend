@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { Button } from '../report/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../report/components/ui/card';
+import { Input } from '../report/components/ui/input';
 import { FileUpload } from '../report/components/ui/file-upload';
 import clsx from 'clsx';
 
@@ -39,6 +40,8 @@ function PaymentContent() {
         amount: `${REPORTING_FEE_PKR_PER_STUDENT} PKR`,
     });
     const [proofFile, setProofFile] = useState<File | null>(null);
+    /** PKR the student actually transferred (digits only in state). */
+    const [paidAmountPkr, setPaidAmountPkr] = useState(String(REPORTING_FEE_PKR_PER_STUDENT));
     const [paymentSubmitted, setPaymentSubmitted] = useState(false);
 
     useEffect(() => {
@@ -112,6 +115,12 @@ function PaymentContent() {
             return;
         }
 
+        const paidPkr = parseInt(paidAmountPkr.replace(/\D/g, ''), 10);
+        if (!Number.isFinite(paidPkr) || paidPkr <= 0) {
+            toast.error('Enter the amount you transferred (PKR)');
+            return;
+        }
+
         try {
             setSubmitting(true);
             
@@ -119,6 +128,8 @@ function PaymentContent() {
             const formData = new FormData();
             formData.append('projectId', projectId as string);
             formData.append('proof', proofFile);
+            // So admin can show the paid amount (not only the standard fee). Backend should persist and return this field.
+            formData.append('paid_amount', String(paidPkr));
 
             const res = await authenticatedFetch(`/api/v1/student/payments/submit`, {
                 method: 'POST',
@@ -130,9 +141,19 @@ function PaymentContent() {
                 setPaymentSubmitted(true);
                 toast.success('Payment proof submitted successfully!');
             } else {
-                // Mocking success for now since we don't have the backend
-                setPaymentSubmitted(true);
-                toast.success('Payment proof submitted (Simulated)');
+                let msg = 'Failed to submit payment proof';
+                if (res) {
+                    const text = await res.text().catch(() => '');
+                    if (text) {
+                        try {
+                            const data = JSON.parse(text) as { message?: string; error?: string };
+                            msg = data.message || data.error || msg;
+                        } catch {
+                            msg = text.length > 200 ? `${text.slice(0, 200)}…` : text;
+                        }
+                    }
+                }
+                toast.error(msg);
             }
         } catch (error) {
             console.error('Payment submission error:', error);
@@ -258,7 +279,24 @@ function PaymentContent() {
                         </CardTitle>
                         <CardDescription className="text-slate-500">Upload your transfer receipt or bank slip.</CardDescription>
                     </CardHeader>
-                    <CardContent className="p-6 flex-1">
+                    <CardContent className="p-6 flex-1 space-y-4">
+                        <div className="space-y-2">
+                            <label className="text-xs font-black text-slate-400 uppercase tracking-widest">
+                                Amount you transferred (PKR)
+                            </label>
+                            <Input
+                                type="text"
+                                inputMode="numeric"
+                                autoComplete="off"
+                                className="font-bold text-slate-900 border-slate-200"
+                                placeholder="e.g. 5000"
+                                value={paidAmountPkr}
+                                onChange={(e) => setPaidAmountPkr(e.target.value.replace(/\D/g, ''))}
+                            />
+                            <p className="text-[11px] text-slate-500 font-medium">
+                                Must match the amount on your bank receipt. Defaults to the fee shown on the left if you paid that exact amount.
+                            </p>
+                        </div>
                         <div className="h-full min-h-[200px]">
                             <FileUpload
                                 onChange={(e) => {

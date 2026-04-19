@@ -120,9 +120,17 @@ function ReportFormContent() {
                     setFullData(mergedReport);
                     const st = String(mergedReport.status || "").toLowerCase();
                     const isSubmitted =
-                        ["submitted", "approved", "under_review", "pending_payment", "payment_under_review", "paid"].includes(
-                            st,
-                        ) ||
+                        [
+                            "submitted",
+                            "approved",
+                            "under_review",
+                            "pending_payment",
+                            "payment_under_review",
+                            "paid",
+                            "verified",
+                            "finalized",
+                            "partner_verified",
+                        ].includes(st) ||
                         ["verified", "approved"].includes(String(mergedReport.admin_status || "").toLowerCase());
                     if (isSubmitted) {
                         // Report already submitted — skip guide, go straight to summary
@@ -272,7 +280,30 @@ function ReportFormContent() {
         } finally {
             setIsSaving(false);
         }
-    }
+    };
+
+    const reportStatusLower = String(data?.status || "").toLowerCase();
+    const adminStatusLower = String(data?.admin_status || "").toLowerCase();
+    /** Same gate as Section 11 “Report Approved & Impact Verified” — CII index must stay on summary only. */
+    const ciiVerifiedSummaryLock = React.useMemo(
+        () =>
+            reportStatusLower === "verified" ||
+            reportStatusLower === "approved" ||
+            adminStatusLower === "verified" ||
+            adminStatusLower === "approved",
+        [reportStatusLower, adminStatusLower],
+    );
+    const summaryOnlyWorkspace = React.useMemo(
+        () => canSubmitReport && !isReadOnly && reportStatusLower !== "rejected",
+        [canSubmitReport, isReadOnly, reportStatusLower],
+    );
+    const stepperLockedToSummaryOnly = summaryOnlyWorkspace || ciiVerifiedSummaryLock;
+
+    React.useEffect(() => {
+        if (isLoading || showGuide) return;
+        if (!summaryOnlyWorkspace && !ciiVerifiedSummaryLock) return;
+        if (activeStep !== 11) setStep(11);
+    }, [isLoading, showGuide, summaryOnlyWorkspace, ciiVerifiedSummaryLock, activeStep, setStep]);
 
     if (isLoading) {
         return (
@@ -378,11 +409,11 @@ function ReportFormContent() {
                             const stepNum = i + 1;
                             const isActive = activeStep === stepNum;
                             const isCompleted = activeStep > stepNum;
-
                             return (
                                 <React.Fragment key={label}>
                                     <div
                                         onClick={() => {
+                                            if (stepperLockedToSummaryOnly && stepNum !== 11) return;
                                             if (isCompleted || isReadOnly || activeStep < 11) {
                                                 setStep(stepNum);
                                             } else if (!isActive && validateCurrentSection()) {
@@ -394,6 +425,7 @@ function ReportFormContent() {
                                         }}
                                         className={clsx(
                                             "flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all text-[11px] font-bold uppercase tracking-tight cursor-pointer",
+                                            stepperLockedToSummaryOnly && stepNum !== 11 && "pointer-events-none cursor-not-allowed opacity-35",
                                             isActive ? "bg-blue-600 text-white shadow-lg shadow-blue-200/50 scale-105"
                                                 : isCompleted || isReadOnly ? "bg-white text-blue-600 border border-blue-100 hover:bg-blue-50"
                                                     : "text-slate-400 bg-transparent border border-transparent hover:border-slate-200"
@@ -430,7 +462,11 @@ function ReportFormContent() {
                     {activeStep === 8 && <Section8Evidence />}
                     {activeStep === 9 && <Section9Reflection />}
                     {activeStep === 10 && <Section10Sustainability />}
-                    {activeStep === 11 && <Section11Summary />}
+                    {activeStep === 11 && (
+                        <Section11Summary
+                            onRequestFinalSubmit={summaryOnlyWorkspace ? handleSubmit : undefined}
+                        />
+                    )}
                 </div>
 
                 {/* PDF Checklist Preview - Visible on large screens only on Step 1 */}
@@ -438,8 +474,8 @@ function ReportFormContent() {
             </div>
 
 
-            {/* Footer Navigation */}
-            <div className="mt-8 rounded-2xl border border-slate-200/80 bg-white/90 shadow-sm shadow-slate-200/50 backdrop-blur-sm px-4 py-4 md:px-6 md:py-5">
+            {!(summaryOnlyWorkspace || ciiVerifiedSummaryLock) && (
+                <div className="mt-8 rounded-2xl border border-slate-200/80 bg-white/90 shadow-sm shadow-slate-200/50 backdrop-blur-sm px-4 py-4 md:px-6 md:py-5">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between max-w-[1600px] mx-auto">
                     <div className="flex justify-start sm:flex-1">
                         {!isReadOnly && (
@@ -473,9 +509,10 @@ function ReportFormContent() {
                     <div className="flex justify-end sm:flex-1 order-3">
                         {!(
                             activeStep === 11 &&
-                            ["submitted", "approved", "under_review", "pending_payment", "payment_under_review", "paid"].includes(
+                            (["submitted", "approved", "under_review", "pending_payment", "payment_under_review", "paid", "verified", "finalized", "partner_verified"].includes(
                                 String(data?.status || "").toLowerCase(),
-                            )
+                            ) ||
+                                ["verified", "approved"].includes(String(data?.admin_status || "").toLowerCase()))
                         ) && (
                             <Button
                                 type="button"
@@ -495,6 +532,7 @@ function ReportFormContent() {
                     </div>
                 </div>
             </div>
+            )}
 
             {/* Submit Confirmation Dialog */}
             <Dialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>

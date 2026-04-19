@@ -11,7 +11,12 @@ import { generateAISummary } from "../utils/aiSummarizer";
 import { toast } from "sonner";
 import clsx from "clsx";
 
-export default function Section11Summary() {
+type Section11SummaryProps = {
+    /** When the footer submit control is hidden (summary-only workspace), opens the same confirm flow. */
+    onRequestFinalSubmit?: () => void;
+};
+
+export default function Section11Summary({ onRequestFinalSubmit }: Section11SummaryProps = {}) {
     const router = useRouter();
     const {
         data,
@@ -568,6 +573,10 @@ export default function Section11Summary() {
                             </p>
                             <Button
                                 onClick={() => {
+                                    if (onRequestFinalSubmit) {
+                                        onRequestFinalSubmit();
+                                        return;
+                                    }
                                     const footerSubmitBtn = Array.from(document.querySelectorAll("button")).find((btn) =>
                                         btn.textContent?.includes("Submit Report"),
                                     );
