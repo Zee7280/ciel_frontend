@@ -118,9 +118,12 @@ function ReportFormContent() {
                         ...(!existingTitle && titleFromProject ? { project_title: titleFromProject } : {}),
                     };
                     setFullData(mergedReport);
+                    const st = String(mergedReport.status || "").toLowerCase();
                     const isSubmitted =
-                        ["submitted", "approved", "under_review"].includes(mergedReport.status) ||
-                        ["verified", "approved"].includes(mergedReport.admin_status || "");
+                        ["submitted", "approved", "under_review", "pending_payment", "payment_under_review", "paid"].includes(
+                            st,
+                        ) ||
+                        ["verified", "approved"].includes(String(mergedReport.admin_status || "").toLowerCase());
                     if (isSubmitted) {
                         // Report already submitted — skip guide, go straight to summary
                         setShowGuide(false);
@@ -468,7 +471,12 @@ function ReportFormContent() {
                     )}
 
                     <div className="flex justify-end sm:flex-1 order-3">
-                        {!(activeStep === 11 && (data?.status === 'submitted' || data?.status === 'approved')) && (
+                        {!(
+                            activeStep === 11 &&
+                            ["submitted", "approved", "under_review", "pending_payment", "payment_under_review", "paid"].includes(
+                                String(data?.status || "").toLowerCase(),
+                            )
+                        ) && (
                             <Button
                                 type="button"
                                 onClick={handleNext}

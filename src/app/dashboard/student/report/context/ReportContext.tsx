@@ -55,6 +55,12 @@ export interface ReportData {
             description: string;
             evidence_file?: File;
             hours: number;
+            participantId?: string;
+            /** Backend / report payload (snake_case). Null = legacy row (counts toward verified hours). */
+            approval_status?: string | null;
+            assigned_approver_type?: string | null;
+            assigned_approver_user_id?: string | null;
+            opportunity_creator_kind?: string | null;
         }>;
         metrics: {
             total_verified_hours: number;

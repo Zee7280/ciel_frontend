@@ -7,6 +7,7 @@ import { Button } from "../../report/components/ui/button";
 import { Input } from "../../report/components/ui/input";
 import { Label } from "../../report/components/ui/label";
 import { authenticatedFetch } from "@/utils/api";
+import { normalizeEngagementAttendanceLog } from "@/utils/engagementAttendanceMap";
 import clsx from "clsx";
 import { useReportForm } from "../../report/context/ReportContext";
 import React, { useRef, useEffect } from "react";
@@ -101,7 +102,7 @@ export default function AttendanceForm({
 
         const numericHours = diffMinutes / 60;
         const activeParticipantId = formData.participantId;
-        const newEntry = {
+        const newEntry: Record<string, unknown> = {
             id: Math.random().toString(36).substring(2, 11),
             date: formData.dateOfEngagement,
             start_time: formData.startTime,
@@ -113,6 +114,7 @@ export default function AttendanceForm({
             hours: numericHours,
             participantId: activeParticipantId // Tag it for frontend filtering
         };
+        let mergedEntry: Record<string, unknown> = { ...newEntry };
         setIsSubmitting(true);
         setSubmitError(null);
         try {
@@ -188,10 +190,28 @@ export default function AttendanceForm({
                     toast.error(message);
                     return;
                 }
+                try {
+                    const okBody = await res.json();
+                    const saved = okBody?.data ?? okBody;
+                    if (saved && typeof saved === "object") {
+                        mergedEntry = {
+                            ...normalizeEngagementAttendanceLog(saved as Record<string, unknown>, {
+                                participantPrefixedId: activeParticipantId,
+                            }),
+                            participantId: activeParticipantId,
+                            evidence_file:
+                                (saved as { evidenceUrl?: string }).evidenceUrl ||
+                                newEntry.evidence_file ||
+                                undefined,
+                        };
+                    }
+                } catch {
+                    /* keep optimistic mergedEntry */
+                }
             }
 
             updateSection('section1', {
-                attendance_logs: [...currentLogs, newEntry]
+                attendance_logs: [...currentLogs, mergedEntry as any]
             });
 
             onSuccess();

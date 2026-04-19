@@ -11,8 +11,31 @@ interface AttendanceEntry {
     hours: number;
     activity_type: string;
     entryStatus?: 'pending' | 'verified' | 'flagged';
+    /** From backend attendance approval (null = legacy). */
+    approval_status?: string | null;
     evidence_file?: any;
     participantId?: string;
+}
+
+function displayApprovalLabel(entry: AttendanceEntry): string {
+    const raw = entry.approval_status ?? entry.entryStatus;
+    if (raw == null || String(raw).trim() === "") return "Verified (legacy)";
+    const s = String(raw).trim().toLowerCase();
+    if (s === "pending") return "Pending review";
+    if (s === "approved") return "Approved";
+    if (s === "rejected") return "Rejected";
+    if (s === "flagged") return "Flagged";
+    return s.replace(/_/g, " ");
+}
+
+function approvalPillClass(entry: AttendanceEntry): string {
+    const raw = (entry.approval_status ?? entry.entryStatus ?? "").toString().toLowerCase();
+    if (!raw || raw === "verified") return "bg-slate-50 text-slate-500 border-slate-100";
+    if (raw === "approved") return "bg-emerald-50 text-emerald-700 border-emerald-100";
+    if (raw === "rejected") return "bg-rose-50 text-rose-700 border-rose-100";
+    if (raw === "flagged") return "bg-amber-50 text-amber-800 border-amber-100";
+    if (raw === "pending") return "bg-amber-50/80 text-amber-800 border-amber-100";
+    return "bg-slate-50 text-slate-600 border-slate-100";
 }
 
 export default function AttendanceSummaryTable({ entries, onDelete, isLocked = false, participantNames = {} }: {
@@ -38,13 +61,14 @@ export default function AttendanceSummaryTable({ entries, onDelete, isLocked = f
             <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-report-primary/30 to-transparent" />
 
             <div className="w-full overflow-x-auto selection:bg-report-primary/10">
-                <table className="w-full text-left border-collapse min-w-[700px]">
+                <table className="w-full text-left border-collapse min-w-[820px]">
                     <thead>
                         <tr className="bg-slate-50/80 backdrop-blur-sm border-b border-slate-100">
                             <th className="px-5 py-5 text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">Date & Session</th>
                             <th className="px-5 py-5 text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">Activity Type</th>
                             <th className="px-5 py-5 text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">Student</th>
                             <th className="px-5 py-5 text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">Duration</th>
+                            <th className="px-5 py-5 text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">Approval</th>
                             <th className="px-5 py-5 text-[10px] font-black uppercase tracking-[0.12em] text-slate-400 text-center">Evidence</th>
                             {!isLocked && onDelete && <th className="px-5 py-5 text-[10px] font-black uppercase tracking-[0.12em] text-slate-400 text-right">Actions</th>}
                         </tr>
@@ -92,6 +116,16 @@ export default function AttendanceSummaryTable({ entries, onDelete, isLocked = f
                                         </div>
                                         <span className="text-lg font-black text-slate-900 tabular-nums">{entry.hours} <span className="text-[10px] text-slate-400 font-black uppercase ml-0.5">hrs</span></span>
                                     </div>
+                                </td>
+                                <td className="px-5 py-7">
+                                    <span
+                                        className={clsx(
+                                            "inline-flex items-center rounded-lg border px-2.5 py-1 text-[9px] font-black uppercase tracking-widest",
+                                            approvalPillClass(entry),
+                                        )}
+                                    >
+                                        {displayApprovalLabel(entry)}
+                                    </span>
                                 </td>
                                 <td className="px-8 py-7 text-center">
                                     {typeof entry.evidence_file === 'string' ? (

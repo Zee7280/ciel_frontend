@@ -2,8 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Info, MapPin, Calendar, Clock, CheckCircle, AlertCircle, ChevronDown, ChevronUp, Users, Loader2, Plus } from "lucide-react";
-import { X } from "lucide-react";
+import { Info, MapPin, Calendar, Clock, CheckCircle, AlertCircle, ChevronDown, ChevronUp, Users, Loader2, Plus, X } from "lucide-react";
 import { authenticatedFetch } from "@/utils/api";
 import { toast } from "sonner";
 import dynamic from "next/dynamic";
@@ -70,7 +69,7 @@ export default function OpportunityPostingPage() {
             responsibilities: "",
             skills: [] as string[],
             isOtherSkillChecked: false,
-            otherSkill: ""
+            otherSkills: [""] as string[],
         },
 
         // Section F — Verification & safety (executing org, partner, declarations, confirmations)
@@ -284,10 +283,12 @@ export default function OpportunityPostingPage() {
                 },
                 activity_details: {
                     student_responsibilities: formData.activity.responsibilities,
-                    // Append `otherSkill` if checked and not empty
-                    skills_gained: formData.activity.isOtherSkillChecked && formData.activity.otherSkill.trim()
-                        ? [...formData.activity.skills, formData.activity.otherSkill.trim()]
-                        : formData.activity.skills
+                    skills_gained: formData.activity.isOtherSkillChecked
+                        ? [
+                            ...formData.activity.skills,
+                            ...formData.activity.otherSkills.map((s) => s.trim()).filter(Boolean),
+                        ]
+                        : formData.activity.skills,
                 },
                 // Legacy shape — keep for older backends; mirrors executing-org contact + safety flags
                 supervision: {
@@ -1258,18 +1259,82 @@ export default function OpportunityPostingPage() {
                                     type="checkbox"
                                     className="rounded text-indigo-600 focus:ring-indigo-500"
                                     checked={formData.activity.isOtherSkillChecked}
-                                    onChange={(e) => setFormData({ ...formData, activity: { ...formData.activity, isOtherSkillChecked: e.target.checked } })}
+                                    onChange={(e) => {
+                                        const checked = e.target.checked;
+                                        setFormData({
+                                            ...formData,
+                                            activity: {
+                                                ...formData.activity,
+                                                isOtherSkillChecked: checked,
+                                                otherSkills: checked
+                                                    ? formData.activity.otherSkills.length
+                                                        ? formData.activity.otherSkills
+                                                        : [""]
+                                                    : [""],
+                                            },
+                                        });
+                                    }}
                                 />
                                 <span className="text-sm font-medium text-slate-700">Other</span>
                             </label>
                             {formData.activity.isOtherSkillChecked && (
-                                <input
-                                    type="text"
-                                    placeholder="Please specify other skill..."
-                                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-indigo-500 outline-none text-sm transition-all"
-                                    value={formData.activity.otherSkill}
-                                    onChange={(e) => setFormData({ ...formData, activity: { ...formData.activity, otherSkill: e.target.value } })}
-                                />
+                                <div className="space-y-3 pl-4 border-l-2 border-indigo-100">
+                                    {formData.activity.otherSkills.map((skill, idx) => (
+                                        <div key={idx} className="flex gap-2">
+                                            <div className="relative flex-1">
+                                                <input
+                                                    type="text"
+                                                    placeholder="Please specify other skill..."
+                                                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-indigo-500 outline-none text-sm transition-all"
+                                                    value={skill}
+                                                    onChange={(e) => {
+                                                        const newOthers = [...formData.activity.otherSkills];
+                                                        newOthers[idx] = e.target.value;
+                                                        setFormData({
+                                                            ...formData,
+                                                            activity: { ...formData.activity, otherSkills: newOthers },
+                                                        });
+                                                    }}
+                                                />
+                                                {formData.activity.otherSkills.length > 1 && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            const newOthers = formData.activity.otherSkills.filter((_, i) => i !== idx);
+                                                            setFormData({
+                                                                ...formData,
+                                                                activity: {
+                                                                    ...formData.activity,
+                                                                    otherSkills: newOthers.length ? newOthers : [""],
+                                                                },
+                                                            });
+                                                        }}
+                                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-red-500 transition-colors"
+                                                        aria-label="Remove skill"
+                                                    >
+                                                        <X className="w-4 h-4" />
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))}
+                                    <button
+                                        type="button"
+                                        onClick={() =>
+                                            setFormData({
+                                                ...formData,
+                                                activity: {
+                                                    ...formData.activity,
+                                                    otherSkills: [...formData.activity.otherSkills, ""],
+                                                },
+                                            })
+                                        }
+                                        className="text-xs font-bold text-indigo-600 hover:text-indigo-700 flex items-center gap-1.5 px-2 py-1"
+                                    >
+                                        <Plus className="w-3.5 h-3.5" />
+                                        Add another skill
+                                    </button>
+                                </div>
                             )}
                         </div>
                     </div>

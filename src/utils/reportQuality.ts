@@ -1,3 +1,5 @@
+import { filterAttendanceLogsForVerifiedMetrics } from "@/utils/attendanceApprovalEligibility";
+
 export interface QualityAlert {
     sectionId: string;
     message: string;
@@ -110,6 +112,8 @@ export const calculateSection1CII = (input: Section1CIIInput): Section1CIIResult
         totalVerifiedTeamHours = 0
     } = input;
 
+    const countedAttendanceLogs = filterAttendanceLogsForVerifiedMetrics(attendanceLogs as any[]);
+
     const redFlags: string[] = [];
 
     // --- 1. Identity Verification (Max 1.5) ---
@@ -139,14 +143,14 @@ export const calculateSection1CII = (input: Section1CIIInput): Section1CIIResult
     // --- 4. Attendance Integrity (Max 2.0) ---
     // Criteria: consistency, logical progression, no inflation
     let attendance = 0;
-    const sessions = attendanceLogs.length;
+    const sessions = countedAttendanceLogs.length;
     if (sessions >= 8) attendance = 2.0;
     else if (sessions >= 4) attendance = 1.0;
     else if (sessions > 0) attendance = 0.5;
 
     // RED FLAG CHECK: Inflation & Overlaps
     const hoursPerDay: Record<string, number> = {};
-    attendanceLogs.forEach(log => {
+    countedAttendanceLogs.forEach(log => {
         const date = log.date;
         const h = parseFloat(log.hours) || 0;
         hoursPerDay[date] = (hoursPerDay[date] || 0) + h;
@@ -158,7 +162,7 @@ export const calculateSection1CII = (input: Section1CIIInput): Section1CIIResult
 
     // Patterns (e.g., exact same time range repeated too many times)
     const patterns: Record<string, number> = {};
-    attendanceLogs.forEach(log => {
+    countedAttendanceLogs.forEach(log => {
         const p = `${log.start_time}-${log.end_time}`;
         patterns[p] = (patterns[p] || 0) + 1;
     });

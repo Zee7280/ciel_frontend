@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState, useEffect, useLayoutEffect } from "react";
-import { LayoutDashboard, BookOpen, Users, Settings, PieChart, LogOut, FileText, Heart, Building2, CheckCircle, Briefcase, FileBarChart, ShieldAlert, Bell, User, Flag, MessageSquare, Plus, CreditCard, ClipboardList } from "lucide-react";
+import { LayoutDashboard, BookOpen, Users, Settings, PieChart, LogOut, FileText, Heart, Building2, CheckCircle, Briefcase, FileBarChart, ShieldAlert, Bell, User, Flag, MessageSquare, Plus, CreditCard, ClipboardList, CalendarClock } from "lucide-react";
 import clsx from "clsx";
 import { authenticatedFetch } from "@/utils/api";
 import {
@@ -99,7 +99,7 @@ export default function Sidebar() {
             { label: "My Organization", href: "/dashboard/partner/organization", icon: Building2 },
             { label: "My Opportunities", href: "/dashboard/partner/requests", icon: Briefcase },
             { label: "Create Opportunity", href: "/dashboard/partner/requests/new", icon: Plus },
-
+            { label: "Attendance review", href: "/dashboard/partner/attendance-review", icon: CalendarClock },
             { label: "Verify Work", href: "/dashboard/partner/verification", icon: CheckCircle },
             { label: "Reports", href: "/dashboard/partner/reports", icon: FileText },
             { label: "Impact", href: "/dashboard/partner/impact", icon: FileBarChart },

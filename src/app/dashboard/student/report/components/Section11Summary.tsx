@@ -1,7 +1,8 @@
-import { BarChart3, ShieldAlert, Sparkles, Loader2, Quote, Award, Clock, Users, Target, ShieldCheck, Download, TrendingUp, X, Printer, CheckCircle, Eye, AlertTriangle, Lock } from "lucide-react";
+import { BarChart3, ShieldAlert, Sparkles, Loader2, Quote, Award, Clock, Users, Target, ShieldCheck, Download, TrendingUp, X, Printer, CheckCircle, Eye, AlertTriangle, Lock, CreditCard } from "lucide-react";
 import { Button } from "./ui/button";
 import { useReportForm } from "../context/ReportContext";
 import React, { useState, useMemo, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
 import ReportPrintView from "./ReportPrintView";
 import CertificateView from "./CertificateView";
@@ -11,6 +12,7 @@ import { toast } from "sonner";
 import clsx from "clsx";
 
 export default function Section11Summary() {
+    const router = useRouter();
     const {
         data,
         updateSection,
@@ -20,6 +22,27 @@ export default function Section11Summary() {
         incompleteSectionsSummary,
     } = useReportForm();
     const { section1, section2, section3, section4, section5, section8, section9, section10 } = data;
+
+    const reportSt = String(data.status || "").toLowerCase();
+    const reportRs = String(data.report_status || "").toLowerCase();
+    const inPostSubmitLifecycle =
+        reportSt === "submitted" ||
+        reportSt === "under_review" ||
+        reportSt === "pending_payment" ||
+        reportSt === "payment_under_review" ||
+        reportRs === "pending_payment";
+    const feeOrSlipRecorded =
+        reportSt === "paid" ||
+        reportSt === "payment_under_review" ||
+        reportSt === "verified" ||
+        reportSt === "approved" ||
+        reportRs === "paid" ||
+        reportRs === "payment_under_review" ||
+        data.payment_verified === true;
+    const paymentSlipInReview =
+        reportSt === "payment_under_review" || reportRs === "payment_under_review";
+    const paymentHref =
+        data.project_id ? `/dashboard/student/payment?projectId=${encodeURIComponent(data.project_id)}` : "";
 
     const [showPreview, setShowPreview] = useState(false);
     const [showCertificate, setShowCertificate] = useState(false);
@@ -378,21 +401,64 @@ export default function Section11Summary() {
                             </div>
                         </div>
                     </>
-                ) : (data?.status === 'submitted' || data?.status === 'under_review') ? (
-                    <>
-                        <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center">
-                            <ShieldAlert className="w-7 h-7 text-slate-400" />
-                        </div>
-                        <div className="max-w-md space-y-3">
-                            <h3 className="text-lg font-black text-slate-900">Report Locked Pending Approval</h3>
-                            <p className="text-sm font-medium text-slate-400 leading-relaxed">
-                                {data.status === 'under_review' 
-                                    ? "Your report is currently being reviewed by the administration."
-                                    : "Your report has been submitted and is currently being reviewed."
-                                }
-                            </p>
-                        </div>
-                    </>
+                ) : inPostSubmitLifecycle ? (
+                    !feeOrSlipRecorded && paymentHref ? (
+                        <>
+                            <div className="w-16 h-16 bg-amber-50 rounded-2xl flex items-center justify-center border border-amber-100">
+                                <CreditCard className="w-7 h-7 text-amber-600" />
+                            </div>
+                            <div className="max-w-md space-y-4">
+                                <h3 className="text-lg font-black text-slate-900">Reporting fee required</h3>
+                                <p className="text-sm font-medium text-slate-500 leading-relaxed">
+                                    Your report is submitted. Complete the reporting fee and upload proof on the payment
+                                    screen so your submission can move forward to verification.
+                                </p>
+                                <Button
+                                    type="button"
+                                    onClick={() => router.push(paymentHref)}
+                                    className="bg-report-primary hover:opacity-90 text-white px-8 h-12 rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-md shadow-report-primary-shadow w-full sm:w-auto"
+                                >
+                                    <CreditCard className="w-4 h-4 mr-2" />
+                                    Go to payment
+                                </Button>
+                            </div>
+                        </>
+                    ) : paymentSlipInReview && paymentHref ? (
+                        <>
+                            <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center">
+                                <Clock className="w-7 h-7 text-slate-400" />
+                            </div>
+                            <div className="max-w-md space-y-4">
+                                <h3 className="text-lg font-black text-slate-900">Payment proof under review</h3>
+                                <p className="text-sm font-medium text-slate-400 leading-relaxed">
+                                    Your fee proof was received and is being verified. You will be notified when it is
+                                    cleared.
+                                </p>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() => router.push(paymentHref)}
+                                    className="border-2 border-slate-200 text-slate-900 px-8 h-12 rounded-xl text-xs font-black uppercase tracking-widest transition-all hover:bg-slate-50 w-full sm:w-auto"
+                                >
+                                    View payment details
+                                </Button>
+                            </div>
+                        </>
+                    ) : (
+                        <>
+                            <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center">
+                                <ShieldAlert className="w-7 h-7 text-slate-400" />
+                            </div>
+                            <div className="max-w-md space-y-3">
+                                <h3 className="text-lg font-black text-slate-900">Report Locked Pending Approval</h3>
+                                <p className="text-sm font-medium text-slate-400 leading-relaxed">
+                                    {data.status === "under_review"
+                                        ? "Your report is currently being reviewed by the administration."
+                                        : "Your report has been submitted and is currently being reviewed."}
+                                </p>
+                            </div>
+                        </>
+                    )
                 ) : !isEligibleForSubmission ? (
                     <>
                         <div className="w-16 h-16 bg-amber-50 rounded-3xl flex items-center justify-center shadow-inner">

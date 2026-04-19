@@ -16,6 +16,8 @@ import AttendanceSummaryTable from "../../engagement/components/AttendanceSummar
 import EngagementOverview from "../../engagement/components/EngagementOverview";
 import TeamVerification from "./TeamVerification";
 import { calculateEngagementMetrics } from "../utils/engagementMetrics";
+import { isAttendanceLogCountedForVerifiedMetrics } from "@/utils/attendanceApprovalEligibility";
+import { normalizeEngagementAttendanceLog } from "@/utils/engagementAttendanceMap";
 import { calculateSection1CII } from "@/utils/reportQuality";
 import { calculateCII } from "../utils/calculateCII";
 
@@ -369,18 +371,9 @@ export default function Section1Participation({ projectData }: { projectData?: a
             const res = await authenticatedFetch(`/api/v1/engagement/${realId}/attendance`);
             if (res && res.ok) {
                 const result = await res.json();
-                return (result.data || []).map((e: any) => ({
-                    ...e,
-                    id: e.id,
-                    date: e.dateOfEngagement || e.date,
-                    start_time: e.startTime || e.start_time,
-                    end_time: e.endTime || e.end_time,
-                    location: e.organizationName || e.location,
-                    activity_type: e.activityType || e.activity_type,
-                    hours: e.sessionHours || e.hours,
-                    participantId: pId, 
-                    evidence_file: e.evidenceUrl || (e.evidenceUploaded ? true : undefined)
-                }));
+                return (result.data || []).map((e: any) =>
+                    normalizeEngagementAttendanceLog(e, { participantPrefixedId: pId }),
+                );
             }
         } catch (e) {}
         return [];
@@ -402,18 +395,7 @@ export default function Section1Participation({ projectData }: { projectData?: a
                     const match = rawParticipants.find(p => p.id.endsWith(realId));
                     const prefixedId = match ? match.id : realId;
 
-                    return {
-                        ...e,
-                        id: e.id,
-                        date: e.dateOfEngagement || e.date,
-                        start_time: e.startTime || e.start_time,
-                        end_time: e.endTime || e.end_time,
-                        location: e.organizationName || e.location,
-                        activity_type: e.activityType || e.activity_type,
-                        hours: e.sessionHours || e.hours,
-                        participantId: prefixedId,
-                        evidence_file: e.evidenceUrl || (e.evidenceUploaded ? true : undefined)
-                    };
+                    return normalizeEngagementAttendanceLog(e, { participantPrefixedId: prefixedId });
                 });
                 
                 // Deduplicate and update
@@ -448,7 +430,10 @@ export default function Section1Participation({ projectData }: { projectData?: a
     const projectGoal = requiredHoursPerStudent * (1 + team_members.length);
     const isMinimumHoursMet = rawParticipants.every(u => {
         const hours = data.section1.attendance_logs
-            .filter((l: any) => l.participantId === u.id)
+            .filter(
+                (l: any) =>
+                    l.participantId === u.id && isAttendanceLogCountedForVerifiedMetrics(l),
+            )
             .reduce((acc: number, log: any) => acc + (Number(log.hours) || 0), 0);
         return hours >= requiredHoursPerStudent;
     });

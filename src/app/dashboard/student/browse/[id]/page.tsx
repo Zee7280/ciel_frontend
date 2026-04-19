@@ -42,7 +42,6 @@ export default function OpportunityDetailsPage() {
 
     const [opportunity, setOpportunity] = useState<any>(null);
     const [isLoading, setIsLoading] = useState(true);
-    const [isApplying, setIsApplying] = useState(false);
     const [isPopupOpen, setIsPopupOpen] = useState(false);
     const [viewerNavRole, setViewerNavRole] = useState<DashboardNavRole | null>(null);
 
@@ -189,71 +188,6 @@ export default function OpportunityDetailsPage() {
         setIsPopupOpen(true);
     };
 
-    const handleApplyFromPopup = async (facultyEmail: string) => {
-        setIsApplying(true);
-        try {
-            // Get user data from localStorage for auto-population
-            const storedUserStr = localStorage.getItem("user") || localStorage.getItem("ciel_user");
-            let userData: any = {};
-            if (storedUserStr) {
-                try {
-                    const u = JSON.parse(storedUserStr);
-                    userData = {
-                        fullName: u.name || "",
-                        email: u.email || "",
-                        mobile: u.phone || u.contact || "",
-                        cnic: u.cnic || "",
-                        universityName: u.university || u.institution || "",
-                        // Defaults for other fields required by /api/v1/engagement/register
-                        universityId: "PENDING",
-                        academicProgram: "PENDING",
-                        yearOfStudy: "3rd Year",
-                        department: "General",
-                        academicIntegrationType: "Course-Linked"
-                    };
-                } catch (e) {}
-            }
-
-            const body: any = { 
-                ...userData,
-                projectId: id,
-                participationMode: 'individual', // Default to individual
-                isTeamLead: true, // Applicant is lead
-                status: 'pending_ciel_approval' // Unified status
-            };
-            
-            if (facultyEmail) {
-                body.facultySupervisorEmail = facultyEmail;
-            }
-
-            const res = await authenticatedFetch(`/api/v1/engagement/register`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(body),
-            });
-
-            if (res && res.ok) {
-                toast.success("Application submitted successfully! Awaiting CIEL & Faculty approval.");
-                setIsPopupOpen(false);
-                setOpportunity((prev: any) => ({
-                    ...prev,
-                    hasApplied: true,
-                    applyLocked: true,
-                    status: "pending_approval",
-                    application_status: "pending_approval",
-                }));
-            } else {
-                const err = await res?.json().catch(() => ({}));
-                toast.error(err?.message || "Failed to submit application");
-            }
-        } catch (error) {
-            console.error("Error applying", error);
-            toast.error("An error occurred while applying");
-        } finally {
-            setIsApplying(false);
-        }
-    };
-
     if (isLoading) {
         return (
             <div className="flex justify-center items-center h-full min-h-[500px]">
@@ -381,7 +315,7 @@ export default function OpportunityDetailsPage() {
                                 )}
                             <Button
                                 onClick={handleApplyClick}
-                                disabled={isApplying || !applyEligibility.canApply}
+                                disabled={!applyEligibility.canApply}
                                 title={applyEligibility.blockedReason || undefined}
                                 className={
                                     applyEligibility.canApply
@@ -389,19 +323,13 @@ export default function OpportunityDetailsPage() {
                                         : "flex items-center gap-2 px-6 py-2 bg-slate-300 text-slate-600 rounded-lg font-medium shadow-sm cursor-not-allowed"
                                 }
                             >
-                                {isApplying ? (
-                                    <Loader2 className="w-4 h-4 animate-spin" />
-                                ) : applyEligibility.canApply ? (
-                                    "Apply again"
-                                ) : (
-                                    "Not eligible"
-                                )}
+                                {applyEligibility.canApply ? "Apply again" : "Not eligible"}
                             </Button>
                         </div>
                     ) : !hideStudentApplyActions ? (
                         <Button
                             onClick={handleApplyClick}
-                            disabled={isApplying || !applyEligibility.canApply}
+                            disabled={!applyEligibility.canApply}
                             title={applyEligibility.blockedReason || undefined}
                             className={
                                 applyEligibility.canApply
@@ -409,13 +337,7 @@ export default function OpportunityDetailsPage() {
                                     : "flex items-center gap-2 px-6 py-2 bg-slate-300 text-slate-600 rounded-lg font-medium shadow-sm cursor-not-allowed"
                             }
                         >
-                            {isApplying ? (
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                            ) : applyEligibility.canApply ? (
-                                "Apply Now"
-                            ) : (
-                                "Not eligible"
-                            )}
+                            {applyEligibility.canApply ? "Apply Now" : "Not eligible"}
                         </Button>
                     ) : null}
                 </div>
@@ -652,12 +574,7 @@ export default function OpportunityDetailsPage() {
                 </div>
             </div>
 
-            <ReportSummaryPopup 
-                isOpen={isPopupOpen}
-                onClose={() => setIsPopupOpen(false)}
-                onApply={handleApplyFromPopup}
-                isSubmitting={isApplying}
-            />
+            <ReportSummaryPopup isOpen={isPopupOpen} onClose={() => setIsPopupOpen(false)} />
         </div>
     );
 

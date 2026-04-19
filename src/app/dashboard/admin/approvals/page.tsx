@@ -14,12 +14,14 @@ import {
     MessageSquare,
     Eye,
     Loader2,
+    CalendarClock,
 } from "lucide-react";
 import { PaginationControls } from "@/components/ui/PaginationControls";
 import { authenticatedFetch } from "@/utils/api";
 import { formatDisplayId } from "@/utils/displayIds";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import AttendancePendingQueuePanel from "@/components/engagement/AttendancePendingQueuePanel";
 
 function pickDetailStr(o: Record<string, unknown> | null | undefined, ...keys: string[]): string {
     if (!o) return "";
@@ -205,7 +207,8 @@ function facultyApprovalPipelineApplies(v: Record<string, unknown>): boolean {
 
 export default function AdminApprovalsPage() {
     const router = useRouter();
-    const [activeTab, setActiveTab] = useState("registrations");
+    const [activeTab, setActiveTab] = useState<"registrations" | "projects" | "attendance">("registrations");
+    const [attendanceProjectId, setAttendanceProjectId] = useState("");
 
     const [isLoading, setIsLoading] = useState(true);
     const [didBootstrapCounts, setDidBootstrapCounts] = useState(false);
@@ -413,6 +416,7 @@ export default function AdminApprovalsPage() {
 
     // Filter & Pagination Logic
     const getFilteredItems = () => {
+        if (activeTab === "attendance") return [];
         const items = activeTab === 'projects' ? opportunities : pendingUsers;
         if (!searchQuery) return items;
 
@@ -499,8 +503,15 @@ export default function AdminApprovalsPage() {
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                     <input
                         type="text"
-                        placeholder={activeTab === 'projects' ? "Search projects..." : "Search users..."}
-                        className="w-full pl-9 pr-4 py-2 rounded-lg border border-slate-200 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                        placeholder={
+                            activeTab === "attendance"
+                                ? "Search disabled for attendance queue"
+                                : activeTab === "projects"
+                                  ? "Search projects..."
+                                  : "Search users..."
+                        }
+                        disabled={activeTab === "attendance"}
+                        className="w-full pl-9 pr-4 py-2 rounded-lg border border-slate-200 text-sm focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-slate-50 disabled:text-slate-400"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                     />
@@ -529,7 +540,43 @@ export default function AdminApprovalsPage() {
                     </div>
                     {activeTab === "projects" && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-blue-600 rounded-t-full"></div>}
                 </button>
+                <button
+                    onClick={() => setActiveTab("attendance")}
+                    className={`pb-4 px-2 text-sm font-bold transition-colors relative ${activeTab === "attendance" ? "text-blue-600" : "text-slate-500 hover:text-slate-700"}`}
+                >
+                    <div className="flex items-center gap-2">
+                        <CalendarClock className="w-4 h-4" /> Attendance review
+                    </div>
+                    {activeTab === "attendance" && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-blue-600 rounded-t-full"></div>}
+                </button>
             </div>
+
+            {activeTab === "attendance" ? (
+                <div className="max-w-3xl space-y-4">
+                    <div className="rounded-lg border border-slate-100 bg-slate-50/80 px-4 py-3 text-sm text-slate-700">
+                        <span className="font-semibold text-slate-900">Admin attendance queue.</span> Enter the project
+                        (opportunity) ID, then load pending logs assigned to CIEL Admin for that project. Partner-assigned
+                        sessions are reviewed in the partner dashboard.
+                    </div>
+                    <div>
+                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">
+                            Project ID
+                        </label>
+                        <input
+                            type="text"
+                            value={attendanceProjectId}
+                            onChange={(e) => setAttendanceProjectId(e.target.value)}
+                            placeholder="e.g. UUID from All projects or student URL ?project=…"
+                            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                        />
+                    </div>
+                    <AttendancePendingQueuePanel
+                        projectId={attendanceProjectId}
+                        title="Pending attendance (admin pool)"
+                        description="Approve, reject, or flag entries. Reject and flag require a short reason."
+                    />
+                </div>
+            ) : null}
 
             {activeTab === "projects" && (
                 <div className="mb-4 rounded-lg border border-blue-100 bg-blue-50/90 px-4 py-3 text-sm text-slate-700">
@@ -541,6 +588,8 @@ export default function AdminApprovalsPage() {
                 </div>
             )}
 
+            {activeTab !== "attendance" ? (
+            <>
             <div className="grid grid-cols-1 gap-4">
                 {activeTab === "registrations" ? (
                     paginatedItems.map((req) => (
@@ -703,6 +752,8 @@ export default function AdminApprovalsPage() {
                     itemsPerPage={itemsPerPage}
                 />
             )}
+            </>
+            ) : null}
             {/* View Details Modal */}
             {isDetailModalOpen && selectedOpportunity && adminDetailView && (
                     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">

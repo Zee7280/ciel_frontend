@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { Loader2, ArrowLeft, Calendar } from "lucide-react";
 import Link from "next/link";
 import { authenticatedFetch } from "@/utils/api";
+import { normalizeEngagementAttendanceLog } from "@/utils/engagementAttendanceMap";
 import AttendanceForm from "../components/AttendanceForm";
 import AttendanceSummaryTable from "../components/AttendanceSummaryTable";
 
@@ -17,7 +18,12 @@ export default function AttendancePage() {
             const res = await authenticatedFetch(`/api/v1/engagement/${pId}/attendance`);
             if (res && res.ok) {
                 const result = await res.json();
-                setEntries(result.data);
+                const rows = Array.isArray(result.data) ? result.data : [];
+                setEntries(
+                    rows.map((e: Record<string, unknown>) =>
+                        normalizeEngagementAttendanceLog(e, { participantPrefixedId: pId }),
+                    ),
+                );
             }
         } catch (err) {
             console.error(err);

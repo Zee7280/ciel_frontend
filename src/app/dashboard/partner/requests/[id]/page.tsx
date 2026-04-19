@@ -2,7 +2,7 @@
 
 import { useParams, useRouter, useSearchParams, usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
-import { Info, MapPin, Calendar, Clock, CheckCircle, AlertCircle, ChevronDown, ChevronUp, Users, Loader2, Edit, ArrowLeft, Save, X, Trash2, Printer, Share2, Search } from "lucide-react";
+import { Info, MapPin, Calendar, Clock, CheckCircle, AlertCircle, ChevronDown, ChevronUp, Users, Loader2, Edit, ArrowLeft, Save, X, Trash2, Printer, Share2, Search, Plus } from "lucide-react";
 import Link from "next/link";
 import { authenticatedFetch } from "@/utils/api";
 import { formatDisplayId } from "@/utils/displayIds";
@@ -94,7 +94,7 @@ function OpportunityDetailsContent() {
             responsibilities: "",
             skills: [] as string[],
             isOtherSkillChecked: false,
-            otherSkill: ""
+            otherSkills: [""] as string[],
         },
 
         // Section F
@@ -181,8 +181,8 @@ function OpportunityDetailsContent() {
                         const opportunityType = apiTypes.filter((t: string) => predefinedTypes.includes(t));
 
                         const apiSkills = opp.activity_details?.skills_gained || [];
-                        const otherSkill = apiSkills.find((s: string) => !predefinedSkills.includes(s)) || "";
                         const activitySkills = apiSkills.filter((s: string) => predefinedSkills.includes(s));
+                        const otherSkillsFromApi = apiSkills.filter((s: string) => !predefinedSkills.includes(s));
 
                         // Map API response to Form Data
                         setFormData({
@@ -222,8 +222,8 @@ function OpportunityDetailsContent() {
                             activity: {
                                 responsibilities: opp.activity_details?.student_responsibilities || "",
                                 skills: activitySkills,
-                                isOtherSkillChecked: !!otherSkill,
-                                otherSkill: otherSkill
+                                isOtherSkillChecked: otherSkillsFromApi.length > 0,
+                                otherSkills: otherSkillsFromApi.length ? otherSkillsFromApi : [""],
                             },
                             supervision: {
                                 name: opp.supervision?.supervisor_name || "",
@@ -393,9 +393,12 @@ function OpportunityDetailsContent() {
                 },
                 activity_details: {
                     student_responsibilities: formData.activity.responsibilities,
-                    skills_gained: formData.activity.isOtherSkillChecked && formData.activity.otherSkill.trim()
-                        ? [...formData.activity.skills, formData.activity.otherSkill.trim()]
-                        : formData.activity.skills
+                    skills_gained: formData.activity.isOtherSkillChecked
+                        ? [
+                            ...formData.activity.skills,
+                            ...formData.activity.otherSkills.map((s) => s.trim()).filter(Boolean),
+                        ]
+                        : formData.activity.skills,
                 },
                 supervision: {
                     supervisor_name: formData.supervision.name,
@@ -691,8 +694,15 @@ function OpportunityDetailsContent() {
                                     <div>
                                         <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-2">Skills to be Gained</span>
                                         <div className="flex flex-wrap gap-2">
-                                            {formData.activity.skills.map(s => (
-                                                <span key={s} className="px-3 py-1 bg-indigo-50 text-indigo-700 border border-indigo-100 text-xs font-bold rounded-full">{s}</span>
+                                            {(
+                                                formData.activity.isOtherSkillChecked
+                                                    ? [
+                                                        ...formData.activity.skills,
+                                                        ...formData.activity.otherSkills.map((s) => s.trim()).filter(Boolean),
+                                                    ]
+                                                    : formData.activity.skills
+                                            ).map((s, i) => (
+                                                <span key={`${i}-${s}`} className="px-3 py-1 bg-indigo-50 text-indigo-700 border border-indigo-100 text-xs font-bold rounded-full">{s}</span>
                                             ))}
                                         </div>
                                     </div>
@@ -1383,20 +1393,82 @@ function OpportunityDetailsContent() {
                                     type="checkbox"
                                     className="rounded text-indigo-600 focus:ring-indigo-500"
                                     checked={formData.activity.isOtherSkillChecked}
-                                    onChange={(e) => setFormData({ ...formData, activity: { ...formData.activity, isOtherSkillChecked: e.target.checked } })}
+                                    onChange={(e) => {
+                                        const checked = e.target.checked;
+                                        setFormData({
+                                            ...formData,
+                                            activity: {
+                                                ...formData.activity,
+                                                isOtherSkillChecked: checked,
+                                                otherSkills: checked
+                                                    ? formData.activity.otherSkills.length
+                                                        ? formData.activity.otherSkills
+                                                        : [""]
+                                                    : [""],
+                                            },
+                                        });
+                                    }}
                                 />
                                 <span className="text-sm font-medium text-slate-700">Other</span>
                             </label>
 
                             {formData.activity.isOtherSkillChecked && (
-                                <div className="col-span-full animate-in fade-in slide-in-from-top-2">
-                                    <input
-                                        type="text"
-                                        placeholder="Please specify other skill"
-                                        className="w-full px-4 py-2 rounded-lg border border-indigo-200 focus:border-indigo-500 outline-none text-sm"
-                                        value={formData.activity.otherSkill}
-                                        onChange={(e) => setFormData({ ...formData, activity: { ...formData.activity, otherSkill: e.target.value } })}
-                                    />
+                                <div className="col-span-full space-y-3 pl-4 border-l-2 border-indigo-100 animate-in fade-in slide-in-from-top-2">
+                                    {formData.activity.otherSkills.map((skill, idx) => (
+                                        <div key={idx} className="flex gap-2">
+                                            <div className="relative flex-1">
+                                                <input
+                                                    type="text"
+                                                    placeholder="Please specify other skill..."
+                                                    className="w-full px-4 py-2 rounded-lg border border-indigo-200 focus:border-indigo-500 outline-none text-sm"
+                                                    value={skill}
+                                                    onChange={(e) => {
+                                                        const newOthers = [...formData.activity.otherSkills];
+                                                        newOthers[idx] = e.target.value;
+                                                        setFormData({
+                                                            ...formData,
+                                                            activity: { ...formData.activity, otherSkills: newOthers },
+                                                        });
+                                                    }}
+                                                />
+                                                {formData.activity.otherSkills.length > 1 && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            const newOthers = formData.activity.otherSkills.filter((_, i) => i !== idx);
+                                                            setFormData({
+                                                                ...formData,
+                                                                activity: {
+                                                                    ...formData.activity,
+                                                                    otherSkills: newOthers.length ? newOthers : [""],
+                                                                },
+                                                            });
+                                                        }}
+                                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-red-500 transition-colors"
+                                                        aria-label="Remove skill"
+                                                    >
+                                                        <X className="w-4 h-4" />
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))}
+                                    <button
+                                        type="button"
+                                        onClick={() =>
+                                            setFormData({
+                                                ...formData,
+                                                activity: {
+                                                    ...formData.activity,
+                                                    otherSkills: [...formData.activity.otherSkills, ""],
+                                                },
+                                            })
+                                        }
+                                        className="text-xs font-bold text-indigo-600 hover:text-indigo-700 flex items-center gap-1.5 px-2 py-1"
+                                    >
+                                        <Plus className="w-3.5 h-3.5" />
+                                        Add another skill
+                                    </button>
                                 </div>
                             )}
                         </div>

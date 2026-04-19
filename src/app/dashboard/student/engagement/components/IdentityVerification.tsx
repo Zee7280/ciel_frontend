@@ -101,7 +101,7 @@ export default function IdentityVerification({
         }
     };
 
-    // Pre-fill from localStorage if this is the lead and form is empty
+    // Pre-fill profile fields for team lead when the name row is still empty
     useEffect(() => {
         if (isTeamLead && !formData.fullName) {
             const storedUserStr = localStorage.getItem("user") || localStorage.getItem("ciel_user");
@@ -113,7 +113,6 @@ export default function IdentityVerification({
                         fullName: u.name || prev.fullName,
                         email: u.email || prev.email,
                         mobile: u.phone || u.contact || prev.mobile,
-                        cnic: u.cnic || prev.cnic,
                         universityName: u.university || u.institution || prev.universityName
                     }));
                     if (u.email) {
@@ -123,6 +122,29 @@ export default function IdentityVerification({
             }
         }
     }, [isTeamLead]);
+
+    // CNIC: draft/API first, then account profile (cnic or national_id). Applies to all flows including /engagement/verify.
+    useEffect(() => {
+        setFormData((prev) => {
+            if (prev.cnic.replace(/\D/g, "").length === 13) return prev;
+
+            const fromInitial = String(initialData?.cnic ?? "").replace(/\D/g, "").slice(0, 13);
+            if (fromInitial.length === 13) {
+                return { ...prev, cnic: fromInitial };
+            }
+
+            const storedUserStr = localStorage.getItem("user") || localStorage.getItem("ciel_user");
+            if (!storedUserStr) return prev;
+            try {
+                const u = JSON.parse(storedUserStr);
+                const raw = String(u.cnic || u.national_id || "").replace(/\D/g, "").slice(0, 13);
+                if (raw.length !== 13) return prev;
+                return { ...prev, cnic: raw };
+            } catch {
+                return prev;
+            }
+        });
+    }, [initialData?.cnic]);
 
     const handleChangeEmail = () => {
         setOtpSent(prev => ({ ...prev, email: false }));

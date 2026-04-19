@@ -32,10 +32,10 @@ function PaymentContent() {
     const [submitting, setSubmitting] = useState(false);
     const [projectDetails, setProjectDetails] = useState<any>(null);
     const [bankInfo, setBankInfo] = useState({
-        bankName: "Habib Bank Limited (HBL)",
+        bankName: "UNITED Bank Limited (UBL)",
         accountTitle: "CIEL International",
-        accountNumber: "1234 5678 9012 3456",
-        iban: "PK70 HABB 0012 3456 7890 1234",
+        accountNumber: "0374251663933",
+        iban: "PK14UNIL0109000251663933",
         amount: `${REPORTING_FEE_PKR_PER_STUDENT} PKR`,
     });
     const [proofFile, setProofFile] = useState<File | null>(null);

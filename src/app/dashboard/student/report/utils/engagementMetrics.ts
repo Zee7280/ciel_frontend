@@ -3,6 +3,8 @@
  * Logic for calculating EIS and HEC compliance benchmarking
  */
 
+import { filterAttendanceLogsForVerifiedMetrics } from "@/utils/attendanceApprovalEligibility";
+
 export interface AttendanceLog {
     id?: string;
     date: string;
@@ -13,6 +15,9 @@ export interface AttendanceLog {
     endTime?: string;
     evidence_file?: any;
     participantId?: string;
+    /** Null/empty = legacy log (counted). Only `approved` counts otherwise — matches backend engagement metrics. */
+    approval_status?: string | null;
+    approvalStatus?: string | null;
 }
 
 function parseClockToMinutes(t: string | undefined): number | null {
@@ -71,8 +76,9 @@ export function calculateEngagementMetrics(
     leadProfile?: any
 ): CalculatedMetrics {
     const redFlags: string[] = [];
-    
-    if (!logs || logs.length === 0) {
+    const countedLogs = filterAttendanceLogsForVerifiedMetrics(logs || []);
+
+    if (!countedLogs || countedLogs.length === 0) {
         return {
             total_verified_hours: 0,
             total_active_days: 0,
@@ -91,14 +97,14 @@ export function calculateEngagementMetrics(
     const N = teamSize > 0 ? teamSize : 1;
     const projectGoal = RHS * N;
     
-    const totalHours = logs.reduce((sum, log) => sum + effectiveHoursFromLog(log), 0);
-    const uniqueDays = new Set(logs.map(log => log.date)).size;
+    const totalHours = countedLogs.reduce((sum, log) => sum + effectiveHoursFromLog(log), 0);
+    const uniqueDays = new Set(countedLogs.map(log => log.date)).size;
 
     // --- AUDIT: Red Flag Detection ---
     const hoursPerDay: Record<string, number> = {};
     const patterns: Record<string, number> = {};
     
-    logs.forEach(log => {
+    countedLogs.forEach(log => {
         const h = effectiveHoursFromLog(log);
         hoursPerDay[log.date] = (hoursPerDay[log.date] || 0) + h;
 
@@ -122,7 +128,7 @@ export function calculateEngagementMetrics(
         if (!leadProfile.cnic) redFlags.push("Missing National ID Attribution");
     }
 
-    const dates = logs.map(log => new Date(log.date).getTime());
+    const dates = countedLogs.map(log => new Date(log.date).getTime());
     const minDate = Math.min(...dates);
     const maxDate = Math.max(...dates);
     const spanMs = maxDate - minDate;
@@ -130,14 +136,14 @@ export function calculateEngagementMetrics(
     const projectSpan = Math.max(1, spanDays / 7);
 
     const weeksWithVisits = new Set();
-    logs.forEach(log => {
+    countedLogs.forEach(log => {
         const d = new Date(log.date);
         const startOfYear = new Date(d.getFullYear(), 0, 1);
         const weekNum = Math.ceil((((d.getTime() - startOfYear.getTime()) / 86400000) + startOfYear.getDay() + 1) / 7);
         weeksWithVisits.add(`${d.getFullYear()}-W${weekNum}`);
     });
     const activeWeeks = weeksWithVisits.size;
-    const avgFrequency = activeWeeks > 0 ? logs.length / activeWeeks : 0;
+    const avgFrequency = activeWeeks > 0 ? countedLogs.length / activeWeeks : 0;
 
     // 2. TEAM EIS CALCULATION (MAX = 100)
     let hoursScore = 0;
@@ -163,7 +169,7 @@ export function calculateEngagementMetrics(
     // 3. INDIVIDUAL SCORE & BONUS
     const studentHoursMap: Record<string, number> = {};
     const studentEvidenceMap: Record<string, boolean> = {};
-    logs.forEach(log => {
+    countedLogs.forEach(log => {
         const pId = log.participantId || 'unknown';
         studentHoursMap[pId] = (studentHoursMap[pId] || 0) + effectiveHoursFromLog(log);
         if (log.evidence_file) studentEvidenceMap[pId] = true;
