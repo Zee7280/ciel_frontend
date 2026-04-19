@@ -183,6 +183,11 @@ export default function IdentityVerification({
     const isPersonalValid = formData.fullName && formData.cnic.length === 13 && otpVerified.email;
     const isAcademicValid = formData.universityId && formData.universityName && formData.academicProgram;
 
+    /** Verified / email-linked records can still lack CNIC (e.g. individual apply). Keep CNIC editable until 13 digits are saved. */
+    const cnicDigitsLen = formData.cnic.replace(/\D/g, "").length;
+    const cnicFieldLocked =
+        (otpVerified.email || !!initialData.verified) && cnicDigitsLen === 13;
+
     return (
         <div className="space-y-8">
             {/* Tab Navigation */}
@@ -223,7 +228,7 @@ export default function IdentityVerification({
                                     placeholder="13 digits"
                                     maxLength={13}
                                     value={formData.cnic}
-                                    disabled={otpVerified.email || !!initialData.verified}
+                                    disabled={cnicFieldLocked}
                                     onChange={(e) => setFormData({ ...formData, cnic: e.target.value.replace(/\D/g, '') })}
                                     className="h-12 bg-slate-50 border-none rounded-2xl font-bold tracking-[0.2em] disabled:opacity-70 disabled:cursor-not-allowed"
                                 />

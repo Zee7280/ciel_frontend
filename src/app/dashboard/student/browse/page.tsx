@@ -32,6 +32,11 @@ import {
     pickJoinApplicationId,
     pickJoinApplicationStage,
 } from "@/utils/studentJoinApplication";
+import {
+    buildStudentReportsCheckMap,
+    pickReportStatusFromCheckRow,
+    resolveStudentBrowseReportCta,
+} from "@/utils/studentBrowseReportCta";
 import { Loader2, MapPin, Calendar, Clock, Globe, CheckCircle2, LayoutGrid, List, Users, Mail, Phone, GraduationCap } from "lucide-react";
 import Link from "next/link";
 import ApplicationDialog from "./components/ApplicationDialog";
@@ -88,6 +93,9 @@ interface BrowseOpportunity {
     seatsRemaining?: number | null;
     /** True while a join application is pending or approved; false when rejected so student can re-apply. */
     applyLocked?: boolean;
+    /** From bulk `/students/reports/check` when available. */
+    report_status?: string;
+    report_id?: string;
 }
 
 function lower(value: unknown): string {
@@ -158,6 +166,29 @@ function normalizeOpportunity(op: BrowseOpportunity): BrowseOpportunity {
         sdgLabel: buildSdgFilterLabel(raw),
         seatsRemaining,
     };
+}
+
+async function mergeBrowseOpportunitiesWithReportCheck(
+    ops: BrowseOpportunity[],
+    studentId: string,
+): Promise<BrowseOpportunity[]> {
+    if (!studentId.trim()) return ops;
+    try {
+        const reportsRes = await authenticatedFetch(`/api/v1/students/reports/check?studentId=${encodeURIComponent(studentId)}`);
+        if (!reportsRes?.ok) return ops;
+        const reportsData = (await reportsRes.json()) as { success?: boolean; data?: unknown };
+        if (!reportsData.success || !Array.isArray(reportsData.data)) return ops;
+        const map = buildStudentReportsCheckMap(reportsData.data);
+        return ops.map((op) => {
+            const row = map.get(op.id);
+            const report_status = pickReportStatusFromCheckRow(row);
+            const rid = row?.report_id ?? row?.id;
+            const report_id = typeof rid === "string" ? rid : rid != null ? String(rid) : undefined;
+            return { ...op, report_status, report_id };
+        });
+    } catch {
+        return ops;
+    }
 }
 
 function shouldShowInBrowse(op: BrowseOpportunity): boolean {
@@ -296,9 +327,12 @@ export default function StudentBrowseOpportunitiesPage() {
             if (res && res.ok) {
                 const data = await res.json();
                 if (data.success) {
-                    const mappedOps = ((data.data || []) as BrowseOpportunity[])
+                    let mappedOps = ((data.data || []) as BrowseOpportunity[])
                         .map((op) => normalizeOpportunity(op))
                         .filter((op) => shouldShowInBrowse(op));
+                    if (userId) {
+                        mappedOps = await mergeBrowseOpportunitiesWithReportCheck(mappedOps, userId);
+                    }
                     setOpportunities(mappedOps);
                 }
             }
@@ -504,6 +538,10 @@ export default function StudentBrowseOpportunitiesPage() {
                             op as unknown as Record<string, unknown>,
                             studentInstitution,
                         );
+                        const reportCta =
+                            op.application_status != null && ["approved", "verified"].includes(op.application_status)
+                                ? resolveStudentBrowseReportCta(op.id, op.report_status)
+                                : null;
                         return viewMode === 'grid' ? (
                             // GRID VIEW CARD
                             <div key={op.id} className="group flex h-full flex-col rounded-xl border border-slate-200 bg-white shadow-sm transition-all hover:border-slate-300 hover:shadow-md">
@@ -566,14 +604,17 @@ export default function StudentBrowseOpportunitiesPage() {
                                     {op.applyLocked ? (
                                         <div className="flex items-center gap-2">
                                             {/* Report Button - Only show if APPLICATION is approved/active */}
-                                            {op.application_status != null &&
-                                                ["approved", "verified"].includes(op.application_status) && (
-                                                <Link href={`/dashboard/student/report?projectId=${op.id}`}>
-                                                    <Button size="sm" variant="outline" className="h-8 border-slate-200 text-xs font-medium">
-                                                        Start Report
+                                            {reportCta ? (
+                                                <Link href={reportCta.href}>
+                                                    <Button
+                                                        size="sm"
+                                                        variant="outline"
+                                                        className="h-8 border-slate-200 text-xs font-medium"
+                                                    >
+                                                        {reportCta.label}
                                                     </Button>
                                                 </Link>
-                                            )}
+                                            ) : null}
 
                                             {(!op.application_status ||
                                                 ["pending", "pending_approval", "applied"].includes(
@@ -680,14 +721,17 @@ export default function StudentBrowseOpportunitiesPage() {
                                     {op.applyLocked ? (
                                         <div className="flex items-center gap-2 flex-1 md:flex-none justify-end">
                                             {/* Report Button - Only show if APPLICATION is approved/active */}
-                                            {op.application_status != null &&
-                                                ["approved", "verified"].includes(op.application_status) && (
-                                                <Link href={`/dashboard/student/report?projectId=${op.id}`}>
-                                                    <Button size="sm" variant="outline" className="h-9 border-slate-200 text-xs font-medium">
-                                                        Start Report
+                                            {reportCta ? (
+                                                <Link href={reportCta.href}>
+                                                    <Button
+                                                        size="sm"
+                                                        variant="outline"
+                                                        className="h-9 border-slate-200 text-xs font-medium"
+                                                    >
+                                                        {reportCta.label}
                                                     </Button>
                                                 </Link>
-                                            )}
+                                            ) : null}
 
                                             {(!op.application_status ||
                                                 ["pending", "pending_approval", "applied"].includes(

@@ -29,6 +29,11 @@ import {
     pickJoinApplicationId,
     pickJoinApplicationStage,
 } from "@/utils/studentJoinApplication";
+import {
+    buildStudentReportsCheckMap,
+    pickReportStatusFromCheckRow,
+    resolveStudentBrowseReportCta,
+} from "@/utils/studentBrowseReportCta";
 
 export default function OpportunityDetailsPage() {
     const params = useParams();
@@ -134,6 +139,24 @@ export default function OpportunityDetailsPage() {
             };
             const applyLocked = !isStudentOwner && joinApplicationLocksApplyButton(rawForApplyLock);
 
+            let report_status: string | undefined;
+            if (myId) {
+                try {
+                    const reportsRes = await authenticatedFetch(
+                        `/api/v1/students/reports/check?studentId=${encodeURIComponent(myId)}`,
+                    );
+                    if (reportsRes?.ok) {
+                        const reportsJson = (await reportsRes.json()) as { success?: boolean; data?: unknown };
+                        if (reportsJson.success && Array.isArray(reportsJson.data)) {
+                            const map = buildStudentReportsCheckMap(reportsJson.data);
+                            report_status = pickReportStatusFromCheckRow(map.get(id));
+                        }
+                    }
+                } catch {
+                    /* ignore */
+                }
+            }
+
             setOpportunity({
                 ...opData,
                 application_status: application_status || undefined,
@@ -147,6 +170,7 @@ export default function OpportunityDetailsPage() {
                     opData.hasApplied === true,
                 applyLocked,
                 isStudentOwner,
+                report_status,
             });
         } catch (error) {
             console.error("Error fetching opportunity", error);
@@ -267,6 +291,14 @@ export default function OpportunityDetailsPage() {
         opportunity.isStudentOwner &&
         canEditReturnedOpportunity(opportunity as Record<string, unknown>);
 
+    const startReportCta =
+        opportunity &&
+        canStudentShowStartReportCta(oppRecord, {
+            isStudentOwner: Boolean(opportunity.isStudentOwner),
+        })
+            ? resolveStudentBrowseReportCta(id, opportunity.report_status as string | undefined)
+            : null;
+
     const applyBlockedByUniversity =
         !hideStudentApplyActions &&
         !opportunity.isStudentOwner &&
@@ -320,16 +352,14 @@ export default function OpportunityDetailsPage() {
                     ) : !hideStudentApplyActions && opportunity.applyLocked ? (
                         <div className="flex flex-col items-end gap-2">
                             <div className="flex items-center gap-2">
-                                {canStudentShowStartReportCta(oppRecord, {
-                                    isStudentOwner: Boolean(opportunity.isStudentOwner),
-                                }) && (
+                                {startReportCta ? (
                                     <Button
-                                        onClick={() => router.push(`/dashboard/student/report?projectId=${id}`)}
+                                        onClick={() => router.push(startReportCta.href)}
                                         className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 font-medium"
                                     >
-                                        Start Report
+                                        {startReportCta.label}
                                     </Button>
-                                )}
+                                ) : null}
                                 <Button className="flex items-center gap-2 px-6 py-2 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg shadow-none cursor-default font-medium hover:bg-emerald-50">
                                     <CheckCircle2 className="w-4 h-4" /> Applied
                                 </Button>

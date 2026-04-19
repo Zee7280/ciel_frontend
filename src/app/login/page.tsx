@@ -415,7 +415,7 @@ function LoginContent() {
                     <div className="relative z-10">
                         <Link href="/" className="inline-flex items-center gap-4 transition-transform hover:scale-105 duration-300">
                             <div className="relative w-24 h-24 p-2 bg-white rounded-full flex items-center justify-center">
-                                <Image src="/ciel-logo-final.png" alt="CIEL Logo" width={200} height={200} className="object-contain" />
+                                <Image src="/iel-pk-logo.png" alt="IEL PK" width={200} height={200} className="object-contain" />
                             </div>
                             <div className="flex flex-col">
                                 <span className="text-2xl font-bold tracking-tight text-white leading-none">

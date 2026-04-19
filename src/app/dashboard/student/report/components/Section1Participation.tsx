@@ -550,6 +550,17 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                 <div className="px-6 pb-6">
                                     {(isVerified && !isEditingLead) ? (
                                         <div className="rounded-2xl border border-emerald-100 bg-white overflow-hidden shadow-sm hover:shadow-md transition-all">
+                                            {(() => {
+                                                const leadCnicRaw = String((data.section1.team_lead as any).cnic || "").replace(/\D/g, "");
+                                                const leadCnicOk = leadCnicRaw.length === 13;
+                                                return !leadCnicOk ? (
+                                                    <div className="px-5 pt-4 pb-0">
+                                                        <p className="text-xs font-medium text-amber-800 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2">
+                                                            CNIC is missing or incomplete for this project record. Use <span className="font-bold">Edit Academic</span> to add your 13-digit CNIC so your report meets traceability requirements.
+                                                        </p>
+                                                    </div>
+                                                ) : null;
+                                            })()}
                                             <div className="p-5 flex items-center justify-between">
                                                 <div className="flex items-center gap-4">
                                                     <div className="w-12 h-12 rounded-full bg-indigo-600 text-white flex items-center justify-center shrink-0">
@@ -574,6 +585,14 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                                         </div>
                                                         <p className="text-xs text-slate-500 font-medium">
                                                             {(data.section1.team_lead as any).university || (data.section1.team_lead as any).universityName || "Academic Record Linked"}
+                                                        </p>
+                                                        <p className="text-[11px] text-slate-600 font-mono font-medium pt-1">
+                                                            CNIC:{" "}
+                                                            {String((data.section1.team_lead as any).cnic || "")
+                                                                .replace(/\D/g, "")
+                                                                .length === 13
+                                                                ? String((data.section1.team_lead as any).cnic || "").replace(/\D/g, "")
+                                                                : "—"}
                                                         </p>
                                                     </div>
                                                 </div>

@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, Calendar, Clock, MapPin, Tag, FileText, Loader2, CheckCircle2, Upload, X, Lock, Users, Info } from "lucide-react";
+import { Plus, Calendar, Clock, MapPin, Tag, FileText, Loader2, CheckCircle2, Upload, X, Lock, Users, Info, AlertCircle } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "../../report/components/ui/button";
 import { Input } from "../../report/components/ui/input";
 import { Label } from "../../report/components/ui/label";
@@ -35,6 +36,7 @@ export default function AttendanceForm({
 }) {
     const { data: reportData, updateSection } = useReportForm();
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [submitError, setSubmitError] = useState<string | null>(null);
     const [evidenceFile, setEvidenceFile] = useState<File | null>(null);
     const [mounted, setMounted] = React.useState(false);
     const [formData, setFormData] = useState({
@@ -112,12 +114,9 @@ export default function AttendanceForm({
             participantId: activeParticipantId // Tag it for frontend filtering
         };
         setIsSubmitting(true);
+        setSubmitError(null);
         try {
-            // Update Context first for immediate feedback
             const currentLogs = reportData.section1.attendance_logs || [];
-            updateSection('section1', {
-                attendance_logs: [...currentLogs, newEntry]
-            });
 
             // Sync with backend if participantId exists
             if (activeParticipantId) {
@@ -173,10 +172,27 @@ export default function AttendanceForm({
                 const res = await authenticatedFetch(`/api/v1/engagement/${realId}/attendance`, fetchOptions);
 
                 if (!res || !res.ok) {
-                    console.warn("Backend sync failed, but context updated");
-                    if (res) console.error("[Attendance] Server Response Error:", res.status, res.statusText);
+                    let message = "Could not save attendance. Please try again.";
+                    if (res) {
+                        console.error("[Attendance] Server Response Error:", res.status, res.statusText);
+                        try {
+                            const errBody = await res.json();
+                            if (typeof errBody?.message === "string" && errBody.message.trim()) {
+                                message = errBody.message.trim();
+                            }
+                        } catch {
+                            /* non-JSON error body */
+                        }
+                    }
+                    setSubmitError(message);
+                    toast.error(message);
+                    return;
                 }
             }
+
+            updateSection('section1', {
+                attendance_logs: [...currentLogs, newEntry]
+            });
 
             onSuccess();
             // Reset form
@@ -188,6 +204,9 @@ export default function AttendanceForm({
             setEvidenceFile(null);
         } catch (error) {
             console.error(error);
+            const message = error instanceof Error ? error.message : "Could not save attendance. Please try again.";
+            setSubmitError(message);
+            toast.error(message);
         } finally {
             setIsSubmitting(false);
         }
@@ -408,6 +427,15 @@ export default function AttendanceForm({
             </div>
 
             <div className="space-y-3">
+                {submitError && (
+                    <div
+                        role="alert"
+                        className="flex gap-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
+                    >
+                        <AlertCircle className="h-5 w-5 shrink-0 text-red-600" aria-hidden />
+                        <p className="min-w-0 leading-relaxed font-medium">{submitError}</p>
+                    </div>
+                )}
                 <Button
                     type="submit"
                     disabled={isSubmitting || wordCount > 40 || effectiveLocked}

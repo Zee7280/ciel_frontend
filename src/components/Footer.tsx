@@ -12,7 +12,7 @@ export default function Footer() {
                     {/* Left Column: Brand & App Links */}
                     <div className="flex flex-col gap-6">
                         <Link href="/" className="flex flex-col items-start gap-4 group cursor-pointer">
-                            <Image src="/ciel-logo-final.png" alt="CIEL Logo" width={60} height={60} className="object-contain" />
+                            <Image src="/iel-pk-logo.png" alt="IEL PK" width={60} height={60} className="object-contain" />
                         </Link>
 
                         <p className="text-slate-600 text-[15px] leading-relaxed max-w-xs font-medium opacity-90">

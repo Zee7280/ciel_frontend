@@ -29,7 +29,7 @@ export default function Navbar() {
                 {/* Logo */}
                 <Link href="/" className="flex items-center gap-4 group cursor-pointer">
                     <div className="relative flex h-16 w-16 items-center justify-center transition-all duration-300 group-hover:scale-105">
-                        <img src="/ciel-mark.svg" alt="CIEL" className="h-14 w-14 object-contain" width={56} height={56} />
+                        <img src="/iel-pk-logo.png" alt="IEL PK" className="h-14 w-14 object-contain" width={56} height={56} />
                     </div>
                     <div className="flex flex-col">
                         <span className="text-[18px] font-black tracking-tight text-slate-800 leading-tight">

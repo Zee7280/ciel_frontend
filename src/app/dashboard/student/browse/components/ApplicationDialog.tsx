@@ -78,7 +78,7 @@ export default function ApplicationDialog({ opportunityId, open, onOpenChange, o
                     const u = JSON.parse(storedUserStr);
                     initialMember = {
                         name: u.name || "",
-                        cnic: u.cnic || "",
+                        cnic: (u.cnic || u.national_id || "").replace(/\D/g, "").slice(0, 13),
                         mobile: u.phone || u.contact || "",
                         email: u.email || "",
                         university: u.university || u.institution || "",
@@ -249,6 +249,12 @@ export default function ApplicationDialog({ opportunityId, open, onOpenChange, o
                 toast.error("Please enter a valid mobile number with country code.");
                 return;
             }
+            const lead = teamMembers[0];
+            const cnicDigits = (lead?.cnic || "").replace(/\D/g, "");
+            if (cnicDigits.length !== 13) {
+                toast.error("Please enter your 13-digit CNIC before submitting.");
+                return;
+            }
         }
 
         // Validation for team
@@ -281,7 +287,16 @@ export default function ApplicationDialog({ opportunityId, open, onOpenChange, o
                 team_id: participationType === 'team' ? teamId : undefined,
                 primary_faculty_email: primaryFacultyEmail,
                 secondary_faculty_email: secondaryFacultyEmail || undefined,
-                team_members: participationType === "team" ? teamMembers : undefined,
+                team_members:
+                    participationType === "team"
+                        ? teamMembers
+                        : teamMembers.length > 0
+                          ? teamMembers.map((m, i) => ({
+                                ...m,
+                                cnic: m.cnic.replace(/\D/g, "").slice(0, 13),
+                                role: i === 0 && (!m.role || m.role === "Member") ? "Lead" : m.role,
+                            }))
+                          : undefined,
                 ...(applicantPhoneE164
                     ? { contact_phone_e164: applicantPhoneE164 }
                     : {}),
@@ -494,10 +509,25 @@ export default function ApplicationDialog({ opportunityId, open, onOpenChange, o
                                         <p className="font-bold text-slate-700">
                                             {composeInternationalPhone(applicantPhoneCountryKey, applicantPhoneNational) ||
                                                 teamMembers[0].mobile ||
-                                                teamMembers[0].cnic ||
                                                 "Not provided"}
                                         </p>
                                     </div>
+                                </div>
+                                <div className="mt-6 pt-6 border-t border-indigo-100 space-y-2">
+                                    <Label className="text-[10px] font-black text-indigo-700 uppercase tracking-widest">
+                                        CNIC (13 digits) <span className="text-red-500">*</span>
+                                    </Label>
+                                    <Input
+                                        inputMode="numeric"
+                                        maxLength={13}
+                                        value={teamMembers[0].cnic}
+                                        onChange={(e) => updateMember(0, "cnic", e.target.value)}
+                                        placeholder="3520212345671"
+                                        className="h-10 max-w-md bg-white border-indigo-200 font-mono tracking-wider"
+                                    />
+                                    <p className="text-[10px] text-indigo-500 font-medium">
+                                        Required for your engagement record and report (same as team applications).
+                                    </p>
                                 </div>
                             </div>
                         </div>

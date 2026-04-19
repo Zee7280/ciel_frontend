@@ -152,7 +152,7 @@ export default function CertificateView() {
             <div className="absolute bottom-0 right-0 w-96 h-96 bg-slate-900/5 -mr-48 -mb-48 rounded-full print:hidden" />
 
             <div className="w-full flex justify-between items-start mb-12 pt-4 print:mb-4 print:pt-0">
-                <img src="/ciel-logo.svg" alt="CIEL — Community Impact Lab" className="h-14 w-auto max-w-[min(100%,280px)] object-left object-contain print:h-9" width={280} height={56} />
+                <img src="/iel-pk-logo.png" alt="IEL PK" className="h-14 w-14 shrink-0 object-contain print:h-9 print:w-9" width={256} height={256} />
                 <div className="flex flex-col items-end">
                     <div className="flex items-center gap-2 mb-1">
                         <ShieldCheck className="w-4 h-4 text-slate-900" />

@@ -18,7 +18,7 @@ export const metadata: Metadata = {
   title: "CIEL PK - Community Impact Education Lab",
   description: "Where Youth, Universities & Communities Create Measurable Impact",
   icons: {
-    icon: "/ciel-logo-v2.png",
+    icon: "/iel-pk-logo.png",
   },
 };
 

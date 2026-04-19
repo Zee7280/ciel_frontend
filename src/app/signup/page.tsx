@@ -310,7 +310,7 @@ function SignUpContent() {
                     <div className="relative z-10">
                         <Link href="/" className="inline-flex items-center gap-5 transition-transform hover:scale-105 duration-300">
                             <div className="relative w-24 h-24 p-3 bg-white rounded-[2rem] flex items-center justify-center shadow-2xl shadow-emerald-900/20">
-                                <Image src="/ciel-logo-final.png" alt="CIEL Logo" width={200} height={200} className="object-contain" />
+                                <Image src="/iel-pk-logo.png" alt="IEL PK" width={200} height={200} className="object-contain" />
                             </div>
                             <div className="flex flex-col">
                                 <span className="text-2xl font-black tracking-tighter text-white leading-none uppercase">

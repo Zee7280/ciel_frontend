@@ -153,7 +153,7 @@ export default function Sidebar() {
             <div className="h-24 flex items-center px-4 border-b border-slate-800">
                 <Link href="/" className="flex items-center gap-3">
                     <div className="relative flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white/5 p-1">
-                        <img src="/ciel-mark.svg" alt="CIEL" className="h-11 w-11 object-contain" width={44} height={44} />
+                        <img src="/iel-pk-logo.png" alt="IEL PK" className="h-11 w-11 object-contain" width={44} height={44} />
                     </div>
                     <div className="flex flex-col ml-1">
                         <span className="text-xs font-bold tracking-tight text-white leading-tight">

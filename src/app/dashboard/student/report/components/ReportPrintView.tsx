@@ -247,11 +247,11 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
                 <header className="mb-12 flex flex-col gap-10 border-b-8 border-slate-900 pb-10 sm:flex-row sm:items-start sm:justify-between sm:gap-8 print:mb-8 print:pb-8">
                     <div className="flex min-w-0 flex-1 flex-col gap-6 sm:max-w-[55%]">
                         <img
-                            src="/ciel-logo.svg"
-                            alt="CIEL — Community Impact Lab"
-                            className="h-12 w-auto max-w-[min(100%,260px)] object-left object-contain sm:h-14 print:h-12"
-                            width={288}
-                            height={56}
+                            src="/iel-pk-logo.png"
+                            alt="IEL PK"
+                            className="h-12 w-12 shrink-0 object-contain sm:h-14 sm:w-14 print:h-12 print:w-12"
+                            width={256}
+                            height={256}
                         />
                         <div>
                             <div className="mb-3 flex items-center gap-2">
@@ -652,11 +652,11 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
                     </div>
                     <div className="text-left sm:text-right">
                         <img
-                            src="/ciel-logo.svg"
+                            src="/iel-pk-logo.png"
                             alt=""
-                            className="mb-3 h-7 w-auto max-w-[180px] opacity-25 grayscale sm:ml-auto print:h-6"
-                            width={288}
-                            height={56}
+                            className="mb-3 h-7 w-7 shrink-0 object-contain opacity-25 grayscale sm:ml-auto print:h-6 print:w-6"
+                            width={256}
+                            height={256}
                             aria-hidden
                         />
                         <p className="text-[9px] font-black uppercase tracking-[0.35em] text-slate-300">
