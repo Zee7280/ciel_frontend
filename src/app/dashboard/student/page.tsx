@@ -13,21 +13,29 @@ import {
     Timer,
     ChevronRight,
     FolderKanban,
+    Bell,
+    Wallet,
+    FileCheck,
 } from "lucide-react";
 import Link from "next/link";
 import { Button } from "./report/components/ui/button";
 import type {
     ActiveProject,
     DashboardData,
+    DashboardNotificationCategory,
     DashboardNotificationsPreview,
     DashboardOverview,
     DashboardStats,
 } from "./types";
-import { authenticatedFetch } from "@/utils/api";
+import { fetchStudentDashboardData } from "@/utils/student-dashboard-fetch";
 import StudentProgressTracker from "./components/StudentProgressTracker";
 
 function normStatus(s: string) {
     return s.toLowerCase();
+}
+
+function normReportStatus(p: ActiveProject) {
+    return (p.report_status || "").trim().toLowerCase();
 }
 
 function deriveOverview(stats: DashboardStats, projects: ActiveProject[]): DashboardOverview {
@@ -37,6 +45,9 @@ function deriveOverview(stats: DashboardStats, projects: ActiveProject[]): Dashb
         const st = normStatus(p.status);
         return st.includes("progress") || st.includes("active") || (!st.includes("complete") && !st.includes("verified"));
     });
+
+    const pendingPaymentProjects = projects.filter((p) => normReportStatus(p) === "pending_payment");
+    const paymentsUnderReviewProjects = projects.filter((p) => normReportStatus(p) === "payment_under_review");
 
     return {
         activeProjectsCount: active.length || projects.length,
@@ -52,7 +63,40 @@ function deriveOverview(stats: DashboardStats, projects: ActiveProject[]): Dashb
             : undefined,
         completedActivityBars: [30, 40, 35, 50, 45, 55, 50],
         impactHistoryBadgeCount: 0,
+        pendingPaymentsCount: pendingPaymentProjects.length,
+        paymentsUnderReviewCount: paymentsUnderReviewProjects.length,
+        pendingPaymentsSample: pendingPaymentProjects.slice(0, 2).map((p) => ({
+            id: p.id,
+            title: p.title,
+        })),
     };
+}
+
+function mergeStudentOverview(data: DashboardData): DashboardOverview {
+    const derived = deriveOverview(data.stats, data.activeProjects);
+    const o = data.overview;
+    if (!o) return derived;
+    return {
+        ...derived,
+        ...o,
+        pendingPaymentsCount: o.pendingPaymentsCount != null ? o.pendingPaymentsCount : derived.pendingPaymentsCount,
+        paymentsUnderReviewCount:
+            o.paymentsUnderReviewCount != null ? o.paymentsUnderReviewCount : derived.paymentsUnderReviewCount,
+        pendingPaymentsSample:
+            o.pendingPaymentsSample !== undefined ? o.pendingPaymentsSample : derived.pendingPaymentsSample,
+    };
+}
+
+function notificationCategoryLabel(c?: DashboardNotificationCategory | string) {
+    if (!c) return null;
+    const labels: Record<string, string> = {
+        deadline: "Deadline",
+        pipeline: "Approval",
+        approval: "Approval",
+        report: "Report",
+        payment: "Payment",
+    };
+    return labels[c] ?? c;
 }
 
 function MiniBars({ values, barClass }: { values: number[]; barClass: string }) {
@@ -83,13 +127,8 @@ export default function StudentDashboard() {
     useEffect(() => {
         const fetchData = async () => {
             try {
-                const res = await authenticatedFetch(`/api/v1/student/dashboard`);
-                if (res && res.ok) {
-                    const result = await res.json();
-                    if (result.success) {
-                        setData(result.data);
-                    }
-                }
+                const payload = await fetchStudentDashboardData();
+                if (payload) setData(payload);
             } catch (error) {
                 console.error("Failed to fetch dashboard data:", error);
             } finally {
@@ -102,7 +141,7 @@ export default function StudentDashboard() {
 
     const overview = useMemo(() => {
         if (!data) return null;
-        return data.overview ?? deriveOverview(data.stats, data.activeProjects);
+        return mergeStudentOverview(data);
     }, [data]);
 
     if (isLoading) {
@@ -132,7 +171,11 @@ export default function StudentDashboard() {
     ];
 
     const continueReport = data.quickActions?.continueReport;
+    const viewPayment = data.quickActions?.viewPayment;
+    const viewReportResults = data.quickActions?.viewReportResults;
     const firstProjectForTracker = activeProjects[0]?.id;
+    const pendingPay = overview.pendingPaymentsCount ?? 0;
+    const payReview = overview.paymentsUnderReviewCount ?? 0;
 
     return (
         <div className="space-y-8">
@@ -149,7 +192,7 @@ export default function StudentDashboard() {
                             <FolderKanban className="h-5 w-5 text-slate-300" />
                         </div>
 
-                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
                             <div className="rounded-2xl border border-slate-100 bg-slate-50/80 p-4">
                                 <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Active</p>
                                 <p className="mt-1 text-3xl font-black text-slate-900">{overview.activeProjectsCount}</p>
@@ -171,6 +214,21 @@ export default function StudentDashboard() {
                                 <p className="mt-1 text-3xl font-black text-slate-900">{overview.reportsUnderReviewCount}</p>
                                 <ul className="mt-2 space-y-1 text-xs font-medium text-slate-600">
                                     {overview.reportsUnderReviewSample.map((row) => (
+                                        <li key={row.id} className="line-clamp-2">
+                                            {row.title}
+                                            {row.hint ? <span className="text-slate-400"> — {row.hint}</span> : null}
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                            <div className="rounded-2xl border border-rose-100 bg-rose-50/50 p-4">
+                                <p className="text-[10px] font-bold uppercase tracking-widest text-rose-800/80">Reporting fee due</p>
+                                <p className="mt-1 text-3xl font-black text-slate-900">{pendingPay}</p>
+                                <p className="mt-1 text-xs font-medium text-rose-800/90">
+                                    {payReview > 0 ? `${payReview} payment slip${payReview === 1 ? "" : "s"} with admin` : "No slips in admin review"}
+                                </p>
+                                <ul className="mt-2 space-y-1 text-xs font-medium text-slate-600">
+                                    {(overview.pendingPaymentsSample ?? []).map((row) => (
                                         <li key={row.id} className="line-clamp-2">
                                             {row.title}
                                             {row.hint ? <span className="text-slate-400"> — {row.hint}</span> : null}
@@ -241,6 +299,39 @@ export default function StudentDashboard() {
                                 </div>
                             </div>
                         </div>
+                        <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-stretch">
+                            {viewPayment ? (
+                                <Link
+                                    href={`/dashboard/student/payment?projectId=${encodeURIComponent(viewPayment.projectId)}`}
+                                    className="inline-flex flex-1 min-w-[10rem] items-center justify-center gap-2 rounded-2xl bg-rose-600 px-4 py-3.5 text-sm font-black text-white shadow-md shadow-rose-200/50 transition hover:bg-rose-700"
+                                >
+                                    <Wallet className="h-4 w-4 shrink-0" />
+                                    <span className="text-center leading-tight">
+                                        Complete payment
+                                        <span className="mt-0.5 block text-xs font-semibold text-white/90">{viewPayment.title}</span>
+                                    </span>
+                                </Link>
+                            ) : null}
+                            {viewReportResults ? (
+                                <Link
+                                    href={`/dashboard/student/report?projectId=${encodeURIComponent(viewReportResults.projectId)}`}
+                                    className="inline-flex flex-1 min-w-[10rem] items-center justify-center gap-2 rounded-2xl border-2 border-slate-900 bg-white px-4 py-3.5 text-sm font-black text-slate-900 shadow-sm transition hover:bg-slate-50"
+                                >
+                                    <FileCheck className="h-4 w-4 shrink-0" />
+                                    <span className="text-center leading-tight">
+                                        View results
+                                        <span className="mt-0.5 block text-xs font-semibold text-slate-600">{viewReportResults.title}</span>
+                                    </span>
+                                </Link>
+                            ) : null}
+                            <Link
+                                href="/dashboard/student/notifications"
+                                className="inline-flex flex-1 min-w-[10rem] items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3.5 text-sm font-bold text-slate-800 shadow-sm transition hover:border-slate-300 hover:bg-slate-50"
+                            >
+                                <Bell className="h-4 w-4 shrink-0 text-slate-500" />
+                                View notifications
+                            </Link>
+                        </div>
                         <Link
                             href="/dashboard/student/projects"
                             className="mt-4 inline-flex items-center gap-1 text-sm font-bold text-blue-600 hover:text-blue-700"
@@ -290,6 +381,11 @@ export default function StudentDashboard() {
                                     <span className="font-black text-slate-900">{notificationsPreview.active.length} Active</span>
                                     {notificationsPreview.active[0] ? (
                                         <p className="mt-1 text-slate-600">
+                                            {notificationsPreview.active[0].category ? (
+                                                <span className="mb-1 mr-2 inline-block rounded-md bg-slate-200/80 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-700">
+                                                    {notificationCategoryLabel(notificationsPreview.active[0].category)}
+                                                </span>
+                                            ) : null}
                                             <span className="font-semibold text-slate-800">{notificationsPreview.active[0].title}</span>
                                             <span className="text-slate-500"> ({notificationsPreview.active[0].detail})</span>
                                         </p>
@@ -301,6 +397,11 @@ export default function StudentDashboard() {
                                     <span className="font-black text-slate-900">{notificationsPreview.pending.length} Pending</span>
                                     {notificationsPreview.pending[0] ? (
                                         <p className="mt-1 text-slate-600">
+                                            {notificationsPreview.pending[0].category ? (
+                                                <span className="mb-1 mr-2 inline-block rounded-md bg-slate-200/80 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-700">
+                                                    {notificationCategoryLabel(notificationsPreview.pending[0].category)}
+                                                </span>
+                                            ) : null}
                                             <span className="font-semibold text-slate-800">{notificationsPreview.pending[0].title}</span>
                                             <span className="text-slate-500"> ({notificationsPreview.pending[0].detail})</span>
                                         </p>
@@ -312,6 +413,11 @@ export default function StudentDashboard() {
                                     <span className="font-black text-slate-900">{notificationsPreview.underReview.length} Under review</span>
                                     {notificationsPreview.underReview[0] ? (
                                         <p className="mt-1 text-slate-600">
+                                            {notificationsPreview.underReview[0].category ? (
+                                                <span className="mb-1 mr-2 inline-block rounded-md bg-slate-200/80 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-700">
+                                                    {notificationCategoryLabel(notificationsPreview.underReview[0].category)}
+                                                </span>
+                                            ) : null}
                                             <span className="font-semibold text-slate-800">{notificationsPreview.underReview[0].title}</span>
                                             <span className="text-slate-500"> ({notificationsPreview.underReview[0].detail})</span>
                                         </p>
@@ -418,6 +524,9 @@ export default function StudentDashboard() {
                                         <h4 className="font-bold text-slate-800 transition-colors group-hover:text-blue-600">{project.title}</h4>
                                         <p className="text-xs text-slate-500">
                                             {project.category} • {project.status}
+                                            {project.report_status ? (
+                                                <span className="text-slate-400"> • Report: {project.report_status}</span>
+                                            ) : null}
                                         </p>
                                     </div>
                                 </div>

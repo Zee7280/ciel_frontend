@@ -23,6 +23,34 @@ function parsePrimarySdgGoal(section3: ReportData["section3"]): string | number 
 
 type TeamMember = ReportData["section1"]["team_members"][number];
 
+type LeadShape = ReportData["section1"]["team_lead"];
+
+function displayPersonName(p: { fullName?: string; name?: string }): string {
+    return (p.fullName || p.name || "").trim();
+}
+
+function normalizeNameKey(name: string): string {
+    return name.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+function digitsOnly(s: string): string {
+    return String(s || "").replace(/\D/g, "");
+}
+
+/** Treat as same participant if CNIC, mobile, or normalized full name matches (stops duplicate rows on CII). */
+function isSameReportParticipant(a: LeadShape | TeamMember, b: LeadShape | TeamMember): boolean {
+    const ac = digitsOnly("cnic" in a ? a.cnic : "");
+    const bc = digitsOnly("cnic" in b ? b.cnic : "");
+    if (ac.length >= 5 && bc.length >= 5 && ac === bc) return true;
+    const am = digitsOnly("mobile" in a ? a.mobile : "");
+    const bm = digitsOnly("mobile" in b ? b.mobile : "");
+    if (am.length >= 7 && bm.length >= 7 && am === bm) return true;
+    const an = normalizeNameKey(displayPersonName(a));
+    const bn = normalizeNameKey(displayPersonName(b));
+    if (an.length >= 2 && bn.length >= 2 && an === bn) return true;
+    return false;
+}
+
 export default function CertificateView() {
     const { data } = useReportForm();
     const { section1, section2, section3 } = data;
@@ -33,22 +61,31 @@ export default function CertificateView() {
     );
 
     const recipientBlocks = useMemo(() => {
-        const leadName =
-            section1.team_lead.fullName?.trim() ||
-            section1.team_lead.name?.trim() ||
-            "Distinguished Participant";
+        const lead = section1.team_lead;
+        const leadName = displayPersonName(lead) || "Distinguished Participant";
         const leadLabel =
             section1.participation_type === "team" ? "Team lead" : "Participant";
 
         if (section1.participation_type !== "team" || !section1.team_members?.length) {
             return [{ key: "lead", name: leadName, label: leadLabel }];
         }
-        const members = section1.team_members.map((m: TeamMember, i: number) => ({
-            key: `m-${i}`,
-            name: (m.fullName || m.name || "").trim() || "Team member",
-            label: (m.role || "Team member").trim(),
-        }));
-        return [{ key: "lead", name: leadName, label: leadLabel }, ...members];
+
+        const seen: (LeadShape | TeamMember)[] = [lead];
+        const rows: { key: string; name: string; label: string }[] = [
+            { key: "lead", name: leadName, label: leadLabel },
+        ];
+
+        section1.team_members.forEach((m: TeamMember, i: number) => {
+            if (seen.some((s) => isSameReportParticipant(m, s))) return;
+            seen.push(m);
+            rows.push({
+                key: m.id || `m-${i}`,
+                name: displayPersonName(m) || "Team member",
+                label: (m.role || "Team member").trim(),
+            });
+        });
+
+        return rows;
     }, [section1.participation_type, section1.team_lead, section1.team_members]);
 
     const institutionLine = useMemo(() => {

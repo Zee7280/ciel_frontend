@@ -8,16 +8,66 @@ import { toast } from "sonner";
 import Link from "next/link";
 import ReportForm from "@/components/partners/ReportForm";
 
+/** List row: NGO impact form (ReportForm) and/or student impact reports returned by the same endpoint. */
 interface Report {
-    id: number;
-    title: string;
-    description: string;
-    status: "draft" | "submitted" | "approved" | "rejected";
-    submittedDate: string;
-    beneficiaries: number;
-    hoursLogged: number;
-    sdgs: number[];
+    id: number | string;
+    title?: string | null;
+    description?: string | null;
+    status: string;
+    submittedDate?: string;
+    submission_date?: string;
+    submitted_at?: string;
+    created_at?: string;
+    project_title?: string | null;
+    student_name?: string | null;
+    student_email?: string | null;
+    partner_status?: string | null;
+    beneficiaries?: number;
+    hoursLogged?: number;
+    sdgs?: number[];
     evidence?: string[];
+}
+
+function looksLikeWorkflowStatus(status: unknown): boolean {
+    const s = String(status ?? "").trim();
+    if (!s) return false;
+    if (s.includes("_")) return true;
+    return s === s.toUpperCase() && s.length > 2;
+}
+
+function isStudentImpactReportRow(r: Report): boolean {
+    if (r.submission_date || r.project_title || r.student_name || r.student_email) return true;
+    if (looksLikeWorkflowStatus(r.status)) return true;
+    return false;
+}
+
+function isLegacyPartnerFormReport(r: Report): boolean {
+    if (r.submission_date || r.project_title || r.student_name || r.student_email) return false;
+    if (looksLikeWorkflowStatus(r.status)) return false;
+    const s = String(r.status ?? "").trim().toLowerCase();
+    return ["draft", "submitted", "approved", "rejected"].includes(s);
+}
+
+function formatSubmittedLabel(r: Report): string {
+    const raw =
+        r.submittedDate ??
+        r.submission_date ??
+        r.submitted_at ??
+        r.created_at ??
+        null;
+    if (raw == null || raw === "") return "Date not available";
+    const d = new Date(String(raw));
+    return Number.isNaN(d.getTime()) ? "Date not available" : d.toLocaleDateString();
+}
+
+function cardTitle(r: Report): string {
+    const t = r.title?.trim();
+    if (t) return t;
+    const p = r.project_title?.trim();
+    if (p) return p;
+    const s = r.student_name?.trim();
+    if (s) return s;
+    return "Untitled report";
 }
 
 export default function PartnerReportsPage() {
@@ -54,15 +104,16 @@ export default function PartnerReportsPage() {
         }
     };
 
-    const handleDelete = async (id: number) => {
+    const handleDelete = async (id: number | string) => {
         if (!confirm("Are you sure you want to delete this report?")) return;
 
         try {
-            const res = await authenticatedFetch(`/api/v1/partner/reports/${id}`, {
+            // NGO-only impact form CRUD lives under `/partners/reports` (unchanged on backend).
+            const res = await authenticatedFetch(`/api/v1/partners/reports/${id}`, {
                 method: 'DELETE'
             });
             if (res && res.ok) {
-                setReports(prev => prev.filter(r => r.id !== id));
+                setReports(prev => prev.filter((r) => String(r.id) !== String(id)));
                 toast.success("Report deleted successfully");
             }
         } catch (error) {
@@ -70,25 +121,37 @@ export default function PartnerReportsPage() {
         }
     };
 
-    const filteredReports = reports.filter(r =>
-        r.title.toLowerCase().includes(searchQuery.toLowerCase())
-    );
+    const q = searchQuery.trim().toLowerCase();
+    const filteredReports = reports.filter((r) => {
+        const hay = [r.title, r.project_title, r.student_name, r.student_email]
+            .map((x) => (x ?? "").toLowerCase())
+            .join(" ");
+        return q === "" || hay.includes(q);
+    });
 
     const getStatusColor = (status: string) => {
-        switch (status) {
+        const s = String(status ?? "").trim().toLowerCase();
+        switch (s) {
             case "draft": return "bg-slate-100 text-slate-700";
             case "submitted": return "bg-blue-100 text-blue-700";
-            case "approved": return "bg-green-100 text-green-700";
+            case "approved":
+            case "verified":
+            case "partner_verified": return "bg-green-100 text-green-700";
             case "rejected": return "bg-red-100 text-red-700";
-            default: return "bg-slate-100 text-slate-700";
+            default:
+                if (s.includes("review") || s.includes("pending")) return "bg-amber-100 text-amber-800";
+                return "bg-slate-100 text-slate-700";
         }
     };
 
     const getStatusIcon = (status: string) => {
-        switch (status) {
+        const s = String(status ?? "").trim().toLowerCase();
+        switch (s) {
             case "draft": return <Edit className="w-4 h-4" />;
             case "submitted": return <Clock className="w-4 h-4" />;
-            case "approved": return <CheckCircle className="w-4 h-4" />;
+            case "approved":
+            case "verified":
+            case "partner_verified": return <CheckCircle className="w-4 h-4" />;
             case "rejected": return <XCircle className="w-4 h-4" />;
             default: return <FileText className="w-4 h-4" />;
         }
@@ -166,18 +229,47 @@ export default function PartnerReportsPage() {
                         >
                             {/* Status Badge */}
                             <div className="flex justify-between items-start mb-4">
-                                <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold uppercase ${getStatusColor(report.status)}`}>
-                                    {getStatusIcon(report.status)}
-                                    {report.status}
-                                </span>
-                                <div className="flex gap-2">
-                                    <button
-                                        className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                                        title="View Report"
-                                    >
-                                        <Eye className="w-4 h-4" />
-                                    </button>
-                                    {report.status === "draft" && (
+                                <div className="flex flex-col gap-1.5 min-w-0">
+                                    <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold uppercase w-fit max-w-full ${getStatusColor(report.status)}`}>
+                                        {getStatusIcon(report.status)}
+                                        <span className="truncate">{String(report.status ?? "").replace(/_/g, " ")}</span>
+                                    </span>
+                                    {report.partner_status != null && String(report.partner_status).trim() !== "" && (
+                                        <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">
+                                            NGO / partner: {String(report.partner_status).replace(/_/g, " ")}
+                                        </span>
+                                    )}
+                                </div>
+                                <div className="flex gap-2 shrink-0">
+                                    {isStudentImpactReportRow(report) ? (
+                                        <Link
+                                            href={`/dashboard/partner/verify/${encodeURIComponent(String(report.id))}`}
+                                            className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                            title="Open report dossier (review / verify)"
+                                        >
+                                            <Eye className="w-4 h-4" />
+                                        </Link>
+                                    ) : (
+                                        <button
+                                            type="button"
+                                            className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                            title={
+                                                String(report.status).toLowerCase() === "draft"
+                                                    ? "Open organization impact report"
+                                                    : "Use Edit when available for organization impact reports"
+                                            }
+                                            onClick={() => {
+                                                if (String(report.status).toLowerCase() === "draft") {
+                                                    setEditingReport(report);
+                                                } else {
+                                                    toast.message("Organization impact reports use Edit when the report is in draft.");
+                                                }
+                                            }}
+                                        >
+                                            <Eye className="w-4 h-4" />
+                                        </button>
+                                    )}
+                                    {isLegacyPartnerFormReport(report) && String(report.status).toLowerCase() === "draft" && (
                                         <>
                                             <button
                                                 onClick={() => setEditingReport(report)}
@@ -199,26 +291,39 @@ export default function PartnerReportsPage() {
                             </div>
 
                             {/* Report Info */}
-                            <h3 className="text-lg font-bold text-slate-900 mb-2">{report.title}</h3>
+                            <h3 className="text-lg font-bold text-slate-900 mb-2">{cardTitle(report)}</h3>
+                            {isStudentImpactReportRow(report) && (report.student_name || report.project_title) && (
+                                <p className="text-xs text-slate-500 mb-1">
+                                    {[report.student_name, report.project_title].filter(Boolean).join(" · ")}
+                                </p>
+                            )}
                             <p className="text-sm text-slate-500 mb-4">
-                                Submitted: {new Date(report.submittedDate).toLocaleDateString()}
+                                Submitted: {formatSubmittedLabel(report)}
                             </p>
+                            {isStudentImpactReportRow(report) && (
+                                <Link
+                                    href={`/dashboard/partner/verify/${encodeURIComponent(String(report.id))}`}
+                                    className="inline-flex text-sm font-semibold text-blue-600 hover:text-blue-700 mb-3"
+                                >
+                                    Review & verify (dossier)
+                                </Link>
+                            )}
 
                             {/* Metrics */}
                             <div className="grid grid-cols-2 gap-4 mb-4">
                                 <div className="bg-blue-50 rounded-lg p-3">
                                     <p className="text-xs text-blue-600 font-semibold mb-1">Beneficiaries</p>
-                                    <p className="text-2xl font-bold text-blue-700">{report.beneficiaries.toLocaleString()}</p>
+                                    <p className="text-2xl font-bold text-blue-700">{(report.beneficiaries ?? 0).toLocaleString()}</p>
                                 </div>
                                 <div className="bg-green-50 rounded-lg p-3">
                                     <p className="text-xs text-green-600 font-semibold mb-1">Hours Logged</p>
-                                    <p className="text-2xl font-bold text-green-700">{report.hoursLogged}</p>
+                                    <p className="text-2xl font-bold text-green-700">{report.hoursLogged ?? 0}</p>
                                 </div>
                             </div>
 
                             {/* SDGs */}
                             <div className="flex flex-wrap gap-2">
-                                {report.sdgs.map((sdg) => (
+                                {(report.sdgs ?? []).map((sdg) => (
                                     <span
                                         key={sdg}
                                         className="px-2 py-1 bg-slate-100 text-slate-700 rounded text-xs font-bold"

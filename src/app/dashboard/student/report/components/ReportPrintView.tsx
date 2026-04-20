@@ -5,11 +5,24 @@ import { Award, CheckCircle, ShieldCheck } from "lucide-react";
 import { calculateCII } from "../utils/calculateCII";
 import { calculateEngagementMetrics } from "../utils/engagementMetrics";
 import { deriveCertificateProjectDisplay } from "../utils/certificateDisplay";
+import { parseSection11AuditSummary } from "@/lib/parseCIIauditSummary";
+import { extractIssueFields, parseAuditSummaryIntoSections } from "@/lib/parseAuditSummarySections";
 
 interface Props {
     projectData: any;
     reportData?: any;
 }
+
+/** Print dossier: one rhythm for navy strip + intelligence dashboard (labels / values). */
+const printDossierTone = {
+    labelMuted: "text-[10px] font-black uppercase tracking-widest text-slate-400",
+    labelOnNavy: "text-[10px] font-black uppercase tracking-widest text-white/55",
+    metricTile:
+        "flex min-h-[7.5rem] flex-col justify-center gap-1.5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:min-h-[7.75rem] sm:p-6",
+    metricValue: "text-3xl font-black tabular-nums leading-none text-slate-900 sm:text-4xl",
+    engagementValue: "text-xl font-black uppercase tracking-tight text-white sm:text-2xl",
+    matrixBlurb: "text-[10px] font-medium uppercase leading-relaxed tracking-wide text-white/60",
+} as const;
 
 /** Section 6 stores `sources: string[]` (+ optional legacy `source`); print view must not render "undefined". */
 function formatResourceSourcesLine(r: {
@@ -114,6 +127,17 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
 
     const ciiResult = calculateCII({ ...reportForCii, required_hours: reqH });
     const { totalScore, level, breakdown } = ciiResult;
+
+    const dossierAuditMeta =
+        data.section11?.audit_meta ??
+        (data.section11?.summary_text ? parseSection11AuditSummary(String(data.section11.summary_text)) : null);
+
+    const dossierSectionWiseAuditBlocks = (() => {
+        const st = String(data.section11?.summary_text || "").trim();
+        const legacy = "project successfully synthesized";
+        if (!st || st.toLowerCase().includes(legacy)) return [];
+        return parseAuditSummaryIntoSections(st).filter((s) => s.sectionNum >= 1 && s.sectionNum <= 10);
+    })();
 
     const blocks = data.section4?.activity_blocks || [];
     const sessionsFromBlocks = blocks.reduce(
@@ -578,52 +602,150 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
                             </tr>
                         </tbody>
                     </table>
-                    <div className="mt-6 flex flex-col gap-6 rounded-2xl bg-slate-900 p-6 text-white shadow-xl sm:flex-row sm:items-center sm:justify-between sm:p-8">
-                        <div className="flex items-center gap-4 sm:gap-6">
-                            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-white/20 bg-white/10 sm:h-16 sm:w-16">
-                                <ShieldCheck className="h-7 w-7 text-white sm:h-8 sm:w-8" />
+                    <div className="mt-6 flex flex-col gap-8 rounded-2xl border border-white/10 bg-slate-950 p-6 text-white shadow-xl ring-1 ring-black/20 sm:flex-row sm:items-center sm:justify-between sm:gap-10 sm:p-8">
+                        <div className="flex items-center gap-4 sm:gap-5">
+                            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border border-white/15 bg-black/30 sm:h-16 sm:w-16">
+                                <ShieldCheck className="h-7 w-7 text-white sm:h-8 sm:w-8" strokeWidth={1.75} />
                             </div>
-                            <div className="min-w-0">
-                                <p className="text-[10px] font-black uppercase tracking-[0.25em] text-white/50">Engagement status</p>
-                                <p className="text-lg font-black uppercase tracking-tight sm:text-xl">{level}</p>
+                            <div className="min-w-0 space-y-1">
+                                <p className={printDossierTone.labelOnNavy}>Engagement status</p>
+                                <p className={printDossierTone.engagementValue}>{level}</p>
                             </div>
                         </div>
-                        <div className="text-left sm:max-w-xs sm:text-right">
-                            <p className="mb-1 text-[10px] font-black uppercase tracking-[0.25em] text-white/50">CII calculation matrix</p>
-                            <p className="text-[10px] font-semibold leading-relaxed text-white/65">
+                        <div className="min-w-0 text-left sm:max-w-sm sm:text-right">
+                            <p className={`mb-1.5 ${printDossierTone.labelOnNavy}`}>CII calculation matrix</p>
+                            <p className={printDossierTone.matrixBlurb}>
                                 CIEL institutional protocol — verified impact scoring
                             </p>
                         </div>
                     </div>
                 </div>
 
-                {/* Institutional Impact Summary */}
-                <div className="relative mt-16 overflow-hidden break-inside-avoid rounded-3xl border-4 border-slate-900 bg-slate-50 p-8 sm:mt-20 sm:rounded-[2.5rem] sm:p-12 md:p-14">
-                    <div className="relative z-10">
-                        <div className="mb-10 flex flex-col gap-6 border-b-2 border-slate-200 pb-8 sm:flex-row sm:items-center sm:justify-between sm:pb-10">
-                            <div>
-                                <p className="mb-2 block text-[10px] font-black uppercase tracking-[0.35em] text-slate-400">
-                                    CIEL impact protocol
-                                </p>
-                                <h2 className="report-h2 text-2xl sm:text-3xl">Intelligence dashboard</h2>
-                            </div>
-                            <Award className="mx-auto h-16 w-16 shrink-0 text-slate-900 opacity-10 sm:mx-0 sm:h-20 sm:w-20" />
+                {dossierSectionWiseAuditBlocks.length > 0 ? (
+                    <div className="mt-10 break-inside-avoid">
+                        <p className="mb-1 text-[10px] font-black uppercase tracking-[0.25em] text-slate-500">
+                            CII AI audit — section-wise review
+                        </p>
+                        <h3 className="report-h3 mb-4 text-slate-900">Red flags by section (1–10)</h3>
+                        <div className="space-y-5 text-xs leading-relaxed text-slate-800">
+                            {dossierSectionWiseAuditBlocks.map((sec) => {
+                                const rows = extractIssueFields(sec.body, sec.sectionNum);
+                                return (
+                                    <div
+                                        key={sec.sectionNum}
+                                        className="break-inside-avoid rounded-xl border border-slate-200 bg-white p-4 sm:p-5"
+                                    >
+                                        <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">
+                                            Section {sec.sectionNum}
+                                        </p>
+                                        <h4 className="mt-0.5 text-sm font-black text-slate-900">{sec.title}</h4>
+                                        <div className="mt-3 space-y-2.5">
+                                            {rows.map((row, i) => (
+                                                <div key={`${sec.sectionNum}-${row.label}-${i}`}>
+                                                    <p className="text-[9px] font-black uppercase tracking-wide text-slate-500">
+                                                        {row.label}
+                                                    </p>
+                                                    <p className="mt-0.5 font-medium text-slate-800">{row.value}</p>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                );
+                            })}
                         </div>
-                        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4 lg:gap-6">
-                            <div className="flex min-h-[7rem] flex-col justify-center rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-                                <p className="mb-2 text-[10px] font-black uppercase tracking-widest text-slate-400">Impact score</p>
-                                <p className="text-4xl font-black tabular-nums text-slate-900 lg:text-5xl">
+                    </div>
+                ) : null}
+
+                {dossierAuditMeta ? (
+                    <div className="mt-8 break-inside-avoid rounded-2xl border-2 border-slate-900 bg-slate-50 p-6 sm:p-8">
+                        <p className="mb-1 text-[10px] font-black uppercase tracking-[0.25em] text-slate-500">
+                            Cross-section audit — CII transparency
+                        </p>
+                        <h3 className="report-h3 mb-4 text-slate-900">Red flags and required fixes (Section 11)</h3>
+                        <div className="space-y-4 text-xs leading-relaxed text-slate-800">
+                            {dossierAuditMeta.credibility ? (
+                                <p>
+                                    <span className="font-black text-slate-900">Credibility: </span>
+                                    {dossierAuditMeta.credibility}
+                                </p>
+                            ) : null}
+                            {dossierAuditMeta.risk_level ? (
+                                <p>
+                                    <span className="font-black text-slate-900">Risk level: </span>
+                                    {dossierAuditMeta.risk_level}
+                                </p>
+                            ) : null}
+                            {dossierAuditMeta.critical_red_flags ? (
+                                <p>
+                                    <span className="font-black text-rose-800">Critical red flags: </span>
+                                    {dossierAuditMeta.critical_red_flags}
+                                </p>
+                            ) : null}
+                            {dossierAuditMeta.moderate_issues ? (
+                                <p>
+                                    <span className="font-black text-amber-900">Moderate issues: </span>
+                                    {dossierAuditMeta.moderate_issues}
+                                </p>
+                            ) : null}
+                            {dossierAuditMeta.minor_issues ? (
+                                <p>
+                                    <span className="font-black text-slate-700">Minor issues: </span>
+                                    {dossierAuditMeta.minor_issues}
+                                </p>
+                            ) : null}
+                            {dossierAuditMeta.top_fixes.length > 0 ? (
+                                <div>
+                                    <p className="mb-2 font-black text-slate-900">Top fixes</p>
+                                    <ol className="list-decimal space-y-1.5 pl-5">
+                                        {dossierAuditMeta.top_fixes.map((fix: string, i: number) => (
+                                            <li key={i}>{fix}</li>
+                                        ))}
+                                    </ol>
+                                </div>
+                            ) : null}
+                            {dossierAuditMeta.final_remark ? (
+                                <p>
+                                    <span className="font-black text-slate-900">Auditor remark: </span>
+                                    {dossierAuditMeta.final_remark}
+                                </p>
+                            ) : null}
+                            {dossierAuditMeta.student_feedback ? (
+                                <p>
+                                    <span className="font-black text-indigo-900">Student feedback: </span>
+                                    {dossierAuditMeta.student_feedback}
+                                </p>
+                            ) : null}
+                        </div>
+                    </div>
+                ) : null}
+
+                {/* Institutional Impact Summary */}
+                <div className="relative mt-16 overflow-hidden break-inside-avoid rounded-3xl border-4 border-slate-900 bg-slate-50 p-8 shadow-sm sm:mt-20 sm:rounded-[2.5rem] sm:p-12 md:p-14">
+                    <div className="relative z-10">
+                        <div className="mb-10 flex flex-col gap-6 border-b border-slate-200 pb-8 sm:flex-row sm:items-center sm:justify-between sm:pb-10">
+                            <div className="min-w-0 space-y-2">
+                                <p className={`block ${printDossierTone.labelMuted}`}>CIEL impact protocol</p>
+                                <h2 className="report-h2 !text-2xl !tracking-tight sm:!text-3xl">Intelligence dashboard</h2>
+                            </div>
+                            <Award className="mx-auto h-14 w-14 shrink-0 text-slate-900 opacity-[0.12] sm:mx-0 sm:h-[4.5rem] sm:w-[4.5rem]" strokeWidth={1.25} />
+                        </div>
+                        <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4 lg:gap-5">
+                            <div className={printDossierTone.metricTile}>
+                                <p className={printDossierTone.labelMuted}>Impact score</p>
+                                <p className={printDossierTone.metricValue}>
                                     {totalScore}
-                                    <span className="ml-1 text-xs font-bold text-slate-400">/100</span>
+                                    <span className="ml-1 align-top text-[10px] font-bold tabular-nums text-slate-400 sm:text-xs">
+                                        /100
+                                    </span>
                                 </p>
                             </div>
-                            <div className="flex min-h-[7rem] flex-col justify-center rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-                                <p className="mb-2 text-[10px] font-black uppercase tracking-widest text-slate-400">Hours logged</p>
-                                <p className="text-4xl font-black tabular-nums text-slate-900 lg:text-5xl">{metrics.total_verified_hours}</p>
+                            <div className={printDossierTone.metricTile}>
+                                <p className={printDossierTone.labelMuted}>Hours logged</p>
+                                <p className={printDossierTone.metricValue}>{metrics.total_verified_hours}</p>
                             </div>
-                            <div className="flex min-h-[7rem] flex-col justify-center rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-                                <p className="mb-2 text-[10px] font-black uppercase tracking-widest text-slate-400">Strategic SDG</p>
-                                <p className="text-4xl font-black tabular-nums text-slate-900 lg:text-5xl">
+                            <div className={printDossierTone.metricTile}>
+                                <p className={printDossierTone.labelMuted}>Strategic SDG</p>
+                                <p className={printDossierTone.metricValue}>
                                     {(() => {
                                         const gn = data.section3.primary_sdg?.goal_number;
                                         if (gn === null || gn === undefined || String(gn).trim() === "") return "—";
@@ -634,9 +756,15 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
                                     })()}
                                 </p>
                             </div>
-                            <div className="flex min-h-[7rem] flex-col items-center justify-center rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-sm">
-                                <CheckCircle className="mb-2 h-10 w-10 text-slate-900 opacity-20 sm:h-12 sm:w-12" />
-                                <p className="text-[10px] font-black uppercase tracking-[0.25em] text-slate-900">Verified</p>
+                            <div className={printDossierTone.metricTile}>
+                                <p className={printDossierTone.labelMuted}>Verified</p>
+                                <p className={`${printDossierTone.metricValue} flex items-center`} aria-label="Verified">
+                                    <CheckCircle
+                                        className="h-[0.9em] w-[0.9em] shrink-0 text-slate-900/90"
+                                        strokeWidth={2}
+                                        aria-hidden
+                                    />
+                                </p>
                             </div>
                         </div>
                     </div>

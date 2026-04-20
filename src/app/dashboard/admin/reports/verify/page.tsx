@@ -2,10 +2,20 @@
 
 import { useEffect, useState } from 'react';
 import { authenticatedFetch } from '@/utils/api';
-import { CheckCircle2, XCircle, Clock, FileText, Search, Building2, Eye, Trash2 } from 'lucide-react';
+import { CheckCircle2, XCircle, Clock, FileText, Search, Building2, Eye, ChevronDown } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import clsx from 'clsx';
+
+function formatDisplayName(name: string) {
+    return name
+        .trim()
+        .split(/\s+/)
+        .map((part) =>
+            part.length ? part.charAt(0).toLocaleUpperCase() + part.slice(1).toLocaleLowerCase() : part
+        )
+        .join(' ');
+}
 
 interface Report {
     id: string;
@@ -93,42 +103,22 @@ export default function AdminReportsVerificationPage() {
         }
     };
 
-    const handleDelete = async (id: string) => {
-        if (!confirm("Are you sure you want to delete this report? This action cannot be undone.")) return;
-
-        try {
-            const response = await authenticatedFetch(`/api/v1/admin/reports/${id}`, {
-                method: 'DELETE'
-            });
-
-            if (response?.ok) {
-                setReports(prev => prev.filter(r => r.id !== id));
-                toast.success("Report deleted successfully");
-            } else {
-                toast.error("Failed to delete report");
-            }
-        } catch (error) {
-            console.error('Error deleting report:', error);
-            toast.error("Failed to delete report");
-        }
-    };
-
     const getStatusBadge = (status: string) => {
         const config = {
-            submitted: { color: 'bg-yellow-50 text-yellow-700 border-yellow-200', icon: Clock, label: 'Submitted' },
-            partner_verified: { color: 'bg-indigo-50 text-indigo-700 border-indigo-200', icon: CheckCircle2, label: 'NGO Verified' },
-            verified: { color: 'bg-green-50 text-green-700 border-green-200', icon: CheckCircle2, label: 'Fully Verified' },
-            rejected: { color: 'bg-red-50 text-red-700 border-red-200', icon: XCircle, label: 'Rejected' },
-            draft: { color: 'bg-slate-50 text-slate-700 border-slate-200', icon: FileText, label: 'Draft' },
-            pending: { color: 'bg-slate-50 text-slate-500 border-slate-200', icon: Clock, label: 'Pending' },
-            approved: { color: 'bg-green-50 text-green-600 border-green-200', icon: CheckCircle2, label: 'Approved' },
+            submitted: { color: 'bg-yellow-50 text-yellow-700', icon: Clock, label: 'Submitted' },
+            partner_verified: { color: 'bg-indigo-50 text-indigo-700', icon: CheckCircle2, label: 'NGO Verified' },
+            verified: { color: 'bg-green-50 text-green-700', icon: CheckCircle2, label: 'Verified' },
+            rejected: { color: 'bg-red-50 text-red-700', icon: XCircle, label: 'Rejected' },
+            draft: { color: 'bg-slate-100 text-slate-600', icon: FileText, label: 'Draft' },
+            pending: { color: 'bg-amber-50 text-amber-700', icon: Clock, label: 'Pending' },
+            approved: { color: 'bg-green-50 text-green-600', icon: CheckCircle2, label: 'Approved' },
         };
 
         const { color, icon: Icon, label } = config[status as keyof typeof config] || config.draft;
 
         return (
-            <span className={clsx('inline-flex items-center gap-1.5 px-3 py-1 rounded-xl border font-bold text-xs uppercase tracking-wide', color)}>
-                <Icon className="w-3 h-3" />
+            <span className={clsx('inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold', color)}>
+                <Icon className="h-3.5 w-3.5" />
                 {label}
             </span>
         );
@@ -140,76 +130,65 @@ export default function AdminReportsVerificationPage() {
         (report.organization_name && report.organization_name.toLowerCase().includes(searchQuery.toLowerCase()))
     );
 
-    const tabs = [
-        { id: 'submitted', label: 'Submitted', count: reports.filter(r => r.status === 'submitted').length },
-        { id: 'all', label: 'All Reports', count: reports.length },
-        { id: 'verified', label: 'Verified', count: reports.filter(r => r.status === 'verified').length },
-        { id: 'rejected', label: 'Rejected', count: reports.filter(r => r.status === 'rejected').length },
+    const statusOptions = [
+        { id: 'submitted', label: 'Submitted' },
+        { id: 'all', label: 'All Reports' },
+        { id: 'verified', label: 'Verified' },
+        { id: 'rejected', label: 'Rejected' },
     ];
 
+    const resetFilters = () => {
+        setSearchQuery('');
+        setSelectedOrg('all');
+        setActiveTab('submitted');
+    };
+
     return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-50 p-8">
-            <div className="max-w-7xl mx-auto space-y-8">
-                {/* Header */}
-                <div className="flex items-start justify-between">
+        <div className="min-h-screen bg-[#f7f9fc] px-4 py-6 sm:px-6 lg:px-8">
+            <div className="mx-auto max-w-7xl space-y-6">
+                <div>
                     <div>
-                        <h1 className="text-4xl font-black text-slate-900 tracking-tight">
+                        <h1 className="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">
                             Student Reports Verification
                         </h1>
-                        <p className="text-slate-500 mt-2 font-medium">
-                            Review and verify student activity reports across all organizations
+                        <p className="mt-2 text-sm text-slate-500 sm:text-base">
+                            Review and verify student activity reports
                         </p>
                     </div>
                 </div>
 
-                {/* Tabs */}
-                <div className="bg-white rounded-3xl p-2 border border-slate-200 shadow-sm inline-flex gap-2">
-                    {tabs.map((tab) => (
-                        <button
-                            key={tab.id}
-                            onClick={() => setActiveTab(tab.id as any)}
-                            className={clsx(
-                                'px-6 py-3 rounded-2xl font-bold text-sm transition-all',
-                                activeTab === tab.id
-                                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-200'
-                                    : 'text-slate-600 hover:bg-slate-50'
-                            )}
-                        >
-                            {tab.label}
-                            <span className={clsx(
-                                'ml-2 px-2 py-0.5 rounded-lg text-xs font-black',
-                                activeTab === tab.id ? 'bg-blue-500' : 'bg-slate-100'
-                            )}>
-                                {tab.count}
-                            </span>
-                        </button>
-                    ))}
-                </div>
-
-                {/* Filters */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* Search */}
-                    <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm">
-                        <div className="relative">
-                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                <div className="rounded-[28px] border border-slate-200 bg-white p-4 shadow-sm">
+                    <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
+                        <div className="relative min-w-0 flex-1">
+                            <Search className="pointer-events-none absolute left-4 top-1/2 z-10 h-5 w-5 -translate-y-1/2 text-slate-400" />
                             <input
                                 type="text"
-                                placeholder="Search by student, project, or organization..."
+                                placeholder="Search by name, email, project..."
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                className="w-full pl-12 pr-4 py-3 rounded-2xl border border-slate-200 focus:outline-none focus:ring-4 focus:ring-blue-50 focus:border-blue-400 transition-all font-medium text-slate-700"
+                                className="h-14 w-full rounded-2xl border border-slate-200 bg-white pl-12 pr-4 text-sm text-slate-700 outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-50"
                             />
                         </div>
-                    </div>
-
-                    {/* Organization Filter */}
-                    <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm">
-                        <div className="relative">
-                            <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                        <div className="relative w-full xl:w-48 shrink-0">
+                            <select
+                                value={activeTab}
+                                onChange={(e) => setActiveTab(e.target.value as 'all' | 'submitted' | 'verified' | 'rejected')}
+                                className="h-14 w-full appearance-none rounded-2xl border border-slate-200 bg-white px-4 pr-10 text-sm font-medium text-slate-700 outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-50"
+                            >
+                                {statusOptions.map((option) => (
+                                    <option key={option.id} value={option.id}>
+                                        {option.label}
+                                    </option>
+                                ))}
+                            </select>
+                            <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                        </div>
+                        <div className="relative w-full xl:w-52 shrink-0">
+                            <Building2 className="pointer-events-none absolute left-4 top-1/2 z-10 h-5 w-5 -translate-y-1/2 text-slate-400" />
                             <select
                                 value={selectedOrg}
                                 onChange={(e) => setSelectedOrg(e.target.value)}
-                                className="w-full pl-12 pr-4 py-3 rounded-2xl border border-slate-200 focus:outline-none focus:ring-4 focus:ring-blue-50 focus:border-blue-400 transition-all font-medium text-slate-700 bg-white"
+                                className="h-14 w-full appearance-none rounded-2xl border border-slate-200 bg-white pl-12 pr-10 text-sm font-medium text-slate-700 outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-50"
                             >
                                 <option value="all">All Organizations</option>
                                 {organizations.map((org) => (
@@ -218,17 +197,26 @@ export default function AdminReportsVerificationPage() {
                                     </option>
                                 ))}
                             </select>
+                            <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                        </div>
+                        <div className="w-full xl:w-auto">
+                            <button
+                                type="button"
+                                onClick={resetFilters}
+                                className="h-14 w-full rounded-2xl bg-blue-600 px-6 text-sm font-semibold text-white transition hover:bg-blue-700 xl:w-auto"
+                            >
+                                Reset Filters
+                            </button>
                         </div>
                     </div>
                 </div>
 
-                {/* Reports Grid */}
                 {loading ? (
                     <div className="flex items-center justify-center py-20">
                         <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-600 border-t-transparent"></div>
                     </div>
                 ) : filteredReports.length === 0 ? (
-                    <div className="bg-white rounded-3xl p-16 border border-slate-200 text-center">
+                    <div className="rounded-[28px] border border-slate-200 bg-white p-16 text-center shadow-sm">
                         <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-6">
                             <CheckCircle2 className="w-10 h-10 text-slate-400" />
                         </div>
@@ -236,38 +224,39 @@ export default function AdminReportsVerificationPage() {
                         <p className="text-slate-500 font-medium">Try adjusting your filters</p>
                     </div>
                 ) : (
-                    <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
-                        <table className="w-full">
-                            <thead className="bg-slate-50 border-b border-slate-200">
+                    <div className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-sm">
+                        <div className="overflow-x-auto">
+                            <table className="min-w-[980px] w-full">
+                            <thead className="border-b border-slate-200 bg-slate-100/80">
                                 <tr className="text-left">
-                                    <th className="p-6 text-xs font-black text-slate-500 uppercase tracking-wider">Student</th>
-                                    <th className="p-6 text-xs font-black text-slate-500 uppercase tracking-wider">Project</th>
-                                    <th className="p-6 text-xs font-black text-slate-500 uppercase tracking-wider">Organization</th>
-                                    <th className="p-6 text-xs font-black text-slate-500 uppercase tracking-wider">Submitted</th>
-                                    <th className="p-6 text-xs font-black text-slate-500 uppercase tracking-wider">NGO Status</th>
-                                    <th className="p-6 text-xs font-black text-slate-500 uppercase tracking-wider">Overall Status</th>
-                                    <th className="p-6 text-xs font-black text-slate-500 uppercase tracking-wider text-right">Actions</th>
+                                    <th className="px-6 py-4 text-sm font-semibold text-slate-600">Student</th>
+                                    <th className="px-6 py-4 text-sm font-semibold text-slate-600">Project</th>
+                                    <th className="px-6 py-4 text-sm font-semibold text-slate-600">Organization</th>
+                                    <th className="px-6 py-4 text-sm font-semibold text-slate-600">Submitted</th>
+                                    <th className="px-6 py-4 text-sm font-semibold text-slate-600">NGO Status</th>
+                                    <th className="px-6 py-4 text-sm font-semibold text-slate-600">Overall</th>
+                                    <th className="px-6 py-4 text-sm font-semibold text-slate-600">Actions</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
                                 {filteredReports.map((report) => (
-                                    <tr key={report.id} className="hover:bg-slate-50/50 transition-colors">
-                                        <td className="p-6">
-                                            <div className="font-bold text-slate-900">{report.student_name}</div>
-                                            <div className="text-xs text-slate-500">{report.student_email}</div>
+                                    <tr key={report.id} className="align-top transition-colors hover:bg-slate-50/60">
+                                        <td className="px-6 py-5">
+                                            <div className="font-semibold text-slate-900">{formatDisplayName(report.student_name)}</div>
+                                            <div className="mt-1 text-sm text-slate-500 break-all">{report.student_email}</div>
                                         </td>
-                                        <td className="p-6">
-                                            <div className="font-medium text-slate-700 line-clamp-2 max-w-xs">
+                                        <td className="px-6 py-5">
+                                            <div className="max-w-[240px] break-words text-base font-medium text-slate-700">
                                                 {report.project_title}
                                             </div>
                                         </td>
-                                        <td className="p-6">
-                                            <span className="text-sm font-medium text-slate-600">
+                                        <td className="px-6 py-5">
+                                            <span className="inline-flex max-w-[180px] break-words rounded-full bg-slate-100 px-3 py-1 text-sm font-medium text-slate-700">
                                                 {report.organization_name || 'N/A'}
                                             </span>
                                         </td>
-                                        <td className="p-6">
-                                            <span className="text-sm text-slate-600">
+                                        <td className="px-6 py-5 whitespace-nowrap">
+                                            <span className="text-sm text-slate-700">
                                                 {new Date(report.submission_date).toLocaleDateString('en-US', {
                                                     month: 'short',
                                                     day: 'numeric',
@@ -275,34 +264,28 @@ export default function AdminReportsVerificationPage() {
                                                 })}
                                             </span>
                                         </td>
-                                        <td className="p-6">
-                                            {getStatusBadge(report.partner_status)}
+                                        <td className="px-6 py-5">
+                                            <div className="flex flex-wrap gap-1">{getStatusBadge(report.partner_status)}</div>
                                         </td>
-                                        <td className="p-6">
-                                            {getStatusBadge(report.status)}
+                                        <td className="px-6 py-5">
+                                            <div className="flex flex-wrap gap-1">{getStatusBadge(report.status)}</div>
                                         </td>
-                                        <td className="p-6 text-right">
-                                            <div className="flex items-center justify-end gap-3">
+                                        <td className="px-6 py-5">
+                                            <div className="flex items-center">
                                                 <button
                                                     onClick={() => router.push(`/dashboard/admin/reports/verify/${report.id}`)}
-                                                    className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-sm shadow-lg shadow-blue-200 transition-all shrink-0"
+                                                    className="inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700"
                                                 >
                                                     <Eye className="w-4 h-4" />
                                                     Review
-                                                </button>
-                                                <button
-                                                    onClick={() => handleDelete(report.id)}
-                                                    className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all border border-transparent hover:border-red-100"
-                                                    title="Delete Report"
-                                                >
-                                                    <Trash2 className="w-5 h-5" />
                                                 </button>
                                             </div>
                                         </td>
                                     </tr>
                                 ))}
                             </tbody>
-                        </table>
+                            </table>
+                        </div>
                     </div>
                 )}
             </div>

@@ -2,7 +2,7 @@
 
 import { useParams, useRouter, useSearchParams, usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
-import { Info, MapPin, Calendar, Clock, CheckCircle, AlertCircle, ChevronDown, ChevronUp, Users, Loader2, Edit, ArrowLeft, Save, X, Trash2, Printer, Share2, Search, Plus } from "lucide-react";
+import { Info, MapPin, Calendar, Clock, CheckCircle, AlertCircle, ChevronDown, ChevronUp, Users, Loader2, Edit, ArrowLeft, Save, X, Printer, Share2, Search, Plus } from "lucide-react";
 import Link from "next/link";
 import { authenticatedFetch } from "@/utils/api";
 import { formatDisplayId } from "@/utils/displayIds";
@@ -436,32 +436,6 @@ function OpportunityDetailsContent() {
         }
     };
 
-    const handleDelete = async () => {
-        if (!confirm("Are you sure you want to delete this opportunity? This action cannot be undone.")) return;
-
-        setIsSubmitting(true);
-        try {
-            const res = await authenticatedFetch(`/api/v1/opportunities/${id}`, {
-                method: 'DELETE'
-            });
-
-            if (res && res.ok) {
-                toast.success("Opportunity deleted successfully");
-                router.push("/dashboard/partner/requests");
-            } else if (res) {
-                const data = await res.json();
-                toast.error(data.message || "Failed to delete opportunity");
-            } else {
-                toast.error("Failed to delete opportunity");
-            }
-        } catch (error) {
-            console.error("Delete failed", error);
-            toast.error("Failed to delete opportunity");
-        } finally {
-            setIsSubmitting(false);
-        }
-    };
-
     const handlePrint = () => {
         window.print();
     };
@@ -529,9 +503,6 @@ function OpportunityDetailsContent() {
                     <div className="flex gap-3">
                         <button onClick={handlePrint} className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 font-medium">
                             <Printer className="w-4 h-4" /> Print PDF
-                        </button>
-                        <button onClick={handleDelete} className="flex items-center gap-2 px-4 py-2 bg-red-50 border border-red-100 text-red-600 rounded-lg hover:bg-red-100 font-medium">
-                            <Trash2 className="w-4 h-4" /> Delete
                         </button>
                         <button onClick={() => setIsEditing(true)} className="flex items-center gap-2 px-6 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 font-medium shadow-sm">
                             <Edit className="w-4 h-4" /> Edit Opportunity

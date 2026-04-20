@@ -1,17 +1,44 @@
 import { NextResponse } from "next/server";
+import { parseSection11AuditSummary } from "@/lib/parseCIIauditSummary";
 
 // Gemini (paused): restore import + init + `model.generateContent(prompt)` below when using GEMINI_API_KEY again.
 // import { GoogleGenerativeAI } from "@google/generative-ai";
 // const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 // const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-async function generateSummaryWithOpenAI(userPrompt: string): Promise<string> {
-    const apiKey = process.env.OPENAI_API_KEY;
+type OpenAiCompletionOpts = {
+    temperature?: number;
+    /** When set, requests reproducible sampling (same inputs → same text for supported models). */
+    seed?: number;
+};
+
+async function generateSummaryWithOpenAI(
+    userPrompt: string,
+    opts?: OpenAiCompletionOpts,
+): Promise<string> {
+    const apiKey = process.env.OPENAI_API_KEY?.trim();
     if (!apiKey) {
         throw new Error("OPENAI_API_KEY missing");
     }
 
     const model = process.env.OPENAI_SUMMARY_MODEL?.trim() || "gpt-4o-mini";
+
+    const temperature = opts?.temperature ?? 0.4;
+    const requestBody: Record<string, unknown> = {
+        model,
+        messages: [
+            {
+                role: "system",
+                content:
+                    "You are a precise analyst. Follow instructions exactly. Output plain text only unless a specific format is requested.",
+            },
+            { role: "user", content: userPrompt },
+        ],
+        temperature,
+    };
+    if (opts?.seed !== undefined) {
+        requestBody.seed = opts.seed;
+    }
 
     const res = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
@@ -19,34 +46,23 @@ async function generateSummaryWithOpenAI(userPrompt: string): Promise<string> {
             "Content-Type": "application/json",
             Authorization: `Bearer ${apiKey}`,
         },
-        body: JSON.stringify({
-            model,
-            messages: [
-                {
-                    role: "system",
-                    content:
-                        "You are a precise analyst. Follow instructions exactly. Output plain text only unless a specific format is requested.",
-                },
-                { role: "user", content: userPrompt },
-            ],
-            temperature: 0.4,
-        }),
+        body: JSON.stringify(requestBody),
     });
 
-    const payload = (await res.json()) as {
+    const responseJson = (await res.json()) as {
         choices?: Array<{ message?: { content?: string | null } }>;
         error?: { message?: string };
     };
 
     if (!res.ok) {
-        const err = new Error(payload.error?.message || `OpenAI error (${res.status})`) as Error & {
+        const err = new Error(responseJson.error?.message || `OpenAI error (${res.status})`) as Error & {
             status?: number;
         };
         err.status = res.status;
         throw err;
     }
 
-    const text = payload.choices?.[0]?.message?.content?.trim();
+    const text = responseJson.choices?.[0]?.message?.content?.trim();
     if (!text) {
         throw new Error("OpenAI returned empty content");
     }
@@ -59,7 +75,7 @@ export async function POST(req: Request) {
 
         const { section, data } = await req.json();
 
-        if (!process.env.OPENAI_API_KEY) {
+        if (!process.env.OPENAI_API_KEY?.trim()) {
             return NextResponse.json(
                 { error: "OpenAI API key is not configured" },
                 { status: 500 }
@@ -1175,7 +1191,8 @@ If any section contains serious inconsistencies, automatically generate a STUDEN
 
 OUTPUT FORMAT RULES:
 - Output plain text only.
-- Use exactly 11 blocks separated by double newlines.
+- Use exactly 11 blocks separated by double newlines (one blank line between blocks).
+- Start each block with SECTION N — on a new line; do not concatenate multiple SECTION headers into one paragraph.
 - Each block must be a single concise paragraph.
 - Do not use markdown bullets, tables, or code fences in the final answer.
 - Do not mention file names, JSON, or internal system IDs.
@@ -1215,10 +1232,27 @@ ${JSON.stringify(data)}`;
         }
 
 
-        const text = await generateSummaryWithOpenAI(prompt);
+        const openAiOpts: OpenAiCompletionOpts | undefined =
+            section === "section11"
+                ? {
+                      temperature: 0,
+                      seed: 277011,
+                  }
+                : undefined;
+
+        const text = await generateSummaryWithOpenAI(prompt, openAiOpts);
+        const summary = text.trim();
+
+        if (section === "section11") {
+            const auditMeta = parseSection11AuditSummary(summary);
+            return NextResponse.json({
+                summary,
+                ...(auditMeta ? { auditMeta } : {}),
+            });
+        }
 
         return NextResponse.json({
-            summary: text.trim()
+            summary,
         });
 
 

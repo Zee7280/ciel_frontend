@@ -50,6 +50,16 @@ interface ReportDetail {
     evidence_urls: string[];
 }
 
+/** Equal-height decision tiles: shared typography and icon frame (Student Report Approval). */
+const approvalDecisionTile = {
+    root: "flex h-full min-h-[11.5rem] w-full flex-col items-center justify-center gap-3 rounded-[2rem] border-2 p-8 font-bold shadow-sm transition-all hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
+    iconFrame:
+        "flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl transition-transform group-hover:scale-105",
+    textBlock: "text-center",
+    title: "text-lg font-black leading-tight",
+    subtitle: "mt-1 text-[10px] font-black uppercase tracking-widest text-current/65",
+} as const;
+
 export default function AdminReportDetailPage() {
     const params = useParams();
     const router = useRouter();
@@ -721,46 +731,64 @@ export default function AdminReportDetailPage() {
                                 <p className="text-[10px] text-slate-400 mt-3 font-bold uppercase tracking-wider italic">* Required for rejection, shared with the student upon decision.</p>
                             </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4">
+                            <div className="grid grid-cols-1 gap-6 pt-4 md:grid-cols-3 md:items-stretch md:gap-6">
                                 <button
+                                    type="button"
                                     onClick={() => handleVerify('approve')}
                                     disabled={isVerifying || report.admin_status === 'approved'}
-                                    className="flex flex-col items-center gap-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-[2rem] font-bold p-8 transition-all shadow-xl shadow-emerald-900/20 disabled:opacity-50 group"
+                                    className={clsx(
+                                        approvalDecisionTile.root,
+                                        "border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 focus-visible:ring-emerald-300",
+                                    )}
                                 >
-                                    <div className="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center group-hover:scale-110 transition-transform">
-                                        <CheckCircle2 className="w-6 h-6" />
+                                    <div className={clsx(approvalDecisionTile.iconFrame, "bg-emerald-100 text-emerald-700")}>
+                                        <CheckCircle2 className="h-6 w-6" strokeWidth={2} />
                                     </div>
-                                    <div className="text-center">
-                                        <p className="text-lg leading-tight">{report.admin_status === 'approved' ? 'Approved' : 'Approve'}</p>
-                                        <p className="text-[10px] opacity-70 font-black uppercase tracking-widest mt-1">Verify Impact</p>
+                                    <div className={approvalDecisionTile.textBlock}>
+                                        <p className={approvalDecisionTile.title}>
+                                            {report.admin_status === 'approved' ? 'Approved' : 'Approve'}
+                                        </p>
+                                        <p className={approvalDecisionTile.subtitle}>Verify impact</p>
                                     </div>
                                 </button>
 
                                 <button
+                                    type="button"
                                     onClick={() => handleVerify('reject')}
                                     disabled={isVerifying || report.status === 'rejected'}
-                                    className="flex flex-col items-center gap-3 border-2 border-red-100 bg-red-50 text-red-600 hover:bg-red-100 rounded-[2rem] font-bold p-8 transition-all disabled:opacity-50 group"
+                                    className={clsx(
+                                        approvalDecisionTile.root,
+                                        "border-red-200 bg-red-50 text-red-700 hover:bg-red-100 focus-visible:ring-red-300",
+                                    )}
                                 >
-                                    <div className="w-12 h-12 rounded-2xl bg-red-200/50 flex items-center justify-center group-hover:scale-110 transition-transform text-red-600">
-                                        <XCircle className="w-6 h-6" />
+                                    <div className={clsx(approvalDecisionTile.iconFrame, "bg-red-100 text-red-600")}>
+                                        <XCircle className="h-6 w-6" strokeWidth={2} />
                                     </div>
-                                    <div className="text-center">
-                                        <p className="text-lg leading-tight">{report.status === 'rejected' ? 'Rejected' : 'Reject'}</p>
-                                        <p className="text-[10px] text-red-400 font-black uppercase tracking-widest mt-1">Needs Revision</p>
+                                    <div className={approvalDecisionTile.textBlock}>
+                                        <p className={approvalDecisionTile.title}>
+                                            {report.status === 'rejected' ? 'Rejected' : 'Reject'}
+                                        </p>
+                                        <p className={approvalDecisionTile.subtitle}>Needs revision</p>
                                     </div>
                                 </button>
 
                                 <button
+                                    type="button"
                                     onClick={() => handleVerify('unlock')}
                                     disabled={isVerifying || report.status === 'draft'}
-                                    className="flex flex-col items-center gap-3 border-2 border-blue-100 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-[2rem] font-bold p-8 transition-all disabled:opacity-50 group"
+                                    className={clsx(
+                                        approvalDecisionTile.root,
+                                        "border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 focus-visible:ring-blue-300",
+                                    )}
                                 >
-                                    <div className="w-12 h-12 rounded-2xl bg-blue-200/50 flex items-center justify-center group-hover:scale-110 transition-transform text-blue-600">
-                                        <Lock className="w-6 h-6" />
+                                    <div className={clsx(approvalDecisionTile.iconFrame, "bg-blue-100 text-blue-600")}>
+                                        <Lock className="h-6 w-6" strokeWidth={2} />
                                     </div>
-                                    <div className="text-center">
-                                        <p className="text-lg leading-tight">{report.status === 'draft' ? 'Unlocked' : 'Unlock'}</p>
-                                        <p className="text-[10px] text-blue-400 font-black uppercase tracking-widest mt-1">Allow Changes</p>
+                                    <div className={approvalDecisionTile.textBlock}>
+                                        <p className={approvalDecisionTile.title}>
+                                            {report.status === 'draft' ? 'Unlocked' : 'Unlock'}
+                                        </p>
+                                        <p className={approvalDecisionTile.subtitle}>Allow changes</p>
                                     </div>
                                 </button>
                             </div>

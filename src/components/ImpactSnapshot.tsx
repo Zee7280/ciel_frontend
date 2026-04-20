@@ -161,13 +161,6 @@ export default function ImpactSnapshot() {
                 </div>
 
                 {/* Live badge */}
-                <div className="mt-12 flex justify-center">
-                    <div className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#34A853]/5 border border-[#34A853]/20 rounded-full text-[#34A853] text-[10px] font-black uppercase tracking-widest">
-                        <span className="w-2 h-2 rounded-full bg-[#34A853] animate-ping" />
-                        <span className="w-2 h-2 rounded-full bg-[#34A853] -ml-3.5" />
-                        Platform is live and growing
-                    </div>
-                </div>
             </div>
         </section>
     );

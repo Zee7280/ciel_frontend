@@ -15,6 +15,27 @@ import ReportPrintView from '../../../student/report/components/ReportPrintView'
 import AttendanceSummaryTable from '../../../student/engagement/components/AttendanceSummaryTable';
 import { checkReportQuality, QualityAlert } from '@/utils/reportQuality';
 
+function normalizeKey(value: unknown): string {
+    return String(value ?? "")
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, "_");
+}
+
+/** When to show NGO verify / reject controls (admin page is always-on; partner should only see this when a decision is still expected). */
+function partnerCanSubmitDecision(report: ReportDetail): boolean {
+    const st = normalizeKey(report.status);
+    if (st === "draft") return false;
+    if (["verified", "rejected", "partner_verified"].includes(st)) return false;
+    const ps = normalizeKey(report.partner_status);
+    if (ps === "approved" || ps === "rejected") return false;
+    if (ps === "pending") return true;
+    if (ps.includes("awaiting") || ps.includes("required") || ps.includes("requested")) return true;
+    if (ps === "none") return true;
+    if (ps === "" && !report.partner_status && st === "submitted") return true;
+    return false;
+}
+
 interface ReportDetail {
     id: string;
     student: {
@@ -67,7 +88,8 @@ export default function ReportDetailPage() {
         console.log('📞 Fetching report detail for ID:', params.reportId);
         try {
             setLoading(true);
-            const apiUrl = `/api/v1/students/reports/${params.reportId}`;
+            // Ownership-safe partner detail; same payload shape as admin/student report detail.
+            const apiUrl = `/api/v1/partner/reports/${params.reportId}`;
             console.log('🌐 API URL:', apiUrl);
 
             const response = await authenticatedFetch(apiUrl);
@@ -107,13 +129,16 @@ export default function ReportDetailPage() {
             setIsVerifying(true);
             const userData = JSON.parse(localStorage.getItem('ciel_user') || '{}');
 
-            const response = await authenticatedFetch(`/api/v1/students/reports/${params.reportId}/verify`,
+            const notes = feedback.trim() || undefined;
+            const response = await authenticatedFetch(`/api/v1/partner/reports/${params.reportId}/verify`,
                 {
                     method: 'PATCH',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         action,
-                        feedback: feedback.trim() || undefined,
+                        feedback: notes,
+                        // Some backends read `reason` for reject; both are accepted.
+                        ...(notes ? { reason: notes } : {}),
                         verified_by: userData.id
                     })
                 }
@@ -121,7 +146,7 @@ export default function ReportDetailPage() {
 
             if (response?.ok) {
                 toast.success(`Report ${action === 'approve' ? 'approved' : 'rejected'} successfully!`);
-                setTimeout(() => router.push('/dashboard/partner/verify'), 1500);
+                setTimeout(() => router.push('/dashboard/partner/reports'), 1500);
             } else {
                 toast.error('Failed to verify report');
             }
@@ -185,7 +210,7 @@ export default function ReportDetailPage() {
                         className="flex items-center gap-2 px-4 py-2 text-slate-700 hover:bg-white rounded-lg font-medium transition-all"
                     >
                         <ArrowLeft className="w-4 h-4" />
-                        Back to Reports
+                        Back to impact reports
                     </button>
                     <div className="flex items-center gap-3">
                         <span className="px-4 py-2 bg-indigo-50 text-indigo-700 rounded-xl text-xs font-black border border-indigo-200 uppercase tracking-widest">
@@ -692,7 +717,7 @@ export default function ReportDetailPage() {
                     </div>
                 </div>
 
-                {report.partner_status === 'pending' && (
+                {partnerCanSubmitDecision(report) && (
                     <div id="actions" className="bg-white rounded-[3rem] p-12 border border-slate-200 shadow-xl mt-12 mb-20 relative overflow-hidden">
                         <div className="absolute top-0 right-0 p-8 opacity-5">
                             <CheckCircle2 className="w-32 h-32" />
@@ -744,6 +769,12 @@ export default function ReportDetailPage() {
                                 </div>
                             </div>
                         </div>
+                    </div>
+                )}
+
+                {!partnerCanSubmitDecision(report) && normalizeKey(report.partner_status) === "approved" && (
+                    <div className="bg-emerald-50 border border-emerald-200 rounded-3xl p-6 mt-8 mb-16 text-emerald-900 text-sm font-medium">
+                        Your organization has already verified this report. If you need changes, contact CIEL support so the report can be reopened for edits.
                     </div>
                 )}
             </div>

@@ -4,7 +4,6 @@ import WhoIsItFor from "@/components/WhoIsItFor";
 import HowWeWork from "@/components/HowWeWork";
 import FeaturesBar from "@/components/FeaturesBar";
 import ImpactSnapshot from "@/components/ImpactSnapshot";
-import WhyItMatters from "@/components/WhyItMatters";
 import FinalCTA from "@/components/FinalCTA";
 import StoriesGrid from "@/components/StoriesGrid";
 import PartnersFooter from "@/components/PartnersFooter";
@@ -19,7 +18,6 @@ export default function Home() {
       <HowWeWork />
       <FeaturesBar />
       <ImpactSnapshot />
-      <WhyItMatters />
       <FinalCTA />
       <StoriesGrid />
       <PartnersFooter />

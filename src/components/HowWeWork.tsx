@@ -98,9 +98,6 @@ export default function HowWeWork() {
                         </svg>
                     </div>
 
-                    <p className="text-base md:text-lg text-slate-500 font-medium max-w-xl mx-auto mt-6">
-                        From your first session to a verified certificate — every step is tracked, measured, and credentialed.
-                    </p>
                 </div>
 
                 {/* Steps — horizontal on desktop, vertical on mobile */}
@@ -147,20 +144,6 @@ export default function HowWeWork() {
                             );
                         })}
                     </div>
-                </div>
-
-                {/* Bottom CTA banner */}
-                <div className="mt-16 p-10 rounded-[3rem] bg-slate-50 border-2 border-slate-100 shadow-premium flex flex-col md:flex-row items-center justify-between gap-8">
-                    <div>
-                        <p className="text-xl font-black text-slate-900 tracking-tight mb-2">Ready to start your impact journey?</p>
-                        <p className="text-sm text-slate-500 font-medium font-bold">Join thousands of students already building verified portfolios.</p>
-                    </div>
-                    <a
-                        href="/signup"
-                        className="shrink-0 inline-flex items-center gap-3 px-10 py-5 bg-[#3A72AA] text-white font-black rounded-2xl hover:scale-105 transition-all duration-300 shadow-2xl shadow-blue-100 text-base"
-                    >
-                        Get Started Free <ArrowRight className="w-5 h-5" />
-                    </a>
                 </div>
             </div>
         </section>

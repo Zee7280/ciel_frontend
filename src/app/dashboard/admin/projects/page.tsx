@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import Link from "next/link";
 import DataTable from "react-data-table-component";
 import type { TableColumn } from "react-data-table-component";
-import { Search, Filter, MoreVertical, Briefcase, MapPin, Loader2, Eye, FileDown } from "lucide-react";
+import { Search, Filter, MoreVertical, Briefcase, MapPin, Eye, FileDown, Trash2 } from "lucide-react";
 import { authenticatedFetch } from "@/utils/api";
 import { toast } from "sonner";
 
@@ -119,6 +119,7 @@ function statusBadgeClass(statusKey: string): string {
 export default function AdminProjectsPage() {
     const [rows, setRows] = useState<AdminProjectRow[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [deletingId, setDeletingId] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState("");
     const [statusFilter, setStatusFilter] = useState("all");
     const [locationFilter, setLocationFilter] = useState("all");
@@ -240,6 +241,47 @@ export default function AdminProjectsPage() {
             }
         } catch {
             toast.error("Could not update status");
+        }
+    };
+
+    const handleDeleteOpportunity = async (id: string) => {
+        const target = rows.find((row) => row.id === id);
+        const label = target?.title?.trim() || "this opportunity";
+        if (!confirm(`Delete "${label}"?\n\nThis should also remove related dependent records from the backend and cannot be undone.`)) {
+            return;
+        }
+
+        setDeletingId(id);
+        try {
+            const res = await authenticatedFetch(`/api/v1/admin/opportunities/${id}`, {
+                method: "DELETE",
+            });
+
+            if (!res) {
+                toast.error("Failed to delete opportunity");
+                return;
+            }
+
+            if (res.ok) {
+                toast.success("Opportunity deleted successfully");
+                setActiveMenu(null);
+                await loadProjects();
+                return;
+            }
+
+            const body = await res.json().catch(() => ({}));
+            const message =
+                typeof (body as { message?: string; error?: string }).message === "string"
+                    ? (body as { message: string }).message
+                    : typeof (body as { message?: string; error?: string }).error === "string"
+                      ? (body as { error: string }).error
+                      : "Failed to delete opportunity";
+            toast.error(message);
+        } catch (error) {
+            console.error("Delete opportunity failed:", error);
+            toast.error("Failed to delete opportunity");
+        } finally {
+            setDeletingId(null);
         }
     };
 
@@ -480,6 +522,16 @@ export default function AdminProjectsPage() {
                                     Reject
                                 </button>
                             )}
+                            <div className="h-px bg-slate-100 my-0.5" />
+                            <button
+                                type="button"
+                                onClick={() => void handleDeleteOpportunity(activeMenuRow.id)}
+                                disabled={deletingId === activeMenuRow.id}
+                                className="w-full text-left px-3 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50 flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+                            >
+                                <Trash2 className="w-4 h-4" />
+                                {deletingId === activeMenuRow.id ? "Deleting..." : "Delete opportunity"}
+                            </button>
                         </div>
                     </>
                 )}

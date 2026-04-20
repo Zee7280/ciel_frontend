@@ -3,9 +3,10 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState, useEffect, useLayoutEffect } from "react";
-import { LayoutDashboard, BookOpen, Users, Settings, PieChart, LogOut, FileText, Heart, Building2, CheckCircle, Briefcase, FileBarChart, ShieldAlert, Bell, User, Flag, MessageSquare, Plus, CreditCard, ClipboardList, CalendarClock } from "lucide-react";
+import { LayoutDashboard, BookOpen, Users, Settings, PieChart, LogOut, FileText, Heart, Building2, CheckCircle, Briefcase, FileBarChart, ShieldAlert, Bell, User, Flag, MessageSquare, Plus, CreditCard, ClipboardList, CalendarClock, LifeBuoy } from "lucide-react";
 import clsx from "clsx";
 import { authenticatedFetch } from "@/utils/api";
+import { fetchStudentDashboardData } from "@/utils/student-dashboard-fetch";
 import {
     dashboardNavRoleFromPathname,
     readDashboardNavRoleFromStorage,
@@ -24,7 +25,12 @@ export default function Sidebar() {
         router.push("/login");
     };
 
+    const isMessagesPage =
+        /^\/dashboard\/(student|partner|faculty|admin)\/messages$/.test(pathname);
+
     useEffect(() => {
+        if (!isMessagesPage) return;
+
         const fetchUnreadCount = async () => {
             try {
                 const res = await authenticatedFetch("/api/v1/chat/unread-count", {}, { redirectToLogin: false });
@@ -42,7 +48,7 @@ export default function Sidebar() {
         fetchUnreadCount();
         const interval = setInterval(fetchUnreadCount, 30000); // Check every 30s
         return () => clearInterval(interval);
-    }, []);
+    }, [isMessagesPage]);
 
     const [navRole, setNavRole] = useState<DashboardNavRole>(() => dashboardNavRoleFromPathname(pathname));
 
@@ -64,12 +70,9 @@ export default function Sidebar() {
         }
         const loadImpactHint = async () => {
             try {
-                const res = await authenticatedFetch("/api/v1/student/dashboard", {}, { redirectToLogin: false });
-                if (res && res.ok) {
-                    const body = await res.json();
-                    const n = body?.data?.overview?.impactHistoryBadgeCount;
-                    if (typeof n === "number" && n >= 0) setImpactHistoryBadge(n);
-                }
+                const data = await fetchStudentDashboardData({ redirectToLogin: false });
+                const n = data?.overview?.impactHistoryBadgeCount;
+                if (typeof n === "number" && n >= 0) setImpactHistoryBadge(n);
             } catch {
                 /* optional hint */
             }
@@ -87,11 +90,13 @@ export default function Sidebar() {
         // Student
         ...(isStudent ? [
             { label: "My Projects", href: "/dashboard/student/projects", icon: FolderOpen },
+            { label: "Payments", href: "/dashboard/student/payments", icon: CreditCard },
             { label: "Browse Opportunities", href: "/dashboard/student/browse", icon: Globe },
             { label: "Create Opportunity", href: "/dashboard/student/create-opportunity", icon: Plus },
             { label: "Impact History", href: "/dashboard/student/impact", icon: PieChart },
             { label: "Messages", href: "/dashboard/student/messages", icon: MessageSquare },
             { label: "Notifications", href: "/dashboard/student/notifications", icon: Bell },
+            { label: "Help & Support", href: "/dashboard/student/help", icon: LifeBuoy },
             { label: "My Profile", href: "/dashboard/student/profile", icon: User },
         ] : []),
         // Partner
@@ -107,12 +112,12 @@ export default function Sidebar() {
             { label: "Funding", href: "/dashboard/partner/funding", icon: PieChart },
             { label: "Notifications", href: "/dashboard/partner/notifications", icon: Bell },
         ] : []),
-        // Faculty
+        // Faculty 
         ...(isFaculty ? [
             // { label: "My Courses", href: "/dashboard/faculty/courses", icon: BookOpen },
             { label: "My Profile", href: "/dashboard/faculty/profile", icon: User },
-            { label: "Project Approvals", href: "/dashboard/faculty/approvals", icon: CheckCircle },
-            { label: "Join applications", href: "/dashboard/faculty/join-applications", icon: ClipboardList },
+            { label: "Opportunity Request Approvals", href: "/dashboard/faculty/approvals", icon: CheckCircle },
+            { label: "Applications & Reports Approvals", href: "/dashboard/faculty/join-applications", icon: ClipboardList },
             { label: "My Opportunities", href: "/dashboard/faculty/my-opportunities", icon: Briefcase },
             { label: "Create Opportunity", href: "/dashboard/faculty/create-opportunity", icon: Plus },
             // { label: "Student Grading", href: "/dashboard/faculty/grading", icon: FileText },
@@ -123,13 +128,14 @@ export default function Sidebar() {
         ...(isAdmin ? [
             { label: "Users", href: "/dashboard/admin/users", icon: Users },
             { label: "Organizations", href: "/dashboard/admin/organizations", icon: Building2 },
-            { label: "Approvals", href: "/dashboard/admin/approvals", icon: CheckCircle },
-            { label: "Join applications", href: "/dashboard/admin/join-applications", icon: ClipboardList },
+            { label: "Opportunity Request Approvals", href: "/dashboard/admin/approvals", icon: CheckCircle },
+            { label: "Applications & Reports Approvals", href: "/dashboard/admin/join-applications", icon: ClipboardList },
             { label: "Payments", href: "/dashboard/admin/payments", icon: CreditCard },
             { label: "All projects", href: "/dashboard/admin/projects", icon: Briefcase },
             { label: "Student Reports", href: "/dashboard/admin/reports/verify", icon: FileText },
             { label: "Impact", href: "/dashboard/admin/impact", icon: FileBarChart },
             { label: "Messages", href: "/dashboard/admin/messages", icon: MessageSquare },
+            { label: "Help & Support", href: "/dashboard/admin/support", icon: LifeBuoy },
             { label: "Audit Logs", href: "/dashboard/admin/audit-logs", icon: ShieldAlert },
         ] : []),
     ];
@@ -168,7 +174,9 @@ export default function Sidebar() {
 
             <div className="flex-1 py-6 px-4 space-y-2 overflow-y-auto custom-scrollbar">
                 {links.map((link) => {
-                    const isActive = pathname === link.href;
+                    const isActive =
+                        pathname === link.href ||
+                        (link.href === "/dashboard/student/payments" && pathname === "/dashboard/student/payment");
                     return (
                         <Link
                             key={link.href}

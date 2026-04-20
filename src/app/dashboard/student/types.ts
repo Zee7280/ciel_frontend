@@ -12,6 +12,8 @@ export interface ActiveProject {
     assignedAt: string;
     status: string;
     progress: number;
+    /** Present only when a report row exists; includes pending_payment, payment_under_review, draft, submitted, … */
+    report_status?: string;
 }
 
 export interface Deadline {
@@ -36,6 +38,10 @@ export interface DashboardOverview {
     completedActivityBars: number[];
     /** Shown on Impact History in the sidebar when > 0 */
     impactHistoryBadgeCount?: number;
+    /** Unique projects with reporting fee due (DB partner_verified / payment_pending → public pending_payment). */
+    pendingPaymentsCount?: number;
+    paymentsUnderReviewCount?: number;
+    pendingPaymentsSample?: { id: string; title: string; hint?: string }[];
 }
 
 export interface DashboardQuickActions {
@@ -44,13 +50,29 @@ export interface DashboardQuickActions {
         title: string;
         subtitle: string;
     } | null;
+    /** First payment-due report (student_reports.updatedAt DESC), or null. */
+    viewPayment?: {
+        projectId: string;
+        title: string;
+        subtitle?: string;
+    } | null;
+    /** First verified / paid report for “view results”, or null. */
+    viewReportResults?: {
+        projectId: string;
+        title: string;
+        subtitle?: string;
+    } | null;
 }
+
+/** Optional grouping for snapshot UI (deadlines, approvals pipeline, report queue, payment stages). */
+export type DashboardNotificationCategory = "deadline" | "pipeline" | "approval" | "report" | "payment";
 
 export interface DashboardNotificationPreviewItem {
     id: string;
     title: string;
     detail: string;
     tone?: "urgent" | "warning" | "neutral";
+    category?: DashboardNotificationCategory;
 }
 
 export interface DashboardNotificationsPreview {

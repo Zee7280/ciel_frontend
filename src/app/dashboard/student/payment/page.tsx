@@ -13,13 +13,17 @@ import {
     ArrowLeft, 
     Copy, 
     Building2, 
-    Info
+    Info,
 } from 'lucide-react';
 import { Button } from '../report/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../report/components/ui/card';
 import { Input } from '../report/components/ui/input';
 import { FileUpload } from '../report/components/ui/file-upload';
-import clsx from 'clsx';
+import {
+    fetchStudentManualPaymentHistory,
+    type StudentManualPaymentHistoryRow,
+} from '@/lib/student-manual-payment-history';
+import { ManualPaymentHistorySection } from '../components/ManualPaymentHistorySection';
 
 /** Reporting fee charged per student for this flow (PKR). */
 const REPORTING_FEE_PKR_PER_STUDENT = 200;
@@ -43,6 +47,8 @@ function PaymentContent() {
     /** PKR the student actually transferred (digits only in state). */
     const [paidAmountPkr, setPaidAmountPkr] = useState(String(REPORTING_FEE_PKR_PER_STUDENT));
     const [paymentSubmitted, setPaymentSubmitted] = useState(false);
+    const [manualPaymentHistory, setManualPaymentHistory] = useState<StudentManualPaymentHistoryRow[]>([]);
+    const [manualPaymentHistoryLoading, setManualPaymentHistoryLoading] = useState(true);
 
     useEffect(() => {
         if (!projectId) {
@@ -50,6 +56,22 @@ function PaymentContent() {
             return;
         }
         fetchProjectDetails();
+    }, [projectId]);
+
+    useEffect(() => {
+        if (!projectId) return;
+        let cancelled = false;
+        (async () => {
+            setManualPaymentHistoryLoading(true);
+            const rows = await fetchStudentManualPaymentHistory();
+            if (!cancelled) {
+                setManualPaymentHistory(rows);
+                setManualPaymentHistoryLoading(false);
+            }
+        })();
+        return () => {
+            cancelled = true;
+        };
     }, [projectId]);
 
     const fetchProjectDetails = async () => {
@@ -140,6 +162,7 @@ function PaymentContent() {
             if (res && res.ok) {
                 setPaymentSubmitted(true);
                 toast.success('Payment proof submitted successfully!');
+                fetchStudentManualPaymentHistory().then(setManualPaymentHistory);
             } else {
                 let msg = 'Failed to submit payment proof';
                 if (res) {
@@ -181,6 +204,13 @@ function PaymentContent() {
                 <p className="text-slate-500 font-medium max-w-md mx-auto">
                     Thank you! Our admin team will verify your payment slip. Once approved, you'll be able to download your certificate (cii) and final report.
                 </p>
+                <div className="pt-4 max-w-lg mx-auto text-left">
+                    <ManualPaymentHistorySection
+                        rows={manualPaymentHistory}
+                        loading={manualPaymentHistoryLoading}
+                        currentProjectId={projectId}
+                    />
+                </div>
                 <div className="pt-8">
                     <Button onClick={() => router.push('/dashboard/student/projects')} className="bg-blue-600 hover:bg-blue-700 text-white px-8 font-bold rounded-xl shadow-lg shadow-blue-200 transition-all">
                         Back to My Projects
@@ -365,6 +395,12 @@ function PaymentContent() {
                     </div>
                 </CardContent>
             </Card>
+
+            <ManualPaymentHistorySection
+                rows={manualPaymentHistory}
+                loading={manualPaymentHistoryLoading}
+                currentProjectId={projectId}
+            />
         </div>
     );
 }

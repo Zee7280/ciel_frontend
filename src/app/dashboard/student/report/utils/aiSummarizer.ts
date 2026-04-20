@@ -1,6 +1,9 @@
+import type { ReportCIIauditMeta } from "@/lib/parseCIIauditSummary";
+
 export interface AISummaryResponse {
     summary?: string;
     error?: string;
+    auditMeta?: ReportCIIauditMeta | null;
 }
 
 export async function generateAISummary(section: string, data: any): Promise<AISummaryResponse> {

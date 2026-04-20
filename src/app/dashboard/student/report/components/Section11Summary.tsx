@@ -1,4 +1,4 @@
-import { BarChart3, ShieldAlert, Sparkles, Loader2, Quote, Award, Clock, Users, Target, ShieldCheck, Download, TrendingUp, X, Printer, CheckCircle, Eye, AlertTriangle, Lock, CreditCard } from "lucide-react";
+import { BarChart3, ShieldAlert, Quote, Award, Clock, Users, Target, ShieldCheck, Download, TrendingUp, X, Printer, CheckCircle, Eye, AlertTriangle, Lock, CreditCard, Flag } from "lucide-react";
 import { Button } from "./ui/button";
 import { useReportForm } from "../context/ReportContext";
 import React, { useState, useMemo, useEffect } from "react";
@@ -7,8 +7,9 @@ import { createPortal } from "react-dom";
 import ReportPrintView from "./ReportPrintView";
 import CertificateView from "./CertificateView";
 import CIIDashboardMeter from "./CIIDashboardMeter";
-import { generateAISummary } from "../utils/aiSummarizer";
-import { toast } from "sonner";
+import RedFlagsAuditModal from "./RedFlagsAuditModal";
+import { calculateCII } from "../utils/calculateCII";
+import { getRedFlagsModalSections } from "@/lib/redFlagsModalMerge";
 import clsx from "clsx";
 
 type Section11SummaryProps = {
@@ -20,7 +21,6 @@ export default function Section11Summary({ onRequestFinalSubmit }: Section11Summ
     const router = useRouter();
     const {
         data,
-        updateSection,
         isEligibleForSubmission,
         areAllSectionsComplete,
         showVerifiedImpactScores,
@@ -51,6 +51,7 @@ export default function Section11Summary({ onRequestFinalSubmit }: Section11Summ
 
     const [showPreview, setShowPreview] = useState(false);
     const [showCertificate, setShowCertificate] = useState(false);
+    const [showRedFlagsModal, setShowRedFlagsModal] = useState(false);
 
     useEffect(() => {
         if (!showCertificate) return;
@@ -68,34 +69,6 @@ export default function Section11Summary({ onRequestFinalSubmit }: Section11Summ
     const engagementScore = section1.metrics?.eis_score ?? 0;
     const verifiedHours = section1.metrics?.total_verified_hours || 0;
 
-    const [isGenerating, setIsGenerating] = useState(false);
-
-    const handleGenerateAISummary = async () => {
-        setIsGenerating(true);
-        try {
-            const result = await generateAISummary("section11", data);
-            
-            if (result.error) {
-                updateSection('section11', { 
-                    summary_text: executiveSummary,
-                    is_ai_generated: false 
-                });
-                toast.info("Generated audit summary.");
-            } else if (result.summary) {
-                updateSection('section11', { 
-                    summary_text: result.summary,
-                    is_ai_generated: true 
-                });
-                toast.success("AI audit summary generated!");
-            }
-        } catch (err) {
-            updateSection('section11', { summary_text: executiveSummary });
-            toast.info("Generated audit summary.");
-        } finally {
-            setIsGenerating(false);
-        }
-    };
-
     const executiveSummary = useMemo(() => {
         if (data.section11?.summary_text && !data.section11.summary_text.includes("Project successfully synthesized")) {
             return data.section11.summary_text;
@@ -105,14 +78,24 @@ export default function Section11Summary({ onRequestFinalSubmit }: Section11Summ
         return `Audit summary pending detailed review. Based on the submitted inputs, the project references ${verifiedHours} verified hours, ${beneficiaries} reported beneficiaries, alignment with ${primaryGoalTitle}, and ${section10.mechanisms?.length || 0} sustainability mechanisms. Final credibility still depends on consistency across attendance, activities, outcomes, resources, evidence, and continuity claims.`;
     }, [section1, section2, section3, section4, section5, section10, verifiedHours, beneficiaries, data.section11?.summary_text]);
 
-    useEffect(() => {
-        const hasEnoughData = (section2.problem_statement?.length > 100) && (section4.activity_blocks.length > 0) && (section5.measurable_outcomes?.length > 0);
-        const isEmpty = !data.section11?.summary_text || data.section11.summary_text.includes("Project successfully synthesized");
-
-        if (hasEnoughData && isEmpty && !isGenerating) {
-            handleGenerateAISummary();
+    /** Always pass the same narrative shown in “Comprehensive audit review” (do not require SECTION 1). */
+    const auditTextForModal = useMemo(() => {
+        const st = data.section11?.summary_text?.trim();
+        const legacy = "project successfully synthesized";
+        if (st && !st.toLowerCase().includes(legacy)) {
+            return st;
         }
-    }, [section2.problem_statement, section4.activity_blocks, section5.measurable_outcomes]);
+        return executiveSummary;
+    }, [data.section11?.summary_text, executiveSummary]);
+
+    const { sections: redFlagsModalSections, usedSystemFallback: redFlagsUsedSystemFallback } = useMemo(
+        () => getRedFlagsModalSections(auditTextForModal, incompleteSectionsSummary, calculateCII(data)),
+        [auditTextForModal, incompleteSectionsSummary, data],
+    );
+
+    const openRedFlagsModal = () => {
+        setShowRedFlagsModal(true);
+    };
 
     const handlePrint = () => {
         window.print();
@@ -272,7 +255,7 @@ export default function Section11Summary({ onRequestFinalSubmit }: Section11Summ
                 </div>
             )}
 
-            <div className={clsx("overflow-hidden relative group", surfaceCard)}>
+            <div id="report-section11-audit-review" className={clsx("scroll-mt-24 md:scroll-mt-28 overflow-hidden relative group", surfaceCard)}>
                 <div className="absolute -bottom-8 -right-8 opacity-[0.04] group-hover:opacity-[0.07] transition-opacity duration-1000 rotate-12 pointer-events-none">
                     <BarChart3 className="w-64 h-64 md:w-80 md:h-80 text-slate-900" />
                 </div>
@@ -282,28 +265,29 @@ export default function Section11Summary({ onRequestFinalSubmit }: Section11Summ
                         surfaceHeaderRow,
                     )}
                 >
-                    <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-9 h-9 shrink-0 rounded-xl bg-report-primary text-white flex items-center justify-center shadow-sm shadow-report-primary-shadow">
-                            <Quote className="w-4 h-4" />
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4 w-full min-w-0">
+                        <div className="flex items-center gap-3 min-w-0">
+                            <div className="w-9 h-9 shrink-0 rounded-xl bg-report-primary text-white flex items-center justify-center shadow-sm shadow-report-primary-shadow">
+                                <Quote className="w-4 h-4" />
+                            </div>
+                            <div className="min-w-0">
+                                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                                    {data.section11?.is_ai_generated ? "AI-Generated" : "System-Generated"}
+                                </p>
+                                <h3 className="text-sm font-black text-slate-900 tracking-tight">
+                                    Comprehensive audit review
+                                </h3>
+                            </div>
                         </div>
-                        <div className="min-w-0">
-                            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
-                                {data.section11?.is_ai_generated ? "AI-Generated" : "System-Generated"}
-                            </p>
-                            <h3 className="text-sm font-black text-slate-900 tracking-tight">
-                                Comprehensive audit review
-                            </h3>
-                        </div>
+                        <button
+                            type="button"
+                            onClick={openRedFlagsModal}
+                            className="inline-flex items-center justify-center gap-2 self-stretch sm:self-center rounded-xl border-2 border-amber-200 bg-amber-50/70 px-4 py-2.5 text-[10px] font-black uppercase tracking-widest text-amber-950 transition-colors hover:bg-amber-50 shrink-0"
+                        >
+                            <Flag className="w-3.5 h-3.5 shrink-0" />
+                            Section-wise red flags
+                        </button>
                     </div>
-                    <button
-                        type="button"
-                        onClick={handleGenerateAISummary}
-                        disabled={isGenerating}
-                        className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-report-primary text-white text-[10px] font-black uppercase tracking-widest hover:opacity-90 disabled:opacity-40 transition-all shadow-md shadow-report-primary-shadow shrink-0 w-full sm:w-auto"
-                    >
-                        {isGenerating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
-                        {isGenerating ? "Generating…" : "Improve with AI"}
-                    </button>
                 </div>
                 <div className="px-6 py-8 md:px-8 md:py-10 space-y-6 relative z-10">
                     <span className="absolute top-4 left-3 md:left-5 text-6xl md:text-7xl font-serif text-slate-100 select-none leading-none pointer-events-none">
@@ -321,7 +305,7 @@ export default function Section11Summary({ onRequestFinalSubmit }: Section11Summ
                     </span>
                     <div className="flex flex-wrap items-center gap-2.5 pt-5 border-t border-slate-100">
                         <span className="inline-flex items-center gap-1.5 text-[9px] font-black text-report-primary bg-report-primary-soft px-3 py-1.5 rounded-lg border border-report-primary-border uppercase tracking-widest">
-                            <Sparkles className="w-3 h-3 shrink-0" /> Integrity Verified
+                            <ShieldCheck className="w-3 h-3 shrink-0" /> Integrity Verified
                         </span>
                         <span className="inline-flex items-center gap-1.5 text-[9px] font-black text-report-primary bg-report-primary-soft px-3 py-1.5 rounded-lg border border-report-primary-border uppercase tracking-widest">
                             <TrendingUp className="w-3 h-3 shrink-0" /> Growth Documented
@@ -396,12 +380,20 @@ export default function Section11Summary({ onRequestFinalSubmit }: Section11Summ
                         <div className="max-w-md space-y-4">
                             <h3 className="text-lg font-black text-slate-900">Report Approved & Impact Verified</h3>
                             <p className="text-sm font-medium text-slate-400 leading-relaxed">Congratulations! Your social impact has been verified. You can now download your official CII.</p>
-                            <div className="flex flex-col sm:flex-row gap-3 w-full">
-                                <Button onClick={() => setShowPreview(true)} className="bg-report-primary hover:opacity-90 text-white px-8 h-12 rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-md shadow-report-primary-shadow flex-1">
+                            <div className="flex flex-col sm:flex-row sm:flex-wrap gap-3 w-full justify-stretch">
+                                <Button onClick={() => setShowPreview(true)} className="bg-report-primary hover:opacity-90 text-white px-8 h-12 rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-md shadow-report-primary-shadow flex-1 min-w-[10rem]">
                                     <Eye className="w-4 h-4 mr-2" /> Preview Dossier
                                 </Button>
-                                <Button variant="outline" onClick={() => setShowCertificate(true)} className="border-2 border-slate-200 text-slate-900 px-8 h-12 rounded-xl text-xs font-black uppercase tracking-widest transition-all hover:bg-slate-50 flex-1">
+                                <Button variant="outline" onClick={() => setShowCertificate(true)} className="border-2 border-slate-200 text-slate-900 px-8 h-12 rounded-xl text-xs font-black uppercase tracking-widest transition-all hover:bg-slate-50 flex-1 min-w-[10rem]">
                                     <Download className="w-4 h-4 mr-2" /> Download CII
+                                </Button>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={openRedFlagsModal}
+                                    className="border-2 border-amber-200 bg-amber-50/60 text-amber-950 px-8 h-12 rounded-xl text-xs font-black uppercase tracking-widest transition-all hover:bg-amber-50 flex-1 min-w-[10rem]"
+                                >
+                                    <Flag className="w-4 h-4 mr-2 shrink-0" /> Red flags & audit
                                 </Button>
                             </div>
                         </div>
@@ -723,6 +715,13 @@ export default function Section11Summary({ onRequestFinalSubmit }: Section11Summ
                     </div>,
                     document.body,
                 )}
+
+            <RedFlagsAuditModal
+                open={showRedFlagsModal}
+                onOpenChange={setShowRedFlagsModal}
+                sections={redFlagsModalSections}
+                usedSystemFallback={redFlagsUsedSystemFallback}
+            />
         </div>
     );
 }

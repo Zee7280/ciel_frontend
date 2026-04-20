@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { ValidationError, validateSection1, validateSection2, validateSection3, validateSection4, validateSection5, validateSection6, validateSection7, validateSection8, validateSection9, validateSection10, getIncompleteSectionsSummary, type SectionIncompleteInfo } from '../utils/validation';
 import { calculateEngagementMetrics } from '../utils/engagementMetrics';
+import type { ReportCIIauditMeta } from '@/lib/parseCIIauditSummary';
 
 // Define the shape of the report data matches the 11 sections (plus summary)
 export interface ReportData {
@@ -269,6 +270,8 @@ export interface ReportData {
     section11: {
         summary_text?: string;
         is_ai_generated?: boolean;
+        /** Structured fields parsed from Section 11 AI final audit (cross-section red flags). */
+        audit_meta?: ReportCIIauditMeta | null;
     };
     required_hours?: number;
 }

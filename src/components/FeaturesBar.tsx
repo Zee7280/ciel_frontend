@@ -1,144 +1,105 @@
 "use client";
 
-import { BarChart3, Globe2, Award, CheckSquare, TrendingUp, LayoutDashboard } from "lucide-react";
+import {
+    LineChart,
+    Globe2,
+    Award,
+    BadgeCheck,
+    BarChart3,
+    LayoutDashboard,
+    type LucideIcon,
+} from "lucide-react";
 
-const benefits = [
+const features: {
+    icon: LucideIcon;
+    title: string;
+    description: string;
+    iconBox: string;
+}[] = [
     {
-        icon: BarChart3,
-        emoji: "📊",
+        icon: LineChart,
         title: "Track Real Impact",
-        description: "Automatically record activities, hours, and outputs every session — no manual paperwork.",
-        bg: "bg-slate-50",
-        border: "border-slate-100",
-        iconBg: "bg-slate-50 text-[#4285F4]",
-        tag: "bg-slate-50 text-[#4285F4]",
-        tagLabel: "Core Feature",
+        description: "Automatically record activities, hours, and outputs",
+        iconBox: "bg-sky-50 text-sky-600",
     },
     {
         icon: Globe2,
-        emoji: "🌍",
         title: "Align with SDGs",
-        description: "Every project maps to UN Sustainable Development Goals — your work matters globally.",
-        bg: "bg-slate-50",
-        border: "border-slate-100",
-        iconBg: "bg-slate-50 text-[#4285F4]",
-        tag: "bg-slate-50 text-[#4285F4]",
-        tagLabel: "Global Standard",
+        description: "Every project connects to global development goals",
+        iconBox: "bg-orange-50 text-orange-600",
     },
     {
         icon: Award,
-        emoji: "🎓",
         title: "Earn Verified Certificates",
-        description: "Proof of your real contribution — not just participation. HEC-recognized and digitally signed.",
-        bg: "bg-slate-50",
-        border: "border-slate-100",
-        iconBg: "bg-slate-50 text-[#4285F4]",
-        tag: "bg-slate-50 text-[#4285F4]",
-        tagLabel: "HEC Recognized",
+        description: "Proof of your real contribution — not just participation",
+        iconBox: "bg-emerald-50 text-emerald-600",
     },
     {
-        icon: CheckSquare,
-        emoji: "🤝",
+        icon: BadgeCheck,
         title: "Verified by Partners",
-        description: "External NGOs, organizations, and faculty verify your outcomes — ensuring unmatched credibility.",
-        bg: "bg-slate-50",
-        border: "border-slate-100",
-        iconBg: "bg-slate-50 text-[#4285F4]",
-        tag: "bg-slate-50 text-[#4285F4]",
-        tagLabel: "Third-Party Verified",
+        description: "Ensure credibility through external validation",
+        iconBox: "bg-rose-50 text-rose-600",
     },
     {
-        icon: TrendingUp,
-        emoji: "📈",
+        icon: BarChart3,
         title: "Get Your CII Score",
-        description: "See your Community Impact Index — one powerful number that summarizes your total engagement.",
-        bg: "bg-slate-50",
-        border: "border-slate-100",
-        iconBg: "bg-slate-50 text-[#4285F4]",
-        tag: "bg-slate-50 text-[#4285F4]",
-        tagLabel: "AI Powered",
+        description: "See your overall impact in one powerful number",
+        iconBox: "bg-cyan-50 text-cyan-600",
     },
     {
         icon: LayoutDashboard,
-        emoji: "🧠",
         title: "Institutional Dashboard",
-        description: "Universities get full analytics, student progress tracking, and one-click report generation.",
-        bg: "bg-slate-50",
-        border: "border-slate-100",
-        iconBg: "bg-slate-50 text-[#4285F4]",
-        tag: "bg-slate-50 text-[#4285F4]",
-        tagLabel: "For Universities",
+        description: "Universities get full analytics and reports",
+        iconBox: "bg-amber-50 text-amber-700",
     },
 ];
 
 export default function FeaturesBar() {
     return (
-        <section className="py-24 px-6 bg-white relative overflow-hidden">
-            {/* Subtle diagonal line background */}
-            <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(0,0,0,0.01)_25%,transparent_25%,transparent_50%,rgba(0,0,0,0.01)_50%,rgba(0,0,0,0.01)_75%,transparent_75%,transparent)] bg-[size:80px_80px] pointer-events-none" />
-
-            <div className="max-w-7xl mx-auto relative z-10">
-                {/* Header */}
-                <div className="text-center mb-16">
-                    <div className="inline-flex items-center gap-2 px-4 py-2 bg-slate-100 rounded-full text-slate-500 text-xs font-black uppercase tracking-widest mb-6">
-                        <span className="w-1.5 h-1.5 rounded-full bg-slate-50 animate-pulse" />
-                        Platform Capability
-                    </div>
-
-                    <div className="relative inline-block mb-4">
-                        <h2 className="text-3xl md:text-4xl lg:text-[42px] font-black text-slate-900 tracking-tight leading-tight">
-                            Exclusive{" "}
-                            <span className="text-[#3A72AA]">
-                                Features
-                            </span>
+        <section className="relative overflow-hidden bg-white px-6 py-20 md:py-24">
+            <div className="relative z-10 mx-auto max-w-6xl">
+                <div className="mb-12 text-center md:mb-16">
+                    <div className="relative mb-4 inline-block">
+                        <h2 className="text-3xl font-black tracking-tight text-slate-900 md:text-4xl lg:text-[42px] lg:leading-tight">
+                            Exclusive Features
                         </h2>
-                        {/* Wavy Underline (Green) */}
-                        <svg className="absolute -bottom-3 left-0 w-full h-3 text-[#34A853]/30" preserveAspectRatio="none" viewBox="0 0 100 10" fill="none">
-                            <path d="M0 5Q 25 0 50 5 Q 75 10 100 5" stroke="currentColor" strokeWidth="4" />
+                        <svg
+                            className="absolute -bottom-3 left-0 h-3 w-full text-[#34A853]/40"
+                            preserveAspectRatio="none"
+                            viewBox="0 0 100 10"
+                            fill="none"
+                            aria-hidden
+                        >
+                            <path
+                                d="M0 5Q 25 0 50 5 Q 75 10 100 5"
+                                stroke="currentColor"
+                                strokeWidth="4"
+                            />
                         </svg>
                     </div>
-
-                    <p className="text-base md:text-lg text-slate-500 font-medium max-w-xl mx-auto mt-6">
-                        Not just features — tools that translate your work into verified, measurable impact.
-                    </p>
                 </div>
 
-                {/* Features grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                    {[
-                        { icon: BarChart3, title: "Track Real Impact", description: "Automatically record activities, hours, and outputs every session.", iconBg: "bg-blue-50 text-blue-600" },
-                        { icon: Globe2, title: "Align with SDGs", description: "Every project maps to UN Sustainable Development Goals.", iconBg: "bg-amber-50 text-amber-600" },
-                        { icon: Award, title: "Earn Verified Certificates", description: "Proof of your real contribution. HEC-recognized and signed.", iconBg: "bg-emerald-50 text-emerald-600" },
-                        { icon: CheckSquare, title: "Verified by Partners", description: "External NGOs and organizations verify your outcomes.", iconBg: "bg-rose-50 text-rose-600" },
-                        { icon: TrendingUp, title: "Get Your CII Score", description: "See your Community Impact Index — your total engagement score.", iconBg: "bg-sky-50 text-sky-600" },
-                        { icon: LayoutDashboard, title: "Institutional Dashboard", description: "Universities get full analytics and progress tracking.", iconBg: "bg-amber-50 text-amber-600" }
-                    ].map((benefit, i) => {
-                        const Icon = benefit.icon;
-                        return (
+                <div className="grid grid-cols-1 gap-5 md:grid-cols-2 md:gap-6 lg:grid-cols-3">
+                    {features.map(({ icon: Icon, title, description, iconBox }) => (
+                        <div
+                            key={title}
+                            className="flex items-center gap-4 rounded-xl border border-slate-100 bg-white p-5 shadow-[0_4px_12px_rgba(0,0,0,0.06)] md:p-6"
+                        >
                             <div
-                                key={i}
-                                className="group relative p-10 rounded-[2.5rem] bg-white border border-slate-100 hover:shadow-2xl hover:-translate-y-2 transition-all duration-500 overflow-hidden cursor-default"
+                                className={`flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-lg ${iconBox}`}
                             >
-                                {/* Icon */}
-                                <div className={`w-16 h-16 rounded-2xl ${benefit.iconBg} flex items-center justify-center mb-6 shadow-sm group-hover:scale-110 transition-transform duration-300`}>
-                                    <Icon className="w-8 h-8" strokeWidth={1.5} />
-                                </div>
-
-                                {/* Title */}
-                                <h3 className="text-xl font-black text-slate-900 tracking-tight leading-snug mb-4">
-                                    {benefit.title}
-                                </h3>
-
-                                {/* Description */}
-                                <p className="text-[15px] font-medium text-slate-500 leading-relaxed">
-                                    {benefit.description}
-                                </p>
-
-                                {/* Decorative corner glow */}
-                                <div className="absolute -bottom-8 -right-8 w-24 h-24 rounded-full bg-slate-500/5 blur-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
+                                <Icon className="h-6 w-6" strokeWidth={2} aria-hidden />
                             </div>
-                        );
-                    })}
+                            <div className="min-w-0 flex-1 text-left">
+                                <h3 className="text-base font-bold leading-snug text-slate-900 md:text-[17px]">
+                                    {title}
+                                </h3>
+                                <p className="mt-1 text-sm font-normal leading-relaxed text-slate-500">
+                                    {description}
+                                </p>
+                            </div>
+                        </div>
+                    ))}
                 </div>
             </div>
         </section>
