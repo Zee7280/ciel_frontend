@@ -7,13 +7,89 @@ import {
     ArrowLeft, CheckCircle2, XCircle, Download, ExternalLink,
     User, Building2, Calendar, Target, Users, Activity,
     TrendingUp, Package, Handshake, FileText, MessageSquare,
-    Globe, MapPin, Clock as ClockIcon, Lock, AlertTriangle, List
+    Globe, MapPin, Clock as ClockIcon, AlertTriangle, List
 } from 'lucide-react';
 import { toast } from 'sonner';
 import clsx from 'clsx';
 import ReportPrintView from '../../../../student/report/components/ReportPrintView';
 import AttendanceSummaryTable from '../../../../student/engagement/components/AttendanceSummaryTable';
 import { checkReportQuality, QualityAlert } from '@/utils/reportQuality';
+import { parseSection11AuditSummary, type ReportCIIauditMeta } from '@/lib/parseCIIauditSummary';
+
+function normalizeAuditMeta(raw: unknown, summaryText: string): ReportCIIauditMeta | null {
+    const fallback = summaryText ? parseSection11AuditSummary(summaryText) : null;
+    if (!raw) return fallback;
+
+    if (typeof raw === "string") {
+        const trimmed = raw.trim();
+        if (!trimmed) return fallback;
+        try {
+            const parsed = JSON.parse(trimmed) as unknown;
+            return normalizeAuditMeta(parsed, summaryText);
+        } catch {
+            return parseSection11AuditSummary(trimmed) ?? fallback;
+        }
+    }
+
+    if (typeof raw !== "object") return fallback;
+    const meta = raw as Partial<ReportCIIauditMeta>;
+    if (!Array.isArray(meta.top_fixes)) return fallback;
+
+    return {
+        critical_red_flags: meta.critical_red_flags ?? null,
+        moderate_issues: meta.moderate_issues ?? null,
+        minor_issues: meta.minor_issues ?? null,
+        credibility: meta.credibility ?? null,
+        risk_level: meta.risk_level ?? null,
+        top_fixes: meta.top_fixes.filter((fix): fix is string => typeof fix === "string"),
+        final_remark: meta.final_remark ?? null,
+        student_feedback: meta.student_feedback ?? null,
+        needs_revision: Boolean(meta.needs_revision),
+    };
+}
+
+function compactAlertText(value: string, max = 180): string {
+    const normalized = value.replace(/\s+/g, " ").trim();
+    if (normalized.length <= max) return normalized;
+    return `${normalized.slice(0, max).trimEnd()}...`;
+}
+
+function buildQualityAlerts(reportData: any, section11Audit: ReportCIIauditMeta | null): QualityAlert[] {
+    const baseAlerts = checkReportQuality(reportData);
+    if (!section11Audit) return baseAlerts;
+
+    const aiAlerts: QualityAlert[] = [];
+    if (section11Audit.critical_red_flags) {
+        aiAlerts.push({
+            sectionId: "section11",
+            severity: "error",
+            message: `Critical red flags: ${compactAlertText(section11Audit.critical_red_flags)}`,
+        });
+    }
+    if (section11Audit.moderate_issues) {
+        aiAlerts.push({
+            sectionId: "section11",
+            severity: "warning",
+            message: `Moderate issues: ${compactAlertText(section11Audit.moderate_issues)}`,
+        });
+    }
+    if (section11Audit.minor_issues) {
+        aiAlerts.push({
+            sectionId: "section11",
+            severity: "warning",
+            message: `Minor issues: ${compactAlertText(section11Audit.minor_issues)}`,
+        });
+    }
+    if (section11Audit.top_fixes.length > 0) {
+        aiAlerts.push({
+            sectionId: "section11",
+            severity: "warning",
+            message: `Top fix needed: ${compactAlertText(section11Audit.top_fixes[0], 160)}`,
+        });
+    }
+
+    return [...aiAlerts, ...baseAlerts];
+}
 
 interface ReportDetail {
     id: string;
@@ -69,6 +145,7 @@ export default function AdminReportDetailPage() {
     const [isVerifying, setIsVerifying] = useState(false);
     const [showStickyActions, setShowStickyActions] = useState(false);
     const [qualityAlerts, setQualityAlerts] = useState<QualityAlert[]>([]);
+    const [section11Audit, setSection11Audit] = useState<ReportCIIauditMeta | null>(null);
 
     useEffect(() => {
         fetchReportDetail();
@@ -99,8 +176,11 @@ export default function AdminReportDetailPage() {
 
                 // Backend might return { success, data } or { report }
                 const reportData = data.data || data.report || data;
+                const section11Text = String(reportData?.section11?.summary_text || "").trim();
+                const parsedAudit = normalizeAuditMeta(reportData?.section11?.audit_meta, section11Text);
                 setReport(reportData);
-                setQualityAlerts(checkReportQuality(reportData));
+                setSection11Audit(parsedAudit);
+                setQualityAlerts(buildQualityAlerts(reportData, parsedAudit));
             } else {
                 const errorText = await response?.text().catch(() => 'No error text');
                 console.error('❌ API Error:', response?.status, errorText);
@@ -114,9 +194,9 @@ export default function AdminReportDetailPage() {
         }
     };
 
-    const handleVerify = async (action: 'approve' | 'reject' | 'unlock') => {
-        if ((action === 'reject' || action === 'unlock') && !feedback.trim()) {
-            toast.error(`Please provide notes/feedback for ${action === 'unlock' ? 'unlocking' : 'rejection'}`);
+    const handleVerify = async (action: 'approve' | 'reject') => {
+        if (action === 'reject' && !feedback.trim()) {
+            toast.error('Please provide notes/feedback for rejection');
             return;
         }
 
@@ -223,7 +303,9 @@ export default function AdminReportDetailPage() {
                             </div>
                             <div>
                                 <h2 className="text-lg font-black text-slate-900 leading-none">Impact Quality Insights</h2>
-                                <p className="text-xs text-amber-700 font-bold mt-1 uppercase tracking-wider">AI-Driven Automated Checks</p>
+                                <p className="text-xs text-amber-700 font-bold mt-1 uppercase tracking-wider">
+                                    {section11Audit ? "AI-Driven Audit + Automated Checks" : "AI-Driven Automated Checks"}
+                                </p>
                             </div>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -731,7 +813,7 @@ export default function AdminReportDetailPage() {
                                 <p className="text-[10px] text-slate-400 mt-3 font-bold uppercase tracking-wider italic">* Required for rejection, shared with the student upon decision.</p>
                             </div>
 
-                            <div className="grid grid-cols-1 gap-6 pt-4 md:grid-cols-3 md:items-stretch md:gap-6">
+                            <div className="grid grid-cols-1 gap-6 pt-4 md:grid-cols-2 md:items-stretch md:gap-6">
                                 <button
                                     type="button"
                                     onClick={() => handleVerify('approve')}
@@ -768,27 +850,7 @@ export default function AdminReportDetailPage() {
                                         <p className={approvalDecisionTile.title}>
                                             {report.status === 'rejected' ? 'Rejected' : 'Reject'}
                                         </p>
-                                        <p className={approvalDecisionTile.subtitle}>Needs revision</p>
-                                    </div>
-                                </button>
-
-                                <button
-                                    type="button"
-                                    onClick={() => handleVerify('unlock')}
-                                    disabled={isVerifying || report.status === 'draft'}
-                                    className={clsx(
-                                        approvalDecisionTile.root,
-                                        "border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 focus-visible:ring-blue-300",
-                                    )}
-                                >
-                                    <div className={clsx(approvalDecisionTile.iconFrame, "bg-blue-100 text-blue-600")}>
-                                        <Lock className="h-6 w-6" strokeWidth={2} />
-                                    </div>
-                                    <div className={approvalDecisionTile.textBlock}>
-                                        <p className={approvalDecisionTile.title}>
-                                            {report.status === 'draft' ? 'Unlocked' : 'Unlock'}
-                                        </p>
-                                        <p className={approvalDecisionTile.subtitle}>Allow changes</p>
+                                        <p className={approvalDecisionTile.subtitle}>Final decision</p>
                                     </div>
                                 </button>
                             </div>

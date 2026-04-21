@@ -8,14 +8,48 @@ import ReportPrintView from "./ReportPrintView";
 import CertificateView from "./CertificateView";
 import CIIDashboardMeter from "./CIIDashboardMeter";
 import RedFlagsAuditModal from "./RedFlagsAuditModal";
+import CIIauditInsightsPanel from "./CIIauditInsightsPanel";
 import { calculateCII } from "../utils/calculateCII";
 import { getRedFlagsModalSections } from "@/lib/redFlagsModalMerge";
+import { parseSection11AuditSummary, type ReportCIIauditMeta } from "@/lib/parseCIIauditSummary";
 import clsx from "clsx";
 
 type Section11SummaryProps = {
     /** When the footer submit control is hidden (summary-only workspace), opens the same confirm flow. */
     onRequestFinalSubmit?: () => void;
 };
+
+function normalizeAuditMeta(raw: unknown, summaryText: string): ReportCIIauditMeta | null {
+    const fallback = summaryText ? parseSection11AuditSummary(summaryText) : null;
+    if (!raw) return fallback;
+
+    if (typeof raw === "string") {
+        const trimmed = raw.trim();
+        if (!trimmed) return fallback;
+        try {
+            const parsed = JSON.parse(trimmed) as unknown;
+            return normalizeAuditMeta(parsed, summaryText);
+        } catch {
+            return parseSection11AuditSummary(trimmed) ?? fallback;
+        }
+    }
+
+    if (typeof raw !== "object") return fallback;
+    const meta = raw as Partial<ReportCIIauditMeta>;
+    if (!Array.isArray(meta.top_fixes)) return fallback;
+
+    return {
+        critical_red_flags: meta.critical_red_flags ?? null,
+        moderate_issues: meta.moderate_issues ?? null,
+        minor_issues: meta.minor_issues ?? null,
+        credibility: meta.credibility ?? null,
+        risk_level: meta.risk_level ?? null,
+        top_fixes: meta.top_fixes.filter((fix): fix is string => typeof fix === "string"),
+        final_remark: meta.final_remark ?? null,
+        student_feedback: meta.student_feedback ?? null,
+        needs_revision: Boolean(meta.needs_revision),
+    };
+}
 
 export default function Section11Summary({ onRequestFinalSubmit }: Section11SummaryProps = {}) {
     const router = useRouter();
@@ -88,9 +122,16 @@ export default function Section11Summary({ onRequestFinalSubmit }: Section11Summ
         return executiveSummary;
     }, [data.section11?.summary_text, executiveSummary]);
 
+    const ciiResult = useMemo(() => calculateCII(data), [data]);
+
+    const section11AuditMeta = useMemo(() => {
+        const text = String(data.section11?.summary_text || "").trim();
+        return normalizeAuditMeta(data.section11?.audit_meta, text);
+    }, [data.section11?.audit_meta, data.section11?.summary_text]);
+
     const { sections: redFlagsModalSections, usedSystemFallback: redFlagsUsedSystemFallback } = useMemo(
-        () => getRedFlagsModalSections(auditTextForModal, incompleteSectionsSummary, calculateCII(data)),
-        [auditTextForModal, incompleteSectionsSummary, data],
+        () => getRedFlagsModalSections(auditTextForModal, incompleteSectionsSummary, ciiResult),
+        [auditTextForModal, incompleteSectionsSummary, ciiResult],
     );
 
     const openRedFlagsModal = () => {
@@ -313,6 +354,13 @@ export default function Section11Summary({ onRequestFinalSubmit }: Section11Summ
                     </div>
                 </div>
             </div>
+
+            {section11AuditMeta ? (
+                <CIIauditInsightsPanel
+                    audit={section11AuditMeta}
+                    ciiTotalScore={ciiResult.totalScore}
+                />
+            ) : null}
 
             <div className="space-y-4 md:space-y-5">
                 <div className="flex items-center gap-3">

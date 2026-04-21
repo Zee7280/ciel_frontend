@@ -1179,15 +1179,15 @@ Identify:
 
 Also provide:
 1. Overall Credibility Score (High / Medium / Low)
-2. Risk Level (Safe / Needs Revision / Reject)
+2. Risk Level (Safe / Reject)
 3. Top 5 Required Fixes before approval
 4. Final Auditor Remark (Professional, report-style)
 
 IMPORTANT:
-If inconsistencies are severe, recommend "RETURN TO STUDENT FOR REVISION"
+Do not recommend revision cycles. This is a one-time submission workflow.
 
 BONUS:
-If any section contains serious inconsistencies, automatically generate a STUDENT FEEDBACK section.
+If serious inconsistencies are found, include a concise STUDENT FEEDBACK section focused on transparency and future learning only (not resubmission).
 
 OUTPUT FORMAT RULES:
 - Output plain text only.
@@ -1221,7 +1221,7 @@ SECTION 9 — LEARNING & COMPETENCIES: Quality: ... Red Flags: ... Missing Eleme
 
 SECTION 10 — SUSTAINABILITY: Quality: ... Red Flags: ... Missing Elements: ... Feedback: ...
 
-SECTION 11 — FINAL AUDIT SUMMARY: CRITICAL RED FLAGS: ... MODERATE ISSUES: ... MINOR ISSUES: ... Overall Credibility Score: High/Medium/Low. Risk Level: Safe/Needs Revision/Reject. Top 5 Required Fixes: 1) ... 2) ... 3) ... 4) ... 5) ... Final Auditor Remark: ... If inconsistencies are severe, explicitly state: RETURN TO STUDENT FOR REVISION. Add Student Feedback only if serious inconsistencies are found.
+SECTION 11 — FINAL AUDIT SUMMARY: CRITICAL RED FLAGS: ... MODERATE ISSUES: ... MINOR ISSUES: ... Overall Credibility Score: High/Medium/Low. Risk Level: Safe/Reject. Top 5 Required Fixes: 1) ... 2) ... 3) ... 4) ... 5) ... Final Auditor Remark: ... Add Student Feedback only if serious inconsistencies are found.
 
 Submitted Report Data:
 ${JSON.stringify(data)}`;

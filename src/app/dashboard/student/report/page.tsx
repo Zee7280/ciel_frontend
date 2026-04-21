@@ -16,6 +16,7 @@ import {
 } from "./components/ui/dialog";
 import clsx from 'clsx';
 import { canStudentAccessReportForProjectPayload } from '@/utils/studentJoinApplication';
+import { mergeReportSection1TeamScope } from '@/utils/reportTeamScope';
 import { getIncompleteSectionsSummary } from './utils/validation';
 
 // Import New Sections
@@ -72,6 +73,7 @@ function ReportFormContent() {
     }, [projectId]);
 
     const fetchProjectAndReport = async () => {
+        if (!projectId) return;
         try {
             setIsLoading(true);
             const [projectRes, reportRes] = await Promise.all([
@@ -117,8 +119,35 @@ function ReportFormContent() {
                         ...actualReportData,
                         ...(!existingTitle && titleFromProject ? { project_title: titleFromProject } : {}),
                     };
-                    setFullData(mergedReport);
-                    const st = String(mergedReport.status || "").toLowerCase();
+
+                    let reportForState: Record<string, unknown> = mergedReport as Record<string, unknown>;
+                    try {
+                        const myRes = await authenticatedFetch(`/api/v1/engagement/my`);
+                        if (myRes && myRes.ok) {
+                            const myJson = await myRes.json();
+                            const rows = Array.isArray(myJson.data) ? myJson.data : [];
+                            const myPart = rows.find(
+                                (p: { projectId?: string; project_id?: string }) =>
+                                    p && (p.projectId === projectId || p.project_id === projectId),
+                            );
+                            if (myPart) {
+                                const teamRes = await authenticatedFetch(
+                                    `/api/v1/engagement/project/${encodeURIComponent(projectId)}/team`,
+                                );
+                                if (teamRes && teamRes.ok) {
+                                    const teamJson = await teamRes.json();
+                                    const teamRows =
+                                        teamJson.success && Array.isArray(teamJson.data) ? teamJson.data : [];
+                                    reportForState = mergeReportSection1TeamScope(reportForState, myPart, teamRows);
+                                }
+                            }
+                        }
+                    } catch (scopeErr) {
+                        console.warn("[Report] Section 1 team scope normalization skipped:", scopeErr);
+                    }
+
+                    setFullData(reportForState as typeof mergedReport);
+                    const st = String((reportForState.status as string | undefined) || "").toLowerCase();
                     const isSubmitted =
                         [
                             "submitted",
@@ -131,13 +160,15 @@ function ReportFormContent() {
                             "finalized",
                             "partner_verified",
                         ].includes(st) ||
-                        ["verified", "approved"].includes(String(mergedReport.admin_status || "").toLowerCase());
+                        ["verified", "approved"].includes(
+                            String((reportForState.admin_status as string | undefined) || "").toLowerCase(),
+                        );
                     if (isSubmitted) {
                         // Report already submitted — skip guide, go straight to summary
                         setShowGuide(false);
                         setStep(11);
                         setReadOnly(true);
-                    } else if (mergedReport.status === "continue" || Object.keys(mergedReport).length > 2) {
+                    } else if (reportForState.status === "continue" || Object.keys(reportForState).length > 2) {
                         setShowGuide(false);
                     }
                 }

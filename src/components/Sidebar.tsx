@@ -90,10 +90,10 @@ export default function Sidebar() {
         // Student
         ...(isStudent ? [
             { label: "My Projects", href: "/dashboard/student/projects", icon: FolderOpen },
-            { label: "Payments", href: "/dashboard/student/payments", icon: CreditCard },
             { label: "Browse Opportunities", href: "/dashboard/student/browse", icon: Globe },
             { label: "Create Opportunity", href: "/dashboard/student/create-opportunity", icon: Plus },
             { label: "Impact History", href: "/dashboard/student/impact", icon: PieChart },
+            { label: "Payments", href: "/dashboard/student/payments", icon: CreditCard },
             { label: "Messages", href: "/dashboard/student/messages", icon: MessageSquare },
             { label: "Notifications", href: "/dashboard/student/notifications", icon: Bell },
             { label: "Help & Support", href: "/dashboard/student/help", icon: LifeBuoy },

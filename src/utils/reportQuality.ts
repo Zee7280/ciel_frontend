@@ -6,8 +6,129 @@ export interface QualityAlert {
     severity: 'warning' | 'error';
 }
 
+function normStr(v: unknown): string {
+    return typeof v === "string" ? v.trim() : "";
+}
+
+function extractUuidFromSyntheticStudentId(studentId: string): string | null {
+    const m = studentId.match(/^member:\d+:([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i);
+    return m?.[1] ? m[1].toLowerCase() : null;
+}
+
+function resolveTeamMemberDisplayName(report: any, row: Record<string, unknown>): string {
+    const synthetic = normStr(row.student_id);
+    const uuidFromSynthetic = synthetic ? extractUuidFromSyntheticStudentId(synthetic) : null;
+
+    const candidates = [
+        normStr(row.studentId),
+        normStr(row.student_id),
+        uuidFromSynthetic || "",
+    ].filter(Boolean);
+
+    const members: any[] = Array.isArray(report?.section1?.team_members) ? report.section1.team_members : [];
+    const lead: any = report?.section1?.team_lead;
+
+    const scoreMatch = (m: any): number => {
+        const ids = [
+            normStr(m?.studentId),
+            normStr(m?.student_id),
+            normStr(m?.id),
+            normStr(m?.applicationId),
+        ].filter(Boolean);
+
+        for (const c of candidates) {
+            if (!c) continue;
+            const cl = c.toLowerCase();
+            for (const id of ids) {
+                if (!id) continue;
+                const il = id.toLowerCase();
+                if (il === cl) return 100;
+                if (il.includes(cl) || cl.includes(il)) return 80;
+            }
+        }
+        return 0;
+    };
+
+    let best: any | null = null;
+    let bestScore = 0;
+    for (const m of members) {
+        const s = scoreMatch(m);
+        if (s > bestScore) {
+            bestScore = s;
+            best = m;
+        }
+    }
+
+    const leadScore = lead ? scoreMatch(lead) : 0;
+    if (leadScore > bestScore) {
+        best = lead;
+        bestScore = leadScore;
+    }
+
+    const pickName = (m: any) => normStr(m?.fullName) || normStr(m?.name);
+    const pickEmail = (m: any) => normStr(m?.email);
+
+    if (best && bestScore > 0) {
+        const nm = pickName(best);
+        const em = pickEmail(best);
+        if (nm && em) return `${nm} (${em})`;
+        if (nm) return nm;
+        if (em) return em;
+    }
+
+    // Fall back to something human-readable (avoid showing synthetic member:idx:uuid if possible)
+    if (uuidFromSynthetic) return `Team member (${uuidFromSynthetic})`;
+    if (synthetic) return "Team member";
+    return "Team member";
+}
+
 export const checkReportQuality = (report: any): QualityAlert[] => {
     const alerts: QualityAlert[] = [];
+
+    // Section 1: engagement / attendance integrity flags (from stored metrics)
+    const s1Metrics = report.section1?.metrics;
+    const redFlags: unknown[] = Array.isArray(s1Metrics?.redFlags) ? s1Metrics.redFlags : [];
+    for (const rf of redFlags) {
+        const msg = typeof rf === "string" ? rf.trim() : "";
+        if (!msg) continue;
+        const lower = msg.toLowerCase();
+        const severity: QualityAlert["severity"] =
+            lower.includes("inflation") ||
+            lower.includes("unrealistic") ||
+            lower.includes("duplicate") ||
+            lower.includes("suspicious") ||
+            lower.includes("fraud")
+                ? "error"
+                : "warning";
+        alerts.push({
+            sectionId: "section1",
+            message: msg,
+            severity,
+        });
+    }
+    if (s1Metrics?.isNonCompliant === true && redFlags.length === 0) {
+        alerts.push({
+            sectionId: "section1",
+            message: "Participation metrics are marked non-compliant (no detailed red-flag text on file).",
+            severity: "error",
+        });
+    }
+    const individuals: unknown[] = Array.isArray(s1Metrics?.individual_metrics)
+        ? s1Metrics.individual_metrics
+        : [];
+    for (const row of individuals) {
+        if (!row || typeof row !== "object") continue;
+        const r = row as Record<string, unknown>;
+        const name = resolveTeamMemberDisplayName(report, r);
+        const ev = typeof r.evidence_status === "string" ? r.evidence_status.trim() : "";
+        if (ev.toLowerCase() === "missing") {
+            alerts.push({
+                sectionId: "section1",
+                message: `${name}: engagement evidence status is Missing.`,
+                severity: "warning",
+            });
+        }
+    }
 
     // Section 2: Problem Statement
     if (!report.section2?.problem_statement || report.section2.problem_statement.length < 50) {
@@ -42,6 +163,17 @@ export const checkReportQuality = (report: any): QualityAlert[] => {
             sectionId: 'section8',
             message: 'No evidence files (photos/PDFs) uploaded.',
             severity: 'warning'
+        });
+    }
+    const hasEvidenceClaim =
+        String(report.section8?.has_evidence || "")
+            .toLowerCase()
+            .trim() === "yes";
+    if (hasEvidenceClaim && (!report.evidence_urls || report.evidence_urls.length === 0)) {
+        alerts.push({
+            sectionId: "section8",
+            message: "Section 8 claims evidence, but no evidence_urls are attached — verify file upload pipeline.",
+            severity: "error",
         });
     }
 

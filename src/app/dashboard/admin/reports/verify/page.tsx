@@ -140,7 +140,7 @@ export default function AdminReportsVerificationPage() {
     const resetFilters = () => {
         setSearchQuery('');
         setSelectedOrg('all');
-        setActiveTab('submitted');
+        setActiveTab('all');
     };
 
     return (

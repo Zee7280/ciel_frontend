@@ -20,6 +20,7 @@ import { isAttendanceLogCountedForVerifiedMetrics } from "@/utils/attendanceAppr
 import { normalizeEngagementAttendanceLog } from "@/utils/engagementAttendanceMap";
 import { calculateSection1CII } from "@/utils/reportQuality";
 import { calculateCII } from "../utils/calculateCII";
+import { resolveScopedTeamMembers } from "@/utils/reportTeamScope";
 
 export default function Section1Participation({ projectData }: { projectData?: any } = {}) {
     const { data, updateSection, getFieldError, validationErrors, nextStep, saveReport, isReadOnly, isParticipationUnlocked, setParticipationUnlocked, setRequiredHours } = useReportForm();
@@ -224,19 +225,12 @@ export default function Section1Participation({ projectData }: { projectData?: a
                     if (teamRes && teamRes.ok) {
                         const teamData = await teamRes.json();
                         if (teamData.success && teamData.data) {
-                            // Filter out the current user (lead) from team_members if returned in the same list
-                            const otherMembers = teamData.data
-                                .filter((m: any) => m.id !== myPart.id)
-                                .map((m: any) => ({
-                                    ...m,
-                                    verified: true, // Backend entries in team endpoint are by definition verified participants
-                                    name: m.fullName || m.name,
-                                    university: m.universityName || m.university
-                                }));
+                            const { team_members: scopedMembers, participation_type: scopedMode } =
+                                resolveScopedTeamMembers(myPart, teamData.data);
 
-                            updateSection('section1', {
-                                team_members: otherMembers,
-                                participation_type: otherMembers.length > 0 ? 'team' : 'individual'
+                            updateSection("section1", {
+                                team_members: scopedMembers,
+                                participation_type: scopedMode,
                             });
                         }
                     }
