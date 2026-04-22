@@ -16,7 +16,7 @@ import { formatDisplayId } from "@/utils/displayIds";
 import { Loader2, MapPin, Calendar, Clock, Globe, ArrowLeft, Building2, Share2, CheckCircle2, User, AlertCircle, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
-import ReportSummaryPopup from "../../report/components/ReportSummaryPopup";
+import ApplicationDialog, { type ApplySuccessMeta } from "../components/ApplicationDialog";
 import {
     readStudentInstitutionFromBrowserStorage,
     resolveStudentUniversityApplyEligibility,
@@ -186,6 +186,10 @@ export default function OpportunityDetailsPage() {
             return;
         }
         setIsPopupOpen(true);
+    };
+
+    const handleApplySuccess = (_appliedId: string, _meta?: ApplySuccessMeta) => {
+        void fetchOpportunityDetails();
     };
 
     if (isLoading) {
@@ -574,7 +578,13 @@ export default function OpportunityDetailsPage() {
                 </div>
             </div>
 
-            <ReportSummaryPopup isOpen={isPopupOpen} onClose={() => setIsPopupOpen(false)} />
+            <ApplicationDialog
+                opportunityId={isPopupOpen ? id : null}
+                opportunityTitle={opportunity.title ?? "Opportunity"}
+                open={isPopupOpen}
+                onOpenChange={setIsPopupOpen}
+                onSuccess={handleApplySuccess}
+            />
         </div>
     );
 

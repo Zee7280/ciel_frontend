@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import Link from "next/link";
 import DataTable from "react-data-table-component";
 import type { TableColumn } from "react-data-table-component";
-import { Search, Filter, MoreVertical, Briefcase, MapPin, Eye, FileDown, Trash2 } from "lucide-react";
+import { Search, Filter, MoreVertical, Briefcase, MapPin, Eye, FileDown, Trash2, Users, Loader2, X } from "lucide-react";
 import { authenticatedFetch } from "@/utils/api";
 import { toast } from "sonner";
 
@@ -103,6 +103,51 @@ function normalizeAdminProjectRow(raw: Record<string, unknown>): AdminProjectRow
     };
 }
 
+type IncompleteReportApplicantRow = {
+    applicationId: string;
+    studentName: string;
+    studentEmail: string;
+    reportStatusLabel: string;
+};
+
+/** Backend returns { data: [...] }; keep fallbacks for older payloads only. */
+function extractIncompleteApplicantsList(body: unknown): Record<string, unknown>[] {
+    if (Array.isArray(body)) return body as Record<string, unknown>[];
+    if (body && typeof body === "object") {
+        const o = body as Record<string, unknown>;
+        const data = o.data;
+        if (Array.isArray(data)) return data as Record<string, unknown>[];
+        for (const k of ["applicants", "items", "rows", "students"] as const) {
+            const v = o[k];
+            if (Array.isArray(v)) return v as Record<string, unknown>[];
+        }
+    }
+    return [];
+}
+
+function mapIncompleteApplicant(raw: Record<string, unknown>): IncompleteReportApplicantRow | null {
+    const applicationId = String(raw.application_id ?? raw.applicationId ?? "").trim();
+    if (!applicationId) return null;
+    const name =
+        (typeof raw.student_name === "string" && raw.student_name.trim()) ||
+        (typeof raw.studentName === "string" && raw.studentName.trim()) ||
+        "—";
+    const email =
+        (typeof raw.student_email === "string" && raw.student_email.trim()) ||
+        (typeof raw.studentEmail === "string" && raw.studentEmail.trim()) ||
+        "";
+    const reportStatus =
+        (typeof raw.report_status === "string" && raw.report_status) ||
+        (typeof raw.reportStatus === "string" && raw.reportStatus) ||
+        "incomplete";
+    return {
+        applicationId,
+        studentName: name,
+        studentEmail: email,
+        reportStatusLabel: reportStatus.replace(/_/g, " "),
+    };
+}
+
 function statusBadgeClass(statusKey: string): string {
     const s = statusKey.toLowerCase();
     if (s === "active" || s === "live" || s === "approved") return "bg-emerald-50 text-emerald-700 border border-emerald-200";
@@ -124,6 +169,12 @@ export default function AdminProjectsPage() {
     const [statusFilter, setStatusFilter] = useState("all");
     const [locationFilter, setLocationFilter] = useState("all");
     const [activeMenu, setActiveMenu] = useState<{ id: string; top: number; right: number } | null>(null);
+    const [applicantsModal, setApplicantsModal] = useState<{ opportunityId: string; title: string } | null>(null);
+    const [incompleteApplicants, setIncompleteApplicants] = useState<IncompleteReportApplicantRow[]>([]);
+    const [applicantsLoading, setApplicantsLoading] = useState(false);
+    const [deletingApplicationId, setDeletingApplicationId] = useState<string | null>(null);
+    /** Bumps when the modal closes or reopens so in-flight fetches cannot apply stale rows. */
+    const incompleteApplicantsLoadSeq = useRef(0);
 
     const loadProjects = useCallback(async () => {
         setIsLoading(true);
@@ -151,6 +202,96 @@ export default function AdminProjectsPage() {
     useEffect(() => {
         void loadProjects();
     }, [loadProjects]);
+
+    const loadIncompleteApplicants = useCallback(async (opportunityId: string, seq: number) => {
+        setApplicantsLoading(true);
+        setIncompleteApplicants([]);
+        try {
+            const res = await authenticatedFetch(
+                `/api/v1/admin/opportunities/${encodeURIComponent(opportunityId)}/incomplete-report-applicants`,
+            );
+            if (seq !== incompleteApplicantsLoadSeq.current) return;
+            if (!res) {
+                toast.error("Could not load applicant list");
+                setIncompleteApplicants([]);
+                return;
+            }
+            const data = await res.json().catch(() => ({}));
+            if (seq !== incompleteApplicantsLoadSeq.current) return;
+            if (!res.ok) {
+                const msg =
+                    typeof (data as { message?: string }).message === "string"
+                        ? (data as { message: string }).message
+                        : "Could not load applicant list";
+                toast.error(msg);
+                setIncompleteApplicants([]);
+                return;
+            }
+            const list = extractIncompleteApplicantsList(data)
+                .map(mapIncompleteApplicant)
+                .filter(Boolean) as IncompleteReportApplicantRow[];
+            if (seq !== incompleteApplicantsLoadSeq.current) return;
+            setIncompleteApplicants(list);
+        } catch {
+            if (seq !== incompleteApplicantsLoadSeq.current) return;
+            toast.error("Could not load applicant list");
+            setIncompleteApplicants([]);
+        } finally {
+            if (seq === incompleteApplicantsLoadSeq.current) {
+                setApplicantsLoading(false);
+            }
+        }
+    }, []);
+
+    const closeApplicantsModal = useCallback(() => {
+        incompleteApplicantsLoadSeq.current += 1;
+        setApplicantsModal(null);
+        setIncompleteApplicants([]);
+        setApplicantsLoading(false);
+        setDeletingApplicationId(null);
+    }, []);
+
+    const openApplicantsModal = (row: AdminProjectRow) => {
+        setActiveMenu(null);
+        incompleteApplicantsLoadSeq.current += 1;
+        const seq = incompleteApplicantsLoadSeq.current;
+        setApplicantsModal({ opportunityId: row.id, title: row.title });
+        void loadIncompleteApplicants(row.id, seq);
+    };
+
+    const handleRemoveIncompleteApplicant = async (applicationId: string) => {
+        if (!applicantsModal) return;
+        if (
+            !confirm(
+                "Withdraw this applicant from the project (admin)?\n\nParticipation and in-progress report data for this opportunity will be cleared, and the seat will show as available again — same occupancy rules as the rest of the app.\n\nThis cannot be undone.",
+            )
+        ) {
+            return;
+        }
+        setDeletingApplicationId(applicationId);
+        try {
+            const res = await authenticatedFetch(
+                `/api/v1/admin/opportunities/${encodeURIComponent(applicantsModal.opportunityId)}/applications/${encodeURIComponent(applicationId)}`,
+                { method: "DELETE" },
+            );
+            if (res && (res.ok || res.status === 204)) {
+                toast.success("Applicant withdrawn; seat freed");
+                setIncompleteApplicants((prev) => prev.filter((r) => r.applicationId !== applicationId));
+                await loadProjects();
+            } else {
+                const body = res ? await res.json().catch(() => ({})) : {};
+                toast.error(
+                    typeof (body as { message?: string }).message === "string"
+                        ? (body as { message: string }).message
+                        : "Could not remove applicant",
+                );
+            }
+        } catch {
+            toast.error("Could not remove applicant");
+        } finally {
+            setDeletingApplicationId(null);
+        }
+    };
 
     useEffect(() => {
         if (!activeMenu) return;
@@ -495,6 +636,13 @@ export default function AdminProjectsPage() {
                             >
                                 <Eye className="w-4 h-4" /> View details
                             </Link>
+                            <button
+                                type="button"
+                                onClick={() => openApplicantsModal(activeMenuRow)}
+                                className="w-full text-left px-3 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 flex items-center gap-2"
+                            >
+                                <Users className="w-4 h-4" /> Applicant list
+                            </button>
                             {lower(activeMenuRow.raw.status) === "active" && (
                                 <button
                                     type="button"
@@ -536,6 +684,86 @@ export default function AdminProjectsPage() {
                     </>
                 )}
             </div>
+
+            {applicantsModal && (
+                <>
+                    <div className="fixed inset-0 z-[60] bg-slate-900/40" aria-hidden onClick={closeApplicantsModal} />
+                    <div
+                        role="dialog"
+                        aria-modal="true"
+                        aria-labelledby="incomplete-applicants-title"
+                        className="fixed left-1/2 top-1/2 z-[70] w-[min(100%-1.5rem,28rem)] max-h-[min(85vh,32rem)] -translate-x-1/2 -translate-y-1/2 rounded-2xl bg-white shadow-2xl border border-slate-200 flex flex-col overflow-hidden"
+                    >
+                        <div className="flex items-start justify-between gap-3 px-5 py-4 border-b border-slate-100 shrink-0">
+                            <div className="min-w-0">
+                                <h2 id="incomplete-applicants-title" className="text-lg font-extrabold text-slate-900 tracking-tight">
+                                    Incomplete reports
+                                </h2>
+                                <p className="text-sm text-slate-500 mt-0.5 line-clamp-2" title={applicantsModal.title}>
+                                    Students who started but did not finish their report —{" "}
+                                    <span className="font-semibold text-slate-700">{applicantsModal.title}</span>
+                                </p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={closeApplicantsModal}
+                                className="p-2 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 shrink-0"
+                                aria-label="Close"
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+                        <div className="px-5 py-4 overflow-y-auto flex-1 min-h-0">
+                            {applicantsLoading ? (
+                                <div className="flex flex-col items-center justify-center py-12 gap-3 text-slate-500">
+                                    <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+                                    <p className="text-sm font-medium">Loading applicants…</p>
+                                </div>
+                            ) : incompleteApplicants.length === 0 ? (
+                                <div className="text-center py-10 px-2">
+                                    <Users className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+                                    <p className="text-sm font-semibold text-slate-800">No incomplete reports</p>
+                                    <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                                        No students currently have a started-but-unfinished report for this project.
+                                    </p>
+                                </div>
+                            ) : (
+                                <ul className="divide-y divide-slate-100">
+                                    {incompleteApplicants.map((r) => (
+                                        <li key={r.applicationId} className="py-3 first:pt-0 flex flex-col sm:flex-row sm:items-center gap-3 sm:justify-between">
+                                            <div className="min-w-0 flex-1">
+                                                <div className="font-bold text-slate-900 text-sm truncate">{r.studentName}</div>
+                                                {r.studentEmail ? (
+                                                    <div className="text-xs text-slate-500 truncate mt-0.5">{r.studentEmail}</div>
+                                                ) : null}
+                                                <span className="inline-flex mt-2 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide bg-amber-50 text-amber-800 border border-amber-100">
+                                                    {r.reportStatusLabel}
+                                                </span>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => void handleRemoveIncompleteApplicant(r.applicationId)}
+                                                disabled={deletingApplicationId === r.applicationId}
+                                                className="shrink-0 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold text-red-700 bg-red-50 hover:bg-red-100 border border-red-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                                            >
+                                                {deletingApplicationId === r.applicationId ? (
+                                                    <>
+                                                        <Loader2 className="w-3.5 h-3.5 animate-spin" /> Withdrawing…
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <Trash2 className="w-3.5 h-3.5" /> Withdraw & free seat
+                                                    </>
+                                                )}
+                                            </button>
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
+                        </div>
+                    </div>
+                </>
+            )}
         </div>
     );
 }

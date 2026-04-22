@@ -2,6 +2,46 @@
  * Normalize engagement attendance API rows (camelCase or snake_case) for tables + report context.
  */
 
+function firstNonEmptyString(obj: Record<string, unknown>, keys: readonly string[]): string | null {
+    for (const k of keys) {
+        const v = obj[k];
+        if (typeof v === "string" && v.trim()) return v.trim();
+    }
+    return null;
+}
+
+/**
+ * Reject/flag note from CIEL backend: PATCH body uses `reason`; persisted/returned as
+ * `approvalActionReason` (camelCase) on attendance entities. Also checks older/alternate keys.
+ */
+function pickApprovalRemark(e: Record<string, unknown>): string | null {
+    return firstNonEmptyString(e, [
+        "approvalActionReason",
+        "approval_action_reason",
+        "approval_remark",
+        "approvalRemark",
+        "rejection_reason",
+        "rejectionReason",
+        "rejection_remarks",
+        "rejectionRemarks",
+        "reject_reason",
+        "rejectReason",
+        "reviewer_notes",
+        "reviewerNotes",
+        "review_notes",
+        "reviewNotes",
+        "partner_remarks",
+        "partnerRemarks",
+        "faculty_remarks",
+        "facultyRemarks",
+        "approver_notes",
+        "approverNotes",
+        "reason",
+        "remarks",
+        "remark",
+    ]);
+}
+
 export function normalizeEngagementAttendanceLog(
     e: Record<string, unknown>,
     options?: { participantPrefixedId?: string },
@@ -9,6 +49,8 @@ export function normalizeEngagementAttendanceLog(
     const participantId =
         options?.participantPrefixedId ??
         (e.participantId != null ? String(e.participantId) : undefined);
+
+    const approval_remark = pickApprovalRemark(e);
 
     return {
         ...e,
@@ -23,6 +65,7 @@ export function normalizeEngagementAttendanceLog(
         participantId,
         evidence_file: e.evidenceUrl ?? (e.evidenceUploaded === true ? true : e.evidenceUploaded === "true" ? true : undefined),
         approval_status: (e.approval_status ?? e.approvalStatus ?? null) as string | null,
+        approval_remark,
         assigned_approver_type: (e.assigned_approver_type ?? e.assignedApproverType ?? null) as string | null,
         assigned_approver_user_id: (e.assigned_approver_user_id ?? e.assignedApproverUserId ?? null) as string | null,
         opportunity_creator_kind: (e.opportunity_creator_kind ?? e.opportunityCreatorKind ?? null) as string | null,

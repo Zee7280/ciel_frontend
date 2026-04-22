@@ -1,6 +1,7 @@
 "use client";
 
-import { Clock, Calendar, Tag, AlertCircle, CheckCircle2, Trash2 } from "lucide-react";
+import React from "react";
+import { Clock, Calendar, Tag, CheckCircle2, Trash2, MessageSquareText } from "lucide-react";
 import clsx from "clsx";
 
 interface AttendanceEntry {
@@ -13,6 +14,11 @@ interface AttendanceEntry {
     entryStatus?: 'pending' | 'verified' | 'flagged';
     /** From backend attendance approval (null = legacy). */
     approval_status?: string | null;
+    /** Rejection / return notes from reviewer (see normalizeEngagementAttendanceLog). */
+    approval_remark?: string | null;
+    /** Raw CIEL attendance entity (e.g. report JSON) when not normalized. */
+    approvalActionReason?: string | null;
+    approval_action_reason?: string | null;
     evidence_file?: any;
     participantId?: string;
 }
@@ -38,29 +44,71 @@ function approvalPillClass(entry: AttendanceEntry): string {
     return "bg-slate-50 text-slate-600 border-slate-100";
 }
 
-export default function AttendanceSummaryTable({ entries, onDelete, isLocked = false, participantNames = {} }: {
+function isRejectedEntry(entry: AttendanceEntry): boolean {
+    const raw = (entry.approval_status ?? entry.entryStatus ?? "").toString().toLowerCase();
+    return raw === "rejected";
+}
+
+/** Normalized `approval_remark` or raw backend `approvalActionReason` (report verify pages pass raw logs). */
+function resolvedRejectRemark(entry: AttendanceEntry): string {
+    const candidates = [entry.approval_remark, entry.approvalActionReason, entry.approval_action_reason];
+    for (const c of candidates) {
+        if (typeof c === "string" && c.trim()) return c.trim();
+    }
+    return "";
+}
+
+export default function AttendanceSummaryTable({ entries, onDelete, isLocked = false, participantNames = {}, embedded = false }: {
     entries: AttendanceEntry[],
     onDelete?: (id: string) => void,
     isLocked?: boolean,
-    participantNames?: Record<string, string>
+    participantNames?: Record<string, string>,
+    /** When true, omit outer card chrome (parent already provides a panel). */
+    embedded?: boolean,
 }) {
+    const [remarkOpenId, setRemarkOpenId] = React.useState<string | null>(null);
+    const actionCol = !isLocked && !!onDelete;
+    const colSpan = actionCol ? 7 : 6;
+
+    const toggleRemarkRow = (id: string) => {
+        setRemarkOpenId((prev) => (prev === id ? null : id));
+    };
+
+    const entryIdsKey = entries.map((e) => e.id).join("|");
+    React.useEffect(() => {
+        setRemarkOpenId(null);
+    }, [entryIdsKey]);
     if (entries.length === 0) {
         return (
-            <div className="bg-white rounded-3xl border border-slate-100 p-12 text-center">
-                <div className="w-16 h-16 bg-slate-50 text-slate-300 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <Calendar className="w-8 h-8" />
+            <div
+                className={clsx(
+                    "p-10 text-center sm:p-12",
+                    embedded ? "rounded-2xl bg-slate-50/60" : "rounded-3xl border border-slate-100 bg-white",
+                )}
+            >
+                <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-slate-100 text-slate-300">
+                    <Calendar className="h-8 w-8" />
                 </div>
-                <h3 className="text-lg font-bold text-slate-900 mb-1">No attendance entries yet</h3>
-                <p className="text-slate-500 text-sm font-medium">Your logged engagement sessions will appear here.</p>
+                <h3 className="mb-1 text-lg font-bold text-slate-900">No attendance entries yet</h3>
+                <p className="text-sm font-medium text-slate-500">Your logged engagement sessions will appear here.</p>
             </div>
         );
     }
 
     return (
-        <div className="bg-white rounded-[2.5rem] border-2 border-slate-100 shadow-xl shadow-slate-200/40 relative overflow-hidden transition-all hover:border-report-primary-border/20 flex flex-col">
-            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-report-primary/30 to-transparent" />
+        <div
+            className={clsx(
+                "relative flex min-w-0 flex-col",
+                embedded
+                    ? ""
+                    : "overflow-hidden rounded-[2.5rem] border-2 border-slate-100 bg-white shadow-xl shadow-slate-200/40 transition-all hover:border-report-primary-border/20",
+            )}
+        >
+            {!embedded ? (
+                <div className="absolute left-0 top-0 h-1 w-full bg-gradient-to-r from-transparent via-report-primary/30 to-transparent" />
+            ) : null}
 
-            <div className="w-full overflow-x-auto selection:bg-report-primary/10">
+            <div className="w-full min-w-0 overflow-x-auto selection:bg-report-primary/10">
                 <table className="w-full text-left border-collapse min-w-[820px]">
                     <thead>
                         <tr className="bg-slate-50/80 backdrop-blur-sm border-b border-slate-100">
@@ -75,7 +123,8 @@ export default function AttendanceSummaryTable({ entries, onDelete, isLocked = f
                     </thead>
                     <tbody className="divide-y divide-slate-50">
                         {entries.map((entry) => (
-                            <tr key={entry.id} className="hover:bg-report-primary-soft/10 transition-all group border-b border-slate-50 last:border-0">
+                            <React.Fragment key={entry.id}>
+                            <tr className="hover:bg-report-primary-soft/10 transition-all group border-b border-slate-50 last:border-0">
                                 <td className="px-5 py-7">
                                     <div className="flex items-center gap-5">
                                         <div className="w-14 h-14 rounded-2xl bg-white text-slate-900 flex items-center justify-center font-black text-lg shrink-0 border-2 border-slate-100 shadow-sm group-hover:border-report-primary/30 transition-all group-hover:scale-105 group-hover:rotate-2">
@@ -118,14 +167,29 @@ export default function AttendanceSummaryTable({ entries, onDelete, isLocked = f
                                     </div>
                                 </td>
                                 <td className="px-5 py-7">
-                                    <span
-                                        className={clsx(
-                                            "inline-flex items-center rounded-lg border px-2.5 py-1 text-[9px] font-black uppercase tracking-widest",
-                                            approvalPillClass(entry),
-                                        )}
-                                    >
-                                        {displayApprovalLabel(entry)}
-                                    </span>
+                                    {isRejectedEntry(entry) ? (
+                                        <button
+                                            type="button"
+                                            onClick={() => toggleRemarkRow(entry.id)}
+                                            aria-expanded={remarkOpenId === entry.id}
+                                            className={clsx(
+                                                "inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[9px] font-black uppercase tracking-widest cursor-pointer transition-shadow hover:shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 focus-visible:ring-offset-1",
+                                                approvalPillClass(entry),
+                                            )}
+                                        >
+                                            {displayApprovalLabel(entry)}
+                                            <MessageSquareText className="w-3 h-3 shrink-0 opacity-80" aria-hidden />
+                                        </button>
+                                    ) : (
+                                        <span
+                                            className={clsx(
+                                                "inline-flex items-center rounded-lg border px-2.5 py-1 text-[9px] font-black uppercase tracking-widest",
+                                                approvalPillClass(entry),
+                                            )}
+                                        >
+                                            {displayApprovalLabel(entry)}
+                                        </span>
+                                    )}
                                 </td>
                                 <td className="px-8 py-7 text-center">
                                     {typeof entry.evidence_file === 'string' ? (
@@ -152,6 +216,22 @@ export default function AttendanceSummaryTable({ entries, onDelete, isLocked = f
                                     </td>
                                 )}
                             </tr>
+                            {remarkOpenId === entry.id && isRejectedEntry(entry) ? (
+                                <tr className="bg-rose-50/50 border-b border-rose-100/80">
+                                    <td colSpan={colSpan} className="px-5 py-4">
+                                        <div className="rounded-xl border border-rose-100 bg-white/90 px-4 py-3 text-sm text-slate-700 shadow-sm">
+                                            <p className="text-[10px] font-black uppercase tracking-widest text-rose-700 mb-1.5">
+                                                Rejection remarks
+                                            </p>
+                                            <p className="leading-relaxed whitespace-pre-wrap break-words">
+                                                {resolvedRejectRemark(entry) ||
+                                                    "No written remarks were provided for this rejection."}
+                                            </p>
+                                        </div>
+                                    </td>
+                                </tr>
+                            ) : null}
+                            </React.Fragment>
                         ))}
                     </tbody>
                 </table>

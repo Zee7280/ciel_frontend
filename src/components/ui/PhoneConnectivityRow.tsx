@@ -4,7 +4,12 @@ import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useSta
 import { createPortal } from "react-dom";
 import { ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { COUNTRY_DIAL_ENTRIES, DEFAULT_PHONE_COUNTRY_KEY } from "@/utils/countryCallingCodes";
+import {
+    COUNTRY_DIAL_PICKER_ENTRIES,
+    DEFAULT_PHONE_COUNTRY_KEY,
+    formatPhoneCountryKey,
+    resolvePhoneCountryDialEntry,
+} from "@/utils/countryCallingCodes";
 
 export type PhoneConnectivityRowProps = {
     /** Select value: `ISO|+dial` (see `DEFAULT_PHONE_COUNTRY_KEY`). */
@@ -27,20 +32,13 @@ export type PhoneConnectivityRowProps = {
     usePortalCountryPicker?: boolean;
 };
 
-function entryKey(e: { iso2: string; dial: string }) {
-    return `${e.iso2}|${e.dial}`;
-}
-
 function entryForKey(key: string) {
-    const found = COUNTRY_DIAL_ENTRIES.find((e) => entryKey(e) === key);
-    if (found) return found;
-    const fallback = COUNTRY_DIAL_ENTRIES.find((e) => entryKey(e) === DEFAULT_PHONE_COUNTRY_KEY);
-    return fallback ?? COUNTRY_DIAL_ENTRIES[0]!;
+    return resolvePhoneCountryDialEntry(key);
 }
 
 function nativeSelectValue(key: string) {
-    const ok = COUNTRY_DIAL_ENTRIES.some((e) => entryKey(e) === key);
-    return ok ? key : DEFAULT_PHONE_COUNTRY_KEY;
+    if (COUNTRY_DIAL_PICKER_ENTRIES.some((e) => formatPhoneCountryKey(e) === key)) return key;
+    return formatPhoneCountryKey(resolvePhoneCountryDialEntry(key));
 }
 
 type PortalCountryPickerProps = {
@@ -65,12 +63,12 @@ function PortalCountryPicker({
     const searchRef = useRef<HTMLInputElement>(null);
 
     const selected = entryForKey(phoneCountryKey);
-    const selectedKey = entryKey(selected);
+    const selectedKey = formatPhoneCountryKey(selected);
 
     const filtered = useMemo(() => {
         const q = filter.trim().toLowerCase();
-        if (!q) return COUNTRY_DIAL_ENTRIES;
-        return COUNTRY_DIAL_ENTRIES.filter((e) => {
+        if (!q) return COUNTRY_DIAL_PICKER_ENTRIES;
+        return COUNTRY_DIAL_PICKER_ENTRIES.filter((e) => {
             const dialDigits = e.dial.replace(/\D/g, "");
             return (
                 e.name.toLowerCase().includes(q) ||
@@ -176,7 +174,7 @@ function PortalCountryPicker({
                         <li className="px-3 py-6 text-center text-sm text-slate-500">No matches</li>
                     ) : (
                         filtered.map((e) => {
-                            const key = entryKey(e);
+                            const key = formatPhoneCountryKey(e);
                             const isSel = key === selectedKey;
                             return (
                                 <li key={key} role="presentation">
@@ -288,8 +286,8 @@ export default function PhoneConnectivityRow({
                             selectClassName,
                         )}
                     >
-                        {COUNTRY_DIAL_ENTRIES.map((e) => {
-                            const key = entryKey(e);
+                        {COUNTRY_DIAL_PICKER_ENTRIES.map((e) => {
+                            const key = formatPhoneCountryKey(e);
                             return (
                                 <option key={key} value={key} title={`${e.name} (${e.dial})`}>
                                     {e.iso2} {e.dial}

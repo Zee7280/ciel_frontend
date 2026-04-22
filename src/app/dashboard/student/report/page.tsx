@@ -482,7 +482,7 @@ function ReportFormContent() {
 
             {/* Main Content Area */}
             <div className="max-w-[1600px] mx-auto pt-2 flex flex-col lg:flex-row gap-8 items-start">
-                <div className="flex-1 w-full min-h-[400px]">
+                <div className="min-w-0 flex-1 w-full min-h-[400px]">
                     {activeStep === 1 && <Section1Participation projectData={projectDetails} />}
                     {activeStep === 2 && <Section2ProjectContext projectData={projectDetails} />}
                     {activeStep === 3 && <Section3SDGMapping projectData={projectDetails} />}

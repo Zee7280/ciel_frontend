@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Info, MapPin, Calendar, Clock, CheckCircle, AlertCircle, ChevronDown, ChevronUp, Users, Loader2, Plus, X } from "lucide-react";
+import { Info, MapPin, Calendar, Clock, CheckCircle, Circle, AlertCircle, ChevronDown, ChevronUp, Users, Loader2, Plus, X } from "lucide-react";
 import { authenticatedFetch } from "@/utils/api";
 import { toast } from "sonner";
 import dynamic from "next/dynamic";
@@ -1677,33 +1677,50 @@ export default function OpportunityPostingPage() {
                 </div>
                 <div className={`p-8 space-y-6 ${!expandedSections.includes('G') ? 'hidden' : ''}`}>
                     <label className="block text-sm font-bold text-slate-900 mb-2">G1. How will student participation be verified?</label>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        {["Attendance sheets", "Supervisor sign-off", "Photos of activities", "Assessment sheets", "Digital logs"].map(v => (
-                            <label key={v} className="flex items-center gap-2 text-sm font-medium text-slate-700">
+                    <div className="space-y-3">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            {["Attendance sheets", "Supervisor sign-off", "Photos of activities", "Assessment sheets", "Digital logs"].map(v => {
+                                const checked = formData.verification.includes(v);
+                                return (
+                                    <label
+                                        key={v}
+                                        className="flex items-center gap-2.5 text-sm font-medium text-slate-700 cursor-pointer select-none rounded-lg focus-within:outline-none focus-within:ring-2 focus-within:ring-cyan-500/30 focus-within:ring-offset-2"
+                                    >
+                                        <input
+                                            type="checkbox"
+                                            className="sr-only"
+                                            checked={checked}
+                                            onChange={() => {
+                                                const vers = checked
+                                                    ? formData.verification.filter(i => i !== v)
+                                                    : [...formData.verification, v];
+                                                setFormData({ ...formData, verification: vers });
+                                            }}
+                                        />
+                                        {checked ? (
+                                            <CheckCircle className="w-5 h-5 shrink-0 text-blue-600" aria-hidden />
+                                        ) : (
+                                            <Circle className="w-5 h-5 shrink-0 text-slate-300" aria-hidden />
+                                        )}
+                                        {v}
+                                    </label>
+                                );
+                            })}
+                            <label className="flex items-center gap-2.5 text-sm font-medium text-slate-700 cursor-pointer select-none md:col-span-2 rounded-lg focus-within:outline-none focus-within:ring-2 focus-within:ring-cyan-500/30 focus-within:ring-offset-2">
                                 <input
                                     type="checkbox"
-                                    className="rounded text-cyan-600 focus:ring-cyan-500"
-                                    checked={formData.verification.includes(v)}
-                                    onChange={() => {
-                                        const vers = formData.verification.includes(v)
-                                            ? formData.verification.filter(i => i !== v)
-                                            : [...formData.verification, v];
-                                        setFormData({ ...formData, verification: vers });
-                                    }}
-                                /> {v}
+                                    className="sr-only"
+                                    checked={formData.isOtherVerificationChecked}
+                                    onChange={(e) => setFormData({ ...formData, isOtherVerificationChecked: e.target.checked })}
+                                />
+                                {formData.isOtherVerificationChecked ? (
+                                    <CheckCircle className="w-5 h-5 shrink-0 text-blue-600" aria-hidden />
+                                ) : (
+                                    <Circle className="w-5 h-5 shrink-0 text-slate-300" aria-hidden />
+                                )}
+                                Other
                             </label>
-                        ))}
-                    </div>
-                    <div className="mt-4">
-                        <label className={`flex items-center gap-2 p-3 border rounded-xl hover:bg-slate-50 cursor-pointer w-full md:w-1/3 mb-2 transition-all ${formData.isOtherVerificationChecked ? 'bg-cyan-50 border-cyan-200' : 'border-slate-100'}`}>
-                            <input
-                                type="checkbox"
-                                className="rounded text-cyan-600 focus:ring-cyan-500"
-                                checked={formData.isOtherVerificationChecked}
-                                onChange={(e) => setFormData({ ...formData, isOtherVerificationChecked: e.target.checked })}
-                            />
-                            <span className={`text-sm font-medium ${formData.isOtherVerificationChecked ? 'text-cyan-700' : 'text-slate-600'}`}>Other</span>
-                        </label>
+                        </div>
                         {formData.isOtherVerificationChecked && (
                             <input
                                 type="text"

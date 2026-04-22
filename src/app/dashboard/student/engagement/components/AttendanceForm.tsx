@@ -234,7 +234,7 @@ export default function AttendanceForm({
     };
 
     return (
-        <form onSubmit={handleSubmit} className="bg-white rounded-[2.5rem] border-2 border-slate-100 p-8 shadow-xl shadow-slate-200/50 space-y-8 relative overflow-hidden group/form transition-all hover:border-report-primary-border/30">
+        <form onSubmit={handleSubmit} className="group/form relative min-w-0 space-y-8 overflow-hidden rounded-[2.5rem] border-2 border-slate-100 bg-white p-6 shadow-xl shadow-slate-200/50 transition-all hover:border-report-primary-border/30 sm:p-8">
             <div className="absolute top-0 right-0 w-32 h-32 bg-report-primary/5 rounded-full blur-3xl -mr-16 -mt-16 group-hover/form:bg-report-primary/10 transition-colors" />
 
             <div className="flex justify-between items-center relative z-10">
@@ -357,7 +357,7 @@ export default function AttendanceForm({
                             />
                             <div className="absolute bottom-4 right-4 z-[1000] pointer-events-none opacity-0 group-hover/map:opacity-100 transition-opacity">
                                 <div className="bg-white/90 backdrop-blur-md px-3 py-1.5 rounded-full shadow-lg border border-slate-100 text-[10px] font-black text-slate-500 uppercase tracking-wider">
-                                    Interactive Leaflet Map
+                                    Simple map — click to set location
                                 </div>
                             </div>
                         </div>

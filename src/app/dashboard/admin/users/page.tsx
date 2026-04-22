@@ -1,10 +1,47 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { createPortal } from "react-dom";
 import { authenticatedFetch } from "@/utils/api";
-import { Search, Filter, MoreVertical, Shield, User, Building2, GraduationCap, Plus, Edit, Trash2, X } from "lucide-react";
+import {
+    Search,
+    Filter,
+    MoreVertical,
+    Shield,
+    User,
+    Building2,
+    GraduationCap,
+    Plus,
+    Edit,
+    Trash2,
+    X,
+    ChevronsLeft,
+    ChevronLeft,
+    ChevronRight,
+    ChevronsRight,
+} from "lucide-react";
 import DataTable from "react-data-table-component";
+
+function formatJoinDate(createdAt: string | undefined | null): string {
+    if (!createdAt) return "N/A";
+    const d = new Date(createdAt);
+    if (Number.isNaN(d.getTime())) return "N/A";
+    return d.toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" });
+}
+
+function formatRoleLabel(role: string): string {
+    const r = role?.toLowerCase() || "";
+    const map: Record<string, string> = {
+        student: "Student",
+        faculty: "Faculty",
+        university: "University",
+        ngo: "Ngo",
+        corporate: "Corporate",
+        organization_admin: "Org Admin",
+        admin: "Admin",
+    };
+    return map[r] || r.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
 
 interface User {
     id: number | string;
@@ -16,13 +53,27 @@ interface User {
     orgName?: string;
 }
 
+const ACTION_MENU_W = 144;
+const ACTION_MENU_H = 96;
+const ACTION_MENU_GAP = 8;
+
+function computeActionMenuPosition(trigger: DOMRect) {
+    const spaceBelow = window.innerHeight - trigger.bottom - ACTION_MENU_GAP;
+    const openAbove = spaceBelow < ACTION_MENU_H;
+    let x = trigger.right - ACTION_MENU_W;
+    let y = openAbove ? trigger.top - ACTION_MENU_H - ACTION_MENU_GAP : trigger.bottom + ACTION_MENU_GAP;
+    x = Math.max(8, Math.min(x, window.innerWidth - ACTION_MENU_W - 8));
+    y = Math.max(8, Math.min(y, window.innerHeight - ACTION_MENU_H - 8));
+    return { x, y };
+}
+
 export default function AdminUsersPage() {
     const [users, setUsers] = useState<User[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
     // Filtering & Pagination States
     const [currentPage, setCurrentPage] = useState(1);
-    const [itemsPerPage] = useState(10);
+    const [itemsPerPage, setItemsPerPage] = useState(10);
     const [searchQuery, setSearchQuery] = useState("");
     const [roleFilter, setRoleFilter] = useState("all");
 
@@ -30,7 +81,11 @@ export default function AdminUsersPage() {
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [selectedUser, setSelectedUser] = useState<User | null>(null);
-    const [activeActionMenu, setActiveActionMenu] = useState<number | string | null>(null);
+    const [actionMenu, setActionMenu] = useState<{
+        userId: number | string;
+        x: number;
+        y: number;
+    } | null>(null);
 
     // Form States
     const [formData, setFormData] = useState({ name: "", email: "", password: "", role: "student", status: "active" });
@@ -45,16 +100,57 @@ export default function AdminUsersPage() {
         return matchesSearch && matchesRole;
     });
 
-    const totalPages = Math.ceil(filteredUsers.length / itemsPerPage);
+    const totalPages = Math.max(1, Math.ceil(filteredUsers.length / itemsPerPage));
     const paginatedUsers = filteredUsers.slice(
         (currentPage - 1) * itemsPerPage,
         currentPage * itemsPerPage
     );
+    const rangeStart = filteredUsers.length === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1;
+    const rangeEnd = Math.min(currentPage * itemsPerPage, filteredUsers.length);
+
+    const actionMenuUser =
+        actionMenu == null
+            ? null
+            : filteredUsers.find((u) => u.id === actionMenu.userId) ?? users.find((u) => u.id === actionMenu.userId) ?? null;
 
     // Reset page when filters change
     useEffect(() => {
         setCurrentPage(1);
     }, [searchQuery, roleFilter]);
+
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [itemsPerPage]);
+
+    useEffect(() => {
+        setCurrentPage((p) => (p > totalPages ? totalPages : p));
+    }, [filteredUsers.length, itemsPerPage, totalPages]);
+
+    useEffect(() => {
+        if (!actionMenu) return;
+        const onPointerDown = (e: PointerEvent) => {
+            const t = e.target as HTMLElement | null;
+            if (t?.closest("[data-user-row-actions]") || t?.closest("[data-user-actions-portal]")) return;
+            setActionMenu(null);
+        };
+        document.addEventListener("pointerdown", onPointerDown);
+        return () => document.removeEventListener("pointerdown", onPointerDown);
+    }, [actionMenu]);
+
+    useEffect(() => {
+        if (!actionMenu) return;
+        const close = () => setActionMenu(null);
+        window.addEventListener("scroll", close, true);
+        window.addEventListener("resize", close);
+        return () => {
+            window.removeEventListener("scroll", close, true);
+            window.removeEventListener("resize", close);
+        };
+    }, [actionMenu]);
+
+    useEffect(() => {
+        if (actionMenu && !actionMenuUser) setActionMenu(null);
+    }, [actionMenu, actionMenuUser]);
 
     useEffect(() => {
         fetchUsers();
@@ -71,17 +167,15 @@ export default function AdminUsersPage() {
             if (Array.isArray(data)) usersList = data;
             else if (data.success && Array.isArray(data.data)) usersList = data.data;
 
-            if (usersList.length > 0) {
-                const mappedUsers = usersList.map((u: any) => ({
-                    id: u.id,
-                    name: u.name || u.orgName || "Unknown User",
-                    email: u.email,
-                    role: u.role,
-                    status: u.status || "active",
-                    joinDate: u.createdAt ? new Date(u.createdAt).toLocaleDateString() : "N/A"
-                }));
-                setUsers(mappedUsers);
-            }
+            const mappedUsers = usersList.map((u: any) => ({
+                id: u.id,
+                name: u.name || u.orgName || "Unknown User",
+                email: u.email,
+                role: u.role,
+                status: u.status || "active",
+                joinDate: formatJoinDate(u.createdAt),
+            }));
+            setUsers(mappedUsers);
         } catch (error) {
             console.error("Failed to fetch users", error);
         } finally {
@@ -119,14 +213,14 @@ export default function AdminUsersPage() {
         } catch (error) {
             console.error("Error deleting user", error);
         }
-        setActiveActionMenu(null);
+        setActionMenu(null);
     };
 
     const openEditModal = (user: User) => {
         setSelectedUser(user);
         setFormData({ name: user.name, email: user.email, password: "", role: user.role, status: user.status });
         setIsEditModalOpen(true);
-        setActiveActionMenu(null);
+        setActionMenu(null);
     };
 
     const handleEditUser = async (e: React.FormEvent) => {
@@ -238,23 +332,25 @@ export default function AdminUsersPage() {
                         {
                             name: "Role",
                             cell: (user: User) => (
-                                <div className="flex items-center gap-2 capitalize text-sm font-bold text-slate-700">
+                                <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
                                     <div className="p-1.5 rounded-md bg-slate-50">
                                         {getRoleIcon(user.role)}
                                     </div>
-                                    {user.role}
+                                    {formatRoleLabel(user.role)}
                                 </div>
                             )
                         },
                         {
                             name: "Status",
                             cell: (user: User) => (
-                                <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${user.status === 'active'
-                                    ? 'bg-green-50 text-green-600'
-                                    : user.status === 'pending'
-                                        ? 'bg-amber-50 text-amber-600'
-                                        : 'bg-red-50 text-red-600'
-                                    }`}>
+                                <span
+                                    className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide ${user.status === "active"
+                                        ? "bg-[#E8F5E9] text-green-700"
+                                        : user.status === "pending"
+                                            ? "bg-amber-50 text-amber-600"
+                                            : "bg-red-50 text-red-600"
+                                        }`}
+                                >
                                     {user.status}
                                 </span>
                             )
@@ -267,42 +363,30 @@ export default function AdminUsersPage() {
                         {
                             name: "Actions",
                             cell: (user: User) => (
-                                <div className="relative overflow-visible">
+                                <div className="relative overflow-visible" data-user-row-actions>
                                     <button
-                                        onClick={() =>
-                                            setActiveActionMenu(
-                                                activeActionMenu === user.id ? null : user.id
-                                            )
-                                        }
+                                        type="button"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            if (actionMenu?.userId === user.id) {
+                                                setActionMenu(null);
+                                                return;
+                                            }
+                                            const rect = e.currentTarget.getBoundingClientRect();
+                                            const { x, y } = computeActionMenuPosition(rect);
+                                            setActionMenu({ userId: user.id, x, y });
+                                        }}
                                         className="p-2 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition"
                                     >
                                         <MoreVertical className="w-5 h-5" />
                                     </button>
-
-                                    {activeActionMenu === user.id && (
-                                        <div className="absolute right-0 top-full mt-2 w-36 bg-white rounded-lg shadow-xl border border-slate-100 z-[9999] py-1">
-                                            <button
-                                                onClick={() => openEditModal(user)}
-                                                className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
-                                            >
-                                                <Edit className="w-4 h-4" /> Edit
-                                            </button>
-
-                                            <button
-                                                onClick={() => handleDeleteUser(user.id)}
-                                                className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
-                                            >
-                                                <Trash2 className="w-4 h-4" /> Delete
-                                            </button>
-                                        </div>
-                                    )}
                                 </div>
                             )
                         }
                     ]}
-                    data={filteredUsers}
+                    data={paginatedUsers}
                     progressPending={isLoading}
-                    pagination
+                    pagination={false}
                     highlightOnHover
                     responsive
 
@@ -332,32 +416,96 @@ export default function AdminUsersPage() {
                     }}
                 />
 
+                {!isLoading && filteredUsers.length > 0 && (
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-end gap-3 px-4 py-3 border-t border-slate-100 text-sm text-slate-600">
+                        <div className="flex items-center gap-2">
+                            <span className="text-slate-500">Rows per page</span>
+                            <select
+                                className="border border-slate-200 rounded-md py-1 pl-2 pr-7 bg-white text-slate-800 font-medium focus:ring-2 focus:ring-blue-500 focus:outline-none cursor-pointer"
+                                value={itemsPerPage}
+                                onChange={(e) => setItemsPerPage(Number(e.target.value))}
+                            >
+                                {[10, 25, 50].map((n) => (
+                                    <option key={n} value={n}>
+                                        {n}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                        <div className="flex items-center gap-4">
+                            <span className="tabular-nums text-slate-700">
+                                {rangeStart}-{rangeEnd} of {filteredUsers.length}
+                            </span>
+                            <div className="flex items-center gap-0.5">
+                                <button
+                                    type="button"
+                                    aria-label="First page"
+                                    disabled={currentPage <= 1}
+                                    onClick={() => setCurrentPage(1)}
+                                    className="p-2 rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-800 disabled:opacity-40 disabled:pointer-events-none transition-colors"
+                                >
+                                    <ChevronsLeft className="w-4 h-4" />
+                                </button>
+                                <button
+                                    type="button"
+                                    aria-label="Previous page"
+                                    disabled={currentPage <= 1}
+                                    onClick={() => setCurrentPage((p) => p - 1)}
+                                    className="p-2 rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-800 disabled:opacity-40 disabled:pointer-events-none transition-colors"
+                                >
+                                    <ChevronLeft className="w-4 h-4" />
+                                </button>
+                                <button
+                                    type="button"
+                                    aria-label="Next page"
+                                    disabled={currentPage >= totalPages}
+                                    onClick={() => setCurrentPage((p) => p + 1)}
+                                    className="p-2 rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-800 disabled:opacity-40 disabled:pointer-events-none transition-colors"
+                                >
+                                    <ChevronRight className="w-4 h-4" />
+                                </button>
+                                <button
+                                    type="button"
+                                    aria-label="Last page"
+                                    disabled={currentPage >= totalPages}
+                                    onClick={() => setCurrentPage(totalPages)}
+                                    className="p-2 rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-800 disabled:opacity-40 disabled:pointer-events-none transition-colors"
+                                >
+                                    <ChevronsRight className="w-4 h-4" />
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
 
-            {/* Pagination Controls */}
-            {!isLoading && filteredUsers.length > 0 && (
-                <div className="flex justify-between items-center mt-4 text-sm text-slate-500">
-                    <div>
-                        Showing <span className="font-bold text-slate-900">{(currentPage - 1) * itemsPerPage + 1}</span> to <span className="font-bold text-slate-900">{Math.min(currentPage * itemsPerPage, filteredUsers.length)}</span> of <span className="font-bold text-slate-900">{filteredUsers.length}</span> users
-                    </div>
-                    <div className="flex gap-2">
+            {typeof document !== "undefined" &&
+                actionMenu &&
+                actionMenuUser &&
+                createPortal(
+                    <div
+                        data-user-actions-portal
+                        className="fixed z-[10000] w-36 rounded-lg border border-slate-100 bg-white py-1 shadow-xl"
+                        style={{ left: actionMenu.x, top: actionMenu.y }}
+                        role="menu"
+                    >
                         <button
-                            disabled={currentPage === 1}
-                            onClick={() => setCurrentPage(p => p - 1)}
-                            className="px-4 py-2 rounded-lg border border-slate-200 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                            type="button"
+                            onClick={() => openEditModal(actionMenuUser)}
+                            className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
                         >
-                            Previous
+                            <Edit className="h-4 w-4 shrink-0" /> Edit
                         </button>
                         <button
-                            disabled={currentPage === totalPages}
-                            onClick={() => setCurrentPage(p => p + 1)}
-                            className="px-4 py-2 rounded-lg border border-slate-200 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                            type="button"
+                            onClick={() => handleDeleteUser(actionMenuUser.id)}
+                            className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50"
                         >
-                            Next
+                            <Trash2 className="h-4 w-4 shrink-0" /> Delete
                         </button>
-                    </div>
-                </div>
-            )}
+                    </div>,
+                    document.body
+                )}
 
             {/* Modals Overlay */}
             {(isAddModalOpen || isEditModalOpen) && (

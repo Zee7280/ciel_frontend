@@ -102,6 +102,25 @@ function lower(value: unknown): string {
     return typeof value === "string" ? value.trim().toLowerCase() : "";
 }
 
+/** API stores per-student hours on `timeline.expected_hours`; list payloads often omit legacy `hours`. */
+function pickBrowseCreditHours(raw: Record<string, unknown>, op: BrowseOpportunity): string | number | undefined {
+    const timeline = raw.timeline as { expected_hours?: unknown } | undefined;
+    const expected = timeline?.expected_hours;
+    if (expected !== undefined && expected !== null && expected !== "") {
+        if (typeof expected === "number" && !Number.isNaN(expected)) {
+            return expected;
+        }
+        if (typeof expected === "string") {
+            const trimmed = expected.trim();
+            if (trimmed) {
+                const n = Number(trimmed);
+                return Number.isNaN(n) ? expected : n;
+            }
+        }
+    }
+    return op.hours;
+}
+
 function normalizeOpportunity(op: BrowseOpportunity): BrowseOpportunity {
     const raw = op as unknown as Record<string, unknown>;
     const applicationStatus = lower(op.application_status ?? raw.applicationStatus);
@@ -150,6 +169,7 @@ function normalizeOpportunity(op: BrowseOpportunity): BrowseOpportunity {
 
     return {
         ...op,
+        hours: pickBrowseCreditHours(raw, op),
         city,
         category,
         hasApplied,

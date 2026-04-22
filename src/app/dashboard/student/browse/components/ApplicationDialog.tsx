@@ -33,7 +33,10 @@ interface ApplicationDialogProps {
 interface TeamMember {
     name: string;
     cnic: string;
+    /** Full international digits (E.164-style), kept in sync with phone parts for the apply API. */
     mobile: string;
+    phoneCountryKey: string;
+    phoneNational: string;
     email: string;
     university: string;
     program: string;
@@ -41,6 +44,13 @@ interface TeamMember {
     verificationStatus: 'unverified' | 'sending' | 'otp_sent' | 'verified';
     otp?: string;
     showOtpInput?: boolean;
+}
+
+function defaultPakistaniUniversity(profileValue: string): string {
+    const t = (profileValue || "").trim();
+    if (t === "Other") return "Other";
+    if (pakistaniUniversities.includes(t)) return t;
+    return pakistaniUniversities[0] ?? "";
 }
 
 // Generate a short unique team ID (e.g. TM-2024-XXXX)
@@ -57,7 +67,18 @@ export default function ApplicationDialog({ opportunityId, open, onOpenChange, o
     const [secondaryFacultyEmail, setSecondaryFacultyEmail] = useState("");
     const [teamId, setTeamId] = useState("");
     const [teamMembers, setTeamMembers] = useState<TeamMember[]>([
-        { name: "", cnic: "", mobile: "", email: "", university: "", program: "", role: "Member", verificationStatus: 'unverified' }
+        {
+            name: "",
+            cnic: "",
+            mobile: "",
+            phoneCountryKey: DEFAULT_PHONE_COUNTRY_KEY,
+            phoneNational: "",
+            email: "",
+            university: defaultPakistaniUniversity(""),
+            program: "",
+            role: "Member",
+            verificationStatus: "unverified",
+        },
     ]);
     const [applicantPhoneCountryKey, setApplicantPhoneCountryKey] = useState(DEFAULT_PHONE_COUNTRY_KEY);
     const [applicantPhoneNational, setApplicantPhoneNational] = useState("");
@@ -71,17 +92,32 @@ export default function ApplicationDialog({ opportunityId, open, onOpenChange, o
             setTeamId("");
 
             const storedUserStr = localStorage.getItem("user") || localStorage.getItem("ciel_user");
-            let initialMember: TeamMember = { name: "", cnic: "", mobile: "", email: "", university: "", program: "", role: "Member", verificationStatus: 'unverified' };
+            let initialMember: TeamMember = {
+                name: "",
+                cnic: "",
+                mobile: "",
+                phoneCountryKey: DEFAULT_PHONE_COUNTRY_KEY,
+                phoneNational: "",
+                email: "",
+                university: defaultPakistaniUniversity(""),
+                program: "",
+                role: "Member",
+                verificationStatus: "unverified",
+            };
 
             if (storedUserStr) {
                 try {
                     const u = JSON.parse(storedUserStr);
+                    const rawPhone = u.phone || u.contact || "";
+                    const parsedMember = parsePhoneForDisplay(rawPhone);
                     initialMember = {
                         name: u.name || "",
                         cnic: (u.cnic || u.national_id || "").replace(/\D/g, "").slice(0, 13),
-                        mobile: u.phone || u.contact || "",
+                        mobile: composeInternationalPhone(parsedMember.phoneCountryKey, parsedMember.national),
+                        phoneCountryKey: parsedMember.phoneCountryKey,
+                        phoneNational: parsedMember.national,
                         email: u.email || "",
-                        university: u.university || u.institution || "",
+                        university: defaultPakistaniUniversity(u.university || u.institution || ""),
                         program: u.program || "",
                         role: "Lead",
                         verificationStatus: 'verified'
@@ -106,7 +142,21 @@ export default function ApplicationDialog({ opportunityId, open, onOpenChange, o
     }, [participationType]);
 
     const handleAddMember = () => {
-        setTeamMembers([...teamMembers, { name: "", cnic: "", mobile: "", email: "", university: "", program: "", role: "Member", verificationStatus: 'unverified' }]);
+        setTeamMembers([
+            ...teamMembers,
+            {
+                name: "",
+                cnic: "",
+                mobile: "",
+                phoneCountryKey: DEFAULT_PHONE_COUNTRY_KEY,
+                phoneNational: "",
+                email: "",
+                university: defaultPakistaniUniversity(""),
+                program: "",
+                role: "Member",
+                verificationStatus: "unverified",
+            },
+        ]);
     };
 
     const handleRemoveMember = (index: number) => {
@@ -119,12 +169,32 @@ export default function ApplicationDialog({ opportunityId, open, onOpenChange, o
         }
     };
 
+    const updateMemberPhone = (index: number, patch: { phoneCountryKey?: string; phoneNational?: string }) => {
+        setTeamMembers((prev) => {
+            const newMembers = [...prev];
+            const m = newMembers[index];
+            if (!m) return prev;
+            const phoneCountryKey = patch.phoneCountryKey ?? m.phoneCountryKey;
+            const phoneNational = patch.phoneNational ?? m.phoneNational;
+            newMembers[index] = {
+                ...m,
+                phoneCountryKey,
+                phoneNational,
+                mobile: composeInternationalPhone(phoneCountryKey, phoneNational),
+            };
+            return newMembers;
+        });
+    };
+
     const updateMember = (index: number, field: keyof TeamMember, value: string) => {
-        // Strict Numeric Support for CNIC and Mobile
-        if (field === 'cnic' || field === 'mobile') {
-            if (!/^\d*$/.test(value)) return; // Only allow numbers
-            if (field === 'cnic' && value.length > 13) return; // Max 13
-            if (field === 'mobile' && value.length > 11) return; // Max 11
+        // Strict numeric support for CNIC
+        if (field === "cnic") {
+            if (!/^\d*$/.test(value)) return;
+            if (value.length > 13) return;
+        }
+
+        if (field === "university" && teamMembers[index]?.role === "Lead") {
+            return;
         }
 
         const newMembers = [...teamMembers];
@@ -255,16 +325,14 @@ export default function ApplicationDialog({ opportunityId, open, onOpenChange, o
         if (participationType === "team") {
             for (let i = 0; i < teamMembers.length; i++) {
                 const member = teamMembers[i];
-                if (!member.name || !member.cnic || !member.mobile) {
+                const memberPhoneE164 = composeInternationalPhone(member.phoneCountryKey, member.phoneNational);
+                const nationalDigits = member.phoneNational.replace(/\D/g, "");
+                if (!member.name || !member.cnic || !memberPhoneE164 || nationalDigits.length < 8) {
                     toast.error(`Please fill in all required fields for Member ${i + 1}.`);
                     return;
                 }
                 if (member.cnic.length !== 13) {
                     toast.error(`CNIC for Member ${i + 1} must be exactly 13 digits.`);
-                    return;
-                }
-                if (member.mobile.length !== 11) {
-                    toast.error(`Mobile Number for Member ${i + 1} must be exactly 11 digits.`);
                     return;
                 }
                 if (member.verificationStatus !== 'verified') {
@@ -283,14 +351,24 @@ export default function ApplicationDialog({ opportunityId, open, onOpenChange, o
                 secondary_faculty_email: secondaryFacultyEmail || undefined,
                 team_members:
                     participationType === "team"
-                        ? teamMembers
+                        ? teamMembers.map((m) => {
+                              const { phoneCountryKey, phoneNational, ...rest } = m;
+                              return {
+                                  ...rest,
+                                  mobile: composeInternationalPhone(phoneCountryKey, phoneNational),
+                              };
+                          })
                         : teamMembers.length > 0
                           ? teamMembers.map((m, i) => {
                                 const role = i === 0 && (!m.role || m.role === "Member") ? "Lead" : m.role;
                                 // CNIC is collected at engagement identity verification for individuals
                                 // (avoids asking twice when it is not returned on the project record).
-                                const { cnic: _cnic, ...rest } = m;
-                                return { ...rest, role };
+                                const { cnic: _cnic, phoneCountryKey, phoneNational, ...rest } = m;
+                                return {
+                                    ...rest,
+                                    role,
+                                    mobile: composeInternationalPhone(phoneCountryKey, phoneNational),
+                                };
                             })
                           : undefined,
                 ...(applicantPhoneE164
@@ -504,7 +582,11 @@ export default function ApplicationDialog({ opportunityId, open, onOpenChange, o
                                         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Contact</p>
                                         <p className="font-bold text-slate-700">
                                             {composeInternationalPhone(applicantPhoneCountryKey, applicantPhoneNational) ||
-                                                teamMembers[0].mobile ||
+                                                composeInternationalPhone(
+                                                    teamMembers[0]?.phoneCountryKey ?? DEFAULT_PHONE_COUNTRY_KEY,
+                                                    teamMembers[0]?.phoneNational ?? "",
+                                                ) ||
+                                                teamMembers[0]?.mobile ||
                                                 "Not provided"}
                                         </p>
                                     </div>
@@ -555,7 +637,8 @@ export default function ApplicationDialog({ opportunityId, open, onOpenChange, o
                                                     value={member.name}
                                                     onChange={(e) => updateMember(index, 'name', e.target.value)}
                                                     placeholder="As appear on CNIC"
-                                                    className="h-9 bg-white"
+                                                    className={`h-9 bg-white ${member.role === "Lead" ? "bg-slate-50 cursor-default" : ""}`}
+                                                    readOnly={member.role === "Lead"}
                                                 />
                                             </div>
                                             <div className="space-y-1.5">
@@ -567,13 +650,20 @@ export default function ApplicationDialog({ opportunityId, open, onOpenChange, o
                                                     className="h-9 bg-white"
                                                 />
                                             </div>
-                                            <div className="space-y-1.5">
+                                            <div className="space-y-1.5 lg:col-span-2">
                                                 <Label className="text-xs font-medium text-slate-600">Mobile Number *</Label>
-                                                <Input
-                                                    value={member.mobile}
-                                                    onChange={(e) => updateMember(index, 'mobile', e.target.value)}
-                                                    placeholder="0300..."
-                                                    className="h-9 bg-white"
+                                                <PhoneConnectivityRow
+                                                    usePortalCountryPicker
+                                                    phoneCountryKey={member.phoneCountryKey}
+                                                    nationalDigits={member.phoneNational}
+                                                    onPhoneCountryKeyChange={(key) => updateMemberPhone(index, { phoneCountryKey: key })}
+                                                    onNationalDigitsChange={(digits) => updateMemberPhone(index, { phoneNational: digits })}
+                                                    maxNationalDigits={15}
+                                                    placeholderNational="3001234567"
+                                                    readOnly={member.role === "Lead"}
+                                                    selectClassName="border-slate-200 focus-visible:border-indigo-400 h-9 rounded-md text-xs py-0 min-h-0"
+                                                    inputClassName="border-slate-200 h-9 rounded-md text-sm py-0 min-h-0"
+                                                    rowClassName="items-stretch gap-2"
                                                 />
                                             </div>
 
@@ -581,9 +671,10 @@ export default function ApplicationDialog({ opportunityId, open, onOpenChange, o
                                             <div className="space-y-1.5">
                                                 <Label className="text-xs font-medium text-slate-600">University *</Label>
                                                 <select
-                                                    className="flex h-9 w-full rounded-md border border-input bg-white px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                                                    className={`flex h-9 w-full rounded-md border border-input px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-100 ${member.role === "Lead" ? "bg-slate-50" : "bg-white"}`}
                                                     value={member.university}
                                                     onChange={(e) => updateMember(index, 'university', e.target.value)}
+                                                    disabled={member.role === "Lead"}
                                                 >
                                                     <option value="">Select University</option>
                                                     {pakistaniUniversities.map(uni => (

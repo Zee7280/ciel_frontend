@@ -25,6 +25,7 @@ import {
     type OpportunityApplicationListRow,
 } from "@/utils/opportunityApplicationsAdmin";
 import { formatDisplayId } from "@/utils/displayIds";
+import { FacultyOpportunityDetailBody } from "@/components/faculty/FacultyOpportunityDetailBody";
 
 export default function FacultyJoinApplicationsPage() {
     const [tab, setTab] = useState<"pending" | "history">("pending");
@@ -38,6 +39,41 @@ export default function FacultyJoinApplicationsPage() {
     const [rejectComment, setRejectComment] = useState("");
     const [rejectSubmitting, setRejectSubmitting] = useState(false);
     const [historyLoadError, setHistoryLoadError] = useState<string | null>(null);
+
+    const [listingOpen, setListingOpen] = useState(false);
+    const [listingLoading, setListingLoading] = useState(false);
+    const [listingRecord, setListingRecord] = useState<Record<string, unknown> | null>(null);
+
+    const openListingModal = async (opportunityId: string) => {
+        setListingOpen(true);
+        setListingLoading(true);
+        setListingRecord(null);
+        try {
+            const res = await authenticatedFetch(`/api/v1/opportunities/detail`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ id: opportunityId }),
+            });
+            if (!res?.ok) {
+                toast.error("Could not load opportunity details");
+                setListingOpen(false);
+                return;
+            }
+            const json = await res.json();
+            const d = json?.data as Record<string, unknown> | undefined;
+            if (!d) {
+                toast.error("Opportunity not found");
+                setListingOpen(false);
+                return;
+            }
+            setListingRecord(d);
+        } catch {
+            toast.error("Could not load opportunity details");
+            setListingOpen(false);
+        } finally {
+            setListingLoading(false);
+        }
+    };
 
     const loadLists = async () => {
         setIsLoading(true);
@@ -236,18 +272,44 @@ export default function FacultyJoinApplicationsPage() {
                                             </Button>
                                         </>
                                     ) : null}
-                                    <Link
-                                        href={`/dashboard/student/browse/${row.opportunityId}`}
+                                    <button
+                                        type="button"
+                                        onClick={() => void openListingModal(row.opportunityId)}
                                         className="inline-flex h-10 w-full items-center justify-center rounded-md border border-slate-200 bg-white px-4 text-sm font-medium text-slate-800 hover:bg-slate-50"
                                     >
                                         View listing
-                                    </Link>
+                                    </button>
                                 </div>
                             </div>
                         </Card>
                     ))
                 )}
             </div>
+
+            <Dialog
+                open={listingOpen}
+                onOpenChange={(open) => {
+                    setListingOpen(open);
+                    if (!open) setListingRecord(null);
+                }}
+            >
+                <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+                    <DialogHeader>
+                        <DialogTitle>Opportunity listing</DialogTitle>
+                        <DialogDescription>
+                            Full opportunity details (same view as faculty project review). Use Approve / Reject on the card
+                            for this join application.
+                        </DialogDescription>
+                    </DialogHeader>
+                    {listingLoading ? (
+                        <div className="flex justify-center py-12 text-slate-500">
+                            <Loader2 className="w-8 h-8 animate-spin" />
+                        </div>
+                    ) : listingRecord ? (
+                        <FacultyOpportunityDetailBody d={listingRecord} />
+                    ) : null}
+                </DialogContent>
+            </Dialog>
 
             <Dialog open={rejectOpen} onOpenChange={setRejectOpen}>
                 <DialogContent>

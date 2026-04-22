@@ -205,10 +205,33 @@ function facultyApprovalPipelineApplies(v: Record<string, unknown>): boolean {
     return false;
 }
 
+/** Same shape as admin projects list API for attendance project picker. */
+function extractProjectsListForPicker(body: unknown): Record<string, unknown>[] {
+    if (Array.isArray(body)) return body as Record<string, unknown>[];
+    if (body && typeof body === "object") {
+        const o = body as Record<string, unknown>;
+        if (o.success === false && !Array.isArray(o.data)) return [];
+        for (const k of ["data", "projects", "opportunities", "items", "results", "rows"] as const) {
+            const v = o[k];
+            if (Array.isArray(v)) return v as Record<string, unknown>[];
+        }
+    }
+    return [];
+}
+
+function mapPickerProject(raw: Record<string, unknown>): { id: string; title: string } | null {
+    const id = String(raw.id ?? raw.opportunity_id ?? "").trim();
+    if (!id) return null;
+    const title = typeof raw.title === "string" && raw.title.trim() ? raw.title.trim() : "Untitled";
+    return { id, title };
+}
+
 export default function AdminApprovalsPage() {
     const router = useRouter();
     const [activeTab, setActiveTab] = useState<"registrations" | "projects" | "attendance">("registrations");
     const [attendanceProjectId, setAttendanceProjectId] = useState("");
+    const [attendanceProjectOptions, setAttendanceProjectOptions] = useState<{ id: string; title: string }[]>([]);
+    const [attendanceProjectsLoading, setAttendanceProjectsLoading] = useState(false);
 
     const [isLoading, setIsLoading] = useState(true);
     const [didBootstrapCounts, setDidBootstrapCounts] = useState(false);
@@ -257,6 +280,44 @@ export default function AdminApprovalsPage() {
             fetchPendingUsers();
         }
     }, [activeTab, didBootstrapCounts]);
+
+    useEffect(() => {
+        if (activeTab !== "attendance") return;
+        let cancelled = false;
+        (async () => {
+            setAttendanceProjectsLoading(true);
+            try {
+                const res = await authenticatedFetch(`/api/v1/admin/projects`);
+                if (!res?.ok) {
+                    if (!cancelled) {
+                        toast.error("Could not load projects for attendance.");
+                        setAttendanceProjectOptions([]);
+                    }
+                    return;
+                }
+                const data = await res.json();
+                const list = extractProjectsListForPicker(data);
+                const mapped = list
+                    .map(mapPickerProject)
+                    .filter((p): p is { id: string; title: string } => p != null);
+                if (!cancelled) setAttendanceProjectOptions(mapped);
+            } catch {
+                if (!cancelled) {
+                    toast.error("Could not load projects for attendance.");
+                    setAttendanceProjectOptions([]);
+                }
+            } finally {
+                if (!cancelled) setAttendanceProjectsLoading(false);
+            }
+        })();
+        return () => {
+            cancelled = true;
+        };
+    }, [activeTab]);
+
+    const attendanceSelectValue = attendanceProjectOptions.some((p) => p.id === attendanceProjectId)
+        ? attendanceProjectId
+        : "";
 
     const fetchPendingOpportunities = async (options?: { withLoading?: boolean }) => {
         if (options?.withLoading !== false) setIsLoading(true);
@@ -554,10 +615,33 @@ export default function AdminApprovalsPage() {
             {activeTab === "attendance" ? (
                 <div className="max-w-3xl space-y-4">
                     <div className="rounded-lg border border-slate-100 bg-slate-50/80 px-4 py-3 text-sm text-slate-700">
-                        <span className="font-semibold text-slate-900">Admin attendance queue.</span> Enter the project
-                        (opportunity) ID, then load pending logs assigned to CIEL Admin for that project. Partner-assigned
-                        sessions are reviewed in the partner dashboard.
+                        <span className="font-semibold text-slate-900">Admin attendance queue.</span> Choose a project
+                        from the list (same as All projects) or paste the opportunity ID, then load pending logs assigned
+                        to CIEL Admin for that project. Partner-assigned sessions are reviewed in the partner dashboard.
                     </div>
+                    {attendanceProjectsLoading ? (
+                        <div className="flex justify-center py-10 text-slate-500 gap-2">
+                            <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+                        </div>
+                    ) : (
+                        <div>
+                            <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">
+                                Project
+                            </label>
+                            <select
+                                value={attendanceSelectValue}
+                                onChange={(e) => setAttendanceProjectId(e.target.value)}
+                                className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm font-medium text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none bg-white"
+                            >
+                                <option value="">Select an opportunity…</option>
+                                {attendanceProjectOptions.map((p) => (
+                                    <option key={p.id} value={p.id}>
+                                        {p.title} ({p.id.slice(0, 8)}…)
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
                     <div>
                         <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">
                             Project ID

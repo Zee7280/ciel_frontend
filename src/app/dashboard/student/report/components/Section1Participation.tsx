@@ -22,6 +22,54 @@ import { calculateSection1CII } from "@/utils/reportQuality";
 import { calculateCII } from "../utils/calculateCII";
 import { resolveScopedTeamMembers } from "@/utils/reportTeamScope";
 
+/** Align dropdown ids (`lead:uuid`, `member:0:…`) with API `participantId` (bare uuid/key). */
+function engagementParticipantCompareKey(id: string | undefined | null): string {
+    if (!id) return "";
+    if (id.startsWith("lead:")) return id.slice("lead:".length);
+    const m = /^member:\d+:(.+)$/.exec(id);
+    if (m?.[1]) return m[1];
+    return id;
+}
+
+function engagementParticipantIdsMatch(a: string | undefined | null, b: string | undefined | null): boolean {
+    if (!a || !b) return false;
+    if (a === b) return true;
+    return engagementParticipantCompareKey(a) === engagementParticipantCompareKey(b);
+}
+
+function memberRowPrefixedId(m: any, idx: number): string {
+    return `member:${idx}:${m?.id || m?.participantId || m?.cnic || m?.email || "anon"}`;
+}
+
+/** Resolve API `participantId` to the same prefixed ids used in the participant dropdown. */
+function resolveAttendanceLogParticipantPrefixedId(
+    realId: string,
+    rawParticipants: { id: string }[],
+    resolvedLeadId: string | null,
+    teamMembers: any[],
+): string {
+    if (!realId) return realId;
+    const match = rawParticipants.find(
+        (p) =>
+            p.id === realId ||
+            p.id.endsWith(realId) ||
+            engagementParticipantIdsMatch(p.id, realId),
+    );
+    if (match) return match.id;
+    if (resolvedLeadId && realId === resolvedLeadId) {
+        return `lead:${resolvedLeadId}`;
+    }
+    for (let idx = 0; idx < teamMembers.length; idx++) {
+        const m = teamMembers[idx];
+        if (!m) continue;
+        const keys = [m.id, m.participantId].filter(Boolean).map(String);
+        if (keys.some((k) => k === realId) || keys.some((k) => engagementParticipantIdsMatch(k, realId))) {
+            return memberRowPrefixedId(m, idx);
+        }
+    }
+    return realId;
+}
+
 export default function Section1Participation({ projectData }: { projectData?: any } = {}) {
     const { data, updateSection, getFieldError, validationErrors, nextStep, saveReport, isReadOnly, isParticipationUnlocked, setParticipationUnlocked, setRequiredHours } = useReportForm();
 
@@ -221,6 +269,7 @@ export default function Section1Participation({ projectData }: { projectData?: a
                     if (myPart.teamId) setTeamId(myPart.teamId);
 
                     // 2. Fetch all team members for this project (Unified Table)
+                    let scopedTeamForAttendance: any[] | undefined;
                     const teamRes = await authenticatedFetch(`/api/v1/engagement/project/${projectIdFromUrl}/team`);
                     if (teamRes && teamRes.ok) {
                         const teamData = await teamRes.json();
@@ -228,6 +277,7 @@ export default function Section1Participation({ projectData }: { projectData?: a
                             const { team_members: scopedMembers, participation_type: scopedMode } =
                                 resolveScopedTeamMembers(myPart, teamData.data);
 
+                            scopedTeamForAttendance = scopedMembers;
                             updateSection("section1", {
                                 team_members: scopedMembers,
                                 participation_type: scopedMode,
@@ -235,8 +285,8 @@ export default function Section1Participation({ projectData }: { projectData?: a
                         }
                     }
 
-                    // 3. Fetch all logs using the unified loader
-                    await loadAllEntries();
+                    // 3. Fetch all logs (pass lead + roster snapshot: context/rawParticipants are still pre-render here)
+                    await loadAllEntries(myPart.id, scopedTeamForAttendance);
                 }
             }
         } catch (err) {
@@ -247,6 +297,9 @@ export default function Section1Participation({ projectData }: { projectData?: a
     };
 
     const teamVerifications = data.section1.team_members.map((m: any) => m.verified).join(',');
+    const teamMemberParticipantKeys = data.section1.team_members
+        .map((m: any) => String(m?.id || m?.participantId || ""))
+        .join("|");
     
     // Re-fetch logs whenever the team composition or verification status changes
     React.useEffect(() => {
@@ -257,7 +310,9 @@ export default function Section1Participation({ projectData }: { projectData?: a
         projectIdFromUrl,
         isVerified, 
         data.section1.team_members.length,
-        teamVerifications
+        teamVerifications,
+        teamMemberParticipantKeys,
+        participantId,
     ]);
 
     const handleNext = () => {
@@ -373,7 +428,7 @@ export default function Section1Participation({ projectData }: { projectData?: a
         return [];
     }
 
-    async function loadAllEntries() {
+    async function loadAllEntries(knownLeadParticipantId?: string | null, teamMembersSnapshot?: any[] | null) {
         if (!projectIdFromUrl) return;
         try {
             console.log(`[Attendance] Performing unified bulk sync for project: ${projectIdFromUrl}`);
@@ -383,11 +438,22 @@ export default function Section1Participation({ projectData }: { projectData?: a
                 const result = await res.json();
                 const rawLogs = result.data || [];
 
+                const resolvedLeadId =
+                    knownLeadParticipantId ?? participantId ?? data.section1.team_lead.id ?? null;
+                const teamMembersForMapping =
+                    teamMembersSnapshot !== undefined && teamMembersSnapshot !== null
+                        ? teamMembersSnapshot
+                        : data.section1.team_members;
+
                 // Map raw logs to prefixed IDs for frontend isolation
                 const unifiedLogs = rawLogs.map((e: any) => {
-                    const realId = e.participantId;
-                    const match = rawParticipants.find(p => p.id.endsWith(realId));
-                    const prefixedId = match ? match.id : realId;
+                    const realId = String(e.participantId ?? "");
+                    const prefixedId = resolveAttendanceLogParticipantPrefixedId(
+                        realId,
+                        rawParticipants,
+                        resolvedLeadId,
+                        teamMembersForMapping,
+                    );
 
                     return normalizeEngagementAttendanceLog(e, { participantPrefixedId: prefixedId });
                 });
@@ -426,7 +492,8 @@ export default function Section1Participation({ projectData }: { projectData?: a
         const hours = data.section1.attendance_logs
             .filter(
                 (l: any) =>
-                    l.participantId === u.id && isAttendanceLogCountedForVerifiedMetrics(l),
+                    engagementParticipantIdsMatch(l.participantId, u.id) &&
+                    isAttendanceLogCountedForVerifiedMetrics(l),
             )
             .reduce((acc: number, log: any) => acc + (Number(log.hours) || 0), 0);
         return hours >= requiredHoursPerStudent;
@@ -434,11 +501,11 @@ export default function Section1Participation({ projectData }: { projectData?: a
 
 
     return (
-        <div className="flex flex-col bg-slate-50/30">
+        <div className="flex min-h-0 w-full min-w-0 flex-col bg-slate-50/30">
 
             {/* Sticky Nav Progress */}
-            <div className="bg-white border-b border-slate-100 px-8 py-4 shrink-0 flex items-center justify-between">
-                <div className="flex items-center gap-4 overflow-x-auto no-scrollbar">
+            <div className="shrink-0 border-b border-slate-100 bg-white px-4 py-4 sm:px-6 lg:px-8">
+                <div className="flex min-w-0 flex-wrap items-center gap-2 sm:gap-3">
                     {steps.map((s, idx) => (
                         <React.Fragment key={s.id}>
                             <button
@@ -455,15 +522,17 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                 )}>{s.id}</span>
                                 {s.title}
                             </button>
-                            {idx < steps.length - 1 && <div className="w-8 h-[1px] bg-slate-100 shrink-0" />}
+                            {idx < steps.length - 1 && (
+                                <div className="hidden h-px w-6 shrink-0 bg-slate-100 sm:block md:w-8" aria-hidden />
+                            )}
                         </React.Fragment>
                     ))}
                 </div>
             </div>
 
             {/* Scrollable Content Workspace */}
-            <main className="px-8 py-10">
-                <div className="max-w-6xl mx-auto space-y-10">
+            <main className="min-w-0 flex-1 overflow-x-hidden px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
+                <div className="mx-auto max-w-6xl min-w-0 space-y-10">
                     {internalStep === 1 && (
                         <div className="space-y-6">
                             {/* ── Institutional purpose (orientation) ── */}
@@ -681,14 +750,16 @@ export default function Section1Participation({ projectData }: { projectData?: a
                         return (
                             <div className="space-y-8">
 
-                                <div className="flex items-center justify-between mb-2">
-                                    <div className="space-y-1">
+                                <div className="mb-2 flex min-w-0 flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                                    <div className="min-w-0 space-y-1">
                                         <h3 className="text-xl font-bold text-slate-900">STEP 2: ATTENDANCE LOGGING</h3>
                                         <p className="text-sm text-slate-500">Record and verify your engagement hours for HEC audit trails</p>
                                     </div>
-                                    <div className="bg-amber-50 px-4 py-2 rounded-xl border border-amber-100 flex items-center gap-2">
-                                        <Zap className="w-4 h-4 text-amber-500" />
-                                        <span className="text-[10px] font-bold text-amber-600 uppercase tracking-widest">Gateway Active: Hours must be at least equal to the required goal for each student to successfully meet the community engagement requirement.</span>
+                                    <div className="flex shrink-0 items-start gap-2 rounded-xl border border-amber-100 bg-amber-50 px-4 py-2.5 lg:max-w-md">
+                                        <Zap className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+                                        <span className="text-[10px] font-bold uppercase leading-snug tracking-widest text-amber-700">
+                                            Gateway active: each student must meet the required hour goal for community engagement.
+                                        </span>
                                     </div>
                                 </div>
 
@@ -768,7 +839,10 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                                             val: data.section1.attendance_logs
                                                                 .filter((l: any) => {
                                                                     if (!selectedParticipantId) return true;
-                                                                    return l.participantId === selectedParticipantId;
+                                                                    return engagementParticipantIdsMatch(
+                                                                        l.participantId,
+                                                                        selectedParticipantId,
+                                                                    );
                                                                 })
 
                                                                 .reduce((acc: number, log: any) => acc + (Number(log.hours) || 0), 0),
@@ -779,7 +853,10 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                                             val: Math.max(0, requiredHoursPerStudent - data.section1.attendance_logs
                                                                 .filter((l: any) => {
                                                                     if (!selectedParticipantId) return true;
-                                                                    return l.participantId === selectedParticipantId;
+                                                                    return engagementParticipantIdsMatch(
+                                                                        l.participantId,
+                                                                        selectedParticipantId,
+                                                                    );
                                                                 })
 
                                                                 .reduce((acc: number, log: any) => acc + (Number(log.hours) || 0), 0)),
@@ -801,8 +878,8 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                     )}
                                 </div>
 
-                                <div className="grid grid-cols-1 lg:grid-cols-[400px_1fr] gap-6">
-                                    <div className="space-y-8">
+                                <div className="grid min-w-0 grid-cols-1 gap-6 xl:grid-cols-[minmax(0,26rem)_minmax(0,1fr)] xl:items-start xl:gap-8">
+                                    <div className="min-w-0 space-y-8">
                                         <div className="p-1 bg-slate-100 rounded-2xl flex">
                                             <button className="flex-1 py-2 text-[10px] font-black uppercase tracking-widest bg-white text-report-primary rounded-xl shadow-sm">New Entry</button>
                                             <button className="flex-1 py-2 text-[10px] font-black uppercase tracking-widest text-slate-400">Bulk Import</button>
@@ -818,31 +895,38 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                             setParticipationUnlocked={setParticipationUnlocked}
                                         />
                                     </div>
-                                    <div className="space-y-6">
-                                        <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-x-auto">
-                                            <div className="p-8 border-b border-slate-50 bg-slate-50/30 flex items-center justify-between">
-                                                <div className="flex flex-col gap-1">
-                                                    <h4 className="report-h3 !flex items-center gap-2 !mb-0 text-slate-900 font-black">
-                                                        <Clock className="w-5 h-5 text-report-primary" /> Logged Sessions
+                                    <div className="min-w-0 space-y-6">
+                                        <div className="overflow-hidden rounded-[2.5rem] border border-slate-100 bg-white shadow-sm">
+                                            <div className="flex flex-col gap-4 border-b border-slate-50 bg-slate-50/30 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-8">
+                                                <div className="min-w-0 flex flex-col gap-1">
+                                                    <h4 className="report-h3 !mb-0 flex flex-wrap items-center gap-2 font-black !text-slate-900">
+                                                        <Clock className="h-5 w-5 shrink-0 text-report-primary" /> Logged Sessions
                                                     </h4>
-                                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-7">
+                                                    <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 sm:pl-7">
                                                         {selectedParticipantId ? `Filtered by: ${rawParticipants.find(u => u.id === selectedParticipantId)?.name || 'Self'}` : 'Showing records for all verified team members'}
                                                     </p>
                                                 </div>
-                                                        <span className="bg-white px-4 py-1.5 rounded-full border border-slate-100 text-[10px] font-black uppercase tracking-widest text-report-primary shadow-sm">
-                                                            {data.section1.attendance_logs.filter((log: any) => {
-                                                                if (!selectedParticipantId) return true;
-                                                                return log.participantId === selectedParticipantId;
-                                                            }).length} Records
-
-                                                        </span>
-                                                    </div>
-                                                    <AttendanceSummaryTable
-                                                        entries={data.section1.attendance_logs.filter((log: any) => {
-                                                            if (!selectedParticipantId) return true;
-                                                            return log.participantId === selectedParticipantId;
-                                                        })}
-
+                                                <span className="w-fit shrink-0 rounded-full border border-slate-100 bg-white px-4 py-1.5 text-[10px] font-black uppercase tracking-widest text-report-primary shadow-sm">
+                                                    {data.section1.attendance_logs.filter((log: any) => {
+                                                        if (!selectedParticipantId) return true;
+                                                        return engagementParticipantIdsMatch(
+                                                            log.participantId,
+                                                            selectedParticipantId,
+                                                        );
+                                                    }).length}{" "}
+                                                    Records
+                                                </span>
+                                            </div>
+                                            <div className="min-w-0 overflow-x-auto">
+                                                <AttendanceSummaryTable
+                                                    embedded
+                                                    entries={data.section1.attendance_logs.filter((log: any) => {
+                                                        if (!selectedParticipantId) return true;
+                                                        return engagementParticipantIdsMatch(
+                                                            log.participantId,
+                                                            selectedParticipantId,
+                                                        );
+                                                    })}
                                                     participantNames={participantNamesMap}
                                                     onDelete={handleDeleteEntry}
                                                     isLocked={isRecordLocked}
@@ -851,6 +935,7 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                         </div>
                                     </div>
                                 </div>
+                            </div>
                         );
                     })()}
 

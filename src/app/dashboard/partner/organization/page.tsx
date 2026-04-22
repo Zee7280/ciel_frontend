@@ -4,6 +4,12 @@ import { useState, useEffect, useRef } from "react";
 import { Building2, MapPin, Mail, Phone, Edit, CheckCircle, Upload, Loader2 } from "lucide-react";
 import { authenticatedFetch } from "@/utils/api";
 import { toast } from "sonner";
+import PhoneConnectivityRow from "@/components/ui/PhoneConnectivityRow";
+import {
+    composeInternationalPhone,
+    DEFAULT_PHONE_COUNTRY_KEY,
+    parsePhoneForDisplay,
+} from "@/utils/countryCallingCodes";
 
 const normalizeText = (value: unknown) =>
     typeof value === "string" ? value : value == null ? "" : String(value);
@@ -44,6 +50,12 @@ export default function OrganizationProfilePage() {
     const [isLoading, setIsLoading] = useState(true);
     const [isUploading, setIsUploading] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const [phoneCountryKey, setPhoneCountryKey] = useState(DEFAULT_PHONE_COUNTRY_KEY);
+    const [phoneNational, setPhoneNational] = useState("");
+    const phoneCountryKeyRef = useRef(phoneCountryKey);
+    const phoneNationalRef = useRef(phoneNational);
+    phoneCountryKeyRef.current = phoneCountryKey;
+    phoneNationalRef.current = phoneNational;
     const [orgData, setOrgData] = useState({
         // Basic Info
         name: "", // Read-only
@@ -109,6 +121,14 @@ export default function OrganizationProfilePage() {
                             logoUrl = `http://localhost:3000${logoUrl}`;
                         }
 
+                        const rawPhone = normalizeText(apiData.contactPhone);
+                        const phoneParts = parsePhoneForDisplay(rawPhone);
+                        const contactE164 = composeInternationalPhone(
+                            phoneParts.phoneCountryKey,
+                            phoneParts.national
+                        );
+                        setPhoneCountryKey(phoneParts.phoneCountryKey);
+                        setPhoneNational(phoneParts.national);
                         setOrgData(prev => ({
                             ...prev,
                             name: normalizeText(apiData.name),
@@ -122,7 +142,7 @@ export default function OrganizationProfilePage() {
                             image: logoUrl,
                             contactName: normalizeText(apiData.contactName),
                             contactEmail: normalizeText(apiData.contactEmail),
-                            contactPhone: normalizeText(apiData.contactPhone),
+                            contactPhone: contactE164.trim() || rawPhone,
                             verificationStatus: normalizeText(apiData.verificationStatus),
                             verificationScope: normalizeText(apiData.verificationScope),
                             worksWithMinors: normalizeBoolean(apiData.worksWithMinors),
@@ -228,6 +248,16 @@ export default function OrganizationProfilePage() {
         ] as const;
 
         for (const field of requiredFields) {
+            if (field.key === "contactPhone") {
+                const e164 = composeInternationalPhone(phoneCountryKey, phoneNational);
+                const nationalDigits = phoneNational.replace(/\D/g, "");
+                if (!e164.trim() || nationalDigits.length < 10) {
+                    toast.error("Enter a valid phone number with country code (at least 10 digits after code)");
+                    setIsSaving(false);
+                    return;
+                }
+                continue;
+            }
             // @ts-ignore
             if (!orgData[field.key] || !orgData[field.key].toString().trim()) {
                 toast.error(`${field.label} is required`);
@@ -256,6 +286,8 @@ export default function OrganizationProfilePage() {
                 }
             }
 
+            const contactPhoneE164 = composeInternationalPhone(phoneCountryKey, phoneNational);
+
             // Map state keys to API DTO keys
             const payload = {
                 userId, // Pass logged-in user ID
@@ -266,7 +298,7 @@ export default function OrganizationProfilePage() {
                 address: orgData.address,
                 contactName: orgData.contactName,
                 contactEmail: orgData.contactEmail,
-                contactPhone: orgData.contactPhone,
+                contactPhone: contactPhoneE164,
                 logoUrl: orgData.image,
                 safeguardingAcknowledged: orgData.isSafeguardingAcknowledged,
                 dataPolicyAcknowledged: orgData.isDataPolicyAcknowledged
@@ -285,8 +317,9 @@ export default function OrganizationProfilePage() {
                     syncStoredUserFromOrganisation({
                         city: orgData.city,
                         name: orgData.name,
-                        contactPhone: orgData.contactPhone,
+                        contactPhone: contactPhoneE164,
                     });
+                    setOrgData((prev) => ({ ...prev, contactPhone: contactPhoneE164 }));
                     // Optionally update state with response data if API returns updated object
                     // Note: If API returns the mapped object, we might need to map it back to state if we use the response
                     toast.success("Profile updated successfully!");
@@ -494,17 +527,52 @@ export default function OrganizationProfilePage() {
                                     <div className="flex items-center gap-2 text-slate-700"><Mail className="w-4 h-4 text-slate-400" /> {orgData.contactEmail || "N/A"}</div>
                                 )}
                             </div>
-                            <div>
+                            <div className="md:col-span-2">
                                 <label className="block text-sm font-bold text-slate-500 uppercase mb-1">Phone Number</label>
                                 {isEditing ? (
-                                    <input
-                                        type="text"
-                                        className="w-full px-4 py-2 rounded-lg border border-slate-200 outline-none focus:border-blue-500"
-                                        value={orgData.contactPhone}
-                                        onChange={(e) => setOrgData({ ...orgData, contactPhone: e.target.value })}
-                                    />
+                                    <>
+                                        <PhoneConnectivityRow
+                                            phoneCountryKey={phoneCountryKey}
+                                            nationalDigits={phoneNational}
+                                            onPhoneCountryKeyChange={(key) => {
+                                                setPhoneCountryKey(key);
+                                                setOrgData((prev) => ({
+                                                    ...prev,
+                                                    contactPhone: composeInternationalPhone(
+                                                        key,
+                                                        phoneNationalRef.current
+                                                    ),
+                                                }));
+                                            }}
+                                            onNationalDigitsChange={(national) => {
+                                                setPhoneNational(national);
+                                                setOrgData((prev) => ({
+                                                    ...prev,
+                                                    contactPhone: composeInternationalPhone(
+                                                        phoneCountryKeyRef.current,
+                                                        national
+                                                    ),
+                                                }));
+                                            }}
+                                            maxNationalDigits={15}
+                                            placeholderNational="3001234567"
+                                            selectClassName="rounded-lg border border-slate-200 bg-white py-2 text-xs font-semibold text-slate-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                                            inputClassName="rounded-lg border border-slate-200 bg-white py-2 text-sm font-medium text-slate-800 placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                                        />
+                                        <p className="text-xs text-slate-400 mt-1.5">
+                                            Stored as{" "}
+                                            <span className="font-mono text-slate-600">
+                                                {composeInternationalPhone(phoneCountryKey, phoneNational) || "—"}
+                                            </span>
+                                        </p>
+                                    </>
                                 ) : (
-                                    <div className="flex items-center gap-2 text-slate-700"><Phone className="w-4 h-4 text-slate-400" /> {orgData.contactPhone || "N/A"}</div>
+                                    <div className="flex flex-wrap items-center gap-2 text-slate-700">
+                                        <Phone className="w-4 h-4 shrink-0 text-slate-400" />
+                                        <span className="font-mono text-sm font-medium">
+                                            {orgData.contactPhone || "N/A"}
+                                        </span>
+                                    </div>
                                 )}
                             </div>
                         </div>

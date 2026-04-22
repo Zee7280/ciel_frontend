@@ -3,10 +3,17 @@
 import { useEffect, useState, useRef, useMemo } from "react";
 import { Button } from "../report/components/ui/button";
 import { authenticatedFetch } from "@/utils/api";
-import { Loader2, Mail, Phone, MapPin, Building2, User, Save, Camera, Sparkles } from "lucide-react";
+import { Loader2, Mail, MapPin, Building2, User, Save, Camera, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import Image from "next/image";
 import { missingProfileFieldsForRole } from "@/utils/profileCompletion";
+import { pakistaniUniversities } from "@/utils/universityData";
+import PhoneConnectivityRow from "@/components/ui/PhoneConnectivityRow";
+import {
+    composeInternationalPhone,
+    DEFAULT_PHONE_COUNTRY_KEY,
+    parsePhoneForDisplay,
+} from "@/utils/countryCallingCodes";
 
 export default function StudentProfilePage() {
     const [isLoading, setIsLoading] = useState(true);
@@ -30,6 +37,13 @@ export default function StudentProfilePage() {
     const [imagePreview, setImagePreview] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
+    const [phoneCountryKey, setPhoneCountryKey] = useState(DEFAULT_PHONE_COUNTRY_KEY);
+    const [phoneNational, setPhoneNational] = useState("");
+    const phoneCountryKeyRef = useRef(phoneCountryKey);
+    const phoneNationalRef = useRef(phoneNational);
+    phoneCountryKeyRef.current = phoneCountryKey;
+    phoneNationalRef.current = phoneNational;
+
     useEffect(() => {
         isMounted.current = true;
         fetchProfile();
@@ -45,10 +59,20 @@ export default function StudentProfilePage() {
                 try {
                     const parsedUser = JSON.parse(storedUserStr);
                     setUser(parsedUser);
+                    const rawPhone = parsedUser.contact || parsedUser.phone || "";
+                    const phoneParts = parsePhoneForDisplay(
+                        typeof rawPhone === "string" ? rawPhone : String(rawPhone ?? "")
+                    );
+                    setPhoneCountryKey(phoneParts.phoneCountryKey);
+                    setPhoneNational(phoneParts.national);
+                    const contactE164 = composeInternationalPhone(
+                        phoneParts.phoneCountryKey,
+                        phoneParts.national
+                    );
                     setFormData({
                         name: parsedUser.name || "",
                         email: parsedUser.email || "",
-                        contact: parsedUser.contact || parsedUser.phone || "",
+                        contact: contactE164,
                         institution: parsedUser.institution || parsedUser.university || "",
                         department:
                             parsedUser.department ||
@@ -95,8 +119,14 @@ export default function StudentProfilePage() {
             toast.error("Department is required before you can create opportunities");
             return;
         }
-        if (!formData.institution.trim() || !formData.city.trim() || !formData.contact.trim()) {
+        const contactE164 = composeInternationalPhone(phoneCountryKey, phoneNational);
+        const nationalDigits = phoneNational.replace(/\D/g, "");
+        if (!formData.institution.trim() || !formData.city.trim() || !contactE164.trim()) {
             toast.error("Institution, city, and phone are required");
+            return;
+        }
+        if (nationalDigits.length < 10) {
+            toast.error("Enter a valid phone number (at least 10 digits after country code)");
             return;
         }
 
@@ -129,8 +159,8 @@ export default function StudentProfilePage() {
 
             payload.append("city", formData.city);
 
-            payload.append("contact", formData.contact);
-            payload.append("phone", formData.contact);
+            payload.append("contact", contactE164);
+            payload.append("phone", contactE164);
 
             payload.append("department", formData.department);
             payload.append("faculty_department", formData.department);
@@ -163,8 +193,16 @@ export default function StudentProfilePage() {
                         storedUser.email = formData.email.trim() || storedUser.email || data.data.email;
                         storedUser.city = data.data.city;
                         storedUser.bio = data.data.bio;
-                        storedUser.phone = data.data.phone;
-                        storedUser.contact = data.data.phone;
+                        const savedPhone =
+                            typeof data.data.phone === "string" && data.data.phone.trim()
+                                ? data.data.phone.trim()
+                                : contactE164;
+                        storedUser.phone = savedPhone;
+                        storedUser.contact = savedPhone;
+                        const parsedSaved = parsePhoneForDisplay(savedPhone);
+                        setPhoneCountryKey(parsedSaved.phoneCountryKey);
+                        setPhoneNational(parsedSaved.national);
+                        setFormData((f) => ({ ...f, contact: savedPhone }));
                         storedUser.university = data.data.university;
                         storedUser.institution = data.data.university;
                         storedUser.department = formData.department.trim();
@@ -190,23 +228,33 @@ export default function StudentProfilePage() {
         }
     };
 
+    const contactE164ForGate = useMemo(
+        () => composeInternationalPhone(phoneCountryKey, phoneNational),
+        [phoneCountryKey, phoneNational]
+    );
+
     const profileGateUser = useMemo(
         () =>
             ({
                 ...(user || {}),
                 name: formData.name,
                 email: formData.email,
-                contact: formData.contact,
-                phone: formData.contact,
+                contact: contactE164ForGate,
+                phone: contactE164ForGate,
                 institution: formData.institution,
                 university: formData.institution,
                 department: formData.department,
                 city: formData.city,
             }) as Record<string, unknown>,
-        [user, formData]
+        [user, formData, contactE164ForGate]
     );
 
     const missingProfile = missingProfileFieldsForRole("student", profileGateUser);
+
+    const institutionInList = useMemo(
+        () => pakistaniUniversities.includes(formData.institution),
+        [formData.institution]
+    );
 
     if (isLoading) {
         return (
@@ -335,31 +383,39 @@ export default function StudentProfilePage() {
                             <div>
                                 <label className="block text-sm font-semibold text-slate-700 mb-2.5">Institution</label>
                                 <div className="relative group">
-                                    <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 group-focus-within:text-blue-600 transition-colors" />
-                                    <input
-                                        type="text"
+                                    <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 z-10 pointer-events-none" />
+                                    <select
                                         value={formData.institution}
-                                        onChange={(e) => setFormData({ ...formData, institution: e.target.value })}
-                                        className="w-full pl-12 pr-4 py-3.5 rounded-2xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all duration-200 font-medium text-slate-800 placeholder:text-slate-400"
-                                        placeholder="University / School"
-                                    />
+                                        disabled
+                                        className="w-full pl-12 pr-4 py-3.5 rounded-2xl border-2 bg-slate-50/50 outline-none transition-all font-bold text-slate-800 appearance-none cursor-not-allowed border-slate-100 opacity-95"
+                                    >
+                                        <option value="">Select Institution</option>
+                                        {formData.institution && !institutionInList ? (
+                                            <option value={formData.institution}>{formData.institution}</option>
+                                        ) : null}
+                                        {pakistaniUniversities.map((u) => (
+                                            <option key={u} value={u}>
+                                                {u}
+                                            </option>
+                                        ))}
+                                    </select>
                                 </div>
+                                <p className="text-xs text-slate-400 mt-2 pl-1">Same list as signup; cannot be changed here.</p>
                             </div>
 
                             <div>
-                                <label className="block text-sm font-semibold text-slate-700 mb-2.5">
-                                    Department <span className="text-red-500">*</span>
-                                </label>
+                                <label className="block text-sm font-semibold text-slate-700 mb-2.5">Program / Department</label>
                                 <div className="relative group">
-                                    <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 group-focus-within:text-blue-600 transition-colors" />
+                                    <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
                                     <input
                                         type="text"
                                         value={formData.department}
-                                        onChange={(e) => setFormData({ ...formData, department: e.target.value })}
-                                        className="w-full pl-12 pr-4 py-3.5 rounded-2xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all duration-200 font-medium text-slate-800 placeholder:text-slate-400"
-                                        placeholder="e.g. Computer Science"
+                                        readOnly
+                                        className="w-full pl-12 pr-4 py-3.5 rounded-2xl border border-slate-100 bg-slate-50/50 text-slate-500 font-medium outline-none cursor-not-allowed"
+                                        placeholder="—"
                                     />
                                 </div>
+                                <p className="text-xs text-slate-400 mt-2 pl-1">Filled at registration; contact support to update.</p>
                             </div>
 
                             <div>
@@ -378,16 +434,37 @@ export default function StudentProfilePage() {
 
                             <div className="md:col-span-2">
                                 <label className="block text-sm font-semibold text-slate-700 mb-2.5">Phone Number</label>
-                                <div className="relative group">
-                                    <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 group-focus-within:text-blue-600 transition-colors" />
-                                    <input
-                                        type="tel"
-                                        value={formData.contact}
-                                        onChange={(e) => setFormData({ ...formData, contact: e.target.value })}
-                                        className="w-full pl-12 pr-4 py-3.5 rounded-2xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all duration-200 font-medium text-slate-800 placeholder:text-slate-400"
-                                        placeholder="+92 300 1234567"
-                                    />
-                                </div>
+                                <PhoneConnectivityRow
+                                    phoneCountryKey={phoneCountryKey}
+                                    nationalDigits={phoneNational}
+                                    onPhoneCountryKeyChange={(key) => {
+                                        setPhoneCountryKey(key);
+                                        setFormData((f) => ({
+                                            ...f,
+                                            contact: composeInternationalPhone(
+                                                key,
+                                                phoneNationalRef.current
+                                            ),
+                                        }));
+                                    }}
+                                    onNationalDigitsChange={(national) => {
+                                        setPhoneNational(national);
+                                        setFormData((f) => ({
+                                            ...f,
+                                            contact: composeInternationalPhone(
+                                                phoneCountryKeyRef.current,
+                                                national
+                                            ),
+                                        }));
+                                    }}
+                                    maxNationalDigits={15}
+                                    placeholderNational="3001234567"
+                                    selectClassName="rounded-2xl border border-slate-200 bg-slate-50 py-3.5 text-sm font-semibold text-slate-800 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
+                                    inputClassName="rounded-2xl border border-slate-200 bg-slate-50 py-3.5 font-medium text-slate-800 placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
+                                />
+                                <p className="text-xs text-slate-400 mt-2 pl-1">
+                                    Full number: <span className="font-mono text-slate-600">{contactE164ForGate || "—"}</span>
+                                </p>
                             </div>
 
                             <div className="md:col-span-2">

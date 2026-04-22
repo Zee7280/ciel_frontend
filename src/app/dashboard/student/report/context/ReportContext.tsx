@@ -59,6 +59,10 @@ export interface ReportData {
             participantId?: string;
             /** Backend / report payload (snake_case). Null = legacy row (counts toward verified hours). */
             approval_status?: string | null;
+            /** Shown when approval_status is rejected (from partner/faculty/admin APIs). */
+            approval_remark?: string | null;
+            /** Raw persisted reject/flag text from backend when report JSON is not re-normalized. */
+            approvalActionReason?: string | null;
             assigned_approver_type?: string | null;
             assigned_approver_user_id?: string | null;
             opportunity_creator_kind?: string | null;

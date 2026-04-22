@@ -1,9 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import {
     ChevronDown,
-    ExternalLink,
     LifeBuoy,
     Loader2,
     Mail,
@@ -11,7 +11,6 @@ import {
     Search,
     Ticket,
 } from "lucide-react";
-import Link from "next/link";
 import { authenticatedFetch } from "@/utils/api";
 import { toast } from "sonner";
 
@@ -30,50 +29,7 @@ type SupportTicket = {
     description?: string;
 };
 
-const DEFAULT_FAQS: FaqItem[] = [
-    {
-        id: "apply",
-        category: "Opportunities",
-        question: "How do I apply for an opportunity?",
-        answer:
-            "Open Browse Opportunities, select a listing, and use Apply. Complete the form and submit. You can track status from My Projects and notifications.",
-    },
-    {
-        id: "join",
-        category: "Projects",
-        question: "What does “pending faculty” or “application stage” mean?",
-        answer:
-            "Some programs require faculty review before you are fully enrolled. Check My Projects and your notifications for updates; your faculty contact may also message you in Messages.",
-    },
-    {
-        id: "report",
-        category: "Impact report",
-        question: "Where do I complete my impact report?",
-        answer:
-            "From My Projects, open the project and use the report flow when it is available. Save sections as you go; required fields are marked in each section.",
-    },
-    {
-        id: "messages",
-        category: "Messaging",
-        question: "How do I reach a partner or faculty member?",
-        answer:
-            "Use Messages in the sidebar. Threads are tied to your participation; keep communication on-platform so support staff can help if something goes wrong.",
-    },
-    {
-        id: "notifs",
-        category: "Account",
-        question: "I am not receiving notifications.",
-        answer:
-            "Check Notifications in the dashboard and your email spam folder. Ensure your profile email is correct. If issues persist, open a support ticket with your account email.",
-    },
-    {
-        id: "tech",
-        category: "Technical",
-        question: "The page fails to load or I see an error after submitting.",
-        answer:
-            "Try a refresh, a different browser, or logging out and back in. If it continues, submit a ticket with the time, page URL, and a screenshot if possible.",
-    },
-];
+
 
 function pickTicketList(payload: unknown): SupportTicket[] {
     if (!payload || typeof payload !== "object") return [];
@@ -104,7 +60,7 @@ function pickTicketOne(payload: unknown): SupportTicket | null {
 
 export default function StudentHelpPage() {
     const [tab, setTab] = useState<HelpTab>("faqs");
-    const [faqs, setFaqs] = useState<FaqItem[]>(DEFAULT_FAQS);
+    const [faqs, setFaqs] = useState<FaqItem[]>([]);
 
     const [tickets, setTickets] = useState<SupportTicket[]>([]);
     const [ticketsLoading, setTicketsLoading] = useState(false);
@@ -295,7 +251,7 @@ export default function StudentHelpPage() {
                         <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Help &amp; Support</h1>
                         <p className="mt-1 max-w-2xl text-sm text-slate-500 sm:text-base">
                             FAQs, submit a ticket, and track requests. For general enquiries you can also use the{" "}
-                            <Link href="/contact" className="font-semibold text-blue-600 underline-offset-2 hover:underline">
+                            <Link href="/contact" className="font-semibold text-blue-600 hover:text-blue-700 hover:underline">
                                 contact page
                             </Link>
                             .
@@ -481,13 +437,6 @@ export default function StudentHelpPage() {
                                 {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <MessageSquarePlus className="h-4 w-4" />}
                                 Submit
                             </button>
-                            <Link
-                                href="/contact"
-                                className="inline-flex items-center gap-1.5 text-sm font-semibold text-blue-600 hover:underline"
-                            >
-                                Public contact form
-                                <ExternalLink className="h-3.5 w-3.5" />
-                            </Link>
                         </div>
                     </form>
                 )}

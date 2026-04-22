@@ -20,6 +20,9 @@
 # production
 /build
 
+# local tooling (image processing venv)
+/.venv-logo
+
 # misc
 .DS_Store
 *.pem
