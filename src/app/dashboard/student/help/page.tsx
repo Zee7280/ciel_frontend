@@ -418,7 +418,7 @@ export default function StudentHelpPage() {
                                 <label htmlFor="ticket-body" className="block text-sm font-semibold text-slate-700">
                                     Description
                                 </label>
-                                <textarea
+                                <textarea spellCheck={true}
                                     id="ticket-body"
                                     value={description}
                                     onChange={(e) => setDescription(e.target.value)}

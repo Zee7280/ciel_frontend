@@ -31,6 +31,20 @@ const ACTIVITY_TYPES_MAIN = [
 /** Show optional schedule fields for these timeline types. */
 const TIMELINES_WITH_SCHEDULE_UI = ["Fixed dates", "Flexible", "Ongoing"] as const;
 
+/** Display-only weekday for HTML date input value (YYYY-MM-DD); does not change stored values. */
+function weekdayLabelFromDateInput(value: string): string | null {
+    const v = value.trim();
+    if (!v || !/^\d{4}-\d{2}-\d{2}$/.test(v)) return null;
+    const [ys, ms, ds] = v.split("-");
+    const y = Number(ys);
+    const m = Number(ms);
+    const d = Number(ds);
+    if (!y || !m || !d) return null;
+    const date = new Date(y, m - 1, d);
+    if (Number.isNaN(date.getTime())) return null;
+    return date.toLocaleDateString("en-US", { weekday: "long" });
+}
+
 const BENEFICIARY_PREDEFINED = [
     "Children",
     "Youth",
@@ -651,6 +665,15 @@ export default function StudentOpportunityCreationPage() {
         [studentDetails.contact],
     );
 
+    const timelineStartWeekdayLabel = useMemo(
+        () => weekdayLabelFromDateInput(formData.dates.start),
+        [formData.dates.start],
+    );
+    const timelineEndWeekdayLabel = useMemo(
+        () => weekdayLabelFromDateInput(formData.dates.end),
+        [formData.dates.end],
+    );
+
     const handleSaveDraft = () => {
         try {
             localStorage.setItem(
@@ -1167,20 +1190,36 @@ export default function StudentOpportunityCreationPage() {
                                         <p className="text-xs text-slate-500">
                                             Start/end dates and daily times are optional for all timeline types.
                                         </p>
-                                        <div className="flex gap-2 flex-wrap">
-                                            <input
-                                                type="date"
-                                                className="flex-1 min-w-[140px] px-3 py-2 border border-slate-200 rounded-lg text-sm"
-                                                value={formData.dates.start}
-                                                onChange={(e) => setFormData({ ...formData, dates: { ...formData.dates, start: e.target.value } })}
-                                            />
-                                            <span className="self-center text-slate-400">-</span>
-                                            <input
-                                                type="date"
-                                                className="flex-1 min-w-[140px] px-3 py-2 border border-slate-200 rounded-lg text-sm"
-                                                value={formData.dates.end}
-                                                onChange={(e) => setFormData({ ...formData, dates: { ...formData.dates, end: e.target.value } })}
-                                            />
+                                        <div className="flex gap-2 flex-wrap items-start">
+                                            <div className="flex-1 min-w-[140px] space-y-1">
+                                                <input
+                                                    type="date"
+                                                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
+                                                    value={formData.dates.start}
+                                                    onChange={(e) => setFormData({ ...formData, dates: { ...formData.dates, start: e.target.value } })}
+                                                />
+                                                {timelineStartWeekdayLabel && (
+                                                    <p className="text-xs font-medium text-slate-500 pl-0.5" aria-live="polite">
+                                                        {timelineStartWeekdayLabel}
+                                                    </p>
+                                                )}
+                                            </div>
+                                            <span className="text-slate-400 pt-2.5 shrink-0" aria-hidden>
+                                                -
+                                            </span>
+                                            <div className="flex-1 min-w-[140px] space-y-1">
+                                                <input
+                                                    type="date"
+                                                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
+                                                    value={formData.dates.end}
+                                                    onChange={(e) => setFormData({ ...formData, dates: { ...formData.dates, end: e.target.value } })}
+                                                />
+                                                {timelineEndWeekdayLabel && (
+                                                    <p className="text-xs font-medium text-slate-500 pl-0.5" aria-live="polite">
+                                                        {timelineEndWeekdayLabel}
+                                                    </p>
+                                                )}
+                                            </div>
                                         </div>
                                         <div className="flex gap-2 flex-wrap items-center">
                                             <div className="flex-1 min-w-[140px]">
@@ -1424,7 +1463,7 @@ export default function StudentOpportunityCreationPage() {
                 <div className={`p-8 space-y-6 ${!expandedSections.includes('D') ? 'hidden' : ''}`}>
                     <div>
                         <label className="block text-sm font-bold text-slate-900 mb-2">D1. Project Objective <span className="text-red-500">*</span></label>
-                        <textarea
+                        <textarea spellCheck={true}
                             className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10 outline-none font-medium h-32"
                             placeholder="What do you aim to achieve?"
                             value={formData.objectives.description}
@@ -1588,7 +1627,7 @@ export default function StudentOpportunityCreationPage() {
                 <div className={`p-8 space-y-6 ${!expandedSections.includes('E') ? 'hidden' : ''}`}>
                     <div>
                         <label className="block text-sm font-bold text-slate-900 mb-2">E1. Detailed Plan (Bullet List) <span className="text-red-500">*</span></label>
-                        <textarea
+                        <textarea spellCheck={true}
                             className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 outline-none font-medium h-32"
                             placeholder="• Step 1: ..."
                             value={formData.activity.responsibilities}
@@ -1830,7 +1869,7 @@ export default function StudentOpportunityCreationPage() {
                         {formData.supervision.executingContext === "independent" && (
                             <div className="space-y-3 animate-in fade-in slide-in-from-top-2">
                                 <p className="text-xs font-bold text-slate-500 uppercase">Independent community activity</p>
-                                <textarea
+                                <textarea spellCheck={true}
                                     className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-orange-500 outline-none text-sm min-h-[88px]"
                                     placeholder="Activity location / site description *"
                                     value={formData.supervision.independentSiteDescription}

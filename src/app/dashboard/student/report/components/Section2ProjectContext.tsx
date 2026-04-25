@@ -190,7 +190,7 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
     const endDate = formatDate(projectData?.end_date || projectData?.endDate);
 
     return (
-        <div className="space-y-6 pb-8">
+        <div className="space-y-5 pb-6">
 
             {/* ── Section Header ─────────────────────────────────────────── */}
             <div className="space-y-5">
@@ -471,7 +471,7 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
                     <span className="ml-auto px-3 py-1 rounded-full bg-amber-50 text-amber-700 font-black text-[9px] uppercase tracking-widest border border-amber-100">Required</span>
                 </div>
 
-                <div className="bg-white rounded-[2.5rem] border-2 border-slate-100 p-8 shadow-sm space-y-8">
+                <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm space-y-4">
                     <div className="space-y-5">
                         <div className="space-y-1">
                             <Label className="report-label !text-slate-900">Select what informed your understanding of the problem</Label>

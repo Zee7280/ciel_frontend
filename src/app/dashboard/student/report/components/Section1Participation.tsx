@@ -504,7 +504,7 @@ export default function Section1Participation({ projectData }: { projectData?: a
         <div className="flex min-h-0 w-full min-w-0 flex-col bg-slate-50/30">
 
             {/* Sticky Nav Progress */}
-            <div className="shrink-0 border-b border-slate-100 bg-white px-4 py-4 sm:px-6 lg:px-8">
+            <div className="shrink-0 border-b border-slate-100 bg-white px-3 py-2.5 sm:px-5 lg:px-6">
                 <div className="flex min-w-0 flex-wrap items-center gap-2 sm:gap-3">
                     {steps.map((s, idx) => (
                         <React.Fragment key={s.id}>
@@ -531,8 +531,8 @@ export default function Section1Participation({ projectData }: { projectData?: a
             </div>
 
             {/* Scrollable Content Workspace */}
-            <main className="min-w-0 flex-1 overflow-x-hidden px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
-                <div className="mx-auto max-w-6xl min-w-0 space-y-10">
+            <main className="min-w-0 flex-1 overflow-x-hidden px-3 py-5 sm:px-5 sm:py-6 lg:px-6">
+                <div className="mx-auto max-w-6xl min-w-0 space-y-5">
                     {internalStep === 1 && (
                         <div className="space-y-6">
                             {/* ── Institutional purpose (orientation) ── */}
@@ -896,7 +896,7 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                         />
                                     </div>
                                     <div className="min-w-0 space-y-6">
-                                        <div className="overflow-hidden rounded-[2.5rem] border border-slate-100 bg-white shadow-sm">
+                                        <div className="overflow-hidden rounded-xl border border-slate-100 bg-white shadow-sm">
                                             <div className="flex flex-col gap-4 border-b border-slate-50 bg-slate-50/30 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-8">
                                                 <div className="min-w-0 flex flex-col gap-1">
                                                     <h4 className="report-h3 !mb-0 flex flex-wrap items-center gap-2 font-black !text-slate-900">

@@ -9,6 +9,9 @@ import { useSearchParams } from "next/navigation";
 import clsx from "clsx";
 import UserSearchModal from "./UserSearchModal";
 
+const CONVERSATION_POLL_MS_VISIBLE = 10_000;
+const CONVERSATION_POLL_MS_HIDDEN = 60_000;
+
 function ChatPageContent() {
     const searchParams = useSearchParams();
     const [conversations, setConversations] = useState<any[]>([]);
@@ -21,12 +24,36 @@ function ChatPageContent() {
         fetchUser();
         fetchConversations();
 
-        // Polling for new conversations
-        const interval = setInterval(() => {
-            fetchConversations();
-        }, 10000);
+        let intervalId: ReturnType<typeof setInterval> | undefined;
 
-        return () => clearInterval(interval);
+        const armInterval = () => {
+            if (intervalId !== undefined) {
+                clearInterval(intervalId);
+            }
+            const ms = document.hidden
+                ? CONVERSATION_POLL_MS_HIDDEN
+                : CONVERSATION_POLL_MS_VISIBLE;
+            intervalId = setInterval(() => {
+                fetchConversations();
+            }, ms);
+        };
+
+        const onVisibility = () => {
+            if (!document.hidden) {
+                fetchConversations();
+            }
+            armInterval();
+        };
+
+        armInterval();
+        document.addEventListener("visibilitychange", onVisibility);
+
+        return () => {
+            document.removeEventListener("visibilitychange", onVisibility);
+            if (intervalId !== undefined) {
+                clearInterval(intervalId);
+            }
+        };
     }, []);
 
     const fetchUser = async () => {

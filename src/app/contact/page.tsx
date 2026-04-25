@@ -175,8 +175,8 @@ export default function ContactPage() {
 
                             <div className="space-y-2">
                                 <label htmlFor="message" className="text-sm font-bold text-slate-700">Message</label>
-                                <textarea 
-                                    id="message" rows={5} required placeholder="How can we help you?" 
+                                <textarea spellCheck={true}
+                                    id="message" rows={5} required placeholder="How can we help you?"
                                     value={formData.message} onChange={handleChange}
                                     className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all bg-slate-50 focus:bg-white resize-none"
                                 ></textarea>

@@ -163,8 +163,10 @@ export default function LocationPicker({ onLocationSelect, initialLocation }: Lo
     }
 
     return (
-        <div className="space-y-4">
-            <div className="flex gap-3 relative z-[1001]">
+        // `isolate` keeps search/dropdown z-index above the map without competing with
+        // app chrome (e.g. report sticky header at z-30).
+        <div className="relative isolate space-y-4">
+            <div className="relative z-20 flex gap-3">
                 <div className="relative flex-1 group">
                     <div className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 group-focus-within:text-blue-500 transition-colors">
                         <MapPin className="w-full h-full" />

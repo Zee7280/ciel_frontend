@@ -1,10 +1,14 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { authenticatedFetch } from "@/utils/api";
 import { ArrowLeft, Send, User, Loader2 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import clsx from "clsx";
+
+/** Active tab: typical REST-chat refresh. Background: lighter load. */
+const MESSAGE_POLL_MS_VISIBLE = 8_000;
+const MESSAGE_POLL_MS_HIDDEN = 60_000;
 
 interface Participant {
     id: string;
@@ -47,22 +51,7 @@ export default function ChatWindow({
     const bottomRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
 
-    useEffect(() => {
-        fetchMessages();
-        markAsRead();
-
-        const interval = setInterval(() => {
-            fetchMessages();
-        }, 90000);
-
-        return () => clearInterval(interval);
-    }, [conversationId]);
-
-    useEffect(() => {
-        bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-    }, [messages]);
-
-    const fetchMessages = async () => {
+    const fetchMessages = useCallback(async () => {
         try {
             const res = await authenticatedFetch(
                 `/api/v1/chat/conversations/${conversationId}/messages`
@@ -78,9 +67,9 @@ export default function ChatWindow({
         } finally {
             setIsLoading(false);
         }
-    };
+    }, [conversationId]);
 
-    const markAsRead = async () => {
+    const markAsRead = useCallback(async () => {
         try {
             await authenticatedFetch(
                 `/api/v1/chat/conversations/${conversationId}/read`,
@@ -89,7 +78,48 @@ export default function ChatWindow({
         } catch {
             // non-critical
         }
-    };
+    }, [conversationId]);
+
+    useEffect(() => {
+        setIsLoading(true);
+        fetchMessages();
+        markAsRead();
+
+        let intervalId: ReturnType<typeof setInterval> | undefined;
+
+        const armInterval = () => {
+            if (intervalId !== undefined) {
+                clearInterval(intervalId);
+            }
+            const ms = document.hidden
+                ? MESSAGE_POLL_MS_HIDDEN
+                : MESSAGE_POLL_MS_VISIBLE;
+            intervalId = setInterval(() => {
+                fetchMessages();
+            }, ms);
+        };
+
+        const onVisibility = () => {
+            if (!document.hidden) {
+                fetchMessages();
+            }
+            armInterval();
+        };
+
+        armInterval();
+        document.addEventListener("visibilitychange", onVisibility);
+
+        return () => {
+            document.removeEventListener("visibilitychange", onVisibility);
+            if (intervalId !== undefined) {
+                clearInterval(intervalId);
+            }
+        };
+    }, [conversationId, fetchMessages, markAsRead]);
+
+    useEffect(() => {
+        bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    }, [messages]);
 
     const handleSend = async () => {
         const content = newMessage.trim();

@@ -1,20 +1,39 @@
 "use client"
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useParams, useRouter } from 'next/navigation';
 import { authenticatedFetch } from '@/utils/api';
 import {
-    ArrowLeft, CheckCircle2, XCircle, Download, ExternalLink,
-    User, Building2, Calendar, Target, Users, Activity,
-    TrendingUp, Package, Handshake, FileText, MessageSquare,
-    Globe, MapPin, Clock as ClockIcon, AlertTriangle, List
-} from 'lucide-react';
+    ArrowLeft,
+    BarChart3,
+    CheckCircle2,
+    ChevronDown,
+    XCircle,
+    ExternalLink,
+    User,
+    Building2,
+    Calendar,
+    Target,
+    Users,
+    Activity,
+    TrendingUp,
+    Package,
+    Handshake,
+    FileText,
+    MessageSquare,
+    MapPin,
+    Clock as ClockIcon,
+    AlertTriangle,
+    List,
+} from "lucide-react";
 import { toast } from 'sonner';
 import clsx from 'clsx';
 import ReportPrintView from '../../../../student/report/components/ReportPrintView';
 import AttendanceSummaryTable from '../../../../student/engagement/components/AttendanceSummaryTable';
 import { checkReportQuality, QualityAlert } from '@/utils/reportQuality';
-import { parseSection11AuditSummary, type ReportCIIauditMeta } from '@/lib/parseCIIauditSummary';
+import { parseSection11AuditSummary, type ReportCIIauditMeta } from "@/lib/parseCIIauditSummary";
+import type { ReportData } from "../../../../student/report/context/ReportContext";
+import { calculateCII } from "../../../../student/report/utils/calculateCII";
 
 function normalizeAuditMeta(raw: unknown, summaryText: string): ReportCIIauditMeta | null {
     const fallback = summaryText ? parseSection11AuditSummary(summaryText) : null;
@@ -93,6 +112,7 @@ function buildQualityAlerts(reportData: any, section11Audit: ReportCIIauditMeta 
 
 interface ReportDetail {
     id: string;
+    project_id?: string;
     student: {
         name: string;
         email: string;
@@ -124,17 +144,131 @@ interface ReportDetail {
     section10: any;
     section11: any;
     evidence_urls: string[];
+    /** Hours target for CII / engagement; falls back to opportunity hours or 16. */
+    required_hours?: number;
 }
 
-/** Equal-height decision tiles: shared typography and icon frame (Student Report Approval). */
-const approvalDecisionTile = {
-    root: "flex h-full min-h-[11.5rem] w-full flex-col items-center justify-center gap-3 rounded-[2rem] border-2 p-8 font-bold shadow-sm transition-all hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
-    iconFrame:
-        "flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl transition-transform group-hover:scale-105",
-    textBlock: "text-center",
-    title: "text-lg font-black leading-tight",
-    subtitle: "mt-1 text-[10px] font-black uppercase tracking-widest text-current/65",
+const DOSSIER_NAV_SECTIONS = [
+    { id: "section1", label: "Participation Profile", icon: Users },
+    { id: "section2", label: "Project Context", icon: FileText },
+    { id: "section3", label: "SDG Mapping", icon: Target },
+    { id: "section4", label: "Activities & Outputs", icon: Activity },
+    { id: "section5", label: "Outcomes", icon: TrendingUp },
+    { id: "section6", label: "Resources", icon: Package },
+    { id: "section7", label: "Partnerships", icon: Handshake },
+    { id: "section8", label: "Evidence", icon: FileText },
+    { id: "section9", label: "Reflection", icon: MessageSquare },
+    { id: "section10", label: "Sustainability", icon: Activity },
+    { id: "section11", label: "Summary / Print View", icon: FileText },
+] as const;
+
+/** Admin verify dossier: indigo accent + slate neutrals (matches `--color-report-*` in globals). */
+const adminDossier = {
+    shell: "min-h-screen bg-slate-50 font-sans text-slate-800 antialiased",
+    card: "rounded-2xl border border-slate-200/90 bg-white shadow-sm",
+    cardLg: "rounded-3xl border border-slate-200/90 bg-white shadow-sm",
+    sectionIcon: "flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-indigo-700 ring-1 ring-indigo-100",
+    sectionTitle: "text-xl font-bold tracking-tight text-slate-900 sm:text-2xl",
+    microLabel: "text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500",
+    inset: "rounded-xl border border-slate-100 bg-slate-50/90 px-3 py-2.5",
+    tocBtn: "group flex w-full flex-row items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-slate-50",
+    navIcon: "h-4 w-4 shrink-0 text-slate-400 transition-colors group-hover:text-indigo-600",
+    navText: "min-w-0 flex-1 text-left text-sm font-medium leading-snug text-slate-700 transition-colors group-hover:text-slate-900",
+    hub: "rounded-3xl bg-slate-900 p-6 text-white shadow-lg shadow-slate-300/40",
 } as const;
+
+function adminValueIsEmpty(value: unknown): boolean {
+    if (value === null || value === undefined) return true;
+    if (typeof value === "string") {
+        const t = value.trim();
+        if (!t) return true;
+        const u = t.toUpperCase();
+        if (u === "N/A" || u === "NA" || u === "NONE" || u === "NULL" || u === "UNDEFINED") return true;
+    }
+    if (Array.isArray(value)) return value.length === 0 || value.every((v) => adminValueIsEmpty(v));
+    return false;
+}
+
+function AdminFieldBody({ value }: { value: unknown }): ReactNode {
+    if (adminValueIsEmpty(value)) {
+        return (
+            <span className="inline-flex max-w-full items-center rounded-full border border-slate-200 bg-white px-2.5 py-0.5 text-xs font-medium text-slate-500">
+                Not provided
+            </span>
+        );
+    }
+    if (typeof value === "boolean") {
+        return value ? (
+            <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-800">
+                Yes
+            </span>
+        ) : (
+            <span className="inline-flex items-center rounded-full border border-slate-200 bg-white px-2.5 py-0.5 text-xs font-semibold text-slate-600">
+                No
+            </span>
+        );
+    }
+    if (typeof value === "string") {
+        const t = value.trim();
+        const lower = t.toLowerCase();
+        if (lower === "yes" || lower === "true") {
+            return (
+                <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-800">
+                    Yes
+                </span>
+            );
+        }
+        if (lower === "no" || lower === "false") {
+            return (
+                <span className="inline-flex items-center rounded-full border border-slate-200 bg-white px-2.5 py-0.5 text-xs font-semibold text-slate-600">
+                    No
+                </span>
+            );
+        }
+        return <span className="text-sm font-medium leading-relaxed text-slate-800">{t}</span>;
+    }
+    if (typeof value === "number" && !Number.isNaN(value)) {
+        return <span className="text-sm font-medium tabular-nums text-slate-800">{value}</span>;
+    }
+    if (Array.isArray(value)) {
+        const parts = value
+            .map((v) => (typeof v === "string" || typeof v === "number" ? String(v) : ""))
+            .map((s) => s.trim())
+            .filter(Boolean);
+        if (!parts.length) {
+            return (
+                <span className="inline-flex max-w-full items-center rounded-full border border-slate-200 bg-white px-2.5 py-0.5 text-xs font-medium text-slate-500">
+                    Not provided
+                </span>
+            );
+        }
+        return <span className="text-sm font-medium leading-relaxed text-slate-800">{parts.join(", ")}</span>;
+    }
+    return <span className="text-sm font-medium leading-relaxed text-slate-800">{String(value)}</span>;
+}
+
+function SectionCollapseTrigger({
+    sectionId,
+    isOpen,
+    onToggle,
+}: {
+    sectionId: string;
+    isOpen: boolean;
+    onToggle: () => void;
+}) {
+    return (
+        <button
+            type="button"
+            onClick={onToggle}
+            className="shrink-0 rounded-xl p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
+            aria-expanded={isOpen}
+            aria-controls={`${sectionId}-panel`}
+            title={isOpen ? "Collapse section" : "Expand section"}
+        >
+            <ChevronDown className={clsx("h-5 w-5 transition-transform duration-200", isOpen && "-rotate-180")} />
+        </button>
+    );
+}
 
 export default function AdminReportDetailPage() {
     const params = useParams();
@@ -146,6 +280,38 @@ export default function AdminReportDetailPage() {
     const [showStickyActions, setShowStickyActions] = useState(false);
     const [qualityAlerts, setQualityAlerts] = useState<QualityAlert[]>([]);
     const [section11Audit, setSection11Audit] = useState<ReportCIIauditMeta | null>(null);
+    const [sectionOpen, setSectionOpen] = useState<Record<string, boolean>>(() =>
+        Object.fromEntries(DOSSIER_NAV_SECTIONS.map((s) => [s.id, true])) as Record<string, boolean>,
+    );
+
+    const toggleSection = (id: string) => setSectionOpen((prev) => ({ ...prev, [id]: !prev[id] }));
+    const expandAllSections = () =>
+        setSectionOpen(Object.fromEntries(DOSSIER_NAV_SECTIONS.map((s) => [s.id, true])) as Record<string, boolean>);
+    const collapseAllSections = () =>
+        setSectionOpen(Object.fromEntries(DOSSIER_NAV_SECTIONS.map((s) => [s.id, false])) as Record<string, boolean>);
+
+    const ciiSnapshot = useMemo(() => {
+        if (!report) return null;
+        try {
+            const reqH =
+                typeof report.required_hours === "number" && report.required_hours > 0
+                    ? report.required_hours
+                    : typeof report.opportunity?.hours === "number" && report.opportunity.hours > 0
+                      ? report.opportunity.hours
+                      : 16;
+            const payload = {
+                ...report,
+                required_hours: reqH,
+                project_id:
+                    typeof report.project_id === "string" && report.project_id.trim()
+                        ? report.project_id
+                        : String(report.id),
+            } as ReportData;
+            return calculateCII(payload);
+        } catch {
+            return null;
+        }
+    }, [report]);
 
     useEffect(() => {
         fetchReportDetail();
@@ -230,41 +396,33 @@ export default function AdminReportDetailPage() {
         }
     };
 
-    const sections = [
-        { id: 'section1', label: 'Participation Profile', icon: Users },
-        { id: 'section2', label: 'Project Context', icon: FileText },
-        { id: 'section3', label: 'SDG Mapping', icon: Target },
-        { id: 'section4', label: 'Activities & Outputs', icon: Activity },
-        { id: 'section5', label: 'Outcomes', icon: TrendingUp },
-        { id: 'section6', label: 'Resources', icon: Package },
-        { id: 'section7', label: 'Partnerships', icon: Handshake },
-        { id: 'section8', label: 'Evidence', icon: FileText },
-        { id: 'section9', label: 'Reflection', icon: MessageSquare },
-        { id: 'section10', label: 'Sustainability', icon: Activity },
-        { id: 'section11', label: 'Summary / Print View', icon: FileText },
-    ];
-
-    const LabelValue = ({ label, value, fullWidth = false }: { label: string, value: any, fullWidth?: boolean }) => (
-        <div className={`flex flex-col mb-4 ${fullWidth ? 'w-full' : 'w-1/2 pr-4'}`}>
-            <span className="font-bold text-slate-700 text-xs uppercase tracking-wider mb-1">{label}</span>
-            <div className="text-sm text-slate-900 leading-relaxed text-justify">{value || "N/A"}</div>
+    const LabelValue = ({ label, value, fullWidth = false }: { label: string; value: unknown; fullWidth?: boolean }) => (
+        <div className={`mb-4 flex flex-col ${fullWidth ? "w-full" : "w-1/2 pr-4"}`}>
+            <span className={clsx(adminDossier.microLabel, "mb-1.5 block tracking-wide")}>{label}</span>
+            <div className={clsx(adminDossier.inset, "text-justify")}>
+                <AdminFieldBody value={value} />
+            </div>
         </div>
     );
 
     if (loading) {
         return (
-            <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-                <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-600 border-t-transparent"></div>
+            <div className={clsx(adminDossier.shell, "flex items-center justify-center p-8")}>
+                <div className="h-12 w-12 animate-spin rounded-full border-4 border-indigo-600 border-t-transparent" />
             </div>
         );
     }
 
     if (!report) {
         return (
-            <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+            <div className={clsx(adminDossier.shell, "flex items-center justify-center p-8")}>
                 <div className="text-center">
-                    <h2 className="text-2xl font-bold text-slate-900 mb-2">Report Not Found</h2>
-                    <button onClick={() => router.back()} className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700">
+                    <h2 className="mb-2 text-2xl font-bold text-slate-900">Report Not Found</h2>
+                    <button
+                        type="button"
+                        onClick={() => router.back()}
+                        className="mt-4 rounded-lg bg-indigo-600 px-4 py-2 font-bold text-white hover:bg-indigo-700"
+                    >
                         Go Back
                     </button>
                 </div>
@@ -273,7 +431,7 @@ export default function AdminReportDetailPage() {
     }
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-50 p-8">
+        <div className={clsx(adminDossier.shell, "p-6 sm:p-8")}>
             <div className="max-w-7xl mx-auto space-y-6">
                 {/* Header */}
                 <div className="flex items-center justify-between">
@@ -285,11 +443,11 @@ export default function AdminReportDetailPage() {
                         Back to Reports
                     </button>
                     <div className="flex items-center gap-3">
-                        <span className="px-4 py-2 bg-blue-50 text-blue-700 rounded-xl text-xs font-black border border-blue-200 uppercase tracking-widest">
-                            Single-Page Dossier Mode
+                        <span className="rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-2 text-xs font-semibold uppercase tracking-widest text-indigo-800">
+                            Single-page dossier
                         </span>
-                        <span className="px-4 py-2 bg-purple-50 text-purple-700 rounded-xl text-xs font-black border border-purple-200 uppercase tracking-widest">
-                            Super Admin
+                        <span className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-widest text-slate-600">
+                            Super admin
                         </span>
                     </div>
                 </div>
@@ -326,26 +484,26 @@ export default function AdminReportDetailPage() {
                 )}
 
                 {/* Student & Opportunity Info */}
-                <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm">
+                <div className={clsx(adminDossier.cardLg, "p-6 sm:p-8")}>
                     <div className="flex items-start justify-between">
                         <div className="flex items-start gap-6">
-                            <div className="w-16 h-16 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white font-black text-2xl border-4 border-slate-100">
+                            <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full border-4 border-slate-100 bg-gradient-to-br from-indigo-600 to-indigo-800 text-2xl font-bold text-white">
                                 {report.student.name.charAt(0)}
                             </div>
                             <div>
-                                <h1 className="text-2xl font-black text-slate-900 mb-2">{report.student.name}</h1>
-                                <div className="space-y-1 text-sm">
-                                    <div className="flex items-center gap-2 text-slate-600">
-                                        <User className="w-4 h-4" />
-                                        <span className="font-medium">{report.student.email}</span>
+                                <h1 className="mb-2 text-2xl font-bold tracking-tight text-slate-900">{report.student.name}</h1>
+                                <div className="space-y-1 text-sm font-medium text-slate-600">
+                                    <div className="flex items-center gap-2">
+                                        <User className="h-4 w-4 shrink-0 text-slate-400" />
+                                        <span>{report.student.email}</span>
                                     </div>
-                                    <div className="flex items-center gap-2 text-slate-600">
-                                        <Building2 className="w-4 h-4" />
-                                        <span className="font-medium">{report.student.university}</span>
+                                    <div className="flex items-center gap-2">
+                                        <Building2 className="h-4 w-4 shrink-0 text-slate-400" />
+                                        <span>{report.student.university}</span>
                                     </div>
-                                    <div className="flex items-center gap-2 text-slate-600">
-                                        <Calendar className="w-4 h-4" />
-                                        <span className="font-medium">
+                                    <div className="flex items-center gap-2">
+                                        <Calendar className="h-4 w-4 shrink-0 text-slate-400" />
+                                        <span>
                                             Submitted: {new Date(report.submission_date).toLocaleDateString('en-US', {
                                                 month: 'long',
                                                 day: 'numeric',
@@ -357,29 +515,52 @@ export default function AdminReportDetailPage() {
                             </div>
                         </div>
 
-                        <div className="flex flex-col items-end gap-2">
-                            <span className={clsx(
-                                'px-4 py-2 rounded-xl text-sm font-bold uppercase tracking-wide border',
-                                report.status === 'verified' && 'bg-green-50 text-green-700 border-green-200',
-                                report.status === 'submitted' && 'bg-yellow-50 text-yellow-700 border-yellow-200',
-                                report.status === 'partner_verified' && 'bg-indigo-50 text-indigo-700 border-indigo-200',
-                                report.status === 'rejected' && 'bg-red-50 text-red-700 border-red-200'
-                            )}>
-                                {report.status === 'partner_verified' ? 'NGO Verified' : report.status}
+                        <div className="flex w-full flex-col items-stretch gap-3 sm:w-auto sm:items-end">
+                            {ciiSnapshot ? (
+                                <div className="flex w-full items-center justify-between gap-3 rounded-2xl border border-indigo-100 bg-indigo-50/90 px-4 py-3 sm:max-w-xs sm:flex-col sm:items-end sm:py-4">
+                                    <div className="flex items-center gap-2 text-indigo-800">
+                                        <BarChart3 className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
+                                        <span className={clsx(adminDossier.microLabel, "text-indigo-700")}>CII index</span>
+                                    </div>
+                                    <div className="text-right">
+                                        <p className="text-2xl font-bold tabular-nums tracking-tight text-slate-900 sm:text-3xl">
+                                            {ciiSnapshot.totalScore}
+                                            <span className="text-base font-semibold text-slate-500 sm:text-lg">/100</span>
+                                        </p>
+                                        <p className="mt-0.5 max-w-[16rem] text-right text-xs font-medium leading-snug text-slate-600 sm:max-w-[14rem]">
+                                            {ciiSnapshot.level}
+                                        </p>
+                                    </div>
+                                </div>
+                            ) : null}
+                            <span
+                                className={clsx(
+                                    "rounded-xl border px-4 py-2 text-sm font-bold uppercase tracking-wide",
+                                    report.status === "verified" && "border-green-200 bg-green-50 text-green-700",
+                                    report.status === "submitted" && "border-yellow-200 bg-yellow-50 text-yellow-700",
+                                    report.status === "partner_verified" && "border-indigo-200 bg-indigo-50 text-indigo-700",
+                                    report.status === "rejected" && "border-red-200 bg-red-50 text-red-700",
+                                )}
+                            >
+                                {report.status === "partner_verified" ? "NGO Verified" : report.status}
                             </span>
-                            <div className="flex items-center gap-2">
-                                <span className="text-[10px] font-black text-slate-400 mt-1">NGO DECISION:</span>
-                                <span className={clsx(
-                                    'text-[10px] font-black mt-1 uppercase',
-                                    report.partner_status === 'approved' ? 'text-green-600' : 'text-slate-400'
-                                )}>
-                                    {report.partner_status || 'Pending'}
+                            <div className="flex items-center justify-end gap-2">
+                                <span className="mt-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                                    NGO decision
+                                </span>
+                                <span
+                                    className={clsx(
+                                        "mt-1 text-[10px] font-semibold uppercase",
+                                        report.partner_status === "approved" ? "text-green-600" : "text-slate-400",
+                                    )}
+                                >
+                                    {report.partner_status || "Pending"}
                                 </span>
                             </div>
                         </div>
                     </div>
 
-                    <div className="mt-6 p-4 bg-slate-50 rounded-2xl">
+                    <div className="mt-6 rounded-2xl bg-slate-50 p-4">
                         <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Opportunity</p>
                         <p className="text-lg font-bold text-slate-900">{report.opportunity.title}</p>
                         <p className="text-sm text-slate-600 mt-1">{report.opportunity.organization}</p>
@@ -389,65 +570,119 @@ export default function AdminReportDetailPage() {
                 {/* Report Content - Unified Scrollable Dossier */}
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
                     {/* Sticky Table of Contents */}
-                    <div className="lg:col-span-3 sticky top-8 space-y-4">
-                        <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm">
-                            <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
-                                <List className="w-4 h-4 text-blue-500" />
-                                Dossier Contents
-                            </h3>
-                            <div className="space-y-1">
-                                {sections.map((section) => (
+                    <div className="sticky top-8 space-y-4 lg:col-span-3">
+                        <div className={clsx(adminDossier.card, "p-5 sm:p-6")}>
+                            <div className="mb-4 flex items-center justify-between gap-2">
+                                <h3 className={clsx(adminDossier.microLabel, "flex items-center gap-2 tracking-widest text-slate-400")}>
+                                    <List className="h-4 w-4 text-indigo-600" strokeWidth={2} />
+                                    Dossier contents
+                                </h3>
+                                <div className="flex gap-1">
+                                    <button
+                                        type="button"
+                                        onClick={expandAllSections}
+                                        className="rounded-lg px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-indigo-700 hover:bg-indigo-50"
+                                    >
+                                        Expand
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={collapseAllSections}
+                                        className="rounded-lg px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500 hover:bg-slate-100"
+                                    >
+                                        Collapse
+                                    </button>
+                                </div>
+                            </div>
+                            <div className="space-y-0.5">
+                                {DOSSIER_NAV_SECTIONS.map((section) => (
                                     <button
                                         key={section.id}
+                                        type="button"
                                         onClick={() => {
                                             const el = document.getElementById(section.id);
-                                            el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                            el?.scrollIntoView({ behavior: "smooth", block: "start" });
                                         }}
-                                        className="w-full flex items-center gap-3 p-3 rounded-xl transition-all hover:bg-slate-50 group text-left"
+                                        className={adminDossier.tocBtn}
                                     >
-                                        <section.icon className="w-4 h-4 text-slate-400 group-hover:text-blue-500 transition-colors" />
-                                        <span className="text-sm font-bold text-slate-600 group-hover:text-slate-900 transition-colors">{section.label}</span>
+                                        <section.icon className={adminDossier.navIcon} strokeWidth={2} />
+                                        <span className={adminDossier.navText}>{section.label}</span>
                                     </button>
                                 ))}
                             </div>
                         </div>
 
                         {/* Quick Status Summary */}
-                        <div className="bg-slate-900 rounded-3xl p-6 text-white shadow-xl shadow-slate-200">
-                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Decision Hub</p>
+                        <div className={adminDossier.hub}>
+                            <p className="mb-3 text-[10px] font-semibold uppercase tracking-widest text-slate-400">Decision hub</p>
                             <div className="space-y-4">
+                                <div className="border-b border-white/10 pb-4">
+                                    <p className="mb-1 flex items-center gap-2 text-xs font-medium text-slate-400">
+                                        <BarChart3 className="h-3.5 w-3.5 shrink-0 text-indigo-300" aria-hidden />
+                                        CII index (institutional)
+                                    </p>
+                                    {ciiSnapshot ? (
+                                        <>
+                                            <p className="text-2xl font-bold tabular-nums tracking-tight text-white">
+                                                {ciiSnapshot.totalScore}
+                                                <span className="text-lg font-semibold text-slate-400">/100</span>
+                                            </p>
+                                            <p className="mt-1 line-clamp-3 text-[11px] font-medium leading-snug text-slate-400">
+                                                {ciiSnapshot.level}
+                                            </p>
+                                        </>
+                                    ) : (
+                                        <p className="text-sm font-medium text-slate-500">—</p>
+                                    )}
+                                </div>
                                 <div>
-                                    <p className="text-xs text-slate-500 font-bold mb-1">Impact Score</p>
-                                    <p className="text-2xl font-black">
-                                        {report.section9?.competency_scores ? (Object.values(report.section9.competency_scores as Record<string, any>).reduce((a: any, b: any) => a + Number(b || 0), 0) / 12).toFixed(1) : "0.0"}
-                                        <span className="text-lg text-slate-500 font-bold">/5.0</span>
+                                    <p className="mb-1 text-xs font-medium text-slate-400">Reflection competency avg.</p>
+                                    <p className="text-2xl font-bold tabular-nums tracking-tight">
+                                        {report.section9?.competency_scores
+                                            ? (
+                                                  Object.values(report.section9.competency_scores as Record<string, unknown>).reduce(
+                                                      (a: number, b: unknown) => a + Number(b || 0),
+                                                      0,
+                                                  ) / 12
+                                              ).toFixed(1)
+                                            : "0.0"}
+                                        <span className="text-lg font-semibold text-slate-500">/5.0</span>
                                     </p>
                                 </div>
                                 <button
+                                    type="button"
                                     onClick={() => {
-                                        const el = document.getElementById('actions');
-                                        el?.scrollIntoView({ behavior: 'smooth' });
+                                        const el = document.getElementById("actions");
+                                        el?.scrollIntoView({ behavior: "smooth" });
                                     }}
-                                    className="w-full py-3 bg-blue-600 hover:bg-blue-500 rounded-xl font-bold text-sm transition-all shadow-lg shadow-blue-900/40"
+                                    className="w-full rounded-xl bg-indigo-500 py-3 text-sm font-semibold text-white shadow-lg shadow-black/25 transition-colors hover:bg-indigo-400"
                                 >
-                                    Jump to Action
+                                    Jump to action
                                 </button>
                             </div>
                         </div>
                     </div>
 
                     {/* All Sections rendered vertically */}
-                    <div className="lg:col-span-9 space-y-8">
+                    <div className="space-y-6 lg:col-span-9 sm:space-y-7">
                         {/* Section 1 */}
-                        <div id="section1" className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm scroll-mt-8">
-                            <div className="space-y-6">
-                                <div className="flex items-center gap-4 mb-2">
-                                    <div className="w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-600">
-                                        <Users className="w-6 h-6" />
+                        <div id="section1" className={clsx(adminDossier.cardLg, "scroll-mt-8 p-6 sm:p-8")}>
+                            <div className="mb-5 flex items-start justify-between gap-3 border-b border-slate-100 pb-4">
+                                <div className="flex min-w-0 flex-1 items-center gap-3">
+                                    <div className={adminDossier.sectionIcon}>
+                                        <Users className="h-6 w-6" strokeWidth={1.75} />
                                     </div>
-                                    <h2 className="text-3xl font-black text-slate-900">01. Participation Profile</h2>
+                                    <h2 className={adminDossier.sectionTitle}>01. Participation profile</h2>
                                 </div>
+                                <SectionCollapseTrigger
+                                    sectionId="section1"
+                                    isOpen={Boolean(sectionOpen.section1)}
+                                    onToggle={() => toggleSection("section1")}
+                                />
+                            </div>
 
+                            {sectionOpen.section1 ? (
+                            <div id="section1-panel" className="space-y-5">
                                 <LabelValue label="Participation Type" value={report.section1?.participation_type} />
                                 <div className="mt-4">
                                     <h3 className="font-bold text-slate-800 text-sm mb-2 border-b pb-1">Team Lead</h3>
@@ -473,8 +708,10 @@ export default function AdminReportDetailPage() {
                                 )}
 
                                 {report.section1?.attendance_logs && report.section1.attendance_logs.length > 0 && (
-                                    <div className="mt-8">
-                                        <h3 className="font-bold text-slate-800 text-sm mb-4 border-b pb-1 uppercase tracking-widest text-slate-400">Attendance & Evidence Logs</h3>
+                                    <div className="mt-6">
+                                        <h3 className={clsx(adminDossier.microLabel, "mb-3 border-b border-slate-100 pb-2 text-slate-400")}>
+                                            Attendance & evidence logs
+                                        </h3>
                                         <AttendanceSummaryTable
                                             entries={report.section1.attendance_logs}
                                             isLocked={true}
@@ -482,107 +719,143 @@ export default function AdminReportDetailPage() {
                                     </div>
                                 )}
                             </div>
+                            ) : null}
                         </div>
 
                         {/* Section 2 */}
-                        <div id="section2" className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm scroll-mt-8">
-                            <div className="space-y-8">
-                                <div className="flex items-center gap-4">
-                                    <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center">
-                                        <FileText className="w-6 h-6" />
+                        <div id="section2" className={clsx(adminDossier.cardLg, "scroll-mt-8 p-6 sm:p-8")}>
+                            <div className="mb-5 flex items-start justify-between gap-3 border-b border-slate-100 pb-4">
+                                <div className="flex min-w-0 flex-1 items-center gap-3">
+                                    <div className={adminDossier.sectionIcon}>
+                                        <FileText className="h-6 w-6" strokeWidth={1.75} />
                                     </div>
-                                    <h2 className="text-3xl font-black text-slate-900">02. Project Context</h2>
+                                    <h2 className={adminDossier.sectionTitle}>02. Project context</h2>
                                 </div>
+                                <SectionCollapseTrigger
+                                    sectionId="section2"
+                                    isOpen={Boolean(sectionOpen.section2)}
+                                    onToggle={() => toggleSection("section2")}
+                                />
+                            </div>
 
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div className="p-5 bg-slate-50 rounded-2xl border border-slate-100 flex items-start gap-4">
-                                        <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
-                                            <Building2 className="w-5 h-5" />
+                            {sectionOpen.section2 ? (
+                            <div id="section2-panel" className="space-y-6">
+                                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                                    <div className="flex items-start gap-4 rounded-2xl border border-slate-100 bg-slate-50/90 p-5">
+                                        <div className={clsx(adminDossier.sectionIcon, "h-10 w-10")}>
+                                            <Building2 className="h-5 w-5" strokeWidth={1.75} />
                                         </div>
-                                        <div>
-                                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Partner Organization</p>
-                                            <p className="font-bold text-slate-900">{report.opportunity?.organization_name || report.opportunity?.organization || "N/A"}</p>
-                                        </div>
-                                    </div>
-                                    <div className="p-5 bg-slate-50 rounded-2xl border border-slate-100 flex items-start gap-4">
-                                        <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
-                                            <MapPin className="w-5 h-5" />
-                                        </div>
-                                        <div>
-                                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Project Location</p>
-                                            <p className="font-bold text-slate-900">{report.opportunity?.city || report.opportunity?.location_district || "N/A"}</p>
+                                        <div className="min-w-0">
+                                            <p className={clsx(adminDossier.microLabel, "mb-1 text-slate-400")}>Partner organization</p>
+                                            <AdminFieldBody
+                                                value={report.opportunity?.organization_name || report.opportunity?.organization}
+                                            />
                                         </div>
                                     </div>
-                                    <div className="p-5 bg-slate-50 rounded-2xl border border-slate-100 flex items-start gap-4">
-                                        <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center shrink-0">
-                                            <Calendar className="w-5 h-5" />
+                                    <div className="flex items-start gap-4 rounded-2xl border border-slate-100 bg-slate-50/90 p-5">
+                                        <div className={clsx(adminDossier.sectionIcon, "h-10 w-10")}>
+                                            <MapPin className="h-5 w-5" strokeWidth={1.75} />
                                         </div>
-                                        <div>
-                                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Timeline</p>
-                                            <p className="font-bold text-slate-900">
-                                                {report.opportunity?.start_date ? new Date(report.opportunity.start_date).toLocaleDateString() : "—"} to {report.opportunity?.end_date ? new Date(report.opportunity.end_date).toLocaleDateString() : "—"}
+                                        <div className="min-w-0">
+                                            <p className={clsx(adminDossier.microLabel, "mb-1 text-slate-400")}>Project location</p>
+                                            <AdminFieldBody value={report.opportunity?.city || report.opportunity?.location_district} />
+                                        </div>
+                                    </div>
+                                    <div className="flex items-start gap-4 rounded-2xl border border-slate-100 bg-slate-50/90 p-5">
+                                        <div className={clsx(adminDossier.sectionIcon, "h-10 w-10")}>
+                                            <Calendar className="h-5 w-5" strokeWidth={1.75} />
+                                        </div>
+                                        <div className="min-w-0">
+                                            <p className={clsx(adminDossier.microLabel, "mb-1 text-slate-400")}>Timeline</p>
+                                            <p className="text-sm font-medium text-slate-800">
+                                                {report.opportunity?.start_date ? new Date(report.opportunity.start_date).toLocaleDateString() : "—"}{" "}
+                                                to{" "}
+                                                {report.opportunity?.end_date ? new Date(report.opportunity.end_date).toLocaleDateString() : "—"}
                                             </p>
                                         </div>
                                     </div>
-                                    <div className="p-5 bg-slate-50 rounded-2xl border border-slate-100 flex items-start gap-4">
-                                        <div className="w-10 h-10 rounded-xl bg-indigo-100 text-indigo-600 flex items-center justify-center shrink-0">
-                                            <ClockIcon className="w-5 h-5" />
+                                    <div className="flex items-start gap-4 rounded-2xl border border-slate-100 bg-slate-50/90 p-5">
+                                        <div className={clsx(adminDossier.sectionIcon, "h-10 w-10")}>
+                                            <ClockIcon className="h-5 w-5" strokeWidth={1.75} />
                                         </div>
-                                        <div>
-                                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Credit Hours</p>
-                                            <p className="font-bold text-slate-900">{report.opportunity?.hours || "0"} Hours Credit</p>
+                                        <div className="min-w-0">
+                                            <p className={clsx(adminDossier.microLabel, "mb-1 text-slate-400")}>Credit hours</p>
+                                            <p className="text-sm font-medium text-slate-800">{report.opportunity?.hours ?? "0"} hours credit</p>
                                         </div>
                                     </div>
                                 </div>
 
-                                <div className="border-t border-slate-100 pt-6">
+                                <div className="border-t border-slate-100 pt-5">
                                     <div className="flex flex-wrap">
                                         <LabelValue label="Discipline" value={report.section2?.discipline} />
                                         <LabelValue label="Problem Statement" value={report.section2?.problem_statement} fullWidth />
                                     </div>
                                 </div>
                             </div>
+                            ) : null}
                         </div>
 
                         {/* Section 3 */}
-                        <div id="section3" className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm scroll-mt-8">
-                            <div className="space-y-6">
-                                <div className="flex items-center gap-4">
-                                    <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center">
-                                        <Target className="w-6 h-6" />
+                        <div id="section3" className={clsx(adminDossier.cardLg, "scroll-mt-8 p-6 sm:p-8")}>
+                            <div className="mb-5 flex items-start justify-between gap-3 border-b border-slate-100 pb-4">
+                                <div className="flex min-w-0 flex-1 items-center gap-3">
+                                    <div className={adminDossier.sectionIcon}>
+                                        <Target className="h-6 w-6" strokeWidth={1.75} />
                                     </div>
-                                    <h2 className="text-3xl font-black text-slate-900">03. SDG Mapping</h2>
+                                    <h2 className={adminDossier.sectionTitle}>03. SDG mapping</h2>
                                 </div>
-                                <LabelValue label="Contribution Logic / Purpose" value={report.section3?.contribution_intent_statement} fullWidth />
+                                <SectionCollapseTrigger
+                                    sectionId="section3"
+                                    isOpen={Boolean(sectionOpen.section3)}
+                                    onToggle={() => toggleSection("section3")}
+                                />
+                            </div>
+                            {sectionOpen.section3 ? (
+                            <div id="section3-panel" className="space-y-5">
+                                <LabelValue label="Contribution logic / purpose" value={report.section3?.contribution_intent_statement} fullWidth />
                                 {report.section3?.secondary_sdgs && report.section3.secondary_sdgs.length > 0 && (
-                                    <div className="mt-4">
-                                        <h3 className="font-bold text-slate-800 text-sm mb-2 border-b pb-1">Secondary SDGs</h3>
+                                    <div>
+                                        <h3 className={clsx(adminDossier.microLabel, "mb-2 border-b border-slate-100 pb-2 text-slate-400")}>
+                                            Secondary SDGs
+                                        </h3>
                                         <div className="grid grid-cols-1 gap-3">
                                             {report.section3.secondary_sdgs.map((sdg: any, i: number) => (
-                                                <div key={i} className="p-3 bg-slate-50 rounded-xl border border-slate-100">
-                                                    <span className="inline-block px-2 py-0.5 bg-blue-600 text-white text-[10px] font-black rounded mr-2">GOAL {sdg.goal_number}</span>
-                                                    <p className="inline text-sm text-slate-700">{sdg.justification_text}</p>
+                                                <div key={i} className="rounded-xl border border-slate-100 bg-slate-50/90 p-3">
+                                                    <span className="mr-2 inline-block rounded bg-indigo-600 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
+                                                        Goal {sdg.goal_number}
+                                                    </span>
+                                                    <span className="text-sm text-slate-700">{sdg.justification_text}</span>
                                                 </div>
                                             ))}
                                         </div>
                                     </div>
                                 )}
                             </div>
+                            ) : null}
                         </div>
 
                         {/* Section 4 */}
-                        <div id="section4" className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm scroll-mt-8">
-                            <div className="space-y-8">
-                                <div className="flex items-center gap-4">
-                                    <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                                        <Activity className="w-6 h-6" />
+                        <div id="section4" className={clsx(adminDossier.cardLg, "scroll-mt-8 p-6 sm:p-8")}>
+                            <div className="mb-5 flex items-start justify-between gap-3 border-b border-slate-100 pb-4">
+                                <div className="flex min-w-0 flex-1 items-center gap-3">
+                                    <div className={adminDossier.sectionIcon}>
+                                        <Activity className="h-6 w-6" strokeWidth={1.75} />
                                     </div>
-                                    <h2 className="text-3xl font-black text-slate-900">04. Activities & Outputs</h2>
+                                    <h2 className={adminDossier.sectionTitle}>04. Activities & outputs</h2>
                                 </div>
-
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                <SectionCollapseTrigger
+                                    sectionId="section4"
+                                    isOpen={Boolean(sectionOpen.section4)}
+                                    onToggle={() => toggleSection("section4")}
+                                />
+                            </div>
+                            {sectionOpen.section4 ? (
+                            <div id="section4-panel" className="space-y-6">
+                                <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
                                     <div className="space-y-4">
-                                        <h3 className="font-bold text-slate-800 text-sm border-b pb-1 uppercase tracking-widest text-slate-400">Engagement Details</h3>
+                                        <h3 className={clsx(adminDossier.microLabel, "border-b border-slate-100 pb-2 text-slate-400")}>
+                                            Engagement details
+                                        </h3>
                                         <div className="flex flex-wrap">
                                             <LabelValue label="Total Beneficiaries" value={report.section4?.project_summary?.distinct_total_beneficiaries} />
                                             <LabelValue label="Total Sessions" value={report.section4?.total_sessions} />
@@ -592,57 +865,82 @@ export default function AdminReportDetailPage() {
                                     </div>
 
                                     <div className="space-y-4">
-                                        <h3 className="font-bold text-slate-800 text-sm border-b pb-1 uppercase tracking-widest text-slate-400">Core Activities</h3>
+                                        <h3 className={clsx(adminDossier.microLabel, "border-b border-slate-100 pb-2 text-slate-400")}>
+                                            Core activities
+                                        </h3>
                                         <div className="flex flex-wrap gap-2">
-                                            {report.section4?.activity_blocks.map((act: any, i: number) => (
-                                                <span key={i} className="px-3 py-1 bg-blue-50 text-blue-700 rounded-lg text-xs font-bold border border-blue-100">
-                                                    {act.type === 'Other' ? act.other_text : act.type}
+                                            {(report.section4?.activity_blocks ?? []).map((act: any, i: number) => (
+                                                <span
+                                                    key={i}
+                                                    className="rounded-lg border border-indigo-100 bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-900"
+                                                >
+                                                    {act.type === "Other" ? act.other_text : act.type}
                                                 </span>
                                             ))}
                                         </div>
                                     </div>
                                 </div>
 
-                                <div className="space-y-4">
-                                    <h3 className="font-bold text-slate-800 text-sm border-b pb-1 uppercase tracking-widest text-slate-400">Tangible Outputs</h3>
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div className="space-y-3">
+                                    <h3 className={clsx(adminDossier.microLabel, "border-b border-slate-100 pb-2 text-slate-400")}>
+                                        Tangible outputs
+                                    </h3>
+                                    <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                                         {report.section4?.outputs?.map((out: any, i: number) => (
-                                            <div key={i} className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                                                <p className="text-2xl font-black text-slate-900">{out.count}</p>
-                                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{out.type === 'Other' ? out.other_text : out.type}</p>
+                                            <div key={i} className="rounded-2xl border border-slate-100 bg-slate-50/90 p-4">
+                                                <p className="text-2xl font-bold tabular-nums text-slate-900">{out.count}</p>
+                                                <p className={clsx(adminDossier.microLabel, "mt-1 text-slate-400")}>
+                                                    {out.type === "Other" ? out.other_text : out.type}
+                                                </p>
                                             </div>
                                         ))}
                                     </div>
                                 </div>
                             </div>
+                            ) : null}
                         </div>
 
                         {/* Section 5 */}
-                        <div id="section5" className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm scroll-mt-8">
-                            <div className="space-y-6">
-                                <div className="flex items-center gap-4">
-                                    <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
-                                        <TrendingUp className="w-6 h-6" />
+                        <div id="section5" className={clsx(adminDossier.cardLg, "scroll-mt-8 p-6 sm:p-8")}>
+                            <div className="mb-5 flex items-start justify-between gap-3 border-b border-slate-100 pb-4">
+                                <div className="flex min-w-0 flex-1 items-center gap-3">
+                                    <div className={adminDossier.sectionIcon}>
+                                        <TrendingUp className="h-6 w-6" strokeWidth={1.75} />
                                     </div>
-                                    <h2 className="text-3xl font-black text-slate-900">05. Outcomes</h2>
+                                    <h2 className={adminDossier.sectionTitle}>05. Outcomes</h2>
                                 </div>
-                                <div className="flex flex-wrap">
-                                    <LabelValue label="Observed Change" value={report.section5?.observed_change} fullWidth />
-                                    <LabelValue label="Challenges" value={report.section5?.challenges} fullWidth />
-                                </div>
+                                <SectionCollapseTrigger
+                                    sectionId="section5"
+                                    isOpen={Boolean(sectionOpen.section5)}
+                                    onToggle={() => toggleSection("section5")}
+                                />
                             </div>
+                            {sectionOpen.section5 ? (
+                            <div id="section5-panel" className="flex flex-wrap">
+                                <LabelValue label="Observed Change" value={report.section5?.observed_change} fullWidth />
+                                <LabelValue label="Challenges" value={report.section5?.challenges} fullWidth />
+                            </div>
+                            ) : null}
                         </div>
 
                         {/* Section 6 */}
-                        <div id="section6" className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm scroll-mt-8">
-                            <div className="space-y-6">
-                                <div className="flex items-center gap-4">
-                                    <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center">
-                                        <Package className="w-6 h-6" />
+                        <div id="section6" className={clsx(adminDossier.cardLg, "scroll-mt-8 p-6 sm:p-8")}>
+                            <div className="mb-5 flex items-start justify-between gap-3 border-b border-slate-100 pb-4">
+                                <div className="flex min-w-0 flex-1 items-center gap-3">
+                                    <div className={adminDossier.sectionIcon}>
+                                        <Package className="h-6 w-6" strokeWidth={1.75} />
                                     </div>
-                                    <h2 className="text-3xl font-black text-slate-900">06. Resources</h2>
+                                    <h2 className={adminDossier.sectionTitle}>06. Resources</h2>
                                 </div>
-                                <LabelValue label="Used External Resources" value={report.section6?.use_resources} />
+                                <SectionCollapseTrigger
+                                    sectionId="section6"
+                                    isOpen={Boolean(sectionOpen.section6)}
+                                    onToggle={() => toggleSection("section6")}
+                                />
+                            </div>
+                            {sectionOpen.section6 ? (
+                            <div id="section6-panel" className="space-y-5">
+                                <LabelValue label="Used external resources" value={report.section6?.use_resources} />
                                 {report.section6?.resources && report.section6.resources.length > 0 && (
                                     <div className="mt-4 overflow-x-auto">
                                         <table className="w-full text-sm border-collapse border border-slate-200">
@@ -668,190 +966,267 @@ export default function AdminReportDetailPage() {
                                     </div>
                                 )}
                             </div>
+                            ) : null}
                         </div>
 
                         {/* Section 7 */}
-                        <div id="section7" className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm scroll-mt-8">
-                            <div className="space-y-6">
-                                <div className="flex items-center gap-4">
-                                    <div className="w-12 h-12 rounded-2xl bg-cyan-50 text-cyan-600 flex items-center justify-center">
-                                        <Handshake className="w-6 h-6" />
+                        <div id="section7" className={clsx(adminDossier.cardLg, "scroll-mt-8 p-6 sm:p-8")}>
+                            <div className="mb-5 flex items-start justify-between gap-3 border-b border-slate-100 pb-4">
+                                <div className="flex min-w-0 flex-1 items-center gap-3">
+                                    <div className={adminDossier.sectionIcon}>
+                                        <Handshake className="h-6 w-6" strokeWidth={1.75} />
                                     </div>
-                                    <h2 className="text-3xl font-black text-slate-900">07. Partnerships</h2>
+                                    <h2 className={adminDossier.sectionTitle}>07. Partnerships</h2>
                                 </div>
-                                <LabelValue label="Has Partners" value={report.section7?.has_partners} />
+                                <SectionCollapseTrigger
+                                    sectionId="section7"
+                                    isOpen={Boolean(sectionOpen.section7)}
+                                    onToggle={() => toggleSection("section7")}
+                                />
+                            </div>
+                            {sectionOpen.section7 ? (
+                            <div id="section7-panel" className="space-y-5">
+                                <LabelValue label="Has partners" value={report.section7?.has_partners} />
                                 {report.section7?.partners && report.section7.partners.length > 0 && (
-                                    <div className="mt-4 space-y-2">
+                                    <div className="space-y-2">
                                         {report.section7.partners.map((p: any, i: number) => (
-                                            <div key={i} className="text-sm border border-slate-200 p-3 rounded-lg bg-slate-50">
-                                                <strong>{p.name}</strong> ({p.type})
-                                                {p.contribution && <div className="mt-1 text-slate-600">Contributions: {p.contribution.join(", ")}</div>}
+                                            <div
+                                                key={i}
+                                                className="rounded-xl border border-slate-100 bg-slate-50/90 p-3 text-sm text-slate-800"
+                                            >
+                                                <span className="font-semibold text-slate-900">{p.name}</span>{" "}
+                                                <span className="text-slate-500">({p.type})</span>
+                                                {p.contribution && (
+                                                    <div className="mt-1.5 text-slate-600">Contributions: {p.contribution.join(", ")}</div>
+                                                )}
                                             </div>
                                         ))}
                                     </div>
                                 )}
                             </div>
+                            ) : null}
                         </div>
 
                         {/* Section 8 */}
-                        <div id="section8" className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm scroll-mt-8">
-                            <div className="space-y-6">
-                                <div className="flex items-center gap-4">
-                                    <div className="w-12 h-12 rounded-2xl bg-slate-100 text-slate-600 flex items-center justify-center">
-                                        <FileText className="w-6 h-6" />
+                        <div id="section8" className={clsx(adminDossier.cardLg, "scroll-mt-8 p-6 sm:p-8")}>
+                            <div className="mb-5 flex items-start justify-between gap-3 border-b border-slate-100 pb-4">
+                                <div className="flex min-w-0 flex-1 items-center gap-3">
+                                    <div className={adminDossier.sectionIcon}>
+                                        <FileText className="h-6 w-6" strokeWidth={1.75} />
                                     </div>
-                                    <h2 className="text-3xl font-black text-slate-900">08. Evidence</h2>
+                                    <h2 className={adminDossier.sectionTitle}>08. Evidence</h2>
                                 </div>
+                                <SectionCollapseTrigger
+                                    sectionId="section8"
+                                    isOpen={Boolean(sectionOpen.section8)}
+                                    onToggle={() => toggleSection("section8")}
+                                />
+                            </div>
+                            {sectionOpen.section8 ? (
+                            <div id="section8-panel" className="space-y-5">
                                 <LabelValue label="Description" value={report.section8?.description} fullWidth />
-                                {report.section8?.evidence_types && (
-                                    <LabelValue label="Evidence Types" value={report.section8.evidence_types.join(", ")} fullWidth />
-                                )}
+                                <LabelValue label="Evidence types" value={report.section8?.evidence_types} fullWidth />
 
-                                <div className="mt-4">
-                                    <h3 className="font-bold text-slate-800 text-sm mb-3">Evidence Files</h3>
+                                <div>
+                                    <h3 className={clsx(adminDossier.microLabel, "mb-3 text-slate-400")}>Evidence files</h3>
                                     {report.evidence_urls && report.evidence_urls.length > 0 ? (
-                                        <div className="grid grid-cols-2 gap-4">
+                                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
                                             {report.evidence_urls.map((url, index) => (
                                                 <a
                                                     key={index}
                                                     href={url}
                                                     target="_blank"
                                                     rel="noopener noreferrer"
-                                                    className="p-4 bg-slate-50 rounded-2xl hover:bg-blue-50 transition-all flex items-center justify-between group border border-slate-100"
+                                                    className="group flex items-center justify-between rounded-2xl border border-slate-100 bg-slate-50/90 p-4 transition-colors hover:border-indigo-200 hover:bg-indigo-50/60"
                                                 >
-                                                    <span className="font-bold text-slate-900 group-hover:text-blue-600">Evidence {index + 1}</span>
-                                                    <ExternalLink className="w-4 h-4 text-slate-400 group-hover:text-blue-600" />
+                                                    <span className="font-semibold text-slate-900 group-hover:text-indigo-800">
+                                                        Evidence {index + 1}
+                                                    </span>
+                                                    <ExternalLink className="h-4 w-4 shrink-0 text-slate-400 group-hover:text-indigo-600" />
                                                 </a>
                                             ))}
                                         </div>
                                     ) : (
-                                        <p className="text-slate-500 italic text-sm">No evidence files uploaded</p>
+                                        <div className={adminDossier.inset}>
+                                            <AdminFieldBody value={null} />
+                                            <p className="mt-2 text-xs text-slate-500">No files attached to this submission.</p>
+                                        </div>
                                     )}
                                 </div>
                             </div>
+                            ) : null}
                         </div>
 
                         {/* Section 9 */}
-                        <div id="section9" className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm scroll-mt-8">
-                            <div className="space-y-8">
-                                <div className="flex items-center gap-4">
-                                    <div className="w-12 h-12 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center">
-                                        <MessageSquare className="w-6 h-6" />
+                        <div id="section9" className={clsx(adminDossier.cardLg, "scroll-mt-8 p-6 sm:p-8")}>
+                            <div className="mb-5 flex items-start justify-between gap-3 border-b border-slate-100 pb-4">
+                                <div className="flex min-w-0 flex-1 items-center gap-3">
+                                    <div className={adminDossier.sectionIcon}>
+                                        <MessageSquare className="h-6 w-6" strokeWidth={1.75} />
                                     </div>
-                                    <h2 className="text-3xl font-black text-slate-900">09. Reflection & Growth</h2>
+                                    <h2 className={adminDossier.sectionTitle}>09. Reflection & growth</h2>
                                 </div>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div className="p-5 bg-blue-50 border border-blue-100 rounded-2xl">
-                                        <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1">Academic Integration</p>
-                                        <p className="font-bold text-slate-900">{report.section9?.academic_integration || "N/A"}</p>
+                                <SectionCollapseTrigger
+                                    sectionId="section9"
+                                    isOpen={Boolean(sectionOpen.section9)}
+                                    onToggle={() => toggleSection("section9")}
+                                />
+                            </div>
+                            {sectionOpen.section9 ? (
+                            <div id="section9-panel" className="space-y-6">
+                                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                                    <div className="rounded-2xl border border-indigo-100 bg-indigo-50/40 p-5">
+                                        <p className={clsx(adminDossier.microLabel, "mb-2 text-indigo-700")}>Academic integration</p>
+                                        <AdminFieldBody value={report.section9?.academic_integration} />
                                     </div>
-                                    <div className="p-5 bg-emerald-50 border border-emerald-100 rounded-2xl">
-                                        <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-1">Impact Score (Calculated)</p>
-                                        <p className="font-bold text-slate-900">{report.section9?.competency_scores ? (Object.values(report.section9.competency_scores as Record<string, any>).reduce((a: any, b: any) => a + Number(b || 0), 0) / 12).toFixed(1) : "0.0"} / 5.0</p>
+                                    <div className="rounded-2xl border border-slate-200 bg-slate-50/90 p-5">
+                                        <p className={clsx(adminDossier.microLabel, "mb-2 text-slate-500")}>Competency average (12 items)</p>
+                                        <p className="text-lg font-semibold tabular-nums text-slate-900">
+                                            {report.section9?.competency_scores
+                                                ? (
+                                                      Object.values(report.section9.competency_scores as Record<string, unknown>).reduce(
+                                                          (a: number, b: unknown) => a + Number(b || 0),
+                                                          0,
+                                                      ) / 12
+                                                  ).toFixed(1)
+                                                : "0.0"}{" "}
+                                            <span className="text-sm font-medium text-slate-500">/ 5.0</span>
+                                        </p>
                                     </div>
                                 </div>
 
-                                <LabelValue label="Disciplinary / Academic Application" value={report.section9?.academic_application} fullWidth />
-                                <LabelValue label="Personal Learning & Insights" value={report.section9?.personal_learning} fullWidth />
-                                <LabelValue label="Sustainability & Systems Reflection" value={report.section9?.sustainability_reflection} fullWidth />
+                                <LabelValue label="Disciplinary / academic application" value={report.section9?.academic_application} fullWidth />
+                                <LabelValue label="Personal learning & insights" value={report.section9?.personal_learning} fullWidth />
+                                <LabelValue label="Sustainability & systems reflection" value={report.section9?.sustainability_reflection} fullWidth />
                             </div>
+                            ) : null}
                         </div>
 
                         {/* Section 10 */}
-                        <div id="section10" className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm scroll-mt-8">
-                            <div className="space-y-6">
-                                <div className="flex items-center gap-4">
-                                    <div className="w-12 h-12 rounded-2xl bg-teal-50 text-teal-600 flex items-center justify-center">
-                                        <Activity className="w-6 h-6" />
+                        <div id="section10" className={clsx(adminDossier.cardLg, "scroll-mt-8 p-6 sm:p-8")}>
+                            <div className="mb-5 flex items-start justify-between gap-3 border-b border-slate-100 pb-4">
+                                <div className="flex min-w-0 flex-1 items-center gap-3">
+                                    <div className={adminDossier.sectionIcon}>
+                                        <Activity className="h-6 w-6" strokeWidth={1.75} />
                                     </div>
-                                    <h2 className="text-3xl font-black text-slate-900">10. Sustainability</h2>
+                                    <h2 className={adminDossier.sectionTitle}>10. Sustainability</h2>
                                 </div>
-                                <LabelValue label="Continuation Status" value={report.section10?.continuation_status} />
-                                {report.section10?.mechanisms && (
-                                    <LabelValue label="Mechanisms" value={report.section10.mechanisms.join(", ")} fullWidth />
-                                )}
-                                <LabelValue label="Sustainability Details" value={report.section10?.continuation_details} fullWidth />
+                                <SectionCollapseTrigger
+                                    sectionId="section10"
+                                    isOpen={Boolean(sectionOpen.section10)}
+                                    onToggle={() => toggleSection("section10")}
+                                />
                             </div>
+                            {sectionOpen.section10 ? (
+                            <div id="section10-panel" className="space-y-5">
+                                <LabelValue label="Continuation status" value={report.section10?.continuation_status} />
+                                <LabelValue label="Mechanisms" value={report.section10?.mechanisms} fullWidth />
+                                <LabelValue label="Sustainability details" value={report.section10?.continuation_details} fullWidth />
+                            </div>
+                            ) : null}
                         </div>
 
                         {/* Summary View */}
-                        <div id="section11" className="bg-white rounded-[3rem] p-12 border border-slate-200 shadow-xl scroll-mt-8 overflow-hidden relative">
-                            <div className="absolute top-0 right-0 p-8 opacity-5">
-                                <FileText className="w-64 h-64 text-slate-900" />
-                            </div>
-                            <div className="relative z-10 text-center">
-                                <div className="inline-flex items-center gap-3 px-6 py-2 bg-indigo-50 border border-indigo-100 rounded-full mb-6">
-                                    <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
-                                    <span className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">Premium Impact Dossier</span>
+                        <div
+                            id="section11"
+                            className={clsx(adminDossier.cardLg, "relative scroll-mt-8 overflow-hidden p-8 shadow-md sm:p-10 md:p-12")}
+                        >
+                            <div className="mb-5 flex items-start justify-between gap-3 border-b border-slate-100 pb-4">
+                                <div className="flex min-w-0 flex-1 items-center gap-3">
+                                    <div className={adminDossier.sectionIcon}>
+                                        <FileText className="h-6 w-6" strokeWidth={1.75} />
+                                    </div>
+                                    <div className="min-w-0">
+                                        <p className={clsx(adminDossier.microLabel, "mb-1 text-indigo-600")}>Print-ready dossier</p>
+                                        <h2 className={adminDossier.sectionTitle}>11. Executive impact dossier</h2>
+                                    </div>
                                 </div>
-                                <h2 className="text-4xl font-black mb-12 text-slate-900">Executive Impact Dossier</h2>
+                                <SectionCollapseTrigger
+                                    sectionId="section11"
+                                    isOpen={Boolean(sectionOpen.section11)}
+                                    onToggle={() => toggleSection("section11")}
+                                />
+                            </div>
+                            {sectionOpen.section11 ? (
+                            <div id="section11-panel" className="relative z-10">
+                                <div className="pointer-events-none absolute right-0 top-0 p-6 opacity-[0.04] sm:p-8">
+                                    <FileText className="h-48 w-48 text-slate-900 sm:h-64 sm:w-64" />
+                                </div>
                                 <div className="text-left">
                                     <ReportPrintView projectData={report.opportunity} reportData={{ ...report }} />
                                 </div>
                             </div>
+                            ) : null}
                         </div>
                     </div>
                 </div>
 
-                <div id="actions" className="bg-white rounded-[3rem] p-12 border border-slate-200 shadow-xl mt-12 mb-20 relative overflow-hidden">
-                    <div className="absolute top-0 right-0 p-8 opacity-5">
-                        <CheckCircle2 className="w-32 h-32" />
+                <div
+                    id="actions"
+                    className={clsx(adminDossier.cardLg, "relative mb-20 mt-10 overflow-hidden p-8 shadow-md sm:p-10 md:p-12")}
+                >
+                    <div className="pointer-events-none absolute right-0 top-0 p-8 opacity-[0.06]">
+                        <CheckCircle2 className="h-32 w-32 text-slate-900" />
                     </div>
                     <div className="relative z-10">
-                        <h3 className="text-3xl font-black text-slate-900 mb-2">Student Report Approval</h3>
-                        <p className="text-slate-500 font-medium mb-8">Review all sections above before making a final determination on this impact report.</p>
+                        <p className={clsx(adminDossier.microLabel, "mb-2 text-slate-400")}>Final decision</p>
+                        <h3 className="mb-2 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Student report approval</h3>
+                        <p className="mb-5 text-sm font-medium text-slate-600">
+                            Review all sections above before making a final determination on this impact report.
+                        </p>
+                        {ciiSnapshot ? (
+                            <div className="mb-6 flex flex-wrap items-baseline gap-x-3 gap-y-2 rounded-2xl border border-indigo-100 bg-indigo-50/50 px-4 py-3">
+                                <span className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-indigo-800">
+                                    <BarChart3 className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
+                                    CII index
+                                </span>
+                                <span className="text-xl font-bold tabular-nums text-slate-900">
+                                    {ciiSnapshot.totalScore}
+                                    <span className="text-sm font-semibold text-slate-500">/100</span>
+                                </span>
+                                <span className="hidden text-slate-300 sm:inline" aria-hidden>
+                                    ·
+                                </span>
+                                <span className="w-full text-sm font-medium leading-snug text-slate-700 sm:w-auto sm:max-w-xl">
+                                    {ciiSnapshot.level}
+                                </span>
+                            </div>
+                        ) : null}
 
                         <div className="space-y-6">
                             <div>
-                                <label className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 block">Decision Feedback / Notes</label>
-                                <textarea
+                                <label className={clsx(adminDossier.microLabel, "mb-3 block text-slate-400")}>
+                                    Decision feedback / notes
+                                </label>
+                                <textarea spellCheck={true}
                                     value={feedback}
                                     onChange={(e) => setFeedback(e.target.value)}
                                     placeholder="Provide detailed feedback for the student..."
-                                    className="w-full min-h-[160px] rounded-[2rem] border border-slate-200 p-6 focus:outline-none focus:ring-8 focus:ring-blue-50 focus:border-blue-400 bg-slate-50/50 text-slate-900 font-medium transition-all"
+                                    className="min-h-[160px] w-full rounded-2xl border border-slate-200 bg-slate-50/50 p-5 text-sm font-medium text-slate-900 transition-all focus:border-indigo-400 focus:outline-none focus:ring-4 focus:ring-indigo-100 sm:rounded-3xl sm:p-6"
                                 />
-                                <p className="text-[10px] text-slate-400 mt-3 font-bold uppercase tracking-wider italic">* Required for rejection, shared with the student upon decision.</p>
+                                <p className="mt-3 text-[10px] font-medium uppercase tracking-wide text-slate-400">
+                                    Required for rejection; shared with the student upon decision.
+                                </p>
                             </div>
 
-                            <div className="grid grid-cols-1 gap-6 pt-4 md:grid-cols-2 md:items-stretch md:gap-6">
+                            <div className="flex flex-col gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
                                 <button
                                     type="button"
-                                    onClick={() => handleVerify('approve')}
-                                    disabled={isVerifying || report.admin_status === 'approved'}
-                                    className={clsx(
-                                        approvalDecisionTile.root,
-                                        "border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 focus-visible:ring-emerald-300",
-                                    )}
+                                    onClick={() => handleVerify("approve")}
+                                    disabled={isVerifying || report.admin_status === "approved"}
+                                    className="inline-flex min-h-[2.75rem] w-full items-center justify-center gap-2 rounded-xl border border-emerald-600 bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 sm:w-auto"
                                 >
-                                    <div className={clsx(approvalDecisionTile.iconFrame, "bg-emerald-100 text-emerald-700")}>
-                                        <CheckCircle2 className="h-6 w-6" strokeWidth={2} />
-                                    </div>
-                                    <div className={approvalDecisionTile.textBlock}>
-                                        <p className={approvalDecisionTile.title}>
-                                            {report.admin_status === 'approved' ? 'Approved' : 'Approve'}
-                                        </p>
-                                        <p className={approvalDecisionTile.subtitle}>Verify impact</p>
-                                    </div>
+                                    <CheckCircle2 className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
+                                    {report.admin_status === "approved" ? "Approved" : "Approve"}
                                 </button>
-
                                 <button
                                     type="button"
-                                    onClick={() => handleVerify('reject')}
-                                    disabled={isVerifying || report.status === 'rejected'}
-                                    className={clsx(
-                                        approvalDecisionTile.root,
-                                        "border-red-200 bg-red-50 text-red-700 hover:bg-red-100 focus-visible:ring-red-300",
-                                    )}
+                                    onClick={() => handleVerify("reject")}
+                                    disabled={isVerifying || report.status === "rejected"}
+                                    className="inline-flex min-h-[2.75rem] w-full items-center justify-center gap-2 rounded-xl border border-red-200 bg-white px-5 py-2.5 text-sm font-semibold text-red-700 shadow-sm transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300 focus-visible:ring-offset-2 sm:w-auto"
                                 >
-                                    <div className={clsx(approvalDecisionTile.iconFrame, "bg-red-100 text-red-600")}>
-                                        <XCircle className="h-6 w-6" strokeWidth={2} />
-                                    </div>
-                                    <div className={approvalDecisionTile.textBlock}>
-                                        <p className={approvalDecisionTile.title}>
-                                            {report.status === 'rejected' ? 'Rejected' : 'Reject'}
-                                        </p>
-                                        <p className={approvalDecisionTile.subtitle}>Final decision</p>
-                                    </div>
+                                    <XCircle className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
+                                    {report.status === "rejected" ? "Rejected" : "Reject"}
                                 </button>
                             </div>
                         </div>
@@ -860,41 +1235,44 @@ export default function AdminReportDetailPage() {
             </div>
 
             {/* Sticky Action Bar for quick access while scrolling */}
-            {showStickyActions && !isVerifying && report.admin_status !== 'approved' && (
-                <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-bottom-10 fade-in duration-500 w-full max-w-3xl px-6">
-                    <div className="bg-slate-900/90 backdrop-blur-xl border border-white/10 shadow-2xl rounded-[2.5rem] p-4 flex items-center justify-between gap-6 ring-1 ring-white/20">
-                        <div className="flex items-center gap-4 ml-4">
-                            <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white font-black text-sm border-2 border-white/20">
+            {showStickyActions && !isVerifying && report.admin_status !== "approved" && (
+                <div className="animate-in fade-in slide-in-from-bottom-10 fixed bottom-8 left-1/2 z-50 w-full max-w-3xl -translate-x-1/2 px-6 duration-500">
+                    <div className="flex items-center justify-between gap-4 rounded-[2rem] border border-white/10 bg-slate-900/90 p-4 shadow-2xl ring-1 ring-white/15 backdrop-blur-xl sm:gap-6">
+                        <div className="ml-1 flex items-center gap-3 sm:ml-3">
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-2 border-white/20 bg-indigo-600 text-sm font-bold text-white">
                                 {report.student.name.charAt(0)}
                             </div>
-                            <div className="hidden md:block">
-                                <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest leading-none mb-1">Approval Context</p>
-                                <p className="text-sm font-bold text-white truncate max-w-[200px]">{report.student.name}</p>
+                            <div className="hidden min-w-0 md:block">
+                                <p className="mb-1 text-[10px] font-semibold uppercase tracking-widest text-indigo-300">Approval context</p>
+                                <p className="max-w-[200px] truncate text-sm font-semibold text-white">{report.student.name}</p>
                             </div>
                         </div>
 
-                        <div className="flex items-center gap-3">
+                        <div className="flex shrink-0 items-center gap-2 sm:gap-3">
                             <button
-                                onClick={() => handleVerify('approve')}
-                                className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-full text-xs font-black uppercase tracking-widest transition-all hover:scale-105 active:scale-95 shadow-lg shadow-emerald-900/20 flex items-center gap-2"
+                                type="button"
+                                onClick={() => handleVerify("approve")}
+                                className="flex items-center gap-2 rounded-full bg-emerald-600 px-5 py-2.5 text-xs font-semibold uppercase tracking-widest text-white shadow-lg shadow-emerald-900/25 transition-transform hover:bg-emerald-500 active:scale-95 sm:px-6"
                             >
-                                <CheckCircle2 className="w-3.5 h-3.5" /> Approve
+                                <CheckCircle2 className="h-3.5 w-3.5" strokeWidth={2} /> Approve
                             </button>
                             <button
-                                onClick={() => handleVerify('reject')}
-                                className="px-6 py-2.5 bg-white/10 hover:bg-white/20 text-white rounded-full text-xs font-black uppercase tracking-widest transition-all hover:scale-105 active:scale-95 flex items-center gap-2"
+                                type="button"
+                                onClick={() => handleVerify("reject")}
+                                className="flex items-center gap-2 rounded-full bg-white/10 px-5 py-2.5 text-xs font-semibold uppercase tracking-widest text-white transition-colors hover:bg-white/20 active:scale-95 sm:px-6"
                             >
-                                <XCircle className="w-3.5 h-3.5 text-red-400" /> Reject
+                                <XCircle className="h-3.5 w-3.5 text-red-400" strokeWidth={2} /> Reject
                             </button>
                             <button
+                                type="button"
                                 onClick={() => {
-                                    const el = document.getElementById('actions');
-                                    el?.scrollIntoView({ behavior: 'smooth' });
+                                    const el = document.getElementById("actions");
+                                    el?.scrollIntoView({ behavior: "smooth" });
                                 }}
-                                className="p-2.5 bg-white/5 hover:bg-white/10 text-white rounded-full transition-all"
-                                title="Add Feedback & More Options"
+                                className="rounded-full p-2.5 text-white transition-colors hover:bg-white/10"
+                                title="Notes & full actions"
                             >
-                                <MessageSquare className="w-4 h-4" />
+                                <MessageSquare className="h-4 w-4" strokeWidth={2} />
                             </button>
                         </div>
                     </div>

@@ -104,7 +104,7 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
     const studentWordCount = (student_contribution_intent_statement || "").trim().split(/\s+/).filter((w: string) => w).length;
 
     return (
-        <div className="space-y-10 pb-16">
+        <div className="space-y-5 pb-10">
 
             {/* ── Section Header ───────────────────────────────────────── */}
             <div className="space-y-6">

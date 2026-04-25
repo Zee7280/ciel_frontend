@@ -17,6 +17,8 @@ interface MultiSelectProps {
     placeholder?: string;
     disabled?: boolean;
     className?: string;
+    /** Tighter control for dense report sections (e.g. Section 4). Default preserves existing UI. */
+    compact?: boolean;
 }
 
 export function MultiSelect({
@@ -25,7 +27,8 @@ export function MultiSelect({
     onChange,
     placeholder = "Select options...",
     disabled = false,
-    className
+    className,
+    compact = false,
 }: MultiSelectProps) {
     const [isOpen, setIsOpen] = React.useState(false);
     const containerRef = React.useRef<HTMLDivElement>(null);
@@ -53,17 +56,31 @@ export function MultiSelect({
             <div
                 onClick={() => !disabled && setIsOpen(!isOpen)}
                 className={clsx(
-                    "flex min-h-[56px] w-full items-center justify-between rounded-2xl border-2 bg-white px-4 py-2 transition-all cursor-pointer group",
-                    isOpen ? "border-report-primary ring-4 ring-report-primary-soft" : "border-slate-100 hover:border-report-primary-border/50",
+                    "flex w-full items-center justify-between bg-white transition-all cursor-pointer group",
+                    compact
+                        ? "min-h-10 rounded-lg border border-slate-200 px-2.5 py-1.5"
+                        : "min-h-[56px] rounded-2xl border-2 px-4 py-2",
+                    isOpen
+                        ? compact
+                            ? "border-indigo-500 ring-2 ring-indigo-500/15"
+                            : "border-report-primary ring-4 ring-report-primary-soft"
+                        : compact
+                          ? "hover:border-slate-300"
+                          : "border-slate-100 hover:border-report-primary-border/50",
                     disabled && "opacity-50 cursor-not-allowed bg-slate-50"
                 )}
             >
-                <div className="flex flex-wrap gap-2">
+                <div className={clsx("flex flex-wrap", compact ? "gap-1" : "gap-2")}>
                     {selected.length > 0 ? (
                         selected.map((item) => (
                             <div
                                 key={item}
-                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-report-primary text-white text-[10px] font-black uppercase tracking-widest shadow-sm animate-in zoom-in-95 duration-200"
+                                className={clsx(
+                                    "flex items-center gap-1 rounded-md bg-report-primary text-white font-bold uppercase shadow-sm animate-in zoom-in-95 duration-200",
+                                    compact
+                                        ? "px-2 py-0.5 text-[8px] tracking-wide"
+                                        : "gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-black tracking-widest",
+                                )}
                             >
                                 {item}
                                 {!disabled && (
@@ -78,15 +95,28 @@ export function MultiSelect({
                             </div>
                         ))
                     ) : (
-                        <span className="text-slate-400 text-sm font-medium">{placeholder}</span>
+                        <span className={clsx("text-slate-400 font-medium", compact ? "text-xs" : "text-sm")}>{placeholder}</span>
                     )}
                 </div>
-                <ChevronDown className={clsx("w-5 h-5 text-slate-400 transition-transform duration-300", isOpen && "rotate-180")} />
+                <ChevronDown
+                    className={clsx(
+                        "text-slate-400 transition-transform duration-300 shrink-0",
+                        compact ? "w-4 h-4" : "w-5 h-5",
+                        isOpen && "rotate-180",
+                    )}
+                />
             </div>
 
             {isOpen && (
-                <div className="absolute z-[100] mt-3 w-full bg-white rounded-[2rem] border-2 border-slate-100 shadow-2xl shadow-slate-200/60 overflow-hidden animate-in fade-in slide-in-from-top-4 duration-300">
-                    <div className="max-h-[300px] overflow-y-auto p-2 custom-scrollbar">
+                <div
+                    className={clsx(
+                        "absolute z-[100] w-full bg-white overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200",
+                        compact
+                            ? "mt-1 rounded-lg border border-slate-200 shadow-lg"
+                            : "mt-3 rounded-[2rem] border-2 border-slate-100 shadow-2xl shadow-slate-200/60",
+                    )}
+                >
+                    <div className={clsx("max-h-[300px] overflow-y-auto custom-scrollbar", compact ? "p-1" : "p-2")}>
                         {options.map((option) => {
                             const isSelected = selected.includes(option);
                             return (
@@ -94,13 +124,23 @@ export function MultiSelect({
                                     key={option}
                                     onClick={() => toggleOption(option)}
                                     className={clsx(
-                                        "flex items-center justify-between px-5 py-4 rounded-2xl cursor-pointer transition-all mb-1 last:mb-0 group/item",
+                                        "flex items-center justify-between cursor-pointer transition-all mb-0.5 last:mb-0 group/item",
+                                        compact
+                                            ? "px-2.5 py-2 rounded-md text-left"
+                                            : "px-5 py-4 rounded-2xl mb-1 last:mb-0",
                                         isSelected
                                             ? "bg-report-primary-soft/50 text-report-primary"
                                             : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
                                     )}
                                 >
-                                    <span className="text-[11px] font-black uppercase tracking-[0.05em]">{option}</span>
+                                    <span
+                                        className={clsx(
+                                            "font-bold uppercase",
+                                            compact ? "text-[9px] tracking-wide leading-snug pr-2" : "text-[11px] font-black tracking-[0.05em]",
+                                        )}
+                                    >
+                                        {option}
+                                    </span>
                                     {isSelected && <Check className="w-4 h-4 text-report-primary" />}
                                 </div>
                             );

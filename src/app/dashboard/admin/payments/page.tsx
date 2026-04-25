@@ -613,7 +613,7 @@ export default function AdminPaymentsPage() {
                     <div className="py-4 space-y-4">
                         <div className="space-y-2">
                             <label className="text-xs font-black text-slate-400 tracking-widest uppercase">Internal Feedback / Note</label>
-                            <textarea 
+                            <textarea spellCheck={true}
                                 className="w-full min-h-[100px] p-3 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
                                 placeholder={actionType === 'approve' ? 'Optional note for the logs...' : 'Reason for rejection (will be shown to student)...'}
                                 value={feedback}
@@ -665,7 +665,7 @@ export default function AdminPaymentsPage() {
                     </DialogHeader>
                     <div className="space-y-2 py-2">
                         <label className="text-xs font-black text-slate-400 tracking-widest uppercase">Reason (optional, for audit)</label>
-                        <textarea
+                        <textarea spellCheck={true}
                             className="w-full min-h-[88px] p-3 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-amber-500 focus:outline-none"
                             placeholder="e.g. Approved wrong slip / duplicate entry..."
                             value={revertReason}

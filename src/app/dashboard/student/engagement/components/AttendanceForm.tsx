@@ -405,7 +405,7 @@ export default function AttendanceForm({
                 </div>
                 <div className="relative">
                     <FileText className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
-                    <textarea
+                    <textarea spellCheck={true}
                         placeholder="What did you accomplish during this session?"
                         value={formData.description}
                         onChange={(e) => setFormData({ ...formData, description: e.target.value })}

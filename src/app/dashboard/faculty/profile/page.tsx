@@ -382,7 +382,7 @@ export default function FacultyProfilePage() {
 
                             <div className="md:col-span-2">
                                 <label className="block text-sm font-semibold text-slate-700 mb-2.5">Bio (optional)</label>
-                                <textarea
+                                <textarea spellCheck={true}
                                     value={formData.bio}
                                     onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
                                     className="w-full px-5 py-4 rounded-2xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-violet-500 focus:ring-4 focus:ring-violet-500/10 outline-none transition-all duration-200 font-medium text-slate-800 placeholder:text-slate-400 min-h-[120px] resize-y"

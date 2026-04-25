@@ -204,12 +204,12 @@ export default function Section11Summary({ onRequestFinalSubmit }: Section11Summ
     const surfaceHeaderRow = "border-b border-slate-100 bg-slate-50/70";
 
     return (
-        <div className="space-y-8 md:space-y-10 pb-16">
+        <div className="space-y-5 md:space-y-6 pb-10">
             {/* ── Section Header — Intelligence strip ── */}
-            <div className="space-y-4 md:space-y-5">
+            <div className="space-y-3 md:space-y-4">
                 <div
                     className={clsx(
-                        "flex flex-col lg:flex-row lg:items-stretch lg:justify-between gap-5 md:gap-6 p-6 md:p-8 bg-gradient-to-br from-white via-slate-50/50 to-white",
+                        "flex flex-col lg:flex-row lg:items-stretch lg:justify-between gap-4 md:gap-5 p-4 md:p-5 bg-gradient-to-br from-white via-slate-50/50 to-white",
                         surfaceCard,
                     )}
                 >

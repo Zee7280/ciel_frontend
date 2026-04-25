@@ -438,7 +438,7 @@ export default function OrganizationProfilePage() {
                             <div>
                                 <label className="block text-sm font-bold text-slate-900 mb-2">Description</label>
                                 {isEditing ? (
-                                    <textarea
+                                    <textarea spellCheck={true}
                                         className="w-full p-4 rounded-xl border border-slate-200 outline-none focus:border-blue-500 min-h-[100px]"
                                         value={orgData.description}
                                         onChange={(e) => setOrgData({ ...orgData, description: e.target.value })}

@@ -351,7 +351,7 @@ function ReportFormContent() {
 
     if (showGuide) {
         return (
-            <div className="max-w-none mx-auto px-6 md:px-12 py-8">
+            <div className="max-w-none mx-auto px-4 md:px-8 py-5">
                 <PreReportGuide
                     projectTitle={projectDetails?.title}
                     onStart={() => setShowGuide(false)}
@@ -361,19 +361,19 @@ function ReportFormContent() {
     }
 
     return (
-        <div className="max-w-none mx-auto px-4 md:px-6 py-6 space-y-6">
+        <div className="max-w-none mx-auto px-3 md:px-5 py-3 md:py-4 space-y-3">
             {/* Sticky Header Wrapper */}
-            <div className="sticky top-0 z-30 -mx-4 md:-mx-6 px-4 md:px-6 py-4 bg-slate-50/80 backdrop-blur-md border-b border-slate-200/60 transition-all">
+            <div className="sticky top-0 z-30 -mx-3 md:-mx-5 px-3 md:px-5 py-2.5 md:py-3 bg-slate-50/80 backdrop-blur-md border-b border-slate-200/60 transition-all">
                 <div className="flex items-center justify-between max-w-[1600px] mx-auto">
                     <div className="min-w-0">
                         <Button variant="ghost" size="sm" onClick={() => router.back()} className="mb-1 -ml-2 text-slate-400 hover:text-slate-600 h-7 text-[11px] font-bold">
                             <ArrowLeft className="w-3.5 h-3.5 mr-1" /> Back to Dashboard
                         </Button>
-                        <div className="flex items-center gap-3 flex-wrap">
-                            <h1 className="text-2xl md:text-3xl font-extrabold text-slate-900 tracking-tight shrink-0">
+                        <div className="flex items-center gap-2.5 flex-wrap">
+                            <h1 className="text-xl md:text-2xl font-extrabold text-slate-900 tracking-tight shrink-0">
                                 Community Engagement Report
                             </h1>
-                            <span className="px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 text-[10px] font-bold border border-blue-100 uppercase tracking-wider">
+                            <span className="px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 text-[9px] font-bold border border-blue-100 uppercase tracking-wider">
                                 Step {activeStep} of 11
                             </span>
                         </div>
@@ -390,7 +390,7 @@ function ReportFormContent() {
                     {/* Eligibility Banner */}
                     {!isReadOnly && (
                         <div className={clsx(
-                            "hidden md:flex items-center gap-3 px-6 py-2.5 rounded-2xl border transition-all animate-in fade-in zoom-in duration-500",
+                            "hidden md:flex items-center gap-2.5 px-3 py-1.5 rounded-xl border transition-all animate-in fade-in zoom-in duration-500",
                             canSubmitReport
                                 ? "bg-emerald-50 border-emerald-100 text-emerald-700 shadow-sm"
                                 : "bg-amber-50 border-amber-100 text-amber-700"
@@ -434,8 +434,8 @@ function ReportFormContent() {
                 </div>
 
                 {/* Stepper Inside Sticky Header */}
-                <div className="max-w-[1600px] mx-auto mt-4 px-1">
-                    <div className="flex flex-wrap items-center gap-y-2 gap-x-1.5">
+                <div className="max-w-[1600px] mx-auto mt-2 px-0.5">
+                    <div className="flex flex-wrap items-center gap-y-1.5 gap-x-1">
                         {steps.map((label, i) => {
                             const stepNum = i + 1;
                             const isActive = activeStep === stepNum;
@@ -455,7 +455,7 @@ function ReportFormContent() {
                                             }
                                         }}
                                         className={clsx(
-                                            "flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all text-[11px] font-bold uppercase tracking-tight cursor-pointer",
+                                            "flex items-center gap-1.5 px-2.5 py-1 rounded-md transition-all text-[10px] font-bold uppercase tracking-tight cursor-pointer",
                                             stepperLockedToSummaryOnly && stepNum !== 11 && "pointer-events-none cursor-not-allowed opacity-35",
                                             isActive ? "bg-blue-600 text-white shadow-lg shadow-blue-200/50 scale-105"
                                                 : isCompleted || isReadOnly ? "bg-white text-blue-600 border border-blue-100 hover:bg-blue-50"
@@ -481,8 +481,8 @@ function ReportFormContent() {
             </div>
 
             {/* Main Content Area */}
-            <div className="max-w-[1600px] mx-auto pt-2 flex flex-col lg:flex-row gap-8 items-start">
-                <div className="min-w-0 flex-1 w-full min-h-[400px]">
+            <div className="max-w-[1600px] mx-auto pt-1 flex flex-col lg:flex-row gap-5 items-start">
+                <div className="min-w-0 flex-1 w-full min-h-[280px]">
                     {activeStep === 1 && <Section1Participation projectData={projectDetails} />}
                     {activeStep === 2 && <Section2ProjectContext projectData={projectDetails} />}
                     {activeStep === 3 && <Section3SDGMapping projectData={projectDetails} />}
@@ -506,8 +506,8 @@ function ReportFormContent() {
 
 
             {!(summaryOnlyWorkspace || ciiVerifiedSummaryLock) && (
-                <div className="mt-8 rounded-2xl border border-slate-200/80 bg-white/90 shadow-sm shadow-slate-200/50 backdrop-blur-sm px-4 py-4 md:px-6 md:py-5">
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between max-w-[1600px] mx-auto">
+                <div className="mt-4 rounded-xl border border-slate-200/80 bg-white/90 shadow-sm shadow-slate-200/50 backdrop-blur-sm px-3 py-3 md:px-5 md:py-3.5">
+                <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between max-w-[1600px] mx-auto">
                     <div className="flex justify-start sm:flex-1">
                         {!isReadOnly && (
                             <Button
@@ -515,7 +515,7 @@ function ReportFormContent() {
                                 variant="outline"
                                 onClick={prevStep}
                                 disabled={activeStep === 1}
-                                className="h-11 rounded-xl border-slate-200 text-slate-700 font-semibold px-5 hover:bg-slate-50 disabled:opacity-40"
+                                className="h-9 rounded-lg border-slate-200 text-slate-700 text-sm font-semibold px-4 hover:bg-slate-50 disabled:opacity-40"
                             >
                                 Previous Step
                             </Button>
@@ -529,7 +529,7 @@ function ReportFormContent() {
                                 variant="outline"
                                 onClick={() => handleSave(false)}
                                 disabled={isSaving}
-                                className="bg-slate-50 hover:bg-slate-100 text-slate-800 h-11 px-5 rounded-xl border border-slate-200 font-semibold text-xs uppercase tracking-wide transition-all flex items-center gap-2 w-full sm:w-auto justify-center"
+                                className="bg-slate-50 hover:bg-slate-100 text-slate-800 h-9 px-4 rounded-lg border border-slate-200 font-semibold text-[11px] uppercase tracking-wide transition-all flex items-center gap-1.5 w-full sm:w-auto justify-center"
                             >
                                 {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4 text-slate-500" />}
                                 <span>Save Section {activeStep} Progress</span>
@@ -549,7 +549,7 @@ function ReportFormContent() {
                                 type="button"
                                 onClick={handleNext}
                                 disabled={isSaving}
-                                className="h-11 rounded-xl bg-blue-600 hover:bg-blue-700 text-white px-6 md:px-8 font-semibold shadow-md shadow-blue-600/20 transition-all w-full sm:w-auto disabled:opacity-50"
+                                className="h-9 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm px-5 md:px-6 font-semibold shadow-sm shadow-blue-600/20 transition-all w-full sm:w-auto disabled:opacity-50"
                             >
                                 {isSaving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
                                 {activeStep === 11

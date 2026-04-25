@@ -173,7 +173,7 @@ function OutcomeCard({
     const improvement = endline - baseline;
 
     return (
-        <div className="bg-white rounded-[2.5rem] border-2 border-slate-100 p-8 shadow-sm space-y-8 relative group">
+        <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm space-y-4 relative group">
             {/* Card header */}
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -446,7 +446,7 @@ export default function Section5Outcomes() {
     const challengeWords = (section5.challenges || '').trim().split(/\s+/).filter(w => w.length > 0).length;
 
     return (
-        <div className="space-y-12 pb-16">
+        <div className="space-y-5 pb-10">
             {/* Header */}
             <div className="space-y-6">
                 <div className="flex items-center gap-4">
@@ -478,7 +478,7 @@ export default function Section5Outcomes() {
                     <h3 className="report-h3">Observed Change (Narrative)</h3>
                 </div>
 
-                <div className="bg-white rounded-[2.5rem] border-2 border-slate-100 p-10 shadow-sm space-y-6">
+                <div className="bg-white rounded-xl border border-slate-200 p-4 md:p-5 shadow-sm space-y-4">
                     <div className="space-y-2">
                         <Label className="report-label text-slate-800">Describe what changed as a result of your project</Label>
                         <p className="text-[10px] text-slate-400 font-medium italic">
@@ -561,7 +561,7 @@ export default function Section5Outcomes() {
                     <h3 className="report-h3">Challenges & Limitations</h3>
                 </div>
 
-                <div className="bg-white rounded-[2.5rem] border-2 border-slate-100 p-10 shadow-sm space-y-6">
+                <div className="bg-white rounded-xl border border-slate-200 p-4 md:p-5 shadow-sm space-y-4">
                     <div className="space-y-2">
                         <Label className="report-label text-slate-800">What challenges did you face? (Required)</Label>
                         <p className="text-[10px] text-slate-400 font-medium italic">

@@ -20,19 +20,13 @@ import {
     COUNTING_METHODS
 } from '../utils/section4Constants';
 
-// Unified UI Tokens
-const inputClasses = "w-full h-14 bg-white hover:bg-slate-50 border-2 border-slate-200 rounded-2xl px-6 font-bold text-slate-800 outline-none focus:bg-white focus:border-indigo-600 focus:ring-4 focus:ring-indigo-600/10 transition-all";
-const selectClasses = "w-full h-14 bg-white hover:bg-slate-50 border-2 border-slate-200 rounded-2xl px-6 font-bold text-slate-800 outline-none focus:bg-white focus:border-indigo-600 focus:ring-4 focus:ring-indigo-600/10 transition-all appearance-none";
-const textareaClasses = "w-full min-h-[120px] bg-white hover:bg-slate-50 border-2 border-slate-200 rounded-2xl p-6 text-sm font-bold text-slate-800 outline-none focus:bg-white focus:border-indigo-600 focus:ring-4 focus:ring-indigo-600/10 transition-all resize-none";
-
-const toggleGroupContainerClasses = "flex gap-2";
-const toggleButtonClasses = "flex-1 h-14 px-4 rounded-2xl border-2 text-[11px] font-black uppercase tracking-wider transition-all flex items-center justify-center text-center";
-const toggleButtonActive = "border-slate-900 bg-slate-900 text-white shadow-md shadow-slate-900/10";
-const toggleButtonInactive = "border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:bg-slate-50";
-
-const multiSelectButtonClasses = "h-12 px-5 rounded-2xl border-2 text-[10px] font-black uppercase tracking-wider transition-all flex items-center justify-center";
-const multiSelectActive = "border-indigo-600 bg-indigo-50 text-indigo-700 shadow-sm";
-const multiSelectInactive = "border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:bg-slate-50";
+// Unified UI Tokens (compact density for Section 4)
+const inputClasses =
+    "w-full min-w-0 h-10 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg px-3 text-sm font-semibold text-slate-800 outline-none focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/15 transition-all";
+const selectClasses =
+    "w-full min-w-0 h-10 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg px-3 pr-9 text-sm font-semibold text-slate-800 outline-none focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/15 transition-all appearance-none";
+const textareaClasses =
+    "w-full min-h-[88px] min-w-0 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm font-medium text-slate-800 outline-none focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/15 transition-all resize-y";
 
 export default function Section4Activities() {
     const { data, updateSection, getFieldError, saveReport } = useReportForm();
@@ -103,40 +97,44 @@ export default function Section4Activities() {
     }, [section4.activity_blocks, section4.project_summary]);
 
     return (
-        <div className="space-y-12 pb-24">
+        <div className="space-y-5 pb-10">
             {/* Header */}
-            <div className="space-y-6">
-                <div className="flex items-center gap-4">
-                    <div className="w-14 h-14 rounded-3xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white flex items-center justify-center shadow-lg shadow-indigo-200">
-                        <Layers className="w-8 h-8" />
+            <div className="space-y-3">
+                <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 shrink-0 rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white flex items-center justify-center shadow-md shadow-indigo-200/60">
+                        <Layers className="w-5 h-5" />
                     </div>
-                    <div>
-                        <h2 className="report-h2 report-h3 !text-2xl font-black">Section 4 — Activities, Outputs & Scale</h2>
-                        <p className="report-label text-slate-500 font-medium tracking-wide mt-1">What Was Done, What It Produced, and the Scope of Impact</p>
+                    <div className="min-w-0">
+                        <h2 className="report-h2 report-h3 !text-base md:!text-lg font-black leading-tight">
+                            Section 4 — Activities, Outputs & Scale
+                        </h2>
+                        <p className="report-label text-slate-500 font-medium tracking-wide mt-0.5 !text-[9px]">
+                            What Was Done, What It Produced, and the Scope of Impact
+                        </p>
                     </div>
                 </div>
 
-                <div className="p-8 bg-white/50 backdrop-blur-md border border-slate-200 rounded-[2.5rem] shadow-sm relative overflow-hidden group">
-                    <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity">
-                        <Target className="w-32 h-32 text-indigo-600" />
+                <div className="p-4 bg-indigo-50/40 border border-indigo-100 rounded-xl shadow-sm relative overflow-hidden group">
+                    <div className="absolute top-0 right-0 p-3 opacity-[0.06] group-hover:opacity-[0.1] transition-opacity pointer-events-none">
+                        <Target className="w-20 h-20 text-indigo-600" />
                     </div>
-                    <div className="relative z-10 space-y-4 max-w-3xl">
-                        <div className="flex items-center gap-3 text-indigo-600">
-                            <Info className="w-6 h-6" />
-                            <h3 className="text-lg font-black uppercase tracking-widest">Section Guidelines</h3>
+                    <div className="relative z-10 space-y-2 max-w-3xl">
+                        <div className="flex items-center gap-2 text-indigo-700">
+                            <Info className="w-4 h-4 shrink-0" />
+                            <h3 className="text-[11px] font-black uppercase tracking-wider text-indigo-900">Section Guidelines</h3>
                         </div>
-                        <p className="text-slate-600 leading-relaxed font-medium">
+                        <p className="text-xs text-slate-600 leading-snug font-medium">
                             Complete this section activity by activity. Each block represents a major effort within your project.
                             This data forms the operational foundation for reporting and SDG validation.
                         </p>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-black text-slate-400 uppercase tracking-widest pt-2">
-                            <div className="flex items-center gap-2">
-                                <div className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
-                                Numeric & Measurable Outputs
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5 text-[10px] font-bold text-slate-500 uppercase tracking-wide pt-1">
+                            <div className="flex items-center gap-1.5 min-w-0">
+                                <div className="w-1 h-1 rounded-full bg-indigo-500 shrink-0" />
+                                <span className="truncate">Numeric & Measurable Outputs</span>
                             </div>
-                            <div className="flex items-center gap-2">
-                                <div className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
-                                Verified Beneficiary Reach
+                            <div className="flex items-center gap-1.5 min-w-0">
+                                <div className="w-1 h-1 rounded-full bg-indigo-500 shrink-0" />
+                                <span className="truncate">Verified Beneficiary Reach</span>
                             </div>
                         </div>
                     </div>
@@ -144,33 +142,35 @@ export default function Section4Activities() {
             </div>
 
             {/* 4.1 Activity Blocks */}
-            <div className="space-y-8">
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-slate-900 text-white flex items-center justify-center text-xs font-black">4.1</div>
-                        <h3 className="report-h3 text-lg">Activity Blocks</h3>
+            <div className="space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex items-center gap-2 min-w-0">
+                        <div className="w-8 h-8 shrink-0 rounded-full bg-slate-900 text-white flex items-center justify-center text-[10px] font-black">
+                            4.1
+                        </div>
+                        <h3 className="report-h3 !text-xs">Activity Blocks</h3>
                     </div>
                     <Button
                         type="button"
                         onClick={addActivity}
-                        className="h-12 px-8 rounded-2xl bg-indigo-600 text-white font-black text-xs uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-100 flex items-center gap-2"
+                        className="h-9 px-4 rounded-lg bg-indigo-600 text-white font-bold text-[10px] uppercase tracking-wide hover:bg-indigo-700 transition-all shadow-sm flex items-center gap-1.5 shrink-0"
                     >
-                        <PlusCircle className="w-5 h-5" /> Add New Activity
+                        <PlusCircle className="w-4 h-4" /> Add New Activity
                     </Button>
                 </div>
 
                 {section4.activity_blocks.length === 0 ? (
-                    <div className="p-16 border-2 border-dashed border-slate-300 rounded-[3rem] flex flex-col items-center justify-center text-center space-y-4 bg-slate-50">
-                        <div className="w-20 h-20 rounded-full bg-white flex items-center justify-center shadow-sm border border-slate-100">
-                            <Plus className="w-10 h-10 text-slate-300" />
+                    <div className="p-8 border border-dashed border-slate-300 rounded-xl flex flex-col items-center justify-center text-center space-y-3 bg-slate-50/80">
+                        <div className="w-14 h-14 rounded-full bg-white flex items-center justify-center shadow-sm border border-slate-100">
+                            <Plus className="w-7 h-7 text-slate-300" />
                         </div>
-                        <div className="space-y-1">
-                            <p className="text-lg font-black text-slate-900">No activities added yet</p>
-                            <p className="text-sm text-slate-400 font-medium">Click the button above to record your first major project activity.</p>
+                        <div className="space-y-0.5">
+                            <p className="text-sm font-bold text-slate-900">No activities added yet</p>
+                            <p className="text-xs text-slate-500">Click the button above to record your first major project activity.</p>
                         </div>
                     </div>
                 ) : (
-                    <div className="space-y-10">
+                    <div className="space-y-4">
                         {section4.activity_blocks.map((activity: any, index: number) => (
                             <ActivityBlockComponent
                                 key={activity.id}
@@ -186,15 +186,17 @@ export default function Section4Activities() {
             </div>
 
             {/* 4.6 Project Summary */}
-            <div className="space-y-8 pt-12 border-t-2 border-slate-200">
-                <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-slate-900 text-white flex items-center justify-center text-xs font-black">4.6</div>
-                    <h3 className="report-h3 text-lg">Project-Level Summary</h3>
+            <div className="space-y-4 pt-6 border-t border-slate-200">
+                <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center text-[10px] font-black shrink-0">
+                        4.6
+                    </div>
+                    <h3 className="report-h3 !text-xs">Project-Level Summary</h3>
                 </div>
 
-                <div className="bg-white rounded-[3rem] border-2 border-slate-200 p-10 shadow-sm space-y-10">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
-                        <div className="space-y-3">
+                <div className="bg-white rounded-xl border border-slate-200 p-4 md:p-5 shadow-sm space-y-5">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 items-start">
+                        <div className="space-y-2 min-w-0">
                             <div>
                                 <Label className="report-label text-slate-900 block mb-1">Distinct Total Beneficiaries (Required)</Label>
                                 <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
@@ -206,12 +208,12 @@ export default function Section4Activities() {
                                 placeholder="e.g. 250"
                                 value={section4.project_summary?.distinct_total_beneficiaries || ''}
                                 onChange={e => updateProjectSummary('distinct_total_beneficiaries', e.target.value)}
-                                className={clsx(inputClasses, "font-black text-2xl text-indigo-600")}
+                                className={clsx(inputClasses, "font-bold text-lg text-indigo-600")}
                             />
                             <FieldError message={getFieldError('section4.project_summary.distinct_total_beneficiaries')} />
                         </div>
 
-                        <div className="space-y-4">
+                        <div className="space-y-2 min-w-0">
                             <Label className="report-label text-slate-900">Beneficiary Counting Method</Label>
                             <div className="relative">
                                 <select
@@ -222,13 +224,13 @@ export default function Section4Activities() {
                                     <option value="">Select Method...</option>
                                     {COUNTING_METHODS.map(m => <option key={m} value={m}>{m}</option>)}
                                 </select>
-                                <ChevronDown className="absolute right-6 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
+                                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
                             </div>
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-12 pt-10 border-t-2 border-slate-100">
-                        <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 items-start pt-4 border-t border-slate-100">
+                        <div className="space-y-2 min-w-0">
                             <Label className="report-label text-slate-900">Overall Beneficiary Overlap</Label>
                             <div className="relative">
                                 <select
@@ -239,11 +241,11 @@ export default function Section4Activities() {
                                     <option value="">Select Overlap...</option>
                                     {OVERLAP_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
                                 </select>
-                                <ChevronDown className="absolute right-6 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
+                                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
                             </div>
                         </div>
 
-                        <div className="space-y-3">
+                        <div className="space-y-2 min-w-0">
                             <div>
                                 <Label className="report-label text-slate-900 block mb-1">Project Implementation Explanation (50–100 words)</Label>
                                 <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
@@ -262,49 +264,54 @@ export default function Section4Activities() {
             </div>
 
             {/* 4.7 Scale Dashboard */}
-            <div className="space-y-8 pt-12 border-t-2 border-slate-200">
-                <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-slate-900 text-white flex items-center justify-center text-xs font-black">4.7</div>
-                    <h2 className="report-h3 text-lg font-black">Implementation Scale Summary</h2>
+            <div className="space-y-4 pt-6 border-t border-slate-200">
+                <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center text-[10px] font-black shrink-0">
+                        4.7
+                    </div>
+                    <h2 className="report-h3 !text-xs font-black">Implementation Scale Summary</h2>
                 </div>
 
-                <div className="bg-white rounded-3xl border-2 border-slate-200 p-8 text-slate-900 relative overflow-hidden shadow-sm">
-                    <div className="absolute top-0 right-0 p-12 opacity-5">
-                        <BarChart3 className="w-64 h-64 text-indigo-600" />
+                <div className="bg-white rounded-xl border border-slate-200 p-4 md:p-5 text-slate-900 relative overflow-hidden shadow-sm">
+                    <div className="absolute top-0 right-0 p-6 opacity-[0.04] pointer-events-none">
+                        <BarChart3 className="w-40 h-40 text-indigo-600" />
                     </div>
-                    
-                    <div className="relative z-10 grid grid-cols-1 md:grid-cols-4 gap-6">
-                        <div className="bg-slate-50 rounded-2xl p-6 border border-slate-100">
-                            <p className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] mb-2">Total Activities</p>
-                            <p className="report-h3 !text-2xl font-black">{section4.activity_blocks?.length || 0}</p>
+
+                    <div className="relative z-10 grid grid-cols-2 md:grid-cols-4 gap-3">
+                        <div className="bg-slate-50 rounded-lg p-3 border border-slate-100 min-w-0">
+                            <p className="text-[9px] font-bold uppercase text-slate-500 tracking-wide mb-1">Total Activities</p>
+                            <p className="report-h3 !text-lg font-black tabular-nums">{section4.activity_blocks?.length || 0}</p>
                         </div>
-                        <div className="bg-slate-50 rounded-2xl p-6 border border-slate-100">
-                            <p className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] mb-2">Total Sessions</p>
-                            <p className="report-h3 !text-2xl font-black">{totalSessions}</p>
+                        <div className="bg-slate-50 rounded-lg p-3 border border-slate-100 min-w-0">
+                            <p className="text-[9px] font-bold uppercase text-slate-500 tracking-wide mb-1">Total Sessions</p>
+                            <p className="report-h3 !text-lg font-black tabular-nums">{totalSessions}</p>
                         </div>
-                        <div className="bg-slate-50 rounded-2xl p-6 border border-slate-100">
-                            <p className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] mb-2">Outputs Recorded</p>
-                            <p className="report-h3 !text-2xl font-black">{totalOutputs}</p>
+                        <div className="bg-slate-50 rounded-lg p-3 border border-slate-100 min-w-0">
+                            <p className="text-[9px] font-bold uppercase text-slate-500 tracking-wide mb-1">Outputs Recorded</p>
+                            <p className="report-h3 !text-lg font-black tabular-nums">{totalOutputs}</p>
                         </div>
-                        <div className="bg-slate-50 rounded-2xl p-6 border border-slate-100">
-                            <p className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] mb-2">Verified Hours</p>
-                            <p className="report-h3 !text-2xl font-black">{section1.metrics?.total_verified_hours || 0}<span className="text-sm font-bold text-slate-400 ml-1">h</span></p>
+                        <div className="bg-slate-50 rounded-lg p-3 border border-slate-100 min-w-0">
+                            <p className="text-[9px] font-bold uppercase text-slate-500 tracking-wide mb-1">Verified Hours</p>
+                            <p className="report-h3 !text-lg font-black tabular-nums">
+                                {section1.metrics?.total_verified_hours || 0}
+                                <span className="text-xs font-semibold text-slate-400 ml-0.5">h</span>
+                            </p>
                         </div>
                     </div>
 
-                    <div className="relative z-10 mt-8 p-6 bg-indigo-50 border border-indigo-100 rounded-2xl flex items-center justify-between">
-                        <div className="flex items-center gap-5">
-                            <div className="w-12 h-12 rounded-xl bg-white shadow-sm border border-indigo-100 flex items-center justify-center">
-                                <Globe className="w-6 h-6 text-indigo-600" />
+                    <div className="relative z-10 mt-4 p-3 md:p-4 bg-indigo-50 border border-indigo-100 rounded-lg flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                        <div className="flex items-center gap-3 min-w-0">
+                            <div className="w-9 h-9 shrink-0 rounded-lg bg-white shadow-sm border border-indigo-100 flex items-center justify-center">
+                                <Globe className="w-4 h-4 text-indigo-600" />
                             </div>
-                            <div>
-                                <p className="text-[10px] font-black uppercase text-indigo-400 tracking-[0.2em] mb-0.5">Scale Classification</p>
-                                <p className="text-lg font-black uppercase text-indigo-700">{scaleClassification}</p>
+                            <div className="min-w-0">
+                                <p className="text-[9px] font-bold uppercase text-indigo-500 tracking-wide mb-0.5">Scale Classification</p>
+                                <p className="text-xs font-bold uppercase text-indigo-800 truncate">{scaleClassification}</p>
                             </div>
                         </div>
-                        <div className="hidden md:block text-right">
-                            <p className="text-[10px] font-black uppercase text-indigo-400 tracking-[0.2em] mb-0.5">Project Status</p>
-                            <p className="text-sm font-black uppercase tracking-widest text-emerald-600">Ready for Evidence Review</p>
+                        <div className="text-left sm:text-right shrink-0">
+                            <p className="text-[9px] font-bold uppercase text-indigo-500 tracking-wide mb-0.5">Project Status</p>
+                            <p className="text-[10px] font-bold uppercase tracking-wide text-emerald-700">Ready for Evidence Review</p>
                         </div>
                     </div>
                 </div>
@@ -355,42 +362,55 @@ function ActivityBlockComponent({ activity, index, updateActivity, removeActivit
     };
 
     return (
-        <div className="bg-white rounded-[3rem] border-2 border-slate-200 shadow-sm relative overflow-hidden transition-all hover:shadow-xl hover:shadow-slate-200/50">
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm relative overflow-hidden transition-shadow hover:shadow-md">
             {/* Block Header */}
-            <div className={clsx(
-                "p-8 flex items-center justify-between cursor-pointer hover:bg-slate-50 transition-colors",
-                isExpanded ? "border-b-2 border-slate-100" : ""
-            )} onClick={() => setIsExpanded(!isExpanded)}>
-                <div className="flex items-center gap-6">
-                    <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-black text-lg border border-indigo-100">
+            <div
+                className={clsx(
+                    "px-4 py-3 flex items-center justify-between gap-3 cursor-pointer hover:bg-slate-50/80 transition-colors",
+                    isExpanded ? "border-b border-slate-100" : "",
+                )}
+                onClick={() => setIsExpanded(!isExpanded)}
+            >
+                <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-9 h-9 shrink-0 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center font-black text-sm border border-indigo-100">
                         {index + 1}
                     </div>
-                    <div>
-                        <h4 className="text-xl font-black text-slate-900">{activity.title || `Unnamed Activity`}</h4>
-                        <div className="flex items-center gap-3 mt-1">
-                            <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">{activity.primary_category || 'No Category Selected'}</span>
-                            {activity.status && <div className="px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-100 text-emerald-600 text-[8px] font-black uppercase">{activity.status}</div>}
+                    <div className="min-w-0">
+                        <h4 className="text-sm font-bold text-slate-900 truncate">{activity.title || `Unnamed Activity`}</h4>
+                        <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                            <span className="text-[9px] font-bold uppercase text-slate-500 tracking-wide">
+                                {activity.primary_category || "No Category Selected"}
+                            </span>
+                            {activity.status && (
+                                <div className="px-1.5 py-0.5 rounded-full bg-emerald-50 border border-emerald-100 text-emerald-700 text-[8px] font-bold uppercase">
+                                    {activity.status}
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>
-                <div className="flex items-center gap-4">
-                    <button 
-                        onClick={(e) => { e.stopPropagation(); removeActivity(activity.id); }}
-                        className="w-10 h-10 rounded-xl bg-red-50 text-red-500 flex items-center justify-center hover:bg-red-500 hover:text-white transition-all group border border-red-100 hover:border-red-500"
+                <div className="flex items-center gap-2 shrink-0">
+                    <button
+                        type="button"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            removeActivity(activity.id);
+                        }}
+                        className="w-8 h-8 rounded-lg bg-red-50 text-red-500 flex items-center justify-center hover:bg-red-500 hover:text-white transition-all group border border-red-100 hover:border-red-500"
                     >
-                        <Trash2 className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                        <Trash2 className="w-4 h-4 group-hover:scale-110 transition-transform" />
                     </button>
-                    <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center text-slate-400 border border-slate-200">
-                        {isExpanded ? <ChevronUp className="w-6 h-6" /> : <ChevronDown className="w-6 h-6" />}
+                    <div className="w-8 h-8 rounded-lg bg-slate-50 flex items-center justify-center text-slate-400 border border-slate-200">
+                        {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                     </div>
                 </div>
             </div>
 
             {isExpanded && (
-                <div className="p-10 space-y-12 animate-in fade-in slide-in-from-top-4 duration-500">
+                <div className="px-4 py-4 md:px-5 space-y-5 animate-in fade-in slide-in-from-top-2 duration-300">
                     {/* 4.1.1 Add Activity */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-                        <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 items-start">
+                        <div className="space-y-2 min-w-0">
                             <Label className="report-label">Activity Title (Required)</Label>
                             <Input
                                 placeholder="e.g. Hygiene Awareness Session"
@@ -400,7 +420,7 @@ function ActivityBlockComponent({ activity, index, updateActivity, removeActivit
                             />
                             <FieldError message={getFieldError(`section4.activity_blocks.${index}.title`)} />
                         </div>
-                        <div className="space-y-4">
+                        <div className="space-y-2 min-w-0">
                             <Label className="report-label">Activity Status</Label>
                             <div className="relative">
                                 <select
@@ -411,13 +431,13 @@ function ActivityBlockComponent({ activity, index, updateActivity, removeActivit
                                     <option value="">Select Status...</option>
                                     {['Completed', 'Partially Completed', 'Ongoing'].map(s => <option key={s} value={s}>{s}</option>)}
                                 </select>
-                                <ChevronDown className="absolute right-6 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
+                                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
                             </div>
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-                        <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 items-start">
+                        <div className="space-y-2 min-w-0">
                             <Label className="report-label">Primary Activity Category (Select One)</Label>
                             <div className="relative">
                                 <select
@@ -428,11 +448,11 @@ function ActivityBlockComponent({ activity, index, updateActivity, removeActivit
                                     <option value="">Select Category...</option>
                                     {PRIMARY_CATEGORIES.map(cat => <option key={cat.id} value={cat.id}>{cat.label}</option>)}
                                 </select>
-                                <ChevronDown className="absolute right-6 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
+                                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
                             </div>
                         </div>
                         {activity.primary_category && (
-                            <div className="space-y-4 animate-in slide-in-from-left-4 duration-300">
+                            <div className="space-y-2 min-w-0 animate-in slide-in-from-left-4 duration-300">
                                 <Label className="report-label">Activity Sub-Category (Select One)</Label>
                                 <div className="relative">
                                     <select
@@ -443,14 +463,14 @@ function ActivityBlockComponent({ activity, index, updateActivity, removeActivit
                                         <option value="">Select Sub-Category...</option>
                                         {(SUB_CATEGORIES[activity.primary_category] || []).map(sub => <option key={sub} value={sub}>{sub}</option>)}
                                     </select>
-                                    <ChevronDown className="absolute right-6 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
+                                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
                                 </div>
                             </div>
                         )}
                     </div>
 
                     {activity.primary_category === 'Other' && (
-                        <div className="space-y-4">
+                        <div className="space-y-2">
                             <Label className="report-label">Please Specify Category</Label>
                             <Input
                                 placeholder="Other activity category..."
@@ -461,10 +481,12 @@ function ActivityBlockComponent({ activity, index, updateActivity, removeActivit
                         </div>
                     )}
 
-                    <div className="space-y-3">
-                        <div className="flex justify-between items-center">
+                    <div className="space-y-2">
+                        <div className="flex justify-between items-center gap-2">
                             <Label className="report-label block">Activity Description (50–100 words)</Label>
-                            <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest italic hidden md:block">What, Who, How, Why</span>
+                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wide italic hidden md:block shrink-0">
+                                What, Who, How, Why
+                            </span>
                         </div>
                         <Textarea
                             placeholder="Describe what was done and the role of those involved..."
@@ -476,16 +498,16 @@ function ActivityBlockComponent({ activity, index, updateActivity, removeActivit
                     </div>
 
                     {/* 4.2 Delivery */}
-                    <div className="pt-10 border-t-2 border-slate-100 space-y-10">
-                        <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center shadow-md shadow-indigo-600/20">
-                                <Truck className="w-4 h-4" />
+                    <div className="pt-4 border-t border-slate-200 space-y-4">
+                        <div className="flex items-center gap-2">
+                            <div className="w-7 h-7 rounded-md bg-indigo-600 text-white flex items-center justify-center shadow-sm shrink-0">
+                                <Truck className="w-3.5 h-3.5" />
                             </div>
-                            <h5 className="text-sm font-black uppercase tracking-[0.2em] text-slate-900">4.2 Delivery Execution</h5>
+                            <h5 className="text-[11px] font-black uppercase tracking-wide text-slate-900">4.2 Delivery Execution</h5>
                         </div>
-                        
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
-                            <div className="space-y-4">
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 items-start">
+                            <div className="space-y-2 min-w-0">
                                 <Label className="report-label">Mode of Delivery</Label>
                                 <div className="relative">
                                     <select
@@ -496,12 +518,13 @@ function ActivityBlockComponent({ activity, index, updateActivity, removeActivit
                                         <option value="">Select Mode...</option>
                                         {DELIVERY_MODES.map(m => <option key={m} value={m}>{m}</option>)}
                                     </select>
-                                    <ChevronDown className="absolute right-6 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
+                                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
                                 </div>
                             </div>
-                            <div className="space-y-4">
+                            <div className="space-y-2 min-w-0">
                                 <Label className="report-label">Implementation Model (Select Multiple)</Label>
                                 <MultiSelect
+                                    compact
                                     placeholder="Select Models..."
                                     options={IMPLEMENTATION_MODELS}
                                     selected={activity.implementation_models || []}
@@ -510,8 +533,8 @@ function ActivityBlockComponent({ activity, index, updateActivity, removeActivit
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
-                            <div className="space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 items-start">
+                            <div className="space-y-2 min-w-0">
                                 <Label className="report-label">Number of Sessions / Events / Drives</Label>
                                 <Input
                                     type="number"
@@ -521,43 +544,46 @@ function ActivityBlockComponent({ activity, index, updateActivity, removeActivit
                                     className={clsx(inputClasses, "text-indigo-600")}
                                 />
                             </div>
-                            <div className="space-y-4">
+                            <div className="space-y-2 min-w-0">
                                 <Label className="report-label">Delivery Explanation (Optional)</Label>
                                 <Textarea
                                     placeholder="Briefly explain implementation roles..."
                                     value={activity.delivery_explanation}
                                     onChange={e => update('delivery_explanation', e.target.value)}
-                                    className={clsx(textareaClasses, "min-h-[100px]")}
+                                    className={clsx(textareaClasses, "min-h-[72px]")}
                                 />
                             </div>
                         </div>
                     </div>
 
                     {/* 4.3 Outputs */}
-                    <div className="pt-10 border-t-2 border-slate-100 space-y-10">
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center shadow-md shadow-indigo-600/20">
-                                    <BarChart3 className="w-4 h-4" />
+                    <div className="pt-4 border-t border-slate-200 space-y-4">
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                            <div className="flex items-center gap-2 min-w-0">
+                                <div className="w-7 h-7 rounded-md bg-indigo-600 text-white flex items-center justify-center shadow-sm shrink-0">
+                                    <BarChart3 className="w-3.5 h-3.5" />
                                 </div>
-                                <h5 className="text-sm font-black uppercase tracking-[0.2em] text-slate-900">4.3 Measurable Outputs</h5>
+                                <h5 className="text-[11px] font-black uppercase tracking-wide text-slate-900">4.3 Measurable Outputs</h5>
                             </div>
                             <Button
                                 type="button"
                                 onClick={addOutput}
                                 variant="outline"
-                                className="h-10 px-4 rounded-xl border-2 border-slate-900 text-slate-900 font-black text-[10px] uppercase transition-all hover:bg-slate-900 hover:text-white"
+                                className="h-8 px-3 rounded-lg border border-slate-900 text-slate-900 font-bold text-[9px] uppercase transition-all hover:bg-slate-900 hover:text-white shrink-0"
                             >
-                                <Plus className="w-4 h-4 mr-2" /> Add Output
+                                <Plus className="w-3.5 h-3.5 mr-1.5" /> Add Output
                             </Button>
                         </div>
 
-                        <div className="space-y-4">
+                        <div className="space-y-3">
                             {activity.outputs?.map((out: any, idx: number) => (
-                                <div key={idx} className="p-6 bg-slate-50/50 rounded-[2rem] border-2 border-slate-100 hover:border-slate-200 transition-all space-y-6 relative group">
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                        <div className="space-y-2">
-                                            <Label className="text-[10px] font-black uppercase text-slate-500">Output Title</Label>
+                                <div
+                                    key={idx}
+                                    className="p-4 bg-slate-50/80 rounded-lg border border-slate-200 hover:border-slate-300 transition-colors space-y-3 relative group"
+                                >
+                                    <div className="grid grid-cols-1 md:grid-cols-12 gap-x-4 gap-y-3 items-start">
+                                        <div className="space-y-1.5 md:col-span-5 min-w-0">
+                                            <Label className="text-[9px] font-bold uppercase text-slate-500 tracking-wide">Output Title</Label>
                                             <Input
                                                 placeholder="e.g. Hygiene Kits"
                                                 value={out.title}
@@ -565,8 +591,8 @@ function ActivityBlockComponent({ activity, index, updateActivity, removeActivit
                                                 className={inputClasses}
                                             />
                                         </div>
-                                        <div className="space-y-2">
-                                            <Label className="text-[10px] font-black uppercase text-slate-500">Type</Label>
+                                        <div className="space-y-1.5 md:col-span-4 min-w-0">
+                                            <Label className="text-[9px] font-bold uppercase text-slate-500 tracking-wide">Type</Label>
                                             <div className="relative">
                                                 <select
                                                     value={out.type}
@@ -576,26 +602,26 @@ function ActivityBlockComponent({ activity, index, updateActivity, removeActivit
                                                     <option value="">Select Type...</option>
                                                     {OUTPUT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                                                 </select>
-                                                <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                                                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
                                             </div>
                                         </div>
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <div className="space-y-2">
-                                                <Label className="text-[10px] font-black uppercase text-slate-500">Qty</Label>
+                                        <div className="grid grid-cols-2 gap-3 md:col-span-3 min-w-0">
+                                            <div className="space-y-1.5 min-w-0">
+                                                <Label className="text-[9px] font-bold uppercase text-slate-500 tracking-wide">Qty</Label>
                                                 <Input
                                                     type="number"
                                                     value={out.quantity}
                                                     onChange={e => updateOutput(idx, 'quantity', e.target.value)}
-                                                    className={clsx(inputClasses, "text-indigo-600 text-center px-4")}
+                                                    className={clsx(inputClasses, "text-indigo-600 text-center px-2")}
                                                 />
                                             </div>
-                                            <div className="space-y-2">
-                                                <Label className="text-[10px] font-black uppercase text-slate-500">Unit</Label>
+                                            <div className="space-y-1.5 min-w-0">
+                                                <Label className="text-[9px] font-bold uppercase text-slate-500 tracking-wide">Unit</Label>
                                                 <div className="relative">
                                                     <select
                                                         value={out.unit}
                                                         onChange={e => updateOutput(idx, 'unit', e.target.value)}
-                                                        className={clsx(selectClasses, "px-4")}
+                                                        className={clsx(selectClasses, "px-2")}
                                                     >
                                                         <option value="">...</option>
                                                         {UNIVERSAL_UNITS.map(u => <option key={u} value={u}>{u}</option>)}
@@ -605,9 +631,9 @@ function ActivityBlockComponent({ activity, index, updateActivity, removeActivit
                                             </div>
                                         </div>
                                     </div>
-                                    <div className="flex items-center gap-4">
-                                        <div className="flex-1 space-y-2">
-                                            <Label className="text-[10px] font-black uppercase text-slate-500">Verification Note</Label>
+                                    <div className="flex flex-col sm:flex-row sm:items-end gap-3">
+                                        <div className="flex-1 space-y-1.5 min-w-0">
+                                            <Label className="text-[9px] font-bold uppercase text-slate-500 tracking-wide">Verification Note</Label>
                                             <Input
                                                 placeholder="e.g. Verified by attendance registry"
                                                 value={out.verification_note}
@@ -615,13 +641,13 @@ function ActivityBlockComponent({ activity, index, updateActivity, removeActivit
                                                 className={inputClasses}
                                             />
                                         </div>
-                                        <div className="flex flex-col items-center gap-2">
-                                            <Label className="text-[9px] font-black uppercase text-slate-400 text-center w-full">Shared?</Label>
+                                        <div className="flex flex-row sm:flex-col items-center sm:items-center gap-2 sm:pb-0.5 shrink-0">
+                                            <Label className="text-[9px] font-bold uppercase text-slate-400 sm:text-center">Shared?</Label>
                                             <input
                                                 type="checkbox"
                                                 checked={out.is_shared}
                                                 onChange={e => updateOutput(idx, 'is_shared', e.target.checked)}
-                                                className="w-8 h-8 rounded-lg bg-white border-2 border-slate-200 text-indigo-600 focus:ring-indigo-600/20 cursor-pointer"
+                                                className="w-7 h-7 rounded-md bg-white border border-slate-200 text-indigo-600 focus:ring-indigo-500/20 cursor-pointer"
                                             />
                                         </div>
                                     </div>
@@ -638,17 +664,17 @@ function ActivityBlockComponent({ activity, index, updateActivity, removeActivit
                     </div>
 
                     {/* 4.4 Beneficiaries */}
-                    <div className="pt-10 border-t-2 border-slate-100 space-y-10">
-                        <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center shadow-md shadow-indigo-600/20">
-                                <Users className="w-4 h-4" />
+                    <div className="pt-4 border-t border-slate-200 space-y-4">
+                        <div className="flex items-center gap-2">
+                            <div className="w-7 h-7 rounded-md bg-indigo-600 text-white flex items-center justify-center shadow-sm shrink-0">
+                                <Users className="w-3.5 h-3.5" />
                             </div>
-                            <h5 className="text-sm font-black uppercase tracking-[0.2em] text-slate-900">4.4 Beneficiary Reach</h5>
+                            <h5 className="text-[11px] font-black uppercase tracking-wide text-slate-900">4.4 Beneficiary Reach</h5>
                         </div>
 
-                        <div className="flex flex-col md:flex-row md:items-center gap-4 mb-6">
-                            <Label className="report-label">Did this activity directly serve beneficiaries?</Label>
-                            <div className="relative w-full md:w-64">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 items-end">
+                            <Label className="report-label md:pb-2.5">Did this activity directly serve beneficiaries?</Label>
+                            <div className="relative w-full min-w-0">
                                 <select
                                     value={activity.serves_beneficiaries === true ? 'Yes' : activity.serves_beneficiaries === false ? 'No' : ''}
                                     onChange={e => update('serves_beneficiaries', e.target.value === 'Yes')}
@@ -658,14 +684,14 @@ function ActivityBlockComponent({ activity, index, updateActivity, removeActivit
                                     <option value="Yes">Yes</option>
                                     <option value="No">No</option>
                                 </select>
-                                <ChevronDown className="absolute right-6 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
+                                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
                             </div>
                         </div>
 
                         {activity.serves_beneficiaries && (
-                            <div className="space-y-10 animate-in fade-in slide-in-from-top-4 duration-500">
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-                                    <div className="space-y-4">
+                            <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 items-start">
+                                    <div className="space-y-2 min-w-0">
                                         <Label className="report-label">Number of People Reached</Label>
                                         <Input
                                             type="number"
@@ -674,7 +700,7 @@ function ActivityBlockComponent({ activity, index, updateActivity, removeActivit
                                             className={clsx(inputClasses, "text-indigo-600")}
                                         />
                                     </div>
-                                    <div className="space-y-4">
+                                    <div className="space-y-2 min-w-0">
                                         <Label className="report-label">Overlap with Other Activities</Label>
                                         <div className="relative">
                                             <select
@@ -685,14 +711,15 @@ function ActivityBlockComponent({ activity, index, updateActivity, removeActivit
                                                 <option value="">Select Status...</option>
                                                 {OVERLAP_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
                                             </select>
-                                            <ChevronDown className="absolute right-6 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
+                                            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
                                         </div>
                                     </div>
                                 </div>
 
-                                <div className="space-y-4">
+                                <div className="space-y-2">
                                     <Label className="report-label">Beneficiary Categories (Select All That Apply)</Label>
                                     <MultiSelect
+                                        compact
                                         placeholder="Select Categories..."
                                         options={BENEFICIARY_CATEGORIES}
                                         selected={activity.beneficiary_categories || []}
@@ -700,9 +727,10 @@ function ActivityBlockComponent({ activity, index, updateActivity, removeActivit
                                     />
                                 </div>
 
-                                <div className="space-y-4">
+                                <div className="space-y-2">
                                     <Label className="report-label">Relevance Types</Label>
                                     <MultiSelect
+                                        compact
                                         placeholder="Select Relevance..."
                                         options={RELEVANCE_TYPES}
                                         selected={activity.relevance_types || []}
@@ -710,10 +738,10 @@ function ActivityBlockComponent({ activity, index, updateActivity, removeActivit
                                     />
                                 </div>
 
-                                <div className="space-y-3">
+                                <div className="space-y-2">
                                     <div>
-                                        <Label className="report-label block mb-1">Target Population Description (Optional)</Label>
-                                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                                        <Label className="report-label block mb-0.5">Target Population Description (Optional)</Label>
+                                        <p className="text-[9px] text-slate-500 font-semibold uppercase tracking-wide">
                                             Briefly explain who these people are and why they were reached.
                                         </p>
                                     </div>
@@ -721,7 +749,7 @@ function ActivityBlockComponent({ activity, index, updateActivity, removeActivit
                                         placeholder="Explain here..."
                                         value={activity.beneficiary_description}
                                         onChange={e => update('beneficiary_description', e.target.value)}
-                                        className={clsx(textareaClasses, "min-h-[100px]")}
+                                        className={clsx(textareaClasses, "min-h-[72px]")}
                                     />
                                 </div>
                             </div>
@@ -729,16 +757,16 @@ function ActivityBlockComponent({ activity, index, updateActivity, removeActivit
                     </div>
 
                     {/* 4.5 Location */}
-                    <div className="pt-10 border-t-2 border-slate-100 space-y-10">
-                        <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center shadow-md shadow-indigo-600/20">
-                                <MapPin className="w-4 h-4" />
+                    <div className="pt-4 border-t border-slate-200 space-y-4">
+                        <div className="flex items-center gap-2">
+                            <div className="w-7 h-7 rounded-md bg-indigo-600 text-white flex items-center justify-center shadow-sm shrink-0">
+                                <MapPin className="w-3.5 h-3.5" />
                             </div>
-                            <h5 className="text-sm font-black uppercase tracking-[0.2em] text-slate-900">4.5 Where It Happened</h5>
+                            <h5 className="text-[11px] font-black uppercase tracking-wide text-slate-900">4.5 Where It Happened</h5>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-                            <div className="space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 items-start">
+                            <div className="space-y-2 min-w-0">
                                 <Label className="report-label">Geographic Reach</Label>
                                 <div className="relative">
                                     <select
@@ -749,11 +777,11 @@ function ActivityBlockComponent({ activity, index, updateActivity, removeActivit
                                         <option value="">Select Reach...</option>
                                         {GEOGRAPHIC_REACH_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                                     </select>
-                                    <ChevronDown className="absolute right-6 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
+                                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
                                 </div>
                             </div>
                             {GEOGRAPHIC_SUB_CATEGORIES[activity.geographic_reach] && (
-                                <div className="space-y-4 animate-in slide-in-from-right-4">
+                                <div className="space-y-2 min-w-0 animate-in slide-in-from-right-4">
                                     <Label className="report-label">Specific Setting / Sub-Category</Label>
                                     <div className="relative">
                                         <select
@@ -764,13 +792,13 @@ function ActivityBlockComponent({ activity, index, updateActivity, removeActivit
                                             <option value="">Select Sub-Category...</option>
                                             {GEOGRAPHIC_SUB_CATEGORIES[activity.geographic_reach].map(sub => <option key={sub} value={sub}>{sub}</option>)}
                                         </select>
-                                        <ChevronDown className="absolute right-6 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
+                                        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
                                     </div>
                                 </div>
                             )}
                         </div>
 
-                        <div className="space-y-4">
+                        <div className="space-y-2">
                             <Label className="report-label">Site / Community Note (Optional)</Label>
                             <Input
                                 placeholder="e.g. Conducted at Govt. Boys High School, Model Town"

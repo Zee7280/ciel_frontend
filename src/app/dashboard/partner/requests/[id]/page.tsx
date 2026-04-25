@@ -1227,7 +1227,7 @@ function OpportunityDetailsContent() {
                 <div className={`p-8 space-y-6 ${!expandedSections.includes('D') ? 'hidden' : ''}`}>
                     <div>
                         <label className="block text-sm font-bold text-slate-900 mb-2">D1. Project Objective <span className="text-red-500">*</span></label>
-                        <textarea
+                        <textarea spellCheck={true}
 
                             className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-teal-500 outline-none font-medium h-32 disabled:bg-slate-50"
                             value={formData.objectives.description}
@@ -1333,7 +1333,7 @@ function OpportunityDetailsContent() {
                 <div className={`p-8 space-y-6 ${!expandedSections.includes('E') ? 'hidden' : ''}`}>
                     <div>
                         <label className="block text-sm font-bold text-slate-900 mb-2">E1. Student Responsibilities</label>
-                        <textarea
+                        <textarea spellCheck={true}
 
                             className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-indigo-500 outline-none font-medium h-32 disabled:bg-slate-50"
                             value={formData.activity.responsibilities}

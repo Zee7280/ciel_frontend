@@ -50,17 +50,17 @@ export default function CIIDashboardMeter() {
     // Map 0-100 to 0-180 degrees (half circle)
     const arcDegree = (totalScore / 100) * 180;
 
-    // Components list for rendering
+    // Per-category maxima — must match `calculateCII.ts` / `CIIResult["breakdown"]` comments
     const scoreItems = [
-        { label: 'Participation', score: breakdown.participation, max: 15 },
-        { label: 'Context', score: breakdown.context, max: 5 },
-        { label: 'SDG Alignment', score: breakdown.sdg, max: 5 },
+        { label: 'Participation', score: breakdown.participation, max: 10 },
+        { label: 'Context', score: breakdown.context, max: 10 },
+        { label: 'SDG Alignment', score: breakdown.sdg, max: 10 },
         { label: 'Activities', score: breakdown.outputs, max: 15 },
-        { label: 'Outcomes', score: breakdown.outcomes, max: 25 },
-        { label: 'Resources', score: breakdown.resources, max: 5 },
-        { label: 'Partnerships', score: breakdown.partnerships, max: 10 },
-        { label: 'Evidence', score: breakdown.evidence, max: 10 },
-        { label: 'Reflection', score: breakdown.learning, max: 5 },
+        { label: 'Outcomes', score: breakdown.outcomes, max: 20 },
+        { label: 'Resources', score: breakdown.resources, max: 7 },
+        { label: 'Partnerships', score: breakdown.partnerships, max: 7 },
+        { label: 'Evidence', score: breakdown.evidence, max: 12 },
+        { label: 'Reflection', score: breakdown.learning, max: 4 },
         { label: 'Sustainability', score: breakdown.sustainability, max: 5 },
     ];
 
@@ -137,10 +137,17 @@ export default function CIIDashboardMeter() {
                                 <div className="h-1.5 flex-1 bg-slate-100 rounded-full overflow-hidden">
                                     <div
                                         className="h-full bg-report-primary rounded-full transition-all duration-700"
-                                        style={{ width: `${(item.score / item.max) * 100}%` }}
+                                        style={{
+                                            width: `${item.max > 0 ? Math.min(100, (item.score / item.max) * 100) : 0}%`,
+                                        }}
                                     />
                                 </div>
-                                <span className="text-[10px] font-bold text-slate-500 w-8 text-right shrink-0">{item.score}/{item.max}</span>
+                                <span className="text-[10px] font-bold text-slate-500 w-8 text-right shrink-0">
+                                    {typeof item.score === 'number' && !Number.isInteger(item.score)
+                                        ? item.score.toFixed(1)
+                                        : item.score}
+                                    /{item.max}
+                                </span>
                             </div>
                         ))}
                     </div>
@@ -173,7 +180,7 @@ export default function CIIDashboardMeter() {
                             <CheckCircle2 className="w-3.5 h-3.5" /> Impact Profile
                         </p>
                         <ul className="space-y-2">
-                            {breakdown.participation >= 11 && (
+                            {breakdown.participation >= 8 && (
                                 <li className="flex items-center gap-2 text-xs text-emerald-700"><CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" /> High Verified Participation</li>
                             )}
                             {breakdown.outcomes >= 18 && (

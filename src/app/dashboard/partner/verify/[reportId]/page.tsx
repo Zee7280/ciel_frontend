@@ -729,7 +729,7 @@ export default function ReportDetailPage() {
                             <div className="space-y-6">
                                 <div>
                                     <label className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 block">Verification Feedback / Notes</label>
-                                    <textarea
+                                    <textarea spellCheck={true}
                                         value={feedback}
                                         onChange={(e) => setFeedback(e.target.value)}
                                         placeholder="Provide feedback for the student and CIEL admin..."

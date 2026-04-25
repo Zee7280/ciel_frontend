@@ -157,7 +157,7 @@ export default function Section10Sustainability() {
                 </div>
             )}
 
-            <div className={clsx("space-y-12 pb-16 transition-all duration-500", !isEligibleForSubmission && "opacity-40 grayscale pointer-events-none blur-[1px]")}>
+            <div className={clsx("space-y-5 pb-10 transition-all duration-500", !isEligibleForSubmission && "opacity-40 grayscale pointer-events-none blur-[1px]")}>
             {/* ─── Header ─────────────────────────────────────────────────── */}
             <div className="flex items-center gap-4">
 

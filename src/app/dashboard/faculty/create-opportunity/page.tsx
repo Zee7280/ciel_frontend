@@ -1297,7 +1297,7 @@ export default function FacultyOpportunityCreationPage() {
                     {/* D1. Project Objective */}
                     <div>
                         <label className="block text-sm font-bold text-slate-900 mb-2">D1. Project Objective <span className="text-red-500">*</span></label>
-                        <textarea
+                        <textarea spellCheck={true}
                             className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10 outline-none font-medium h-32"
                             placeholder="In simple language, describe what this activity aims to achieve..."
                             value={formData.objectives.description}
@@ -1470,7 +1470,7 @@ export default function FacultyOpportunityCreationPage() {
                 <div className={`p-8 space-y-6 ${!expandedSections.includes('E') ? 'hidden' : ''}`}>
                     <div>
                         <label className="block text-sm font-bold text-slate-900 mb-2">E1. Student Responsibilities (Bullet List) <span className="text-red-500">*</span></label>
-                        <textarea
+                        <textarea spellCheck={true}
                             className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 outline-none font-medium h-32"
                             placeholder="• Conduct survey..."
                             value={formData.activity.responsibilities}

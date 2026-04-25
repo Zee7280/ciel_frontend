@@ -90,7 +90,7 @@ export default function Section9Reflection() {
 
 
     return (
-        <div className="space-y-12 pb-16">
+        <div className="space-y-5 pb-10">
             {/* ─── Header ─────────────────────────────────────────────────── */}
             <div className="flex items-center gap-4">
 

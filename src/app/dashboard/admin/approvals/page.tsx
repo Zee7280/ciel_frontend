@@ -1423,7 +1423,7 @@ export default function AdminApprovalsPage() {
 
                             <div className="mb-6">
                                 <label className="block text-sm font-bold text-slate-700 mb-2">Reason for Return</label>
-                                <textarea
+                                <textarea spellCheck={true}
                                     className="w-full h-32 p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none resize-none"
                                     placeholder="Please explain why this opportunity is being returned..."
                                     value={rejectReason}

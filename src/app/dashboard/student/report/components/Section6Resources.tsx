@@ -170,7 +170,7 @@ function ResourceCard({
     };
 
     return (
-        <div className="bg-white rounded-[2.5rem] border-2 border-slate-100 p-8 shadow-sm space-y-8 relative group">
+        <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm space-y-4 relative group">
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -347,7 +347,7 @@ function ResourceCard({
                     {/* 6.2.5 Purpose — 20-40 words */}
                     <div className="space-y-3">
                         <Label className="report-label">6.2.5 — Purpose of Resource (50–200 Words)</Label>
-                        <textarea
+                        <textarea spellCheck={true}
                             placeholder="Explain what exactly this resource enabled (e.g. 'Used to purchase hygiene kits for 45 participants')"
                             value={res.purpose}
                             onChange={e => onUpdate('purpose', e.target.value)}
@@ -418,7 +418,7 @@ export default function Section6Resources() {
     const uniqueSources = new Set(resources.flatMap(r => r.sources || [])).size;
 
     return (
-        <div className="space-y-12 pb-16">
+        <div className="space-y-5 pb-10">
             {/* ─── Header ─────────────────────────────────────────────────── */}
             <div className="space-y-4">
 

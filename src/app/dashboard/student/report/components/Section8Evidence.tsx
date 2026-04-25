@@ -116,7 +116,7 @@ export default function Section8Evidence() {
 
 
     return (
-        <div className="space-y-12 pb-16">
+        <div className="space-y-5 pb-10">
             {/* ─── Header ─────────────────────────────────────────────────── */}
             <div className="flex items-center gap-4">
 
@@ -493,7 +493,7 @@ export default function Section8Evidence() {
 
 
 
-                    <textarea
+                    <textarea spellCheck={true}
                         placeholder="Example: The uploaded photos show students conducting hygiene awareness sessions at a community school. The attendance sheet confirms 60 participants across three sessions. The presentation slides demonstrate the structured content delivered."
                         value={description}
                         onChange={e => update('description', e.target.value)}

@@ -116,7 +116,7 @@ function PartnerCard({
     };
 
     return (
-        <div className="bg-white rounded-[2.5rem] border-2 border-slate-100 p-8 shadow-sm space-y-8 relative">
+        <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm space-y-4 relative">
             {/* Card header */}
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -151,11 +151,11 @@ function PartnerCard({
                 <FieldError message={getFieldError(`partners.${idx}.name`)} />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-5">
                 {/* Left: Type + Role */}
-                <div className="space-y-6">
+                <div className="space-y-4">
                     {/* Partner Type */}
-                    <div className="space-y-3">
+                    <div className="space-y-2">
                         <Label className="report-label">Partner Type</Label>
                         <select
                             value={p.type}
@@ -208,9 +208,9 @@ function PartnerCard({
                 </div>
 
                 {/* Right: Contribution + Verification */}
-                <div className="space-y-6">
+                <div className="space-y-4">
                     {/* Contribution Type — multi-select */}
-                    <div className="space-y-3">
+                    <div className="space-y-2">
                         <Label className="report-label">Contribution Type (Select All That Apply)</Label>
                         <p className="report-help">At least one must be selected.</p>
                         <div className="grid grid-cols-1 gap-1.5">
@@ -326,7 +326,7 @@ export default function Section7Partnerships() {
     }, [autoNarrative, data.section7.summary_text]);
 
     return (
-        <div className="space-y-12 pb-16">
+        <div className="space-y-5 pb-10">
             {/* ─── Header ─────────────────────────────────────────────────── */}
             <div className="space-y-4">
 
@@ -370,9 +370,9 @@ export default function Section7Partnerships() {
 
 
             {/* ─── Step 1: Partnership Confirmation ────────────────────────── */}
-            <div className="space-y-6">
+            <div className="space-y-4">
 
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2.5">
 
                     <div className="w-8 h-8 rounded-full bg-report-primary text-white flex items-center justify-center text-[11px] font-semibold">
                         7.0
@@ -386,7 +386,7 @@ export default function Section7Partnerships() {
 
 
 
-                <div className="bg-white rounded-xl border border-slate-200 p-8 shadow-sm space-y-6">
+                <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm space-y-4">
 
                     <Label className="text-sm font-semibold text-slate-800">
                         Did This Project Involve Any Active Partners?
@@ -401,7 +401,7 @@ export default function Section7Partnerships() {
                             type="button"
                             onClick={() => update('has_partners', 'no')}
                             className={clsx(
-                                "p-6 rounded-lg border text-left transition space-y-2",
+                                "p-4 rounded-lg border text-left transition space-y-1.5",
                                 has_partners === 'no'
                                     ? "border-slate-900 bg-slate-900 text-white shadow-md"
                                     : "border-slate-200 bg-slate-50 text-slate-600 hover:border-slate-400"
@@ -428,7 +428,7 @@ export default function Section7Partnerships() {
                             type="button"
                             onClick={() => update('has_partners', 'yes')}
                             className={clsx(
-                                "p-6 rounded-lg border text-left transition space-y-2",
+                                "p-4 rounded-lg border text-left transition space-y-1.5",
                                 has_partners === 'yes'
                                     ? "border-report-primary bg-report-primary text-white shadow-md"
                                     : "border-slate-200 bg-slate-50 text-slate-600 hover:border-report-primary"
@@ -461,7 +461,7 @@ export default function Section7Partnerships() {
 
             {/* ─── Step 2: Partner Details ──────────────────────────────────── */}
             {has_partners === 'yes' && (
-                <div className="space-y-8 animate-in fade-in slide-in-from-top-4 duration-500">
+                <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
 
                     {/* HEADER */}
                     <div className="flex items-center justify-between">
@@ -513,7 +513,7 @@ export default function Section7Partnerships() {
 
                     ) : (
 
-                        <div className="space-y-6">
+                        <div className="space-y-4">
 
                             {partners.map((p, idx) => (
                                 <PartnerCard
@@ -534,9 +534,9 @@ export default function Section7Partnerships() {
 
 
                     {/* ─── Step 3: Formalization Status ─────────────────────── */}
-                    <div className="space-y-6">
+                    <div className="space-y-4">
 
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2.5">
 
                             <div className="w-8 h-8 rounded-full bg-report-primary text-white flex items-center justify-center text-[11px] font-semibold">
                                 7.2
@@ -550,7 +550,7 @@ export default function Section7Partnerships() {
 
 
 
-                        <div className="bg-white rounded-xl border border-slate-200 p-8 shadow-sm space-y-6">
+                        <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm space-y-4">
 
                             <div className="space-y-1">
 
@@ -632,7 +632,7 @@ export default function Section7Partnerships() {
 
 
                     {/* ─── Auto-Generated Analytics ─────────────────────────── */}
-                    <div className="pt-10 border-t border-slate-200 space-y-6">
+                    <div className="pt-5 border-t border-slate-200 space-y-4">
 
                         <div className="flex items-center justify-between">
 
@@ -739,7 +739,7 @@ export default function Section7Partnerships() {
 
 
                         {/* AUTO NARRATIVE */}
-                        <div className="bg-white border border-slate-200 rounded-xl p-8 relative overflow-hidden">
+                        <div className="bg-white border border-slate-200 rounded-xl p-4 relative overflow-hidden">
 
                             <p className="text-sm text-slate-700 leading-relaxed">
                                 {autoNarrative}
