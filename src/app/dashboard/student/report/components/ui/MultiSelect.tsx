@@ -19,6 +19,12 @@ interface MultiSelectProps {
     className?: string;
     /** Tighter control for dense report sections (e.g. Section 4). Default preserves existing UI. */
     compact?: boolean;
+    /** Override label shown in selected chips (e.g. Section 2.4 "Other" slots). */
+    getTagLabel?: (value: string) => string;
+    /** When set, use instead of `selected.includes(option)` for the dropdown checkmark (e.g. "Other" vs `__o_0` tokens). */
+    isDropdownOptionSelected?: (option: string, selected: string[]) => boolean;
+    /** Return full new selection; used for advanced toggles. If unset, default add/remove is used. */
+    resolveToggle?: (option: string, selected: string[]) => string[];
 }
 
 export function MultiSelect({
@@ -29,6 +35,9 @@ export function MultiSelect({
     disabled = false,
     className,
     compact = false,
+    getTagLabel,
+    isDropdownOptionSelected,
+    resolveToggle,
 }: MultiSelectProps) {
     const [isOpen, setIsOpen] = React.useState(false);
     const containerRef = React.useRef<HTMLDivElement>(null);
@@ -44,11 +53,22 @@ export function MultiSelect({
     }, []);
 
     const toggleOption = (option: string) => {
+        if (resolveToggle) {
+            onChange(resolveToggle(option, selected));
+            return;
+        }
         if (selected.includes(option)) {
             onChange(selected.filter((item) => item !== option));
         } else {
             onChange([...selected, option]);
         }
+    };
+
+    const isOptionRowSelected = (option: string) => {
+        if (isDropdownOptionSelected) {
+            return isDropdownOptionSelected(option, selected);
+        }
+        return selected.includes(option);
     };
 
     return (
@@ -82,7 +102,7 @@ export function MultiSelect({
                                         : "gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-black tracking-widest",
                                 )}
                             >
-                                {item}
+                                {getTagLabel ? getTagLabel(item) : item}
                                 {!disabled && (
                                     <X
                                         className="w-3 h-3 cursor-pointer hover:text-white/80"
@@ -118,7 +138,7 @@ export function MultiSelect({
                 >
                     <div className={clsx("max-h-[300px] overflow-y-auto custom-scrollbar", compact ? "p-1" : "p-2")}>
                         {options.map((option) => {
-                            const isSelected = selected.includes(option);
+                            const isSelected = isOptionRowSelected(option);
                             return (
                                 <div
                                     key={option}

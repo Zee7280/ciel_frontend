@@ -4,10 +4,19 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import { ValidationError, validateSection1, validateSection2, validateSection3, validateSection4, validateSection5, validateSection6, validateSection7, validateSection8, validateSection9, validateSection10, getIncompleteSectionsSummary, type SectionIncompleteInfo } from '../utils/validation';
 import { calculateEngagementMetrics } from '../utils/engagementMetrics';
 import type { ReportCIIauditMeta } from '@/lib/parseCIIauditSummary';
+import { pickImpactVerifyUrlFromPayload } from '@/utils/reportVerificationUrl';
 
 // Define the shape of the report data matches the 11 sections (plus summary)
 export interface ReportData {
     project_id: string;
+    /** Public verify page URL from backend (absolute or path); sole source for QR encoding. */
+    impact_verify_url?: string | null;
+    /** Some API responses use camelCase; merged into `impact_verify_url` in `setFullData`. */
+    impactVerifyUrl?: string | null;
+    /** Backend impact report row id when distinct from `project_id`. */
+    report_id?: string;
+    /** Report document id from API when present. */
+    id?: string;
     /** Short official name from opportunity / API; preferred over long problem statements on certificates. */
     project_title?: string;
     status?: string;
@@ -84,6 +93,10 @@ export interface ReportData {
         review_checked?: boolean[];
         verified_summary?: string; // System-generated narrative
         faculty_supervisor_email?: string;
+        attendance_verification_requested_at?: string;
+        attendance_verification_status?: string;
+        attendance_verification_locked?: boolean;
+        attendance_verification_email_notified?: boolean;
     };
     // Section 2: Project Context (Was Section 1)
     section2: {
@@ -92,6 +105,8 @@ export interface ReportData {
         discipline_contribution: string;
         baseline_evidence: string[];
         baseline_evidence_other?: string;
+        /** Parallel text for each `__o_n` token in `baseline_evidence` (Section 2.4 multiple "Other" sources). */
+        baseline_other_entries?: string[];
         problem_category?: string;
         primary_beneficiary?: string;
         summary_text?: string;
@@ -302,7 +317,11 @@ const defaultReportData: ReportData = {
         privacy_consent: false,
         review_checked: [false, false, false],
         verified_summary: '',
-        faculty_supervisor_email: ''
+        faculty_supervisor_email: '',
+        attendance_verification_requested_at: '',
+        attendance_verification_status: '',
+        attendance_verification_locked: false,
+        attendance_verification_email_notified: false,
     },
     section2: {
         problem_statement: '',
@@ -310,6 +329,7 @@ const defaultReportData: ReportData = {
         discipline_contribution: '',
         baseline_evidence: [],
         baseline_evidence_other: '',
+        baseline_other_entries: [],
         problem_category: '',
         primary_beneficiary: '',
         summary_text: ''
@@ -517,7 +537,7 @@ export function ReportProvider({ children }: { children: React.ReactNode }) {
         return adminDone && paymentCleared;
     }, [data.status, data.report_status, data.admin_status, data.payment_verified]);
 
-    // Auto-calculate Section 1 metrics whenever attendance logs change
+    // Auto-calculate Section 1 metrics when logs, team size, or required hours change
     useEffect(() => {
         const teamSize = (data.section1.participation_type === 'team' ? data.section1.team_members.length : 0) + 1;
         const metrics = calculateEngagementMetrics(data.section1.attendance_logs, data.required_hours, teamSize);
@@ -532,7 +552,7 @@ export function ReportProvider({ children }: { children: React.ReactNode }) {
                 }
             }));
         }
-    }, [data.section1.attendance_logs, data.required_hours]);
+    }, [data.section1.attendance_logs, data.section1.participation_type, data.section1.team_members, data.required_hours]);
 
 
     const clearValidationErrors = useCallback((section: string) => {
@@ -573,6 +593,10 @@ export function ReportProvider({ children }: { children: React.ReactNode }) {
             if (newData.section9) merged.section9 = { ...defaultReportData.section9, ...prev.section9, ...newData.section9 };
             if (newData.section10) merged.section10 = { ...defaultReportData.section10, ...prev.section10, ...newData.section10 };
             if (newData.section11) merged.section11 = { ...defaultReportData.section11, ...prev.section11, ...newData.section11 };
+            const verifyPick = pickImpactVerifyUrlFromPayload(merged);
+            if (verifyPick) {
+                merged.impact_verify_url = verifyPick;
+            }
             // Section 6: resource verification is multi-select (string[]); normalize legacy string values
             if (merged.section6?.resources?.length) {
                 merged.section6 = {

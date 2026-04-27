@@ -73,6 +73,30 @@ export function validateSection2(data: any): ValidationResult {
         errors.push({ field: 'baseline_evidence', message: 'At least one baseline evidence type is required' });
     }
 
+    const hasOtherToken = Array.isArray(data.baseline_evidence) && (data.baseline_evidence as string[]).some((s) => /^__o_(\d+)$/.test(String(s)));
+    const hasLegacyOther = Array.isArray(data.baseline_evidence) && (data.baseline_evidence as string[]).includes("Other");
+    if (hasOtherToken || hasLegacyOther) {
+        const entries: string[] =
+            Array.isArray((data as { baseline_other_entries?: string[] }).baseline_other_entries) &&
+            (data as { baseline_other_entries?: string[] }).baseline_other_entries!.length > 0
+                ? (data as { baseline_other_entries: string[] }).baseline_other_entries
+                : [String((data as { baseline_evidence_other?: string }).baseline_evidence_other || "")];
+        for (let i = 0; i < entries.length; i++) {
+            const w = countWords(entries[i] || "");
+            if (w < 100) {
+                errors.push({
+                    field: `baseline_other_entries.${i}`,
+                    message: `Other evidence source #${i + 1} is too short (${w}/100 words min)`,
+                });
+            } else if (w > 200) {
+                errors.push({
+                    field: `baseline_other_entries.${i}`,
+                    message: `Other evidence source #${i + 1} is too long (${w}/200 words max)`,
+                });
+            }
+        }
+    }
+
     return { isValid: errors.length === 0, errors };
 }
 

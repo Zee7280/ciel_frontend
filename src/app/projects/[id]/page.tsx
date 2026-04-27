@@ -9,6 +9,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useState, useEffect } from "react";
 import { readStoredCurrentUser } from "@/utils/currentUser";
+import { authenticatedFetch, isTokenValid } from "@/utils/api";
 
 interface ProjectDetails {
     id: string | number;
@@ -72,6 +73,18 @@ function normalizeTextList(value?: string[] | string): string[] {
     return [];
 }
 
+/** When an opportunity is not in the public list, a logged-in student can still open `/projects/{id}` via share link. */
+function coerceProjectDetailsFromStudentApi(raw: unknown): ProjectDetails | null {
+    if (!raw || typeof raw !== "object") return null;
+    const r = raw as Record<string, unknown>;
+    const id = r.id;
+    if (id == null) return null;
+    const base = { ...r, id, title: String(r.title ?? "Project") } as ProjectDetails;
+    if (!base.description) base.description = String(r.description ?? "");
+    if (!base.status) base.status = String(r.status ?? "Active");
+    return base;
+}
+
 export default function ProjectDetailsPage() {
     const params = useParams();
     const projectId = params.id as string;
@@ -86,22 +99,46 @@ export default function ProjectDetailsPage() {
                 const backendUrl = process.env.NEXT_PUBLIC_BACKEND_BASE_URL ?? "";
                 const baseUrl = backendUrl.endsWith("/api/v1") ? backendUrl.replace("/api/v1", "") : backendUrl;
 
+                let resolved: ProjectDetails | null = null;
+
                 const detailResponse = await fetch(`${baseUrl}/api/v1/public/opportunities/${projectId}`);
                 const detailData = await detailResponse.json().catch(() => ({}));
 
                 if (detailResponse.ok && detailData.success && detailData.data) {
-                    setProject(detailData.data);
-                    return;
+                    resolved = detailData.data as ProjectDetails;
+                } else {
+                    const fallbackResponse = await fetch(`${backendUrl}/public/opportunities`);
+                    const fallbackData = await fallbackResponse.json();
+
+                    if (fallbackData.success && Array.isArray(fallbackData.data)) {
+                        const found = (fallbackData.data as ProjectDetails[]).find((p) => p.id.toString() === projectId);
+                        if (found) {
+                            resolved = found;
+                        }
+                    }
                 }
 
-                const fallbackResponse = await fetch(`${backendUrl}/public/opportunities`);
-                const fallbackData = await fallbackResponse.json();
-
-                if (fallbackData.success && Array.isArray(fallbackData.data)) {
-                    const found = (fallbackData.data as ProjectDetails[]).find((p) => p.id.toString() === projectId);
-                    if (found) {
-                        setProject(found);
+                if (!resolved) {
+                    const token = typeof window !== "undefined" ? localStorage.getItem("ciel_token") : null;
+                    const user = readStoredCurrentUser();
+                    const role = String(user?.role ?? "")
+                        .trim()
+                        .toLowerCase();
+                    if (isTokenValid(token) && role === "student") {
+                        const sres = await authenticatedFetch(`/api/v1/student/projects/${projectId}`);
+                        if (sres?.ok) {
+                            const sbody = await sres.json().catch(() => ({}));
+                            const raw = sbody && typeof sbody === "object" && "data" in sbody ? (sbody as { data?: unknown }).data : sbody;
+                            const fromStudent = coerceProjectDetailsFromStudentApi(raw);
+                            if (fromStudent) {
+                                resolved = fromStudent;
+                            }
+                        }
                     }
+                }
+
+                if (resolved) {
+                    setProject(resolved);
                 }
             } catch (err) {
                 console.error("Failed to fetch project details:", err);

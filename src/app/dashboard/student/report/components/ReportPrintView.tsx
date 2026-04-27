@@ -6,7 +6,16 @@ import { calculateCII } from "../utils/calculateCII";
 import { calculateEngagementMetrics } from "../utils/engagementMetrics";
 import { deriveCertificateProjectDisplay } from "../utils/certificateDisplay";
 import { parseSection11AuditSummary } from "@/lib/parseCIIauditSummary";
+import ReportVerificationQr from "@/components/ReportVerificationQr";
+import { isInstitutionallyVerifiedReport } from "@/utils/institutionalReportVerification";
+import { pickImpactVerifyUrlFromPayload } from "@/utils/reportVerificationUrl";
 import { extractIssueFields, parseAuditSummaryIntoSections } from "@/lib/parseAuditSummarySections";
+import {
+    formatMergedSdgGoalsLabel,
+    listOpportunityReportSdgs,
+    listStudentReportSdgs,
+    uniqueMergedSdgGoalNumbers,
+} from "../utils/reportSdgMerge";
 
 interface Props {
     projectData: any;
@@ -188,6 +197,22 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
     }).headline;
     const teamMembers = data.section1.team_members || [];
 
+    const opportunitySdgRows = listOpportunityReportSdgs(projectData);
+    const studentSdgRows = listStudentReportSdgs(data.section3);
+    const mergedSdgNums = uniqueMergedSdgGoalNumbers(projectData, data.section3);
+
+    const formatSdgRowAnswer = (r: (typeof opportunitySdgRows)[number]) => {
+        const t = r.targetId || "—";
+        const ind = r.indicatorId || "—";
+        const base = `Goal ${r.goalNumber} — ${r.title}. Target: ${t}. Indicator: ${ind}.`;
+        if (r.justification) return `${base} Contribution: ${r.justification}`;
+        return base;
+    };
+
+    const reportRow = data as ReportData;
+    const resolvedVerifyUrl = pickImpactVerifyUrlFromPayload(reportRow);
+    const showVerificationQr = Boolean(resolvedVerifyUrl) && isInstitutionallyVerifiedReport(reportRow);
+
     const SectionHeader = ({ title, number, question }: { title: string; number: number; question?: string }) => (
         <div className="dossier-section-header mt-14 mb-8 first:mt-0 border-b-2 border-slate-900 pb-4 break-inside-avoid">
             <div className="flex items-start gap-4">
@@ -305,6 +330,16 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
                                 {data.project_id?.split("-")[0] || "CIEL"}—{new Date().getFullYear()}
                             </span>
                         </div>
+                        {showVerificationQr ? (
+                            <div className="mt-5 flex w-full flex-col items-center sm:items-end print:mt-4 print:items-end">
+                                <ReportVerificationQr
+                                    impactVerifyUrl={resolvedVerifyUrl ?? undefined}
+                                    size={96}
+                                    caption="Verify this dossier"
+                                    className="items-end"
+                                />
+                            </div>
+                        ) : null}
                     </div>
                 </header>
 
@@ -367,6 +402,35 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
                     title="SDG impact mapping"
                     question="Which United Nations Sustainable Development Goals (SDGs) were prioritized by this project?"
                 />
+                {opportunitySdgRows.length > 0 ? (
+                    <div className="mb-8 space-y-4">
+                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">
+                            Opportunity-registered SDGs
+                        </p>
+                        <p className="text-xs font-medium leading-relaxed text-slate-600">
+                            These goals were set when the opportunity was published (partner / institution registration).
+                        </p>
+                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-x-10">
+                            {opportunitySdgRows.map((r, i) => {
+                                const secondaryIndex =
+                                    r.role === "secondary"
+                                        ? opportunitySdgRows.slice(0, i).filter((x) => x.role === "secondary").length + 1
+                                        : 0;
+                                const qLabel =
+                                    r.role === "primary"
+                                        ? "Primary SDG (opportunity)"
+                                        : `Secondary SDG (opportunity) ${secondaryIndex}`;
+                                return (
+                                    <QandA key={`opp-sdg-${r.goalNumber}-${i}`} q={qLabel} a={formatSdgRowAnswer(r)} />
+                                );
+                            })}
+                        </div>
+                    </div>
+                ) : null}
+
+                <p className="mb-4 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">
+                    Student project SDG mapping (accountability profile)
+                </p>
                 <div className="grid grid-cols-1 items-stretch gap-6 md:grid-cols-2 md:gap-x-10">
                     <div className="flex min-h-[8rem] items-center gap-6 rounded-2xl bg-slate-900 p-6 text-white shadow-lg">
                         <div className="text-5xl font-black tabular-nums opacity-40">
@@ -380,16 +444,52 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
                             })()}
                         </div>
                         <div className="min-w-0 space-y-1">
-                            <p className="text-[9px] font-black uppercase tracking-[0.25em] text-white/60">Primary goal</p>
+                            <p className="text-[9px] font-black uppercase tracking-[0.25em] text-white/60">Student primary goal</p>
                             <p className="text-sm font-black uppercase leading-snug">
                                 {data.section3.primary_sdg?.goal_title || "—"}
                             </p>
                         </div>
                     </div>
                     <QandA
-                        q="Target & indicator mapping"
+                        q="Student primary — target & indicator"
                         a={`${data.section3.primary_sdg?.target_id || "T/A"} — ${data.section3.primary_sdg?.indicator_id || "I/A"}`}
                     />
+                </div>
+                {studentSdgRows.filter((r) => r.role === "secondary").length > 0 ? (
+                    <div className="mt-6 space-y-4">
+                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Student secondary SDGs</p>
+                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-x-10">
+                            {studentSdgRows
+                                .filter((r) => r.role === "secondary")
+                                .map((r, i) => (
+                                    <QandA
+                                        key={`stu-sec-${r.goalNumber}-${i}`}
+                                        q={`Secondary SDG (student) ${i + 1}`}
+                                        a={formatSdgRowAnswer(r)}
+                                    />
+                                ))}
+                        </div>
+                    </div>
+                ) : null}
+                {(data.section3.contribution_intent_statement || "").trim() ||
+                (data.section3.student_contribution_intent_statement || "").trim() ? (
+                    <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-x-10">
+                        {(data.section3.contribution_intent_statement || "").trim() ? (
+                            <QandA q="Contribution intent (pathway narrative)" a={data.section3.contribution_intent_statement} />
+                        ) : null}
+                        {(data.section3.student_contribution_intent_statement || "").trim() ? (
+                            <QandA
+                                q="Student contribution intent"
+                                a={data.section3.student_contribution_intent_statement}
+                            />
+                        ) : null}
+                    </div>
+                ) : null}
+                <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-center">
+                    <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">All aligned goals (deduplicated)</p>
+                    <p className="text-sm font-black text-slate-900">
+                        {mergedSdgNums.length ? mergedSdgNums.map((n) => `SDG ${n}`).join(" · ") : "—"}
+                    </p>
                 </div>
 
                 {/* Section 4: Operational Metrics */}
@@ -744,16 +844,9 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
                                 <p className={printDossierTone.metricValue}>{metrics.total_verified_hours}</p>
                             </div>
                             <div className={printDossierTone.metricTile}>
-                                <p className={printDossierTone.labelMuted}>Strategic SDG</p>
-                                <p className={printDossierTone.metricValue}>
-                                    {(() => {
-                                        const gn = data.section3.primary_sdg?.goal_number;
-                                        if (gn === null || gn === undefined || String(gn).trim() === "") return "—";
-                                        const num = Number(gn);
-                                        if (Number.isFinite(num) && num >= 1 && num <= 9) return `0${num}`;
-                                        if (Number.isFinite(num) && num >= 10) return String(num);
-                                        return String(gn);
-                                    })()}
+                                <p className={printDossierTone.labelMuted}>Strategic SDGs</p>
+                                <p className={`${printDossierTone.metricValue} !text-2xl sm:!text-3xl leading-none`}>
+                                    {formatMergedSdgGoalsLabel(mergedSdgNums)}
                                 </p>
                             </div>
                             <div className={printDossierTone.metricTile}>

@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Loader2, RefreshCw, CheckCircle, XCircle, Flag } from "lucide-react";
 import { authenticatedFetch } from "@/utils/api";
 import { toast } from "sonner";
 import { normalizeEngagementAttendanceLog } from "@/utils/engagementAttendanceMap";
+import { extractPendingAttendanceRows } from "@/utils/engagementPendingAttendanceResponse";
 
 type PendingRow = Record<string, unknown>;
 
@@ -37,19 +38,29 @@ export default function AttendancePendingQueuePanel({
     projectId,
     title = "Pending attendance",
     description,
+    autoLoadOnProjectIdChange = false,
+    onPendingCountChanged,
 }: {
     projectId: string;
     title?: string;
     description?: string;
+    /** When set, the queue is fetched automatically whenever the selected project id changes. */
+    autoLoadOnProjectIdChange?: boolean;
+    /** Fired with the number of rows returned (after a successful load or after approve/reject/flag + reload). */
+    onPendingCountChanged?: (n: number) => void;
 }) {
     const [rows, setRows] = useState<PendingRow[]>([]);
     const [loading, setLoading] = useState(false);
     const [acting, setActing] = useState<string | null>(null);
     const [reasonByLogId, setReasonByLogId] = useState<Record<string, string>>({});
 
-    const load = async () => {
+    const onCountRef = useRef(onPendingCountChanged);
+    onCountRef.current = onPendingCountChanged;
+
+    const load = useCallback(async () => {
         if (!projectId.trim()) {
-            toast.error("Project ID is required.");
+            setRows([]);
+            onCountRef.current?.(0);
             return;
         }
         setLoading(true);
@@ -60,19 +71,26 @@ export default function AttendancePendingQueuePanel({
             if (!res?.ok) {
                 toast.error("Could not load pending attendance.");
                 setRows([]);
+                onCountRef.current?.(0);
                 return;
             }
             const json = await res.json();
-            const raw = json.data ?? json.items ?? json;
-            const list = Array.isArray(raw) ? raw : [];
-            setRows(list.filter((item): item is Record<string, unknown> => item != null && typeof item === "object"));
+            const next = extractPendingAttendanceRows(json);
+            setRows(next);
+            onCountRef.current?.(next.length);
         } catch {
             toast.error("Could not load pending attendance.");
             setRows([]);
+            onCountRef.current?.(0);
         } finally {
             setLoading(false);
         }
-    };
+    }, [projectId]);
+
+    useEffect(() => {
+        if (!autoLoadOnProjectIdChange) return;
+        void load();
+    }, [autoLoadOnProjectIdChange, projectId, load]);
 
     const act = async (logId: string, action: "approve" | "reject" | "flag") => {
         const reason = pickStr(reasonByLogId[logId]);
@@ -129,13 +147,17 @@ export default function AttendancePendingQueuePanel({
                     className="inline-flex items-center justify-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-sm font-bold text-white hover:bg-slate-800 disabled:opacity-50"
                 >
                     {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-                    Load queue
+                    {autoLoadOnProjectIdChange ? "Refresh" : "Load queue"}
                 </button>
             </div>
 
             {rows.length === 0 && !loading ? (
                 <p className="text-sm text-slate-500 rounded-lg border border-dashed border-slate-200 bg-slate-50/80 px-4 py-6 text-center">
-                    No rows loaded yet. Choose a project and press &quot;Load queue&quot; (only pending items for your role are returned).
+                    {!projectId.trim()
+                        ? "Select an opportunity above. The list includes how many sessions are still waiting in each project."
+                        : autoLoadOnProjectIdChange
+                          ? "No pending attendance for this project right now. You can select another project or use Refresh to check again."
+                          : 'No rows loaded yet. Choose a project and press "Load queue" (only pending items for your role are returned).'}
                 </p>
             ) : null}
 

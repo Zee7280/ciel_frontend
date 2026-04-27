@@ -13,10 +13,15 @@ import { calculateCII } from "../utils/calculateCII";
 import { getRedFlagsModalSections } from "@/lib/redFlagsModalMerge";
 import { parseSection11AuditSummary, type ReportCIIauditMeta } from "@/lib/parseCIIauditSummary";
 import clsx from "clsx";
+import ReportVerificationQr from "@/components/ReportVerificationQr";
+import { pickImpactVerifyUrlFromPayload } from "@/utils/reportVerificationUrl";
+import { formatMergedSdgGoalsShort, mergedSdgTitlesLine, uniqueMergedSdgGoalNumbers } from "../utils/reportSdgMerge";
 
 type Section11SummaryProps = {
     /** When the footer submit control is hidden (summary-only workspace), opens the same confirm flow. */
     onRequestFinalSubmit?: () => void;
+    /** Opportunity payload so print/certificate include partner-registered SDGs. */
+    projectData?: unknown;
 };
 
 function normalizeAuditMeta(raw: unknown, summaryText: string): ReportCIIauditMeta | null {
@@ -51,7 +56,7 @@ function normalizeAuditMeta(raw: unknown, summaryText: string): ReportCIIauditMe
     };
 }
 
-export default function Section11Summary({ onRequestFinalSubmit }: Section11SummaryProps = {}) {
+export default function Section11Summary({ onRequestFinalSubmit, projectData }: Section11SummaryProps = {}) {
     const router = useRouter();
     const {
         data,
@@ -103,14 +108,32 @@ export default function Section11Summary({ onRequestFinalSubmit }: Section11Summ
     const engagementScore = section1.metrics?.eis_score ?? 0;
     const verifiedHours = section1.metrics?.total_verified_hours || 0;
 
+    const mergedSdgNums = useMemo(
+        () => uniqueMergedSdgGoalNumbers(projectData, section3),
+        [projectData, section3],
+    );
+    const mergedSdgNarrative = useMemo(
+        () => mergedSdgTitlesLine(projectData, section3),
+        [projectData, section3],
+    );
+
     const executiveSummary = useMemo(() => {
         if (data.section11?.summary_text && !data.section11.summary_text.includes("Project successfully synthesized")) {
             return data.section11.summary_text;
         }
 
-        const primaryGoalTitle = section3.primary_sdg?.goal_title || "Sustainable Development";
-        return `Audit summary pending detailed review. Based on the submitted inputs, the project references ${verifiedHours} verified hours, ${beneficiaries} reported beneficiaries, alignment with ${primaryGoalTitle}, and ${section10.mechanisms?.length || 0} sustainability mechanisms. Final credibility still depends on consistency across attendance, activities, outcomes, resources, evidence, and continuity claims.`;
-    }, [section1, section2, section3, section4, section5, section10, verifiedHours, beneficiaries, data.section11?.summary_text]);
+        const sdgPhrase =
+            mergedSdgNarrative ||
+            (mergedSdgNums.length ? mergedSdgNums.map((n) => `SDG ${n}`).join(", ") : "Sustainable Development");
+        return `Audit summary pending detailed review. Based on the submitted inputs, the project references ${verifiedHours} verified hours, ${beneficiaries} reported beneficiaries, alignment with ${sdgPhrase}, and ${section10.mechanisms?.length || 0} sustainability mechanisms. Final credibility still depends on consistency across attendance, activities, outcomes, resources, evidence, and continuity claims.`;
+    }, [
+        section10.mechanisms?.length,
+        beneficiaries,
+        verifiedHours,
+        data.section11?.summary_text,
+        mergedSdgNarrative,
+        mergedSdgNums,
+    ]);
 
     /** Always pass the same narrative shown in “Comprehensive audit review” (do not require SECTION 1). */
     const auditTextForModal = useMemo(() => {
@@ -129,6 +152,8 @@ export default function Section11Summary({ onRequestFinalSubmit }: Section11Summ
         return normalizeAuditMeta(data.section11?.audit_meta, text);
     }, [data.section11?.audit_meta, data.section11?.summary_text]);
 
+    const resolvedImpactVerifyUrl = useMemo(() => pickImpactVerifyUrlFromPayload(data), [data]);
+
     const { sections: redFlagsModalSections, usedSystemFallback: redFlagsUsedSystemFallback } = useMemo(
         () => getRedFlagsModalSections(auditTextForModal, incompleteSectionsSummary, ciiResult),
         [auditTextForModal, incompleteSectionsSummary, ciiResult],
@@ -142,11 +167,7 @@ export default function Section11Summary({ onRequestFinalSubmit }: Section11Summ
         window.print();
     };
 
-    const primaryGoalNum = section3.primary_sdg?.goal_number;
-    const hasPrimarySdg =
-        primaryGoalNum !== null &&
-        primaryGoalNum !== undefined &&
-        String(primaryGoalNum).trim() !== "";
+    const hasMergedSdgs = mergedSdgNums.length > 0;
 
     const stats = [
         {
@@ -168,9 +189,9 @@ export default function Section11Summary({ onRequestFinalSubmit }: Section11Summ
             suffix: "PAX",
         },
         {
-            label: "SDG Priority",
+            label: "SDG alignment",
             icon: Target,
-            display: hasPrimarySdg ? `Goal ${primaryGoalNum}` : "—",
+            display: hasMergedSdgs ? formatMergedSdgGoalsShort(mergedSdgNums) : "—",
             suffix: "",
         },
     ];
@@ -425,23 +446,50 @@ export default function Section11Summary({ onRequestFinalSubmit }: Section11Summ
                         <div className="w-16 h-16 bg-green-100 rounded-2xl flex items-center justify-center shadow-sm">
                             <CheckCircle className="w-7 h-7 text-green-600" />
                         </div>
-                        <div className="max-w-md space-y-4">
+                        <div className="w-full max-w-3xl space-y-5 px-0 sm:px-1">
                             <h3 className="text-lg font-black text-slate-900">Report Approved & Impact Verified</h3>
-                            <p className="text-sm font-medium text-slate-400 leading-relaxed">Congratulations! Your social impact has been verified. You can now download your official CII.</p>
-                            <div className="flex flex-col sm:flex-row sm:flex-wrap gap-3 w-full justify-stretch">
-                                <Button onClick={() => setShowPreview(true)} className="bg-report-primary hover:opacity-90 text-white px-8 h-12 rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-md shadow-report-primary-shadow flex-1 min-w-[10rem]">
-                                    <Eye className="w-4 h-4 mr-2" /> Preview Dossier
+                            <p className="text-sm font-medium text-slate-400 leading-relaxed">
+                                Congratulations! Your social impact has been verified. You can now download your official CII.
+                            </p>
+                            {resolvedImpactVerifyUrl ? (
+                                <div className="flex justify-center pt-1">
+                                    <ReportVerificationQr
+                                        impactVerifyUrl={resolvedImpactVerifyUrl}
+                                        size={104}
+                                        caption="Share — scan to verify authenticity"
+                                    />
+                                </div>
+                            ) : null}
+                            <div className="grid w-full grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-3">
+                                <Button
+                                    onClick={() => setShowPreview(true)}
+                                    className="bg-report-primary hover:opacity-90 text-white rounded-xl text-[11px] font-black uppercase tracking-wide transition-all shadow-md shadow-report-primary-shadow w-full min-h-12 px-3 py-3 whitespace-normal leading-snug sm:text-xs sm:tracking-widest"
+                                >
+                                    <span className="inline-flex items-center justify-center gap-2">
+                                        <Eye className="h-4 w-4 shrink-0" aria-hidden />
+                                        <span>Preview report & CII score</span>
+                                    </span>
                                 </Button>
-                                <Button variant="outline" onClick={() => setShowCertificate(true)} className="border-2 border-slate-200 text-slate-900 px-8 h-12 rounded-xl text-xs font-black uppercase tracking-widest transition-all hover:bg-slate-50 flex-1 min-w-[10rem]">
-                                    <Download className="w-4 h-4 mr-2" /> Download CII
+                                <Button
+                                    variant="outline"
+                                    onClick={() => setShowCertificate(true)}
+                                    className="border-2 border-slate-200 text-slate-900 rounded-xl text-[11px] font-black uppercase tracking-wide transition-all hover:bg-slate-50 w-full min-h-12 px-3 py-3 whitespace-normal leading-snug sm:text-xs sm:tracking-widest"
+                                >
+                                    <span className="inline-flex items-center justify-center gap-2">
+                                        <Download className="h-4 w-4 shrink-0" aria-hidden />
+                                        <span>Download CIEL certificate</span>
+                                    </span>
                                 </Button>
                                 <Button
                                     type="button"
                                     variant="outline"
                                     onClick={openRedFlagsModal}
-                                    className="border-2 border-amber-200 bg-amber-50/60 text-amber-950 px-8 h-12 rounded-xl text-xs font-black uppercase tracking-widest transition-all hover:bg-amber-50 flex-1 min-w-[10rem]"
+                                    className="border-2 border-amber-200 bg-amber-50/60 text-amber-950 rounded-xl text-[11px] font-black uppercase tracking-wide transition-all hover:bg-amber-50 w-full min-h-12 px-3 py-3 whitespace-normal leading-snug sm:text-xs sm:tracking-widest"
                                 >
-                                    <Flag className="w-4 h-4 mr-2 shrink-0" /> Red flags & audit
+                                    <span className="inline-flex items-center justify-center gap-2">
+                                        <Flag className="h-4 w-4 shrink-0" aria-hidden />
+                                        <span>Red flags & audit</span>
+                                    </span>
                                 </Button>
                             </div>
                         </div>
@@ -715,7 +763,7 @@ export default function Section11Summary({ onRequestFinalSubmit }: Section11Summ
                             </div>
                         </div>
                         <div id="print-area" className="px-6 py-10 md:px-12 md:py-16 overflow-y-auto max-h-[85vh] print:max-h-none print:px-0 print:py-0 print-scroll-auto">
-                            <ReportPrintView reportData={data} projectData={null} />
+                            <ReportPrintView reportData={data} projectData={projectData} />
                         </div>
                     </div>
                 </div>
@@ -757,7 +805,7 @@ export default function Section11Summary({ onRequestFinalSubmit }: Section11Summ
                                 id="print-area-certificate"
                                 className="p-4 md:p-10 overflow-y-auto max-h-[85vh] print:max-h-none print:p-0 print-scroll-auto"
                             >
-                                <CertificateView />
+                                <CertificateView projectData={projectData} />
                             </div>
                         </div>
                     </div>,

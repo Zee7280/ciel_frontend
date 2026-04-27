@@ -217,6 +217,11 @@ export default function LocationPicker({ onLocationSelect, initialLocation }: Lo
                 </button>
             </div>
 
+            <p className="text-xs text-slate-500 leading-relaxed -mt-1">
+                <span className="font-semibold text-slate-600">Google map:</span> If you do not find your location in
+                search, copy from Google Maps and paste here.
+            </p>
+
             <div className="relative z-0 h-[280px] w-full overflow-hidden rounded-2xl border border-slate-200/80 bg-slate-100 shadow-inner">
                 <MapContainer
                     center={position || defaultCenter}

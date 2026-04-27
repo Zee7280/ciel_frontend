@@ -1,5 +1,5 @@
 "use client";
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useMemo, useState, useEffect, useLayoutEffect, useRef } from "react";
 import { generateAISummary } from "../utils/aiSummarizer";
 import { calculateSection2CII } from "@/utils/reportQuality";
 import { toast } from "sonner";
@@ -7,6 +7,7 @@ import { Sparkles, Loader2 } from "lucide-react";
 import { Building, Globe, Users, BookOpen, AlertCircle, Clock, CheckCircle2, Save, MapPin, Calendar, XCircle } from "lucide-react";
 import { Label } from "./ui/label";
 import { Textarea } from "./ui/textarea";
+import { Input } from "./ui/input";
 import { Button } from "./ui/button";
 import { useReportForm } from "../context/ReportContext";
 import { useDebounce } from "@/hooks/useDebounce";
@@ -15,8 +16,77 @@ import { MultiSelect } from "./ui/MultiSelect";
 import { SingleSelect } from "./ui/SingleSelect";
 import clsx from "clsx";
 
+/** Internal tokens for multiple "Other" rows in 2.4 (must not match human-readable option labels). */
+const OTHER_SLOT_RE = /^__o_(\d+)$/;
+
+function isOtherSlotToken(s: string): boolean {
+    return OTHER_SLOT_RE.test(s);
+}
+
+/**
+ * Renumbers `__o_n` in selection and syncs the parallel `baseline_other_entries` text.
+ * Keeps `baseline_evidence_other` as a joined string for API / legacy consumers.
+ */
+function syncBaselineOtherSlots(rawSelected: string[], prevEntries: string[] | undefined): {
+    evidence: string[];
+    entries: string[];
+    legacyOther: string;
+} {
+    const raw = rawSelected.map((s) => (s === "Other" ? "__o_0" : s));
+    const staticPart = raw.filter((s) => !isOtherSlotToken(s));
+    const oldIndices = raw
+        .filter((s) => isOtherSlotToken(s))
+        .map((s) => parseInt(s.match(OTHER_SLOT_RE)![1], 10));
+    const uniqueSorted = [...new Set(oldIndices)].sort((a, b) => a - b);
+    const ent = Array.isArray(prevEntries) ? [...prevEntries] : [];
+    const texts = uniqueSorted.map((i) => (ent[i] != null && ent[i] !== undefined ? ent[i] : ""));
+    const newOtherTags = texts.map((_, j) => `__o_${j}`);
+    return {
+        evidence: [...staticPart, ...newOtherTags],
+        entries: texts,
+        legacyOther: texts.join("\n\n---\n\n"),
+    };
+}
+
+function otherSlotCount(evidence: string[] | undefined): number {
+    return (evidence || []).filter((s) => isOtherSlotToken(s)).length;
+}
+
+function otherTagLabel(value: string): string {
+    const m = value.match(OTHER_SLOT_RE);
+    if (!m) return value;
+    const n = parseInt(m[1], 10);
+    if (n === 0) return "Other";
+    return `Other (${n + 1})`;
+}
+
 interface Section2Props {
     projectData?: any;
+}
+
+function formatBaselineEvidenceForDisplay(section: {
+    baseline_evidence?: string[];
+    baseline_other_entries?: string[];
+    baseline_evidence_other?: string;
+}): string {
+    const ev = section.baseline_evidence || [];
+    const otherTexts = section.baseline_other_entries;
+    return ev
+        .map((t) => {
+            if (t === "Other") {
+                return (section.baseline_evidence_other || "Other").trim() || "Other";
+            }
+            if (isOtherSlotToken(t)) {
+                const m = t.match(OTHER_SLOT_RE);
+                if (m) {
+                    const idx = parseInt(m[1], 10);
+                    const o = otherTexts && otherTexts[idx] != null ? otherTexts[idx] : "";
+                    return o.trim() || `Other (slot ${idx + 1})`;
+                }
+            }
+            return t;
+        })
+        .join(", ");
 }
 
 export default function Section2ProjectContext({ projectData }: Section2Props) {
@@ -27,6 +97,22 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
     const sectionData = data.section2;
 
     const [isGenerating, setIsGenerating] = useState(false);
+    const legacyOtherMigrated = useRef(false);
+
+    /** One-time: legacy `Other` + single string -> `__o_0` + `baseline_other_entries` (before paint) */
+    useLayoutEffect(() => {
+        if (legacyOtherMigrated.current) return;
+        const be = sectionData.baseline_evidence;
+        if (!be || !be.includes("Other") || be.some((s) => isOtherSlotToken(s))) return;
+        legacyOtherMigrated.current = true;
+        const nextSel = be.map((x) => (x === "Other" ? "__o_0" : x));
+        const s = syncBaselineOtherSlots(nextSel, [sectionData.baseline_evidence_other || ""]);
+        updateSection("section2", {
+            baseline_evidence: s.evidence,
+            baseline_other_entries: s.entries,
+            baseline_evidence_other: s.legacyOther,
+        });
+    }, [sectionData.baseline_evidence, sectionData.baseline_evidence_other, updateSection]);
 
     const handleGenerateAISummary = async () => {
         const words = (sectionData.problem_statement || "").trim().split(/\s+/).filter(w => w).length;
@@ -40,9 +126,10 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
         }
 
         setIsGenerating(true);
-        const evidenceSource = sectionData.baseline_evidence?.length > 0
-            ? sectionData.baseline_evidence.map((t: string) => t === 'Other' ? (sectionData.baseline_evidence_other || 'Other Sources') : t).join(", ")
-            : "Unknown Sources";
+        const evidenceSource =
+            sectionData.baseline_evidence?.length > 0
+                ? formatBaselineEvidenceForDisplay(sectionData)
+                : "Unknown Sources";
 
         const result = await generateAISummary("section2", {
             ...sectionData,
@@ -50,7 +137,7 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
             partnerOrg: partner,
             location: `${district}, ${province}, ${country}`,
             duration: `${startDate} – ${endDate}`,
-            baseline_evidence: evidenceSource
+            baseline_evidence: evidenceSource,
         });
         setIsGenerating(false);
 
@@ -109,20 +196,29 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
 
         const problem = sectionData.problem_statement ? `Problem: ${sectionData.problem_statement}` : '';
         const discipline = sectionData.discipline ? `Discipline: ${sectionData.discipline}` : '';
-        const evidence = sectionData.baseline_evidence ? `Evidence: ${sectionData.baseline_evidence}` : '';
+        const be = sectionData.baseline_evidence;
+        const evStr =
+            be && be.length > 0
+                ? be.includes("Other") || be.some((x) => isOtherSlotToken(x))
+                    ? formatBaselineEvidenceForDisplay(sectionData)
+                    : be.join(", ")
+                : "";
+        const evidence = evStr ? `Evidence: ${evStr}` : "";
 
         if (problem || discipline || evidence) {
-            return [problem, discipline, evidence].filter(Boolean).join('\n');
+            return [problem, discipline, evidence].filter(Boolean).join("\n");
         }
-        return '';
-    }, [sectionData.summary_text, sectionData.problem_statement, sectionData.discipline, sectionData.baseline_evidence]);
+        return "";
+    }, [sectionData.summary_text, sectionData.problem_statement, sectionData.discipline, sectionData.baseline_evidence, sectionData.baseline_other_entries, sectionData.baseline_evidence_other]);
 
     // ─── Auto-generate summary when inputs are complete ───────────────────────
     React.useEffect(() => {
-        const words = (sectionData.problem_statement || "").trim().split(/\s+/).filter(w => w).length;
+        const words = (sectionData.problem_statement || "").trim().split(/\s+/).filter((w) => w).length;
         const evidenceArray = sectionData.baseline_evidence || [];
-        const evidenceSource = evidenceArray.includes('Other')
-            ? [...evidenceArray.filter(t => t !== 'Other'), (sectionData.baseline_evidence_other || 'Other Sources')].join(", ")
+        const hasOtherBlock =
+            evidenceArray.includes("Other") || evidenceArray.some((t) => isOtherSlotToken(t));
+        const evidenceSource = hasOtherBlock
+            ? formatBaselineEvidenceForDisplay(sectionData)
             : evidenceArray.join(", ");
 
         if (words >= 100 && sectionData.discipline && evidenceArray.length > 0) {
@@ -142,12 +238,28 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
                 }
             }
         }
-    }, [sectionData.problem_statement, sectionData.discipline, sectionData.baseline_evidence, sectionData.baseline_evidence_other, sectionData.summary_text]);
+    }, [sectionData.problem_statement, sectionData.discipline, sectionData.baseline_evidence, sectionData.baseline_evidence_other, sectionData.baseline_other_entries, sectionData.summary_text, updateSection]);
 
     // ─── Word counts ─────────────────────────────────────────────────────────
-    const wordCount = (sectionData.problem_statement || "").trim().split(/\s+/).filter(w => w).length;
-    const disciplineWordCount = (sectionData.discipline_contribution || "").trim().split(/\s+/).filter(w => w).length;
-    const otherEvidenceWordCount = (sectionData.baseline_evidence_other || "").trim().split(/\s+/).filter(w => w).length;
+    const wordCount = (sectionData.problem_statement || "").trim().split(/\s+/).filter((w) => w).length;
+    const disciplineWordCount = (sectionData.discipline_contribution || "").trim().split(/\s+/).filter((w) => w).length;
+    const otherCount = useMemo(() => {
+        const n = otherSlotCount(sectionData.baseline_evidence);
+        if (n > 0) return n;
+        if (sectionData.baseline_evidence?.includes("Other")) return 1;
+        return 0;
+    }, [sectionData.baseline_evidence]);
+    const otherEntries = useMemo(() => {
+        if (otherCount === 0) return [];
+        const n = otherSlotCount(sectionData.baseline_evidence);
+        if (n > 0) {
+            return Array.from({ length: otherCount }, (_, i) => sectionData.baseline_other_entries?.[i] ?? "");
+        }
+        if (sectionData.baseline_evidence?.includes("Other")) {
+            return [sectionData.baseline_evidence_other ?? ""];
+        }
+        return [];
+    }, [otherCount, sectionData.baseline_evidence, sectionData.baseline_other_entries, sectionData.baseline_evidence_other]);
 
     // ─── Data ────────────────────────────────────────────────────────────────
     const disciplines = [
@@ -482,51 +594,129 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
                             options={evidenceTypes}
                             selected={sectionData.baseline_evidence || []}
                             onChange={(values) => {
-                                updateSection('section2', {
-                                    baseline_evidence: values,
-                                    // Clear 'other' text if 'Other' is deselected
-                                    ...(!values.includes('Other') ? { baseline_evidence_other: '' } : {})
+                                const s = syncBaselineOtherSlots(
+                                    values,
+                                    sectionData.baseline_other_entries,
+                                );
+                                updateSection("section2", {
+                                    baseline_evidence: s.evidence,
+                                    baseline_other_entries: s.entries,
+                                    baseline_evidence_other: s.legacyOther,
                                 });
+                            }}
+                            getTagLabel={otherTagLabel}
+                            isDropdownOptionSelected={(opt, sel) =>
+                                opt === "Other"
+                                    ? sel.some((x) => isOtherSlotToken(x) || x === "Other")
+                                    : sel.includes(opt)
+                            }
+                            resolveToggle={(opt, cur) => {
+                                if (opt === "Other") {
+                                    const hasAnyOther = cur.some((x) => isOtherSlotToken(x) || x === "Other");
+                                    if (hasAnyOther) {
+                                        return cur.filter((x) => !isOtherSlotToken(x) && x !== "Other");
+                                    }
+                                    return [...cur, "__o_0"];
+                                }
+                                if (isOtherSlotToken(opt)) {
+                                    return cur.filter((x) => x !== opt);
+                                }
+                                if (cur.includes(opt)) {
+                                    return cur.filter((x) => x !== opt);
+                                }
+                                return [...cur, opt];
                             }}
                             placeholder="Select data or observations..."
                             disabled={isReadOnly}
                         />
-                        <FieldError message={getFieldError('baseline_evidence')} />
+                        <FieldError message={getFieldError("baseline_evidence")} />
                     </div>
 
-                    {/* Other: specify text */}
-                    {sectionData.baseline_evidence?.includes('Other') && (
+                    {otherCount > 0 && (
                         <div className="animate-in fade-in slide-in-from-top-4 duration-400 pt-8 border-t-2 border-slate-50 space-y-5">
                             <div className="space-y-2">
                                 <Label className="report-label !text-slate-900 border-b border-slate-100 pb-2 mb-3 flex items-center gap-2">
                                     <AlertCircle className="w-4 h-4 text-amber-500" />
-                                    Specify Evidence Source
+                                    Specify evidence source{otherCount > 1 ? "s" : ""}
                                 </Label>
                                 <p className="text-[10px] font-bold text-slate-500 leading-relaxed max-w-2xl pl-1">
-                                    Clearly explain what specific documentation, professional consultation, or institutional data informed your understanding of the baseline situation.
+                                    Clearly explain what specific documentation, professional consultation, or institutional data
+                                    informed your understanding of the baseline situation. Add another &quot;Other&quot; in the
+                                    list above, or use the button below, if you need more than one custom source.
                                 </p>
                             </div>
-                            <Textarea
-                                placeholder="Example: Review of internal performance records and consultation with local administrative leads..."
-                                readOnly={isReadOnly}
-                                disabled={isReadOnly}
-                                className={clsx(
-                                    "min-h-[120px] bg-white border-2 border-slate-100 rounded-3xl p-6 font-bold text-slate-700 focus:ring-8 focus:ring-report-primary-soft/50 focus:border-report-primary-border transition-all resize-none text-sm leading-relaxed",
-                                    getFieldError('baseline_evidence_other') && "border-red-400 bg-red-50/30"
-                                )}
-                                value={sectionData.baseline_evidence_other}
-                                onChange={(e) => updateSection('section2', { baseline_evidence_other: e.target.value })}
-                            />
-                            <div className="flex justify-between items-center px-2">
-                                <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest leading-none">100-200 words required</p>
-                                <span className={clsx(
-                                    "text-[10px] font-black uppercase tracking-widest leading-none",
-                                    otherEvidenceWordCount >= 100 && otherEvidenceWordCount <= 200 ? "text-emerald-600" : "text-amber-500"
-                                )}>
-                                    {otherEvidenceWordCount} / 200 Words (Min 100)
-                                </span>
-                            </div>
-                            <FieldError message={getFieldError('baseline_evidence_other')} />
+                            {otherEntries.map((entryText, i) => {
+                                const w = (entryText || "")
+                                    .trim()
+                                    .split(/\s+/)
+                                    .filter(Boolean).length;
+                                return (
+                                    <div key={`baseline-other-${i}`} className="space-y-2">
+                                        {otherCount > 1 ? (
+                                            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest pl-1">
+                                                Other source {i + 1}
+                                            </p>
+                                        ) : null}
+                                        <Input
+                                            placeholder="Example: Review of internal performance records and consultation with local administrative leads..."
+                                            readOnly={isReadOnly}
+                                            disabled={isReadOnly}
+                                            className={clsx(
+                                                "h-12 w-full border-2 border-slate-100 rounded-2xl bg-white px-4 text-left text-sm font-medium text-slate-900 shadow-sm",
+                                                "placeholder:text-slate-400 placeholder:font-normal",
+                                                "focus-visible:ring-4 focus-visible:ring-report-primary-soft/50 focus-visible:border-report-primary-border",
+                                                getFieldError(`baseline_other_entries.${i}`) && "border-red-400 bg-red-50/30",
+                                            )}
+                                            value={entryText}
+                                            onChange={(e) => {
+                                                const next = [...otherEntries];
+                                                next[i] = e.target.value;
+                                                updateSection("section2", {
+                                                    baseline_other_entries: next,
+                                                    baseline_evidence_other: next.join("\n\n---\n\n"),
+                                                });
+                                            }}
+                                        />
+                                        <div className="flex justify-between items-center px-2">
+                                            <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest leading-none">
+                                                100-200 words required
+                                            </p>
+                                            <span
+                                                className={clsx(
+                                                    "text-[10px] font-black uppercase tracking-widest leading-none",
+                                                    w >= 100 && w <= 200 ? "text-emerald-600" : "text-amber-500",
+                                                )}
+                                            >
+                                                {w} / 200 Words (Min 100)
+                                            </span>
+                                        </div>
+                                        <FieldError message={getFieldError(`baseline_other_entries.${i}`)} />
+                                    </div>
+                                );
+                            })}
+                            {!isReadOnly && otherCount > 0 ? (
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    className="w-full sm:w-auto rounded-xl border-slate-200 text-slate-700"
+                                    onClick={() => {
+                                        const ev = sectionData.baseline_evidence || [];
+                                        const c = otherSlotCount(ev);
+                                        const nextSel = [...ev, `__o_${c}`];
+                                        const s = syncBaselineOtherSlots(
+                                            nextSel,
+                                            sectionData.baseline_other_entries,
+                                        );
+                                        updateSection("section2", {
+                                            baseline_evidence: s.evidence,
+                                            baseline_other_entries: s.entries,
+                                            baseline_evidence_other: s.legacyOther,
+                                        });
+                                    }}
+                                >
+                                    Add another &apos;Other&apos; source
+                                </Button>
+                            ) : null}
                         </div>
                     )}
                 </div>

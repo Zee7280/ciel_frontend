@@ -4,25 +4,72 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Inbox, Loader2 } from "lucide-react";
 import { authenticatedFetch } from "@/utils/api";
-import { getStoredCurrentUserId } from "@/utils/currentUser";
+import { getStoredCurrentUserEmail } from "@/utils/currentUser";
 import { toast } from "sonner";
 import AttendancePendingQueuePanel from "@/components/engagement/AttendancePendingQueuePanel";
 import { fetchPendingAttendanceCountForProject } from "@/utils/engagementPendingAttendanceResponse";
 
-function isOwnedByCurrentPartner(opportunity: Record<string, unknown>, currentUserId: string) {
-    const createdByRole = String(opportunity.created_by_role ?? opportunity.creator_role ?? "").toLowerCase();
-    const source = String(opportunity.source ?? "").toLowerCase();
+/** Normalize faculty /mine list payloads (flat `data[]`, nested wrappers, Mongo-style `_id`). */
+function extractFacultyMineOpportunityRows(payload: unknown): Record<string, unknown>[] {
+    if (Array.isArray(payload)) {
+        return payload.filter((x): x is Record<string, unknown> => x != null && typeof x === "object");
+    }
+    if (payload == null || typeof payload !== "object") return [];
+    const root = payload as Record<string, unknown>;
+    if (root.success === false) return [];
 
-    if (opportunity.is_student_created === true || createdByRole === "student" || source === "student_created") {
-        return false;
+    const asObjectRows = (v: unknown): Record<string, unknown>[] | null => {
+        if (!Array.isArray(v)) return null;
+        return v.filter((x): x is Record<string, unknown> => x != null && typeof x === "object");
+    };
+
+    const top = asObjectRows(root.data);
+    if (top) return top;
+
+    if (root.data != null && typeof root.data === "object" && !Array.isArray(root.data)) {
+        const inner = root.data as Record<string, unknown>;
+        for (const key of ["opportunities", "items", "rows", "records", "list"] as const) {
+            const nested = asObjectRows(inner[key]);
+            if (nested) return nested;
+        }
     }
 
-    const creatorId = opportunity.creatorId ?? opportunity.creator_id ?? opportunity.created_by ?? opportunity.owner_id;
-    if (!currentUserId || creatorId == null) {
-        return true;
+    for (const key of ["opportunities", "items"] as const) {
+        const direct = asObjectRows(root[key]);
+        if (direct) return direct;
     }
 
-    return String(creatorId).trim() === currentUserId;
+    return [];
+}
+
+function pickOpportunityListId(o: Record<string, unknown>): string {
+    const nested =
+        o.opportunity && typeof o.opportunity === "object"
+            ? (o.opportunity as Record<string, unknown>)
+            : null;
+    for (const v of [
+        o.id,
+        o._id,
+        o.opportunity_id,
+        o.opportunityId,
+        nested?.id,
+        nested?._id,
+    ]) {
+        if (v == null) continue;
+        const s = String(v).trim();
+        if (s) return s;
+    }
+    return "";
+}
+
+function pickOpportunityListTitle(o: Record<string, unknown>): string {
+    const nested =
+        o.opportunity && typeof o.opportunity === "object"
+            ? (o.opportunity as Record<string, unknown>)
+            : null;
+    const t = o.title ?? o.name ?? o.opportunity_title ?? nested?.title ?? nested?.name;
+    const s = String(t ?? "").trim();
+    return s || "Untitled";
 }
 
 function formatOpportunityLabel(title: string, n: number | undefined): string {
@@ -31,7 +78,7 @@ function formatOpportunityLabel(title: string, n: number | undefined): string {
     return `${title} — no pending`;
 }
 
-export default function PartnerAttendanceReviewPage() {
+export default function FacultyAttendanceReviewPage() {
     const [loading, setLoading] = useState(true);
     const [projects, setProjects] = useState<{ id: string; title: string }[]>([]);
     const [projectId, setProjectId] = useState("");
@@ -83,27 +130,24 @@ export default function PartnerAttendanceReviewPage() {
         (async () => {
             try {
                 const params = new URLSearchParams();
-                params.set("partner_id", "me");
-                const res = await authenticatedFetch(`/api/v1/opportunities?${params.toString()}`);
+                const facultyEmail = getStoredCurrentUserEmail();
+                if (facultyEmail) params.set("faculty_email", facultyEmail);
+                const res = await authenticatedFetch(`/api/v1/opportunities/faculty/mine?${params.toString()}`);
                 if (!res?.ok) {
-                    if (!cancelled) toast.error("Could not load your opportunities.");
+                    if (!cancelled) toast.error("Could not load your faculty opportunities.");
                     return;
                 }
                 const data = await res.json();
-                const rows = Array.isArray(data.data) ? data.data : [];
-                const currentUserId = getStoredCurrentUserId();
-                const mine = rows.filter((item: unknown) =>
-                    item && typeof item === "object" ? isOwnedByCurrentPartner(item as Record<string, unknown>, currentUserId) : false,
-                );
-                const mapped = mine
-                    .map((o: Record<string, unknown>) => ({
-                        id: String(o.id ?? ""),
-                        title: String(o.title ?? o.name ?? o.opportunity_title ?? "Untitled").trim() || "Untitled",
+                const rows = extractFacultyMineOpportunityRows(data);
+                const mapped = rows
+                    .map((o) => ({
+                        id: pickOpportunityListId(o),
+                        title: pickOpportunityListTitle(o),
                     }))
                     .filter((p: { id: string; title: string }) => p.id);
                 if (!cancelled) setProjects(mapped);
             } catch {
-                if (!cancelled) toast.error("Could not load your opportunities.");
+                if (!cancelled) toast.error("Could not load your faculty opportunities.");
             } finally {
                 if (!cancelled) setLoading(false);
             }
@@ -117,17 +161,17 @@ export default function PartnerAttendanceReviewPage() {
         <div className="p-8 max-w-4xl mx-auto space-y-8">
             <div>
                 <Link
-                    href="/dashboard/partner/requests"
+                    href="/dashboard/faculty/approvals"
                     className="group inline-flex items-center gap-1.5 text-slate-500 hover:text-blue-600 text-sm font-bold mb-4"
                 >
                     <ArrowLeft className="w-4 h-4 transition-transform group-hover:-translate-x-0.5" />
-                    Back to opportunities
+                    Back to approvals
                 </Link>
                 <h1 className="text-3xl font-bold text-slate-900">Attendance review</h1>
                 <p className="text-slate-500 mt-2 text-sm max-w-2xl">
-                    Open pending engagement sessions for a project you created. Each opportunity in the list shows how
-                    many are still waiting so you know where to go first. Only items routed to your account appear in the
-                    queue.
+                    Review attendance logs that students send to you as the faculty approver. Pick an opportunity below: each
+                    line shows <span className="text-slate-700 font-medium">how many are still waiting</span> in that
+                    project so you can see where action is needed without trying every one.
                 </p>
             </div>
 
@@ -152,7 +196,8 @@ export default function PartnerAttendanceReviewPage() {
                                     return (
                                         <p>
                                             <span className="font-semibold text-slate-900">No open queue right now.</span> You
-                                            have nothing pending in any of your opportunities, or you are up to date.
+                                            have nothing pending in any of your listed opportunities, or the list is up to
+                                            date. You can still pick a project to confirm.
                                         </p>
                                     );
                                 }
@@ -161,8 +206,8 @@ export default function PartnerAttendanceReviewPage() {
                                         <span className="font-semibold text-slate-900">
                                             {total} {total === 1 ? "entry" : "entries"} to review
                                         </span>{" "}
-                                        across {withWork} {withWork === 1 ? "opportunity" : "opportunities"}. Counts in the
-                                        list below; the first project with work was pre-selected when possible.
+                                        across {withWork} {withWork === 1 ? "opportunity" : "opportunities"}. The dropdown
+                                        below shows a count for each; the first with work was selected when possible.
                                     </p>
                                 );
                             })()}
@@ -191,8 +236,8 @@ export default function PartnerAttendanceReviewPage() {
 
                     <AttendancePendingQueuePanel
                         projectId={projectId}
-                        title="Pending attendance"
-                        description="Sessions awaiting your approval for the project above. The queue updates when you change the opportunity or use Refresh."
+                        title="Pending attendance (faculty)"
+                        description="Approve, reject, or flag attendance for the project above. The queue updates when you change the opportunity or when you use Refresh."
                         autoLoadOnProjectIdChange
                         onPendingCountChanged={handlePanelPendingCount}
                     />

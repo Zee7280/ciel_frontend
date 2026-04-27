@@ -106,6 +106,7 @@ export default function Section1Participation({ projectData }: { projectData?: a
     const [isSubmitted, setIsSubmitted] = React.useState(isSubmittedReport);
     const reviewChecked = data.section1.review_checked || [false, false, false];
     const [isDeleting, setIsDeleting] = React.useState<string | null>(null);
+    const [isRequestingAttendanceVerification, setIsRequestingAttendanceVerification] = React.useState(false);
     const [selectedParticipantId, setSelectedParticipantId] = React.useState<string | null>(null);
     const [isEditingLead, setIsEditingLead] = React.useState(false);
     const [leadStatus, setLeadStatus] = React.useState<string>('pending_approval');
@@ -408,7 +409,92 @@ export default function Section1Participation({ projectData }: { projectData?: a
     };
 
 
-    const isRecordLocked = isSubmittedReport && !isParticipationUnlocked;
+    const attendanceVerificationRequestedAt =
+        (data.section1 as any).attendance_verification_requested_at ||
+        (data.section1 as any).attendanceVerificationRequestedAt ||
+        "";
+    const isAttendanceVerificationRequested = !!attendanceVerificationRequestedAt;
+    const isRecordLocked = (isSubmittedReport && !isParticipationUnlocked) || isAttendanceVerificationRequested;
+
+    const handleRequestAttendanceVerification = async () => {
+        if (isAttendanceVerificationRequested || isSubmittedReport) return;
+        if (!projectIdFromUrl) {
+            toast.error("Project context missing. Please refresh and try again.");
+            return;
+        }
+        if (!data.section1.attendance_logs.length) {
+            toast.error("Please add at least one attendance entry before verification.");
+            return;
+        }
+        const confirmed = window.confirm(
+            "Are you sure you want to verify attendance? After confirmation, attendance entries will be locked for editing.",
+        );
+        if (!confirmed) return;
+
+        const requestedAt = new Date().toISOString();
+        setIsRequestingAttendanceVerification(true);
+
+        updateSection("section1", {
+            attendance_verification_requested_at: requestedAt,
+            attendance_verification_status: "pending_approval",
+            attendance_verification_locked: true,
+            attendance_verification_email_notified: false,
+        });
+        setParticipationUnlocked(false);
+
+        let serverNotified = false;
+        let requestType = "created";
+        let reviewerType: "faculty" | "partner" | "" = "";
+        try {
+            const res = await authenticatedFetch(
+                `/api/v1/engagement/project/${encodeURIComponent(projectIdFromUrl)}/attendance/verify-request`,
+                {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        projectId: projectIdFromUrl,
+                        participantId: participantId || undefined,
+                        requestedAt,
+                    }),
+                },
+            );
+
+            if (res?.ok) {
+                const json = await res.json().catch(() => ({}));
+                serverNotified = Boolean(json?.emailNotified);
+                requestType = typeof json?.type === "string" ? json.type : "created";
+                reviewerType =
+                    json?.reviewerType === "faculty" || json?.reviewerType === "partner"
+                        ? json.reviewerType
+                        : "";
+            } else {
+                toast.warning("Verification locked. Email notify endpoint not available yet.");
+            }
+        } catch {
+            toast.warning("Verification locked. Email notify endpoint not available yet.");
+        } finally {
+            updateSection("section1", {
+                attendance_verification_requested_at: requestedAt,
+                attendance_verification_status: "pending_approval",
+                attendance_verification_locked: true,
+                attendance_verification_email_notified: serverNotified,
+            });
+            await saveReport(true);
+            setIsRequestingAttendanceVerification(false);
+        }
+
+        if (requestType === "already_requested") {
+            toast.success("Attendance verification was already requested earlier and remains locked.");
+            return;
+        }
+
+        const reviewerLabel = reviewerType ? `${reviewerType} reviewer` : "assigned reviewer";
+        toast.success(
+            serverNotified
+                ? `Attendance sent for verification. ${reviewerLabel} has been notified.`
+                : "Attendance sent for verification and locked.",
+        );
+    };
 
     // Helpers
     async function loadEntries(pId: string) {
@@ -893,7 +979,47 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                             isLocked={isRecordLocked}
                                             isParticipationUnlocked={isParticipationUnlocked}
                                             setParticipationUnlocked={setParticipationUnlocked}
+                                            allowManualUnlock={!isAttendanceVerificationRequested}
                                         />
+
+                                        {!isSubmittedReport && (
+                                            <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                                                {isAttendanceVerificationRequested ? (
+                                                    <div className="space-y-1">
+                                                        <p className="text-xs font-black uppercase tracking-widest text-emerald-700">
+                                                            Verification request sent
+                                                        </p>
+                                                        <p className="text-xs text-slate-500">
+                                                            Attendance is locked. Reviewer decision required for any further changes.
+                                                        </p>
+                                                    </div>
+                                                ) : (
+                                                    <div className="space-y-3">
+                                                        <Button
+                                                            type="button"
+                                                            onClick={handleRequestAttendanceVerification}
+                                                            disabled={isRequestingAttendanceVerification || !data.section1.attendance_logs.length}
+                                                            className="w-full h-11 rounded-xl bg-slate-900 text-white hover:bg-slate-800 disabled:opacity-60"
+                                                        >
+                                                            {isRequestingAttendanceVerification ? (
+                                                                <span className="inline-flex items-center gap-2">
+                                                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                                                    Sending for verification...
+                                                                </span>
+                                                            ) : (
+                                                                <span className="inline-flex items-center gap-2">
+                                                                    <Lock className="h-4 w-4" />
+                                                                    Verify Attendance (One Time)
+                                                                </span>
+                                                            )}
+                                                        </Button>
+                                                        <p className="text-[11px] font-medium text-slate-500">
+                                                            One-time action: this locks attendance editing and triggers reviewer email notification.
+                                                        </p>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
                                     </div>
                                     <div className="min-w-0 space-y-6">
                                         <div className="overflow-hidden rounded-xl border border-slate-100 bg-white shadow-sm">

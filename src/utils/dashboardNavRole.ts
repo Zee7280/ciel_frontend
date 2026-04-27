@@ -2,6 +2,23 @@ import { isPartnerRole } from "@/utils/profileCompletion";
 
 export type DashboardNavRole = "student" | "partner" | "faculty" | "admin";
 
+/**
+ * Home URL under `/dashboard/*` for a stored API role.
+ * Partner org types (ngo, corporate, university, etc.) all use `/dashboard/partner`, not `/dashboard/{role}`.
+ */
+export function getDashboardHomePathForRole(rawRole: unknown): string {
+    const r = String(rawRole ?? "")
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, "_");
+    if (!r) return "/dashboard/student";
+    if (isPartnerRole(r)) return "/dashboard/partner";
+    if (r === "admin" || r === "super_admin") return "/dashboard/admin";
+    if (r === "faculty") return "/dashboard/faculty";
+    if (r === "student") return "/dashboard/student";
+    return "/dashboard/student";
+}
+
 /** Role segment implied by the URL (used before client reads `localStorage`). */
 export function dashboardNavRoleFromPathname(pathname: string): DashboardNavRole {
     if (pathname.includes("/dashboard/admin")) return "admin";

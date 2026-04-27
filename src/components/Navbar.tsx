@@ -6,6 +6,17 @@ import { useEffect, useState } from "react";
 import clsx from "clsx";
 import { isTokenValid } from "@/utils/api";
 import { readStoredCurrentUser } from "@/utils/currentUser";
+import { readDashboardNavRoleFromStorage } from "@/utils/dashboardNavRole";
+
+/** Logged-in users: dashboard “my projects” area. Guests: public catalog at `/projects`. */
+function projectsNavHrefForSession(isLoggedIn: boolean): string {
+    if (!isLoggedIn) return "/projects";
+    const role = readDashboardNavRoleFromStorage();
+    if (role === "admin") return "/dashboard/admin/projects";
+    if (role === "partner") return "/dashboard/partner/requests";
+    if (role === "faculty") return "/dashboard/faculty/my-opportunities";
+    return "/dashboard/student/projects";
+}
 
 export default function Navbar() {
     const pathname = usePathname();
@@ -16,10 +27,12 @@ export default function Navbar() {
         setIsLoggedIn(isTokenValid(token) && !!readStoredCurrentUser());
     }, [pathname]);
 
+    const projectsHref = projectsNavHrefForSession(isLoggedIn);
+
     const navItems = [
         { name: "Home", href: "/" },
         { name: "About Us", href: "/about" },
-        { name: "Projects", href: "/projects" },
+        { name: "Projects", href: projectsHref },
         { name: "Contact Us", href: "/contact" },
     ];
 
@@ -44,7 +57,12 @@ export default function Navbar() {
                 {/* Navigation */}
                 <div className="hidden md:flex items-center gap-10">
                     {navItems.map((item) => {
-                        const isActive = pathname === item.href;
+                        const isActive =
+                            item.name === "Projects"
+                                ? item.href === "/projects"
+                                    ? pathname === "/projects" || pathname.startsWith("/projects/")
+                                    : pathname === item.href || pathname.startsWith(`${item.href}/`)
+                                : pathname === item.href;
                         return (
                             <Link
                                 key={item.name}

@@ -17,6 +17,7 @@ import {
     consumePersistedVerificationReturn,
     isSafeInternalReturnPath,
 } from "@/utils/verificationReturnUrl";
+import { getDashboardHomePathForRole } from "@/utils/dashboardNavRole";
 
 function toRecord(value: unknown): Record<string, unknown> | null {
     if (!value || typeof value !== "object" || Array.isArray(value)) return null;
@@ -346,10 +347,7 @@ function LoginContent() {
                 }
             }
 
-            let targetPath = `/dashboard/${role}`;
-            if (isPartnerRole(String(role))) {
-                targetPath = "/dashboard/partner";
-            }
+            let targetPath = getDashboardHomePathForRole(role);
 
             let profilePath: string | null = null;
             if (authToken) {

@@ -25,7 +25,8 @@ export default function AttendanceForm({
     onParticipantChange,
     isLocked = false,
     isParticipationUnlocked,
-    setParticipationUnlocked
+    setParticipationUnlocked,
+    allowManualUnlock = true,
 }: {
     verifiedUsers: { id: string, name: string, status?: string }[],
     onSuccess: () => void,
@@ -33,7 +34,8 @@ export default function AttendanceForm({
     onParticipantChange?: (id: string) => void,
     isLocked?: boolean,
     isParticipationUnlocked?: boolean,
-    setParticipationUnlocked?: (unlocked: boolean) => void
+    setParticipationUnlocked?: (unlocked: boolean) => void,
+    allowManualUnlock?: boolean,
 }) {
     const { data: reportData, updateSection } = useReportForm();
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -481,7 +483,7 @@ export default function AttendanceForm({
                     )}
                 </Button>
 
-                {effectiveLocked && setParticipationUnlocked && (
+                {effectiveLocked && setParticipationUnlocked && allowManualUnlock && (
                     <div className="text-center">
                         {!isUserApproved && selectedUser ? (
                             <p className="text-[10px] font-bold text-amber-600 uppercase tracking-tight">

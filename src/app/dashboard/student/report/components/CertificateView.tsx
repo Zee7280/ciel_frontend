@@ -6,24 +6,19 @@ import { Award, ShieldCheck, Globe } from "lucide-react";
 import { calculateCII } from "../utils/calculateCII";
 import { calculateEngagementMetrics } from "../utils/engagementMetrics";
 import { deriveCertificateProjectDisplay } from "../utils/certificateDisplay";
-import { findSdgById } from "@/utils/sdgData";
-
-function parsePrimarySdgGoal(section3: ReportData["section3"]): string | number | null {
-    const raw = section3?.primary_sdg as Record<string, unknown> | undefined;
-    if (!raw) return null;
-    const n =
-        raw.goal_number ??
-        raw.goalNumber ??
-        raw.sdg_id ??
-        raw.goal ??
-        raw.sdgId;
-    if (n === null || n === undefined || n === "") return null;
-    return n as string | number;
-}
+import { mergedSdgTitlesLine, uniqueMergedSdgGoalNumbers } from "../utils/reportSdgMerge";
+import ReportVerificationQr from "@/components/ReportVerificationQr";
+import { isInstitutionallyVerifiedReport } from "@/utils/institutionalReportVerification";
+import { pickImpactVerifyUrlFromPayload } from "@/utils/reportVerificationUrl";
 
 type TeamMember = ReportData["section1"]["team_members"][number];
 
 type LeadShape = ReportData["section1"]["team_lead"];
+
+type CertificateBadge = {
+    src: string;
+    alt: string;
+};
 
 function displayPersonName(p: { fullName?: string; name?: string }): string {
     return (p.fullName || p.name || "").trim();
@@ -51,7 +46,38 @@ function isSameReportParticipant(a: LeadShape | TeamMember, b: LeadShape | TeamM
     return false;
 }
 
-export default function CertificateView() {
+function getCiiCertificateBadge(score: number): CertificateBadge {
+    if (score >= 85) {
+        return {
+            src: "/certificate-badges/transformative-impact.png",
+            alt: "Transformative Impact badge",
+        };
+    }
+    if (score >= 70) {
+        return {
+            src: "/certificate-badges/strong-impact-contributor.png",
+            alt: "Strong Impact Contributor badge",
+        };
+    }
+    if (score >= 55) {
+        return {
+            src: "/certificate-badges/developing-impact-contributor.png",
+            alt: "Developing Impact Contributor badge",
+        };
+    }
+    if (score >= 40) {
+        return {
+            src: "/certificate-badges/emerging-community-contributor.png",
+            alt: "Emerging Community Contributor badge",
+        };
+    }
+    return {
+        src: "/certificate-badges/foundation-stage-contributor.png",
+        alt: "Foundation Stage Contributor badge",
+    };
+}
+
+export default function CertificateView({ projectData }: { projectData?: unknown } = {}) {
     const { data } = useReportForm();
     const { section1, section2, section3 } = data;
 
@@ -98,18 +124,20 @@ export default function CertificateView() {
         return { primary: parts.join(" "), secondary: program };
     }, [section1.team_lead.university, section1.team_lead.degree, section2.discipline]);
 
-    const sdgGoalDisplay = useMemo(() => {
-        const n = parsePrimarySdgGoal(section3);
-        if (n === null || n === undefined || String(n).trim() === "") return "—";
-        return String(n).trim();
-    }, [section3]);
+    const mergedSdgNums = useMemo(
+        () => uniqueMergedSdgGoalNumbers(projectData, section3),
+        [projectData, section3],
+    );
 
-    const sdgTitleLine = useMemo(() => {
-        const custom = section3.primary_sdg?.goal_title?.trim();
-        if (custom) return custom;
-        const sdg = findSdgById(parsePrimarySdgGoal(section3));
-        return sdg?.title || "";
-    }, [section3]);
+    const sdgGoalDisplay = useMemo(() => {
+        if (!mergedSdgNums.length) return "—";
+        return mergedSdgNums.join(", ");
+    }, [mergedSdgNums]);
+
+    const sdgTitleLine = useMemo(() => mergedSdgTitlesLine(projectData, section3), [projectData, section3]);
+
+    const resolvedVerifyUrl = useMemo(() => pickImpactVerifyUrlFromPayload(data), [data]);
+    const showVerificationQr = Boolean(resolvedVerifyUrl) && isInstitutionallyVerifiedReport(data);
 
     const engagementRecalc = useMemo(() => {
         const teamSize = (section1.participation_type === "team" ? section1.team_members.length : 0) + 1;
@@ -177,6 +205,8 @@ export default function CertificateView() {
         return Math.min(100, Math.max(0, Math.round(calculateCII(reportForCii).totalScore)));
     }, [reportForCii, section1.metrics?.eis_score]);
 
+    const ciiBadge = useMemo(() => getCiiCertificateBadge(ciiScore), [ciiScore]);
+
     const today = new Date().toLocaleDateString(undefined, {
         year: "numeric",
         month: "long",
@@ -188,16 +218,26 @@ export default function CertificateView() {
             <div className="absolute top-0 left-0 w-64 h-64 bg-slate-900/5 -ml-32 -mt-32 rounded-full print:hidden" />
             <div className="absolute bottom-0 right-0 w-96 h-96 bg-slate-900/5 -mr-48 -mb-48 rounded-full print:hidden" />
 
-            <div className="w-full flex justify-between items-start mb-12 pt-4 print:mb-4 print:pt-0">
-                <img src="/iel-pk-logo.png" alt="IEL PK" className="h-14 w-14 shrink-0 object-contain print:h-9 print:w-9" width={256} height={256} />
-                <div className="flex flex-col items-end">
-                    <div className="flex items-center gap-2 mb-1">
-                        <ShieldCheck className="w-4 h-4 text-slate-900" />
-                        <span className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-900">Verified impact</span>
+            <div className="w-full flex justify-between items-start gap-6 mb-12 pt-4 print:mb-4 print:gap-3 print:pt-0">
+                <img src="/certificate-iel-pk-logo.png" alt="IEL PK" className="h-[5.5rem] w-[5.5rem] shrink-0 object-contain object-left print:h-14 print:w-14" width={1024} height={1024} />
+                <div className="flex items-start justify-end gap-4 text-right print:gap-2">
+                    <div>
+                        <div className="flex items-center justify-end gap-2 mb-1">
+                            <ShieldCheck className="w-4 h-4 text-slate-900 print:h-3 print:w-3" />
+                            <span className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-900 print:text-[7px] print:tracking-[0.2em]">Verified impact</span>
+                        </div>
+                        <div className="text-[9px] font-bold text-slate-400 print:text-[6px]">
+                            ID: {data.project_id ? formatDisplayId(data.project_id, "OPP") : "CIEL-REF-PENDING"}
+                        </div>
                     </div>
-                    <div className="text-[9px] font-bold text-slate-400">
-                        ID: {data.project_id ? formatDisplayId(data.project_id, "OPP") : "CIEL-REF-PENDING"}
-                    </div>
+                    {showVerificationQr ? (
+                        <ReportVerificationQr
+                            impactVerifyUrl={resolvedVerifyUrl ?? undefined}
+                            size={64}
+                            caption="Authenticate certificate"
+                            className="shrink-0 items-end gap-1 print:gap-0.5"
+                        />
+                    ) : null}
                 </div>
             </div>
 
@@ -303,10 +343,20 @@ export default function CertificateView() {
                         </div>
                     </div>
                     <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 print:text-[8px]">
-                        Primary SDG
+                        SDG alignment
                     </p>
                     <p className="text-xl sm:text-2xl font-black text-slate-900 print:text-base">
-                        Goal <span className="whitespace-nowrap">{sdgGoalDisplay}</span>
+                        {mergedSdgNums.length === 0 ? (
+                            <span className="whitespace-nowrap">—</span>
+                        ) : mergedSdgNums.length === 1 ? (
+                            <>
+                                Goal <span className="whitespace-nowrap">{sdgGoalDisplay}</span>
+                            </>
+                        ) : (
+                            <>
+                                Goals <span className="whitespace-nowrap">{sdgGoalDisplay}</span>
+                            </>
+                        )}
                     </p>
                     {sdgTitleLine ? (
                         <p className="text-[11px] font-semibold text-slate-600 leading-snug max-w-[14rem] mx-auto print:text-[9px] print:max-w-[11rem]">
@@ -335,6 +385,13 @@ export default function CertificateView() {
 
             <div className="w-full flex justify-between items-end mt-auto pt-8 print:mt-2 print:flex-shrink-0 print:pt-3">
                 <div className="text-left space-y-3 print:space-y-1">
+                    <div className="pl-1">
+                        <p className="font-serif text-2xl italic leading-none text-slate-900 print:text-base">
+                        </p>
+                        <p className="mt-1 text-[7px] font-black uppercase tracking-[0.35em] text-slate-400 print:text-[5px] print:tracking-[0.2em]">
+                            E-signature
+                        </p>
+                    </div>
                     <div className="w-48 h-[1px] bg-slate-900 print:w-32" />
                     <div>
                         <p className="font-black text-slate-900 text-sm uppercase print:text-[10px]">Registrar of impact</p>
@@ -344,17 +401,14 @@ export default function CertificateView() {
                     </div>
                 </div>
 
-                <div className="w-28 h-28 sm:w-32 sm:h-32 rounded-full border-4 border-slate-900 flex flex-col items-center justify-center rotate-12 bg-white shadow-xl shadow-slate-100 p-2 print:h-20 print:w-20 print:border-2 print:shadow-none print:p-1">
-                    <div className="w-full h-full rounded-full border border-dashed border-slate-900 flex flex-col items-center justify-center text-center">
-                        <Award className="w-7 h-7 text-slate-900 mb-1 print:w-5 print:h-5 print:mb-0" />
-                        <span className="text-[6px] sm:text-[7px] font-black text-slate-900 uppercase leading-none print:text-[5px]">
-                            OFFICIAL
-                            <br />
-                            SEAL OF
-                            <br />
-                            IMPACT
-                        </span>
-                    </div>
+                <div className="flex flex-col items-center justify-end">
+                    <img
+                        src={ciiBadge.src}
+                        alt={ciiBadge.alt}
+                        className="h-28 w-40 object-contain drop-shadow-sm print:h-20 print:w-32 print:drop-shadow-none"
+                        width={1024}
+                        height={1024}
+                    />
                 </div>
 
                 <div className="text-right space-y-3 print:space-y-1">

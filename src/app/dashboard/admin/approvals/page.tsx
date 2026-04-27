@@ -14,14 +14,12 @@ import {
     MessageSquare,
     Eye,
     Loader2,
-    CalendarClock,
 } from "lucide-react";
 import { PaginationControls } from "@/components/ui/PaginationControls";
 import { authenticatedFetch } from "@/utils/api";
 import { formatDisplayId } from "@/utils/displayIds";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import AttendancePendingQueuePanel from "@/components/engagement/AttendancePendingQueuePanel";
 
 function pickDetailStr(o: Record<string, unknown> | null | undefined, ...keys: string[]): string {
     if (!o) return "";
@@ -205,33 +203,9 @@ function facultyApprovalPipelineApplies(v: Record<string, unknown>): boolean {
     return false;
 }
 
-/** Same shape as admin projects list API for attendance project picker. */
-function extractProjectsListForPicker(body: unknown): Record<string, unknown>[] {
-    if (Array.isArray(body)) return body as Record<string, unknown>[];
-    if (body && typeof body === "object") {
-        const o = body as Record<string, unknown>;
-        if (o.success === false && !Array.isArray(o.data)) return [];
-        for (const k of ["data", "projects", "opportunities", "items", "results", "rows"] as const) {
-            const v = o[k];
-            if (Array.isArray(v)) return v as Record<string, unknown>[];
-        }
-    }
-    return [];
-}
-
-function mapPickerProject(raw: Record<string, unknown>): { id: string; title: string } | null {
-    const id = String(raw.id ?? raw.opportunity_id ?? "").trim();
-    if (!id) return null;
-    const title = typeof raw.title === "string" && raw.title.trim() ? raw.title.trim() : "Untitled";
-    return { id, title };
-}
-
 export default function AdminApprovalsPage() {
     const router = useRouter();
-    const [activeTab, setActiveTab] = useState<"registrations" | "projects" | "attendance">("registrations");
-    const [attendanceProjectId, setAttendanceProjectId] = useState("");
-    const [attendanceProjectOptions, setAttendanceProjectOptions] = useState<{ id: string; title: string }[]>([]);
-    const [attendanceProjectsLoading, setAttendanceProjectsLoading] = useState(false);
+    const [activeTab, setActiveTab] = useState<"registrations" | "projects">("registrations");
 
     const [isLoading, setIsLoading] = useState(true);
     const [didBootstrapCounts, setDidBootstrapCounts] = useState(false);
@@ -280,44 +254,6 @@ export default function AdminApprovalsPage() {
             fetchPendingUsers();
         }
     }, [activeTab, didBootstrapCounts]);
-
-    useEffect(() => {
-        if (activeTab !== "attendance") return;
-        let cancelled = false;
-        (async () => {
-            setAttendanceProjectsLoading(true);
-            try {
-                const res = await authenticatedFetch(`/api/v1/admin/projects`);
-                if (!res?.ok) {
-                    if (!cancelled) {
-                        toast.error("Could not load projects for attendance.");
-                        setAttendanceProjectOptions([]);
-                    }
-                    return;
-                }
-                const data = await res.json();
-                const list = extractProjectsListForPicker(data);
-                const mapped = list
-                    .map(mapPickerProject)
-                    .filter((p): p is { id: string; title: string } => p != null);
-                if (!cancelled) setAttendanceProjectOptions(mapped);
-            } catch {
-                if (!cancelled) {
-                    toast.error("Could not load projects for attendance.");
-                    setAttendanceProjectOptions([]);
-                }
-            } finally {
-                if (!cancelled) setAttendanceProjectsLoading(false);
-            }
-        })();
-        return () => {
-            cancelled = true;
-        };
-    }, [activeTab]);
-
-    const attendanceSelectValue = attendanceProjectOptions.some((p) => p.id === attendanceProjectId)
-        ? attendanceProjectId
-        : "";
 
     const fetchPendingOpportunities = async (options?: { withLoading?: boolean }) => {
         if (options?.withLoading !== false) setIsLoading(true);
@@ -477,7 +413,6 @@ export default function AdminApprovalsPage() {
 
     // Filter & Pagination Logic
     const getFilteredItems = () => {
-        if (activeTab === "attendance") return [];
         const items = activeTab === 'projects' ? opportunities : pendingUsers;
         if (!searchQuery) return items;
 
@@ -565,14 +500,11 @@ export default function AdminApprovalsPage() {
                     <input
                         type="text"
                         placeholder={
-                            activeTab === "attendance"
-                                ? "Search disabled for attendance queue"
-                                : activeTab === "projects"
+                            activeTab === "projects"
                                   ? "Search projects..."
                                   : "Search users..."
                         }
-                        disabled={activeTab === "attendance"}
-                        className="w-full pl-9 pr-4 py-2 rounded-lg border border-slate-200 text-sm focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-slate-50 disabled:text-slate-400"
+                        className="w-full pl-9 pr-4 py-2 rounded-lg border border-slate-200 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                     />
@@ -601,66 +533,7 @@ export default function AdminApprovalsPage() {
                     </div>
                     {activeTab === "projects" && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-blue-600 rounded-t-full"></div>}
                 </button>
-                <button
-                    onClick={() => setActiveTab("attendance")}
-                    className={`pb-4 px-2 text-sm font-bold transition-colors relative ${activeTab === "attendance" ? "text-blue-600" : "text-slate-500 hover:text-slate-700"}`}
-                >
-                    <div className="flex items-center gap-2">
-                        <CalendarClock className="w-4 h-4" /> Attendance review
-                    </div>
-                    {activeTab === "attendance" && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-blue-600 rounded-t-full"></div>}
-                </button>
             </div>
-
-            {activeTab === "attendance" ? (
-                <div className="max-w-3xl space-y-4">
-                    <div className="rounded-lg border border-slate-100 bg-slate-50/80 px-4 py-3 text-sm text-slate-700">
-                        <span className="font-semibold text-slate-900">Admin attendance queue.</span> Choose a project
-                        from the list (same as All projects) or paste the opportunity ID, then load pending logs assigned
-                        to CIEL Admin for that project. Partner-assigned sessions are reviewed in the partner dashboard.
-                    </div>
-                    {attendanceProjectsLoading ? (
-                        <div className="flex justify-center py-10 text-slate-500 gap-2">
-                            <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
-                        </div>
-                    ) : (
-                        <div>
-                            <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">
-                                Project
-                            </label>
-                            <select
-                                value={attendanceSelectValue}
-                                onChange={(e) => setAttendanceProjectId(e.target.value)}
-                                className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm font-medium text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none bg-white"
-                            >
-                                <option value="">Select an opportunity…</option>
-                                {attendanceProjectOptions.map((p) => (
-                                    <option key={p.id} value={p.id}>
-                                        {p.title} ({p.id.slice(0, 8)}…)
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-                    )}
-                    <div>
-                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">
-                            Project ID
-                        </label>
-                        <input
-                            type="text"
-                            value={attendanceProjectId}
-                            onChange={(e) => setAttendanceProjectId(e.target.value)}
-                            placeholder="e.g. UUID from All projects or student URL ?project=…"
-                            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                        />
-                    </div>
-                    <AttendancePendingQueuePanel
-                        projectId={attendanceProjectId}
-                        title="Pending attendance (admin pool)"
-                        description="Approve, reject, or flag entries. Reject and flag require a short reason."
-                    />
-                </div>
-            ) : null}
 
             {activeTab === "projects" && (
                 <div className="mb-4 rounded-lg border border-blue-100 bg-blue-50/90 px-4 py-3 text-sm text-slate-700">
@@ -672,7 +545,6 @@ export default function AdminApprovalsPage() {
                 </div>
             )}
 
-            {activeTab !== "attendance" ? (
             <>
             <div className="grid grid-cols-1 gap-4">
                 {activeTab === "registrations" ? (
@@ -837,7 +709,6 @@ export default function AdminApprovalsPage() {
                 />
             )}
             </>
-            ) : null}
             {/* View Details Modal */}
             {isDetailModalOpen && selectedOpportunity && adminDetailView && (
                     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">

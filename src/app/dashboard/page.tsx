@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
+import { getDashboardHomePathForRole } from "@/utils/dashboardNavRole";
 
 export default function DashboardRedirect() {
     const router = useRouter();
@@ -18,7 +19,7 @@ export default function DashboardRedirect() {
                 const role = user.role;
 
                 if (role) {
-                    router.replace(`/dashboard/${role}`);
+                    router.replace(getDashboardHomePathForRole(role));
                     return;
                 }
             } catch (e) {

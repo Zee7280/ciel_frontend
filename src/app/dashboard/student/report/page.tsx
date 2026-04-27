@@ -18,6 +18,7 @@ import clsx from 'clsx';
 import { canStudentAccessReportForProjectPayload } from '@/utils/studentJoinApplication';
 import { mergeReportSection1TeamScope } from '@/utils/reportTeamScope';
 import { getIncompleteSectionsSummary } from './utils/validation';
+import { pickImpactVerifyUrlFromPayload } from '@/utils/reportVerificationUrl';
 
 // Import New Sections
 import Section1Participation from './components/Section1Participation';
@@ -115,9 +116,11 @@ function ReportFormContent() {
                         (actualReportData as { project_title?: string }).project_title || "",
                     ).trim();
                     const titleFromProject = pickOpportunityTitle(projectPayload);
+                    const impactVerifyNormalized = pickImpactVerifyUrlFromPayload(actualReportData);
                     const mergedReport = {
                         ...actualReportData,
                         ...(!existingTitle && titleFromProject ? { project_title: titleFromProject } : {}),
+                        ...(impactVerifyNormalized ? { impact_verify_url: impactVerifyNormalized } : {}),
                     };
 
                     let reportForState: Record<string, unknown> = mergedReport as Record<string, unknown>;
@@ -496,6 +499,7 @@ function ReportFormContent() {
                     {activeStep === 11 && (
                         <Section11Summary
                             onRequestFinalSubmit={summaryOnlyWorkspace ? handleSubmit : undefined}
+                            projectData={projectDetails}
                         />
                     )}
                 </div>

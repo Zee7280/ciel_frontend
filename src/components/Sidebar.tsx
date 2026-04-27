@@ -118,6 +118,7 @@ export default function Sidebar() {
             { label: "My Profile", href: "/dashboard/faculty/profile", icon: User },
             { label: "Opportunity Request Approvals", href: "/dashboard/faculty/approvals", icon: CheckCircle },
             { label: "Applications & Reports Approvals", href: "/dashboard/faculty/join-applications", icon: ClipboardList },
+            { label: "Attendance review", href: "/dashboard/faculty/attendance-review", icon: CalendarClock },
             { label: "My Opportunities", href: "/dashboard/faculty/my-opportunities", icon: Briefcase },
             { label: "Create Opportunity", href: "/dashboard/faculty/create-opportunity", icon: Plus },
             // { label: "Student Grading", href: "/dashboard/faculty/grading", icon: FileText },
