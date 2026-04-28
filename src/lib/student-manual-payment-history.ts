@@ -1,4 +1,5 @@
 import { authenticatedFetch } from "@/utils/api";
+import { REPORTING_FEE_DISPLAY } from "@/config/reportingFee";
 
 /** Logged-in student id from persisted session (matches other student flows). */
 export function readStudentIdFromCielUser(): string | null {
@@ -98,7 +99,6 @@ export function normalizeStudentManualPaymentHistoryItem(raw: unknown): StudentM
     if (!id) return null;
 
     const status = normalizeStatus(pickStr(paymentSource, ["status"]));
-    const amount = pickStr(paymentSource, ["amount"]);
     const proofUrl = pickStr(paymentSource, ["proofUrl", "proof_url"]);
     const feedback = pickStrOrNull(paymentSource, ["feedback", "admin_feedback", "adminFeedback"]);
     const submittedAt = pickStr(paymentSource, ["submittedAt", "submitted_at", "created_at", "createdAt"]);
@@ -112,7 +112,7 @@ export function normalizeStudentManualPaymentHistoryItem(raw: unknown): StudentM
         payment: {
             id,
             status,
-            amount: amount || "—",
+            amount: REPORTING_FEE_DISPLAY,
             paidAmountPkr,
             proofUrl,
             feedback,

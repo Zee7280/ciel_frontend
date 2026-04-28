@@ -30,11 +30,13 @@ interface Report {
     created_at: string;
 }
 
+type ReportStatusFilter = 'all' | 'submitted' | 'pending' | 'verified' | 'rejected';
+
 export default function AdminReportsVerificationPage() {
     const router = useRouter();
     const [reports, setReports] = useState<Report[]>([]);
     const [loading, setLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState<'all' | 'submitted' | 'verified' | 'rejected'>('submitted');
+    const [activeTab, setActiveTab] = useState<ReportStatusFilter>('pending');
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedOrg, setSelectedOrg] = useState<string>('all');
     const [organizations, setOrganizations] = useState<any[]>([]);
@@ -131,16 +133,17 @@ export default function AdminReportsVerificationPage() {
     );
 
     const statusOptions = [
+        { id: 'pending', label: 'Pending' },
         { id: 'submitted', label: 'Submitted' },
         { id: 'all', label: 'All Reports' },
         { id: 'verified', label: 'Verified' },
         { id: 'rejected', label: 'Rejected' },
-    ];
+    ] as const;
 
     const resetFilters = () => {
         setSearchQuery('');
         setSelectedOrg('all');
-        setActiveTab('all');
+        setActiveTab('pending');
     };
 
     return (
@@ -172,7 +175,7 @@ export default function AdminReportsVerificationPage() {
                         <div className="relative w-full xl:w-48 shrink-0">
                             <select
                                 value={activeTab}
-                                onChange={(e) => setActiveTab(e.target.value as 'all' | 'submitted' | 'verified' | 'rejected')}
+                                onChange={(e) => setActiveTab(e.target.value as ReportStatusFilter)}
                                 className="h-14 w-full appearance-none rounded-2xl border border-slate-200 bg-white px-4 pr-10 text-sm font-medium text-slate-700 outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-50"
                             >
                                 {statusOptions.map((option) => (

@@ -41,6 +41,46 @@ function memberRowPrefixedId(m: any, idx: number): string {
     return `member:${idx}:${m?.id || m?.participantId || m?.cnic || m?.email || "anon"}`;
 }
 
+function pickFacultyEmail(record: unknown, keys: string[]): string {
+    if (!record || typeof record !== "object") return "";
+    const source = record as Record<string, unknown>;
+    for (const key of keys) {
+        const value = source[key];
+        if (typeof value === "string" && value.trim()) return value.trim();
+    }
+    return "";
+}
+
+function readFacultyEmails(...records: unknown[]): { primary: string; secondary: string } {
+    for (const record of records) {
+        const primary = pickFacultyEmail(record, [
+            "primaryFacultyEmail",
+            "primary_faculty_email",
+            "facultyEmail",
+            "faculty_email",
+        ]);
+        const secondary = pickFacultyEmail(record, [
+            "secondaryFacultyEmail",
+            "secondary_faculty_email",
+        ]);
+
+        if (primary || secondary) {
+            return { primary, secondary };
+        }
+    }
+
+    return { primary: "", secondary: "" };
+}
+
+function pickTeamId(record: unknown): string {
+    if (!record || typeof record !== "object") return "";
+    const source = record as Record<string, unknown>;
+    const value = source.teamId ?? source.team_id;
+    if (typeof value === "string") return value.trim();
+    if (value != null && (typeof value === "number" || typeof value === "boolean")) return String(value).trim();
+    return "";
+}
+
 /** Resolve API `participantId` to the same prefixed ids used in the participant dropdown. */
 function resolveAttendanceLogParticipantPrefixedId(
     realId: string,
@@ -158,6 +198,7 @@ export default function Section1Participation({ projectData }: { projectData?: a
     }, [currentUserEmail, rawParticipants, hasSelectedInitial, selectedParticipantId]);
     const [teamId, setTeamId] = React.useState<string>('');
     const [primaryFacultyEmail, setPrimaryFacultyEmail] = React.useState<string>('');
+    const [secondaryFacultyEmail, setSecondaryFacultyEmail] = React.useState<string>('');
 
     // Scroll to Top on Step Change
     React.useEffect(() => {
@@ -266,8 +307,11 @@ export default function Section1Participation({ projectData }: { projectData?: a
                     });
 
                     // Pull faculty + teamId from backend participation record
-                    if (myPart.primaryFacultyEmail) setPrimaryFacultyEmail(myPart.primaryFacultyEmail);
-                    if (myPart.teamId) setTeamId(myPart.teamId);
+                    const myPartFaculty = readFacultyEmails(myPart);
+                    if (myPartFaculty.primary) setPrimaryFacultyEmail(myPartFaculty.primary);
+                    if (myPartFaculty.secondary) setSecondaryFacultyEmail(myPartFaculty.secondary);
+                    const myPartTeamId = pickTeamId(myPart);
+                    if (myPartTeamId) setTeamId(myPartTeamId);
 
                     // 2. Fetch all team members for this project (Unified Table)
                     let scopedTeamForAttendance: any[] | undefined;
@@ -275,8 +319,20 @@ export default function Section1Participation({ projectData }: { projectData?: a
                     if (teamRes && teamRes.ok) {
                         const teamData = await teamRes.json();
                         if (teamData.success && teamData.data) {
+                            const teamRows = Array.isArray(teamData.data) ? teamData.data : [];
                             const { team_members: scopedMembers, participation_type: scopedMode } =
-                                resolveScopedTeamMembers(myPart, teamData.data);
+                                resolveScopedTeamMembers(myPart, teamRows);
+                            const leadTeamRow = teamRows.find((row: unknown) => {
+                                const teamRow = row && typeof row === "object" ? row as Record<string, unknown> : {};
+                                const rowId = String(teamRow.id || teamRow.participantId || "");
+                                const rowEmail = String(teamRow.email || "").toLowerCase();
+                                return rowId === String(myPart.id) || (!!rowEmail && rowEmail === String(myPart.email || "").toLowerCase());
+                            });
+                            const teamFaculty = readFacultyEmails(leadTeamRow, scopedMembers[0]);
+                            if (teamFaculty.primary) setPrimaryFacultyEmail(teamFaculty.primary);
+                            if (teamFaculty.secondary) setSecondaryFacultyEmail(teamFaculty.secondary);
+                            const resolvedTeamId = pickTeamId(leadTeamRow) || pickTeamId(scopedMembers[0]);
+                            if (resolvedTeamId) setTeamId(resolvedTeamId);
 
                             scopedTeamForAttendance = scopedMembers;
                             updateSection("section1", {
@@ -797,6 +853,9 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                         projectId={data.project_id || projectIdFromUrl || ""}
                                         members={team_members}
                                         isLocked={isRecordLocked}
+                                        teamId={teamId}
+                                        primaryFacultyEmail={primaryFacultyEmail}
+                                        secondaryFacultyEmail={secondaryFacultyEmail}
                                         onUpdateMembers={async (newMembers) => {
                                             const newType = newMembers.length > 0 ? 'team' : 'individual';
                                             updateSection('section1', {

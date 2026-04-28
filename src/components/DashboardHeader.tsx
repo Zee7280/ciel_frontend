@@ -51,15 +51,21 @@ export default function DashboardHeader() {
     const firstName = user?.name?.split(/\s+/)[0] || "User";
 
     useEffect(() => {
-        try {
-            const storedUser = localStorage.getItem("ciel_user");
-            if (storedUser) {
-                const parsedUser = JSON.parse(storedUser);
-                setUser(parsedUser);
+        const loadUserFromStorage = () => {
+            try {
+                const storedUser = localStorage.getItem("ciel_user") || localStorage.getItem("user");
+                if (storedUser) {
+                    const parsedUser = JSON.parse(storedUser);
+                    setUser(parsedUser);
+                }
+            } catch (e) {
+                console.error("Failed to parse user from localStorage");
             }
-        } catch (e) {
-            console.error("Failed to parse user from localStorage");
-        }
+        };
+
+        loadUserFromStorage();
+        window.addEventListener("ciel_user_updated", loadUserFromStorage);
+        return () => window.removeEventListener("ciel_user_updated", loadUserFromStorage);
     }, []);
 
     // Helper to get image URL
@@ -72,7 +78,9 @@ export default function DashboardHeader() {
             ? "/dashboard/student/notifications"
             : navRole === "partner"
               ? "/dashboard/partner/notifications"
-              : null;
+              : navRole === "faculty"
+                ? "/dashboard/faculty/notifications"
+                : null;
 
     const [notifOpen, setNotifOpen] = useState(false);
     const [notifLoading, setNotifLoading] = useState(false);

@@ -89,6 +89,35 @@ function formatBaselineEvidenceForDisplay(section: {
         .join(", ");
 }
 
+function asRecord(value: unknown): Record<string, unknown> | null {
+    return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null;
+}
+
+function cleanString(value: unknown): string {
+    return typeof value === "string" ? value.trim() : "";
+}
+
+function pickString(...values: unknown[]): string {
+    for (const value of values) {
+        const text = cleanString(value);
+        if (text) return text;
+    }
+    return "";
+}
+
+function joinLocationParts(parts: string[]): string {
+    const seen = new Set<string>();
+    const filtered = parts.filter((part) => {
+        const text = part.trim();
+        if (!text || text === "—") return false;
+        const key = text.toLowerCase();
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+    });
+    return filtered.length ? filtered.join(", ") : "—";
+}
+
 export default function Section2ProjectContext({ projectData }: Section2Props) {
     const { data, updateSection, getFieldError, validationErrors, saveReport, isReadOnly } = useReportForm();
 
@@ -135,7 +164,7 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
             ...sectionData,
             projectTitle: title,
             partnerOrg: partner,
-            location: `${district}, ${province}, ${country}`,
+            location: locationDisplay,
             duration: `${startDate} – ${endDate}`,
             baseline_evidence: evidenceSource,
         });
@@ -182,10 +211,7 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
     };
 
     const generateSummary = (pCategory: string, beneficiary: string, evidenceList: string, discipline: string) => {
-        const district = projectData?.location_district || projectData?.district || "Lahore";
-        const province = projectData?.location_province || projectData?.province || "Punjab";
-        const country = projectData?.location_country || projectData?.country || "Pakistan";
-        const location = `${district}, ${province}, ${country}`;
+        const location = locationDisplay === "—" ? "Pakistan" : locationDisplay;
         return `This project addresses a documented gap in ${pCategory} affecting ${beneficiary} in ${location}. Baseline assessment was informed through ${evidenceList}. The project demonstrates academic alignment with ${discipline}, ensuring structured and evidence-based engagement.`;
     };
 
@@ -290,16 +316,21 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
     ];
 
     // Project identity fields
+    const project = asRecord(projectData);
+    const projectLocation = asRecord(project?.location);
+    const projectTimeline = asRecord(project?.timeline);
     const title = projectData?.title || "Untitled Engagement";
     const partner = projectData?.organization_name || projectData?.partner_name || projectData?.organization || "Self-Initiated";
-    const district = projectData?.city || projectData?.district || projectData?.location_district || "—";
-    const province = projectData?.province || projectData?.location_province || "—";
-    const country = projectData?.country || projectData?.location_country || "Pakistan";
+    const venue = pickString(projectLocation?.venue, projectData?.venue);
+    const district = pickString(projectData?.city, projectData?.district, projectData?.location_district, projectLocation?.city, projectLocation?.district);
+    const province = pickString(projectData?.province, projectData?.location_province, projectLocation?.province);
+    const country = pickString(projectData?.country, projectData?.location_country, projectLocation?.country) || "Pakistan";
+    const locationDisplay = joinLocationParts([venue, district, province, country]);
 
     // Format dates nicely if they exist
     const formatDate = (dateStr: string) => dateStr ? new Date(dateStr).toLocaleDateString() : "—";
-    const startDate = formatDate(projectData?.start_date || projectData?.startDate);
-    const endDate = formatDate(projectData?.end_date || projectData?.endDate);
+    const startDate = formatDate(pickString(projectData?.start_date, projectData?.startDate, projectTimeline?.start_date, projectTimeline?.startDate));
+    const endDate = formatDate(pickString(projectData?.end_date, projectData?.endDate, projectTimeline?.end_date, projectTimeline?.endDate));
 
     return (
         <div className="space-y-5 pb-6">
@@ -355,7 +386,7 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     {[
                         { label: "Partner Organization", value: partner, icon: Building },
-                        { label: "Location", value: `${district}, ${province}, ${country}`, icon: MapPin },
+                        { label: "Location", value: locationDisplay, icon: MapPin },
                         { label: "Project Duration", value: `${startDate} – ${endDate}`, icon: Calendar },
                     ].map((item) => (
                         <div key={item.label} className="bg-white rounded-2xl p-5 border-2 border-slate-100 shadow-sm space-y-2.5 relative overflow-hidden flex flex-col justify-between">
@@ -646,10 +677,6 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
                                 </p>
                             </div>
                             {otherEntries.map((entryText, i) => {
-                                const w = (entryText || "")
-                                    .trim()
-                                    .split(/\s+/)
-                                    .filter(Boolean).length;
                                 return (
                                     <div key={`baseline-other-${i}`} className="space-y-2">
                                         {otherCount > 1 ? (
@@ -677,19 +704,6 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
                                                 });
                                             }}
                                         />
-                                        <div className="flex justify-between items-center px-2">
-                                            <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest leading-none">
-                                                100-200 words required
-                                            </p>
-                                            <span
-                                                className={clsx(
-                                                    "text-[10px] font-black uppercase tracking-widest leading-none",
-                                                    w >= 100 && w <= 200 ? "text-emerald-600" : "text-amber-500",
-                                                )}
-                                            >
-                                                {w} / 200 Words (Min 100)
-                                            </span>
-                                        </div>
                                         <FieldError message={getFieldError(`baseline_other_entries.${i}`)} />
                                     </div>
                                 );

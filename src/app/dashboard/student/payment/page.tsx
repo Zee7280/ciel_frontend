@@ -23,10 +23,8 @@ import {
     fetchStudentManualPaymentHistory,
     type StudentManualPaymentHistoryRow,
 } from '@/lib/student-manual-payment-history';
+import { REPORTING_FEE_DISPLAY, REPORTING_FEE_PKR } from '@/config/reportingFee';
 import { ManualPaymentHistorySection } from '../components/ManualPaymentHistorySection';
-
-/** Reporting fee charged per student for this flow (PKR). */
-const REPORTING_FEE_PKR_PER_STUDENT = 200;
 
 function PaymentContent() {
     const searchParams = useSearchParams();
@@ -41,11 +39,11 @@ function PaymentContent() {
         accountTitle: "CIEL International",
         accountNumber: "0374251663933",
         iban: "PK14UNIL0109000251663933",
-        amount: `${REPORTING_FEE_PKR_PER_STUDENT} PKR`,
+        amount: REPORTING_FEE_DISPLAY,
     });
     const [proofFile, setProofFile] = useState<File | null>(null);
     /** PKR the student actually transferred (digits only in state). */
-    const [paidAmountPkr, setPaidAmountPkr] = useState(String(REPORTING_FEE_PKR_PER_STUDENT));
+    const [paidAmountPkr, setPaidAmountPkr] = useState(String(REPORTING_FEE_PKR));
     const [paymentSubmitted, setPaymentSubmitted] = useState(false);
     const [manualPaymentHistory, setManualPaymentHistory] = useState<StudentManualPaymentHistoryRow[]>([]);
     const [manualPaymentHistoryLoading, setManualPaymentHistoryLoading] = useState(true);
@@ -229,7 +227,7 @@ function PaymentContent() {
                     </Button>
                     <h1 className="text-3xl font-black text-slate-900 tracking-tight">Complete Payment</h1>
                     <p className="text-slate-500 font-medium">
-                        Please transfer <span className="font-semibold text-slate-700">{REPORTING_FEE_PKR_PER_STUDENT} PKR</span> per student to the account below and upload the proof.
+                        Please transfer <span className="font-semibold text-slate-700">{REPORTING_FEE_DISPLAY}</span> per student to the account below and upload the proof.
                     </p>
                 </div>
                 <div className="bg-blue-50 text-blue-700 px-4 py-2 rounded-2xl border border-blue-100 flex items-center gap-2">
@@ -319,7 +317,7 @@ function PaymentContent() {
                                 inputMode="numeric"
                                 autoComplete="off"
                                 className="font-bold text-slate-900 border-slate-200"
-                                placeholder="e.g. 5000"
+                                placeholder={`e.g. ${REPORTING_FEE_PKR}`}
                                 value={paidAmountPkr}
                                 onChange={(e) => setPaidAmountPkr(e.target.value.replace(/\D/g, ''))}
                             />

@@ -5,8 +5,30 @@ import { Button } from "@/app/dashboard/student/report/components/ui/button";
 import { authenticatedFetch } from "@/utils/api";
 import { Loader2, Mail, Phone, MapPin, Building2, User, Save, Camera, GraduationCap } from "lucide-react";
 import { toast } from "sonner";
-import Image from "next/image";
 import { missingProfileFieldsForRole } from "@/utils/profileCompletion";
+
+const backendAssetBaseUrl = (process.env.NEXT_PUBLIC_BACKEND_BASE_URL || "").replace(/\/api\/v1\/?$/, "").replace(/\/$/, "");
+
+function normalizeImageUrl(value: unknown) {
+    if (typeof value !== "string" || !value.trim()) return "";
+
+    const url = value.trim();
+    if (/^(data:|blob:|https?:\/\/)/i.test(url)) return url;
+    if (url.startsWith("/") && backendAssetBaseUrl) return `${backendAssetBaseUrl}${url}`;
+
+    return url;
+}
+
+function profileImageFromUser(user: Record<string, unknown>) {
+    return normalizeImageUrl(
+        user.image ??
+        user.avatar_url ??
+        user.avatarUrl ??
+        user.profile_image ??
+        user.profileImage ??
+        user.profile_photo_url
+    );
+}
 
 export default function FacultyProfilePage() {
     const [isLoading, setIsLoading] = useState(true);
@@ -62,8 +84,8 @@ export default function FacultyProfilePage() {
                         city: typeof parsedUser.city === "string" ? parsedUser.city : "",
                         bio: typeof parsedUser.bio === "string" ? parsedUser.bio : ""
                     });
-                    const img = parsedUser.image ?? parsedUser.avatar_url;
-                    if (typeof img === "string" && img) {
+                    const img = profileImageFromUser(parsedUser);
+                    if (img) {
                         setImagePreview(img);
                     }
                 } catch (e) {
@@ -168,14 +190,17 @@ export default function FacultyProfilePage() {
                         storedUserObj.email = formData.email.trim() || storedUserObj.email || (d.email as string | undefined);
                         storedUserObj.department = formData.department.trim();
                         storedUserObj.faculty_department = formData.department.trim();
-                        if (d.image || d.avatar_url) {
-                            const url = (d.image || d.avatar_url) as string;
+                        const savedImageUrl = profileImageFromUser(d);
+                        if (savedImageUrl) {
+                            const url = savedImageUrl;
                             storedUserObj.image = url;
                             storedUserObj.avatar_url = url;
+                            setImagePreview(url);
                         }
                         const s = JSON.stringify(storedUserObj);
                         localStorage.setItem("user", s);
                         localStorage.setItem("ciel_user", s);
+                        window.dispatchEvent(new Event("ciel_user_updated"));
                     }
                 } else {
                     toast.error(data.message || "Failed to update profile");
@@ -243,13 +268,10 @@ export default function FacultyProfilePage() {
                                     <div className="w-24 h-24 rounded-full bg-white p-1 shadow-lg ring-4 ring-white/50">
                                         <div className="w-full h-full rounded-full bg-slate-100 flex items-center justify-center overflow-hidden relative">
                                             {imagePreview ? (
-                                                <Image
+                                                <img
                                                     src={imagePreview}
                                                     alt="Profile"
-                                                    width={96}
-                                                    height={96}
                                                     className="w-full h-full object-cover"
-                                                    unoptimized={imagePreview.startsWith("data:")}
                                                 />
                                             ) : (
                                                 <span className="text-violet-600 font-bold text-3xl">

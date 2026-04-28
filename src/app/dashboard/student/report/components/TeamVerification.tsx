@@ -5,17 +5,24 @@ import { Users, UserPlus, CheckCircle2, ChevronDown, ChevronUp, AlertCircle, Shi
 import IdentityVerification, { Participant } from "../../engagement/components/IdentityVerification";
 import { Button } from "./ui/button";
 import clsx from "clsx";
+import { authenticatedFetch } from "@/utils/api";
 
 export default function TeamVerification({
     projectId,
     members,
     onUpdateMembers,
-    isLocked = false
+    isLocked = false,
+    teamId = "",
+    primaryFacultyEmail = "",
+    secondaryFacultyEmail = ""
 }: {
     projectId: string;
     members: any[];
     onUpdateMembers: (newMembers: any[]) => void;
     isLocked?: boolean;
+    teamId?: string;
+    primaryFacultyEmail?: string;
+    secondaryFacultyEmail?: string;
 }) {
     const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
 
@@ -32,15 +39,12 @@ export default function TeamVerification({
 
         if (participantId) {
             try {
-                const res = await fetch(`/api/v1/engagement/${participantId}`, {
+                const res = await authenticatedFetch(`/api/v1/engagement/${encodeURIComponent(participantId)}`, {
                     method: 'DELETE',
-                    headers: {
-                        'Authorization': `Bearer ${localStorage.getItem('ciel_token')}`
-                    }
                 });
                 
-                if (!res.ok) {
-                    const err = await res.json();
+                if (!res || !res.ok) {
+                    const err = await res?.json().catch(() => ({}));
                     alert(err.message || "Failed to remove member record from backend.");
                     return;
                 }
@@ -197,6 +201,9 @@ export default function TeamVerification({
                                         initialData={member}
                                         participationMode="team"
                                         isTeamLead={false}
+                                        teamId={teamId}
+                                        primaryFacultyEmail={primaryFacultyEmail}
+                                        secondaryFacultyEmail={secondaryFacultyEmail}
                                         onSuccess={(p) => handleMemberSuccess(idx, p)}
                                     />
                                 </div>

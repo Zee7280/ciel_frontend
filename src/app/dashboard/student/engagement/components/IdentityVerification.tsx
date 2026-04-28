@@ -30,13 +30,19 @@ export default function IdentityVerification({
     onSuccess,
     initialData = {},
     participationMode = 'individual',
-    isTeamLead = false
+    isTeamLead = false,
+    teamId = "",
+    primaryFacultyEmail = "",
+    secondaryFacultyEmail = ""
 }: {
     projectId: string;
     onSuccess: (p: Participant) => void;
     initialData?: Partial<any>;
     participationMode?: 'individual' | 'team';
     isTeamLead?: boolean;
+    teamId?: string;
+    primaryFacultyEmail?: string;
+    secondaryFacultyEmail?: string;
 }) {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [activeTab, setActiveTab] = useState<'personal' | 'academic'>('personal');
@@ -181,6 +187,27 @@ export default function IdentityVerification({
             const body: any = { ...formData, projectId, participationMode, isTeamLead, status: 'pending_ciel_approval' };
             // facultySupervisorEmail is now collected at the application/apply stage — not here
             delete body.facultySupervisorEmail;
+            const resolvedTeamId = teamId || initialData.teamId || initialData.team_id || "";
+            if (resolvedTeamId) {
+                body.teamId = resolvedTeamId;
+                body.team_id = resolvedTeamId;
+            }
+            const resolvedPrimaryFacultyEmail =
+                primaryFacultyEmail ||
+                initialData.primaryFacultyEmail ||
+                initialData.primary_faculty_email ||
+                initialData.facultyEmail ||
+                initialData.faculty_email ||
+                "";
+            const resolvedSecondaryFacultyEmail =
+                secondaryFacultyEmail ||
+                initialData.secondaryFacultyEmail ||
+                initialData.secondary_faculty_email ||
+                "";
+            if (resolvedPrimaryFacultyEmail) {
+                body.primary_faculty_email = resolvedPrimaryFacultyEmail;
+                body.secondary_faculty_email = resolvedSecondaryFacultyEmail || null;
+            }
 
             const res = await authenticatedFetch(`/api/v1/engagement/register`, {
                 method: 'POST',

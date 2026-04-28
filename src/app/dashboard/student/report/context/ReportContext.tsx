@@ -5,6 +5,7 @@ import { ValidationError, validateSection1, validateSection2, validateSection3, 
 import { calculateEngagementMetrics } from '../utils/engagementMetrics';
 import type { ReportCIIauditMeta } from '@/lib/parseCIIauditSummary';
 import { pickImpactVerifyUrlFromPayload } from '@/utils/reportVerificationUrl';
+import { prepareReportEvidenceForSave } from '../utils/evidenceUpload';
 
 // Define the shape of the report data matches the 11 sections (plus summary)
 export interface ReportData {
@@ -22,6 +23,7 @@ export interface ReportData {
     status?: string;
     admin_status?: string;
     partner_status?: string;
+    evidence_urls?: string[];
     /** When backend sends project/report payment state separately from `status`. */
     report_status?: string;
     payment_verified?: boolean;
@@ -702,16 +704,24 @@ export function ReportProvider({ children }: { children: React.ReactNode }) {
                 return false;
             }
 
-            const res = await authenticatedFetch(`/api/v1/student/reports/draft`, {
-                method: 'POST',
-                body: JSON.stringify({
+            const dataForSave = await prepareReportEvidenceForSave(
+                {
                     ...data,
                     project_id: projectId,
                     status: 'continue'
-                })
+                },
+                projectId,
+            );
+
+            const res = await authenticatedFetch(`/api/v1/student/reports/draft`, {
+                method: 'POST',
+                body: JSON.stringify(dataForSave)
+            }, {
+                timeoutMs: 30000
             });
 
             if (!res || !res.ok) throw new Error('Save failed');
+            setData(dataForSave);
             if (!silent) toast.success('Progress saved!');
             return true;
         } catch (error) {

@@ -30,11 +30,16 @@ export function isTokenValid(token: string | null): boolean {
     return payload.exp * 1000 > Date.now();
 }
 
-export async function authenticatedFetch(url: string, options: RequestInit = {}, config: { redirectToLogin?: boolean } = { redirectToLogin: true }) {
+export async function authenticatedFetch(
+    url: string,
+    options: RequestInit = {},
+    config: { redirectToLogin?: boolean; timeoutMs?: number } = { redirectToLogin: true }
+) {
     const token = localStorage.getItem("ciel_token");
+    const redirectToLogin = config.redirectToLogin ?? true;
 
     // If token is already expired locally, redirect immediately without making the API call
-    if (!isTokenValid(token) && config.redirectToLogin) {
+    if (!isTokenValid(token) && redirectToLogin) {
         console.log("Fetcher: Token expired or missing. Redirecting to login...");
         if (typeof window !== "undefined") {
             localStorage.removeItem("ciel_token");
@@ -72,13 +77,26 @@ export async function authenticatedFetch(url: string, options: RequestInit = {},
         headers["Content-Type"] = "application/json";
     }
 
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    let signal = options.signal;
+
+    if (config.timeoutMs && config.timeoutMs > 0) {
+        const controller = new AbortController();
+        signal = controller.signal;
+        timeoutId = setTimeout(() => controller.abort(), config.timeoutMs);
+        options.signal?.addEventListener("abort", () => controller.abort(), { once: true });
+    }
+
     const response = await fetch(fullUrl, {
         ...options,
-        headers
+        headers,
+        signal
+    }).finally(() => {
+        if (timeoutId) clearTimeout(timeoutId);
     });
 
     if (response.status === 401) {
-        if (config.redirectToLogin) {
+        if (redirectToLogin) {
             // Double check: only redirect if our local token is also expired
             // This prevents redirect on server-side permission errors (403-like 401s)
             if (!isTokenValid(token)) {

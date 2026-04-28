@@ -424,16 +424,16 @@ export default function Section6Resources() {
 
                 <div className="flex items-center gap-4">
 
-                    <div className="w-12 h-12 rounded-lg bg-report-primary text-white flex items-center justify-center shadow-md">
-                        <Package className="w-6 h-6" />
+                    <div className="w-14 h-14 rounded-2xl bg-report-primary text-white flex items-center justify-center shadow-xl shadow-report-primary-shadow ring-4 ring-report-primary-soft">
+                        <Package className="w-7 h-7" />
                     </div>
 
-                    <div className="space-y-1">
-                        <h2 className="text-xl font-semibold text-slate-900">
+                    <div className="space-y-0.5">
+                        <h2 className="report-h2">
                             Section 6 — Resources & Implementation Support
                         </h2>
 
-                        <p className="text-sm text-slate-500 font-medium">
+                        <p className="report-label">
                             How Your Project Was Enabled
                         </p>
                     </div>
@@ -447,26 +447,28 @@ export default function Section6Resources() {
 
                 <div className="flex items-center gap-3">
 
-                    <div className="w-8 h-8 rounded-full bg-report-primary text-white flex items-center justify-center text-[11px] font-semibold">
+                    <div className="w-8 h-8 rounded-full bg-report-primary text-white flex items-center justify-center text-[11px] font-black">
                         6.0
                     </div>
 
-                    <h3 className="text-sm font-semibold text-slate-900 uppercase tracking-wide">
+                    <h3 className="report-h3">
                         Project Snapshot
                     </h3>
 
-                    <span className="text-[10px] font-semibold text-slate-500 uppercase bg-slate-100 px-3 py-1 rounded-full">
+                    <span className="report-label !text-report-primary bg-report-primary-soft border border-report-primary-border px-3 py-1 rounded-full">
                         Auto-Generated · Read-Only
                     </span>
 
                 </div>
 
 
-                <div className="p-6 bg-slate-900 rounded-xl text-white relative overflow-hidden shadow-sm">
+                <div className="bg-white rounded-xl border border-slate-200 p-4 md:p-5 text-slate-900 relative overflow-hidden shadow-sm">
 
-                    <div className="absolute right-0 top-0 w-32 h-32 bg-report-primary/20 rounded-full -mr-16 -mt-16 blur-3xl opacity-70" />
+                    <div className="absolute top-0 right-0 p-6 opacity-[0.04] pointer-events-none">
+                        <BarChart3 className="w-40 h-40 text-report-primary" />
+                    </div>
 
-                    <div className="relative z-10 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6">
+                    <div className="relative z-10 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
 
                         {[
                             { label: "Primary SDG", val: section3.primary_sdg.goal_number ? `SDG ${section3.primary_sdg.goal_number}` : "—" },
@@ -477,13 +479,13 @@ export default function Section6Resources() {
                             { label: "Outputs", val: `${(section4.activity_blocks || []).reduce((acc: number, b: any) => acc + (b.outputs?.length || 0), 0)} Recorded` },
                         ].map(({ label, val }) => (
 
-                            <div key={label} className="space-y-1">
+                            <div key={label} className="bg-slate-50 rounded-lg p-3 border border-slate-100 min-w-0 space-y-1">
 
-                                <p className="text-[10px] text-slate-400 uppercase tracking-wide">
+                                <p className="text-[9px] font-bold uppercase text-slate-500 tracking-wide">
                                     {label}
                                 </p>
 
-                                <p className="text-sm font-semibold truncate">
+                                <p className="text-sm font-black text-slate-900 truncate">
                                     {val}
                                 </p>
 
@@ -496,11 +498,11 @@ export default function Section6Resources() {
                 </div>
 
 
-                <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-3">
+                <div className="p-4 bg-report-primary-soft border border-report-primary-border rounded-xl flex items-start gap-3">
 
-                    <AlertCircle className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
+                    <AlertCircle className="w-4 h-4 text-report-primary mt-0.5 shrink-0" />
 
-                    <p className="text-sm text-amber-800">
+                    <p className="text-sm font-semibold text-report-primary">
                         This information is automatically pulled from previous sections and cannot be edited.
                     </p>
 
@@ -513,11 +515,11 @@ export default function Section6Resources() {
 
                 <div className="flex items-center gap-3">
 
-                    <div className="w-8 h-8 rounded-full bg-report-primary text-white flex items-center justify-center text-[11px] font-semibold">
+                    <div className="w-8 h-8 rounded-full bg-report-primary text-white flex items-center justify-center text-[11px] font-black">
                         6.1
                     </div>
 
-                    <h3 className="text-base font-semibold text-slate-900">
+                    <h3 className="report-h3">
                         Step 1 — Resource Confirmation
                     </h3>
 

@@ -134,17 +134,17 @@ export default function AttendancePendingQueuePanel({
     };
 
     return (
-        <div className="space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="space-y-4 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+            <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
                 <div>
-                    <h2 className="text-lg font-bold text-slate-900">{title}</h2>
-                    {description ? <p className="text-sm text-slate-500 mt-1">{description}</p> : null}
+                    <h2 className="text-xl font-black tracking-tight text-slate-950">{title}</h2>
+                    {description ? <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-500">{description}</p> : null}
                 </div>
                 <button
                     type="button"
                     onClick={() => void load()}
                     disabled={loading || !projectId.trim()}
-                    className="inline-flex items-center justify-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-sm font-bold text-white hover:bg-slate-800 disabled:opacity-50"
+                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-slate-800 hover:shadow-md disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none"
                 >
                     {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
                     {autoLoadOnProjectIdChange ? "Refresh" : "Load queue"}
@@ -152,7 +152,7 @@ export default function AttendancePendingQueuePanel({
             </div>
 
             {rows.length === 0 && !loading ? (
-                <p className="text-sm text-slate-500 rounded-lg border border-dashed border-slate-200 bg-slate-50/80 px-4 py-6 text-center">
+                <p className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 px-4 py-8 text-center text-sm leading-6 text-slate-500">
                     {!projectId.trim()
                         ? "Select an opportunity above. The list includes how many sessions are still waiting in each project."
                         : autoLoadOnProjectIdChange
@@ -161,7 +161,7 @@ export default function AttendancePendingQueuePanel({
                 </p>
             ) : null}
 
-            <div className="space-y-3">
+            <div className="space-y-4">
                 {rows.map((raw, idx) => {
                     const rawObj = raw as Record<string, unknown>;
                     const row = normalizeEngagementAttendanceLog(rawObj);
@@ -171,11 +171,11 @@ export default function AttendancePendingQueuePanel({
                     return (
                         <div
                             key={id || `row-${idx}`}
-                            className="rounded-xl border border-slate-100 bg-white p-4 shadow-sm flex flex-col lg:flex-row lg:items-stretch gap-4"
+                            className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-gradient-to-br from-white to-slate-50/60 p-4 shadow-sm transition hover:border-slate-300 hover:shadow-md lg:flex-row lg:items-stretch"
                         >
                             <div className="flex-1 space-y-1 text-sm">
                                 <div className="flex flex-wrap items-center gap-2">
-                                    <span className={`text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded border ${approvalBadgeClass(st)}`}>
+                                    <span className={`rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-widest ${approvalBadgeClass(st)}`}>
                                         {st}
                                     </span>
                                     {pickStr(row.opportunity_creator_kind) ? (
@@ -185,13 +185,13 @@ export default function AttendancePendingQueuePanel({
                                     ) : null}
                                 </div>
                                 {who.name ? (
-                                    <div className="mt-2 rounded-lg border border-slate-100 bg-slate-50/80 px-3 py-2">
+                                    <div className="mt-3 rounded-2xl border border-slate-100 bg-white/80 px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
                                         <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Participant</p>
-                                        <p className="font-semibold text-slate-900">{who.name}</p>
+                                        <p className="mt-1 font-bold text-slate-950">{who.name}</p>
                                         {who.detail ? <p className="text-xs text-slate-600 mt-0.5">{who.detail}</p> : null}
                                     </div>
                                 ) : null}
-                                <p className="font-bold text-slate-900">
+                                <p className="pt-2 font-bold text-slate-950">
                                     {pickStr(row.activity_type) || "Session"} · {Number(row.hours || 0).toFixed(2)} hrs
                                 </p>
                                 <p className="text-slate-600">
@@ -201,19 +201,19 @@ export default function AttendancePendingQueuePanel({
                                 <label className="block pt-2">
                                     <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Reason (reject/flag)</span>
                                     <input
-                                        className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                                        className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
                                         placeholder="Required when rejecting or flagging"
                                         value={reasonByLogId[id] || ""}
                                         onChange={(e) => setReasonByLogId((prev) => ({ ...prev, [id]: e.target.value }))}
                                     />
                                 </label>
                             </div>
-                            <div className="flex flex-row lg:flex-col gap-2 shrink-0">
+                            <div className="grid grid-cols-3 gap-2 lg:w-28 lg:grid-cols-1">
                                 <button
                                     type="button"
                                     disabled={acting !== null}
                                     onClick={() => void act(id, "approve")}
-                                    className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
+                                    className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-emerald-600 px-3 py-3 text-xs font-bold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-emerald-700 hover:shadow-md disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none"
                                 >
                                     {acting === `${id}:approve` ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle className="h-3.5 w-3.5" />}
                                     Approve
@@ -222,7 +222,7 @@ export default function AttendancePendingQueuePanel({
                                     type="button"
                                     disabled={acting !== null}
                                     onClick={() => void act(id, "reject")}
-                                    className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-rose-600 px-3 py-2 text-xs font-bold text-white hover:bg-rose-700 disabled:opacity-50"
+                                    className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-rose-600 px-3 py-3 text-xs font-bold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-rose-700 hover:shadow-md disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none"
                                 >
                                     {acting === `${id}:reject` ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <XCircle className="h-3.5 w-3.5" />}
                                     Reject
@@ -231,7 +231,7 @@ export default function AttendancePendingQueuePanel({
                                     type="button"
                                     disabled={acting !== null}
                                     onClick={() => void act(id, "flag")}
-                                    className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-900 hover:bg-amber-100 disabled:opacity-50"
+                                    className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-amber-200 bg-amber-50 px-3 py-3 text-xs font-bold text-amber-900 shadow-sm transition hover:-translate-y-0.5 hover:border-amber-300 hover:bg-amber-100 hover:shadow-md disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none"
                                 >
                                     {acting === `${id}:flag` ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Flag className="h-3.5 w-3.5" />}
                                     Flag

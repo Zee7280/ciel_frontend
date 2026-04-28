@@ -29,6 +29,7 @@ import type {
 } from "./types";
 import { fetchStudentDashboardData } from "@/utils/student-dashboard-fetch";
 import StudentProgressTracker from "./components/StudentProgressTracker";
+import PendingActionCards from "@/components/dashboard/PendingActionCards";
 
 function normStatus(s: string) {
     return s.toLowerCase();
@@ -183,6 +184,8 @@ export default function StudentDashboard() {
                 <h2 className="text-lg font-bold tracking-tight text-slate-800">Overview</h2>
                 <p className="text-sm text-slate-500">Your projects, deadlines, and actions at a glance.</p>
             </div>
+
+            <PendingActionCards summary={data.pendingSummary} emptyMessage="You are all caught up on approvals, reports, payments, and deadlines." />
 
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-3 lg:gap-8">
                 <div className="space-y-6 lg:col-span-2">

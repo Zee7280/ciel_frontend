@@ -24,10 +24,11 @@ import { Card, CardContent, CardHeader } from '../../student/report/components/u
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '../../student/report/components/ui/dialog';
 import { Badge } from '../../student/report/components/ui/badge';
 import { Input } from '../../student/report/components/ui/input';
+import { REPORTING_FEE_DISPLAY } from '@/config/reportingFee';
 
 type PaymentStatusTab = 'pending' | 'approved' | 'rejected';
 
-/** Uses API `paid_amount` (int|null) when set; else legacy `amount` string (e.g. "5,000 PKR"). */
+/** Uses submitted paid amount fields when set; otherwise falls back to the configured reporting fee. */
 function resolvePaidAmountDisplay(raw: Record<string, unknown>): string {
     const keys = [
         'paid_amount',
@@ -42,7 +43,6 @@ function resolvePaidAmountDisplay(raw: Record<string, unknown>): string {
         'actualAmount',
         'transfer_amount',
         'transferAmount',
-        'amount',
     ];
     let val: unknown;
     for (const k of keys) {
@@ -52,7 +52,7 @@ function resolvePaidAmountDisplay(raw: Record<string, unknown>): string {
             break;
         }
     }
-    if (val == null) return '—';
+    if (val == null) return REPORTING_FEE_DISPLAY;
     const str = String(val).trim();
     if (!str) return '—';
     if (/pkr/i.test(str) || /(^|\s)rs\.?\s*/i.test(str)) return str;
@@ -182,7 +182,7 @@ export default function AdminPaymentsPage() {
                             studentEmail: "zain@example.com",
                             projectTitle: "Clean Water Initiative",
                             projectId: "proj_123",
-                            amount: "5,000 PKR",
+                            amount: REPORTING_FEE_DISPLAY,
                             date: new Date().toISOString(),
                             proofUrl: "https://via.placeholder.com/600x800?text=Payment+Receipt+Proof",
                             status: 'pending'
@@ -193,7 +193,7 @@ export default function AdminPaymentsPage() {
                             studentEmail: "ahmed@example.com",
                             projectTitle: "Education for All",
                             projectId: "proj_456",
-                            amount: "5,000 PKR",
+                            amount: REPORTING_FEE_DISPLAY,
                             date: new Date(Date.now() - 86400000).toISOString(),
                             proofUrl: "https://via.placeholder.com/600x800?text=Bank+Transfer+Slip",
                             status: 'pending'

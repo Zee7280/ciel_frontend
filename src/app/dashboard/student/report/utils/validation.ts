@@ -82,16 +82,10 @@ export function validateSection2(data: any): ValidationResult {
                 ? (data as { baseline_other_entries: string[] }).baseline_other_entries
                 : [String((data as { baseline_evidence_other?: string }).baseline_evidence_other || "")];
         for (let i = 0; i < entries.length; i++) {
-            const w = countWords(entries[i] || "");
-            if (w < 100) {
+            if (!String(entries[i] || "").trim()) {
                 errors.push({
                     field: `baseline_other_entries.${i}`,
-                    message: `Other evidence source #${i + 1} is too short (${w}/100 words min)`,
-                });
-            } else if (w > 200) {
-                errors.push({
-                    field: `baseline_other_entries.${i}`,
-                    message: `Other evidence source #${i + 1} is too long (${w}/200 words max)`,
+                    message: `Other evidence source #${i + 1} is required`,
                 });
             }
         }

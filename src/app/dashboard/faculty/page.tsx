@@ -26,6 +26,7 @@ import {
     Cell,
 } from "recharts";
 import { authenticatedFetch } from "@/utils/api";
+import PendingActionCards, { type PendingSummary } from "@/components/dashboard/PendingActionCards";
 
 type FacultyCourse = {
     id?: string;
@@ -77,6 +78,7 @@ type FacultyDashboardStats = {
     impact_distribution?: DistributionPoint[];
     /** Short list for the activity panel (backend can add). */
     recent_activity?: ActivityItem[];
+    pendingSummary?: PendingSummary;
 };
 
 function normalizeHoursTrend(raw?: TrendPoint[]) {
@@ -148,6 +150,27 @@ export default function FacultyDashboard() {
     }, [stats?.courses]);
 
     const recentActivity = stats?.recent_activity ?? [];
+    const pendingSummary: PendingSummary = stats?.pendingSummary ?? {
+        total: (stats?.pending_approvals ?? 0) + courseSummaries.totalPendingGrading,
+        items: [
+            {
+                key: "faculty_pending_approvals",
+                title: "Pending approvals",
+                count: stats?.pending_approvals ?? 0,
+                href: "/dashboard/faculty/approvals",
+                tone: "warning",
+                description: "Student-created opportunities or reports waiting for faculty review.",
+            },
+            {
+                key: "faculty_pending_grading",
+                title: "Pending grading",
+                count: courseSummaries.totalPendingGrading,
+                href: "/dashboard/faculty/grading",
+                tone: "neutral",
+                description: "Submitted student work still waiting for grading.",
+            },
+        ],
+    };
 
     return (
         <div className="space-y-8 p-6">
@@ -164,6 +187,8 @@ export default function FacultyDashboard() {
                     Impact analytics
                 </Link>
             </div>
+
+            <PendingActionCards summary={pendingSummary} emptyMessage="No approvals or grading items are pending." />
 
             {/* Stats Overview */}
             <div className="grid grid-cols-1 gap-6 md:grid-cols-3">

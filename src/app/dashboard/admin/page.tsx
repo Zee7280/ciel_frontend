@@ -2,12 +2,36 @@
 
 import { useEffect, useState } from "react";
 import { authenticatedFetch } from "@/utils/api";
-import { Users, Briefcase, Clock, FileText, TrendingUp, AlertCircle, Building2, Eye, ArrowRight } from "lucide-react";
+import { Users, Briefcase, Clock, FileText, TrendingUp, AlertCircle, ArrowRight } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import Link from "next/link";
+import PendingActionCards, { type PendingSummary } from "@/components/dashboard/PendingActionCards";
+
+type SdgDistributionPoint = {
+    name: string;
+    value: number;
+    color?: string;
+};
+
+type AdminDashboardData = {
+    metrics?: {
+        totalUsers?: {
+            total?: number;
+            students?: number;
+            ngos?: number;
+            corporates?: number;
+        };
+        opportunities?: number;
+        verifiedHours?: number;
+        pendingApprovals?: number;
+        totalReports?: number;
+    };
+    sdgDistribution?: SdgDistributionPoint[];
+    pendingSummary?: PendingSummary;
+};
 
 export default function AdminDashboard() {
-    const [data, setData] = useState<any>(null);
+    const [data, setData] = useState<AdminDashboardData | null>(null);
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
@@ -33,13 +57,15 @@ export default function AdminDashboard() {
     const { metrics, sdgDistribution } = data || {};
 
     // Fallback data if API fails (for development visual confirmation)
-    const chartData = sdgDistribution || [
+    const chartData: SdgDistributionPoint[] = sdgDistribution || [
         { name: "No Poverty", value: 30, color: "#e5243b" },
         { name: "Quality Education", value: 45, color: "#c5192d" },
         { name: "Climate Action", value: 25, "color": "#3f7e44" },
         { name: "Gender Equality", value: 20, "color": "#ff3a21" },
         { name: "Clean Water", value: 15, "color": "#26bde2" }
     ];
+    const totalUsers = metrics?.totalUsers?.total ?? 0;
+    const studentPercent = totalUsers > 0 ? Math.round(((metrics?.totalUsers?.students ?? 0) / totalUsers) * 100) : 0;
 
     if (isLoading) {
         return (
@@ -52,6 +78,20 @@ export default function AdminDashboard() {
         );
     }
 
+    const pendingSummary: PendingSummary = data?.pendingSummary ?? {
+        total: metrics?.pendingApprovals ?? 0,
+        items: [
+            {
+                key: "admin_pending_actions",
+                title: "Pending approvals",
+                count: metrics?.pendingApprovals ?? 0,
+                href: "/dashboard/admin/approvals",
+                tone: "urgent",
+                description: "Users, participation requests, and applications waiting for admin action.",
+            },
+        ],
+    };
+
     return (
         <div className="space-y-8 p-8 max-w-[1600px] mx-auto">
             {/* Header */}
@@ -59,6 +99,8 @@ export default function AdminDashboard() {
                 <h1 className="text-4xl font-extrabold text-slate-900 tracking-tight">Platform Overview</h1>
                 <p className="text-slate-500 mt-2 text-lg">Real-time system activity and performance metrics.</p>
             </div>
+
+            <PendingActionCards summary={pendingSummary} emptyMessage="No platform approvals are pending right now." />
 
             {/* Metrics Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
@@ -80,10 +122,10 @@ export default function AdminDashboard() {
                         <div className="space-y-3">
                             <div className="flex items-center justify-between text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
                                 <span>Students</span>
-                                <span>{Math.round((metrics?.totalUsers?.students / metrics?.totalUsers?.total) * 100) || 0}%</span>
+                                <span>{studentPercent}%</span>
                             </div>
                             <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-                                <div className="bg-blue-500 h-full rounded-full" style={{ width: `${(metrics?.totalUsers?.students / metrics?.totalUsers?.total) * 100}%` }}></div>
+                                <div className="bg-blue-500 h-full rounded-full" style={{ width: `${studentPercent}%` }}></div>
                             </div>
 
                             <div className="grid grid-cols-2 gap-4 mt-4 pt-4 border-t border-slate-50">
@@ -195,7 +237,7 @@ export default function AdminDashboard() {
                                     itemStyle={{ color: '#1e293b', fontWeight: 'bold' }}
                                 />
                                 <Bar dataKey="value" radius={[0, 8, 8, 0]} barSize={32} animationDuration={1000}>
-                                    {chartData.map((entry: any, index: number) => (
+                                    {chartData.map((entry, index) => (
                                         <Cell key={`cell-${index}`} fill={entry.color || '#3b82f6'} />
                                     ))}
                                 </Bar>

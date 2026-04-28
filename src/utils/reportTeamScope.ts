@@ -13,24 +13,30 @@ export function pickTeamIdFromRecord(rec: unknown): string {
     return "";
 }
 
-export function mapProjectTeamRowsForReport(teamRows: unknown[], myParticipantId: string): any[] {
+type ReportTeamRow = Record<string, unknown>;
+
+export function mapProjectTeamRowsForReport(teamRows: unknown[], myParticipantId: string): ReportTeamRow[] {
     if (!Array.isArray(teamRows) || !myParticipantId) return [];
     return teamRows
         .filter((m: unknown) => {
             if (!m || typeof m !== "object") return false;
-            const id = (m as { id?: string }).id;
-            return typeof id === "string" && id.length > 0 && id !== myParticipantId;
+            const row = m as { id?: unknown; participantId?: unknown };
+            const ids = [row.id, row.participantId].filter((v): v is string => typeof v === "string" && v.length > 0);
+            return ids.length > 0 && !ids.includes(myParticipantId);
         })
-        .map((m: any) => ({
-            ...m,
-            verified: true,
-            name: m.fullName || m.name,
-            university: m.universityName || m.university,
-        }));
+        .map((m: unknown) => {
+            const row = m as ReportTeamRow;
+            return {
+                ...row,
+                verified: true,
+                name: row.fullName || row.name,
+                university: row.universityName || row.university,
+            };
+        });
 }
 
 export type ScopedTeamResult = {
-    team_members: any[];
+    team_members: ReportTeamRow[];
     participation_type: "individual" | "team";
 };
 
@@ -46,11 +52,24 @@ export function resolveScopedTeamMembers(participant: unknown, teamRows: unknown
         return { team_members: [], participation_type: "individual" };
     }
 
-    const myTeamId = pickTeamIdFromRecord(participant);
+    const matchedTeamRow = Array.isArray(teamRows)
+        ? teamRows.find((row) => {
+            if (!row || typeof row !== "object") return false;
+            const o = row as Record<string, unknown>;
+            const rowIds = [o.id, o.participantId].map((v) => (v == null ? "" : String(v)));
+            const rowEmail = typeof o.email === "string" ? o.email.trim().toLowerCase() : "";
+            const myEmail = typeof p?.email === "string" ? p.email.trim().toLowerCase() : "";
+            return rowIds.includes(myId) || (!!rowEmail && rowEmail === myEmail);
+        })
+        : undefined;
+    const myTeamId = pickTeamIdFromRecord(participant) || pickTeamIdFromRecord(matchedTeamRow);
     const base = mapProjectTeamRowsForReport(teamRows, myId);
 
     if (!myTeamId) {
-        return { team_members: [], participation_type: "individual" };
+        return {
+            team_members: base,
+            participation_type: base.length > 0 ? "team" : "individual",
+        };
     }
 
     const filtered = base.filter((m) => pickTeamIdFromRecord(m) === myTeamId);

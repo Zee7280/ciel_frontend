@@ -148,6 +148,11 @@ interface ReportDetail {
     required_hours?: number;
 }
 
+type AdminEvidenceFile = {
+    url: string;
+    name: string;
+};
+
 const DOSSIER_NAV_SECTIONS = [
     { id: "section1", label: "Participation Profile", icon: Users },
     { id: "section2", label: "Project Context", icon: FileText },
@@ -187,6 +192,58 @@ function adminValueIsEmpty(value: unknown): boolean {
     }
     if (Array.isArray(value)) return value.length === 0 || value.every((v) => adminValueIsEmpty(v));
     return false;
+}
+
+function pickEvidenceUrl(value: unknown): string {
+    if (typeof value === "string") return value.trim();
+    if (!value || typeof value !== "object") return "";
+
+    const record = value as Record<string, unknown>;
+    const url =
+        record.url ||
+        record.evidence_url ||
+        record.file_url ||
+        record.location ||
+        record.path;
+
+    return typeof url === "string" ? url.trim() : "";
+}
+
+function pickEvidenceName(value: unknown, fallback: string): string {
+    if (typeof value === "string") {
+        return value.split("?")[0].split("/").filter(Boolean).pop() || fallback;
+    }
+    if (!value || typeof value !== "object") return fallback;
+
+    const record = value as Record<string, unknown>;
+    const name =
+        record.name ||
+        record.fileName ||
+        record.filename ||
+        record.originalName;
+
+    return typeof name === "string" && name.trim() ? name.trim() : fallback;
+}
+
+function collectAdminEvidenceFiles(report: ReportDetail | null): AdminEvidenceFile[] {
+    if (!report) return [];
+
+    const candidates: unknown[] = [
+        ...(Array.isArray(report.evidence_urls) ? report.evidence_urls : []),
+        ...(Array.isArray(report.section8?.evidence_files) ? report.section8.evidence_files : []),
+    ];
+
+    const seen = new Set<string>();
+    return candidates.reduce<AdminEvidenceFile[]>((files, item) => {
+        const url = pickEvidenceUrl(item);
+        if (!url || seen.has(url)) return files;
+        seen.add(url);
+        files.push({
+            url,
+            name: pickEvidenceName(item, `Evidence ${files.length + 1}`),
+        });
+        return files;
+    }, []);
 }
 
 function AdminFieldBody({ value }: { value: unknown }): ReactNode {
@@ -312,6 +369,7 @@ export default function AdminReportDetailPage() {
             return null;
         }
     }, [report]);
+    const evidenceFiles = useMemo(() => collectAdminEvidenceFiles(report), [report]);
 
     useEffect(() => {
         fetchReportDetail();
@@ -1029,18 +1087,21 @@ export default function AdminReportDetailPage() {
 
                                 <div>
                                     <h3 className={clsx(adminDossier.microLabel, "mb-3 text-slate-400")}>Evidence files</h3>
-                                    {report.evidence_urls && report.evidence_urls.length > 0 ? (
+                                    {evidenceFiles.length > 0 ? (
                                         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
-                                            {report.evidence_urls.map((url, index) => (
+                                            {evidenceFiles.map((file, index) => (
                                                 <a
-                                                    key={index}
-                                                    href={url}
+                                                    key={file.url}
+                                                    href={file.url}
                                                     target="_blank"
                                                     rel="noopener noreferrer"
                                                     className="group flex items-center justify-between rounded-2xl border border-slate-100 bg-slate-50/90 p-4 transition-colors hover:border-indigo-200 hover:bg-indigo-50/60"
                                                 >
-                                                    <span className="font-semibold text-slate-900 group-hover:text-indigo-800">
-                                                        Evidence {index + 1}
+                                                    <span className="min-w-0 pr-3 font-semibold text-slate-900 group-hover:text-indigo-800">
+                                                        <span className="block truncate">{file.name || `Evidence ${index + 1}`}</span>
+                                                        <span className="mt-1 block text-xs font-medium text-slate-500">
+                                                            Evidence {index + 1}
+                                                        </span>
                                                     </span>
                                                     <ExternalLink className="h-4 w-4 shrink-0 text-slate-400 group-hover:text-indigo-600" />
                                                 </a>

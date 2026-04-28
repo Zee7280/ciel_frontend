@@ -1,4 +1,4 @@
-import React, { useMemo, useEffect, useState } from "react";
+import React, { useEffect } from "react";
 import { generateAISummary } from "../utils/aiSummarizer";
 import { toast } from "sonner";
 import {
@@ -46,6 +46,95 @@ const verificationTypes = [
     "Institutional stamp or seal"
 ];
 
+type EvidenceFileItem = File | {
+    file?: File;
+    name?: string;
+    fileName?: string;
+    filename?: string;
+    originalName?: string;
+    size?: number;
+    bytes?: number;
+    file_size?: number;
+    size_bytes?: number;
+    type?: string;
+    mimeType?: string;
+    mimetype?: string;
+    url?: string;
+    path?: string;
+    lastModified?: number;
+} | string;
+
+const toEvidenceFileItem = (file: File): EvidenceFileItem => ({
+    file,
+    name: file.name,
+    size: file.size,
+    type: file.type,
+    lastModified: file.lastModified
+});
+
+const isNativeFile = (file: EvidenceFileItem): file is File => (
+    typeof File !== 'undefined' && file instanceof File
+);
+
+const isEvidenceFileRecord = (
+    file: EvidenceFileItem
+): file is Exclude<EvidenceFileItem, File | string> => (
+    typeof file === 'object' && file !== null && !isNativeFile(file)
+);
+
+const getFileName = (file: EvidenceFileItem, index: number) => {
+    if (typeof file === 'string') return file.split('/').pop() || `Evidence file ${index + 1}`;
+    if (isNativeFile(file)) return file.name || `Evidence file ${index + 1}`;
+    return (
+        file?.name ||
+        file?.fileName ||
+        file?.filename ||
+        file?.originalName ||
+        file?.file?.name ||
+        `Evidence file ${index + 1}`
+    );
+};
+
+const getFileSize = (file: EvidenceFileItem) => {
+    if (typeof file === 'string') return undefined;
+    if (isNativeFile(file)) return Number.isFinite(file.size) ? file.size : undefined;
+    if (!isEvidenceFileRecord(file)) return undefined;
+    const size = file?.size ?? file?.bytes ?? file?.file_size ?? file?.size_bytes ?? file?.file?.size;
+    return typeof size === 'number' && Number.isFinite(size) ? size : undefined;
+};
+
+const formatFileSize = (file: EvidenceFileItem) => {
+    const size = getFileSize(file);
+    return typeof size === 'number' ? `${(size / (1024 * 1024)).toFixed(2)} MB` : 'Size unavailable';
+};
+
+const getFileType = (file: EvidenceFileItem) => {
+    if (typeof file === 'string') return '';
+    if (isNativeFile(file)) return file.type || '';
+    if (!isEvidenceFileRecord(file)) return '';
+    return file?.type || file?.mimeType || file?.mimetype || file?.file?.type || '';
+};
+
+function EvidenceFilePreview({ file, name }: { file: EvidenceFileItem; name: string }) {
+    const directUrl = typeof file === 'string' ? file : isEvidenceFileRecord(file) ? file?.url || file?.path : undefined;
+    const isImage = getFileType(file).startsWith('image/') || /\.(jpg|jpeg|png|gif|webp)$/i.test(name);
+    const previewUrl = isImage ? directUrl : null;
+
+    if (isImage && previewUrl) {
+        return (
+            <div className="w-8 h-8 rounded-md overflow-hidden bg-slate-100 border border-slate-200 shrink-0">
+                <img src={previewUrl} alt={name} className="w-full h-full object-cover" />
+            </div>
+        );
+    }
+
+    return (
+        <div className="w-8 h-8 rounded-md bg-report-primary-soft text-report-primary flex items-center justify-center shrink-0">
+            <ImageIcon className="w-4 h-4" />
+        </div>
+    );
+}
+
 // ─── Helper for Verification Strength ───────────────────────────────────────
 function classifyVerification(filesCount: number, typesCount: number, partnerAssessed: boolean): {
     label: string; color: string; desc: string;
@@ -74,7 +163,7 @@ export default function Section8Evidence() {
         partner_verification_files = []
     } = section8;
 
-    const update = (field: string, val: any) => updateSection('section8', { [field]: val });
+    const update = (field: string, val: unknown) => updateSection('section8', { [field]: val });
     const toggleEvidenceType = (type: string) => {
         const cur = evidence_types || [];
         update('evidence_types', cur.includes(type) ? cur.filter(t => t !== type) : [...cur, type]);
@@ -91,7 +180,7 @@ export default function Section8Evidence() {
     // ── Content generation ────────────────────────────────────────────────────
     const classification = classifyVerification(evidence_files?.length || 0, evidence_types?.length || 0, partner_verification && !!partner_verification_type);
 
-    const autoNarrative = useMemo(() => {
+    const autoNarrative = (() => {
         if (section8.summary_text && (section8.summary_text.length > 50 || !section8.summary_text.includes("The report includes"))) {
             return section8.summary_text;
         }
@@ -103,13 +192,13 @@ export default function Section8Evidence() {
         const ethicalStr = allEthicalChecked ? "Ethical compliance was fully confirmed." : "Ethical compliance checks are pending.";
         const partnerStr = partner_verification ? `External partner verification was provided via ${partner_verification_type || 'documentation'}.` : "External partner verification was not provided.";
         return `The report includes ${filesCount} supporting evidence ${filesCount === 1 ? 'file' : 'files'}${typesStr}. ${ethicalStr} ${partnerStr}`;
-    }, [evidence_files, evidence_types, allEthicalChecked, partner_verification, partner_verification_type, section8.summary_text]);
+    })();
 
     useEffect(() => {
         if (section8.summary_text !== autoNarrative) {
             updateSection('section8', { summary_text: autoNarrative });
         }
-    }, [autoNarrative, section8.summary_text]);
+    }, [autoNarrative, section8.summary_text, updateSection]);
 
 
 
@@ -180,7 +269,7 @@ export default function Section8Evidence() {
                         </Label>
 
                         <p className="text-sm text-slate-500">
-                            Selecting "No" will bypass evidence requirements, but may affect report credibility.
+                            Selecting &quot;No&quot; will bypass evidence requirements, but may affect report credibility.
                         </p>
                     </div>
 
@@ -285,11 +374,13 @@ export default function Section8Evidence() {
                             {/* FILE UPLOAD */}
                             <FileUpload
                                 label="Drag & Drop Files or Click to Browse"
+                                multiple
+                                accept=".jpg,.jpeg,.png,.mp4,.pdf,.doc,.docx"
                                 onChange={(e) => {
                                     if (e.target.files) {
                                         update('evidence_files', [
                                             ...(evidence_files || []),
-                                            ...Array.from(e.target.files)
+                                            ...Array.from(e.target.files).map(toEvidenceFileItem)
                                         ])
                                     }
                                 }}
@@ -309,47 +400,49 @@ export default function Section8Evidence() {
 
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
 
-                                        {evidence_files.map((file: File, fIdx: number) => (
-                                            <div
-                                                key={fIdx}
-                                                className="flex items-center justify-between p-3 bg-slate-50 border border-slate-200 rounded-lg"
-                                            >
+                                        {evidence_files.map((file: EvidenceFileItem, fIdx: number) => {
+                                            const fileName = getFileName(file, fIdx);
 
-                                                <div className="flex items-center gap-3 overflow-hidden">
+                                            return (
+                                                <div
+                                                    key={`${fileName}-${fIdx}`}
+                                                    className="flex items-center justify-between p-3 bg-slate-50 border border-slate-200 rounded-lg"
+                                                >
 
-                                                    <div className="w-8 h-8 rounded-md bg-report-primary-soft text-report-primary flex items-center justify-center shrink-0">
-                                                        <ImageIcon className="w-4 h-4" />
+                                                    <div className="flex items-center gap-3 overflow-hidden">
+
+                                                        <EvidenceFilePreview file={file} name={fileName} />
+
+                                                        <div className="overflow-hidden">
+
+                                                            <p className="text-sm font-semibold text-slate-700 truncate">
+                                                                {fileName}
+                                                            </p>
+
+                                                            <p className="text-xs text-slate-400">
+                                                                {formatFileSize(file)}
+                                                            </p>
+
+                                                        </div>
+
                                                     </div>
 
-                                                    <div className="overflow-hidden">
 
-                                                        <p className="text-sm font-semibold text-slate-700 truncate">
-                                                            {file.name}
-                                                        </p>
 
-                                                        <p className="text-xs text-slate-400">
-                                                            {(file.size / (1024 * 1024)).toFixed(2)} MB
-                                                        </p>
-
-                                                    </div>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            const kept = evidence_files.filter((_: EvidenceFileItem, i: number) => i !== fIdx)
+                                                            update('evidence_files', kept)
+                                                        }}
+                                                        className="w-7 h-7 rounded-md bg-white border border-slate-200 text-slate-400 hover:bg-red-50 hover:text-red-500 transition"
+                                                    >
+                                                        <Trash2 className="w-3.5 h-3.5" />
+                                                    </button>
 
                                                 </div>
-
-
-
-                                                <button
-                                                    type="button"
-                                                    onClick={() => {
-                                                        const kept = evidence_files.filter((_: any, i: number) => i !== fIdx)
-                                                        update('evidence_files', kept)
-                                                    }}
-                                                    className="w-7 h-7 rounded-md bg-white border border-slate-200 text-slate-400 hover:bg-red-50 hover:text-red-500 transition"
-                                                >
-                                                    <Trash2 className="w-3.5 h-3.5" />
-                                                </button>
-
-                                            </div>
-                                        ))}
+                                            );
+                                        })}
 
                                     </div>
 
@@ -779,11 +872,13 @@ export default function Section8Evidence() {
 
                             <FileUpload
                                 label="Upload Partner Verification Letter / Document"
+                                multiple
+                                accept=".jpg,.jpeg,.png,.pdf,.doc,.docx"
                                 onChange={(e) => {
                                     if (e.target.files) {
                                         update(
                                             'partner_verification_files',
-                                            [...(partner_verification_files || []), ...Array.from(e.target.files)]
+                                            [...(partner_verification_files || []), ...Array.from(e.target.files).map(toEvidenceFileItem)]
                                         );
                                     }
                                 }}
@@ -800,47 +895,50 @@ export default function Section8Evidence() {
 
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
 
-                                        {partner_verification_files.map((file: File, fIdx: number) => (
+                                        {partner_verification_files.map((file: EvidenceFileItem, fIdx: number) => {
+                                            const fileName = getFileName(file, fIdx);
 
-                                            <div
-                                                key={fIdx}
-                                                className="flex items-center justify-between p-3 bg-report-primary-soft border border-report-primary-border rounded-lg"
-                                            >
+                                            return (
+                                                <div
+                                                    key={`${fileName}-${fIdx}`}
+                                                    className="flex items-center justify-between p-3 bg-report-primary-soft border border-report-primary-border rounded-lg"
+                                                >
 
-                                                <div className="flex items-center gap-3 overflow-hidden">
+                                                    <div className="flex items-center gap-3 overflow-hidden">
 
-                                                    <div className="w-8 h-8 rounded-md bg-white text-report-primary flex items-center justify-center">
-                                                        <FileText className="w-4 h-4" />
+                                                        <div className="w-8 h-8 rounded-md bg-white text-report-primary flex items-center justify-center shrink-0">
+                                                            <FileText className="w-4 h-4" />
+                                                        </div>
+
+                                                        <div className="overflow-hidden">
+                                                            <p className="text-sm font-semibold text-report-primary truncate">
+                                                                {fileName}
+                                                            </p>
+
+                                                            <p className="text-xs text-report-primary-border">
+                                                                {formatFileSize(file)}
+                                                            </p>
+                                                        </div>
+
                                                     </div>
 
-                                                    <div className="overflow-hidden">
-                                                        <p className="text-sm font-semibold text-report-primary truncate">
-                                                            {file.name}
-                                                        </p>
 
-                                                        <p className="text-xs text-report-primary-border">
-                                                            {(file.size / (1024 * 1024)).toFixed(2)} MB
-                                                        </p>
-                                                    </div>
+
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            const kept = partner_verification_files.filter((_: EvidenceFileItem, i: number) => i !== fIdx);
+                                                            update('partner_verification_files', kept);
+                                                        }}
+                                                        className="w-7 h-7 rounded-md bg-white text-slate-400 hover:bg-red-50 hover:text-red-500 border border-report-primary-border flex items-center justify-center"
+                                                    >
+                                                        <Trash2 className="w-3.5 h-3.5" />
+                                                    </button>
 
                                                 </div>
+                                            );
+                                        })}
 
-
-
-                                                <button
-                                                    type="button"
-                                                    onClick={() => {
-                                                        const kept = partner_verification_files.filter((_: any, i: number) => i !== fIdx);
-                                                        update('partner_verification_files', kept);
-                                                    }}
-                                                    className="w-7 h-7 rounded-md bg-white text-slate-400 hover:bg-red-50 hover:text-red-500 border border-report-primary-border flex items-center justify-center"
-                                                >
-                                                    <Trash2 className="w-3.5 h-3.5" />
-                                                </button>
-
-                                            </div>
-
-                                        ))}
 
                                     </div>
 

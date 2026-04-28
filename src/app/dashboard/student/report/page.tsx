@@ -19,6 +19,7 @@ import { canStudentAccessReportForProjectPayload } from '@/utils/studentJoinAppl
 import { mergeReportSection1TeamScope } from '@/utils/reportTeamScope';
 import { getIncompleteSectionsSummary } from './utils/validation';
 import { pickImpactVerifyUrlFromPayload } from '@/utils/reportVerificationUrl';
+import { prepareReportEvidenceForSave } from './utils/evidenceUpload';
 
 // Import New Sections
 import Section1Participation from './components/Section1Participation';
@@ -33,6 +34,8 @@ import Section9Reflection from './components/Section9Reflection'; // New
 import Section10Sustainability from './components/Section10Sustainability'; // Renamed
 import Section11Summary from './components/Section11Summary'; // New
 import PreReportGuide from './components/PreReportGuide';
+
+type ProjectDetails = { title?: string } & Record<string, unknown>;
 
 function ReportFormContent() {
     const router = useRouter();
@@ -59,7 +62,7 @@ function ReportFormContent() {
 
     const [isSaving, setIsSaving] = React.useState(false);
     const [aiStatus, setAiStatus] = React.useState<string | null>(null);
-    const [projectDetails, setProjectDetails] = React.useState<any>(null);
+    const [projectDetails, setProjectDetails] = React.useState<ProjectDetails | null>(null);
     const [isLoading, setIsLoading] = React.useState(true);
     const [showGuide, setShowGuide] = React.useState(true);
 
@@ -211,7 +214,7 @@ function ReportFormContent() {
                         updatedData = {
                             ...updatedData,
                             [sectionKey]: {
-                                ...(updatedData[sectionKey] as any),
+                                ...(updatedData[sectionKey] as Record<string, unknown>),
                                 summary_text: summaryRes.summary
                             }
                         };
@@ -223,7 +226,11 @@ function ReportFormContent() {
             }
             
             setAiStatus('Saving Progress...');
-            await handleSave(true, updatedData);
+            const saved = await handleSave(true, updatedData);
+            if (!saved) {
+                toast.error('Could not save progress. Please try again.');
+                return;
+            }
             
             if (!isValid) {
                 toast.info("Draft saved. Some fields need attention before submission.");
@@ -247,23 +254,34 @@ function ReportFormContent() {
         }
     };
 
-    const handleSave = async (silent = false, customData = data) => {
-        if (isReadOnly) return;
+    const handleSave = async (silent = false, customData = data): Promise<boolean> => {
+        if (isReadOnly) return false;
         if (!isSaving) setIsSaving(true);
         try {
+            setAiStatus('Uploading Evidence...');
+            const projectIdForSave = customData.project_id || projectId || '';
+            const dataForSave = projectIdForSave
+                ? await prepareReportEvidenceForSave(customData, projectIdForSave)
+                : customData;
+
             const res = await authenticatedFetch(`/api/v1/student/reports/draft`, {
                 method: 'POST',
                 body: JSON.stringify({
-                    ...customData,
+                    ...dataForSave,
                     status: 'continue'
                 })
+            }, {
+                timeoutMs: 30000
             });
 
             if (!res || !res.ok) throw new Error('Save failed');
+            if (projectIdForSave) setFullData(dataForSave);
             if (!silent) toast.success('Progress saved');
+            return true;
         } catch (error) {
             console.error(error);
             if (!silent) toast.error('Failed to save progress');
+            return false;
         } finally {
             setIsSaving(false);
             setAiStatus(null);
@@ -297,9 +315,46 @@ function ReportFormContent() {
         setIsConfirmOpen(false);
         setIsSaving(true);
         try {
+            let submitData = data;
+
+            try {
+                setAiStatus('Generating ChatGPT CII audit...');
+                const [{ generateAISummary }, { calculateCII }] = await Promise.all([
+                    import('./utils/aiSummarizer'),
+                    import('./utils/calculateCII'),
+                ]);
+                const ciiResult = calculateCII(data);
+                const section11Res = await generateAISummary('section11', {
+                    ...data,
+                    cii_index: ciiResult,
+                });
+
+                if (section11Res.summary) {
+                    submitData = {
+                        ...data,
+                        section11: {
+                            ...data.section11,
+                            summary_text: section11Res.summary,
+                            is_ai_generated: true,
+                            audit_meta: section11Res.auditMeta ?? null,
+                        },
+                    };
+                    updateSection('section11', submitData.section11);
+                }
+            } catch (aiError) {
+                console.error('Failed to generate ChatGPT CII audit', aiError);
+                toast.info('Report will submit with the current CII summary.');
+            }
+
+            setAiStatus('Uploading Evidence...');
+            submitData = await prepareReportEvidenceForSave(submitData, projectId || submitData.project_id);
+            setFullData(submitData);
+
             const res = await authenticatedFetch(`/api/v1/student/reports/${projectId}/submit`, {
                 method: 'POST',
-                body: JSON.stringify(data)
+                body: JSON.stringify(submitData)
+            }, {
+                timeoutMs: 45000
             });
 
             if (!res || !res.ok) throw new Error('Submission failed');
@@ -313,6 +368,7 @@ function ReportFormContent() {
             toast.error('Failed to submit report');
         } finally {
             setIsSaving(false);
+            setAiStatus(null);
         }
     };
 

@@ -123,6 +123,7 @@ export default function Sidebar() {
             { label: "Create Opportunity", href: "/dashboard/faculty/create-opportunity", icon: Plus },
             // { label: "Student Grading", href: "/dashboard/faculty/grading", icon: FileText },
             { label: "Messages", href: "/dashboard/faculty/messages", icon: MessageSquare },
+            { label: "Notifications", href: "/dashboard/faculty/notifications", icon: Bell },
             { label: "Impact Analytics", href: "/dashboard/faculty/analytics", icon: PieChart },
         ] : []),
         // Admin

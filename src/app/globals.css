@@ -191,17 +191,43 @@ body {
 }
 
 @media print {
+  @page cii-certificate-page {
+    size: A4 landscape;
+    margin: 0.35cm;
+  }
+
   /* CII certificate modal is portaled to body; hide the rest of the app so Save PDF is certificate-only */
   body.cii-certificate-printing > *:not(.cii-certificate-print-root) {
     display: none !important;
   }
 
+  body.cii-certificate-printing {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    background: white !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
   body.cii-certificate-printing .cii-certificate-print-root {
     display: block !important;
+    position: static !important;
+    width: 287mm !important;
+    height: 190mm !important;
+    margin: 0 auto !important;
+    padding: 0 !important;
+    overflow: hidden !important;
   }
 
   body.cii-certificate-printing .certificate-one-page {
+    page: cii-certificate-page;
     break-inside: avoid;
     page-break-inside: avoid;
+    width: 287mm !important;
+    height: 190mm !important;
+    max-width: 287mm !important;
+    max-height: 190mm !important;
+    min-height: 190mm !important;
+    overflow: hidden !important;
   }
 }

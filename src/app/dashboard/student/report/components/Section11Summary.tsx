@@ -105,7 +105,6 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
         String(beneficiariesRaw).trim() !== ""
             ? String(beneficiariesRaw)
             : "0";
-    const engagementScore = section1.metrics?.eis_score ?? 0;
     const verifiedHours = section1.metrics?.total_verified_hours || 0;
 
     const mergedSdgNums = useMemo(
@@ -130,7 +129,7 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
         section10.mechanisms?.length,
         beneficiaries,
         verifiedHours,
-        data.section11?.summary_text,
+        data.section11,
         mergedSdgNarrative,
         mergedSdgNums,
     ]);
@@ -173,7 +172,7 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
         {
             label: "CII Index Score",
             icon: Award,
-            display: `${engagementScore} / 100`,
+            display: `${Math.round(ciiResult.totalScore)} / 100`,
             suffix: "" as string,
         },
         {
@@ -773,7 +772,7 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                 typeof document !== "undefined" &&
                 createPortal(
                     <div className="cii-certificate-print-root fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-md flex items-center justify-center overflow-y-auto p-4 md:p-8 animate-in fade-in duration-300 print:p-0 print:bg-white print:backdrop-blur-none print-active-modal">
-                        <div className="relative w-full max-w-4xl bg-white rounded-[2rem] shadow-2xl animate-in zoom-in-95 duration-300 print:shadow-none print:rounded-none print:max-w-none print:w-full print:p-0 print:m-0 print-scroll-auto">
+                        <div className="relative w-full max-w-7xl bg-white rounded-[2rem] shadow-2xl animate-in zoom-in-95 duration-300 print:shadow-none print:rounded-none print:max-w-none print:w-full print:p-0 print:m-0 print-scroll-auto">
                             {/* Modal Header */}
                             <div className="flex items-center justify-between px-8 py-6 border-b border-slate-100 sticky top-0 bg-white/95 backdrop-blur-xl rounded-t-[2rem] z-[110] print-no-ui">
                                 <div className="flex items-center gap-4">
@@ -803,7 +802,7 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                             </div>
                             <div
                                 id="print-area-certificate"
-                                className="p-4 md:p-10 overflow-y-auto max-h-[85vh] print:max-h-none print:p-0 print-scroll-auto"
+                                className="p-4 md:p-6 overflow-y-auto max-h-[85vh] print:max-h-none print:p-0 print-scroll-auto"
                             >
                                 <CertificateView projectData={projectData} />
                             </div>

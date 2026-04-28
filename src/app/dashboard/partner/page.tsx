@@ -1,12 +1,37 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { HandHeart, Users, FileCheck, CircleDollarSign, Clock, FileText, AlertCircle, Loader2 } from "lucide-react";
+import { Users, FileCheck, Clock, FileText, AlertCircle, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { authenticatedFetch } from "@/utils/api";
+import PendingActionCards, { type PendingSummary } from "@/components/dashboard/PendingActionCards";
+
+type PartnerProject = {
+    id: string;
+    title: string;
+    location: string;
+    volunteersNeeded: number;
+    volunteersApplied: number;
+};
+
+type PartnerDashboardData = {
+    stats?: {
+        activeOpportunities?: number;
+        studentsEngaged?: number;
+        verifiedHours?: number;
+        reportsSubmitted?: number;
+    };
+    pendingVerifications?: number;
+    pendingSummary?: PendingSummary;
+    recentProjects?: PartnerProject[];
+    impactTarget?: {
+        percentage?: number;
+        label?: string;
+    };
+};
 
 export default function PartnerDashboard() {
-    const [stats, setStats] = useState<any>(null);
+    const [stats, setStats] = useState<PartnerDashboardData | null>(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -60,6 +85,21 @@ export default function PartnerDashboard() {
         { label: "Verified Hours", value: stats?.stats?.verifiedHours?.toLocaleString() ?? 0, icon: Clock, color: "purple" as const },
         { label: "Reports Submitted", value: stats?.stats?.reportsSubmitted ?? 0, icon: FileText, color: "amber" as const },
     ];
+    const pendingVerifications = stats?.pendingVerifications ?? 0;
+    const recentProjects = stats?.recentProjects ?? [];
+    const pendingSummary: PendingSummary = stats?.pendingSummary ?? {
+        total: pendingVerifications,
+        items: [
+            {
+                key: "partner_pending_verifications",
+                title: "Pending verifications",
+                count: pendingVerifications,
+                href: "/dashboard/partner/verification",
+                tone: "warning",
+                description: "Student hours or reports waiting for partner review.",
+            },
+        ],
+    };
 
     return (
         <div className="space-y-8">
@@ -76,8 +116,10 @@ export default function PartnerDashboard() {
                 </div>
             </div>
 
+            <PendingActionCards summary={pendingSummary} emptyMessage="No partner reviews or approval follow-ups are pending." />
+
             {/* Pending Verifications Alert */}
-            {stats?.pendingVerifications > 0 && (
+            {pendingVerifications > 0 && (
                 <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-center justify-between">
                     <div className="flex items-center gap-3">
                         <div className="p-2 bg-amber-100 rounded-full text-amber-600">
@@ -85,7 +127,7 @@ export default function PartnerDashboard() {
                         </div>
                         <div>
                             <h3 className="font-bold text-amber-900">Pending Verifications</h3>
-                            <p className="text-sm text-amber-700">You have {stats.pendingVerifications} student reports waiting for your approval.</p>
+                            <p className="text-sm text-amber-700">You have {pendingVerifications} student reports waiting for your approval.</p>
                         </div>
                     </div>
                     <Link href="/dashboard/partner/verification" className="bg-amber-600 text-white px-4 py-2 rounded-lg font-bold text-sm hover:bg-amber-700 transition-colors">
@@ -120,8 +162,8 @@ export default function PartnerDashboard() {
                         <Link href="/dashboard/partner/requests" className="text-sm font-bold text-blue-600 hover:underline">View All</Link>
                     </div>
                     <div className="space-y-4">
-                        {stats?.recentProjects?.length > 0 ? (
-                            stats.recentProjects.map((project: any) => (
+                        {recentProjects.length > 0 ? (
+                            recentProjects.map((project) => (
                                 <div key={project.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 border border-slate-50 rounded-xl hover:border-slate-100 hover:shadow-sm transition-all">
                                     <div className="flex items-center gap-4">
                                         <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-600">

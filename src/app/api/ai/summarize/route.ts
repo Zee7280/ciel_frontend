@@ -30,7 +30,7 @@ async function generateSummaryWithOpenAI(
             {
                 role: "system",
                 content:
-                    "You are a precise analyst. Follow instructions exactly. Output plain text only unless a specific format is requested.",
+                    "You are ChatGPT, acting as a precise institutional impact analyst. Follow instructions exactly. Output plain text only unless a specific format is requested.",
             },
             { role: "user", content: userPrompt },
         ],
@@ -915,6 +915,35 @@ Provide a brief explanation of the score.`;
                 break;
 
             // =====================================================
+            // CII INDEX OVERALL REVIEW
+            // =====================================================
+            case "cii_index":
+                prompt = `You are ChatGPT acting as a CIEL Composite Impact Index (CII) auditor.
+
+Review the submitted report data and the calculated CII index values. Do not invent missing evidence.
+
+INPUTS:
+Data: ${JSON.stringify(data)}
+
+TASK:
+1. Explain the overall CII index score in professional institutional language.
+2. Identify the strongest scoring areas.
+3. Identify weak or risky areas that may reduce the CII index.
+4. Cross-check whether the numeric score is consistent with the report evidence.
+5. Provide short improvement guidance without changing the score.
+
+OUTPUT FORMAT:
+CII Index Score: ___ / 100
+CII Level: ___
+Score Interpretation: ___
+Strong Areas: ___
+Weak Areas / Risks: ___
+Audit Remark: ___
+
+Keep the full response under 180 words.`;
+                break;
+
+            // =====================================================
             // SECTION 11 EXECUTIVE SUMMARY
             // =====================================================
             case "section11":
@@ -925,6 +954,7 @@ Your role is NOT just to evaluate but to critically REVIEW, VALIDATE, and IDENTI
 
 You must:
 - Cross-check all sections (1-10)
+- Use the provided CII index data when present to explain score credibility
 - Detect contradictions, exaggerations, missing logic, or weak justification
 - Identify inflated claims vs actual inputs
 - Flag unclear, generic, or AI-generated vague responses
@@ -940,6 +970,7 @@ STRICT RULES:
 - Do NOT assume missing information
 - Do NOT reward vague or generic answers
 - Do NOT ignore inconsistencies
+- Do NOT change any provided numeric CII score; audit and explain it only
 
 Always give:
 1. Section Quality (Strong / Moderate / Weak)
@@ -1181,7 +1212,7 @@ Also provide:
 1. Overall Credibility Score (High / Medium / Low)
 2. Risk Level (Safe / Reject)
 3. Top 5 Required Fixes before approval
-4. Final Auditor Remark (Professional, report-style)
+4. Final Auditor Remark (Professional, report-style, including whether the calculated CII index is well supported by the submitted evidence)
 
 IMPORTANT:
 Do not recommend revision cycles. This is a one-time submission workflow.
@@ -1256,18 +1287,23 @@ ${JSON.stringify(data)}`;
         });
 
 
-    } catch (error: any) {
+    } catch (error: unknown) {
 
         console.error("AI Error:", error);
 
-        if (error.status === 429) {
+        const status =
+            typeof error === "object" && error !== null && "status" in error
+                ? (error as { status?: unknown }).status
+                : undefined;
+
+        if (status === 429) {
             return NextResponse.json(
                 { error: "AI limit reached. Please wait." },
                 { status: 429 }
             );
         }
 
-        if (error.status === 503) {
+        if (status === 503) {
             return NextResponse.json(
                 { error: "AI servers overloaded. Try again shortly." },
                 { status: 503 }

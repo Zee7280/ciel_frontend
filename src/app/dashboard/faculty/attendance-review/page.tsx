@@ -158,35 +158,47 @@ export default function FacultyAttendanceReviewPage() {
     }, []);
 
     return (
-        <div className="p-8 max-w-4xl mx-auto space-y-8">
-            <div>
+        <div className="mx-auto max-w-5xl space-y-6 px-4 py-6 sm:px-6 lg:px-8">
+            <div className="rounded-3xl border border-slate-200/80 bg-white p-6 shadow-sm sm:p-8">
                 <Link
                     href="/dashboard/faculty/approvals"
-                    className="group inline-flex items-center gap-1.5 text-slate-500 hover:text-blue-600 text-sm font-bold mb-4"
+                    className="group inline-flex items-center gap-1.5 rounded-full px-1 text-sm font-semibold text-slate-500 transition-colors hover:text-blue-600"
                 >
                     <ArrowLeft className="w-4 h-4 transition-transform group-hover:-translate-x-0.5" />
                     Back to approvals
                 </Link>
-                <h1 className="text-3xl font-bold text-slate-900">Attendance review</h1>
-                <p className="text-slate-500 mt-2 text-sm max-w-2xl">
-                    Review attendance logs that students send to you as the faculty approver. Pick an opportunity below: each
-                    line shows <span className="text-slate-700 font-medium">how many are still waiting</span> in that
-                    project so you can see where action is needed without trying every one.
+                <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                    <div>
+                        <p className="text-xs font-bold uppercase tracking-[0.2em] text-blue-600">Faculty approvals</p>
+                        <h1 className="mt-2 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">
+                            Attendance review
+                        </h1>
+                    </div>
+                    <div className="rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-700">
+                        Review queue
+                    </div>
+                </div>
+                <p className="mt-4 max-w-3xl text-sm leading-6 text-slate-600">
+                    Review attendance logs that students send to you as the faculty approver. Pick an opportunity below; each
+                    line shows <span className="font-semibold text-slate-800">how many are still waiting</span> in that
+                    project so you can quickly see where action is needed.
                 </p>
             </div>
 
             {loading ? (
-                <div className="flex justify-center py-16 text-slate-500 gap-2">
+                <div className="flex justify-center gap-2 rounded-3xl border border-slate-200 bg-white py-16 text-slate-500 shadow-sm">
                     <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
                 </div>
             ) : (
                 <div className="space-y-4">
                     <div
-                        className="rounded-xl border border-blue-100 bg-gradient-to-r from-blue-50/80 to-slate-50/80 p-4 flex gap-3 items-start"
+                        className="flex items-start gap-3 rounded-2xl border border-blue-100 bg-gradient-to-r from-blue-50 via-white to-slate-50 p-4 shadow-sm"
                         role="status"
                     >
-                        <Inbox className="w-6 h-6 text-blue-600 shrink-0 mt-0.5" aria-hidden />
-                        <div className="min-w-0 text-sm text-slate-700">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white text-blue-600 shadow-sm ring-1 ring-blue-100">
+                            <Inbox className="h-5 w-5" aria-hidden />
+                        </div>
+                        <div className="min-w-0 pt-0.5 text-sm leading-6 text-slate-700">
                             {countsLoading || loading ? (
                                 <p>Checking which opportunities have work waiting for you…</p>
                             ) : (() => {
@@ -213,8 +225,8 @@ export default function FacultyAttendanceReviewPage() {
                             })()}
                         </div>
                     </div>
-                    <div>
-                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">
+                    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                        <label className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
                             Project
                         </label>
                         <select
@@ -223,7 +235,7 @@ export default function FacultyAttendanceReviewPage() {
                                 didInitProjectChoice.current = true;
                                 setProjectId(e.target.value);
                             }}
-                            className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm font-medium text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none bg-white"
+                            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-100"
                         >
                             <option value="">Select an opportunity…</option>
                             {projects.map((p) => (
