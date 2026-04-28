@@ -69,12 +69,21 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
 
     const reportSt = String(data.status || "").toLowerCase();
     const reportRs = String(data.report_status || "").toLowerCase();
+    const paymentSt = String(data.payment_status || "").toLowerCase();
     const inPostSubmitLifecycle =
         reportSt === "submitted" ||
         reportSt === "under_review" ||
         reportSt === "pending_payment" ||
         reportSt === "payment_under_review" ||
-        reportRs === "pending_payment";
+        reportSt === "paid" ||
+        reportSt === "approved" ||
+        reportSt === "partner_verified" ||
+        reportRs === "pending_payment" ||
+        reportRs === "payment_under_review" ||
+        reportRs === "paid" ||
+        paymentSt === "payment_under_review" ||
+        paymentSt === "paid" ||
+        paymentSt === "approved";
     const feeOrSlipRecorded =
         reportSt === "paid" ||
         reportSt === "payment_under_review" ||
@@ -82,9 +91,11 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
         reportSt === "approved" ||
         reportRs === "paid" ||
         reportRs === "payment_under_review" ||
+        paymentSt === "paid" ||
+        paymentSt === "approved" ||
         data.payment_verified === true;
     const paymentSlipInReview =
-        reportSt === "payment_under_review" || reportRs === "payment_under_review";
+        reportSt === "payment_under_review" || reportRs === "payment_under_review" || paymentSt === "payment_under_review";
     const paymentHref =
         data.project_id ? `/dashboard/student/payment?projectId=${encodeURIComponent(data.project_id)}` : "";
 
@@ -440,7 +451,7 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
             >
                 <div className="absolute right-0 top-0 w-40 h-40 bg-report-primary/5 rounded-full -mr-20 -mt-20 blur-3xl pointer-events-none" />
                 
-                {(data?.admin_status === 'verified' || data?.admin_status === 'approved' || data?.status === 'approved' || data?.status === 'verified') ? (
+                {showVerifiedImpactScores ? (
                     <>
                         <div className="w-16 h-16 bg-green-100 rounded-2xl flex items-center justify-center shadow-sm">
                             <CheckCircle className="w-7 h-7 text-green-600" />
@@ -448,7 +459,7 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                         <div className="w-full max-w-3xl space-y-5 px-0 sm:px-1">
                             <h3 className="text-lg font-black text-slate-900">Report Approved & Impact Verified</h3>
                             <p className="text-sm font-medium text-slate-400 leading-relaxed">
-                                Congratulations! Your social impact has been verified. You can now download your official CII.
+                                Congratulations! Your social impact has been verified by CIEL Admin. You can now download your official CII.
                             </p>
                             {resolvedImpactVerifyUrl ? (
                                 <div className="flex justify-center pt-1">
@@ -542,11 +553,9 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                                 <ShieldAlert className="w-7 h-7 text-slate-400" />
                             </div>
                             <div className="max-w-md space-y-3">
-                                <h3 className="text-lg font-black text-slate-900">Report Locked Pending Approval</h3>
+                                <h3 className="text-lg font-black text-slate-900">Report Locked Pending Admin Approval</h3>
                                 <p className="text-sm font-medium text-slate-400 leading-relaxed">
-                                    {data.status === "under_review"
-                                        ? "Your report is currently being reviewed by the administration."
-                                        : "Your report has been submitted and is currently being reviewed."}
+                                    Your report is submitted, but the CII index, report preview, and certificate will unlock only after CIEL Admin gives final approval.
                                 </p>
                             </div>
                         </>

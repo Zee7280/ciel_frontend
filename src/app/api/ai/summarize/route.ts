@@ -1211,8 +1211,9 @@ Identify:
 Also provide:
 1. Overall Credibility Score (High / Medium / Low)
 2. Risk Level (Safe / Reject)
-3. Top 5 Required Fixes before approval
-4. Final Auditor Remark (Professional, report-style, including whether the calculated CII index is well supported by the submitted evidence)
+3. CII Index Score exactly as supplied in the submitted CII index data
+4. Top 5 Required Fixes before approval
+5. Final Auditor Remark (Professional, report-style, including whether the calculated CII index is well supported by the submitted evidence)
 
 IMPORTANT:
 Do not recommend revision cycles. This is a one-time submission workflow.
@@ -1252,7 +1253,7 @@ SECTION 9 — LEARNING & COMPETENCIES: Quality: ... Red Flags: ... Missing Eleme
 
 SECTION 10 — SUSTAINABILITY: Quality: ... Red Flags: ... Missing Elements: ... Feedback: ...
 
-SECTION 11 — FINAL AUDIT SUMMARY: CRITICAL RED FLAGS: ... MODERATE ISSUES: ... MINOR ISSUES: ... Overall Credibility Score: High/Medium/Low. Risk Level: Safe/Reject. Top 5 Required Fixes: 1) ... 2) ... 3) ... 4) ... 5) ... Final Auditor Remark: ... Add Student Feedback only if serious inconsistencies are found.
+SECTION 11 — FINAL AUDIT SUMMARY: CRITICAL RED FLAGS: ... MODERATE ISSUES: ... MINOR ISSUES: ... Overall Credibility Score: High/Medium/Low. Risk Level: Safe/Reject. CII Index Score: ___ / 100. Top 5 Required Fixes: 1) ... 2) ... 3) ... 4) ... 5) ... Final Auditor Remark: ... Add Student Feedback only if serious inconsistencies are found.
 
 Submitted Report Data:
 ${JSON.stringify(data)}`;

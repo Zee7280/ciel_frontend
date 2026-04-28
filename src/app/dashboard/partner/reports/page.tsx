@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { FileText, Plus, Search, Filter, Edit, Trash2, Eye, CheckCircle, Clock, XCircle, Loader2 } from "lucide-react";
+import { FileText, Search, Filter, Edit, Trash2, Eye, CheckCircle, Clock, XCircle, Loader2 } from "lucide-react";
 import { authenticatedFetch } from "@/utils/api";
 import { toast } from "sonner";
 
@@ -21,11 +21,36 @@ interface Report {
     project_title?: string | null;
     student_name?: string | null;
     student_email?: string | null;
+    organization_name?: string | null;
+    organization?: string | null;
     partner_status?: string | null;
+    admin_status?: string | null;
     beneficiaries?: number;
+    beneficiaries_reached?: number | string | null;
+    total_beneficiaries?: number | string | null;
+    totalBeneficiaries?: number | string | null;
     hoursLogged?: number;
+    hours_logged?: number | string | null;
+    total_hours?: number | string | null;
+    verified_hours?: number | string | null;
+    required_hours?: number | string | null;
     sdgs?: number[];
     evidence?: string[];
+    section1?: {
+        metrics?: {
+            total_verified_hours?: number | string | null;
+        } | null;
+    } | null;
+    section3?: {
+        sdg_alignment?: number[] | string[] | null;
+        sdgs?: number[] | string[] | null;
+    } | null;
+    section4?: {
+        project_summary?: {
+            distinct_total_beneficiaries?: number | string | null;
+            total_beneficiaries?: number | string | null;
+        } | null;
+    } | null;
 }
 
 function looksLikeWorkflowStatus(status: unknown): boolean {
@@ -60,6 +85,45 @@ function formatSubmittedLabel(r: Report): string {
     return Number.isNaN(d.getTime()) ? "Date not available" : d.toLocaleDateString();
 }
 
+function toFiniteNumber(value: unknown): number | null {
+    if (value == null || value === "") return null;
+    const n = Number(value);
+    return Number.isFinite(n) ? n : null;
+}
+
+function pickNumber(...values: unknown[]): number {
+    for (const value of values) {
+        const n = toFiniteNumber(value);
+        if (n != null) return n;
+    }
+    return 0;
+}
+
+function getBeneficiaries(r: Report): number {
+    return pickNumber(
+        r.beneficiaries,
+        r.beneficiaries_reached,
+        r.total_beneficiaries,
+        r.totalBeneficiaries,
+        r.section4?.project_summary?.distinct_total_beneficiaries,
+        r.section4?.project_summary?.total_beneficiaries
+    );
+}
+
+function getHoursLogged(r: Report): number {
+    return pickNumber(
+        r.hoursLogged,
+        r.hours_logged,
+        r.total_hours,
+        r.verified_hours,
+        r.section1?.metrics?.total_verified_hours
+    );
+}
+
+function getSdgs(r: Report): Array<number | string> {
+    return r.sdgs ?? r.section3?.sdg_alignment ?? r.section3?.sdgs ?? [];
+}
+
 function cardTitle(r: Report): string {
     const t = r.title?.trim();
     if (t) return t;
@@ -75,7 +139,6 @@ export default function PartnerReportsPage() {
     const [reports, setReports] = useState<Report[]>([]);
     const [searchQuery, setSearchQuery] = useState("");
     const [statusFilter, setStatusFilter] = useState("All");
-    const [showCreateModal, setShowCreateModal] = useState(false);
     const [editingReport, setEditingReport] = useState<Report | null>(null);
 
     useEffect(() => {
@@ -123,7 +186,7 @@ export default function PartnerReportsPage() {
 
     const q = searchQuery.trim().toLowerCase();
     const filteredReports = reports.filter((r) => {
-        const hay = [r.title, r.project_title, r.student_name, r.student_email]
+        const hay = [r.title, r.project_title, r.student_name, r.student_email, r.organization_name, r.organization]
             .map((x) => (x ?? "").toLowerCase())
             .join(" ");
         return q === "" || hay.includes(q);
@@ -163,15 +226,8 @@ export default function PartnerReportsPage() {
             <div className="flex justify-between items-center mb-8">
                 <div>
                     <h1 className="text-3xl font-bold text-slate-900">Impact Reports</h1>
-                    <p className="text-slate-500">Create, manage, and track your impact reports</p>
+                    <p className="text-slate-500">Review, manage, and track submitted impact reports</p>
                 </div>
-                <button
-                    onClick={() => setShowCreateModal(true)}
-                    className="flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors shadow-md"
-                >
-                    <Plus className="w-5 h-5" />
-                    Create New Report
-                </button>
             </div>
 
             {/* Filters */}
@@ -212,14 +268,7 @@ export default function PartnerReportsPage() {
                     <div className="col-span-full text-center py-20 bg-white rounded-2xl border border-slate-100">
                         <FileText className="w-16 h-16 text-slate-200 mx-auto mb-4" />
                         <h3 className="text-lg font-bold text-slate-900 mb-2">No Reports Found</h3>
-                        <p className="text-slate-500 mb-6">Start by creating your first impact report</p>
-                        <button
-                            onClick={() => setShowCreateModal(true)}
-                            className="inline-flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700"
-                        >
-                            <Plus className="w-5 h-5" />
-                            Create Report
-                        </button>
+                        <p className="text-slate-500">Try adjusting your filters or search query.</p>
                     </div>
                 ) : (
                     filteredReports.map((report) => (
@@ -237,6 +286,11 @@ export default function PartnerReportsPage() {
                                     {report.partner_status != null && String(report.partner_status).trim() !== "" && (
                                         <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">
                                             NGO / partner: {String(report.partner_status).replace(/_/g, " ")}
+                                        </span>
+                                    )}
+                                    {report.admin_status != null && String(report.admin_status).trim() !== "" && (
+                                        <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">
+                                            Corporate / admin: {String(report.admin_status).replace(/_/g, " ")}
                                         </span>
                                     )}
                                 </div>
@@ -292,9 +346,9 @@ export default function PartnerReportsPage() {
 
                             {/* Report Info */}
                             <h3 className="text-lg font-bold text-slate-900 mb-2">{cardTitle(report)}</h3>
-                            {isStudentImpactReportRow(report) && (report.student_name || report.project_title) && (
-                                <p className="text-xs text-slate-500 mb-1">
-                                    {[report.student_name, report.project_title].filter(Boolean).join(" · ")}
+                            {isStudentImpactReportRow(report) && (report.student_name || report.project_title || report.organization_name || report.organization || report.student_email) && (
+                                <p className="text-xs text-slate-500 mb-1 leading-relaxed">
+                                    {[report.student_name, report.project_title, report.organization_name ?? report.organization, report.student_email].filter(Boolean).join(" · ")}
                                 </p>
                             )}
                             <p className="text-sm text-slate-500 mb-4">
@@ -313,17 +367,17 @@ export default function PartnerReportsPage() {
                             <div className="grid grid-cols-2 gap-4 mb-4">
                                 <div className="bg-blue-50 rounded-lg p-3">
                                     <p className="text-xs text-blue-600 font-semibold mb-1">Beneficiaries</p>
-                                    <p className="text-2xl font-bold text-blue-700">{(report.beneficiaries ?? 0).toLocaleString()}</p>
+                                    <p className="text-2xl font-bold text-blue-700">{getBeneficiaries(report).toLocaleString()}</p>
                                 </div>
                                 <div className="bg-green-50 rounded-lg p-3">
                                     <p className="text-xs text-green-600 font-semibold mb-1">Hours Logged</p>
-                                    <p className="text-2xl font-bold text-green-700">{report.hoursLogged ?? 0}</p>
+                                    <p className="text-2xl font-bold text-green-700">{getHoursLogged(report).toLocaleString()}</p>
                                 </div>
                             </div>
 
                             {/* SDGs */}
                             <div className="flex flex-wrap gap-2">
-                                {(report.sdgs ?? []).map((sdg) => (
+                                {getSdgs(report).map((sdg) => (
                                     <span
                                         key={sdg}
                                         className="px-2 py-1 bg-slate-100 text-slate-700 rounded text-xs font-bold"
@@ -338,14 +392,12 @@ export default function PartnerReportsPage() {
             </div>
 
             {/* Create/Edit Modal */}
-            {(showCreateModal || editingReport) && (
+            {editingReport && (
                 <ReportForm
                     onClose={() => {
-                        setShowCreateModal(false);
                         setEditingReport(null);
                     }}
                     onSuccess={() => {
-                        setShowCreateModal(false);
                         setEditingReport(null);
                         fetchReports();
                     }}

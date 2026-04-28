@@ -9,6 +9,7 @@ import { useDebounce } from "@/hooks/useDebounce";
 import { FieldError } from "./ui/FieldError";
 import { sdgData } from "@/utils/sdgData";
 import clsx from "clsx";
+import { listOpportunityReportSdgs } from "../utils/reportSdgMerge";
 
 interface Section3Props {
     projectData: any;
@@ -50,10 +51,10 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
     const hasErrors = sectionErrors.length > 0;
 
     // ── Opportunity SDGs (Part A – read-only display) ─────────────────────────
-    const oppPrimaryNum = Number(String(projectData?.sdg_info?.sdg_id || "").replace(/\D/g, "")) || 0;
-    const oppSecondaries: number[] = (projectData?.secondary_sdgs || [])
-        .map((s: any) => Number(String(s?.sdg_id || "").replace(/\D/g, "")))
-        .filter(Boolean);
+    const opportunitySdgRows = useMemo(() => listOpportunityReportSdgs(projectData), [projectData]);
+    const oppPrimaryRow = opportunitySdgRows.find((row) => row.role === "primary");
+    const oppPrimaryNum = oppPrimaryRow?.goalNumber || 0;
+    const oppSecondaries = opportunitySdgRows.filter((row) => row.role === "secondary");
 
     // ── Student primary SDG state (Part B – dropdowns) ────────────────────────
     const studentPrimaryId = data.section3.primary_sdg.goal_number?.toString() || "";
@@ -87,10 +88,10 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
         }
 
         const goalNum = oppPrimaryNum || studentPrimaryId || "X";
-        const target = projectData?.sdg_info?.target_id || studentTargetId || "X.X";
-        const indicator = projectData?.sdg_info?.indicator_id || studentIndicatorId || "X.X.X";
+        const target = oppPrimaryRow?.targetId || studentTargetId || "X.X";
+        const indicator = oppPrimaryRow?.indicatorId || studentIndicatorId || "X.X.X";
         return `This project is aligned with SDG ${goalNum}, Target ${target}, Indicator ${indicator}. The planned intervention focuses on the intended contribution pathway described above. Final validation of indicator-level contribution will be determined after measurable outputs and outcomes are submitted in Sections 4 and 5.`;
-    }, [projectData, oppPrimaryNum, studentPrimaryId, studentTargetId, studentIndicatorId]);
+    }, [oppPrimaryNum, oppPrimaryRow?.targetId, oppPrimaryRow?.indicatorId, studentPrimaryId, studentTargetId, studentIndicatorId]);
 
     useEffect(() => {
         if (data.section3.summary_text !== autoSummary) {
@@ -268,8 +269,8 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
                         const sdg = ALL_SDGS.find(s => s.num === oppPrimaryNum);
                         const sdgRecord = sdgData.find(s => s.number === oppPrimaryNum);
 
-                        const targetId = projectData?.sdg_info?.target_id || "";
-                        const indicatorId = projectData?.sdg_info?.indicator_id || "";
+                        const targetId = oppPrimaryRow?.targetId || "";
+                        const indicatorId = oppPrimaryRow?.indicatorId || "";
 
                         const targetDesc =
                             sdgRecord?.targets?.find(t => t.id === targetId)?.description || "";
@@ -363,15 +364,13 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
 
 
                     {/* Secondary SDGs */}
-                    {oppSecondaries.map((num, i) => {
+                    {oppSecondaries.map((row, i) => {
+                        const num = row.goalNumber;
 
                         const sdg = ALL_SDGS.find(s => s.num === num);
                         const sdgRecord = sdgData.find(s => s.number === num);
-
-                        const secData = projectData?.secondary_sdgs?.[i];
-
-                        const secTargetId = secData?.target_id || "";
-                        const secIndicatorId = secData?.indicator_id || "";
+                        const secTargetId = row.targetId;
+                        const secIndicatorId = row.indicatorId;
 
                         const secTargetDesc =
                             sdgRecord?.targets?.find(t => t.id === secTargetId)?.description || "";
@@ -386,7 +385,7 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
                         return (
 
                             <div
-                                key={num}
+                                key={`${num}-${row.targetId}-${i}`}
                                 className="relative overflow-hidden flex flex-col md:flex-row items-center gap-4 p-5 rounded-xl border bg-slate-50/50 hover:bg-white border-slate-200 transition-all duration-300"
                             >
                                 {/* SDG Number Side */}
@@ -416,7 +415,7 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
                                         )}
                                         {secIndicatorId && (
                                             <span className="flex items-center gap-1 pl-4 border-l border-slate-200">
-                                                <span className="font-bold text-slate-700">Indicator {secIndicatorId}</span>
+                                                <span className="font-bold text-slate-700">Indicator {secIndicatorId}:</span> {secIndicatorDesc || "Registered Indicator"}
                                             </span>
                                         )}
                                     </div>

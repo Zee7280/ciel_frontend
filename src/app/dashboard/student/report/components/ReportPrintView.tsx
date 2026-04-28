@@ -9,6 +9,7 @@ import { parseSection11AuditSummary } from "@/lib/parseCIIauditSummary";
 import ReportVerificationQr from "@/components/ReportVerificationQr";
 import { isInstitutionallyVerifiedReport } from "@/utils/institutionalReportVerification";
 import { pickImpactVerifyUrlFromPayload } from "@/utils/reportVerificationUrl";
+import { readPersistedCiiSnapshot } from "@/utils/reportCiiSnapshot";
 import { extractIssueFields, parseAuditSummaryIntoSections } from "@/lib/parseAuditSummarySections";
 import {
     formatMergedSdgGoalsLabel,
@@ -134,7 +135,17 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
         },
     };
 
-    const ciiResult = calculateCII({ ...reportForCii, required_hours: reqH });
+    const calculatedCiiResult = calculateCII({ ...reportForCii, required_hours: reqH });
+    const persistedCii = readPersistedCiiSnapshot(data);
+    const ciiResult = persistedCii
+        ? {
+              ...calculatedCiiResult,
+              ...persistedCii,
+              totalScore: Math.round(persistedCii.totalScore),
+              breakdown: persistedCii.breakdown ?? calculatedCiiResult.breakdown,
+              suggestions: persistedCii.suggestions ?? calculatedCiiResult.suggestions,
+          }
+        : calculatedCiiResult;
     const { totalScore, level, breakdown } = ciiResult;
 
     const dossierAuditMeta =

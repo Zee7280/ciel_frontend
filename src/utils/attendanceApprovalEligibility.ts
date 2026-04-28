@@ -1,6 +1,6 @@
 /**
  * Aligns client-side hour/session calculations with backend attendance approval:
- * legacy rows (approval_status null/empty) count; only explicit `approved` counts otherwise.
+ * legacy rows (approval_status null/empty) count; approved/verified rows count otherwise.
  */
 
 export type AttendanceApprovalLike = {
@@ -16,7 +16,7 @@ export function isAttendanceLogCountedForVerifiedMetrics(
     if (raw == null) return true;
     const s = String(raw).trim();
     if (s === "") return true;
-    return s.toLowerCase() === "approved";
+    return ["approved", "verified"].includes(s.toLowerCase());
 }
 
 export function filterAttendanceLogsForVerifiedMetrics<T extends AttendanceApprovalLike>(logs: T[] | null | undefined): T[] {

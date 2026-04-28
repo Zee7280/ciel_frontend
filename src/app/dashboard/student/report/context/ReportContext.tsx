@@ -22,11 +22,20 @@ export interface ReportData {
     project_title?: string;
     status?: string;
     admin_status?: string;
+    admin_approval_status?: string;
     partner_status?: string;
     evidence_urls?: string[];
     /** When backend sends project/report payment state separately from `status`. */
     report_status?: string;
+    payment_status?: string;
     payment_verified?: boolean;
+    /** Persisted CII snapshot generated at submit time; admin/review screens should display this instead of recalculating stale payloads. */
+    cii_index?: {
+        totalScore: number;
+        level: string;
+        breakdown?: Record<string, number>;
+        suggestions?: string[];
+    };
     // Section 1: Participation (Was Section 2)
     section1: {
         participation_type: 'individual' | 'team';
@@ -526,18 +535,27 @@ export function ReportProvider({ children }: { children: React.ReactNode }) {
         const st = String(data.status || '').toLowerCase();
         const rs = String(data.report_status || '').toLowerCase();
         const adm = String(data.admin_status || '').toLowerCase();
+        const adminApproval = String(data.admin_approval_status || '').toLowerCase();
+        const paymentStatus = String(data.payment_status || '').toLowerCase();
         const reportFullyVerified =
             st === 'verified' || st === 'approved' || st === 'finalized';
+        const hasExplicitAdminStatus = Boolean(adm || adminApproval);
         const adminDone =
-            adm === 'verified' || adm === 'approved' || reportFullyVerified;
+            adm === 'verified' ||
+            adm === 'approved' ||
+            adminApproval === 'verified' ||
+            adminApproval === 'approved' ||
+            (!hasExplicitAdminStatus && reportFullyVerified);
         const paymentCleared =
             st === 'paid' ||
             rs === 'paid' ||
+            paymentStatus === 'paid' ||
+            paymentStatus === 'approved' ||
             data.payment_verified === true ||
             // End-state report implies fee + review completed in this product flow
-            reportFullyVerified;
+            (!hasExplicitAdminStatus && reportFullyVerified);
         return adminDone && paymentCleared;
-    }, [data.status, data.report_status, data.admin_status, data.payment_verified]);
+    }, [data.status, data.report_status, data.admin_status, data.admin_approval_status, data.payment_status, data.payment_verified]);
 
     // Auto-calculate Section 1 metrics when logs, team size, or required hours change
     useEffect(() => {

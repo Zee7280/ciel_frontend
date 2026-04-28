@@ -20,6 +20,7 @@ import { mergeReportSection1TeamScope } from '@/utils/reportTeamScope';
 import { getIncompleteSectionsSummary } from './utils/validation';
 import { pickImpactVerifyUrlFromPayload } from '@/utils/reportVerificationUrl';
 import { prepareReportEvidenceForSave } from './utils/evidenceUpload';
+import { normalizeEngagementAttendanceLog } from '@/utils/engagementAttendanceMap';
 
 // Import New Sections
 import Section1Participation from './components/Section1Participation';
@@ -150,6 +151,30 @@ function ReportFormContent() {
                         }
                     } catch (scopeErr) {
                         console.warn("[Report] Section 1 team scope normalization skipped:", scopeErr);
+                    }
+
+                    try {
+                        const attendanceRes = await authenticatedFetch(
+                            `/api/v1/engagement/project/${encodeURIComponent(projectId)}/attendance-logs`,
+                        );
+                        if (attendanceRes && attendanceRes.ok) {
+                            const attendanceJson = await attendanceRes.json();
+                            const rawLogs = Array.isArray(attendanceJson.data) ? attendanceJson.data : [];
+                            if (rawLogs.length > 0) {
+                                const section1 = ((reportForState.section1 as Record<string, unknown> | undefined) || {});
+                                reportForState = {
+                                    ...reportForState,
+                                    section1: {
+                                        ...section1,
+                                        attendance_logs: rawLogs.map((log: Record<string, unknown>) =>
+                                            normalizeEngagementAttendanceLog(log),
+                                        ),
+                                    },
+                                };
+                            }
+                        }
+                    } catch (attendanceErr) {
+                        console.warn("[Report] Attendance log refresh skipped:", attendanceErr);
                     }
 
                     setFullData(reportForState as typeof mergedReport);
@@ -324,6 +349,10 @@ function ReportFormContent() {
                     import('./utils/calculateCII'),
                 ]);
                 const ciiResult = calculateCII(data);
+                submitData = {
+                    ...data,
+                    cii_index: ciiResult,
+                };
                 const section11Res = await generateAISummary('section11', {
                     ...data,
                     cii_index: ciiResult,
@@ -331,7 +360,7 @@ function ReportFormContent() {
 
                 if (section11Res.summary) {
                     submitData = {
-                        ...data,
+                        ...submitData,
                         section11: {
                             ...data.section11,
                             summary_text: section11Res.summary,

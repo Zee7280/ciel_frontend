@@ -14,9 +14,76 @@ type VerifyJson = {
     verified?: boolean;
     project_title?: string;
     verified_at?: string;
+    status?: string;
+    report_status?: string;
+    verification_status?: string;
+    workflow_stage?: string;
+    approval_stage?: string;
+    approval_status?: string;
+    requires_partner_approval?: boolean | null;
+    has_partner?: boolean | null;
+    has_ngo?: boolean | null;
+    partner_required?: boolean | null;
+    partner_approval_status?: string;
+    partner_status?: string;
+    admin_approval_status?: string;
+    admin_status?: string;
+    payment_status?: string;
     message?: string;
     error?: string;
 };
+
+function joinStatusSignals(body: VerifyJson | null): string {
+    if (!body) return "";
+    return [
+        body.status,
+        body.report_status,
+        body.verification_status,
+        body.workflow_stage,
+        body.approval_stage,
+        body.approval_status,
+        body.partner_approval_status,
+        body.partner_status,
+        body.admin_approval_status,
+        body.admin_status,
+        body.payment_status,
+        body.error,
+    ]
+        .filter((value): value is string => typeof value === "string" && value.trim().length > 0)
+        .join(" ")
+        .toLowerCase()
+        .replace(/[\s-]+/g, "_");
+}
+
+function hasNoPartnerRequirement(body: VerifyJson | null): boolean {
+    return (
+        body?.requires_partner_approval === false ||
+        body?.partner_required === false ||
+        (body?.has_partner === false && body?.has_ngo === false)
+    );
+}
+
+function getPendingVerificationMessage(body: VerifyJson | null): string {
+    const status = joinStatusSignals(body);
+
+    if (hasNoPartnerRequirement(body)) {
+        return "This report is on file, but public verification is pending final approval from CIEL Admin.";
+    }
+
+    if (status.includes("pending_partner") || status.includes("partner_pending") || status.includes("awaiting_partner")) {
+        return "This report is on file, but public verification is pending from the NGO/partner organization.";
+    }
+
+    if (status.includes("pending_admin") || status.includes("admin_pending") || status.includes("awaiting_admin")) {
+        return "This report is on file, but public verification is pending final approval from CIEL Admin.";
+    }
+
+    if (status.includes("payment_pending") || status.includes("pending_payment") || status.includes("payment_under_review")) {
+        return "This report is on file, but public verification is pending reporting fee/payment clearance.";
+    }
+
+    return body?.message || "This report is on file, but public verification is still pending approval.";
+}
 
 export default function ImpactReportVerificationClient({ verificationKey }: Props) {
     const [state, setState] = useState<"loading" | "ok" | "not_verified" | "not_found" | "error">("loading");
@@ -115,12 +182,11 @@ export default function ImpactReportVerificationClient({ verificationKey }: Prop
                                   : "Could not verify"}
                         </h1>
                         <p className="text-sm font-medium text-slate-500">
-                            {body?.message ||
-                                (state === "not_found"
-                                    ? "This verification link does not match any report on file."
-                                    : state === "not_verified"
-                                      ? "This report is on file but is not yet eligible for public verification (for example, awaiting payment or final approval)."
-                                      : "Verification is temporarily unavailable or this link is invalid.")}
+                            {state === "not_found"
+                                ? body?.message || "This verification link does not match any report on file."
+                                : state === "not_verified"
+                                  ? getPendingVerificationMessage(body)
+                                  : body?.message || "Verification is temporarily unavailable or this link is invalid."}
                         </p>
                     </div>
                 )}

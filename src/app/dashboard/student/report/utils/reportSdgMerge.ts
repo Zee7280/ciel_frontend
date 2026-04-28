@@ -9,6 +9,29 @@ function digitsGoalNumber(v: unknown): number | null {
     return n;
 }
 
+function objectRecord(value: unknown): Record<string, unknown> | null {
+    return value && typeof value === "object" && !Array.isArray(value)
+        ? (value as Record<string, unknown>)
+        : null;
+}
+
+function firstArray(...values: unknown[]): unknown[] {
+    for (const value of values) {
+        if (Array.isArray(value)) return value;
+        if (objectRecord(value)) return [value];
+        if (value !== undefined && value !== null && String(value).trim() !== "") return [value];
+    }
+    return [];
+}
+
+function firstValue(record: Record<string, unknown>, keys: string[]): unknown {
+    for (const key of keys) {
+        const value = record[key];
+        if (value !== undefined && value !== null && String(value).trim() !== "") return value;
+    }
+    return undefined;
+}
+
 export function formatSdgGoalPadded(goalNumber: number): string {
     if (!Number.isFinite(goalNumber) || goalNumber < 1 || goalNumber > 17) return String(goalNumber);
     return goalNumber >= 1 && goalNumber <= 9 ? `0${goalNumber}` : String(goalNumber);
@@ -38,32 +61,41 @@ export function listOpportunityReportSdgs(projectData: unknown): ReportSdgRow[] 
     const p = projectData as Record<string, unknown>;
     const rows: ReportSdgRow[] = [];
 
-    const info = p.sdg_info as Record<string, unknown> | undefined;
-    const primaryNum = digitsGoalNumber(info?.sdg_id ?? p.sdg);
+    const info = objectRecord(p.sdg_info) ?? objectRecord(p.sdgInfo) ?? {};
+    const primaryNum = digitsGoalNumber(
+        firstValue(info, ["sdg_id", "sdgId", "goal_number", "goalNumber", "id"]) ?? p.sdg,
+    );
     if (primaryNum) {
         rows.push({
             goalNumber: primaryNum,
             title: titleForGoal(primaryNum),
-            targetId: String(info?.target_id ?? "").trim(),
-            indicatorId: String(info?.indicator_id ?? "").trim(),
+            targetId: String(firstValue(info, ["target_id", "targetId", "target"]) ?? "").trim(),
+            indicatorId: String(firstValue(info, ["indicator_id", "indicatorId", "indicator"]) ?? "").trim(),
             source: "opportunity",
             role: "primary",
         });
     }
 
-    const secondaries = p.secondary_sdgs;
-    if (!Array.isArray(secondaries)) return rows;
+    const secondaries = firstArray(
+        p.secondary_sdgs,
+        p.secondarySdgs,
+        p.secondary_sdg,
+        p.secondarySdg,
+        info.secondary_sdgs,
+        info.secondarySdgs,
+    );
 
     secondaries.forEach((raw) => {
-        if (!raw || typeof raw !== "object") return;
-        const s = raw as Record<string, unknown>;
-        const n = digitsGoalNumber(s.sdg_id);
+        const s = objectRecord(raw);
+        const n = digitsGoalNumber(
+            s ? firstValue(s, ["sdg_id", "sdgId", "goal_number", "goalNumber", "sdg", "id"]) : raw,
+        );
         if (!n) return;
         rows.push({
             goalNumber: n,
             title: titleForGoal(n),
-            targetId: String(s.target_id ?? "").trim(),
-            indicatorId: String(s.indicator_id ?? "").trim(),
+            targetId: String(s ? firstValue(s, ["target_id", "targetId", "target"]) : "").trim(),
+            indicatorId: String(s ? firstValue(s, ["indicator_id", "indicatorId", "indicator"]) : "").trim(),
             source: "opportunity",
             role: "secondary",
         });

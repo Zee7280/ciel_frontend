@@ -200,6 +200,8 @@ export default function ReportDetailPage() {
         );
     }
 
+    const canSubmitDecision = partnerCanSubmitDecision(report);
+
     return (
         <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-50 p-8">
             <div className="max-w-7xl mx-auto space-y-6">
@@ -339,17 +341,44 @@ export default function ReportDetailPage() {
                         </div>
 
                         {/* NGO Action Box (Quick Decision) */}
-                        {report.partner_status === 'pending' && (
+                        {canSubmitDecision && (
                             <div className="bg-indigo-900 rounded-3xl p-6 text-white shadow-xl shadow-indigo-200">
                                 <p className="text-[10px] font-black text-indigo-300 uppercase tracking-widest mb-3">Verification Hub</p>
+                                <p className="text-sm font-bold text-white mb-4">Approve or reject this report from the NGO side.</p>
+                                <textarea
+                                    spellCheck={true}
+                                    value={feedback}
+                                    onChange={(e) => setFeedback(e.target.value)}
+                                    placeholder="Notes / rejection reason..."
+                                    className="mb-4 min-h-[110px] w-full rounded-2xl border border-indigo-400/40 bg-white/10 p-4 text-sm font-medium text-white placeholder:text-indigo-200 outline-none focus:border-indigo-200 focus:ring-4 focus:ring-indigo-500/20"
+                                />
+                                <div className="grid grid-cols-2 gap-3">
+                                    <button
+                                        type="button"
+                                        onClick={() => handleVerify('approve')}
+                                        disabled={isVerifying}
+                                        className="rounded-xl bg-emerald-500 px-3 py-3 text-xs font-black uppercase tracking-wide text-white transition hover:bg-emerald-400 disabled:opacity-50"
+                                    >
+                                        Approve
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => handleVerify('reject')}
+                                        disabled={isVerifying}
+                                        className="rounded-xl bg-red-500 px-3 py-3 text-xs font-black uppercase tracking-wide text-white transition hover:bg-red-400 disabled:opacity-50"
+                                    >
+                                        Reject
+                                    </button>
+                                </div>
                                 <button
+                                    type="button"
                                     onClick={() => {
                                         const el = document.getElementById('actions');
                                         el?.scrollIntoView({ behavior: 'smooth' });
                                     }}
-                                    className="w-full py-3 bg-indigo-500 hover:bg-indigo-400 rounded-xl font-bold text-sm transition-all shadow-lg shadow-indigo-900/40"
+                                    className="mt-3 w-full py-2 text-xs font-bold text-indigo-200 transition hover:text-white"
                                 >
-                                    Make Your Decision
+                                    Open full decision panel
                                 </button>
                             </div>
                         )}
@@ -717,7 +746,7 @@ export default function ReportDetailPage() {
                     </div>
                 </div>
 
-                {partnerCanSubmitDecision(report) && (
+                {canSubmitDecision && (
                     <div id="actions" className="bg-white rounded-[3rem] p-12 border border-slate-200 shadow-xl mt-12 mb-20 relative overflow-hidden">
                         <div className="absolute top-0 right-0 p-8 opacity-5">
                             <CheckCircle2 className="w-32 h-32" />
@@ -772,7 +801,7 @@ export default function ReportDetailPage() {
                     </div>
                 )}
 
-                {!partnerCanSubmitDecision(report) && normalizeKey(report.partner_status) === "approved" && (
+                {!canSubmitDecision && normalizeKey(report.partner_status) === "approved" && (
                     <div className="bg-emerald-50 border border-emerald-200 rounded-3xl p-6 mt-8 mb-16 text-emerald-900 text-sm font-medium">
                         Your organization has already verified this report. If you need changes, contact CIEL support so the report can be reopened for edits.
                     </div>

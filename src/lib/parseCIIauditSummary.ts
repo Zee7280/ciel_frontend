@@ -51,7 +51,7 @@ function sliceBetween(
 ): string | null {
     const sm = haystack.match(start);
     if (!sm || sm.index === undefined) return null;
-    let from = sm.index + sm[0].length;
+    const from = sm.index + sm[0].length;
     const rest = haystack.slice(from);
 
     let endIdx = rest.length;
@@ -93,6 +93,7 @@ export function parseSection11AuditSummary(fullText: string): ReportCIIauditMeta
     const credibility = sliceBetween(para, /Overall\s+Credibility\s+Score\s*:\s*/i, [/\bRisk\s+Level\s*:/i]);
 
     const risk_level = sliceBetween(para, /Risk\s+Level\s*:\s*/i, [
+        /\bCII\s+Index\s+Score\s*:/i,
         /\bTop\s*5\s+Required\s+Fixes\s*:/i,
         /\bTop\s+Five\s+Required\s+Fixes\s*:/i,
         /\bRequired\s+Fixes\s*:/i,

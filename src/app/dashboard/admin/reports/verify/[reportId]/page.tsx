@@ -34,6 +34,7 @@ import { checkReportQuality, QualityAlert } from '@/utils/reportQuality';
 import { parseSection11AuditSummary, type ReportCIIauditMeta } from "@/lib/parseCIIauditSummary";
 import type { ReportData } from "../../../../student/report/context/ReportContext";
 import { calculateCII } from "../../../../student/report/utils/calculateCII";
+import { readPersistedCiiSnapshot } from "@/utils/reportCiiSnapshot";
 
 function normalizeAuditMeta(raw: unknown, summaryText: string): ReportCIIauditMeta | null {
     const fallback = summaryText ? parseSection11AuditSummary(summaryText) : null;
@@ -350,6 +351,7 @@ export default function AdminReportDetailPage() {
     const ciiSnapshot = useMemo(() => {
         if (!report) return null;
         try {
+            const persisted = readPersistedCiiSnapshot(report);
             const reqH =
                 typeof report.required_hours === "number" && report.required_hours > 0
                     ? report.required_hours
@@ -364,7 +366,16 @@ export default function AdminReportDetailPage() {
                         ? report.project_id
                         : String(report.id),
             } as ReportData;
-            return calculateCII(payload);
+            const calculated = calculateCII(payload);
+            return persisted
+                ? {
+                      ...calculated,
+                      ...persisted,
+                      totalScore: Math.round(persisted.totalScore),
+                      breakdown: persisted.breakdown ?? calculated.breakdown,
+                      suggestions: persisted.suggestions ?? calculated.suggestions,
+                  }
+                : calculated;
         } catch {
             return null;
         }
