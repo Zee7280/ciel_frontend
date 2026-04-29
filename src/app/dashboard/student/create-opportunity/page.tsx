@@ -16,7 +16,7 @@ import {
     parsePhoneForDisplay,
 } from "@/utils/countryCallingCodes";
 
-// Dynamically import LocationPicker to avoid SSR issues with Leaflet
+// Dynamically import LocationPicker to avoid SSR issues with Google Maps.
 const LocationPicker = dynamic(() => import('@/components/ui/LocationPicker'), {
     ssr: false,
     loading: () => <div className="h-[300px] w-full bg-slate-50 rounded-xl animate-pulse flex items-center justify-center text-slate-400">Loading Map...</div>
@@ -1144,7 +1144,7 @@ export default function StudentOpportunityCreationPage() {
                                                     ...prev,
                                                     location: {
                                                         ...prev.location,
-                                                        venue: loc.address || prev.location.venue || "", // Use address if returned by Nominatim, otherwise keep existing
+                                                        venue: loc.address || prev.location.venue || "",
                                                         pin: `${loc.lat},${loc.lng}`
                                                     }
                                                 }));

@@ -34,6 +34,37 @@ const printDossierTone = {
     matrixBlurb: "text-[10px] font-medium uppercase leading-relaxed tracking-wide text-white/60",
 } as const;
 
+function getCiiCertificateBadge(score: number) {
+    if (score >= 85) {
+        return {
+            src: "/certificate-badges/transformative-impact.png",
+            alt: "Transformative Impact badge",
+        };
+    }
+    if (score >= 70) {
+        return {
+            src: "/certificate-badges/strong-impact-contributor.png",
+            alt: "Strong Impact Contributor badge",
+        };
+    }
+    if (score >= 55) {
+        return {
+            src: "/certificate-badges/developing-impact-contributor.png",
+            alt: "Developing Impact Contributor badge",
+        };
+    }
+    if (score >= 40) {
+        return {
+            src: "/certificate-badges/emerging-community-contributor.png",
+            alt: "Emerging Community Contributor badge",
+        };
+    }
+    return {
+        src: "/certificate-badges/foundation-stage-contributor.png",
+        alt: "Foundation Stage Contributor badge",
+    };
+}
+
 /** Section 6 stores `sources: string[]` (+ optional legacy `source`); print view must not render "undefined". */
 function formatResourceSourcesLine(r: {
     sources?: string[];
@@ -147,6 +178,7 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
           }
         : calculatedCiiResult;
     const { totalScore, level, breakdown } = ciiResult;
+    const ciiBadge = getCiiCertificateBadge(Math.round(totalScore));
 
     const dossierAuditMeta =
         data.section11?.audit_meta ??
@@ -875,25 +907,49 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
                 </div>
 
                 {/* Footer Signing Area */}
-                <footer className="mb-10 mt-16 flex flex-col items-stretch justify-between gap-10 border-t-4 border-slate-100 pt-10 sm:flex-row sm:items-end sm:gap-6 print:mb-6 print:mt-10 print:pt-6">
-                    <div className="space-y-4">
-                        <div className="h-0.5 w-48 max-w-full bg-slate-900 print:w-40" />
-                        <p className="text-[9px] font-black uppercase tracking-[0.35em] text-slate-400">
-                            Student signature / attestation
-                        </p>
-                    </div>
-                    <div className="text-left sm:text-right">
-                        <img
-                            src="/iel-pk-logo.png"
-                            alt=""
-                            className="mb-3 h-7 w-7 shrink-0 object-contain opacity-25 grayscale sm:ml-auto print:h-6 print:w-6"
-                            width={256}
-                            height={256}
-                            aria-hidden
-                        />
-                        <p className="text-[9px] font-black uppercase tracking-[0.35em] text-slate-300">
-                            CIEL digital protocol — © {new Date().getFullYear()}
-                        </p>
+                <footer className="mb-10 mt-16 border-t-4 border-slate-100 pt-10 print:mb-6 print:mt-10 print:pt-6">
+                    <div className="grid grid-cols-1 items-end gap-8 sm:grid-cols-3 sm:gap-6">
+                        <div className="space-y-4 print:space-y-2">
+                            <img
+                                src="/ciel-e-signature.png"
+                                alt="CIEL e-signature"
+                                className="h-10 w-40 object-contain object-left print:h-8 print:w-32"
+                                width={640}
+                                height={160}
+                            />
+                            <div className="h-0.5 w-48 max-w-full bg-slate-900 print:w-40" />
+                            <div>
+                                <p className="text-[9px] font-black uppercase tracking-[0.35em] text-slate-400 print:text-[7px]">
+                                    E-signature / attestation
+                                </p>
+                                <p className="mt-1 text-[10px] font-black uppercase tracking-widest text-slate-900 print:text-[8px]">
+                                    Registrar of impact
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="flex justify-start sm:justify-center">
+                            <img
+                                src={ciiBadge.src}
+                                alt={ciiBadge.alt}
+                                className="h-24 w-36 object-contain drop-shadow-sm print:h-[4.5rem] print:w-28 print:drop-shadow-none"
+                                width={1024}
+                                height={1024}
+                            />
+                        </div>
+
+                        <div className="text-left sm:text-right">
+                            <img
+                                src="/certificate-iel-pk-logo.png"
+                                alt="CIEL PK"
+                                className="mb-3 h-10 w-10 shrink-0 object-contain sm:ml-auto print:h-8 print:w-8"
+                                width={1024}
+                                height={1024}
+                            />
+                            <p className="text-[9px] font-black uppercase tracking-[0.35em] text-slate-300 print:text-[7px]">
+                                CIEL digital protocol — © {new Date().getFullYear()}
+                            </p>
+                        </div>
                     </div>
                 </footer>
             </div>

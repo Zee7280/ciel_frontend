@@ -264,10 +264,32 @@ export default function CertificateView({ projectData }: { projectData?: unknown
             <style dangerouslySetInnerHTML={{
                 __html: `
                 @media print {
-                    @page { size: A4 landscape; margin: 0.35cm; }
+                    @page { size: A4 landscape; margin: 0.2cm; }
                     body.cii-certificate-printing {
                         -webkit-print-color-adjust: exact;
                         print-color-adjust: exact;
+                        overflow: hidden !important;
+                    }
+                    body.cii-certificate-printing .cii-certificate-print-root {
+                        align-items: center !important;
+                        justify-content: center !important;
+                    }
+                    body.cii-certificate-printing #print-area-certificate {
+                        display: flex !important;
+                        align-items: center !important;
+                        justify-content: center !important;
+                        width: 297mm !important;
+                        min-height: 210mm !important;
+                        overflow: hidden !important;
+                    }
+                    body.cii-certificate-printing .certificate-one-page {
+                        width: 284mm !important;
+                        height: 184mm !important;
+                        min-height: 184mm !important;
+                        max-height: 184mm !important;
+                        overflow: visible !important;
+                        transform: scale(0.96);
+                        transform-origin: center center;
                     }
                     body.cii-certificate-printing .certificate-metrics-grid {
                         display: grid !important;

@@ -10,13 +10,76 @@ import { authenticatedFetch } from "@/utils/api";
 import { normalizeEngagementAttendanceLog } from "@/utils/engagementAttendanceMap";
 import clsx from "clsx";
 import { useReportForm } from "../../report/context/ReportContext";
-import React, { useRef, useEffect } from "react";
+import React from "react";
 import dynamic from "next/dynamic";
 
 const LocationPicker = dynamic(() => import("@/components/ui/LocationPicker"), {
     ssr: false,
     loading: () => <div className="h-[200px] w-full bg-slate-50 animate-pulse rounded-2xl flex items-center justify-center text-slate-400 font-bold text-xs uppercase tracking-widest">Loading Interactive Map...</div>
 });
+
+type AttendanceLogLike = {
+    date?: unknown;
+    dateOfEngagement?: unknown;
+    start_time?: unknown;
+    startTime?: unknown;
+    end_time?: unknown;
+    endTime?: unknown;
+    participantId?: unknown;
+};
+
+function attendanceParticipantKey(id: unknown): string {
+    if (typeof id !== "string") return "";
+    const memberMatch = /^member:\d+:(.+)$/.exec(id);
+    if (memberMatch?.[1]) return memberMatch[1];
+    if (id.startsWith("lead:")) return id.slice("lead:".length);
+    return id;
+}
+
+function attendanceParticipantsMatch(a: unknown, b: unknown): boolean {
+    if (typeof a !== "string" || typeof b !== "string") return false;
+    return a === b || attendanceParticipantKey(a) === attendanceParticipantKey(b);
+}
+
+function normalizeAttendanceDate(value: unknown): string {
+    if (typeof value !== "string" || !value.trim()) return "";
+    const trimmed = value.trim();
+    if (/^\d{4}-\d{2}-\d{2}/.test(trimmed)) return trimmed.slice(0, 10);
+    const parsed = new Date(trimmed);
+    return Number.isNaN(parsed.getTime()) ? trimmed : parsed.toISOString().slice(0, 10);
+}
+
+function timeToMinutes(value: unknown): number | null {
+    if (typeof value !== "string") return null;
+    const match = /^(\d{1,2}):(\d{2})/.exec(value.trim());
+    if (!match) return null;
+    const hours = Number(match[1]);
+    const minutes = Number(match[2]);
+    if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return null;
+    return hours * 60 + minutes;
+}
+
+function hasOverlappingAttendanceLog(
+    logs: AttendanceLogLike[],
+    candidate: { participantId: string; date: string; startTime: string; endTime: string },
+): boolean {
+    const candidateDate = normalizeAttendanceDate(candidate.date);
+    const candidateStart = timeToMinutes(candidate.startTime);
+    const candidateEnd = timeToMinutes(candidate.endTime);
+    if (!candidateDate || candidateStart == null || candidateEnd == null) return false;
+
+    return logs.some((log) => {
+        if (!attendanceParticipantsMatch(log.participantId, candidate.participantId)) return false;
+        const logDate = normalizeAttendanceDate(log.dateOfEngagement ?? log.date);
+        if (logDate !== candidateDate) return false;
+
+        const logStart = timeToMinutes(log.startTime ?? log.start_time);
+        const logEnd = timeToMinutes(log.endTime ?? log.end_time);
+        if (logStart == null || logEnd == null) return false;
+
+        return candidateStart < logEnd && candidateEnd > logStart;
+    });
+}
 
 export default function AttendanceForm({
     verifiedUsers,
@@ -57,19 +120,20 @@ export default function AttendanceForm({
     // Handle client-side initialization
     React.useEffect(() => {
         setMounted(true);
-        if (!formData.dateOfEngagement) {
-            setFormData(prev => ({
+        setFormData(prev => prev.dateOfEngagement
+            ? prev
+            : {
                 ...prev,
                 dateOfEngagement: new Date().toISOString().split('T')[0]
-            }));
-        }
+            });
     }, []);
 
     // Keep formData.participantId in sync with selectedParticipantId prop
     React.useEffect(() => {
-        if (selectedParticipantId && selectedParticipantId !== formData.participantId) {
-            setFormData(prev => ({ ...prev, participantId: selectedParticipantId }));
-        }
+        if (!selectedParticipantId) return;
+        setFormData(prev => selectedParticipantId === prev.participantId
+            ? prev
+            : { ...prev, participantId: selectedParticipantId });
     }, [selectedParticipantId]);
 
     const wordCount = formData.description.trim() === "" ? 0 : formData.description.trim().split(/\s+/).length;
@@ -77,7 +141,7 @@ export default function AttendanceForm({
     const selectedUser = verifiedUsers.find(u => u.id === formData.participantId);
     const isUserApproved = !!selectedUser && [
         'approved', 'verified', 'active', 'accepted', 'pending',
-        'pending_approval', 'pending_faculty_approval', 'pending_ciel_approval', 'registered'
+        'pending_approval', 'pending_faculty_approval', 'pending_partner_approval', 'pending_ciel_approval', 'registered'
     ].includes(selectedUser.status || '');
     
     // Restore proper locking logic: record is locked if report is submitted OR if user is not yet approved
@@ -86,6 +150,7 @@ export default function AttendanceForm({
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (isSubmitting) return;
 
         // Strict Time Validation
         const [h1, m1] = formData.startTime.split(':').map(Number);
@@ -104,6 +169,20 @@ export default function AttendanceForm({
 
         const numericHours = diffMinutes / 60;
         const activeParticipantId = formData.participantId;
+        const currentLogs = reportData.section1.attendance_logs || [];
+
+        if (hasOverlappingAttendanceLog(currentLogs, {
+            participantId: activeParticipantId,
+            date: formData.dateOfEngagement,
+            startTime: formData.startTime,
+            endTime: formData.endTime,
+        })) {
+            const message = "This student already has an attendance entry for this date/time. Please choose a non-overlapping session.";
+            setSubmitError(message);
+            toast.error(message);
+            return;
+        }
+
         const newEntry: Record<string, unknown> = {
             id: Math.random().toString(36).substring(2, 11),
             date: formData.dateOfEngagement,
@@ -120,8 +199,6 @@ export default function AttendanceForm({
         setIsSubmitting(true);
         setSubmitError(null);
         try {
-            const currentLogs = reportData.section1.attendance_logs || [];
-
             // Sync with backend if participantId exists
             if (activeParticipantId) {
                 // Determine if we need to send multipart/form-data or application/json
@@ -213,7 +290,7 @@ export default function AttendanceForm({
             }
 
             updateSection('section1', {
-                attendance_logs: [...currentLogs, mergedEntry as any]
+                attendance_logs: [...currentLogs, mergedEntry]
             });
 
             onSuccess();
@@ -359,7 +436,7 @@ export default function AttendanceForm({
                             />
                             <div className="absolute bottom-4 right-4 z-[1000] pointer-events-none opacity-0 group-hover/map:opacity-100 transition-opacity">
                                 <div className="bg-white/90 backdrop-blur-md px-3 py-1.5 rounded-full shadow-lg border border-slate-100 text-[10px] font-black text-slate-500 uppercase tracking-wider">
-                                    Simple map — click to set location
+                                    Google Maps — click to set location
                                 </div>
                             </div>
                         </div>
@@ -487,7 +564,7 @@ export default function AttendanceForm({
                     <div className="text-center">
                         {!isUserApproved && selectedUser ? (
                             <p className="text-[10px] font-bold text-amber-600 uppercase tracking-tight">
-                                Attendance logging for this student is disabled until faculty approval.
+                                Attendance logging for this student is disabled until the assigned reviewer approves participation.
                             </p>
                         ) : (
                             <button

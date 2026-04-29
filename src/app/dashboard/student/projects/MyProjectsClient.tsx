@@ -30,6 +30,7 @@ import {
     pickReportStatusFromCheckRow,
     resolveStudentBrowseReportCta,
 } from "@/utils/studentBrowseReportCta";
+import { getStoredCurrentUserId } from "@/utils/currentUser";
 import { formatDisplayId } from "@/utils/displayIds";
 import {
     Loader2,
@@ -265,6 +266,22 @@ function isStudentCreatedOpportunity(v: Record<string, unknown>): boolean {
     return raw === true || String(raw).toLowerCase() === "true";
 }
 
+function pickProjectOwnerId(v: Record<string, unknown>): string {
+    for (const key of ["creatorId", "creator_id", "created_by", "owner_id"]) {
+        const raw = v[key];
+        if (typeof raw === "string" && raw.trim()) return raw.trim();
+        if (typeof raw === "number") return String(raw);
+    }
+    const creator = v.creator && typeof v.creator === "object" ? (v.creator as Record<string, unknown>) : null;
+    return pickDetailStr(creator, "id", "user_id");
+}
+
+function isCurrentStudentOwnedOpportunity(v: Record<string, unknown>, currentStudentId: string): boolean {
+    const ownerId = pickProjectOwnerId(v);
+    if (ownerId && currentStudentId) return ownerId === currentStudentId;
+    return false;
+}
+
 function facultyApprovalPipelineApplies(v: Record<string, unknown>): boolean {
     if (isStudentCreatedOpportunity(v)) return true;
     if (typeof v.faculty_verification_token === "string" && v.faculty_verification_token.trim()) return true;
@@ -421,6 +438,7 @@ export default function MyProjectsPage() {
     const [projectDetail, setProjectDetail] = useState<Record<string, unknown> | null>(null);
     const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
     const [projectDetailLoading, setProjectDetailLoading] = useState(false);
+    const [currentStudentId, setCurrentStudentId] = useState("");
 
     useEffect(() => {
         const fetchProjects = async () => {
@@ -432,6 +450,7 @@ export default function MyProjectsPage() {
                     const userObj = JSON.parse(storedUser);
                     studentId = userObj.id || userObj.studentId || userObj.userId;
                 }
+                setCurrentStudentId(studentId || getStoredCurrentUserId());
 
                 const res = await authenticatedFetch(`/api/v1/student/projects`, {
                     method: 'POST',
@@ -597,10 +616,7 @@ export default function MyProjectsPage() {
         () =>
             projects.map((project) => {
                 const pRecord = project as unknown as Record<string, unknown>;
-                const isStudentOwnedOpportunity =
-                    project.is_student_created === true ||
-                    String(project.created_by_role || "").toLowerCase() === "student" ||
-                    String(project.source || "").toLowerCase() === "student_created";
+                const isStudentOwnedOpportunity = isCurrentStudentOwnedOpportunity(pRecord, currentStudentId);
                 const applicationStatusRaw =
                     pRecord.application_status ?? pRecord.applicationStatus ?? project.application_status;
                 const applicationStatus =
@@ -674,7 +690,7 @@ export default function MyProjectsPage() {
                     statusBadgeClass,
                 };
             }),
-        [projects],
+        [projects, currentStudentId],
     );
 
     const filteredRows = useMemo(

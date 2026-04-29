@@ -5,6 +5,7 @@ import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Button } from "../../report/components/ui/button";
 import { authenticatedFetch } from "@/utils/api";
+import { resolveAttendanceApproverType } from "@/utils/attendanceApproverRouting";
 import {
     canEditReturnedOpportunity,
     extractOpportunityReturnRemarkSections,
@@ -13,10 +14,10 @@ import {
 } from "@/utils/opportunityWorkflow";
 import { readDashboardNavRoleFromStorage, type DashboardNavRole } from "@/utils/dashboardNavRole";
 import { formatDisplayId } from "@/utils/displayIds";
-import { Loader2, MapPin, Calendar, Clock, Globe, ArrowLeft, Building2, Share2, CheckCircle2, User, AlertCircle, Pencil } from "lucide-react";
+import { Loader2, MapPin, Calendar, ArrowLeft, Share2, CheckCircle2, AlertCircle, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
-import ApplicationDialog, { type ApplySuccessMeta } from "../components/ApplicationDialog";
+import ApplicationDialog from "../components/ApplicationDialog";
 import {
     readStudentInstitutionFromBrowserStorage,
     resolveStudentUniversityApplyEligibility,
@@ -35,12 +36,74 @@ import {
     resolveStudentBrowseReportCta,
 } from "@/utils/studentBrowseReportCta";
 
+type DisplayValue = string | number | null | undefined;
+
+type OpportunityDetail = Record<string, unknown> & {
+    title?: string;
+    mode?: string;
+    city?: string;
+    start_date?: string;
+    end_date?: string;
+    description?: string;
+    application_status?: string;
+    applyLocked?: boolean;
+    hasApplied?: boolean;
+    isStudentOwner?: boolean;
+    report_status?: string;
+    organization_name?: string;
+    organization?: { name?: string; city?: string };
+    location?: { city?: string; venue?: string };
+    timeline?: {
+        start_date?: string;
+        end_date?: string;
+        volunteers_required?: DisplayValue;
+        expected_hours?: DisplayValue;
+        type?: string;
+    };
+    sdg?: DisplayValue;
+    verification_method?: string[];
+    volunteers_needed?: DisplayValue;
+    hours?: DisplayValue;
+    timeline_type?: string;
+    objectives?: {
+        beneficiaries_count?: DisplayValue;
+        description?: string;
+        beneficiaries_type?: string[] | string;
+    };
+    activity_details?: {
+        student_responsibilities?: string;
+        skills_gained?: string[];
+    };
+    supervision?: {
+        supervisor_name?: string;
+        role?: string;
+        safe_environment?: boolean;
+        supervised?: boolean;
+    };
+};
+
+function pickOpportunityOwnerId(opportunity: Record<string, unknown>): string {
+    for (const key of ["creatorId", "creator_id", "created_by", "owner_id"]) {
+        const raw = opportunity[key];
+        if (typeof raw === "string" && raw.trim()) return raw.trim();
+        if (typeof raw === "number") return String(raw);
+    }
+    const creator =
+        opportunity.creator && typeof opportunity.creator === "object"
+            ? (opportunity.creator as Record<string, unknown>)
+            : null;
+    const nestedId = creator?.id ?? creator?.user_id;
+    if (typeof nestedId === "string" && nestedId.trim()) return nestedId.trim();
+    if (typeof nestedId === "number") return String(nestedId);
+    return "";
+}
+
 export default function OpportunityDetailsPage() {
     const params = useParams();
     const router = useRouter();
     const id = params.id as string;
 
-    const [opportunity, setOpportunity] = useState<any>(null);
+    const [opportunity, setOpportunity] = useState<OpportunityDetail | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [isPopupOpen, setIsPopupOpen] = useState(false);
     const [viewerNavRole, setViewerNavRole] = useState<DashboardNavRole | null>(null);
@@ -115,12 +178,8 @@ export default function OpportunityDetailsPage() {
                 /* ignore */
             }
 
-            const creatorRaw = opData.creatorId ?? opData.creator_id;
-            const creatorStr = creatorRaw != null ? String(creatorRaw) : "";
-            const isStudentOwner =
-                Boolean(myId && creatorStr && creatorStr === myId) ||
-                opData.is_student_created === true ||
-                String(opData.created_by_role || "").toLowerCase() === "student";
+            const creatorStr = pickOpportunityOwnerId(opData);
+            const isStudentOwner = Boolean(myId && creatorStr && creatorStr === myId);
 
             const appRaw = opData.application_status ?? opData.applicationStatus;
             const application_status =
@@ -188,7 +247,7 @@ export default function OpportunityDetailsPage() {
         setIsPopupOpen(true);
     };
 
-    const handleApplySuccess = (_appliedId: string, _meta?: ApplySuccessMeta) => {
+    const handleApplySuccess = () => {
         void fetchOpportunityDetails();
     };
 
@@ -581,6 +640,7 @@ export default function OpportunityDetailsPage() {
             <ApplicationDialog
                 opportunityId={isPopupOpen ? id : null}
                 opportunityTitle={opportunity.title ?? "Opportunity"}
+                attendanceApproverType={resolveAttendanceApproverType(opportunity)}
                 open={isPopupOpen}
                 onOpenChange={setIsPopupOpen}
                 onSuccess={handleApplySuccess}

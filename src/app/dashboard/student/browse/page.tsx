@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Button } from "../report/components/ui/button";
 import { Badge } from "../report/components/ui/badge";
 import { authenticatedFetch } from "@/utils/api";
+import { resolveAttendanceApproverType, type AttendanceApproverType } from "@/utils/attendanceApproverRouting";
 import { getStoredCurrentUserId } from "@/utils/currentUser";
 import { isStudentOpportunityLiveForReporting } from "@/utils/opportunityWorkflow";
 import type { CreatorBucket, ModeBucket, VisibilityBucket } from "@/utils/opportunityListing";
@@ -239,6 +240,7 @@ export default function StudentBrowseOpportunitiesPage() {
     const [isLoading, setIsLoading] = useState(true);
     const [applyingId, setApplyingId] = useState<string | null>(null);
     const [applyingTitle, setApplyingTitle] = useState<string | undefined>(undefined);
+    const [applyingAttendanceApproverType, setApplyingAttendanceApproverType] = useState<AttendanceApproverType>("faculty");
     const [isDialogOpen, setIsDialogOpen] = useState(false);
 
     // Team Dialog
@@ -296,9 +298,11 @@ export default function StudentBrowseOpportunitiesPage() {
     const filterSelectClass =
         "h-10 w-full min-w-0 px-3 text-sm rounded-lg border border-slate-200 bg-white text-slate-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-300";
 
-    const openApplicationDialog = (id: string, title: string) => {
-        setApplyingId(id);
+    const openApplicationDialog = (opportunity: BrowseOpportunity) => {
+        const title = opportunity.title ?? "Opportunity";
+        setApplyingId(opportunity.id);
         setApplyingTitle(title);
+        setApplyingAttendanceApproverType(resolveAttendanceApproverType(opportunity as unknown as Record<string, unknown>));
         setIsDialogOpen(true);
     };
 
@@ -319,6 +323,7 @@ export default function StudentBrowseOpportunitiesPage() {
         );
         setApplyingId(null);
         setApplyingTitle(undefined);
+        setApplyingAttendanceApproverType("faculty");
     };
 
     useEffect(() => {
@@ -673,7 +678,7 @@ export default function StudentBrowseOpportunitiesPage() {
                                                 }
                                                 onClick={() =>
                                                     applyEligibility.canApply &&
-                                                    openApplicationDialog(op.id, op.title ?? "Opportunity")
+                                                    openApplicationDialog(op)
                                                 }
                                                 disabled={!applyEligibility.canApply}
                                                 title={applyEligibility.blockedReason || undefined}
@@ -691,7 +696,7 @@ export default function StudentBrowseOpportunitiesPage() {
                                             }
                                             onClick={() =>
                                                 applyEligibility.canApply &&
-                                                openApplicationDialog(op.id, op.title ?? "Opportunity")
+                                                openApplicationDialog(op)
                                             }
                                             disabled={!applyEligibility.canApply}
                                             title={applyEligibility.blockedReason || undefined}
@@ -789,7 +794,7 @@ export default function StudentBrowseOpportunitiesPage() {
                                                 }
                                                 onClick={() =>
                                                     applyEligibility.canApply &&
-                                                    openApplicationDialog(op.id, op.title ?? "Opportunity")
+                                                    openApplicationDialog(op)
                                                 }
                                                 disabled={!applyEligibility.canApply}
                                                 title={applyEligibility.blockedReason || undefined}
@@ -806,7 +811,7 @@ export default function StudentBrowseOpportunitiesPage() {
                                             }
                                             onClick={() =>
                                                 applyEligibility.canApply &&
-                                                openApplicationDialog(op.id, op.title ?? "Opportunity")
+                                                openApplicationDialog(op)
                                             }
                                             disabled={!applyEligibility.canApply}
                                             title={applyEligibility.blockedReason || undefined}
@@ -824,12 +829,14 @@ export default function StudentBrowseOpportunitiesPage() {
             <ApplicationDialog
                 opportunityId={applyingId}
                 opportunityTitle={applyingTitle}
+                attendanceApproverType={applyingAttendanceApproverType}
                 open={isDialogOpen}
                 onOpenChange={(open) => {
                     setIsDialogOpen(open);
                     if (!open) {
                         setApplyingId(null);
                         setApplyingTitle(undefined);
+                        setApplyingAttendanceApproverType("faculty");
                     }
                 }}
                 onSuccess={handleSuccess}

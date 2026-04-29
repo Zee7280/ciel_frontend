@@ -13,7 +13,23 @@ interface Stat {
     iconBg: string;
 }
 
-const stats: Stat[] = [
+type PlatformStatsData = {
+    students_enrolled?: unknown;
+    engagement_hours?: unknown;
+    sdgs_covered?: unknown;
+    active_projects?: unknown;
+    avg_cii_score?: unknown;
+    contributors?: unknown;
+    impact_hours?: unknown;
+    sdgs_impacted?: unknown;
+};
+
+type PlatformStatsResponse = {
+    success?: boolean;
+    data?: PlatformStatsData;
+};
+
+const defaultStats: Stat[] = [
     {
         icon: GraduationCap,
         value: 1200,
@@ -61,6 +77,30 @@ const stats: Stat[] = [
     },
 ];
 
+function normalizeCount(value: unknown, fallback: number): number {
+    const numeric = Number(value);
+    return Number.isFinite(numeric) ? Math.max(0, Math.floor(numeric)) : fallback;
+}
+
+function buildStats(data?: PlatformStatsData): Stat[] {
+    return defaultStats.map((stat) => {
+        switch (stat.label) {
+            case "Students Enrolled":
+                return { ...stat, value: normalizeCount(data?.students_enrolled ?? data?.contributors, stat.value) };
+            case "Engagement Hours":
+                return { ...stat, value: normalizeCount(data?.engagement_hours ?? data?.impact_hours, stat.value) };
+            case "SDGs Covered":
+                return { ...stat, value: normalizeCount(data?.sdgs_covered ?? data?.sdgs_impacted, stat.value) };
+            case "Active Projects":
+                return { ...stat, value: normalizeCount(data?.active_projects, stat.value) };
+            case "Avg CII Score":
+                return { ...stat, value: normalizeCount(data?.avg_cii_score, stat.value) };
+            default:
+                return stat;
+        }
+    });
+}
+
 function AnimatedCounter({ target, suffix, duration = 2000 }: { target: number; suffix: string; duration?: number }) {
     const [count, setCount] = useState(0);
     const [started, setStarted] = useState(false);
@@ -97,6 +137,32 @@ function AnimatedCounter({ target, suffix, duration = 2000 }: { target: number; 
 }
 
 export default function ImpactSnapshot() {
+    const [stats, setStats] = useState<Stat[]>(defaultStats);
+
+    useEffect(() => {
+        let cancelled = false;
+
+        (async () => {
+            try {
+                const response = await fetch("/api/v1/public/platform-stats", {
+                    headers: { Accept: "application/json" },
+                    cache: "no-store",
+                });
+                const payload = (await response.json().catch(() => null)) as PlatformStatsResponse | null;
+
+                if (!cancelled && response.ok && payload?.success && payload.data) {
+                    setStats(buildStats(payload.data));
+                }
+            } catch {
+                // Keep the marketing-safe defaults if live stats are temporarily unavailable.
+            }
+        })();
+
+        return () => {
+            cancelled = true;
+        };
+    }, []);
+
     return (
         <section className="py-24 px-6 bg-slate-50/50 relative overflow-hidden">
             {/* Radial glow */}

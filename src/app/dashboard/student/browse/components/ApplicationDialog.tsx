@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { authenticatedFetch } from "@/utils/api";
 import { pakistaniUniversities } from "@/utils/universityData";
 import PhoneConnectivityRow from "@/components/ui/PhoneConnectivityRow";
+import type { AttendanceApproverType } from "@/utils/attendanceApproverRouting";
 import {
     DEFAULT_PHONE_COUNTRY_KEY,
     composeInternationalPhone,
@@ -28,6 +29,7 @@ interface ApplicationDialogProps {
     onOpenChange: (open: boolean) => void;
     onSuccess: (id: string, meta?: ApplySuccessMeta) => void;
     opportunityTitle?: string;
+    attendanceApproverType?: AttendanceApproverType;
 }
 
 interface TeamMember {
@@ -60,7 +62,14 @@ function generateTeamId() {
     return `TM-${year}-${rand}`;
 }
 
-export default function ApplicationDialog({ opportunityId, open, onOpenChange, onSuccess, opportunityTitle }: ApplicationDialogProps) {
+export default function ApplicationDialog({
+    opportunityId,
+    open,
+    onOpenChange,
+    onSuccess,
+    opportunityTitle,
+    attendanceApproverType = "faculty",
+}: ApplicationDialogProps) {
     const [participationType, setParticipationType] = useState<"individual" | "team">("individual");
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [primaryFacultyEmail, setPrimaryFacultyEmail] = useState("");
@@ -349,6 +358,7 @@ export default function ApplicationDialog({ opportunityId, open, onOpenChange, o
                 team_id: participationType === 'team' ? teamId : undefined,
                 primary_faculty_email: primaryFacultyEmail,
                 secondary_faculty_email: secondaryFacultyEmail || undefined,
+                attendance_approver_type: attendanceApproverType,
                 team_members:
                     participationType === "team"
                         ? teamMembers.map((m) => {
@@ -469,7 +479,9 @@ export default function ApplicationDialog({ opportunityId, open, onOpenChange, o
                                 <Label className="text-xs font-black text-indigo-700 uppercase tracking-widest">
                                     Primary Faculty Supervisor <span className="text-red-500 ml-1">*</span>
                                 </Label>
-                                <span className="text-[10px] font-bold text-indigo-500 bg-indigo-100 px-2 py-0.5 rounded-full">Required · Analytics Owner</span>
+                                <span className="text-[10px] font-bold text-indigo-500 bg-indigo-100 px-2 py-0.5 rounded-full">
+                                    {attendanceApproverType === "partner" ? "Required · Academic Supervisor" : "Required · Attendance Owner"}
+                                </span>
                             </div>
                             <Input
                                 id="primary-faculty-email"
@@ -480,7 +492,9 @@ export default function ApplicationDialog({ opportunityId, open, onOpenChange, o
                                 className="h-10 bg-white border-indigo-200 focus:border-indigo-400"
                             />
                             <p className="text-[10px] text-indigo-500 font-medium">
-                                This faculty member will receive approval requests and own the analytics for this project.
+                                {attendanceApproverType === "partner"
+                                    ? "Attendance for this partner-created project will be reviewed by the partner. Faculty stays attached for academic supervision."
+                                    : "This faculty member will receive attendance approval requests for this project."}
                             </p>
                         </div>
 

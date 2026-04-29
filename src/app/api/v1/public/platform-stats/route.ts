@@ -11,6 +11,11 @@ type PlatformStatsPayload = {
         impact_hours_label?: string | null;
         universities: number;
         sdgs_impacted: number;
+        students_enrolled?: number;
+        engagement_hours?: number;
+        sdgs_covered?: number;
+        active_projects?: number;
+        avg_cii_score?: number;
     };
 };
 
@@ -22,8 +27,20 @@ const FALLBACK: PlatformStatsPayload = {
         impact_hours_label: "Launching Pilot",
         universities: 24,
         sdgs_impacted: 17,
+        students_enrolled: 1200,
+        engagement_hours: 18000,
+        sdgs_covered: 10,
+        active_projects: 85,
+        avg_cii_score: 72,
     },
 };
+
+function normalizeCount(value: unknown, fallback: number, max?: number): number {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) return fallback;
+    const normalized = Math.max(0, Math.floor(numeric));
+    return typeof max === "number" ? Math.min(max, normalized) : normalized;
+}
 
 function resolveBackendStatsUrl(): string | null {
     const raw = process.env.NEXT_PUBLIC_BACKEND_BASE_URL?.trim();
@@ -60,7 +77,7 @@ export async function GET() {
         const normalized: PlatformStatsPayload = {
             success: true,
             data: {
-                contributors: Number.isFinite(d.contributors) ? Math.max(0, Math.floor(d.contributors)) : FALLBACK.data.contributors,
+                contributors: normalizeCount(d.contributors, FALLBACK.data.contributors),
                 impact_hours:
                     d.impact_hours == null || Number.isNaN(Number(d.impact_hours))
                         ? null
@@ -69,10 +86,19 @@ export async function GET() {
                     typeof d.impact_hours_label === "string" && d.impact_hours_label.trim()
                         ? d.impact_hours_label.trim()
                         : FALLBACK.data.impact_hours_label,
-                universities: Number.isFinite(d.universities) ? Math.max(0, Math.floor(d.universities)) : FALLBACK.data.universities,
-                sdgs_impacted: Number.isFinite(d.sdgs_impacted)
-                    ? Math.min(17, Math.max(0, Math.floor(d.sdgs_impacted)))
-                    : FALLBACK.data.sdgs_impacted,
+                universities: normalizeCount(d.universities, FALLBACK.data.universities),
+                sdgs_impacted: normalizeCount(d.sdgs_impacted, FALLBACK.data.sdgs_impacted, 17),
+                students_enrolled: normalizeCount(
+                    d.students_enrolled ?? d.contributors,
+                    FALLBACK.data.students_enrolled ?? FALLBACK.data.contributors
+                ),
+                engagement_hours: normalizeCount(
+                    d.engagement_hours ?? d.impact_hours,
+                    FALLBACK.data.engagement_hours ?? 0
+                ),
+                sdgs_covered: normalizeCount(d.sdgs_covered ?? d.sdgs_impacted, FALLBACK.data.sdgs_covered ?? 0, 17),
+                active_projects: normalizeCount(d.active_projects, FALLBACK.data.active_projects ?? 0),
+                avg_cii_score: normalizeCount(d.avg_cii_score, FALLBACK.data.avg_cii_score ?? 0, 100),
             },
         };
 

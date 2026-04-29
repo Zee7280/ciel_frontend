@@ -103,23 +103,6 @@ function distanceScore(lat1: number, lng1: number, lat2: number, lng2: number): 
     return Math.sqrt(dx * dx + dy * dy);
 }
 
-const LAHORE_CENTER = { lat: 31.5204, lng: 74.3587 };
-const LAHORE_RADIUS = 0.65;
-
-function isWithinLocalRadius(item: NormalizedResult, lat: number, lng: number): boolean {
-    return distanceScore(lat, lng, item.lat, item.lng) <= LAHORE_RADIUS;
-}
-
-function isLahoreResult(item: NormalizedResult): boolean {
-    const haystack = normalizeText(`${item.title} ${item.subtitle} ${item.address}`);
-    return haystack.includes("lahore") || isWithinLocalRadius(item, LAHORE_CENTER.lat, LAHORE_CENTER.lng);
-}
-
-function shouldUseLahoreOnly(query: string, lat: number, lng: number): boolean {
-    const normalizedQuery = normalizeText(query);
-    return normalizedQuery.includes("lahore") || distanceScore(lat, lng, LAHORE_CENTER.lat, LAHORE_CENTER.lng) <= 0.45;
-}
-
 function scoreResult(item: NormalizedResult, query: string, lat: number, lng: number): number {
     const q = normalizeText(query);
     const haystack = normalizeText(`${item.title} ${item.subtitle} ${item.address}`);
@@ -129,7 +112,6 @@ function scoreResult(item: NormalizedResult, query: string, lat: number, lng: nu
     const matchedTokens = queryTokens.filter((token) => haystack.includes(token)).length;
     const includesWholeQuery = q.length > 0 && haystack.includes(q);
     const includesCompactQuery = compactQuery.length > 0 && compactHaystack.includes(compactQuery);
-    const includesLahore = haystack.includes("lahore");
     const proximityPenalty = distanceScore(lat, lng, item.lat, item.lng);
     const title = normalizeText(item.title);
     const titleCompact = compactText(item.title);
@@ -141,37 +123,17 @@ function scoreResult(item: NormalizedResult, query: string, lat: number, lng: nu
         (includesCompactQuery ? 90 : 0) +
         matchedTokens * 25 +
         titleMatches * 20 +
-        (titleCompactMatches ? 60 : 0) +
-        (includesLahore ? 35 : 0) -
+        (titleCompactMatches ? 60 : 0) -
         proximityPenalty * 10
     );
 }
 
 function buildQueries(query: string) {
     const q = query.trim();
-    const lower = q.toLowerCase();
     const variants = [q];
     const compact = q.replace(/\s+/g, " ").trim();
     const squashed = compact.replace(/\s+/g, "");
     if (squashed && squashed !== compact.toLowerCase()) variants.push(squashed);
-
-    const alKhidmatMerged = compact.replace(/\bal\s+khidmat\b/gi, "alkhidmat");
-    if (alKhidmatMerged !== compact) variants.push(alKhidmatMerged);
-
-    if (/\b(al\s*khidmat|alkhidmat)\b/i.test(compact) && !/\bfoundation\b/i.test(compact)) {
-        variants.push(`${alKhidmatMerged} foundation`);
-    }
-
-    if (!lower.includes("lahore")) variants.push(`${q}, Lahore`);
-    if (!lower.includes("pakistan")) variants.push(`${q}, Pakistan`);
-    if (!lower.includes("lahore") && !lower.includes("pakistan")) {
-        variants.push(`${q}, Lahore, Pakistan`);
-    }
-
-    if (/\b(al\s*khidmat|alkhidmat)\b/i.test(compact)) {
-        variants.push("Alkhidmat Foundation Lahore");
-        variants.push("Alkhidmat Foundation Pakistan Lahore");
-    }
 
     return [...new Set(variants)];
 }
@@ -182,7 +144,6 @@ async function fetchNominatimResults(query: string, lat: number, lng: number, bo
     url.searchParams.set("format", "jsonv2");
     url.searchParams.set("addressdetails", "1");
     url.searchParams.set("limit", "6");
-    url.searchParams.set("countrycodes", "pk");
     url.searchParams.set("accept-language", "en");
     url.searchParams.set("viewbox", buildViewbox(lat, lng));
     if (bounded) url.searchParams.set("bounded", "1");
@@ -285,10 +246,7 @@ export async function GET(request: NextRequest) {
 
         const allResults = [...deduped.values()]
             .sort((a, b) => scoreResult(b, q, lat, lng) - scoreResult(a, q, lat, lng))
-        const localOnly = shouldUseLahoreOnly(q, lat, lng)
-            ? allResults.filter((item) => isLahoreResult(item))
-            : [];
-        const results = (localOnly.length > 0 ? localOnly : allResults).slice(0, 5);
+        const results = allResults.slice(0, 5);
 
         return NextResponse.json({ results });
     } catch (error) {

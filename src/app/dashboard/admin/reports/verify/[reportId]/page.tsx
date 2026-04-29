@@ -25,6 +25,7 @@ import {
     Clock as ClockIcon,
     AlertTriangle,
     List,
+    PencilLine,
 } from "lucide-react";
 import { toast } from 'sonner';
 import clsx from 'clsx';
@@ -429,9 +430,13 @@ export default function AdminReportDetailPage() {
         }
     };
 
-    const handleVerify = async (action: 'approve' | 'reject') => {
+    const handleVerify = async (action: 'approve' | 'reject', intent: 'decision' | 'editable' = 'decision') => {
         if (action === 'reject' && !feedback.trim()) {
-            toast.error('Please provide notes/feedback for rejection');
+            toast.error(
+                intent === 'editable'
+                    ? 'Please provide notes so the student knows what to edit'
+                    : 'Please provide notes/feedback for rejection',
+            );
             return;
         }
 
@@ -452,10 +457,14 @@ export default function AdminReportDetailPage() {
             );
 
             if (response?.ok) {
-                toast.success(`Report ${action === 'approve' ? 'approved' : 'rejected'} successfully!`);
+                toast.success(
+                    intent === 'editable'
+                        ? 'Report returned to student for edits.'
+                        : `Report ${action === 'approve' ? 'approved' : 'rejected'} successfully!`,
+                );
                 setTimeout(() => router.push('/dashboard/admin/reports/verify'), 1500);
             } else {
-                toast.error('Failed to verify report');
+                toast.error(intent === 'editable' ? 'Failed to make report editable' : 'Failed to verify report');
             }
         } catch (error) {
             console.error('Verification error:', error);
@@ -1277,11 +1286,21 @@ export default function AdminReportDetailPage() {
                                     className="min-h-[160px] w-full rounded-2xl border border-slate-200 bg-slate-50/50 p-5 text-sm font-medium text-slate-900 transition-all focus:border-indigo-400 focus:outline-none focus:ring-4 focus:ring-indigo-100 sm:rounded-3xl sm:p-6"
                                 />
                                 <p className="mt-3 text-[10px] font-medium uppercase tracking-wide text-slate-400">
-                                    Required for rejection; shared with the student upon decision.
+                                    Required for rejection or edit return; shared with the student upon decision.
                                 </p>
                             </div>
 
                             <div className="flex flex-col gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
+                                <button
+                                    type="button"
+                                    onClick={() => handleVerify("reject", "editable")}
+                                    disabled={isVerifying || report.status === "rejected"}
+                                    className="inline-flex min-h-[2.75rem] w-full items-center justify-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-5 py-2.5 text-sm font-semibold text-amber-800 shadow-sm transition-colors hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300 focus-visible:ring-offset-2 sm:w-auto"
+                                    title="Return this report so the student can revise and resubmit it."
+                                >
+                                    <PencilLine className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
+                                    {report.status === "rejected" ? "Editable" : "Make editable"}
+                                </button>
                                 <button
                                     type="button"
                                     onClick={() => handleVerify("approve")}
@@ -1334,6 +1353,15 @@ export default function AdminReportDetailPage() {
                                 className="flex items-center gap-2 rounded-full bg-white/10 px-5 py-2.5 text-xs font-semibold uppercase tracking-widest text-white transition-colors hover:bg-white/20 active:scale-95 sm:px-6"
                             >
                                 <XCircle className="h-3.5 w-3.5 text-red-400" strokeWidth={2} /> Reject
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => handleVerify("reject", "editable")}
+                                disabled={report.status === "rejected"}
+                                className="flex items-center gap-2 rounded-full bg-amber-500 px-5 py-2.5 text-xs font-semibold uppercase tracking-widest text-slate-950 shadow-lg shadow-amber-950/20 transition-transform hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-50 active:scale-95 sm:px-6"
+                                title="Return this report so the student can revise and resubmit it."
+                            >
+                                <PencilLine className="h-3.5 w-3.5" strokeWidth={2} /> Editable
                             </button>
                             <button
                                 type="button"
