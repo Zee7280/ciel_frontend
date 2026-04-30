@@ -43,17 +43,27 @@ function digitsOnly(s: string): string {
     return String(s || "").replace(/\D/g, "");
 }
 
-/** Treat as same participant if CNIC, mobile, or normalized full name matches (stops duplicate rows on CII). */
+/**
+ * Collapse obvious duplicate roster rows only (lead also listed under team_members, etc.).
+ * Do not treat mobile-only or name-only as identity — teammates often share household numbers or placeholder text.
+ */
 function isSameReportParticipant(a: LeadShape | TeamMember, b: LeadShape | TeamMember): boolean {
+    const idA = String((a as { id?: string }).id ?? "").trim();
+    const idB = String((b as { id?: string }).id ?? "").trim();
+    if (idA.length > 0 && idA === idB) return true;
+
     const ac = digitsOnly("cnic" in a ? a.cnic : "");
     const bc = digitsOnly("cnic" in b ? b.cnic : "");
     if (ac.length >= 5 && bc.length >= 5 && ac === bc) return true;
+
     const am = digitsOnly("mobile" in a ? a.mobile : "");
     const bm = digitsOnly("mobile" in b ? b.mobile : "");
-    if (am.length >= 7 && bm.length >= 7 && am === bm) return true;
     const an = normalizeNameKey(displayPersonName(a));
     const bn = normalizeNameKey(displayPersonName(b));
-    if (an.length >= 2 && bn.length >= 2 && an === bn) return true;
+    const mobilesMatch = am.length >= 7 && bm.length >= 7 && am === bm;
+    const namesMatch = an.length >= 2 && bn.length >= 2 && an === bn;
+    if (mobilesMatch && namesMatch) return true;
+
     return false;
 }
 
@@ -260,11 +270,11 @@ export default function CertificateView({ projectData }: { projectData?: unknown
     });
 
     return (
-        <div className="certificate-one-page bg-[#fffdfa] min-h-[690px] w-full max-w-6xl mx-auto p-12 relative border-[12px] border-[#071b3a] shadow-2xl flex flex-col items-center text-center overflow-x-hidden overflow-y-visible break-inside-avoid print:h-[190mm] print:w-[287mm] print:min-h-[190mm] print:max-h-[190mm] print:overflow-hidden print:break-inside-avoid print:shadow-none print:m-0 print:max-w-none print:px-5 print:py-3 print:border-[6px]">
+        <div className="certificate-one-page bg-[#fffdfa] min-h-[690px] w-full max-w-6xl mx-auto p-12 relative border-[12px] border-[#071b3a] shadow-2xl flex flex-col items-center text-center overflow-x-hidden overflow-y-visible break-inside-avoid print:w-full print:h-auto print:min-h-0 print:max-h-none print:overflow-visible print:break-inside-avoid print:shadow-none print:m-0 print:max-w-none print:px-5 print:py-3 print:border-[6px]">
             <style dangerouslySetInnerHTML={{
                 __html: `
                 @media print {
-                    @page { size: A4 landscape; margin: 0.2cm; }
+                    @page { size: A4 landscape; margin: 0; }
                     body.cii-certificate-printing {
                         -webkit-print-color-adjust: exact;
                         print-color-adjust: exact;
@@ -278,18 +288,18 @@ export default function CertificateView({ projectData }: { projectData?: unknown
                         display: flex !important;
                         align-items: center !important;
                         justify-content: center !important;
-                        width: 297mm !important;
-                        min-height: 210mm !important;
+                        width: 100% !important;
+                        min-height: 100vh !important;
                         overflow: hidden !important;
                     }
                     body.cii-certificate-printing .certificate-one-page {
-                        width: 284mm !important;
-                        height: 184mm !important;
-                        min-height: 184mm !important;
-                        max-height: 184mm !important;
+                        width: 294mm !important;
+                        height: auto !important;
+                        min-height: 206mm !important;
+                        max-height: none !important;
                         overflow: visible !important;
-                        transform: scale(0.96);
-                        transform-origin: center center;
+                        transform: none !important;
+                        margin: 0 !important;
                     }
                     body.cii-certificate-printing .certificate-metrics-grid {
                         display: grid !important;

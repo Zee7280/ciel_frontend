@@ -538,14 +538,15 @@ export function ReportProvider({ children }: { children: React.ReactNode }) {
         const adminApproval = String(data.admin_approval_status || '').toLowerCase();
         const paymentStatus = String(data.payment_status || '').toLowerCase();
         const reportFullyVerified =
-            st === 'verified' || st === 'approved' || st === 'finalized';
-        const hasExplicitAdminStatus = Boolean(adm || adminApproval);
+            st === 'verified' || st === 'finalized';
         const adminDone =
             adm === 'verified' ||
             adm === 'approved' ||
             adminApproval === 'verified' ||
             adminApproval === 'approved' ||
-            (!hasExplicitAdminStatus && reportFullyVerified);
+            // Strict legacy fallback: only terminal "verified/finalized" report states unlock
+            // when explicit admin fields are absent in old payloads.
+            reportFullyVerified;
         const paymentCleared =
             st === 'paid' ||
             rs === 'paid' ||
@@ -553,7 +554,7 @@ export function ReportProvider({ children }: { children: React.ReactNode }) {
             paymentStatus === 'approved' ||
             data.payment_verified === true ||
             // End-state report implies fee + review completed in this product flow
-            (!hasExplicitAdminStatus && reportFullyVerified);
+            reportFullyVerified;
         return adminDone && paymentCleared;
     }, [data.status, data.report_status, data.admin_status, data.admin_approval_status, data.payment_status, data.payment_verified]);
 

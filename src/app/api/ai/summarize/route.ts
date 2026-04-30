@@ -407,6 +407,22 @@ Scale Credibility (S) = ___
 
 Section 4 CII Score = ___ / 15
 Classify quality: 13-15=Excellent, 10.5-12.9=Good, 8-10.4=Moderate, 5-7.9=Weak, 0-4.9=Very Weak
+
+SECTION 4 AUDIT GUARDRAIL (MANDATORY):
+Do not score activities, outputs, beneficiaries, or scale only from entered numbers. Validate realism against verified hours, sessions, evidence, and team size.
+Specifically check:
+- Are activities clearly described?
+- Are outputs measurable (not generic claims)?
+- Are beneficiary numbers realistic and counted with method?
+- Do outputs and scale align with evidence and attendance?
+- Are there inflation signals?
+
+Section 4 cap rules (apply if triggered):
+- Activities done but outputs vague: max 10/15
+- Beneficiary numbers inflated: max 8/15
+- Evidence does not support outputs: max 7/15
+- Major contradiction in scale: max 5/15
+
 Provide a brief explanation of the score.`;
                 break;
 
@@ -500,6 +516,23 @@ Linkage (L) = ___
 Realism (R) = ___
 
 Section 5 CII Score = ___ / 20
+
+SECTION 5 REALISM GUARDRAIL (MANDATORY):
+Apply strict realism. Do not reward outcomes unless linked to baseline, activities, outputs, measurement method, and evidence.
+Check:
+- Is the outcome measurable (not only narrative)?
+- Is there before/after or equivalent comparison logic?
+- Is a method of measurement stated?
+- Is the claim evidence-backed and proportionate to intervention?
+- Are limitations acknowledged?
+- Is there overclaiming?
+
+Section 5 cap rules (apply if triggered):
+- Outcomes described but not measured: max 13/20
+- Outcomes vague/generic: max 10/20
+- Outcomes inflated or unsupported: max 8/20
+- Outcomes contradict evidence: max 5/20
+
 Provide a brief explanation of the score.`;
                 break;
 
@@ -752,6 +785,17 @@ Ethics Compliance (E) = ___
 Absence of Contradiction (X) = ___
 
 Section 8 CII Score = ___ / 5
+
+SECTION 8 EVIDENCE AUDIT GUARDRAIL (MANDATORY):
+Evidence must only strengthen score if it is relevant, attributable, time-aligned, ethical, and internally consistent.
+Check for duplicate/unrelated files, weak linkage, date mismatch, unsupported partner claims, inflated numbers not visible in proof, suspicious staging, and contradictions with attendance/activities/outcomes/resources.
+
+Section 8 cap rules (apply if triggered):
+- Some evidence but weak linkage: max 3.5/5
+- Evidence vague or insufficient: max 2.5/5
+- Evidence contradicts claims: max 1.5/5
+- Evidence appears fake/unethical: max 0.5/5
+
 Provide a brief explanation of the score.`;
                 break;
 
@@ -831,6 +875,10 @@ Competency Insight (C) = ___
 Transformative Understanding (T) = ___
 
 Section 9 CII Score = ___ / 5
+
+WRITING QUALITY GUARDRAIL:
+Do not heavily penalize minor language mistakes when meaning is clear. But if writing is vague, repetitive, generic, unclear, or appears template/AI-like without personal insight, reduce this section score appropriately.
+
 Provide a brief explanation of the score.`;
                 break;
 
@@ -911,6 +959,10 @@ Scaling Potential (S) = ___
 Policy/System Relevance (P) = ___
 
 Section 10 CII Score = ___ / 5
+
+WRITING QUALITY GUARDRAIL:
+Do not heavily penalize minor language mistakes when meaning is clear. But if writing is vague, repetitive, generic, unclear, or appears template/AI-like without personal insight, reduce this section score appropriately.
+
 Provide a brief explanation of the score.`;
                 break;
 
@@ -1023,6 +1075,9 @@ Output:
 3. Missing Elements
 4. Feedback
 
+WRITING QUALITY CHECK FOR SECTION 2:
+Do not penalize minor grammar errors if meaning is clear. However, when grammar and wording are unclear enough to weaken interpretation of problem, baseline, academic linkage, or intervention logic, flag as a quality issue and reduce confidence in the section.
+
 SECTION 3 — SDG MAPPING
 Review Section 3 (SDG Mapping).
 
@@ -1089,6 +1144,9 @@ Output:
 3. Missing Elements
 4. Feedback
 
+WRITING QUALITY CHECK FOR SECTION 5:
+If writing is unclear, repetitive, generic, or AI-like without concrete reflection, classify this as a quality weakness and include it in red flags.
+
 SECTION 6 — RESOURCES
 Review Section 6 (Resources).
 
@@ -1153,6 +1211,9 @@ Output:
 3. Missing Elements
 4. Feedback
 
+SECTION 8 AUDIT CAP TRIGGER:
+If evidence is weak, contradictory, suspicious, or ethically concerning, include an explicit recommendation to cap the overall final CII (84 / 74 / 64) or move to manual review for critical integrity concerns.
+
 SECTION 9 — LEARNING & COMPETENCIES
 Review Section 9 (Reflection & Learning).
 
@@ -1171,6 +1232,9 @@ Output:
 2. Red Flags
 3. Missing Elements
 4. Feedback
+
+WRITING QUALITY CHECK FOR SECTION 9:
+If reflection appears copy-paste, generic, or AI-like without authentic personal insight, explicitly flag authenticity risk.
 
 SECTION 10 — SUSTAINABILITY
 Review Section 10 (Sustainability).
@@ -1191,6 +1255,9 @@ Output:
 3. Missing Elements
 4. Feedback
 
+WRITING QUALITY CHECK FOR SECTION 10:
+If continuation or scaling text is unclear, generic, unsupported, or unrealistic, lower confidence and flag as moderate concern.
+
 FINAL CII RED FLAG SUMMARY PROMPT
 Now perform a FINAL AUDIT across ALL sections (1-10).
 
@@ -1207,6 +1274,34 @@ Identify:
 - CRITICAL RED FLAGS: Major inconsistencies, false claims, inflated impact
 - MODERATE ISSUES: Weak logic, missing links, unclear justification
 - MINOR ISSUES: Clarity, structure, or detail improvements
+
+MANDATORY FINAL ADJUSTMENT LOGIC:
+1) Compute Raw CII = S1+S2+S3+S4+S5+S6+S7+S8+S9+S10 using provided section scores.
+2) Determine red flag severity and apply ONE total Red Flag Penalty:
+   - Minor: 2-4
+   - Moderate: 5-10
+   - Serious: 11-20
+   - Critical: trigger manual review / rejection pathway
+3) Apply audit cap using overall quality evidence:
+   - Strong verified realistic report: cap 100
+   - Good work with some writing/evidence weakness: cap 84
+   - Work done but average/vague/weakly supported: cap 74
+   - Work done but inflated numbers or weak evidence: cap 64
+   - Major contradiction/unsupported serious red flags: cap 54
+   - Fake/unverifiable/critical integrity issue: manual review or rejection
+4) Final CII = min(Raw CII - Red Flag Penalty, Audit Cap)
+
+INFLATION DETECTION (MANDATORY):
+Cross-check numbers across attendance, activities, outputs, beneficiaries, outcomes, resources, and evidence.
+Check whether claimed beneficiaries and outputs are feasible within verified hours, sessions, and team size, and whether direct vs indirect beneficiaries are mixed or duplicated.
+
+FINAL DECISION CATEGORY (MANDATORY):
+Classify into exactly one:
+- Clean
+- Minor Issues
+- Revision Needed
+- Audit Concern
+- Integrity Risk
 
 Also provide:
 1. Overall Credibility Score (High / Medium / Low)
@@ -1253,7 +1348,7 @@ SECTION 9 — LEARNING & COMPETENCIES: Quality: ... Red Flags: ... Missing Eleme
 
 SECTION 10 — SUSTAINABILITY: Quality: ... Red Flags: ... Missing Elements: ... Feedback: ...
 
-SECTION 11 — FINAL AUDIT SUMMARY: CRITICAL RED FLAGS: ... MODERATE ISSUES: ... MINOR ISSUES: ... Overall Credibility Score: High/Medium/Low. Risk Level: Safe/Reject. CII Index Score: ___ / 100. Top 5 Required Fixes: 1) ... 2) ... 3) ... 4) ... 5) ... Final Auditor Remark: ... Add Student Feedback only if serious inconsistencies are found.
+SECTION 11 — FINAL AUDIT SUMMARY: CRITICAL RED FLAGS: ... MODERATE ISSUES: ... MINOR ISSUES: ... Overall Credibility Score: High/Medium/Low. Risk Level: Safe/Reject. Raw CII Score: ___ / 100. Penalty Applied: ___. Audit Cap Applied: ___. Final Adjusted CII Score: ___ / 100. CII Index Score: ___ / 100. Final Band: ___. Revision Required: Yes/No. Final Decision Category: Clean/Minor Issues/Revision Needed/Audit Concern/Integrity Risk. Top 5 Required Fixes: 1) ... 2) ... 3) ... 4) ... 5) ... Final Auditor Remark: ... Add Student Feedback only if serious inconsistencies are found.
 
 Submitted Report Data:
 ${JSON.stringify(data)}`;

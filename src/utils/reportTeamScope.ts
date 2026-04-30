@@ -4,6 +4,8 @@
  * or certificate / dossier payloads.
  */
 
+import { authenticatedFetch } from "@/utils/api";
+
 export function pickTeamIdFromRecord(rec: unknown): string {
     if (!rec || typeof rec !== "object") return "";
     const o = rec as Record<string, unknown>;
@@ -103,4 +105,100 @@ export function mergeReportSection1TeamScope(
             participation_type,
         },
     };
+}
+
+function pickProjectIdFromReport(report: Record<string, unknown>): string {
+    const nestedProject =
+        report["project"] && typeof report["project"] === "object"
+            ? (report["project"] as Record<string, unknown>)
+            : undefined;
+    const cand = [
+        report.project_id,
+        report.projectId,
+        (report.opportunity as Record<string, unknown> | undefined)?.id,
+        (report.opportunity as Record<string, unknown> | undefined)?.project_id,
+        (report.opportunity as Record<string, unknown> | undefined)?.projectId,
+        report.opportunity_id,
+        nestedProject?.id,
+    ];
+    for (const c of cand) {
+        if (typeof c === "string" && c.trim()) return c.trim();
+        if (c != null && String(c).trim()) return String(c).trim();
+    }
+    return "";
+}
+
+/** When lead + teammates carry the same embedded `team_id`, drop other teams without calling the engagement API. */
+export function scopeTeamMembersByEmbeddedTeamId(section1: Record<string, unknown>): unknown[] | null {
+    const raw = section1.team_members;
+    if (!Array.isArray(raw) || raw.length === 0) return null;
+    const lead = section1.team_lead as Record<string, unknown> | undefined;
+    const leadTid = pickTeamIdFromRecord(lead);
+    if (!leadTid) return null;
+
+    let anyMemberTagged = false;
+    for (const m of raw) {
+        if (m && typeof m === "object" && pickTeamIdFromRecord(m as Record<string, unknown>)) {
+            anyMemberTagged = true;
+            break;
+        }
+    }
+    if (!anyMemberTagged) return null;
+
+    const filtered = raw.filter((m) => {
+        if (!m || typeof m !== "object") return false;
+        return pickTeamIdFromRecord(m as Record<string, unknown>) === leadTid;
+    });
+    return filtered.length > 0 ? filtered : null;
+}
+
+/** Same merge as student report load: scope roster to the author’s engagement team for dossier / verify UIs. */
+export async function applyEngagementTeamScopeToReport(report: Record<string, unknown>): Promise<Record<string, unknown>> {
+    const section1 = (report.section1 as Record<string, unknown> | undefined) || {};
+    const sync = scopeTeamMembersByEmbeddedTeamId(section1);
+    if (sync) {
+        return {
+            ...report,
+            section1: {
+                ...section1,
+                team_members: sync,
+            },
+        };
+    }
+
+    const projectId = pickProjectIdFromReport(report);
+    if (!projectId) return report;
+
+    const student = report.student as Record<string, unknown> | undefined;
+    const lead = section1.team_lead as Record<string, unknown> | undefined;
+    const emails = [
+        typeof student?.email === "string" ? student.email.trim().toLowerCase() : "",
+        typeof lead?.email === "string" ? String(lead.email).trim().toLowerCase() : "",
+    ].filter(Boolean);
+
+    try {
+        const teamRes = await authenticatedFetch(`/api/v1/engagement/project/${encodeURIComponent(projectId)}/team`);
+        if (!teamRes?.ok) return report;
+        const teamJson = (await teamRes.json().catch(() => ({}))) as { success?: boolean; data?: unknown[] };
+        const teamRows = teamJson.success && Array.isArray(teamJson.data) ? teamJson.data : [];
+
+        let participant: Record<string, unknown> | null = null;
+        for (const em of emails) {
+            for (const row of teamRows) {
+                if (!row || typeof row !== "object") continue;
+                const o = row as Record<string, unknown>;
+                const rowEm = typeof o.email === "string" ? o.email.trim().toLowerCase() : "";
+                if (rowEm && rowEm === em) {
+                    participant = o;
+                    break;
+                }
+            }
+            if (participant) break;
+        }
+        if (!participant) return report;
+
+        return mergeReportSection1TeamScope(report, participant, teamRows);
+    } catch {
+        return report;
+    }
 }

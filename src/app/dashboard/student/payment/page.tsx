@@ -236,6 +236,64 @@ function PaymentContent() {
                 </div>
             </div>
 
+            {/* Project summary first so program + fee + slip stay readable when a file is selected */}
+            <Card className="border-slate-100 bg-slate-50/50">
+                <CardContent className="p-6">
+                    <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between lg:gap-8">
+                        <div className="flex min-w-0 flex-1 items-start gap-4">
+                            <div className="h-12 w-12 shrink-0 rounded-xl border border-slate-200 bg-white flex items-center justify-center font-black text-xl text-blue-600 shadow-sm">
+                                {(projectDetails?.title || "P").substring(0, 2).toUpperCase()}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Paying for Report</p>
+                                <h3 className="mt-1 break-words text-lg font-bold leading-snug text-slate-900">
+                                    {projectDetails?.title}
+                                </h3>
+                            </div>
+                        </div>
+
+                        <div className="flex w-full min-w-0 flex-col gap-4 sm:max-w-full sm:flex-row sm:flex-wrap sm:items-center sm:justify-end lg:w-auto lg:shrink-0 lg:justify-end">
+                            {proofFile ? (
+                                <div className="flex w-full min-w-0 items-center gap-3 rounded-xl border border-blue-100 bg-blue-50 p-3 sm:w-auto sm:max-w-[min(100%,20rem)]">
+                                    <div className="rounded-lg bg-white p-2 text-blue-600 shadow-sm">
+                                        <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden />
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                        <p className="truncate text-xs font-bold text-slate-900">{proofFile.name}</p>
+                                        <p className="text-[10px] font-black uppercase text-slate-500">
+                                            {(proofFile.size / 1024 / 1024).toFixed(2)} MB
+                                        </p>
+                                    </div>
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        type="button"
+                                        onClick={() => setProofFile(null)}
+                                        className="shrink-0 text-slate-500 hover:text-red-500"
+                                    >
+                                        Remove
+                                    </Button>
+                                </div>
+                            ) : null}
+
+                            <div className="flex w-full flex-col gap-4 min-[520px]:flex-row min-[520px]:flex-wrap min-[520px]:items-center min-[520px]:justify-end min-[520px]:gap-6 sm:w-auto lg:w-auto">
+                                <div className="text-left min-[520px]:text-right">
+                                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                                        Amount Due (per student)
+                                    </p>
+                                    <p className="text-xl font-black text-slate-900">{bankInfo.amount}</p>
+                                </div>
+                                <div className="hidden h-10 w-px min-[520px]:block shrink-0 bg-slate-200" aria-hidden />
+                                <div className="flex min-w-[12rem] items-center gap-2 text-sm italic text-slate-500">
+                                    <AlertCircle className="h-4 w-4 shrink-0 text-slate-400" aria-hidden />
+                                    Secure manual transfer
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 {/* Bank Details Card */}
                 <Card className="border-slate-200 shadow-sm overflow-hidden">
@@ -337,20 +395,6 @@ function PaymentContent() {
                                 accept="image/*,application/pdf"
                             />
                         </div>
-                        {proofFile && (
-                            <div className="mt-4 p-3 bg-blue-50 border border-blue-100 rounded-xl flex items-center gap-3">
-                                <div className="bg-white p-2 rounded-lg text-blue-600 shadow-sm">
-                                    <CheckCircle2 className="w-4 h-4" />
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                    <p className="text-xs font-bold text-slate-900 truncate">{proofFile.name}</p>
-                                    <p className="text-[10px] text-slate-500 uppercase font-black">{(proofFile.size / 1024 / 1024).toFixed(2)} MB</p>
-                                </div>
-                                <Button variant="ghost" size="sm" onClick={() => setProofFile(null)} className="text-slate-400 hover:text-red-500">
-                                    Remove
-                                </Button>
-                            </div>
-                        )}
                     </CardContent>
                     <CardFooter className="p-6 pt-0">
                         <Button 
@@ -367,32 +411,6 @@ function PaymentContent() {
                     </CardFooter>
                 </Card>
             </div>
-
-            {/* Project Summary */}
-            <Card className="border-slate-100 bg-slate-50/50">
-                <CardContent className="p-6 flex flex-col md:flex-row items-center justify-between gap-6">
-                    <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-xl bg-white border border-slate-200 flex items-center justify-center font-black text-xl text-blue-600 shadow-sm">
-                            {(projectDetails?.title || "P").substring(0, 2).toUpperCase()}
-                        </div>
-                        <div>
-                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Paying for Report</p>
-                            <h3 className="text-lg font-bold text-slate-900">{projectDetails?.title}</h3>
-                        </div>
-                    </div>
-                    <div className="flex items-center gap-6">
-                        <div className="text-right">
-                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Amount Due (per student)</p>
-                            <p className="text-xl font-black text-slate-900">{bankInfo.amount}</p>
-                        </div>
-                        <div className="w-px h-10 bg-slate-200 hidden md:block" />
-                        <div className="flex items-center gap-2 text-slate-500 italic text-sm">
-                            <AlertCircle className="w-4 h-4" />
-                            Secure manual transfer
-                        </div>
-                    </div>
-                </CardContent>
-            </Card>
 
             <ManualPaymentHistorySection
                 rows={manualPaymentHistory}

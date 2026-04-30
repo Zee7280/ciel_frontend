@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Loader2, RefreshCw, CheckCircle, XCircle, Flag } from "lucide-react";
+import { Loader2, RefreshCw, CheckCircle, XCircle, Flag, ExternalLink } from "lucide-react";
 import { authenticatedFetch } from "@/utils/api";
 import { toast } from "sonner";
 import { normalizeEngagementAttendanceLog } from "@/utils/engagementAttendanceMap";
@@ -154,7 +154,7 @@ export default function AttendancePendingQueuePanel({
             {rows.length === 0 && !loading ? (
                 <p className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 px-4 py-8 text-center text-sm leading-6 text-slate-500">
                     {!projectId.trim()
-                        ? "Select an opportunity above. The list includes how many sessions are still waiting in each project."
+                        ? "Select a project from the list first. Counts on each row show how many sessions are still pending for that opportunity."
                         : autoLoadOnProjectIdChange
                           ? "No pending attendance for this project right now. You can select another project or use Refresh to check again."
                           : 'No rows loaded yet. Choose a project and press "Load queue" (only pending items for your role are returned).'}
@@ -171,7 +171,7 @@ export default function AttendancePendingQueuePanel({
                     return (
                         <div
                             key={id || `row-${idx}`}
-                            className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-gradient-to-br from-white to-slate-50/60 p-4 shadow-sm transition hover:border-slate-300 hover:shadow-md lg:flex-row lg:items-stretch"
+                            className="group flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-slate-300 hover:shadow-md lg:flex-row lg:items-stretch lg:gap-5"
                         >
                             <div className="flex-1 space-y-1 text-sm">
                                 <div className="flex flex-wrap items-center gap-2">
@@ -185,7 +185,7 @@ export default function AttendancePendingQueuePanel({
                                     ) : null}
                                 </div>
                                 {who.name ? (
-                                    <div className="mt-3 rounded-2xl border border-slate-100 bg-white/80 px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
+                                    <div className="mt-3 rounded-2xl border border-slate-100 bg-slate-50/60 px-4 py-3">
                                         <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Participant</p>
                                         <p className="mt-1 font-bold text-slate-950">{who.name}</p>
                                         {who.detail ? <p className="text-xs text-slate-600 mt-0.5">{who.detail}</p> : null}
@@ -198,22 +198,44 @@ export default function AttendancePendingQueuePanel({
                                     {pickStr(row.date)} · {pickStr(row.start_time)} — {pickStr(row.end_time)}
                                 </p>
                                 {pickStr(row.location) ? <p className="text-xs text-slate-500">{pickStr(row.location)}</p> : null}
+                                {(() => {
+                                    const rawUrl = pickStr(rawObj.evidenceUrl ?? rawObj.evidence_url ?? rawObj.evidenceURL);
+                                    const fromRow =
+                                        typeof row.evidence_file === "string" && /^https?:\/\//i.test(row.evidence_file.trim())
+                                            ? row.evidence_file.trim()
+                                            : "";
+                                    const url = fromRow || (rawUrl.startsWith("http") ? rawUrl : "");
+                                    if (!url) return null;
+                                    return (
+                                        <p className="pt-1">
+                                            <a
+                                                href={url}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="inline-flex items-center gap-1 text-xs font-bold text-blue-600 underline decoration-blue-200 underline-offset-2 hover:text-blue-800"
+                                            >
+                                                View evidence
+                                                <ExternalLink className="h-3 w-3" aria-hidden />
+                                            </a>
+                                        </p>
+                                    );
+                                })()}
                                 <label className="block pt-2">
                                     <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Reason (reject/flag)</span>
                                     <input
-                                        className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
+                                        className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
                                         placeholder="Required when rejecting or flagging"
                                         value={reasonByLogId[id] || ""}
                                         onChange={(e) => setReasonByLogId((prev) => ({ ...prev, [id]: e.target.value }))}
                                     />
                                 </label>
                             </div>
-                            <div className="grid grid-cols-3 gap-2 lg:w-28 lg:grid-cols-1">
+                            <div className="grid grid-cols-3 gap-2 rounded-2xl border border-slate-100 bg-slate-50/60 p-2 lg:w-40 lg:grid-cols-1 lg:content-start">
                                 <button
                                     type="button"
                                     disabled={acting !== null}
                                     onClick={() => void act(id, "approve")}
-                                    className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-emerald-600 px-3 py-3 text-xs font-bold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-emerald-700 hover:shadow-md disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none"
+                                    className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-emerald-700/10 bg-emerald-600 px-3 py-3 text-xs font-bold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-emerald-700 hover:shadow-md active:translate-y-0 disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none"
                                 >
                                     {acting === `${id}:approve` ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle className="h-3.5 w-3.5" />}
                                     Approve
@@ -222,7 +244,7 @@ export default function AttendancePendingQueuePanel({
                                     type="button"
                                     disabled={acting !== null}
                                     onClick={() => void act(id, "reject")}
-                                    className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-rose-600 px-3 py-3 text-xs font-bold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-rose-700 hover:shadow-md disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none"
+                                    className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-rose-700/10 bg-rose-600 px-3 py-3 text-xs font-bold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-rose-700 hover:shadow-md active:translate-y-0 disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none"
                                 >
                                     {acting === `${id}:reject` ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <XCircle className="h-3.5 w-3.5" />}
                                     Reject
@@ -231,7 +253,7 @@ export default function AttendancePendingQueuePanel({
                                     type="button"
                                     disabled={acting !== null}
                                     onClick={() => void act(id, "flag")}
-                                    className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-amber-200 bg-amber-50 px-3 py-3 text-xs font-bold text-amber-900 shadow-sm transition hover:-translate-y-0.5 hover:border-amber-300 hover:bg-amber-100 hover:shadow-md disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none"
+                                    className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-amber-300 bg-amber-50 px-3 py-3 text-xs font-bold text-amber-900 shadow-sm transition hover:-translate-y-0.5 hover:border-amber-400 hover:bg-amber-100 hover:shadow-md active:translate-y-0 disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none"
                                 >
                                     {acting === `${id}:flag` ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Flag className="h-3.5 w-3.5" />}
                                     Flag

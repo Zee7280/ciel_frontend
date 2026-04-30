@@ -36,6 +36,7 @@ import { parseSection11AuditSummary, type ReportCIIauditMeta } from "@/lib/parse
 import type { ReportData } from "../../../../student/report/context/ReportContext";
 import { calculateCII } from "../../../../student/report/utils/calculateCII";
 import { readPersistedCiiSnapshot } from "@/utils/reportCiiSnapshot";
+import { applyEngagementTeamScopeToReport } from "@/utils/reportTeamScope";
 
 function normalizeAuditMeta(raw: unknown, summaryText: string): ReportCIIauditMeta | null {
     const fallback = summaryText ? parseSection11AuditSummary(summaryText) : null;
@@ -411,7 +412,9 @@ export default function AdminReportDetailPage() {
                 console.log('📋 Data field:', data.data);
 
                 // Backend might return { success, data } or { report }
-                const reportData = data.data || data.report || data;
+                const raw = data.data || data.report || data;
+                const scoped = await applyEngagementTeamScopeToReport(raw as Record<string, unknown>);
+                const reportData = scoped as unknown as ReportDetail;
                 const section11Text = String(reportData?.section11?.summary_text || "").trim();
                 const parsedAudit = normalizeAuditMeta(reportData?.section11?.audit_meta, section11Text);
                 setReport(reportData);

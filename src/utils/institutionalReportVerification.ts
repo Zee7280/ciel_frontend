@@ -16,9 +16,7 @@ export function isInstitutionallyVerifiedReport(
     return (
         adminSt === "verified" ||
         adminSt === "approved" ||
-        reportSt === "approved" ||
         reportSt === "verified" ||
-        reportSt === "paid" ||
         reportSt === "finalized"
     );
 }

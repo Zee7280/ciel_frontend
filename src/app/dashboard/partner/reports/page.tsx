@@ -34,7 +34,8 @@ interface Report {
     total_hours?: number | string | null;
     verified_hours?: number | string | null;
     required_hours?: number | string | null;
-    sdgs?: number[];
+    /** Numeric IDs or full section3 SDG rows from API */
+    sdgs?: unknown;
     evidence?: string[];
     section1?: {
         metrics?: {
@@ -42,8 +43,8 @@ interface Report {
         } | null;
     } | null;
     section3?: {
-        sdg_alignment?: number[] | string[] | null;
-        sdgs?: number[] | string[] | null;
+        sdg_alignment?: unknown;
+        sdgs?: unknown;
     } | null;
     section4?: {
         project_summary?: {
@@ -120,8 +121,58 @@ function getHoursLogged(r: Report): number {
     );
 }
 
-function getSdgs(r: Report): Array<number | string> {
-    return r.sdgs ?? r.section3?.sdg_alignment ?? r.section3?.sdgs ?? [];
+/** One API row per SDG goal (see student report Section3 shape) — cannot be rendered as a React child. */
+function sdgEntryToDisplayLabel(entry: unknown): string | null {
+    if (entry == null || entry === "") return null;
+    if (typeof entry === "number" && Number.isFinite(entry)) return String(entry);
+    if (typeof entry === "string") {
+        const t = entry.trim();
+        return t.length ? t : null;
+    }
+    if (typeof entry === "object" && entry !== null) {
+        const o = entry as Record<string, unknown>;
+        const id =
+            o.goal_number ?? o.sdg_id ?? o.sdg ?? o.goalNumber ?? o.sdgId ?? o.id;
+        if (id != null && id !== "") return String(id);
+        return null;
+    }
+    return null;
+}
+
+/** Backend sends SDGs as numbers, strings, section3-shaped objects, CSV/JSON strings, etc. */
+function normalizeSdgsList(raw: unknown): string[] {
+    if (raw == null || raw === "") return [];
+    if (Array.isArray(raw)) {
+        return raw.map(sdgEntryToDisplayLabel).filter((x): x is string => x != null);
+    }
+    if (typeof raw === "number" && Number.isFinite(raw)) return [String(raw)];
+    if (typeof raw === "string") {
+        const trimmed = raw.trim();
+        if (!trimmed) return [];
+        if (trimmed.startsWith("[")) {
+            try {
+                const parsed: unknown = JSON.parse(trimmed);
+                return normalizeSdgsList(parsed);
+            } catch {
+                /* ignore */
+            }
+        }
+        return trimmed
+            .split(/[\s,;]+/)
+            .map((p) => p.trim())
+            .filter(Boolean);
+    }
+    if (typeof raw === "object") {
+        const single = sdgEntryToDisplayLabel(raw);
+        if (single !== null) return [single];
+        const vals = Object.values(raw as Record<string, unknown>).filter((v) => v != null);
+        return vals.length ? normalizeSdgsList(vals) : [];
+    }
+    return [];
+}
+
+function getSdgs(r: Report): string[] {
+    return normalizeSdgsList(r.sdgs ?? r.section3?.sdg_alignment ?? r.section3?.sdgs);
 }
 
 function cardTitle(r: Report): string {
@@ -377,9 +428,9 @@ export default function PartnerReportsPage() {
 
                             {/* SDGs */}
                             <div className="flex flex-wrap gap-2">
-                                {getSdgs(report).map((sdg) => (
+                                {getSdgs(report).map((sdg, idx) => (
                                     <span
-                                        key={sdg}
+                                        key={`${report.id}-sdg-${idx}-${String(sdg)}`}
                                         className="px-2 py-1 bg-slate-100 text-slate-700 rounded text-xs font-bold"
                                     >
                                         SDG {sdg}

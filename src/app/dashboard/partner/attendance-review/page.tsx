@@ -1,12 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import Link from "next/link";
-import { ArrowLeft, Inbox, Loader2 } from "lucide-react";
 import { authenticatedFetch } from "@/utils/api";
 import { getStoredCurrentUserId } from "@/utils/currentUser";
 import { toast } from "sonner";
-import AttendancePendingQueuePanel from "@/components/engagement/AttendancePendingQueuePanel";
+import AttendanceReviewDashboard from "@/components/engagement/AttendanceReviewDashboard";
 import { fetchPendingAttendanceCountForProject } from "@/utils/engagementPendingAttendanceResponse";
 
 function isOwnedByCurrentPartner(opportunity: Record<string, unknown>, currentUserId: string) {
@@ -25,15 +23,15 @@ function isOwnedByCurrentPartner(opportunity: Record<string, unknown>, currentUs
     return String(creatorId).trim() === currentUserId;
 }
 
-function formatOpportunityLabel(title: string, n: number | undefined): string {
-    if (n === undefined) return title;
-    if (n > 0) return `${title} — ${n} to review`;
-    return `${title} — no pending`;
+function opportunitySubtitle(o: Record<string, unknown>): string | undefined {
+    const raw = o.category ?? o.opportunity_category ?? o.opportunityCategory;
+    if (typeof raw === "string" && raw.trim()) return raw.trim();
+    return undefined;
 }
 
 export default function PartnerAttendanceReviewPage() {
     const [loading, setLoading] = useState(true);
-    const [projects, setProjects] = useState<{ id: string; title: string }[]>([]);
+    const [projects, setProjects] = useState<{ id: string; title: string; subtitle?: string }[]>([]);
     const [projectId, setProjectId] = useState("");
     const [pendingById, setPendingById] = useState<Record<string, number>>({});
     const [countsLoading, setCountsLoading] = useState(false);
@@ -99,8 +97,9 @@ export default function PartnerAttendanceReviewPage() {
                     .map((o: Record<string, unknown>) => ({
                         id: String(o.id ?? ""),
                         title: String(o.title ?? o.name ?? o.opportunity_title ?? "Untitled").trim() || "Untitled",
+                        subtitle: opportunitySubtitle(o),
                     }))
-                    .filter((p: { id: string; title: string }) => p.id);
+                    .filter((p: { id: string }) => p.id);
                 if (!cancelled) setProjects(mapped);
             } catch {
                 if (!cancelled) toast.error("Could not load your opportunities.");
@@ -114,90 +113,24 @@ export default function PartnerAttendanceReviewPage() {
     }, []);
 
     return (
-        <div className="p-8 max-w-4xl mx-auto space-y-8">
-            <div>
-                <Link
-                    href="/dashboard/partner/requests"
-                    className="group inline-flex items-center gap-1.5 text-slate-500 hover:text-blue-600 text-sm font-bold mb-4"
-                >
-                    <ArrowLeft className="w-4 h-4 transition-transform group-hover:-translate-x-0.5" />
-                    Back to opportunities
-                </Link>
-                <h1 className="text-3xl font-bold text-slate-900">Attendance review</h1>
-                <p className="text-slate-500 mt-2 text-sm max-w-2xl">
-                    Open pending engagement sessions for a project you created. Each opportunity in the list shows how
-                    many are still waiting so you know where to go first. Only items routed to your account appear in the
-                    queue.
-                </p>
-            </div>
-
-            {loading ? (
-                <div className="flex justify-center py-16 text-slate-500 gap-2">
-                    <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
-                </div>
-            ) : (
-                <div className="space-y-4">
-                    <div
-                        className="rounded-xl border border-blue-100 bg-gradient-to-r from-blue-50/80 to-slate-50/80 p-4 flex gap-3 items-start"
-                        role="status"
-                    >
-                        <Inbox className="w-6 h-6 text-blue-600 shrink-0 mt-0.5" aria-hidden />
-                        <div className="min-w-0 text-sm text-slate-700">
-                            {countsLoading || loading ? (
-                                <p>Checking which opportunities have work waiting for you…</p>
-                            ) : (() => {
-                                const total = Object.values(pendingById).reduce((a, b) => a + b, 0);
-                                const withWork = Object.values(pendingById).filter((n) => n > 0).length;
-                                if (total === 0) {
-                                    return (
-                                        <p>
-                                            <span className="font-semibold text-slate-900">No open queue right now.</span> You
-                                            have nothing pending in any of your opportunities, or you are up to date.
-                                        </p>
-                                    );
-                                }
-                                return (
-                                    <p>
-                                        <span className="font-semibold text-slate-900">
-                                            {total} {total === 1 ? "entry" : "entries"} to review
-                                        </span>{" "}
-                                        across {withWork} {withWork === 1 ? "opportunity" : "opportunities"}. Counts in the
-                                        list below; the first project with work was pre-selected when possible.
-                                    </p>
-                                );
-                            })()}
-                        </div>
-                    </div>
-                    <div>
-                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">
-                            Project
-                        </label>
-                        <select
-                            value={projectId}
-                            onChange={(e) => {
-                                didInitProjectChoice.current = true;
-                                setProjectId(e.target.value);
-                            }}
-                            className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm font-medium text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none bg-white"
-                        >
-                            <option value="">Select an opportunity…</option>
-                            {projects.map((p) => (
-                                <option key={p.id} value={p.id}>
-                                    {formatOpportunityLabel(p.title, pendingById[p.id])}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
-
-                    <AttendancePendingQueuePanel
-                        projectId={projectId}
-                        title="Pending attendance"
-                        description="Sessions awaiting your approval for the project above. The queue updates when you change the opportunity or use Refresh."
-                        autoLoadOnProjectIdChange
-                        onPendingCountChanged={handlePanelPendingCount}
-                    />
-                </div>
-            )}
-        </div>
+        <AttendanceReviewDashboard
+            backHref="/dashboard/partner/requests"
+            backLabel="Back to opportunities"
+            eyebrow="Partner workspace"
+            title="Attendance review"
+            description="Open pending engagement sessions for opportunities you own. Counts show how many sessions are still waiting per project. Only items routed to your account appear in the queue."
+            reviewerBadge="Partner queue"
+            projects={projects}
+            projectId={projectId}
+            setProjectId={setProjectId}
+            didInitProjectChoiceRef={didInitProjectChoice}
+            pendingById={pendingById}
+            loading={loading}
+            countsLoading={countsLoading}
+            onRefreshCounts={refreshAllPendingCounts}
+            onQueuePendingCountChanged={handlePanelPendingCount}
+            queueTitle="Pending attendance"
+            queueDescription="Sessions awaiting your approval for the selected project. Use Refresh after actions or to pick up changes from students."
+        />
     );
 }

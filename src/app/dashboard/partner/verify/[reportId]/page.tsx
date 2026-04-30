@@ -12,6 +12,7 @@ import {
 import { toast } from 'sonner';
 import clsx from 'clsx';
 import ReportPrintView from '../../../student/report/components/ReportPrintView';
+import { applyEngagementTeamScopeToReport } from '@/utils/reportTeamScope';
 import AttendanceSummaryTable from '../../../student/engagement/components/AttendanceSummaryTable';
 import { checkReportQuality, QualityAlert } from '@/utils/reportQuality';
 
@@ -103,9 +104,10 @@ export default function ReportDetailPage() {
                 console.log('📋 Data field:', data.data);
 
                 // Backend might return { success, data } or { report }
-                const reportData = data.data || data.report || data;
-                setReport(reportData);
-                setQualityAlerts(checkReportQuality(reportData));
+                const raw = data.data || data.report || data;
+                const scoped = await applyEngagementTeamScopeToReport(raw as Record<string, unknown>);
+                setReport(scoped as unknown as ReportDetail);
+                setQualityAlerts(checkReportQuality(scoped));
             } else {
                 const errorText = await response?.text().catch(() => 'No error text');
                 console.error('❌ API Error:', response?.status, errorText);

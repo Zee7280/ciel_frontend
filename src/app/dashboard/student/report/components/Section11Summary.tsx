@@ -15,7 +15,7 @@ import { parseSection11AuditSummary, type ReportCIIauditMeta } from "@/lib/parse
 import clsx from "clsx";
 import ReportVerificationQr from "@/components/ReportVerificationQr";
 import { pickImpactVerifyUrlFromPayload } from "@/utils/reportVerificationUrl";
-import { formatMergedSdgGoalsShort, mergedSdgTitlesLine, uniqueMergedSdgGoalNumbers } from "../utils/reportSdgMerge";
+import { mergedSdgTitlesLine, uniqueMergedSdgGoalNumbers } from "../utils/reportSdgMerge";
 
 type Section11SummaryProps = {
     /** When the footer submit control is hidden (summary-only workspace), opens the same confirm flow. */
@@ -179,6 +179,13 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
 
     const hasMergedSdgs = mergedSdgNums.length > 0;
 
+    /** Match certificate wording: full merged list, no "Goal A, Goal B +N" truncation. */
+    const sdgAlignmentDisplay = !hasMergedSdgs
+        ? "—"
+        : mergedSdgNums.length === 1
+          ? `Goal ${mergedSdgNums[0]}`
+          : `Goals ${mergedSdgNums.join(", ")}`;
+
     const stats = [
         {
             label: "CII Index Score",
@@ -201,8 +208,11 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
         {
             label: "SDG alignment",
             icon: Target,
-            display: hasMergedSdgs ? formatMergedSdgGoalsShort(mergedSdgNums) : "—",
+            display: sdgAlignmentDisplay,
             suffix: "",
+            tooltip:
+                mergedSdgNarrative ||
+                (mergedSdgNums.length ? mergedSdgNums.map((n) => `Goal ${n}`).join(", ") : undefined),
         },
     ];
 
@@ -274,6 +284,7 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                     {stats.map((stat, i) => (
                         <div
                             key={i}
+                            title={stat.tooltip}
                             className={clsx(
                                 "group relative overflow-hidden rounded-2xl border bg-white p-5 md:p-6 flex flex-col gap-3 shadow-sm transition-all duration-300",
                                 showVerifiedImpactScores

@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { useReportForm } from "../context/ReportContext";
 import type { ReportData } from "../context/ReportContext";
-import { Award, CheckCircle, ShieldCheck } from "lucide-react";
+import { Award, CheckCircle } from "lucide-react";
 import { calculateCII } from "../utils/calculateCII";
 import { calculateEngagementMetrics } from "../utils/engagementMetrics";
 import { deriveCertificateProjectDisplay } from "../utils/certificateDisplay";
@@ -177,7 +177,7 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
               suggestions: persistedCii.suggestions ?? calculatedCiiResult.suggestions,
           }
         : calculatedCiiResult;
-    const { totalScore, level, breakdown } = ciiResult;
+    const { totalScore, breakdown } = ciiResult;
     const ciiBadge = getCiiCertificateBadge(Math.round(totalScore));
 
     const dossierAuditMeta =
@@ -414,9 +414,11 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
                             <tbody className="divide-y divide-slate-100 bg-white">
                                 {teamMembers.map((m: ReportData["section1"]["team_members"][number], i: number) => (
                                     <tr key={i}>
-                                        <td className="px-4 py-3 align-top font-bold text-slate-900">{m.fullName?.trim() || m.name}</td>
+                                        <td className="px-4 py-3 align-top font-bold text-slate-900">
+                                            {(m as { fullName?: string }).fullName?.trim() || m.name}
+                                        </td>
                                         <td className="px-4 py-3 align-top text-[10px] font-bold uppercase tracking-tight text-slate-600">
-                                            {m.role}
+                                            {(String((m as { role?: string }).role || "").trim() || "Team member")}
                                         </td>
                                     </tr>
                                 ))}
@@ -745,23 +747,6 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
                             </tr>
                         </tbody>
                     </table>
-                    <div className="mt-6 flex flex-col gap-8 rounded-2xl border border-white/10 bg-slate-950 p-6 text-white shadow-xl ring-1 ring-black/20 sm:flex-row sm:items-center sm:justify-between sm:gap-10 sm:p-8">
-                        <div className="flex items-center gap-4 sm:gap-5">
-                            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border border-white/15 bg-black/30 sm:h-16 sm:w-16">
-                                <ShieldCheck className="h-7 w-7 text-white sm:h-8 sm:w-8" strokeWidth={1.75} />
-                            </div>
-                            <div className="min-w-0 space-y-1">
-                                <p className={printDossierTone.labelOnNavy}>Engagement status</p>
-                                <p className={printDossierTone.engagementValue}>{level}</p>
-                            </div>
-                        </div>
-                        <div className="min-w-0 text-left sm:max-w-sm sm:text-right">
-                            <p className={`mb-1.5 ${printDossierTone.labelOnNavy}`}>CII calculation matrix</p>
-                            <p className={printDossierTone.matrixBlurb}>
-                                CIEL institutional protocol — verified impact scoring
-                            </p>
-                        </div>
-                    </div>
                 </div>
 
                 {dossierSectionWiseAuditBlocks.length > 0 ? (

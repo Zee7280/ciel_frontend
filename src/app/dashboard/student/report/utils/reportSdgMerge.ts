@@ -2,9 +2,23 @@ import type { ReportData } from "../context/ReportContext";
 import { findSdgById } from "@/utils/sdgData";
 
 function digitsGoalNumber(v: unknown): number | null {
-    const digits = String(v ?? "").replace(/\D/g, "");
-    if (!digits) return null;
-    const n = parseInt(digits, 10);
+    if (typeof v === "number" && Number.isFinite(v)) {
+        const n = Math.trunc(v);
+        if (n >= 1 && n <= 17) return n;
+    }
+
+    const raw = String(v ?? "").trim();
+    if (!raw) return null;
+
+    const exactDigits = raw.match(/^\D*([0-9]{1,2})\D*$/);
+    if (exactDigits?.[1]) {
+        const n = parseInt(exactDigits[1], 10);
+        if (Number.isFinite(n) && n >= 1 && n <= 17) return n;
+    }
+
+    const firstGoalLike = raw.match(/\b(1[0-7]|[1-9])\b/);
+    if (!firstGoalLike?.[1]) return null;
+    const n = parseInt(firstGoalLike[1], 10);
     if (!Number.isFinite(n) || n < 1 || n > 17) return null;
     return n;
 }
@@ -19,6 +33,16 @@ function firstArray(...values: unknown[]): unknown[] {
     for (const value of values) {
         if (Array.isArray(value)) return value;
         if (objectRecord(value)) return [value];
+        if (typeof value === "string") {
+            const trimmed = value.trim();
+            if (!trimmed) continue;
+            const parts = trimmed
+                .split(/[,\|;/]+/)
+                .map((s) => s.trim())
+                .filter(Boolean);
+            if (parts.length > 1) return parts;
+            return [trimmed];
+        }
         if (value !== undefined && value !== null && String(value).trim() !== "") return [value];
     }
     return [];
@@ -136,11 +160,45 @@ export function listStudentReportSdgs(section3: ReportData["section3"]): ReportS
     return rows;
 }
 
-/** Distinct goal numbers (opportunity ∪ student), sorted 1–17. */
+/** Extra goal indices sometimes persisted alongside primary/secondary (API alias fields). */
+function collectLooseGoalNumbersFromSection3(section3: ReportData["section3"] | undefined): number[] {
+    if (!section3) return [];
+    const loose = section3 as unknown as Record<string, unknown>;
+    const out: number[] = [];
+    for (const key of ["sdg_alignment", "aligned_sdgs", "sdgs"] as const) {
+        const raw = loose[key];
+        if (raw == null) continue;
+        const pushN = (v: unknown) => {
+            const n =
+                typeof v === "object" && v !== null
+                    ? digitsGoalNumber(
+                          firstValue(v as Record<string, unknown>, [
+                              "goal_number",
+                              "goalNumber",
+                              "sdg_id",
+                              "sdgId",
+                              "sdg",
+                              "id",
+                          ]),
+                      )
+                    : digitsGoalNumber(v);
+            if (n) out.push(n);
+        };
+        if (Array.isArray(raw)) {
+            raw.forEach(pushN);
+        } else {
+            pushN(raw);
+        }
+    }
+    return out;
+}
+
+/** Distinct goal numbers (opportunity ∪ student ∪ loose section3 fields), sorted 1–17. */
 export function uniqueMergedSdgGoalNumbers(projectData: unknown, section3: ReportData["section3"]): number[] {
     const set = new Set<number>();
     listOpportunityReportSdgs(projectData).forEach((r) => set.add(r.goalNumber));
     listStudentReportSdgs(section3).forEach((r) => set.add(r.goalNumber));
+    collectLooseGoalNumbersFromSection3(section3).forEach((n) => set.add(n));
     return Array.from(set).sort((a, b) => a - b);
 }
 
