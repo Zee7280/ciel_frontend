@@ -7,15 +7,13 @@ import Footer from "@/components/Footer";
 import { Search, MapPin, Users, ArrowRight, Filter, Loader2 } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
-import type { CreatorBucket, ModeBucket, VisibilityBucket } from "@/utils/opportunityListing";
+import type { ModeBucket, VisibilityBucket } from "@/utils/opportunityListing";
 import {
     buildSdgFilterLabel,
     computeSeatsRemaining,
-    creatorMenuLabel,
     modeMenuLabel,
     normalizeModeBucket,
     passesSeatsFilter,
-    pickCreatorBucket,
     pickOpportunityTypes,
     pickUniversityLabel,
     pickVisibilityBucket,
@@ -35,7 +33,6 @@ interface Project {
     category?: string;
     types?: string[];
     universityLabel: string;
-    creatorBucket: CreatorBucket;
     modeBucket: ModeBucket;
     visibilityBucket: VisibilityBucket;
     opportunityTypes: string[];
@@ -48,7 +45,6 @@ export default function ProjectsPage() {
     const [isLoading, setIsLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState("");
     const [universityFilter, setUniversityFilter] = useState("all");
-    const [creatorFilter, setCreatorFilter] = useState<"all" | CreatorBucket>("all");
     const [modeFilter, setModeFilter] = useState<"all" | ModeBucket>("all");
     const [oppTypeFilter, setOppTypeFilter] = useState("all");
     const [sdgFilter, setSdgFilter] = useState("all");
@@ -138,7 +134,6 @@ export default function ProjectsPage() {
                                     : "Social Impact"),
                             types: opportunityTypes,
                             universityLabel: pickUniversityLabel(p),
-                            creatorBucket: pickCreatorBucket(p),
                             modeBucket: normalizeModeBucket(p.mode),
                             visibilityBucket: pickVisibilityBucket(p),
                             opportunityTypes,
@@ -191,7 +186,6 @@ export default function ProjectsPage() {
     const resetFilters = () => {
         setSearchQuery("");
         setUniversityFilter("all");
-        setCreatorFilter("all");
         setModeFilter("all");
         setOppTypeFilter("all");
         setSdgFilter("all");
@@ -216,7 +210,6 @@ export default function ProjectsPage() {
             if (!hay.includes(q)) return false;
         }
         if (universityFilter !== "all" && project.universityLabel !== universityFilter) return false;
-        if (creatorFilter !== "all" && project.creatorBucket !== creatorFilter) return false;
         if (modeFilter !== "all" && project.modeBucket !== modeFilter) return false;
         if (oppTypeFilter !== "all" && !project.opportunityTypes.includes(oppTypeFilter)) return false;
         if (sdgFilter !== "all" && project.sdgLabel !== sdgFilter) return false;
@@ -273,21 +266,6 @@ export default function ProjectsPage() {
                                     {universityOptions.map((u) => (
                                         <option key={u} value={u}>
                                             {u === "all" ? "All universities" : u}
-                                        </option>
-                                    ))}
-                                </select>
-                            </label>
-                            <label className="flex flex-col gap-1 text-[11px] font-bold text-slate-500 uppercase tracking-wide">
-                                Creator
-                                <select
-                                    value={creatorFilter}
-                                    onChange={(e) => setCreatorFilter(e.target.value as "all" | CreatorBucket)}
-                                    className={selectClass}
-                                >
-                                    <option value="all">All creators</option>
-                                    {(["student", "faculty", "partner", "unspecified"] as const).map((b) => (
-                                        <option key={b} value={b}>
-                                            {creatorMenuLabel(b)}
                                         </option>
                                     ))}
                                 </select>

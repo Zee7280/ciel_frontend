@@ -10,6 +10,7 @@ import {
     type DashboardNavRole,
 } from "@/utils/dashboardNavRole";
 import { authenticatedFetch } from "@/utils/api";
+import { CIEL_NOTIFICATIONS_UNREAD_EVENT, type CielNotificationsUnreadEventDetail, broadcastUnreadNotificationsCount } from "@/utils/cielNotificationsUnread";
 
 type HeaderNotification = {
     id: number;
@@ -87,6 +88,50 @@ export default function DashboardHeader() {
     const [notifPreview, setNotifPreview] = useState<HeaderNotification[]>([]);
     const notifWrapRef = useRef<HTMLDivElement>(null);
 
+    /** After first successful poll, overrides `user.notifications_count` from localStorage for the bell badge. */
+    const [liveUnreadInboxCount, setLiveUnreadInboxCount] = useState<number | null>(null);
+
+    const refreshUnreadInboxCount = useCallback(async () => {
+        if (!notificationHref) return;
+        try {
+            const res = await authenticatedFetch("/api/v1/notifications/unread-count", {}, { redirectToLogin: false });
+            if (!res?.ok) return;
+            const data = (await res.json()) as { success?: boolean; data?: { count?: number } };
+            if (data.success && typeof data.data?.count === "number") {
+                const count = data.data.count;
+                setLiveUnreadInboxCount(count);
+                broadcastUnreadNotificationsCount(count);
+            }
+        } catch {
+            /* non-fatal */
+        }
+    }, [notificationHref]);
+
+    useEffect(() => {
+        if (!notificationHref) {
+            setLiveUnreadInboxCount(null);
+            return;
+        }
+        void refreshUnreadInboxCount();
+        const interval = setInterval(() => void refreshUnreadInboxCount(), 30000);
+        return () => clearInterval(interval);
+    }, [notificationHref, refreshUnreadInboxCount]);
+
+    useEffect(() => {
+        if (!notificationHref) return;
+        const handler = (e: Event) => {
+            const ce = e as CustomEvent<CielNotificationsUnreadEventDetail>;
+            if (typeof ce.detail?.count === "number") {
+                setLiveUnreadInboxCount(ce.detail.count);
+            }
+        };
+        window.addEventListener(CIEL_NOTIFICATIONS_UNREAD_EVENT, handler);
+        return () => window.removeEventListener(CIEL_NOTIFICATIONS_UNREAD_EVENT, handler);
+    }, [notificationHref]);
+
+    const headerUnreadBellCount =
+        liveUnreadInboxCount !== null ? liveUnreadInboxCount : (user?.notifications_count ?? 0);
+
     const loadHeaderNotifications = useCallback(async () => {
         if (!notificationHref) return;
         setNotifLoading(true);
@@ -110,7 +155,8 @@ export default function DashboardHeader() {
         } finally {
             setNotifLoading(false);
         }
-    }, [notificationHref]);
+        void refreshUnreadInboxCount();
+    }, [notificationHref, refreshUnreadInboxCount]);
 
     useEffect(() => {
         if (notifOpen && notificationHref) {
@@ -218,7 +264,7 @@ export default function DashboardHeader() {
                             aria-label="Notifications"
                         >
                             <Bell className="w-5 h-5 group-hover:scale-110 transition-transform" />
-                            {user?.notifications_count ? (
+                            {headerUnreadBellCount > 0 ? (
                                 <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-blue-600 rounded-full border-2 border-white" />
                             ) : null}
                         </button>
@@ -316,7 +362,7 @@ export default function DashboardHeader() {
                 ) : (
                     <button type="button" className="relative p-2.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all group">
                         <Bell className="w-5 h-5 group-hover:scale-110 transition-transform" />
-                        {user?.notifications_count ? (
+                        {(user?.notifications_count ?? 0) > 0 ? (
                             <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-blue-600 rounded-full border-2 border-white"></span>
                         ) : null}
                     </button>

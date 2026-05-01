@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { Bell, CheckCircle, Trash2, Filter, Loader2, AlertCircle, Info, Clock } from "lucide-react";
 import { authenticatedFetch } from "@/utils/api";
+import { broadcastUnreadNotificationsCount } from "@/utils/cielNotificationsUnread";
 import { toast } from "sonner";
 
 interface Notification {
@@ -29,7 +30,9 @@ export default function PartnerNotificationsPage() {
             if (res && res.ok) {
                 const data = await res.json();
                 if (data.success) {
-                    setNotifications(data.data || []);
+                    const list = data.data || [];
+                    setNotifications(list);
+                    broadcastUnreadNotificationsCount(list.filter((n: Notification) => !n.isRead).length);
                 }
             }
         } catch (error) {
@@ -46,9 +49,11 @@ export default function PartnerNotificationsPage() {
                 method: 'PUT'
             });
             if (res && res.ok) {
-                setNotifications(prev =>
-                    prev.map(n => n.id === id ? { ...n, isRead: true } : n)
-                );
+                setNotifications((prev) => {
+                    const next = prev.map((n) => (n.id === id ? { ...n, isRead: true } : n));
+                    broadcastUnreadNotificationsCount(next.filter((x) => !x.isRead).length);
+                    return next;
+                });
             }
         } catch (error) {
             toast.error("Failed to mark as read");
@@ -61,7 +66,11 @@ export default function PartnerNotificationsPage() {
                 method: 'DELETE'
             });
             if (res && res.ok) {
-                setNotifications(prev => prev.filter(n => n.id !== id));
+                setNotifications((prev) => {
+                    const next = prev.filter((n) => n.id !== id);
+                    broadcastUnreadNotificationsCount(next.filter((x) => !x.isRead).length);
+                    return next;
+                });
                 toast.success("Notification deleted");
             }
         } catch (error) {

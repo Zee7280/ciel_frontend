@@ -7,6 +7,8 @@ import { Label } from "../../report/components/ui/label";
 import { Button } from "../../report/components/ui/button";
 import { authenticatedFetch } from "@/utils/api";
 import { pakistaniUniversities } from "@/utils/universityData";
+import PhoneConnectivityRow from "@/components/ui/PhoneConnectivityRow";
+import { composeInternationalPhone, parsePhoneForDisplay } from "@/utils/countryCallingCodes";
 import clsx from "clsx";
 import { useRef, useEffect } from "react";
 
@@ -52,6 +54,25 @@ export default function IdentityVerification({
     const [showUniDropdown, setShowUniDropdown] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
 
+    const initialPhone = parsePhoneForDisplay(String(initialData.mobile ?? ""));
+    const [phoneCountryKey, setPhoneCountryKey] = useState(initialPhone.phoneCountryKey);
+    const [phoneNational, setPhoneNational] = useState(initialPhone.national);
+
+    const [formData, setFormData] = useState({
+        fullName: initialData.fullName || '',
+        cnic: initialData.cnic || '',
+        email: initialData.email || '',
+        universityId: initialData.universityId || '',
+        universityName: initialData.universityName || '',
+        academicProgram: initialData.academicProgram || '',
+        yearOfStudy: initialData.yearOfStudy || '3rd Year',
+        department: initialData.department || '',
+        academicIntegrationType: initialData.academicIntegrationType || 'Course-Linked',
+        facultySupervisorEmail: initialData.facultySupervisorEmail || '',
+    });
+
+    const [otpInputs, setOtpInputs] = useState({ email: '' });
+
     // Close dropdown when clicking outside
     useEffect(() => {
         function handleClickOutside(event: MouseEvent) {
@@ -69,21 +90,11 @@ export default function IdentityVerification({
         }
     }, [initialData.verified]);
 
-    const [formData, setFormData] = useState({
-        fullName: initialData.fullName || '',
-        cnic: initialData.cnic || '',
-        mobile: initialData.mobile || '',
-        email: initialData.email || '',
-        universityId: initialData.universityId || '',
-        universityName: initialData.universityName || '',
-        academicProgram: initialData.academicProgram || '',
-        yearOfStudy: initialData.yearOfStudy || '3rd Year',
-        department: initialData.department || '',
-        academicIntegrationType: initialData.academicIntegrationType || 'Course-Linked',
-        facultySupervisorEmail: initialData.facultySupervisorEmail || '',
-    });
-
-    const [otpInputs, setOtpInputs] = useState({ email: '' });
+    useEffect(() => {
+        const next = parsePhoneForDisplay(String(initialData?.mobile ?? ""));
+        setPhoneCountryKey(next.phoneCountryKey);
+        setPhoneNational(next.national);
+    }, [initialData?.mobile]);
 
     const sendOtp = async (type: 'email') => {
         setIsVerifyingOtp(prev => ({ ...prev, [type]: true }));
@@ -114,11 +125,16 @@ export default function IdentityVerification({
             if (storedUserStr) {
                 try {
                     const u = JSON.parse(storedUserStr);
+                    const rawPhone = u.phone || u.contact;
+                    if (rawPhone) {
+                        const p = parsePhoneForDisplay(String(rawPhone));
+                        setPhoneCountryKey(p.phoneCountryKey);
+                        setPhoneNational(p.national);
+                    }
                     setFormData(prev => ({
                         ...prev,
                         fullName: u.name || prev.fullName,
                         email: u.email || prev.email,
-                        mobile: u.phone || u.contact || prev.mobile,
                         universityName: u.university || u.institution || prev.universityName
                     }));
                     if (u.email) {
@@ -184,7 +200,14 @@ export default function IdentityVerification({
     const handleSubmit = async () => {
         setIsSubmitting(true);
         try {
-            const body: any = { ...formData, projectId, participationMode, isTeamLead, status: 'pending_ciel_approval' };
+            const body: any = {
+                ...formData,
+                mobile: composeInternationalPhone(phoneCountryKey, phoneNational),
+                projectId,
+                participationMode,
+                isTeamLead,
+                status: 'pending_ciel_approval',
+            };
             // facultySupervisorEmail is now collected at the application/apply stage — not here
             delete body.facultySupervisorEmail;
             const resolvedTeamId = teamId || initialData.teamId || initialData.team_id || "";
@@ -292,15 +315,19 @@ export default function IdentityVerification({
                                     <Smartphone className="w-3.5 h-3.5" /> Mobile Contact
                                 </Label>
                                 <div className="space-y-3">
-                                    <div className="relative">
-                                        <Input
-                                            placeholder="03XXXXXXXXX"
-                                            value={formData.mobile}
-                                            disabled={otpVerified.email || !!initialData.verified}
-                                            onChange={(e) => setFormData({ ...formData, mobile: e.target.value })}
-                                            className="h-11 bg-white border-slate-100 rounded-xl font-bold disabled:opacity-70 disabled:cursor-not-allowed"
-                                        />
-                                    </div>
+                                    <PhoneConnectivityRow
+                                        usePortalCountryPicker
+                                        phoneCountryKey={phoneCountryKey}
+                                        nationalDigits={phoneNational}
+                                        onPhoneCountryKeyChange={setPhoneCountryKey}
+                                        onNationalDigitsChange={setPhoneNational}
+                                        disabled={otpVerified.email || !!initialData.verified}
+                                        maxNationalDigits={15}
+                                        placeholderNational="3001234567"
+                                        selectClassName="h-11 min-w-[7.5rem] rounded-xl border-slate-100 font-bold text-xs shadow-none focus-visible:border-report-primary focus-visible:ring-2 focus-visible:ring-report-primary/20"
+                                        inputClassName="h-11 rounded-xl border-slate-100 font-bold shadow-none focus:border-report-primary focus:ring-2 focus:ring-report-primary/20"
+                                        rowClassName="items-stretch gap-2"
+                                    />
                                     <p className="text-[10px] text-slate-400 font-medium">Used for critical institutional notifications.</p>
                                 </div>
                             </div>

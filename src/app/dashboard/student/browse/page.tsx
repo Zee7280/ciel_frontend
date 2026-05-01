@@ -7,15 +7,13 @@ import { authenticatedFetch } from "@/utils/api";
 import { resolveAttendanceApproverType, type AttendanceApproverType } from "@/utils/attendanceApproverRouting";
 import { getStoredCurrentUserId } from "@/utils/currentUser";
 import { isStudentOpportunityLiveForReporting } from "@/utils/opportunityWorkflow";
-import type { CreatorBucket, ModeBucket, VisibilityBucket } from "@/utils/opportunityListing";
+import type { ModeBucket, VisibilityBucket } from "@/utils/opportunityListing";
 import {
     buildSdgFilterLabel,
     computeSeatsRemaining,
-    creatorMenuLabel,
     modeMenuLabel,
     normalizeModeBucket,
     passesSeatsFilter,
-    pickCreatorBucket,
     pickOpportunityTypes,
     pickUniversityLabel,
     pickVisibilityBucket,
@@ -86,7 +84,6 @@ interface BrowseOpportunity {
     };
     /** Normalized for listing filters */
     universityLabel?: string;
-    creatorBucket?: CreatorBucket;
     modeBucket?: ModeBucket;
     visibilityBucket?: VisibilityBucket;
     opportunityTypes?: string[];
@@ -180,7 +177,6 @@ function normalizeOpportunity(op: BrowseOpportunity): BrowseOpportunity {
         application_stage: application_stage || undefined,
         application_status: applicationStatus || undefined,
         universityLabel: pickUniversityLabel(raw),
-        creatorBucket: pickCreatorBucket(raw),
         modeBucket: normalizeModeBucket(op.mode ?? raw.mode),
         visibilityBucket: pickVisibilityBucket(raw),
         opportunityTypes,
@@ -250,7 +246,6 @@ export default function StudentBrowseOpportunitiesPage() {
     // Filters & View State
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
     const [universityFilter, setUniversityFilter] = useState("all");
-    const [creatorFilter, setCreatorFilter] = useState<"all" | CreatorBucket>("all");
     const [modeFilter, setModeFilter] = useState<"all" | ModeBucket>("all");
     const [oppTypeFilter, setOppTypeFilter] = useState("all");
     const [sdgFilter, setSdgFilter] = useState("all");
@@ -274,7 +269,6 @@ export default function StudentBrowseOpportunitiesPage() {
 
     const filteredOpportunities = opportunities.filter((op) => {
         if (universityFilter !== "all" && (op.universityLabel || "Unspecified") !== universityFilter) return false;
-        if (creatorFilter !== "all" && (op.creatorBucket || "unspecified") !== creatorFilter) return false;
         if (modeFilter !== "all" && (op.modeBucket || "unspecified") !== modeFilter) return false;
         if (oppTypeFilter !== "all" && !(op.opportunityTypes || []).includes(oppTypeFilter)) return false;
         if (sdgFilter !== "all" && (op.sdgLabel || "Unspecified SDG") !== sdgFilter) return false;
@@ -286,7 +280,6 @@ export default function StudentBrowseOpportunitiesPage() {
 
     const clearListingFilters = () => {
         setUniversityFilter("all");
-        setCreatorFilter("all");
         setModeFilter("all");
         setOppTypeFilter("all");
         setSdgFilter("all");
@@ -408,19 +401,6 @@ export default function StudentBrowseOpportunitiesPage() {
                         {universityOptions.map((u) => (
                             <option key={u} value={u}>
                                 {u}
-                            </option>
-                        ))}
-                    </select>
-                    <select
-                        value={creatorFilter}
-                        onChange={(e) => setCreatorFilter(e.target.value as "all" | CreatorBucket)}
-                        className={filterSelectClass}
-                        title="Creator type"
-                    >
-                        <option value="all">All creators</option>
-                        {(["student", "faculty", "partner", "unspecified"] as const).map((b) => (
-                            <option key={b} value={b}>
-                                {creatorMenuLabel(b)}
                             </option>
                         ))}
                     </select>

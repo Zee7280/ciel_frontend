@@ -12,11 +12,13 @@ import {
     readDashboardNavRoleFromStorage,
     type DashboardNavRole,
 } from "@/utils/dashboardNavRole";
+import { CIEL_NOTIFICATIONS_UNREAD_EVENT, type CielNotificationsUnreadEventDetail } from "@/utils/cielNotificationsUnread";
 
 export default function Sidebar() {
     const pathname = usePathname();
     const [unreadCount, setUnreadCount] = useState(0);
     const [impactHistoryBadge, setImpactHistoryBadge] = useState(0);
+    const [notificationUnreadCount, setNotificationUnreadCount] = useState(0);
     const router = useRouter();
 
     const handleLogout = () => {
@@ -62,6 +64,39 @@ export default function Sidebar() {
     const isPartner = navRole === "partner";
     const isFaculty = navRole === "faculty";
     const isAdmin = navRole === "admin";
+
+    const hasInboxNotificationsNav = isStudent || isPartner || isFaculty;
+
+    useEffect(() => {
+        if (!hasInboxNotificationsNav) {
+            setNotificationUnreadCount(0);
+            return;
+        }
+        const syncFromLs = () => {
+            try {
+                const raw = localStorage.getItem("ciel_user") || localStorage.getItem("user");
+                const u = raw ? JSON.parse(raw) : null;
+                if (typeof u?.notifications_count === "number") {
+                    setNotificationUnreadCount(u.notifications_count);
+                }
+            } catch {
+                /* ignore */
+            }
+        };
+        syncFromLs();
+        const handler = (e: Event) => {
+            const ce = e as CustomEvent<CielNotificationsUnreadEventDetail>;
+            if (typeof ce.detail?.count === "number") {
+                setNotificationUnreadCount(ce.detail.count);
+            }
+        };
+        window.addEventListener(CIEL_NOTIFICATIONS_UNREAD_EVENT, handler);
+        window.addEventListener("ciel_user_updated", syncFromLs);
+        return () => {
+            window.removeEventListener(CIEL_NOTIFICATIONS_UNREAD_EVENT, handler);
+            window.removeEventListener("ciel_user_updated", syncFromLs);
+        };
+    }, [hasInboxNotificationsNav]);
 
     useEffect(() => {
         if (!isStudent) {
@@ -199,6 +234,11 @@ export default function Sidebar() {
                                     {unreadCount > 99 ? "99+" : unreadCount}
                                 </span>
                             )}
+                            {link.label === "Notifications" && notificationUnreadCount > 0 && (
+                                <span className="bg-rose-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm">
+                                    {notificationUnreadCount > 99 ? "99+" : notificationUnreadCount}
+                                </span>
+                            )}
                             {link.label === "Impact History" && impactHistoryBadge > 0 && (
                                 <span className="rounded-full bg-amber-500/90 px-2 py-0.5 text-[10px] font-bold text-white shadow-sm">
                                     {impactHistoryBadge > 99 ? "99+" : impactHistoryBadge}
@@ -243,6 +283,11 @@ export default function Sidebar() {
                             {link.label === "Messages" && unreadCount > 0 && (
                                 <span className="absolute right-2 top-1 rounded-full bg-slate-900 px-1.5 py-0.5 text-[9px] font-bold leading-none text-white">
                                     {unreadCount > 99 ? "99+" : unreadCount}
+                                </span>
+                            )}
+                            {link.label === "Notifications" && notificationUnreadCount > 0 && (
+                                <span className="absolute right-2 top-1 rounded-full bg-rose-600 px-1.5 py-0.5 text-[9px] font-bold leading-none text-white">
+                                    {notificationUnreadCount > 99 ? "99+" : notificationUnreadCount}
                                 </span>
                             )}
                             {link.label === "Impact History" && impactHistoryBadge > 0 && (
