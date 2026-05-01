@@ -16,9 +16,20 @@ import { FieldError } from "./ui/FieldError";
 import React, { useMemo, useEffect, useState } from "react";
 import clsx from "clsx";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog";
+import { toast } from "sonner";
+import { MAX_REPORT_IMAGE_UPLOAD_LABEL, splitReportFilesByImageSize } from "../utils/fileUploadLimits";
 
 function countWords(str: string): number {
     return (str || "").trim().split(/\s+/).filter(w => w.length > 0).length;
+}
+
+function filterOversizedImages(files: File[], input: HTMLInputElement): File[] {
+    const { accepted, rejected } = splitReportFilesByImageSize(files);
+    if (rejected.length > 0) {
+        toast.error(`Images must be ${MAX_REPORT_IMAGE_UPLOAD_LABEL} or smaller: ${rejected.map((file) => file.name).join(", ")}`);
+        input.value = "";
+    }
+    return accepted;
 }
 
 // ─── Static data ──────────────────────────────────────────────────────────────
@@ -823,7 +834,8 @@ export default function Section6Resources({ projectData }: { projectData?: unkno
                                     className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                                     onChange={e => {
                                         if (e.target.files) {
-                                            const newFiles = Array.from(e.target.files);
+                                            const newFiles = filterOversizedImages(Array.from(e.target.files), e.currentTarget);
+                                            if (!newFiles.length) return;
                                             updateSection('section6', {
                                                 evidence_files: [...(section6.evidence_files || []), ...newFiles]
                                             });

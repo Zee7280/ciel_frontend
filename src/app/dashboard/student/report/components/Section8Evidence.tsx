@@ -13,6 +13,7 @@ import { useReportForm } from "../context/ReportContext";
 import { useDebounce } from "@/hooks/useDebounce";
 import { FieldError } from "./ui/FieldError";
 import clsx from "clsx";
+import { MAX_REPORT_IMAGE_UPLOAD_LABEL, splitReportFilesByImageSize } from "../utils/fileUploadLimits";
 
 // ─── Static configuration ───────────────────────────────────────────────────
 const evidenceOptions = [
@@ -71,6 +72,15 @@ const toEvidenceFileItem = (file: File): EvidenceFileItem => ({
     type: file.type,
     lastModified: file.lastModified
 });
+
+function filterOversizedImages(files: File[], input: HTMLInputElement): File[] {
+    const { accepted, rejected } = splitReportFilesByImageSize(files);
+    if (rejected.length > 0) {
+        toast.error(`Images must be ${MAX_REPORT_IMAGE_UPLOAD_LABEL} or smaller: ${rejected.map((file) => file.name).join(", ")}`);
+        input.value = "";
+    }
+    return accepted;
+}
 
 const isNativeFile = (file: EvidenceFileItem): file is File => (
     typeof File !== 'undefined' && file instanceof File
@@ -373,14 +383,16 @@ export default function Section8Evidence() {
 
                             {/* FILE UPLOAD */}
                             <FileUpload
-                                label="Drag & Drop Files or Click to Browse"
+                                label="Drag & drop files or click to browse (images max 5 MB)"
                                 multiple
                                 accept=".jpg,.jpeg,.png,.mp4,.pdf,.doc,.docx"
                                 onChange={(e) => {
                                     if (e.target.files) {
+                                        const acceptedFiles = filterOversizedImages(Array.from(e.target.files), e.currentTarget);
+                                        if (!acceptedFiles.length) return;
                                         update('evidence_files', [
                                             ...(evidence_files || []),
-                                            ...Array.from(e.target.files).map(toEvidenceFileItem)
+                                            ...acceptedFiles.map(toEvidenceFileItem)
                                         ])
                                     }
                                 }}
@@ -871,14 +883,16 @@ export default function Section8Evidence() {
 
 
                             <FileUpload
-                                label="Upload Partner Verification Letter / Document"
+                                label="Upload Partner Verification Letter / Document (images max 5 MB)"
                                 multiple
                                 accept=".jpg,.jpeg,.png,.pdf,.doc,.docx"
                                 onChange={(e) => {
                                     if (e.target.files) {
+                                        const acceptedFiles = filterOversizedImages(Array.from(e.target.files), e.currentTarget);
+                                        if (!acceptedFiles.length) return;
                                         update(
                                             'partner_verification_files',
-                                            [...(partner_verification_files || []), ...Array.from(e.target.files).map(toEvidenceFileItem)]
+                                            [...(partner_verification_files || []), ...acceptedFiles.map(toEvidenceFileItem)]
                                         );
                                     }
                                 }}

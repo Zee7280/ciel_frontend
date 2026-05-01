@@ -9,6 +9,8 @@ import { useReportForm } from "../context/ReportContext";
 import { FieldError } from "./ui/FieldError";
 import React, { useMemo, useEffect } from "react";
 import clsx from "clsx";
+import { toast } from "sonner";
+import { MAX_REPORT_IMAGE_UPLOAD_LABEL, splitReportFilesByImageSize } from "../utils/fileUploadLimits";
 
 // ─── Static data ──────────────────────────────────────────────────────────────
 const partnerTypes = [
@@ -32,6 +34,15 @@ const partnerTypes = [
     "Research Institute / Think Tank",
     "Others (please specify)"
 ];
+
+function filterOversizedImages(files: File[], input: HTMLInputElement): File[] {
+    const { accepted, rejected } = splitReportFilesByImageSize(files);
+    if (rejected.length > 0) {
+        toast.error(`Images must be ${MAX_REPORT_IMAGE_UPLOAD_LABEL} or smaller: ${rejected.map((file) => file.name).join(", ")}`);
+        input.value = "";
+    }
+    return accepted;
+}
 
 const roleOptions = [
     "Project Host",
@@ -614,10 +625,12 @@ export default function Section7Partnerships() {
                                     className="text-xs text-slate-500"
                                     onChange={e => {
                                         if (e.target.files) {
+                                            const acceptedFiles = filterOversizedImages(Array.from(e.target.files), e.currentTarget);
+                                            if (!acceptedFiles.length) return;
                                             updateSection('section7', {
                                                 formalization_files: [
                                                     ...(formalization_files || []),
-                                                    ...Array.from(e.target.files)
+                                                    ...acceptedFiles
                                                 ]
                                             })
                                         }

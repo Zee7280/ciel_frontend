@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState, useEffect, useLayoutEffect } from "react";
-import { LayoutDashboard, Users, Settings, PieChart, LogOut, FileText, Building2, CheckCircle, Briefcase, FileBarChart, ShieldAlert, Bell, User, MessageSquare, Plus, CreditCard, ClipboardList, CalendarClock, LifeBuoy, type LucideProps } from "lucide-react";
+import { LayoutDashboard, Users, Settings, PieChart, LogOut, FileText, Building2, CheckCircle, Briefcase, FileBarChart, ShieldAlert, History, Bell, User, MessageSquare, Plus, CreditCard, ClipboardList, CalendarClock, LifeBuoy, type LucideProps } from "lucide-react";
 import clsx from "clsx";
 import { authenticatedFetch } from "@/utils/api";
 import { fetchStudentDashboardData } from "@/utils/student-dashboard-fetch";
@@ -138,7 +138,8 @@ export default function Sidebar() {
             { label: "Impact", href: "/dashboard/admin/impact", icon: FileBarChart },
             { label: "Messages", href: "/dashboard/admin/messages", icon: MessageSquare },
             { label: "Help & Support", href: "/dashboard/admin/support", icon: LifeBuoy },
-            { label: "Audit Logs", href: "/dashboard/admin/audit-logs", icon: ShieldAlert },
+            { label: "Audit Logs", href: "/dashboard/admin/audit-logs", icon: History },
+            { label: "Issue Logs", href: "/dashboard/admin/issue-logs", icon: ShieldAlert },
         ] : []),
     ];
 
@@ -158,8 +159,8 @@ export default function Sidebar() {
 
     return (
         <>
-        <aside className="fixed left-0 top-0 z-40 hidden min-h-screen w-64 flex-col bg-slate-900 text-white lg:flex">
-            <div className="h-24 flex items-center px-4 border-b border-slate-800">
+        <aside className="fixed left-0 top-0 z-40 hidden h-screen max-h-[100dvh] w-64 flex-col bg-slate-900 text-white lg:flex">
+            <div className="flex h-24 shrink-0 items-center px-4 border-b border-slate-800">
                 <Link href="/" className="flex items-center gap-3">
                     <div className="relative flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white/5 p-1">
                         <img src="/iel-pk-logo.png" alt="IEL PK" className="h-11 w-11 object-contain" width={44} height={44} />
@@ -175,7 +176,7 @@ export default function Sidebar() {
                 </Link>
             </div>
 
-            <div className="flex-1 py-6 px-4 space-y-2 overflow-y-auto custom-scrollbar">
+            <div className="min-h-0 flex-1 space-y-2 overflow-y-auto px-4 py-6 custom-scrollbar overscroll-contain">
                 {links.map((link) => {
                     const isActive =
                         pathname === link.href ||
@@ -208,7 +209,7 @@ export default function Sidebar() {
                 })}
             </div>
 
-            <div className="p-4 border-t border-slate-800">
+            <div className="shrink-0 border-t border-slate-800 p-4">
                 <button
                     onClick={handleLogout}
                     className="flex items-center gap-3 px-4 py-3 w-full rounded-xl text-[#4285F4] hover:bg-slate-500/10 hover:text-[#4285F4] transition-colors text-sm font-medium"

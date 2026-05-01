@@ -144,6 +144,7 @@ export default function AdminSupportPage() {
     const [internalNoteDraft, setInternalNoteDraft] = useState("");
     const [replyDraft, setReplyDraft] = useState("");
     const [savingTicket, setSavingTicket] = useState(false);
+    const [ticketDeletingId, setTicketDeletingId] = useState<string | number | null>(null);
 
     const [faqs, setFaqs] = useState<FaqItem[]>([]);
     const [faqsLoading, setFaqsLoading] = useState(false);
@@ -287,6 +288,35 @@ export default function AdminSupportPage() {
         }
     };
 
+    const deleteTicket = async (row: AdminSupportTicket) => {
+        const label = row.reference || `#${row.id}`;
+        if (!confirm(`Delete ticket ${label}? This cannot be undone.`)) return;
+        setTicketDeletingId(row.id);
+        try {
+            const res = await authenticatedFetch(`/api/v1/admin/support/tickets/${encodeURIComponent(String(row.id))}`, {
+                method: "DELETE",
+            });
+            if (res?.status === 404 || res?.status === 501) {
+                toast.message("API not available", { description: "Implement DELETE /api/v1/admin/support/tickets/:id on the server." });
+                return;
+            }
+            if (!res?.ok) {
+                toast.error("Failed to delete ticket");
+                return;
+            }
+            toast.success("Ticket deleted");
+            if (activeTicket && String(activeTicket.id) === String(row.id)) {
+                setDetailOpen(false);
+                setActiveTicket(null);
+            }
+            void loadTickets();
+        } catch {
+            toast.error("Network error");
+        } finally {
+            setTicketDeletingId(null);
+        }
+    };
+
     const openFaqCreate = () => {
         setFaqEditingId(null);
         setFaqCategory("");
@@ -408,7 +438,7 @@ export default function AdminSupportPage() {
                         <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
                             <strong className="font-semibold">Backend not connected.</strong> Add{" "}
                             <code className="rounded bg-amber-100/80 px-1">GET /api/v1/admin/support/tickets</code> (and ticket detail /
-                            PATCH) so this inbox fills automatically.
+                            PATCH / DELETE) so this inbox fills automatically.
                         </div>
                     ) : null}
 
@@ -462,52 +492,76 @@ export default function AdminSupportPage() {
                         </Card>
                     ) : (
                         <div className="overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-sm">
-                            <div className="hidden grid-cols-[1.2fr_1fr_0.7fr_0.9fr] gap-4 border-b border-slate-100 bg-slate-50/80 px-4 py-3 text-xs font-bold uppercase tracking-wide text-slate-500 md:grid">
+                            <div className="hidden grid-cols-[1.2fr_1fr_0.7fr_0.9fr_auto] gap-4 border-b border-slate-100 bg-slate-50/80 px-4 py-3 text-xs font-bold uppercase tracking-wide text-slate-500 md:grid">
                                 <span>Ticket</span>
                                 <span>Student</span>
                                 <span>Status</span>
                                 <span>Updated</span>
+                                <span className="sr-only md:not-sr-only md:w-10 md:text-center">Actions</span>
                             </div>
                             <ul role="list">
                                 {filteredTickets.map((t) => (
                                     <li key={String(t.id)} className="border-b border-slate-100 last:border-0">
-                                        <button
-                                            type="button"
-                                            onClick={() => void openTicketDetail(t)}
-                                            className="grid w-full gap-3 px-4 py-4 text-left transition hover:bg-slate-50/90 md:grid-cols-[1.2fr_1fr_0.7fr_0.9fr] md:items-center md:gap-4"
-                                        >
-                                            <div>
-                                                <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                                                    {t.reference || `#${t.id}`}
-                                                </p>
-                                                <p className="mt-0.5 font-semibold text-slate-900">{t.subject}</p>
-                                                {t.category ? (
-                                                    <p className="mt-1 text-xs text-slate-500">Category: {t.category}</p>
-                                                ) : null}
+                                        <div className="grid gap-3 px-4 py-4 transition hover:bg-slate-50/90 md:grid-cols-[1.2fr_1fr_0.7fr_0.9fr_auto] md:items-center md:gap-4">
+                                            <button
+                                                type="button"
+                                                onClick={() => void openTicketDetail(t)}
+                                                className="contents cursor-pointer text-left outline-none focus-visible:ring-2 focus-visible:ring-slate-400/40 md:rounded-md"
+                                            >
+                                                <div>
+                                                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                                                        {t.reference || `#${t.id}`}
+                                                    </p>
+                                                    <p className="mt-0.5 font-semibold text-slate-900">{t.subject}</p>
+                                                    {t.category ? (
+                                                        <p className="mt-1 text-xs text-slate-500">Category: {t.category}</p>
+                                                    ) : null}
+                                                </div>
+                                                <div className="flex flex-col gap-0.5 text-sm text-slate-600">
+                                                    {t.studentName ? (
+                                                        <span className="inline-flex items-center gap-1.5">
+                                                            <User className="h-3.5 w-3.5 text-slate-400" />
+                                                            {t.studentName}
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-slate-400">—</span>
+                                                    )}
+                                                    {t.studentEmail ? (
+                                                        <span className="inline-flex items-center gap-1.5 text-xs">
+                                                            <Mail className="h-3.5 w-3.5 text-slate-400" />
+                                                            {t.studentEmail}
+                                                        </span>
+                                                    ) : null}
+                                                </div>
+                                                <div>
+                                                    <Badge variant="secondary" className="capitalize">
+                                                        {(t.status || "open").replace(/_/g, " ")}
+                                                    </Badge>
+                                                </div>
+                                                <div className="text-xs tabular-nums text-slate-500">{formatWhen(t.updatedAt || t.createdAt)}</div>
+                                            </button>
+                                            <div className="flex justify-end md:justify-center">
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    size="sm"
+                                                    title="Delete ticket"
+                                                    disabled={ticketDeletingId !== null && String(ticketDeletingId) === String(t.id)}
+                                                    className="shrink-0"
+                                                    onClick={(e) => {
+                                                        e.preventDefault();
+                                                        e.stopPropagation();
+                                                        void deleteTicket(t);
+                                                    }}
+                                                >
+                                                    {ticketDeletingId != null && String(ticketDeletingId) === String(t.id) ? (
+                                                        <Loader2 className="h-4 w-4 animate-spin text-slate-600" />
+                                                    ) : (
+                                                        <Trash2 className="h-4 w-4 text-red-600" />
+                                                    )}
+                                                </Button>
                                             </div>
-                                            <div className="flex flex-col gap-0.5 text-sm text-slate-600">
-                                                {t.studentName ? (
-                                                    <span className="inline-flex items-center gap-1.5">
-                                                        <User className="h-3.5 w-3.5 text-slate-400" />
-                                                        {t.studentName}
-                                                    </span>
-                                                ) : (
-                                                    <span className="text-slate-400">—</span>
-                                                )}
-                                                {t.studentEmail ? (
-                                                    <span className="inline-flex items-center gap-1.5 text-xs">
-                                                        <Mail className="h-3.5 w-3.5 text-slate-400" />
-                                                        {t.studentEmail}
-                                                    </span>
-                                                ) : null}
-                                            </div>
-                                            <div>
-                                                <Badge variant="secondary" className="capitalize">
-                                                    {(t.status || "open").replace(/_/g, " ")}
-                                                </Badge>
-                                            </div>
-                                            <div className="text-xs tabular-nums text-slate-500">{formatWhen(t.updatedAt || t.createdAt)}</div>
-                                        </button>
+                                        </div>
                                     </li>
                                 ))}
                             </ul>

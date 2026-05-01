@@ -35,10 +35,11 @@ import { checkReportQuality, QualityAlert } from '@/utils/reportQuality';
 import { parseSection11AuditSummary, type ReportCIIauditMeta } from "@/lib/parseCIIauditSummary";
 import type { ReportData } from "../../../../student/report/context/ReportContext";
 import { calculateCII } from "../../../../student/report/utils/calculateCII";
-import { mergeReportSdgSnapshotRows } from "../../../../student/report/utils/reportSdgMerge";
+import { formatSdgGoalPadded, mergeReportSdgSnapshotRows } from "../../../../student/report/utils/reportSdgMerge";
 import { readPersistedCiiSnapshot } from "@/utils/reportCiiSnapshot";
 import { applyEngagementTeamScopeToReport } from "@/utils/reportTeamScope";
 import { getReportProjectContextDisplay } from "@/utils/reportProjectContext";
+import { VERIFY_DOSSIER_FIELD_GRID } from "@/utils/verifyDossierFieldGrid";
 
 function normalizeAuditMeta(raw: unknown, summaryText: string): ReportCIIauditMeta | null {
     const fallback = summaryText ? parseSection11AuditSummary(summaryText) : null;
@@ -78,7 +79,7 @@ function compactAlertText(value: string, max = 180): string {
     return `${normalized.slice(0, max).trimEnd()}...`;
 }
 
-function buildQualityAlerts(reportData: any, section11Audit: ReportCIIauditMeta | null): QualityAlert[] {
+function buildQualityAlerts(reportData: unknown, section11Audit: ReportCIIauditMeta | null): QualityAlert[] {
     const baseAlerts = checkReportQuality(reportData);
     if (!section11Audit) return baseAlerts;
 
@@ -137,17 +138,17 @@ interface ReportDetail {
     status: string;
     partner_status: string;
     admin_status: string;
-    section1: any;
-    section2: any;
-    section3: any;
-    section4: any;
-    section5: any;
-    section6: any;
-    section7: any;
-    section8: any;
-    section9: any;
-    section10: any;
-    section11: any;
+    section1: ReportData["section1"];
+    section2: ReportData["section2"];
+    section3: ReportData["section3"];
+    section4: ReportData["section4"] & Record<string, unknown>;
+    section5: ReportData["section5"];
+    section6: ReportData["section6"];
+    section7: ReportData["section7"];
+    section8: ReportData["section8"];
+    section9: ReportData["section9"];
+    section10: ReportData["section10"];
+    section11: ReportData["section11"];
     evidence_urls: string[];
     /** Hours target for CII / engagement; falls back to opportunity hours or 16. */
     required_hours?: number;
@@ -156,6 +157,12 @@ interface ReportDetail {
 type AdminEvidenceFile = {
     url: string;
     name: string;
+};
+
+type AdminBlueprintRow = {
+    label: string;
+    value: unknown;
+    fullWidth?: boolean;
 };
 
 const DOSSIER_NAV_SECTIONS = [
@@ -197,6 +204,124 @@ function adminValueIsEmpty(value: unknown): boolean {
     }
     if (Array.isArray(value)) return value.length === 0 || value.every((v) => adminValueIsEmpty(v));
     return false;
+}
+
+function adminObjectRecord(value: unknown): Record<string, unknown> {
+    return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+}
+
+function pickAdminValue(records: Record<string, unknown>[], keys: string[]): unknown {
+    for (const record of records) {
+        for (const key of keys) {
+            const value = record[key];
+            if (!adminValueIsEmpty(value)) return value;
+        }
+    }
+    return undefined;
+}
+
+function joinAdminParts(parts: unknown[]): string {
+    return parts
+        .map((part) => {
+            if (part === null || part === undefined) return "";
+            return typeof part === "string" || typeof part === "number" ? String(part).trim() : "";
+        })
+        .filter(Boolean)
+        .join(" · ");
+}
+
+function buildAdminProjectBlueprintRows(report: ReportDetail | null): AdminBlueprintRow[] {
+    if (!report) return [];
+
+    const root = adminObjectRecord(report);
+    const opportunity = adminObjectRecord(report.opportunity);
+    const objectives = adminObjectRecord(pickAdminValue([opportunity, root], ["objectives"]));
+    const activityDetails = adminObjectRecord(pickAdminValue([opportunity, root], ["activity_details", "activityDetails", "activity"]));
+    const supervision = adminObjectRecord(pickAdminValue([opportunity, root], ["supervision"]));
+    const executingContext = adminObjectRecord(pickAdminValue([opportunity, root], ["executing_context", "executingContext"]));
+    const partnerContext = adminObjectRecord(pickAdminValue([executingContext, root], ["partner", "partner_organization", "external_partner_collaboration"]));
+    const independentContext = adminObjectRecord(
+        pickAdminValue([executingContext, root], ["independent_community_activity", "independentCommunityActivity"]),
+    );
+    const safetyDeclaration = adminObjectRecord(pickAdminValue([opportunity, root], ["safety_declaration", "safetyDeclaration"]));
+    const location = adminObjectRecord(pickAdminValue([opportunity, root], ["location"]));
+
+    const supervisorSummary = joinAdminParts([
+        pickAdminValue([supervision], ["supervisor_name", "supervisorName", "facultyName"]),
+        pickAdminValue([supervision], ["role", "facultyDesignation"]),
+        pickAdminValue([supervision], ["contact", "facultyOfficialEmail"]),
+    ]);
+    const partnerSummary = joinAdminParts([
+        pickAdminValue([partnerContext, supervision], ["organization_name", "organizationName", "partner_org_name", "partnerOrgName"]),
+        pickAdminValue([partnerContext, supervision], ["contact_person", "contactPerson", "partner_contact_person", "partnerContactPerson"]),
+        pickAdminValue([partnerContext, supervision], ["official_email", "officialEmail", "partner_email", "partnerEmail"]),
+    ]);
+    const independentSummary = joinAdminParts([
+        pickAdminValue([independentContext, supervision], ["activity_site_description", "activitySiteDescription", "independentSiteDescription"]),
+        pickAdminValue([independentContext, supervision], ["local_contact_person", "localContactPerson", "independentLocalContact"]),
+        pickAdminValue([independentContext, supervision], ["contact_number", "contactNumber", "independentContactPhone"]),
+    ]);
+    const locationSummary = joinAdminParts([
+        pickAdminValue([location, opportunity, root], ["city", "district", "location_district", "locationDistrict"]),
+        pickAdminValue([location, opportunity, root], ["venue", "address"]),
+    ]);
+
+    return [
+        {
+            label: "Opportunity title",
+            value: pickAdminValue([opportunity, root], ["title", "project_title", "projectTitle"]),
+            fullWidth: true,
+        },
+        {
+            label: "Project objectives",
+            value: pickAdminValue([objectives, opportunity, root], ["description", "objective", "objectives_description"]),
+            fullWidth: true,
+        },
+        {
+            label: "Expected beneficiaries",
+            value: pickAdminValue([objectives, opportunity, root], ["beneficiaries_count", "beneficiariesCount", "beneficiary_count"]),
+        },
+        {
+            label: "Beneficiary type",
+            value: pickAdminValue([objectives, opportunity, root], ["beneficiaries_type", "beneficiariesType", "beneficiary_type"]),
+        },
+        {
+            label: "Student responsibilities",
+            value: pickAdminValue([activityDetails, opportunity, root], ["student_responsibilities", "studentResponsibilities", "responsibilities"]),
+            fullWidth: true,
+        },
+        {
+            label: "Skills to be gained",
+            value: pickAdminValue([activityDetails, opportunity, root], ["skills_gained", "skillsGained", "skills"]),
+        },
+        {
+            label: "Mode / location",
+            value: joinAdminParts([pickAdminValue([opportunity, root], ["mode"]), locationSummary]),
+        },
+        {
+            label: "Faculty supervision",
+            value: supervisorSummary,
+            fullWidth: true,
+        },
+        {
+            label: "Partner / executing organization",
+            value: partnerSummary,
+            fullWidth: true,
+        },
+        {
+            label: "Independent community activity",
+            value: independentSummary,
+            fullWidth: true,
+        },
+        {
+            label: "Safe environment declared",
+            value: pickAdminValue([safetyDeclaration, supervision], ["environment_safe_and_appropriate", "safe_environment"]),
+        },
+        {
+            label: "Faculty oversight declared",
+            value: pickAdminValue([safetyDeclaration, supervision], ["students_guided_and_supervised", "supervised"]),
+        },
+    ].filter((row) => !adminValueIsEmpty(row.value));
 }
 
 function pickEvidenceUrl(value: unknown): string {
@@ -251,6 +376,12 @@ function collectAdminEvidenceFiles(report: ReportDetail | null): AdminEvidenceFi
     }, []);
 }
 
+function adminRecordArray(value: unknown): Record<string, unknown>[] {
+    return Array.isArray(value)
+        ? value.filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object" && !Array.isArray(item))
+        : [];
+}
+
 function AdminFieldBody({ value }: { value: unknown }): ReactNode {
     if (adminValueIsEmpty(value)) {
         return (
@@ -294,7 +425,33 @@ function AdminFieldBody({ value }: { value: unknown }): ReactNode {
     }
     if (Array.isArray(value)) {
         const parts = value
-            .map((v) => (typeof v === "string" || typeof v === "number" ? String(v) : ""))
+            .map((v) => {
+                if (typeof v === "string" || typeof v === "number" || typeof v === "boolean") return String(v);
+                if (v && typeof v === "object") {
+                    return Object.entries(v as Record<string, unknown>)
+                        .map(([key, entry]) => {
+                            if (entry === null || entry === undefined) return "";
+                            if (Array.isArray(entry)) {
+                                const joined = entry
+                                    .map((item) =>
+                                        typeof item === "string" || typeof item === "number" || typeof item === "boolean"
+                                            ? String(item)
+                                            : "",
+                                    )
+                                    .filter(Boolean)
+                                    .join(", ");
+                                return joined ? `${key}: ${joined}` : "";
+                            }
+                            if (typeof entry === "string" || typeof entry === "number" || typeof entry === "boolean") {
+                                return `${key}: ${entry}`;
+                            }
+                            return "";
+                        })
+                        .filter(Boolean)
+                        .join(" · ");
+                }
+                return "";
+            })
             .map((s) => s.trim())
             .filter(Boolean);
         if (!parts.length) {
@@ -390,6 +547,26 @@ export default function AdminReportDetailPage() {
         [report],
     );
     const projectContextDisplay = useMemo(() => getReportProjectContextDisplay(report), [report]);
+    const projectBlueprintRows = useMemo(() => buildAdminProjectBlueprintRows(report), [report]);
+    const section4Blocks = useMemo(() => adminRecordArray(report?.section4?.activity_blocks), [report]);
+    const section4Outputs = useMemo(
+        () =>
+            section4Blocks.flatMap((block, blockIndex) =>
+                adminRecordArray(block.outputs).map((output, outputIndex) => ({
+                    blockTitle: pickAdminValue([block], ["title", "primary_category", "primaryCategory"]) || `Activity ${blockIndex + 1}`,
+                    output,
+                    key: `${blockIndex}-${outputIndex}`,
+                })),
+            ),
+        [section4Blocks],
+    );
+    const section4TotalSessions = useMemo(() => {
+        const section4 = adminObjectRecord(report?.section4);
+        const explicit = pickAdminValue([section4], ["total_sessions", "totalSessions"]);
+        if (!adminValueIsEmpty(explicit)) return explicit;
+        const total = section4Blocks.reduce((sum, block) => sum + (parseInt(String(block.sessions_count ?? "0"), 10) || 0), 0);
+        return total > 0 ? total : section4Blocks.length || undefined;
+    }, [report, section4Blocks]);
 
     useEffect(() => {
         fetchReportDetail();
@@ -485,7 +662,7 @@ export default function AdminReportDetailPage() {
     };
 
     const LabelValue = ({ label, value, fullWidth = false }: { label: string; value: unknown; fullWidth?: boolean }) => (
-        <div className={`mb-4 flex flex-col ${fullWidth ? "w-full" : "w-1/2 pr-4"}`}>
+        <div className={clsx("mb-4 flex min-w-0 flex-col", fullWidth && "md:col-span-2")}>
             <span className={clsx(adminDossier.microLabel, "mb-1.5 block tracking-wide")}>{label}</span>
             <div className={clsx(adminDossier.inset, "text-justify")}>
                 <AdminFieldBody value={value} />
@@ -772,28 +949,77 @@ export default function AdminReportDetailPage() {
                             {sectionOpen.section1 ? (
                             <div id="section1-panel" className="space-y-5">
                                 <LabelValue label="Participation Type" value={report.section1?.participation_type} />
+                                <div className={VERIFY_DOSSIER_FIELD_GRID}>
+                                    <LabelValue label="Privacy consent" value={report.section1?.privacy_consent} />
+                                    <LabelValue label="Faculty supervisor email" value={report.section1?.faculty_supervisor_email} />
+                                    <LabelValue label="Attendance verification status" value={report.section1?.attendance_verification_status} />
+                                    <LabelValue label="Attendance requested at" value={report.section1?.attendance_verification_requested_at} />
+                                    <LabelValue label="Attendance verification locked" value={report.section1?.attendance_verification_locked} />
+                                    <LabelValue label="Email notified" value={report.section1?.attendance_verification_email_notified} />
+                                    <LabelValue label="Review checklist" value={report.section1?.review_checked} fullWidth />
+                                    <LabelValue label="Verified summary" value={report.section1?.verified_summary} fullWidth />
+                                </div>
                                 <div className="mt-4">
                                     <h3 className="font-bold text-slate-800 text-sm mb-2 border-b pb-1">Team Lead</h3>
-                                    <div className="flex flex-wrap">
-                                        <LabelValue label="Name" value={report.section1?.team_lead?.name} />
+                                    <div className={VERIFY_DOSSIER_FIELD_GRID}>
+                                        <LabelValue label="Name" value={report.section1?.team_lead?.fullName || report.section1?.team_lead?.name} />
+                                        <LabelValue label="CNIC" value={report.section1?.team_lead?.cnic} />
+                                        <LabelValue label="Mobile" value={report.section1?.team_lead?.mobile} />
                                         <LabelValue label="University" value={report.section1?.team_lead?.university} />
+                                        <LabelValue label="Degree" value={report.section1?.team_lead?.degree} />
+                                        <LabelValue label="Year" value={report.section1?.team_lead?.year} />
                                         <LabelValue label="Email" value={report.section1?.team_lead?.email} />
                                         <LabelValue label="Role" value={report.section1?.team_lead?.role} />
+                                        <LabelValue label="Hours" value={report.section1?.team_lead?.hours} />
+                                        <LabelValue label="Consent" value={report.section1?.team_lead?.consent} />
+                                        <LabelValue label="Verified" value={report.section1?.team_lead?.verified} />
                                     </div>
                                 </div>
                                 {report.section1?.team_members && report.section1.team_members.length > 0 && (
                                     <div className="mt-4">
                                         <h3 className="font-bold text-slate-800 text-sm mb-2 border-b pb-1">Team Members ({report.section1.team_members.length})</h3>
-                                        <div className="space-y-2">
-                                            {report.section1.team_members.map((member: any, index: number) => (
-                                                <div key={index} className="p-4 bg-slate-50 rounded-2xl flex items-center justify-between">
-                                                    <span className="font-bold text-slate-900">{member.name}</span>
-                                                    <span className="text-sm text-slate-600">{member.role}</span>
+                                        <div className="space-y-3">
+                                            {adminRecordArray(report.section1.team_members).map((member, index) => (
+                                                <div key={index} className="rounded-2xl border border-slate-100 bg-slate-50/90 p-4">
+                                                    <div className="mb-3 flex items-center justify-between gap-3 border-b border-slate-100 pb-2">
+                                                        <span className="font-bold text-slate-900">{String(member.fullName || member.name || "")}</span>
+                                                        <span className="text-sm font-semibold text-slate-600">{String(member.role || "")}</span>
+                                                    </div>
+                                                    <div className={VERIFY_DOSSIER_FIELD_GRID}>
+                                                        <LabelValue label="CNIC" value={member.cnic} />
+                                                        <LabelValue label="Mobile" value={member.mobile} />
+                                                        <LabelValue label="University" value={member.university} />
+                                                        <LabelValue label="Program" value={member.program} />
+                                                        <LabelValue label="Hours" value={member.hours} />
+                                                        <LabelValue label="Verified" value={member.verified} />
+                                                    </div>
                                                 </div>
                                             ))}
                                         </div>
                                     </div>
                                 )}
+
+                                {report.section1?.metrics ? (
+                                    <div className="mt-4">
+                                        <h3 className={clsx(adminDossier.microLabel, "mb-3 border-b border-slate-100 pb-2 text-slate-400")}>
+                                            Engagement metrics
+                                        </h3>
+                                        <div className={VERIFY_DOSSIER_FIELD_GRID}>
+                                            <LabelValue label="Total verified hours" value={report.section1.metrics.total_verified_hours} />
+                                            <LabelValue label="Verified session count" value={report.section1.metrics.verified_session_count} />
+                                            <LabelValue label="Total active days" value={report.section1.metrics.total_active_days} />
+                                            <LabelValue label="Engagement span" value={report.section1.metrics.engagement_span} />
+                                            <LabelValue label="Attendance frequency" value={report.section1.metrics.attendance_frequency} />
+                                            <LabelValue label="Weekly continuity" value={report.section1.metrics.weekly_continuity} />
+                                            <LabelValue label="EIS score" value={report.section1.metrics.eis_score} />
+                                            <LabelValue label="Engagement category" value={report.section1.metrics.engagement_category} />
+                                            <LabelValue label="HEC compliance" value={report.section1.metrics.hec_compliance} />
+                                            <LabelValue label="Red flags" value={report.section1.metrics.redFlags} fullWidth />
+                                            <LabelValue label="Individual metrics" value={report.section1.metrics.individual_metrics} fullWidth />
+                                            <LabelValue label="Non-compliant" value={report.section1.metrics.isNonCompliant} />
+                                        </div>
+                                    </div>
+                                ) : null}
 
                                 {report.section1?.attendance_logs && report.section1.attendance_logs.length > 0 && (
                                     <div className="mt-6">
@@ -869,10 +1095,28 @@ export default function AdminReportDetailPage() {
                                     </div>
                                 </div>
 
+                                {projectBlueprintRows.length > 0 ? (
+                                    <div className="border-t border-slate-100 pt-5">
+                                        <h3 className={clsx(adminDossier.microLabel, "mb-3 text-slate-400")}>Opportunity blueprint</h3>
+                                        <div className={VERIFY_DOSSIER_FIELD_GRID}>
+                                            {projectBlueprintRows.map((row) => (
+                                                <LabelValue key={row.label} label={row.label} value={row.value} fullWidth={row.fullWidth} />
+                                            ))}
+                                        </div>
+                                    </div>
+                                ) : null}
+
                                 <div className="border-t border-slate-100 pt-5">
-                                    <div className="flex flex-wrap">
+                                    <div className={VERIFY_DOSSIER_FIELD_GRID}>
+                                        <LabelValue label="Problem category" value={report.section2?.problem_category} />
+                                        <LabelValue label="Primary beneficiary" value={report.section2?.primary_beneficiary} />
                                         <LabelValue label="Discipline" value={report.section2?.discipline} />
                                         <LabelValue label="Problem Statement" value={report.section2?.problem_statement} fullWidth />
+                                        <LabelValue label="Disciplinary contribution" value={report.section2?.discipline_contribution} fullWidth />
+                                        <LabelValue label="Baseline evidence" value={report.section2?.baseline_evidence} fullWidth />
+                                        <LabelValue label="Baseline evidence other" value={report.section2?.baseline_evidence_other} fullWidth />
+                                        <LabelValue label="Baseline other entries" value={report.section2?.baseline_other_entries} fullWidth />
+                                        <LabelValue label="Section summary" value={report.section2?.summary_text} fullWidth />
                                     </div>
                                 </div>
                             </div>
@@ -897,6 +1141,37 @@ export default function AdminReportDetailPage() {
                             {sectionOpen.section3 ? (
                             <div id="section3-panel" className="space-y-5">
                                 <LabelValue label="Contribution logic / purpose" value={report.section3?.contribution_intent_statement} fullWidth />
+                                <LabelValue label="Student contribution intent" value={report.section3?.student_contribution_intent_statement} fullWidth />
+                                <div className={VERIFY_DOSSIER_FIELD_GRID}>
+                                    <LabelValue label="Validation status" value={report.section3?.validation_status} />
+                                    <LabelValue label="Summary stage" value={report.section3?.summary_stage} />
+                                    <LabelValue label="Section summary" value={report.section3?.summary_text} fullWidth />
+                                </div>
+                                {sdgMappingRows.length > 0 ? (
+                                    <div className="rounded-[2rem] border-[3px] border-slate-900 bg-slate-50 p-5 sm:p-6">
+                                        <div className="mb-5 flex items-center justify-between gap-4 border-b border-slate-200 pb-4">
+                                            <div>
+                                                <p className={adminDossier.microLabel}>CIEL impact protocol</p>
+                                                <h3 className="mt-1 text-xl font-black uppercase tracking-tight text-slate-900">Strategic SDGs</h3>
+                                            </div>
+                                            <Target className="h-12 w-12 shrink-0 text-slate-900 opacity-10" strokeWidth={1.5} />
+                                        </div>
+                                        <div className="flex flex-wrap gap-2">
+                                            {sdgMappingRows.map((sdg) => (
+                                                <span
+                                                    key={`chip-${sdg.source}-${sdg.role}-${sdg.goalNumber}`}
+                                                    className="inline-flex items-center rounded-xl bg-slate-900 px-3 py-2 text-sm font-black leading-none text-white"
+                                                >
+                                                    SDG {formatSdgGoalPadded(sdg.goalNumber)}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm font-semibold text-slate-500">
+                                        No SDG mapping found in this report payload.
+                                    </div>
+                                )}
                                 {sdgMappingRows.length > 0 && (
                                     <div>
                                         <h3 className={clsx(adminDossier.microLabel, "mb-2 border-b border-slate-100 pb-2 text-slate-400")}>
@@ -926,6 +1201,11 @@ export default function AdminReportDetailPage() {
                                         </div>
                                     </div>
                                 )}
+                                {Array.isArray(report.section3?.secondary_sdgs) && report.section3.secondary_sdgs.length > 0 ? (
+                                    <div className={VERIFY_DOSSIER_FIELD_GRID}>
+                                        <LabelValue label="Raw secondary SDG entries" value={report.section3.secondary_sdgs} fullWidth />
+                                    </div>
+                                ) : null}
                             </div>
                             ) : null}
                         </div>
@@ -952,11 +1232,14 @@ export default function AdminReportDetailPage() {
                                         <h3 className={clsx(adminDossier.microLabel, "border-b border-slate-100 pb-2 text-slate-400")}>
                                             Engagement details
                                         </h3>
-                                        <div className="flex flex-wrap">
+                                        <div className={VERIFY_DOSSIER_FIELD_GRID}>
                                             <LabelValue label="Total Beneficiaries" value={report.section4?.project_summary?.distinct_total_beneficiaries} />
-                                            <LabelValue label="Total Sessions" value={report.section4?.total_sessions} />
-                                            <LabelValue label="Delivery Mode" value={report.section4?.delivery_mode} />
-                                            <LabelValue label="Primary Change Area" value={report.section4?.primary_change_area} />
+                                            <LabelValue label="Total Sessions" value={section4TotalSessions} />
+                                            <LabelValue label="Counting method" value={report.section4?.project_summary?.counting_method} />
+                                            <LabelValue label="Overall overlap" value={report.section4?.project_summary?.overall_overlap} />
+                                            <LabelValue label="Overall delivery mode" value={report.section4?.project_summary?.overall_delivery_mode} />
+                                            <LabelValue label="Overall implementation model" value={report.section4?.project_summary?.overall_implementation_model} />
+                                            <LabelValue label="Overall geographic reach" value={report.section4?.project_summary?.overall_geographic_reach} />
                                         </div>
                                     </div>
 
@@ -964,16 +1247,39 @@ export default function AdminReportDetailPage() {
                                         <h3 className={clsx(adminDossier.microLabel, "border-b border-slate-100 pb-2 text-slate-400")}>
                                             Core activities
                                         </h3>
-                                        <div className="flex flex-wrap gap-2">
-                                            {(report.section4?.activity_blocks ?? []).map((act: any, i: number) => (
-                                                <span
-                                                    key={i}
-                                                    className="rounded-lg border border-indigo-100 bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-900"
-                                                >
-                                                    {act.type === "Other" ? act.other_text : act.type}
-                                                </span>
-                                            ))}
-                                        </div>
+                                        {section4Blocks.length > 0 ? (
+                                            <div className="space-y-3">
+                                                {section4Blocks.map((act, i) => (
+                                                    <div key={String(act.id ?? i)} className="rounded-2xl border border-slate-100 bg-slate-50/90 p-4">
+                                                        <p className="mb-3 text-sm font-black text-slate-900">
+                                                            {String(act.title || `Activity ${i + 1}`)}
+                                                        </p>
+                                                        <div className={VERIFY_DOSSIER_FIELD_GRID}>
+                                                            <LabelValue label="Primary category" value={act.primary_category} />
+                                                            <LabelValue label="Sub-category" value={act.sub_category} />
+                                                            <LabelValue label="Other category" value={act.other_category_text} />
+                                                            <LabelValue label="Status" value={act.status} />
+                                                            <LabelValue label="Delivery mode" value={act.delivery_mode} />
+                                                            <LabelValue label="Implementation models" value={act.implementation_models} />
+                                                            <LabelValue label="Sessions count" value={act.sessions_count} />
+                                                            <LabelValue label="Geographic reach" value={act.geographic_reach} />
+                                                            <LabelValue label="Geographic sub-category" value={act.geographic_sub_category} />
+                                                            <LabelValue label="Description" value={act.description} fullWidth />
+                                                            <LabelValue label="Delivery explanation" value={act.delivery_explanation} fullWidth />
+                                                            <LabelValue label="Serves beneficiaries" value={act.serves_beneficiaries} />
+                                                            <LabelValue label="Beneficiaries reached" value={act.beneficiaries_reached} />
+                                                            <LabelValue label="Beneficiary categories" value={act.beneficiary_categories} fullWidth />
+                                                            <LabelValue label="Relevance types" value={act.relevance_types} fullWidth />
+                                                            <LabelValue label="Overlap status" value={act.overlap_status} />
+                                                            <LabelValue label="Beneficiary description" value={act.beneficiary_description} fullWidth />
+                                                            <LabelValue label="Site note" value={act.site_note} fullWidth />
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <AdminFieldBody value={null} />
+                                        )}
                                     </div>
                                 </div>
 
@@ -982,15 +1288,30 @@ export default function AdminReportDetailPage() {
                                         Tangible outputs
                                     </h3>
                                     <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                                        {report.section4?.outputs?.map((out: any, i: number) => (
-                                            <div key={i} className="rounded-2xl border border-slate-100 bg-slate-50/90 p-4">
-                                                <p className="text-2xl font-bold tabular-nums text-slate-900">{out.count}</p>
-                                                <p className={clsx(adminDossier.microLabel, "mt-1 text-slate-400")}>
-                                                    {out.type === "Other" ? out.other_text : out.type}
-                                                </p>
+                                        {section4Outputs.length > 0 ? (
+                                            section4Outputs.map(({ blockTitle, output, key }) => (
+                                                <div key={key} className="rounded-2xl border border-slate-100 bg-slate-50/90 p-4">
+                                                    <p className="text-sm font-black text-slate-900">{String(output.title || "Output")}</p>
+                                                    <p className={clsx(adminDossier.microLabel, "mt-1 text-slate-400")}>{String(blockTitle)}</p>
+                                                    <div className={clsx("mt-3", VERIFY_DOSSIER_FIELD_GRID)}>
+                                                        <LabelValue label="Type" value={output.type} />
+                                                        <LabelValue label="Quantity" value={output.quantity} />
+                                                        <LabelValue label="Unit" value={output.unit} />
+                                                        <LabelValue label="Shared" value={output.is_shared} />
+                                                        <LabelValue label="Verification note" value={output.verification_note} fullWidth />
+                                                    </div>
+                                                </div>
+                                            ))
+                                        ) : (
+                                            <div className="rounded-2xl border border-slate-100 bg-slate-50/90 p-4">
+                                                <AdminFieldBody value={null} />
                                             </div>
-                                        ))}
+                                        )}
                                     </div>
+                                </div>
+                                <div className={VERIFY_DOSSIER_FIELD_GRID}>
+                                    <LabelValue label="Project implementation explanation" value={report.section4?.project_summary?.project_implementation_explanation} fullWidth />
+                                    <LabelValue label="Section summary" value={report.section4?.summary_text} fullWidth />
                                 </div>
                             </div>
                             ) : null}
@@ -1012,9 +1333,47 @@ export default function AdminReportDetailPage() {
                                 />
                             </div>
                             {sectionOpen.section5 ? (
-                            <div id="section5-panel" className="flex flex-wrap">
-                                <LabelValue label="Observed Change" value={report.section5?.observed_change} fullWidth />
-                                <LabelValue label="Challenges" value={report.section5?.challenges} fullWidth />
+                            <div id="section5-panel" className="space-y-6">
+                                {Array.isArray(report.section5?.measurable_outcomes) && report.section5.measurable_outcomes.length > 0 ? (
+                                    <div className="space-y-4">
+                                        <h3 className={clsx(adminDossier.microLabel, "border-b border-slate-100 pb-2 text-slate-400")}>
+                                            Measurable outcome details
+                                        </h3>
+                                        <div className="grid grid-cols-1 gap-4">
+                                            {adminRecordArray(report.section5.measurable_outcomes).map((outcome, index) => (
+                                                <div key={String(outcome?.id ?? index)} className="rounded-2xl border border-slate-100 bg-slate-50/90 p-5">
+                                                    <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
+                                                        <div>
+                                                            <p className={clsx(adminDossier.microLabel, "text-slate-400")}>Outcome {index + 1}</p>
+                                                            <p className="mt-1 text-base font-bold text-slate-900">
+                                                                {String(outcome?.metric_other || outcome?.metric || outcome?.outcome_area_other || outcome?.outcome_area || "Measured outcome")}
+                                                            </p>
+                                                        </div>
+                                                        <span className="rounded-full border border-indigo-100 bg-white px-3 py-1 text-[10px] font-bold uppercase tracking-wide text-indigo-700">
+                                                            {Array.isArray(outcome?.confidence_level) && outcome.confidence_level.length
+                                                                ? outcome.confidence_level.join(", ")
+                                                                : String(outcome?.confidence_level || "Confidence not provided")}
+                                                        </span>
+                                                    </div>
+                                                    <div className={VERIFY_DOSSIER_FIELD_GRID}>
+                                                        <LabelValue label="Outcome area" value={outcome?.outcome_area_other || outcome?.outcome_area} />
+                                                        <LabelValue label="Metric category" value={outcome?.metric_category} />
+                                                        <LabelValue label="Outcome sub-category" value={outcome?.outcome_sub_category} />
+                                                        <LabelValue label="Unit" value={outcome?.unit_other || outcome?.unit} />
+                                                        <LabelValue label="Baseline" value={outcome?.baseline} />
+                                                        <LabelValue label="Endline / achieved" value={outcome?.endline} />
+                                                        <LabelValue label="Measurement explanation" value={outcome?.measurement_explanation} fullWidth />
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                ) : null}
+                                <div className={VERIFY_DOSSIER_FIELD_GRID}>
+                                    <LabelValue label="Observed Change" value={report.section5?.observed_change} fullWidth />
+                                    <LabelValue label="Challenges" value={report.section5?.challenges} fullWidth />
+                                    <LabelValue label="Section Summary" value={report.section5?.summary_text} fullWidth />
+                                </div>
                             </div>
                             ) : null}
                         </div>
@@ -1046,21 +1405,31 @@ export default function AdminReportDetailPage() {
                                                     <th className="border border-slate-200 p-2">Amount</th>
                                                     <th className="border border-slate-200 p-2">Source</th>
                                                     <th className="border border-slate-200 p-2">Purpose</th>
+                                                    <th className="border border-slate-200 p-2">Verification</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
-                                                {report.section6.resources.map((r: any, i: number) => (
+                                                {adminRecordArray(report.section6.resources).map((r, i) => (
                                                     <tr key={i}>
-                                                        <td className="border border-slate-200 p-2">{r.type}</td>
-                                                        <td className="border border-slate-200 p-2">{r.amount} {r.unit}</td>
-                                                        <td className="border border-slate-200 p-2">{r.sources?.join(', ') || r.source}</td>
-                                                        <td className="border border-slate-200 p-2">{r.purpose}</td>
+                                                        <td className="border border-slate-200 p-2">{String(r.type_other || r.type || "")}</td>
+                                                        <td className="border border-slate-200 p-2">{String(r.amount || "")} {String(r.unit_other || r.unit || "")}</td>
+                                                        <td className="border border-slate-200 p-2">
+                                                            {[...(Array.isArray(r.sources) ? r.sources : []), r.source_other || r.source]
+                                                                .filter(Boolean)
+                                                                .join(", ")}
+                                                        </td>
+                                                        <td className="border border-slate-200 p-2">{String(r.purpose || "")}</td>
+                                                        <td className="border border-slate-200 p-2">{Array.isArray(r.verification) ? r.verification.join(", ") : String(r.verification || "")}</td>
                                                     </tr>
                                                 ))}
                                             </tbody>
                                         </table>
                                     </div>
                                 )}
+                                <div className={VERIFY_DOSSIER_FIELD_GRID}>
+                                    <LabelValue label="Resource evidence files" value={report.section6?.evidence_files} fullWidth />
+                                    <LabelValue label="Section summary" value={report.section6?.summary_text} fullWidth />
+                                </div>
                             </div>
                             ) : null}
                         </div>
@@ -1085,20 +1454,33 @@ export default function AdminReportDetailPage() {
                                 <LabelValue label="Has partners" value={report.section7?.has_partners} />
                                 {report.section7?.partners && report.section7.partners.length > 0 && (
                                     <div className="space-y-2">
-                                        {report.section7.partners.map((p: any, i: number) => (
+                                        {adminRecordArray(report.section7.partners).map((p, i) => (
                                             <div
                                                 key={i}
                                                 className="rounded-xl border border-slate-100 bg-slate-50/90 p-3 text-sm text-slate-800"
                                             >
-                                                <span className="font-semibold text-slate-900">{p.name}</span>{" "}
-                                                <span className="text-slate-500">({p.type})</span>
-                                                {p.contribution && (
-                                                    <div className="mt-1.5 text-slate-600">Contributions: {p.contribution.join(", ")}</div>
+                                                <span className="font-semibold text-slate-900">{String(p.name || "")}</span>{" "}
+                                                <span className="text-slate-500">({String(p.type_other || p.type || "")})</span>
+                                                {Boolean(p.role) && (
+                                                    <div className="mt-1.5 text-slate-600">Role: {Array.isArray(p.role) ? p.role.join(", ") : String(p.role)}</div>
+                                                )}
+                                                {Boolean(p.contribution) && (
+                                                    <div className="mt-1.5 text-slate-600">
+                                                        Contributions: {Array.isArray(p.contribution) ? p.contribution.join(", ") : String(p.contribution)}
+                                                    </div>
+                                                )}
+                                                {Boolean(p.verification) && (
+                                                    <div className="mt-1.5 text-slate-600">Verification: {String(p.verification)}</div>
                                                 )}
                                             </div>
                                         ))}
                                     </div>
                                 )}
+                                <div className={VERIFY_DOSSIER_FIELD_GRID}>
+                                    <LabelValue label="Formalization status" value={report.section7?.formalization_status} fullWidth />
+                                    <LabelValue label="Formalization files" value={report.section7?.formalization_files} fullWidth />
+                                    <LabelValue label="Section summary" value={report.section7?.summary_text} fullWidth />
+                                </div>
                             </div>
                             ) : null}
                         </div>
@@ -1120,8 +1502,22 @@ export default function AdminReportDetailPage() {
                             </div>
                             {sectionOpen.section8 ? (
                             <div id="section8-panel" className="space-y-5">
+                                <div className={VERIFY_DOSSIER_FIELD_GRID}>
+                                    <LabelValue label="Has evidence" value={report.section8?.has_evidence} />
+                                    <LabelValue label="Media visibility" value={report.section8?.media_visible} />
+                                    <LabelValue label="Partner verification" value={report.section8?.partner_verification} />
+                                    <LabelValue label="Partner verification type" value={report.section8?.partner_verification_type} />
+                                </div>
                                 <LabelValue label="Description" value={report.section8?.description} fullWidth />
                                 <LabelValue label="Evidence types" value={report.section8?.evidence_types} fullWidth />
+                                <div className={VERIFY_DOSSIER_FIELD_GRID}>
+                                    <LabelValue label="Authentic evidence" value={report.section8?.ethical_compliance?.authentic} />
+                                    <LabelValue label="Informed consent" value={report.section8?.ethical_compliance?.informed_consent} />
+                                    <LabelValue label="No harm" value={report.section8?.ethical_compliance?.no_harm} />
+                                    <LabelValue label="Privacy respected" value={report.section8?.ethical_compliance?.privacy_respected} />
+                                    <LabelValue label="Partner verification files" value={report.section8?.partner_verification_files} fullWidth />
+                                    <LabelValue label="Section summary" value={report.section8?.summary_text} fullWidth />
+                                </div>
 
                                 <div>
                                     <h3 className={clsx(adminDossier.microLabel, "mb-3 text-slate-400")}>Evidence files</h3>
@@ -1197,6 +1593,19 @@ export default function AdminReportDetailPage() {
                                 <LabelValue label="Disciplinary / academic application" value={report.section9?.academic_application} fullWidth />
                                 <LabelValue label="Personal learning & insights" value={report.section9?.personal_learning} fullWidth />
                                 <LabelValue label="Sustainability & systems reflection" value={report.section9?.sustainability_reflection} fullWidth />
+                                {report.section9?.competency_scores ? (
+                                    <div className="rounded-2xl border border-slate-100 bg-slate-50/90 p-4">
+                                        <h3 className={clsx(adminDossier.microLabel, "mb-3 border-b border-slate-100 pb-2 text-slate-400")}>
+                                            Individual competency scores
+                                        </h3>
+                                        <div className={VERIFY_DOSSIER_FIELD_GRID}>
+                                            {Object.entries(report.section9.competency_scores as Record<string, unknown>).map(([key, value]) => (
+                                                <LabelValue key={key} label={key.replace(/_/g, " ")} value={value} />
+                                            ))}
+                                        </div>
+                                    </div>
+                                ) : null}
+                                <LabelValue label="Section summary" value={report.section9?.summary_text} fullWidth />
                             </div>
                             ) : null}
                         </div>
@@ -1218,9 +1627,14 @@ export default function AdminReportDetailPage() {
                             </div>
                             {sectionOpen.section10 ? (
                             <div id="section10-panel" className="space-y-5">
-                                <LabelValue label="Continuation status" value={report.section10?.continuation_status} />
-                                <LabelValue label="Mechanisms" value={report.section10?.mechanisms} fullWidth />
-                                <LabelValue label="Sustainability details" value={report.section10?.continuation_details} fullWidth />
+                                <div className={VERIFY_DOSSIER_FIELD_GRID}>
+                                    <LabelValue label="Continuation status" value={report.section10?.continuation_status} />
+                                    <LabelValue label="Mechanisms" value={report.section10?.mechanisms} fullWidth />
+                                    <LabelValue label="Sustainability details" value={report.section10?.continuation_details} fullWidth />
+                                    <LabelValue label="Scaling potential" value={report.section10?.scaling_potential} fullWidth />
+                                    <LabelValue label="Policy influence" value={report.section10?.policy_influence} fullWidth />
+                                    <LabelValue label="Section summary" value={report.section10?.summary_text} fullWidth />
+                                </div>
                             </div>
                             ) : null}
                         </div>

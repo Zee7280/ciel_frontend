@@ -1,19 +1,79 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { TrendingUp, Users, Clock, Globe, Loader2 } from "lucide-react";
+import { Clock, Globe, Loader2 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from "recharts";
 import { authenticatedFetch } from "@/utils/api";
 
+type ImpactStats = {
+    activeVolunteers: number;
+    partnerNgos: number;
+    totalBeneficiaries: number;
+};
+
+type TrendPoint = {
+    month: string;
+    hours: number;
+};
+
+type SdgPoint = {
+    name: string;
+    value: number;
+};
+
+const emptyStats: ImpactStats = {
+    activeVolunteers: 0,
+    partnerNgos: 0,
+    totalBeneficiaries: 0,
+};
+
+function toNumber(value: unknown): number {
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+    if (typeof value === "string" && value.trim() !== "") {
+        const parsed = Number(value);
+        if (Number.isFinite(parsed)) return parsed;
+    }
+    return 0;
+}
+
+function normalizeStats(value: unknown): ImpactStats {
+    const stats = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+    return {
+        activeVolunteers: toNumber(stats.active_volunteers ?? stats.activeVolunteers),
+        partnerNgos: toNumber(stats.partner_ngos ?? stats.partnerNgos),
+        totalBeneficiaries: toNumber(stats.total_beneficiaries ?? stats.totalBeneficiaries),
+    };
+}
+
+function normalizeHoursTrend(value: unknown): TrendPoint[] {
+    return Array.isArray(value)
+        ? value.map((row) => {
+              const item = row && typeof row === "object" ? (row as Record<string, unknown>) : {};
+              return {
+                  month: String(item.month ?? item.name ?? ""),
+                  hours: toNumber(item.hours),
+              };
+          })
+        : [];
+}
+
+function normalizeSdgImpact(value: unknown): SdgPoint[] {
+    return Array.isArray(value)
+        ? value.map((row) => {
+              const item = row && typeof row === "object" ? (row as Record<string, unknown>) : {};
+              return {
+                  name: String(item.name ?? item.sdg ?? "Unknown"),
+                  value: toNumber(item.value ?? item.hours),
+              };
+          })
+        : [];
+}
+
 export default function AdminImpactPage() {
     const [isLoading, setIsLoading] = useState(true);
-    const [hoursData, setHoursData] = useState<any[]>([]);
-    const [sdgData, setSdgData] = useState<any[]>([]);
-    const [stats, setStats] = useState({
-        activeVolunteers: 0,
-        partnerNgos: 0,
-        totalBeneficiaries: 0
-    });
+    const [hoursData, setHoursData] = useState<TrendPoint[]>([]);
+    const [sdgData, setSdgData] = useState<SdgPoint[]>([]);
+    const [stats, setStats] = useState<ImpactStats>(emptyStats);
 
     useEffect(() => {
         const fetchImpactData = async () => {
@@ -23,13 +83,9 @@ export default function AdminImpactPage() {
                 if (res && res.ok) {
                     const data = await res.json();
                     if (data.success) {
-                        setHoursData(data.data.hours_trend || []);
-                        setSdgData(data.data.impact_by_sdg || []);
-                        setStats(data.data.stats || {
-                            activeVolunteers: 0,
-                            partnerNgos: 0,
-                            totalBeneficiaries: 0
-                        });
+                        setHoursData(normalizeHoursTrend(data.data?.hours_trend));
+                        setSdgData(normalizeSdgImpact(data.data?.impact_by_sdg));
+                        setStats(normalizeStats(data.data?.stats));
                     }
                 }
             } catch (error) {
@@ -68,7 +124,7 @@ export default function AdminImpactPage() {
                         <ResponsiveContainer width="100%" height="100%">
                             <LineChart data={hoursData}>
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                                <XAxis dataKey="name" />
+                                <XAxis dataKey="month" />
                                 <YAxis />
                                 <Tooltip />
                                 <Line type="monotone" dataKey="hours" stroke="#3b82f6" strokeWidth={3} dot={{ r: 4 }} />

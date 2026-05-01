@@ -16,12 +16,13 @@ import {
     listOpportunityReportSdgs,
     listStudentReportSdgs,
     mergeReportSdgSnapshotRows,
+    mergedSdgTitlesLine,
     uniqueMergedSdgGoalNumbers,
 } from "../utils/reportSdgMerge";
 
 interface Props {
-    projectData: any;
-    reportData?: any;
+    projectData?: unknown;
+    reportData?: unknown;
 }
 
 /** Print dossier: one rhythm for navy strip + intelligence dashboard (labels / values). */
@@ -29,7 +30,7 @@ const printDossierTone = {
     labelMuted: "text-[10px] font-black uppercase tracking-widest text-slate-400",
     labelOnNavy: "text-[10px] font-black uppercase tracking-widest text-white/55",
     metricTile:
-        "flex min-h-[7.5rem] flex-col justify-center gap-1.5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:min-h-[7.75rem] sm:p-6",
+        "flex min-h-[7.5rem] flex-col justify-center gap-2 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:min-h-[7.75rem] sm:p-6",
     metricValue: "text-3xl font-black tabular-nums leading-none text-slate-900 sm:text-4xl",
     engagementValue: "text-xl font-black uppercase tracking-tight text-white sm:text-2xl",
     matrixBlurb: "text-[10px] font-medium uppercase leading-relaxed tracking-wide text-white/60",
@@ -90,12 +91,67 @@ function formatResourceSourcesLine(r: {
 function normalizePrintAnswer(a: unknown): ReactNode {
     if (a === null || a === undefined) return null;
     if (typeof a === "number" && !Number.isNaN(a)) return a;
+    if (typeof a === "boolean") return a ? "Yes" : "No";
     if (typeof a === "string") {
         const t = a.trim();
         if (!t || t.toLowerCase() === "undefined") return null;
         return t;
     }
-    return a as ReactNode;
+    if (Array.isArray(a)) {
+        const parts = a
+            .map((item) => {
+                if (item === null || item === undefined) return "";
+                if (typeof item === "string" || typeof item === "number" || typeof item === "boolean") return String(item);
+                if (typeof item === "object") {
+                    return Object.entries(item as Record<string, unknown>)
+                        .map(([key, value]) => {
+                            if (value === null || value === undefined) return "";
+                            if (Array.isArray(value)) {
+                                const joined = value
+                                    .map((v) =>
+                                        typeof v === "string" || typeof v === "number" || typeof v === "boolean"
+                                            ? String(v)
+                                            : "",
+                                    )
+                                    .filter(Boolean)
+                                    .join(", ");
+                                return joined ? `${key}: ${joined}` : "";
+                            }
+                            if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+                                return `${key}: ${value}`;
+                            }
+                            return "";
+                        })
+                        .filter(Boolean)
+                        .join(" · ");
+                }
+                return "";
+            })
+            .map((item) => item.trim())
+            .filter(Boolean);
+        return parts.length ? parts.join(" | ") : null;
+    }
+    if (typeof a === "object") {
+        const text = Object.entries(a as Record<string, unknown>)
+            .map(([key, value]) => {
+                if (value === null || value === undefined) return "";
+                if (Array.isArray(value)) {
+                    const joined = value
+                        .map((v) => (typeof v === "string" || typeof v === "number" || typeof v === "boolean" ? String(v) : ""))
+                        .filter(Boolean)
+                        .join(", ");
+                    return joined ? `${key}: ${joined}` : "";
+                }
+                if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+                    return `${key}: ${value}`;
+                }
+                return "";
+            })
+            .filter(Boolean)
+            .join(" · ");
+        return text || null;
+    }
+    return null;
 }
 
 function printObject(value: unknown): Record<string, unknown> | null {
@@ -144,6 +200,12 @@ function firstOutcomeArray(section5: unknown): unknown[] {
     return [];
 }
 
+function printRecordArray(value: unknown): Record<string, unknown>[] {
+    return Array.isArray(value)
+        ? value.filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object" && !Array.isArray(item))
+        : [];
+}
+
 type PrintableOutcome = {
     metric: string;
     baseline: string;
@@ -151,12 +213,22 @@ type PrintableOutcome = {
     unit: string;
     outcomeArea: string;
     explanation: string;
+    metricCategory: string;
+    confidence: string;
+};
+
+type PrintableBlueprintRow = {
+    label: string;
+    value: string;
+    fullWidth?: boolean;
 };
 
 function normalizePrintableOutcome(raw: unknown): PrintableOutcome | null {
     if (typeof raw === "string") {
         const metric = firstNonBlank(raw);
-        return metric ? { metric, baseline: "", endline: "", unit: "", outcomeArea: "", explanation: "" } : null;
+        return metric
+            ? { metric, baseline: "", endline: "", unit: "", outcomeArea: "", explanation: "", metricCategory: "", confidence: "" }
+            : null;
     }
 
     const record = printObject(raw);
@@ -200,6 +272,8 @@ function normalizePrintableOutcome(raw: unknown): PrintableOutcome | null {
         record.after,
     );
     const unit = firstNonBlank(record.unit_other, record.unitOther, record.unit, record.unit_label, record.unitLabel);
+    const metricCategory = firstNonBlank(record.metric_category, record.metricCategory);
+    const confidence = firstNonBlank(record.confidence_level, record.confidenceLevel);
 
     if (!metric && !outcomeArea && !explanation && !baseline && !endline) return null;
     return {
@@ -209,15 +283,85 @@ function normalizePrintableOutcome(raw: unknown): PrintableOutcome | null {
         unit,
         outcomeArea,
         explanation,
+        metricCategory,
+        confidence,
     };
 }
 
+function pickPrintValue(records: Record<string, unknown>[], keys: string[]): unknown {
+    for (const record of records) {
+        for (const key of keys) {
+            const value = record[key];
+            if (printObject(value)) return value;
+            if (typeof value === "boolean") return value ? "Yes" : "No";
+            const normalized = firstNonBlank(value);
+            if (normalized) return normalized;
+        }
+    }
+    return "";
+}
+
+function joinPrintParts(parts: unknown[]): string {
+    return parts.map((part) => firstNonBlank(part)).filter(Boolean).join(" · ");
+}
+
+function buildPrintableBlueprintRows(reportData: unknown, projectData: unknown): PrintableBlueprintRow[] {
+    const root = printObject(reportData) ?? {};
+    const project = printObject(projectData) ?? {};
+    const opportunity = printObject(root.opportunity) ?? project;
+    const objectives = printObject(pickPrintValue([opportunity, project, root], ["objectives"])) ?? {};
+    const activityDetails = printObject(pickPrintValue([opportunity, project, root], ["activity_details", "activityDetails", "activity"])) ?? {};
+    const supervision = printObject(pickPrintValue([opportunity, project, root], ["supervision"])) ?? {};
+    const executingContext = printObject(pickPrintValue([opportunity, project, root], ["executing_context", "executingContext"])) ?? {};
+    const partnerContext =
+        printObject(pickPrintValue([executingContext, root], ["partner", "partner_organization", "external_partner_collaboration"])) ?? {};
+    const independentContext =
+        printObject(pickPrintValue([executingContext, root], ["independent_community_activity", "independentCommunityActivity"])) ?? {};
+    const safetyDeclaration = printObject(pickPrintValue([opportunity, project, root], ["safety_declaration", "safetyDeclaration"])) ?? {};
+    const location = printObject(pickPrintValue([opportunity, project, root], ["location"])) ?? {};
+
+    const supervisorSummary = joinPrintParts([
+        pickPrintValue([supervision], ["supervisor_name", "supervisorName", "facultyName"]),
+        pickPrintValue([supervision], ["role", "facultyDesignation"]),
+        pickPrintValue([supervision], ["contact", "facultyOfficialEmail"]),
+    ]);
+    const partnerSummary = joinPrintParts([
+        pickPrintValue([partnerContext, supervision], ["organization_name", "organizationName", "partner_org_name", "partnerOrgName"]),
+        pickPrintValue([partnerContext, supervision], ["contact_person", "contactPerson", "partner_contact_person", "partnerContactPerson"]),
+        pickPrintValue([partnerContext, supervision], ["official_email", "officialEmail", "partner_email", "partnerEmail"]),
+    ]);
+    const independentSummary = joinPrintParts([
+        pickPrintValue([independentContext, supervision], ["activity_site_description", "activitySiteDescription", "independentSiteDescription"]),
+        pickPrintValue([independentContext, supervision], ["local_contact_person", "localContactPerson", "independentLocalContact"]),
+        pickPrintValue([independentContext, supervision], ["contact_number", "contactNumber", "independentContactPhone"]),
+    ]);
+    const locationSummary = joinPrintParts([
+        pickPrintValue([location, opportunity, project, root], ["city", "district", "location_district", "locationDistrict"]),
+        pickPrintValue([location, opportunity, project, root], ["venue", "address"]),
+    ]);
+
+    return [
+        { label: "Opportunity title", value: firstNonBlank(pickPrintValue([opportunity, project, root], ["title", "project_title", "projectTitle"])), fullWidth: true },
+        { label: "Project objectives", value: firstNonBlank(pickPrintValue([objectives, opportunity, project, root], ["description", "objective", "objectives_description"])), fullWidth: true },
+        { label: "Expected beneficiaries", value: firstNonBlank(pickPrintValue([objectives, opportunity, project, root], ["beneficiaries_count", "beneficiariesCount", "beneficiary_count"])) },
+        { label: "Beneficiary type", value: firstNonBlank(pickPrintValue([objectives, opportunity, project, root], ["beneficiaries_type", "beneficiariesType", "beneficiary_type"])) },
+        { label: "Student responsibilities", value: firstNonBlank(pickPrintValue([activityDetails, opportunity, project, root], ["student_responsibilities", "studentResponsibilities", "responsibilities"])), fullWidth: true },
+        { label: "Skills to be gained", value: firstNonBlank(pickPrintValue([activityDetails, opportunity, project, root], ["skills_gained", "skillsGained", "skills"])) },
+        { label: "Mode / location", value: joinPrintParts([pickPrintValue([opportunity, project, root], ["mode"]), locationSummary]) },
+        { label: "Faculty supervision", value: supervisorSummary, fullWidth: true },
+        { label: "Partner / executing organization", value: partnerSummary, fullWidth: true },
+        { label: "Independent community activity", value: independentSummary, fullWidth: true },
+        { label: "Safe environment declared", value: firstNonBlank(pickPrintValue([safetyDeclaration, supervision], ["environment_safe_and_appropriate", "safe_environment"])) },
+        { label: "Faculty oversight declared", value: firstNonBlank(pickPrintValue([safetyDeclaration, supervision], ["students_guided_and_supervised", "supervised"])) },
+    ].filter((row) => row.value);
+}
+
 export default function ReportPrintView({ projectData, reportData }: Props) {
-    let data = reportData;
+    let data = reportData as ReportData | undefined;
     try {
         const contextData = useReportForm().data;
         if (!data) data = contextData;
-    } catch (e) {}
+    } catch {}
 
     if (!data) return <div className="p-8 text-center text-slate-500 italic">No report data available for preview.</div>;
 
@@ -299,6 +443,11 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
         : calculatedCiiResult;
     const { totalScore, breakdown } = ciiResult;
     const ciiBadge = getCiiCertificateBadge(Math.round(totalScore));
+    const penaltyApplied =
+        typeof persistedCii?.penaltyApplied === "number" && Number.isFinite(persistedCii.penaltyApplied)
+            ? persistedCii.penaltyApplied
+            : 0;
+    const showCiiPenaltyRow = penaltyApplied > 0;
 
     const dossierAuditMeta =
         data.section11?.audit_meta ??
@@ -350,24 +499,36 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
     };
 
     const metrics = calculateMetrics();
+    const projectRecord = printObject(projectData) ?? {};
 
     const dossierProjectHeadline = deriveCertificateProjectDisplay({
         ...(data as ReportData),
         project_title:
             (data as ReportData).project_title ||
-            (typeof projectData?.title === "string" ? projectData.title : "") ||
+            (typeof projectRecord.title === "string" ? projectRecord.title : "") ||
             "",
     }).headline;
     const teamMembers = data.section1.team_members || [];
     const sdgProjectData =
-        projectData && typeof projectData === "object"
-            ? { ...(data as Record<string, unknown>), ...(projectData as Record<string, unknown>) }
-            : data;
+        projectData ??
+        (data as { opportunity?: unknown }).opportunity ??
+        data;
 
     const opportunitySdgRows = listOpportunityReportSdgs(sdgProjectData);
     const studentSdgRows = listStudentReportSdgs(data.section3);
     const mergedSdgNums = uniqueMergedSdgGoalNumbers(sdgProjectData, data.section3);
     const mergedSdgRows = mergeReportSdgSnapshotRows(sdgProjectData, data.section3);
+    const sdgGoalDisplay = mergedSdgNums.join(", ");
+    const sdgTitleLine = mergedSdgTitlesLine(sdgProjectData, data.section3);
+    const printableBlueprintRows = buildPrintableBlueprintRows(data, projectData);
+    const section4Blocks = printRecordArray(data.section4?.activity_blocks);
+    const section4Outputs = section4Blocks.flatMap((block, blockIndex) =>
+        printRecordArray(block.outputs).map((output, outputIndex) => ({
+            blockTitle: firstNonBlank(block.title, block.primary_category, `Activity ${blockIndex + 1}`),
+            output,
+            key: `${blockIndex}-${outputIndex}`,
+        })),
+    );
     const primarySdgDisplay =
         studentSdgRows.find((row) => row.role === "primary") ||
         opportunitySdgRows.find((row) => row.role === "primary") ||
@@ -406,7 +567,7 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
         </div>
     );
 
-    const QandA = ({ q, a, fullWidth = false }: { q: string; a: any; fullWidth?: boolean }) => {
+    const QandA = ({ q, a, fullWidth = false }: { q: string; a: unknown; fullWidth?: boolean }) => {
         const normalized = normalizePrintAnswer(a);
         const showPending =
             normalized === null ||
@@ -434,6 +595,17 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
         );
     };
 
+    const BlueprintCard = ({ row }: { row: PrintableBlueprintRow }) => (
+        <div className={`min-w-0 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm ${row.fullWidth ? "md:col-span-2" : ""}`}>
+            <p className="mb-2 text-[9px] font-black uppercase leading-relaxed tracking-[0.18em] text-slate-400">
+                {row.label}
+            </p>
+            <p className="whitespace-pre-wrap break-words text-[13px] font-semibold leading-relaxed text-slate-900">
+                {row.value}
+            </p>
+        </div>
+    );
+
     const scoreTableItems = [
         { label: "Identity & Participation", score: breakdown.participation, max: 10, weight: "10%" },
         { label: "Project Context & Discipline", score: breakdown.context, max: 10, weight: "10%" },
@@ -446,6 +618,7 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
         { label: "Personal & Academic Reflection", score: breakdown.learning, max: 4, weight: "4%" },
         { label: "Sustainability & Continuation", score: breakdown.sustainability, max: 5, weight: "5%" }
     ];
+    const formatCiiScore = (score: number) => Number.isInteger(score) ? String(score) : score.toFixed(1);
 
     return (
         <div className="dossier-root group relative mx-auto max-w-4xl bg-white px-4 py-6 font-sans text-slate-900 sm:px-8 sm:py-10 print:max-w-none print:p-0">
@@ -526,9 +699,18 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
                 />
                 <div className="grid grid-cols-1 gap-x-10 gap-y-6 md:grid-cols-2">
                     <QandA q="Participation structure" a={data.section1.participation_type === "team" ? "Team-based initiative" : "Individual project"} />
-                    <QandA q="Lead author / coordinator" a={data.section1.team_lead.name} />
+                    <QandA q="Lead author / coordinator" a={data.section1.team_lead.fullName || data.section1.team_lead.name} />
                     <QandA q="Host institution / university" a={data.section1.team_lead.university} />
                     <QandA q="Verified total engagement" a={`${metrics.total_verified_hours} hours verified`} />
+                    <QandA q="Lead CNIC" a={data.section1.team_lead.cnic} />
+                    <QandA q="Lead mobile" a={data.section1.team_lead.mobile} />
+                    <QandA q="Lead email" a={data.section1.team_lead.email} />
+                    <QandA q="Lead degree / year" a={[data.section1.team_lead.degree, data.section1.team_lead.year].filter(Boolean).join(" · ")} />
+                    <QandA q="Lead role / hours" a={[data.section1.team_lead.role, data.section1.team_lead.hours ? `${data.section1.team_lead.hours} hours` : ""].filter(Boolean).join(" · ")} />
+                    <QandA q="Privacy consent" a={data.section1.privacy_consent} />
+                    <QandA q="Faculty supervisor email" a={data.section1.faculty_supervisor_email} />
+                    <QandA q="Attendance verification status" a={data.section1.attendance_verification_status} />
+                    <QandA q="Verified summary" a={data.section1.verified_summary} fullWidth />
                 </div>
 
                 {teamMembers.length > 0 && (
@@ -539,8 +721,10 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
                         <table className="w-full border-collapse overflow-hidden rounded-xl border border-slate-200 text-xs">
                             <thead>
                                 <tr className="bg-slate-900 text-[9px] font-black uppercase tracking-widest text-white">
-                                    <th className="w-[45%] px-4 py-3 text-left align-middle">Full name</th>
+                                    <th className="w-[30%] px-4 py-3 text-left align-middle">Full name</th>
+                                    <th className="px-4 py-3 text-left align-middle">Institution / program</th>
                                     <th className="px-4 py-3 text-left align-middle">Capacity / role</th>
+                                    <th className="px-4 py-3 text-left align-middle">Hours / verified</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100 bg-white">
@@ -549,8 +733,14 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
                                         <td className="px-4 py-3 align-top font-bold text-slate-900">
                                             {(m as { fullName?: string }).fullName?.trim() || m.name}
                                         </td>
+                                        <td className="px-4 py-3 align-top text-[10px] font-semibold leading-relaxed text-slate-600">
+                                            {[m.university, m.program].filter(Boolean).join(" · ")}
+                                        </td>
                                         <td className="px-4 py-3 align-top text-[10px] font-bold uppercase tracking-tight text-slate-600">
                                             {(String((m as { role?: string }).role || "").trim() || "Team member")}
+                                        </td>
+                                        <td className="px-4 py-3 align-top text-[10px] font-semibold text-slate-600">
+                                            {[m.hours ? `${m.hours} hours` : "", m.verified === undefined ? "" : m.verified ? "Verified" : "Unverified"].filter(Boolean).join(" · ")}
                                         </td>
                                     </tr>
                                 ))}
@@ -559,6 +749,18 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
                     </div>
                 )}
 
+                <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-x-10">
+                    <QandA q="Engagement span" a={data.section1.metrics?.engagement_span ? `${data.section1.metrics.engagement_span} days` : ""} />
+                    <QandA q="Verified session count" a={data.section1.metrics?.verified_session_count} />
+                    <QandA q="Attendance frequency" a={data.section1.metrics?.attendance_frequency} />
+                    <QandA q="Weekly continuity" a={data.section1.metrics?.weekly_continuity} />
+                    <QandA q="EIS score" a={data.section1.metrics?.eis_score} />
+                    <QandA q="HEC compliance" a={data.section1.metrics?.hec_compliance} />
+                    <QandA q="Engagement category" a={data.section1.metrics?.engagement_category} />
+                    <QandA q="Individual metrics" a={data.section1.metrics?.individual_metrics} fullWidth />
+                    <QandA q="Engagement red flags" a={data.section1.metrics?.redFlags} fullWidth />
+                </div>
+
                 {/* Section 2: Project Context */}
                 <SectionHeader
                     number={2}
@@ -566,10 +768,23 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
                     question="What specific problem was addressed and how did it relate to your academic discipline?"
                 />
                 <div className="grid grid-cols-1 gap-6">
+                    {printableBlueprintRows.length > 0 ? (
+                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-x-10">
+                            {printableBlueprintRows.map((row) => (
+                                <BlueprintCard key={row.label} row={row} />
+                            ))}
+                        </div>
+                    ) : null}
                     <QandA q="Core problem statement" a={data.section2.problem_statement} fullWidth />
-                    <div className="grid grid-cols-1 gap-6 md:grid-cols-2 md:gap-x-10">
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-x-10">
+                        <QandA q="Problem category" a={data.section2.problem_category} />
+                        <QandA q="Primary beneficiary" a={data.section2.primary_beneficiary} />
                         <QandA q="Academic discipline" a={data.section2.discipline} />
-                        <QandA q="Disciplinary contribution" a={data.section2.discipline_contribution} />
+                        <QandA q="Disciplinary contribution" a={data.section2.discipline_contribution} fullWidth />
+                        <QandA q="Baseline evidence" a={data.section2.baseline_evidence} fullWidth />
+                        <QandA q="Baseline evidence other" a={data.section2.baseline_evidence_other} fullWidth />
+                        <QandA q="Baseline other entries" a={data.section2.baseline_other_entries} fullWidth />
+                        <QandA q="Section summary" a={data.section2.summary_text} fullWidth />
                     </div>
                 </div>
 
@@ -661,12 +876,36 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
                         ) : null}
                     </div>
                 ) : null}
+                <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-x-10">
+                    <QandA q="Validation status" a={data.section3.validation_status} />
+                    <QandA q="Summary stage" a={data.section3.summary_stage} />
+                    <QandA q="Section summary" a={data.section3.summary_text} fullWidth />
+                    <QandA q="Raw secondary SDG entries" a={data.section3.secondary_sdgs} fullWidth />
+                </div>
                 <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-center">
                     <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">All aligned goals (deduplicated)</p>
                     <p className="text-sm font-black text-slate-900">
-                        {mergedSdgNums.length ? mergedSdgNums.map((n) => `SDG ${n}`).join(" · ") : "—"}
+                        {mergedSdgNums.length
+                            ? `${mergedSdgNums.length === 1 ? "Goal" : "Goals"} ${sdgGoalDisplay}`
+                            : "—"}
                     </p>
+                    {sdgTitleLine ? (
+                        <p className="mt-1 text-[10px] font-semibold leading-snug text-slate-500">
+                            {sdgTitleLine}
+                        </p>
+                    ) : null}
                 </div>
+                {mergedSdgRows.length > 0 ? (
+                    <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-x-10">
+                        {mergedSdgRows.map((r, i) => (
+                            <QandA
+                                key={`merged-sdg-${r.goalNumber}-${i}`}
+                                q={`Aligned SDG ${i + 1}`}
+                                a={formatSdgRowAnswer(r)}
+                            />
+                        ))}
+                    </div>
+                ) : null}
 
                 {/* Section 4: Operational Metrics */}
                 <SectionHeader
@@ -696,6 +935,64 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
                     ))}
                 </div>
                 <QandA q="Comprehensive activity description" a={activityDescriptionCombined} fullWidth />
+                <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-x-10">
+                    <QandA q="Counting method" a={data.section4.project_summary?.counting_method} />
+                    <QandA q="Overall overlap" a={data.section4.project_summary?.overall_overlap} />
+                    <QandA q="Overall delivery mode" a={data.section4.project_summary?.overall_delivery_mode} />
+                    <QandA q="Overall implementation model" a={data.section4.project_summary?.overall_implementation_model} />
+                    <QandA q="Overall geographic reach" a={data.section4.project_summary?.overall_geographic_reach} />
+                    <QandA q="Project implementation explanation" a={data.section4.project_summary?.project_implementation_explanation} fullWidth />
+                    <QandA q="Section summary" a={data.section4.summary_text} fullWidth />
+                </div>
+                {section4Blocks.length > 0 ? (
+                    <div className="mt-8 space-y-5">
+                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Activity block details</p>
+                        {section4Blocks.map((block, i) => (
+                            <div key={String(block.id ?? i)} className="break-inside-avoid rounded-2xl border border-slate-200 bg-slate-50/90 p-5">
+                                <p className="mb-4 text-sm font-black text-slate-900">{firstNonBlank(block.title, `Activity ${i + 1}`)}</p>
+                                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-x-10">
+                                    <QandA q="Primary category" a={block.primary_category} />
+                                    <QandA q="Sub-category" a={block.sub_category} />
+                                    <QandA q="Other category" a={block.other_category_text} />
+                                    <QandA q="Status" a={block.status} />
+                                    <QandA q="Delivery mode" a={block.delivery_mode} />
+                                    <QandA q="Implementation models" a={block.implementation_models} />
+                                    <QandA q="Sessions count" a={block.sessions_count} />
+                                    <QandA q="Geographic reach" a={block.geographic_reach} />
+                                    <QandA q="Geographic sub-category" a={block.geographic_sub_category} />
+                                    <QandA q="Description" a={block.description} fullWidth />
+                                    <QandA q="Delivery explanation" a={block.delivery_explanation} fullWidth />
+                                    <QandA q="Serves beneficiaries" a={block.serves_beneficiaries} />
+                                    <QandA q="Beneficiaries reached" a={block.beneficiaries_reached} />
+                                    <QandA q="Beneficiary categories" a={block.beneficiary_categories} fullWidth />
+                                    <QandA q="Relevance types" a={block.relevance_types} fullWidth />
+                                    <QandA q="Overlap status" a={block.overlap_status} />
+                                    <QandA q="Beneficiary description" a={block.beneficiary_description} fullWidth />
+                                    <QandA q="Site note" a={block.site_note} fullWidth />
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                ) : null}
+                {section4Outputs.length > 0 ? (
+                    <div className="mt-8 space-y-5">
+                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Tangible output details</p>
+                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-x-10">
+                            {section4Outputs.map(({ blockTitle, output, key }) => (
+                                <div key={key} className="break-inside-avoid rounded-2xl border border-slate-200 bg-white p-5">
+                                    <p className="mb-1 text-sm font-black text-slate-900">{firstNonBlank(output.title, "Output")}</p>
+                                    <p className="mb-4 text-[9px] font-black uppercase tracking-widest text-slate-400">{blockTitle}</p>
+                                    <div className="grid grid-cols-1 gap-4">
+                                        <QandA q="Type" a={output.type} />
+                                        <QandA q="Quantity / unit" a={[output.quantity, output.unit].filter(Boolean).join(" ")} />
+                                        <QandA q="Shared" a={output.is_shared} />
+                                        <QandA q="Verification note" a={output.verification_note} fullWidth />
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                ) : null}
 
                 {/* Section 5: Measurable Outcomes */}
                 <SectionHeader
@@ -741,6 +1038,8 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
                                 </div>
                                 <div className="space-y-4">
                                     <QandA q="Impact dimension" a={outcome.outcomeArea} />
+                                    <QandA q="Metric category" a={outcome.metricCategory} />
+                                    <QandA q="Confidence level" a={outcome.confidence} />
                                     <QandA q="Measurement note" a={outcome.explanation} />
                                 </div>
                             </div>
@@ -754,6 +1053,7 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
                     )}
                     <QandA q="Observed change narrative" a={data.section5.observed_change} fullWidth />
                     <QandA q="Core implementation challenges" a={data.section5.challenges} fullWidth />
+                    <QandA q="Section summary" a={data.section5.summary_text} fullWidth />
                 </div>
 
                 {/* Section 6: Resources */}
@@ -762,16 +1062,22 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
                     title="Resource utilization"
                     question="What resources were deployed and how were they sourced?"
                 />
+                <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-x-10">
+                    <QandA q="Used external resources" a={data.section6.use_resources} />
+                    <QandA q="Resource evidence files" a={data.section6.evidence_files} />
+                </div>
                 {data.section6.resources?.length > 0 ? (
                     <div className="grid grid-cols-1 gap-6 md:grid-cols-2 md:gap-x-10">
-                        {data.section6.resources.map((r: any, i: number) => (
+                        {data.section6.resources.map((r: ReportData["section6"]["resources"][number], i: number) => (
                             <QandA
                                 key={i}
-                                q={`Resource ${i + 1}: ${r.type}?`}
+                                q={`Resource ${i + 1}: ${r.type_other || r.type}?`}
                                 a={(() => {
                                     const src = formatResourceSourcesLine(r);
-                                    const countPart = `Count: ${r.amount ?? "—"} ${r.unit || ""}`.trim();
-                                    return src ? `${countPart} | Source: ${src}` : countPart;
+                                    const countPart = `Count: ${r.amount ?? "—"} ${r.unit_other || r.unit || ""}`.trim();
+                                    const verification = r.verification?.length ? ` | Verification: ${r.verification.join(", ")}` : "";
+                                    const purpose = r.purpose ? ` | Purpose: ${r.purpose}` : "";
+                                    return `${src ? `${countPart} | Source: ${src}` : countPart}${purpose}${verification}`;
                                 })()}
                             />
                         ))}
@@ -783,6 +1089,9 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
                         fullWidth
                     />
                 )}
+                <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-x-10">
+                    <QandA q="Section summary" a={data.section6.summary_text} fullWidth />
+                </div>
 
                 {/* Section 7: Strategic Partnerships */}
                 <SectionHeader
@@ -790,10 +1099,24 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
                     title="Strategic partnerships"
                     question="Which organizations or partners collaborated in the project?"
                 />
+                <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-x-10">
+                    <QandA q="Has partners" a={data.section7.has_partners} />
+                    <QandA q="Formalization status" a={data.section7.formalization_status} />
+                    <QandA q="Formalization files" a={data.section7.formalization_files} fullWidth />
+                </div>
                 {data.section7.partners?.length > 0 ? (
                     <div className="grid grid-cols-1 gap-6 md:grid-cols-2 md:gap-x-10">
-                        {data.section7.partners.map((p: any, i: number) => (
-                            <QandA key={i} q={`Partner ${i + 1}`} a={`${p.name} (${p.type} organization)`} />
+                        {data.section7.partners.map((p: ReportData["section7"]["partners"][number], i: number) => (
+                            <QandA
+                                key={i}
+                                q={`Partner ${i + 1}`}
+                                a={[
+                                    `${p.name} (${p.type_other || p.type} organization)`,
+                                    p.role?.length ? `Role: ${p.role.join(", ")}` : "",
+                                    p.contribution?.length ? `Contribution: ${p.contribution.join(", ")}` : "",
+                                    p.verification ? `Verification: ${p.verification}` : "",
+                                ].filter(Boolean).join(" | ")}
+                            />
                         ))}
                     </div>
                 ) : (
@@ -803,6 +1126,9 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
                         fullWidth
                     />
                 )}
+                <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-x-10">
+                    <QandA q="Section summary" a={data.section7.summary_text} fullWidth />
+                </div>
 
                 {/* Section 8: Evidence & Ethics */}
                 <SectionHeader
@@ -811,16 +1137,24 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
                     question="What evidence was captured and how were ethical standards maintained?"
                 />
                 <div className="grid grid-cols-1 gap-6 md:grid-cols-2 md:gap-x-10">
-                    <QandA q="Primary evidence types" a={data.section8.evidence_types?.join(", ")} />
+                    <QandA q="Has evidence" a={data.section8.has_evidence} />
+                    <QandA q="Media visibility" a={data.section8.media_visible} />
+                    <QandA q="Primary evidence types" a={data.section8.evidence_types} />
+                    <QandA q="Evidence description" a={data.section8.description} fullWidth />
+                    <QandA q="Evidence files" a={data.section8.evidence_files} fullWidth />
                     <QandA
                         q="Ethical declaration compliance"
                         a={
                             Object.entries(data.section8.ethical_compliance || {})
-                                .filter(([_, v]) => v)
+                                .filter((entry) => entry[1])
                                 .map(([k]) => k.replace(/_/g, " "))
                                 .join(", ") || "Global ethical compliance adhered"
                         }
                     />
+                    <QandA q="Partner verification" a={data.section8.partner_verification} />
+                    <QandA q="Partner verification type" a={data.section8.partner_verification_type} />
+                    <QandA q="Partner verification files" a={data.section8.partner_verification_files} fullWidth />
+                    <QandA q="Section summary" a={data.section8.summary_text} fullWidth />
                 </div>
 
                 {/* Section 9: Reflection */}
@@ -830,8 +1164,14 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
                     question="How has this project influenced your professional growth and academic understanding?"
                 />
                 <div className="space-y-6">
+                    <div className="grid grid-cols-1 gap-6 md:grid-cols-2 md:gap-x-10">
+                        <QandA q="Academic integration" a={data.section9.academic_integration} />
+                        <QandA q="Competency scores" a={data.section9.competency_scores} fullWidth />
+                    </div>
                     <QandA q="Academic–professional synthesis" a={data.section9.academic_application} fullWidth />
                     <QandA q="Personal narrative & identity growth" a={data.section9.personal_learning} fullWidth />
+                    <QandA q="Sustainability & systems reflection" a={data.section9.sustainability_reflection} fullWidth />
+                    <QandA q="Section summary" a={data.section9.summary_text} fullWidth />
                 </div>
 
                 {/* Section 10: Sustainability */}
@@ -842,9 +1182,12 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
                 />
                 <div className="mb-6 grid grid-cols-1 gap-6 md:grid-cols-2 md:gap-x-10">
                     <QandA q="Continuation strategy status" a={data.section10.continuation_status} />
+                    <QandA q="Mechanisms" a={data.section10.mechanisms} />
                     <QandA q="Scaling potential" a={data.section10.scaling_potential} />
+                    <QandA q="Policy influence" a={data.section10.policy_influence} />
                 </div>
                 <QandA q="Detailed roadmap for future continuity" a={data.section10.continuation_details} fullWidth />
+                <QandA q="Section summary" a={data.section10.summary_text} fullWidth />
 
                 {/* Section 11: Impact Intelligence breakdown */}
                 <SectionHeader
@@ -872,11 +1215,27 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
                                     <td className="px-3 py-3 text-center align-middle font-bold tabular-nums text-slate-500">{item.max}</td>
                                     <td className="px-4 py-3 text-right align-middle">
                                         <span className="inline-flex min-w-[2.75rem] justify-center rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] font-black tabular-nums text-slate-900">
-                                            {item.score}
+                                            {formatCiiScore(item.score)}
                                         </span>
                                     </td>
                                 </tr>
                             ))}
+                            {showCiiPenaltyRow ? (
+                                <tr className="bg-rose-50/60">
+                                    <td className="px-4 py-3 align-middle font-black text-rose-900">
+                                        Penalty deductions
+                                    </td>
+                                    <td className="px-3 py-3 text-center align-middle text-[10px] font-bold uppercase tracking-tight text-rose-700">
+                                        Audit
+                                    </td>
+                                    <td className="px-3 py-3 text-center align-middle font-bold tabular-nums text-rose-700">—</td>
+                                    <td className="px-4 py-3 text-right align-middle">
+                                        <span className="inline-flex min-w-[2.75rem] justify-center rounded-lg border border-rose-200 bg-white px-2 py-1 text-[11px] font-black tabular-nums text-rose-800">
+                                            -{formatCiiScore(penaltyApplied)}
+                                        </span>
+                                    </td>
+                                </tr>
+                            ) : null}
                             <tr className="border-t-2 border-slate-200 bg-slate-50">
                                 <td
                                     colSpan={3}
@@ -886,7 +1245,7 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
                                 </td>
                                 <td className="px-4 py-3 text-right align-middle">
                                     <span className="inline-flex min-w-[2.75rem] justify-center rounded-lg bg-slate-900 px-2 py-2 text-xs font-black tabular-nums text-white shadow-md">
-                                        {totalScore}
+                                        {formatCiiScore(totalScore)}
                                     </span>
                                 </td>
                             </tr>
@@ -1019,15 +1378,15 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
                             <div className={printDossierTone.metricTile}>
                                 <p className={printDossierTone.labelMuted}>Strategic SDGs</p>
                                 {mergedSdgNums.length ? (
-                                    <div className="flex flex-wrap gap-1.5">
-                                        {mergedSdgNums.map((num) => (
-                                            <span
-                                                key={num}
-                                                className="rounded-lg bg-slate-900 px-2.5 py-1 text-sm font-black leading-none text-white sm:text-base"
-                                            >
-                                                SDG {formatSdgGoalPadded(num)}
-                                            </span>
-                                        ))}
+                                    <div className="min-w-0 space-y-1">
+                                        <p className="break-words text-xl font-black leading-tight text-slate-900 sm:text-2xl">
+                                            {mergedSdgNums.length === 1 ? "Goal" : "Goals"} {sdgGoalDisplay}
+                                        </p>
+                                        {sdgTitleLine ? (
+                                            <p className="text-[9px] font-semibold leading-snug text-slate-500">
+                                                {sdgTitleLine}
+                                            </p>
+                                        ) : null}
                                     </div>
                                 ) : (
                                     <p className={printDossierTone.metricValue}>—</p>
