@@ -5,7 +5,6 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import {
     ArrowLeft,
-    BarChart3,
     Building2,
     CheckCircle2,
     ClipboardList,
@@ -14,7 +13,6 @@ import {
     RefreshCw,
     Search,
     TrendingUp,
-    HelpCircle,
 } from "lucide-react";
 import clsx from "clsx";
 import AttendancePendingQueuePanel from "@/components/engagement/AttendancePendingQueuePanel";
@@ -163,7 +161,7 @@ export default function AttendanceReviewDashboard({
                 </div>
             ) : (
                 <>
-                    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
                         <div className="rounded-3xl border border-slate-200/90 bg-white p-5 shadow-sm">
                             <div className="flex items-start justify-between gap-2">
                                 <div>
@@ -212,45 +210,7 @@ export default function AttendanceReviewDashboard({
                                 </span>
                             </div>
                         </div>
-                        <div className="rounded-3xl border border-slate-200/90 bg-white p-5 shadow-sm">
-                            <div className="flex items-start justify-between gap-2">
-                                <div>
-                                    <p className="text-[11px] font-black uppercase tracking-widest text-slate-400">
-                                        Verified recently
-                                    </p>
-                                    <p className="mt-3 text-3xl font-black tabular-nums text-slate-400">—</p>
-                                    <p className="mt-2 flex flex-wrap items-center gap-1 text-xs font-medium leading-relaxed text-slate-500">
-                                        <HelpCircle className="h-3.5 w-3.5 shrink-0 text-slate-400" aria-hidden />
-                                        Weekly rollup needs a backend aggregate (see note below).
-                                    </p>
-                                </div>
-                                <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100">
-                                    <BarChart3 className="h-6 w-6" aria-hidden />
-                                </span>
-                            </div>
-                        </div>
                     </div>
-
-                    <details className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 px-4 py-3 text-sm text-slate-600 [&_svg]:relative [&_svg]:top-[-1px]">
-                        <summary className="cursor-pointer list-none font-semibold text-slate-700 [&::-webkit-details-marker]:hidden">
-                            Backend needed for fuller dashboard parity
-                        </summary>
-                        <ul className="mt-3 list-disc space-y-1.5 pl-5 leading-relaxed text-slate-600">
-                            <li>
-                                Endpoint for <strong>verified-this-week</strong> (counts of approved attendance in a rolling 7-day
-                                window, scoped to reviewer).
-                            </li>
-                            <li>
-                                Optional cross-project <strong>rollup</strong> for admin-style views instead of fetching one
-                                pending list per opportunity.
-                            </li>
-                            <li>
-                                <strong>Exception rules</strong> (overlap detection, checkout gaps) surfaced from the API
-                                instead of only client validations on submit.
-                            </li>
-                            <li>Optional <strong>team-level bulk approve</strong> endpoint if workflows require it.</li>
-                        </ul>
-                    </details>
 
                     <div
                         className="flex items-start gap-3 rounded-2xl border border-blue-100 bg-gradient-to-r from-blue-50 via-white to-slate-50 p-4 shadow-sm"

@@ -22,12 +22,79 @@ interface Applicant {
     studentName: string;
     university: string;
     email: string;
-    status: 'pending' | 'shortlisted' | 'accepted' | 'rejected';
+    status: 'pending' | 'shortlisted' | 'accepted' | 'rejected' | 'approved' | 'finalized' | string;
     appliedAt: string;
     avatar?: string;
     participation_type?: 'individual' | 'team';
     teamName?: string;
-    teamMembers?: TeamMember[];
+    isTeamLead?: boolean;
+    /** Present on the team lead row when API returns roster; often empty for non-lead rows (same team). */
+    teamMembers?: RawTeamMember[];
+}
+
+type RawTeamMember = TeamMember | Record<string, unknown>;
+
+function rawTeamMemberId(m: RawTeamMember): string | undefined {
+    if (m && typeof m === "object" && "id" in m && typeof (m as { id?: unknown }).id === "string") {
+        return (m as { id: string }).id;
+    }
+    return undefined;
+}
+
+function rawTeamMemberEmail(m: RawTeamMember): string | undefined {
+    if (m && typeof m === "object" && "email" in m && typeof (m as { email?: unknown }).email === "string") {
+        return (m as { email: string }).email;
+    }
+    return undefined;
+}
+
+function normalizeMemberRow(m: RawTeamMember): TeamMember {
+    const r = m as Record<string, unknown>;
+    const name = String(r.name ?? r.studentName ?? "").trim() || "—";
+    const roleRaw = String(r.role ?? "Member");
+    const role = roleRaw === "Lead" || roleRaw === "Leader" ? "Leader" : roleRaw;
+    const cnicVal = r.cnic;
+    const cnic =
+        cnicVal != null && String(cnicVal).trim() !== "" ? String(cnicVal).trim() : "—";
+    return { name, role, cnic };
+}
+
+function findTeamLeadRowForMember(member: Applicant, all: Applicant[]): Applicant | null {
+    if (member.participation_type !== "team") return null;
+    if (member.isTeamLead) return member;
+    const found =
+        all.find(
+            (a) =>
+                a.isTeamLead &&
+                a.participation_type === "team" &&
+                (a.teamMembers ?? []).some((row) => {
+                    const id = rawTeamMemberId(row);
+                    const email = rawTeamMemberEmail(row);
+                    return (id && id === member.id) || (email && email === member.email);
+                }),
+        ) ?? null;
+    return found;
+}
+
+/** Rows for the team dialog: uses this applicant's teamMembers when set; otherwise resolves the lead row from the list (non-lead applicants often get teamMembers: []). */
+function teamRowsForDialog(applicant: Applicant | null, allApplicants: Applicant[]): TeamMember[] {
+    if (!applicant || applicant.participation_type !== "team") return [];
+
+    const direct = applicant.teamMembers;
+    if (direct && direct.length > 0) {
+        return direct.map(normalizeMemberRow);
+    }
+
+    const lead = findTeamLeadRowForMember(applicant, allApplicants);
+    if (!lead || lead.id === applicant.id) return [];
+
+    const leaderRow: TeamMember = {
+        name: lead.studentName,
+        role: "Leader",
+        cnic: "—",
+    };
+    const memberRows = (lead.teamMembers ?? []).map(normalizeMemberRow);
+    return [leaderRow, ...memberRows];
 }
 
 export default function ManageApplicantsPage() {
@@ -108,7 +175,11 @@ export default function ManageApplicantsPage() {
 
     const getStatusBadge = (status: string) => {
         switch (status) {
-            case 'accepted': return <span className="px-3 py-1 rounded-full text-xs font-bold bg-green-100 text-green-700 flex items-center gap-1"><CheckCircle className="w-3 h-3" /> Accepted</span>;
+            case 'accepted':
+            case 'approved':
+                return <span className="px-3 py-1 rounded-full text-xs font-bold bg-green-100 text-green-700 flex items-center gap-1"><CheckCircle className="w-3 h-3" /> {status === 'approved' ? 'Approved' : 'Accepted'}</span>;
+            case 'finalized':
+                return <span className="px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 flex items-center gap-1"><CheckCircle className="w-3 h-3" /> Finalized</span>;
             case 'rejected': return <span className="px-3 py-1 rounded-full text-xs font-bold bg-red-100 text-red-700 flex items-center gap-1"><XCircle className="w-3 h-3" /> Rejected</span>;
             case 'shortlisted': return <span className="px-3 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-700 flex items-center gap-1"><Clock className="w-3 h-3" /> Shortlisted</span>;
             default: return <span className="px-3 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-600 flex items-center gap-1"><Clock className="w-3 h-3" /> Pending</span>;
@@ -126,6 +197,8 @@ export default function ManageApplicantsPage() {
         setSelectedTeam(applicant);
         setIsTeamDialogOpen(true);
     };
+
+    const selectedTeamRows = teamRowsForDialog(selectedTeam, applicants);
 
     if (isLoading) {
         return <div className="p-8 flex justify-center items-center"><Loader2 className="w-8 h-8 animate-spin text-blue-600" /></div>;
@@ -307,17 +380,25 @@ export default function ManageApplicantsPage() {
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
-                                    {selectedTeam?.teamMembers?.map((member, idx) => (
-                                        <tr key={idx} className="hover:bg-slate-100/50">
-                                            <td className="px-4 py-3 font-medium text-slate-900">{member.name}</td>
-                                            <td className="px-4 py-3">
-                                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${member.role === 'Leader' ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-200 text-slate-600'}`}>
-                                                    {member.role}
-                                                </span>
+                                    {selectedTeamRows.length === 0 ? (
+                                        <tr>
+                                            <td colSpan={3} className="px-4 py-8 text-center text-sm text-slate-500">
+                                                No team member details available for this application.
                                             </td>
-                                            <td className="px-4 py-3 font-mono text-slate-500">{member.cnic}</td>
                                         </tr>
-                                    ))}
+                                    ) : (
+                                        selectedTeamRows.map((member, idx) => (
+                                            <tr key={idx} className="hover:bg-slate-100/50">
+                                                <td className="px-4 py-3 font-medium text-slate-900">{member.name}</td>
+                                                <td className="px-4 py-3">
+                                                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${member.role === 'Leader' ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-200 text-slate-600'}`}>
+                                                        {member.role}
+                                                    </span>
+                                                </td>
+                                                <td className="px-4 py-3 font-mono text-slate-500">{member.cnic}</td>
+                                            </tr>
+                                        ))
+                                    )}
                                 </tbody>
                             </table>
                         </div>

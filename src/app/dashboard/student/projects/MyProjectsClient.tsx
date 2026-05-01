@@ -662,11 +662,16 @@ export default function MyProjectsPage() {
                         : detailStatusLabel === "Rejected"
                           ? "bg-red-50 text-red-800 border-red-200/80"
                           : "bg-amber-50 text-amber-900 border-amber-200/80";
+                /** Match browse cards: join rows show report CTA once application is approved/verified (see `browse/page.tsx`). */
+                const joinBrowseReportCtaEligible =
+                    !isStudentOwnedOpportunity &&
+                    applicationStatus !== "" &&
+                    ["approved", "verified"].includes(applicationStatus);
                 const reportCta =
                     reportUnlocked &&
-                    canStudentShowStartReportCta(pRecord, {
-                        isStudentOwner: isStudentOwnedOpportunity,
-                    })
+                    (isStudentOwnedOpportunity
+                        ? canStudentShowStartReportCta(pRecord, { isStudentOwner: true })
+                        : joinBrowseReportCtaEligible)
                         ? resolveStudentBrowseReportCta(project.id, project.report_status)
                         : null;
 
@@ -709,6 +714,17 @@ export default function MyProjectsPage() {
                         r.project.report_status === "continue"),
             ),
         [projectRows],
+    );
+
+    const firstContinueToolbarCta = useMemo(
+        () =>
+            firstContinueRow
+                ? resolveStudentBrowseReportCta(
+                      firstContinueRow.project.id,
+                      firstContinueRow.project.report_status,
+                  )
+                : null,
+        [firstContinueRow],
     );
 
     const firstPaymentRow = useMemo(
@@ -759,18 +775,18 @@ export default function MyProjectsPage() {
 
                     <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                         <div className="flex flex-wrap gap-2">
-                            {firstContinueRow ? (
+                            {firstContinueToolbarCta ? (
                                 <Link
-                                    href={`/dashboard/student/report?projectId=${firstContinueRow.project.id}`}
+                                    href={firstContinueToolbarCta.href}
                                     className="inline-flex"
-                                    title={`Open report for “${firstContinueRow.project.title}”`}
+                                    title={`Open report for “${firstContinueRow?.project.title ?? ""}”`}
                                 >
                                     <Button
                                         variant="outline"
                                         className="h-11 gap-2 rounded-xl border-blue-200/80 bg-white text-blue-700 shadow-sm hover:bg-blue-50"
                                     >
                                         <FileText className="h-4 w-4" />
-                                        Continue Report
+                                        {firstContinueToolbarCta.label}
                                     </Button>
                                 </Link>
                             ) : (
@@ -781,7 +797,7 @@ export default function MyProjectsPage() {
                                     className="h-11 gap-2 rounded-xl border-slate-200 bg-white text-slate-400 shadow-sm"
                                 >
                                     <FileText className="h-4 w-4" />
-                                    Continue Report
+                                    Start Report
                                 </Button>
                             )}
                             <Button

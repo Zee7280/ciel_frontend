@@ -15,6 +15,7 @@ import { parseSection11AuditSummary, type ReportCIIauditMeta } from "@/lib/parse
 import clsx from "clsx";
 import ReportVerificationQr from "@/components/ReportVerificationQr";
 import { pickImpactVerifyUrlFromPayload } from "@/utils/reportVerificationUrl";
+import { readPersistedCiiSnapshot } from "@/utils/reportCiiSnapshot";
 import { mergedSdgTitlesLine, uniqueMergedSdgGoalNumbers } from "../utils/reportSdgMerge";
 
 type Section11SummaryProps = {
@@ -155,7 +156,19 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
         return executiveSummary;
     }, [data.section11?.summary_text, executiveSummary]);
 
-    const ciiResult = useMemo(() => calculateCII(data), [data]);
+    const ciiResult = useMemo(() => {
+        const calculated = calculateCII(data);
+        const persisted = readPersistedCiiSnapshot(data);
+        return persisted
+            ? {
+                  ...calculated,
+                  ...persisted,
+                  totalScore: Math.round(persisted.totalScore),
+                  breakdown: calculated.breakdown,
+                  suggestions: persisted.suggestions ?? calculated.suggestions,
+              }
+            : calculated;
+    }, [data]);
 
     const section11AuditMeta = useMemo(() => {
         const text = String(data.section11?.summary_text || "").trim();
@@ -338,71 +351,111 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                 </div>
             )}
 
-            <div id="report-section11-audit-review" className={clsx("scroll-mt-24 md:scroll-mt-28 overflow-hidden relative group", surfaceCard)}>
-                <div className="absolute -bottom-8 -right-8 opacity-[0.04] group-hover:opacity-[0.07] transition-opacity duration-1000 rotate-12 pointer-events-none">
-                    <BarChart3 className="w-64 h-64 md:w-80 md:h-80 text-slate-900" />
-                </div>
-                <div
-                    className={clsx(
-                        "flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 px-6 py-4 md:px-8 md:py-5",
-                        surfaceHeaderRow,
-                    )}
-                >
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4 w-full min-w-0">
-                        <div className="flex items-center gap-3 min-w-0">
-                            <div className="w-9 h-9 shrink-0 rounded-xl bg-report-primary text-white flex items-center justify-center shadow-sm shadow-report-primary-shadow">
-                                <Quote className="w-4 h-4" />
+            {showVerifiedImpactScores ? (
+                <>
+                    <div
+                        id="report-section11-audit-review"
+                        className={clsx("scroll-mt-24 md:scroll-mt-28 overflow-hidden relative group", surfaceCard)}
+                    >
+                        <div className="absolute -bottom-8 -right-8 opacity-[0.04] group-hover:opacity-[0.07] transition-opacity duration-1000 rotate-12 pointer-events-none">
+                            <BarChart3 className="w-64 h-64 md:w-80 md:h-80 text-slate-900" />
+                        </div>
+                        <div
+                            className={clsx(
+                                "flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 px-6 py-4 md:px-8 md:py-5",
+                                surfaceHeaderRow,
+                            )}
+                        >
+                            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4 w-full min-w-0">
+                                <div className="flex items-center gap-3 min-w-0">
+                                    <div className="w-9 h-9 shrink-0 rounded-xl bg-report-primary text-white flex items-center justify-center shadow-sm shadow-report-primary-shadow">
+                                        <Quote className="w-4 h-4" />
+                                    </div>
+                                    <div className="min-w-0">
+                                        <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                                            {data.section11?.is_ai_generated ? "AI-Generated" : "System-Generated"}
+                                        </p>
+                                        <h3 className="text-sm font-black text-slate-900 tracking-tight">
+                                            Comprehensive audit review
+                                        </h3>
+                                    </div>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={openRedFlagsModal}
+                                    className="inline-flex items-center justify-center gap-2 self-stretch sm:self-center rounded-xl border-2 border-amber-200 bg-amber-50/70 px-4 py-2.5 text-[10px] font-black uppercase tracking-widest text-amber-950 transition-colors hover:bg-amber-50 shrink-0"
+                                >
+                                    <Flag className="w-3.5 h-3.5 shrink-0" />
+                                    Section-wise red flags
+                                </button>
                             </div>
-                            <div className="min-w-0">
+                        </div>
+                        <div className="px-6 py-8 md:px-8 md:py-10 space-y-6 relative z-10">
+                            <span className="absolute top-4 left-3 md:left-5 text-6xl md:text-7xl font-serif text-slate-100 select-none leading-none pointer-events-none">
+                                “
+                            </span>
+                            <div className="space-y-4 md:space-y-5 relative">
+                                {executiveSummary.split("\n\n").map((paragraph: string, idx: number) => (
+                                    <p key={idx} className="report-ai-text !text-base md:!text-lg">
+                                        {paragraph.trim()}
+                                    </p>
+                                ))}
+                            </div>
+                            <span className="absolute bottom-2 right-3 md:right-6 text-6xl md:text-7xl font-serif text-slate-100 select-none rotate-180 leading-none pointer-events-none">
+                                “
+                            </span>
+                            <div className="flex flex-wrap items-center gap-2.5 pt-5 border-t border-slate-100">
+                                <span className="inline-flex items-center gap-1.5 text-[9px] font-black text-report-primary bg-report-primary-soft px-3 py-1.5 rounded-lg border border-report-primary-border uppercase tracking-widest">
+                                    <ShieldCheck className="w-3 h-3 shrink-0" /> Integrity Verified
+                                </span>
+                                <span className="inline-flex items-center gap-1.5 text-[9px] font-black text-report-primary bg-report-primary-soft px-3 py-1.5 rounded-lg border border-report-primary-border uppercase tracking-widest">
+                                    <TrendingUp className="w-3 h-3 shrink-0" /> Growth Documented
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {section11AuditMeta ? (
+                        <CIIauditInsightsPanel
+                            audit={section11AuditMeta}
+                            ciiTotalScore={ciiResult.totalScore}
+                        />
+                    ) : null}
+                </>
+            ) : (
+                <div
+                    id="report-section11-audit-review"
+                    className={clsx("scroll-mt-24 md:scroll-mt-28 overflow-hidden", surfaceCard)}
+                >
+                    <div
+                        className={clsx(
+                            "flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 px-6 py-4 md:px-8 md:py-5",
+                            surfaceHeaderRow,
+                        )}
+                    >
+                        <div className="flex items-start gap-3 min-w-0">
+                            <div className="w-9 h-9 shrink-0 rounded-xl bg-slate-200 text-slate-600 flex items-center justify-center">
+                                <Lock className="w-4 h-4" />
+                            </div>
+                            <div className="min-w-0 space-y-1">
                                 <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
-                                    {data.section11?.is_ai_generated ? "AI-Generated" : "System-Generated"}
+                                    Post-approval only
                                 </p>
                                 <h3 className="text-sm font-black text-slate-900 tracking-tight">
-                                    Comprehensive audit review
+                                    Audit narrative and CII breakdown
                                 </h3>
                             </div>
                         </div>
-                        <button
-                            type="button"
-                            onClick={openRedFlagsModal}
-                            className="inline-flex items-center justify-center gap-2 self-stretch sm:self-center rounded-xl border-2 border-amber-200 bg-amber-50/70 px-4 py-2.5 text-[10px] font-black uppercase tracking-widest text-amber-950 transition-colors hover:bg-amber-50 shrink-0"
-                        >
-                            <Flag className="w-3.5 h-3.5 shrink-0" />
-                            Section-wise red flags
-                        </button>
+                    </div>
+                    <div className="px-6 py-8 md:px-8 md:py-9 border-t border-slate-100/80 bg-slate-50/40">
+                        <p className="text-sm font-medium text-slate-600 leading-relaxed">
+                            Final auditor narrative, CII transparency (scores, penalties, risk), and section-wise flags
+                            stay hidden until your reporting fee is confirmed and an administrator approves your
+                            submission—the same unlock as quantified scores above.
+                        </p>
                     </div>
                 </div>
-                <div className="px-6 py-8 md:px-8 md:py-10 space-y-6 relative z-10">
-                    <span className="absolute top-4 left-3 md:left-5 text-6xl md:text-7xl font-serif text-slate-100 select-none leading-none pointer-events-none">
-                        “
-                    </span>
-                    <div className="space-y-4 md:space-y-5 relative">
-                        {executiveSummary.split('\n\n').map((paragraph: string, idx: number) => (
-                            <p key={idx} className="report-ai-text !text-base md:!text-lg">
-                                {paragraph.trim()}
-                            </p>
-                        ))}
-                    </div>
-                    <span className="absolute bottom-2 right-3 md:right-6 text-6xl md:text-7xl font-serif text-slate-100 select-none rotate-180 leading-none pointer-events-none">
-                        “
-                    </span>
-                    <div className="flex flex-wrap items-center gap-2.5 pt-5 border-t border-slate-100">
-                        <span className="inline-flex items-center gap-1.5 text-[9px] font-black text-report-primary bg-report-primary-soft px-3 py-1.5 rounded-lg border border-report-primary-border uppercase tracking-widest">
-                            <ShieldCheck className="w-3 h-3 shrink-0" /> Integrity Verified
-                        </span>
-                        <span className="inline-flex items-center gap-1.5 text-[9px] font-black text-report-primary bg-report-primary-soft px-3 py-1.5 rounded-lg border border-report-primary-border uppercase tracking-widest">
-                            <TrendingUp className="w-3 h-3 shrink-0" /> Growth Documented
-                        </span>
-                    </div>
-                </div>
-            </div>
-
-            {section11AuditMeta ? (
-                <CIIauditInsightsPanel
-                    audit={section11AuditMeta}
-                    ciiTotalScore={ciiResult.totalScore}
-                />
-            ) : null}
+            )}
 
             <div className="space-y-4 md:space-y-5">
                 <div className="flex items-center gap-3">
@@ -831,12 +884,14 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                     document.body,
                 )}
 
-            <RedFlagsAuditModal
-                open={showRedFlagsModal}
-                onOpenChange={setShowRedFlagsModal}
-                sections={redFlagsModalSections}
-                usedSystemFallback={redFlagsUsedSystemFallback}
-            />
+            {showVerifiedImpactScores ? (
+                <RedFlagsAuditModal
+                    open={showRedFlagsModal}
+                    onOpenChange={setShowRedFlagsModal}
+                    sections={redFlagsModalSections}
+                    usedSystemFallback={redFlagsUsedSystemFallback}
+                />
+            ) : null}
         </div>
     );
 }

@@ -36,6 +36,15 @@ function firstArray(...values: unknown[]): unknown[] {
         if (typeof value === "string") {
             const trimmed = value.trim();
             if (!trimmed) continue;
+            if (trimmed.startsWith("[")) {
+                try {
+                    const parsed = JSON.parse(trimmed) as unknown;
+                    const parsedRows = firstArray(parsed);
+                    if (parsedRows.length) return parsedRows;
+                } catch {
+                    /* ignore non-JSON list strings */
+                }
+            }
             const parts = trimmed
                 .split(/[,\|;/]+/)
                 .map((s) => s.trim())
@@ -54,6 +63,12 @@ function firstValue(record: Record<string, unknown>, keys: string[]): unknown {
         if (value !== undefined && value !== null && String(value).trim() !== "") return value;
     }
     return undefined;
+}
+
+function nestedRecords(record: Record<string, unknown>, keys: string[]): Record<string, unknown>[] {
+    return keys
+        .map((key) => objectRecord(record[key]))
+        .filter((value): value is Record<string, unknown> => Boolean(value));
 }
 
 export function formatSdgGoalPadded(goalNumber: number): string {
@@ -85,43 +100,81 @@ export function listOpportunityReportSdgs(projectData: unknown): ReportSdgRow[] 
     const p = projectData as Record<string, unknown>;
     const rows: ReportSdgRow[] = [];
 
-    const info = objectRecord(p.sdg_info) ?? objectRecord(p.sdgInfo) ?? {};
-    const primaryNum = digitsGoalNumber(
-        firstValue(info, ["sdg_id", "sdgId", "goal_number", "goalNumber", "id"]) ?? p.sdg,
-    );
-    if (primaryNum) {
-        rows.push({
-            goalNumber: primaryNum,
-            title: titleForGoal(primaryNum),
-            targetId: String(firstValue(info, ["target_id", "targetId", "target"]) ?? "").trim(),
-            indicatorId: String(firstValue(info, ["indicator_id", "indicatorId", "indicator"]) ?? "").trim(),
-            source: "opportunity",
-            role: "primary",
-        });
-    }
+    const payloads = [
+        p,
+        ...nestedRecords(p, ["opportunity", "project", "projectData", "opportunity_details", "opportunityDetails"]),
+    ];
 
-    const secondaries = firstArray(
-        p.secondary_sdgs,
-        p.secondarySdgs,
-        p.secondary_sdg,
-        p.secondarySdg,
-        info.secondary_sdgs,
-        info.secondarySdgs,
-    );
-
-    secondaries.forEach((raw) => {
-        const s = objectRecord(raw);
-        const n = digitsGoalNumber(
-            s ? firstValue(s, ["sdg_id", "sdgId", "goal_number", "goalNumber", "sdg", "id"]) : raw,
+    payloads.forEach((payload) => {
+        const info = objectRecord(payload.sdg_info) ?? objectRecord(payload.sdgInfo) ?? {};
+        const primaryObj = objectRecord(payload.primary_sdg) ?? objectRecord(payload.primarySdg);
+        const primaryNum = digitsGoalNumber(
+            firstValue(info, ["sdg_id", "sdgId", "goal_number", "goalNumber", "id"]) ??
+                (primaryObj
+                    ? firstValue(primaryObj, ["sdg_id", "sdgId", "goal_number", "goalNumber", "sdg", "id"])
+                    : undefined) ??
+                firstValue(payload, ["sdg", "sdg_id", "sdgId", "goal_number", "goalNumber", "primary_sdg", "primarySdg"]),
         );
-        if (!n) return;
-        rows.push({
-            goalNumber: n,
-            title: titleForGoal(n),
-            targetId: String(s ? firstValue(s, ["target_id", "targetId", "target"]) : "").trim(),
-            indicatorId: String(s ? firstValue(s, ["indicator_id", "indicatorId", "indicator"]) : "").trim(),
-            source: "opportunity",
-            role: "secondary",
+        if (primaryNum) {
+            rows.push({
+                goalNumber: primaryNum,
+                title: titleForGoal(primaryNum, String(primaryObj?.goal_title ?? primaryObj?.title ?? "").trim() || null),
+                targetId: String(
+                    firstValue(info, ["target_id", "targetId", "target"]) ??
+                        (primaryObj ? firstValue(primaryObj, ["target_id", "targetId", "target"]) : "") ??
+                        "",
+                ).trim(),
+                indicatorId: String(
+                    firstValue(info, ["indicator_id", "indicatorId", "indicator"]) ??
+                        (primaryObj ? firstValue(primaryObj, ["indicator_id", "indicatorId", "indicator"]) : "") ??
+                        "",
+                ).trim(),
+                source: "opportunity",
+                role: "primary",
+            });
+        }
+
+        const secondaries = firstArray(
+            payload.secondary_sdgs,
+            payload.secondarySdgs,
+            payload.secondary_sdg,
+            payload.secondarySdg,
+            info.secondary_sdgs,
+            info.secondarySdgs,
+        );
+
+        secondaries.forEach((raw) => {
+            const s = objectRecord(raw);
+            const n = digitsGoalNumber(
+                s ? firstValue(s, ["sdg_id", "sdgId", "goal_number", "goalNumber", "sdg", "id"]) : raw,
+            );
+            if (!n) return;
+            rows.push({
+                goalNumber: n,
+                title: titleForGoal(n, String(s?.goal_title ?? s?.title ?? "").trim() || null),
+                targetId: String(s ? firstValue(s, ["target_id", "targetId", "target"]) : "").trim(),
+                indicatorId: String(s ? firstValue(s, ["indicator_id", "indicatorId", "indicator"]) : "").trim(),
+                source: "opportunity",
+                role: "secondary",
+                justification: String(s ? firstValue(s, ["justification_text", "justification"]) ?? "" : "").trim(),
+            });
+        });
+
+        firstArray(payload.sdgs, payload.sdg_alignment, payload.aligned_sdgs).forEach((raw) => {
+            const s = objectRecord(raw);
+            const n = digitsGoalNumber(
+                s ? firstValue(s, ["sdg_id", "sdgId", "goal_number", "goalNumber", "sdg", "id"]) : raw,
+            );
+            if (!n) return;
+            rows.push({
+                goalNumber: n,
+                title: titleForGoal(n, String(s?.goal_title ?? s?.title ?? "").trim() || null),
+                targetId: String(s ? firstValue(s, ["target_id", "targetId", "target"]) : "").trim(),
+                indicatorId: String(s ? firstValue(s, ["indicator_id", "indicatorId", "indicator"]) : "").trim(),
+                source: "opportunity",
+                role: "secondary",
+                justification: String(s ? firstValue(s, ["justification_text", "justification"]) ?? "" : "").trim(),
+            });
         });
     });
 
@@ -131,29 +184,37 @@ export function listOpportunityReportSdgs(projectData: unknown): ReportSdgRow[] 
 /** Student Section 3 mapping (primary + optional secondaries). */
 export function listStudentReportSdgs(section3: ReportData["section3"]): ReportSdgRow[] {
     const rows: ReportSdgRow[] = [];
-    const primaryNum = digitsGoalNumber(section3?.primary_sdg?.goal_number);
+    const primary = objectRecord(section3?.primary_sdg);
+    const primaryNum = digitsGoalNumber(
+        primary
+            ? firstValue(primary, ["goal_number", "goalNumber", "sdg_id", "sdgId", "sdg", "id"])
+            : undefined,
+    );
     if (primaryNum) {
         rows.push({
             goalNumber: primaryNum,
-            title: titleForGoal(primaryNum, section3.primary_sdg?.goal_title),
-            targetId: String(section3.primary_sdg?.target_id ?? "").trim(),
-            indicatorId: String(section3.primary_sdg?.indicator_id ?? "").trim(),
+            title: titleForGoal(primaryNum, String(primary?.goal_title ?? primary?.title ?? "").trim() || null),
+            targetId: String(primary ? firstValue(primary, ["target_id", "targetId", "target"]) ?? "" : "").trim(),
+            indicatorId: String(primary ? firstValue(primary, ["indicator_id", "indicatorId", "indicator"]) ?? "" : "").trim(),
             source: "student",
             role: "primary",
         });
     }
 
-    (section3?.secondary_sdgs || []).forEach((s) => {
-        const n = digitsGoalNumber(s?.goal_number);
+    (section3?.secondary_sdgs || []).forEach((raw) => {
+        const s = objectRecord(raw);
+        const n = digitsGoalNumber(
+            s ? firstValue(s, ["goal_number", "goalNumber", "sdg_id", "sdgId", "sdg", "id"]) : raw?.goal_number,
+        );
         if (!n) return;
         rows.push({
             goalNumber: n,
-            title: titleForGoal(n),
-            targetId: String(s.target_id ?? "").trim(),
-            indicatorId: String(s.indicator_id ?? "").trim(),
+            title: titleForGoal(n, String(s?.goal_title ?? s?.title ?? "").trim() || null),
+            targetId: String(s ? firstValue(s, ["target_id", "targetId", "target"]) : raw.target_id ?? "").trim(),
+            indicatorId: String(s ? firstValue(s, ["indicator_id", "indicatorId", "indicator"]) : raw.indicator_id ?? "").trim(),
             source: "student",
             role: "secondary",
-            justification: String(s.justification_text ?? "").trim(),
+            justification: String(s ? firstValue(s, ["justification_text", "justification"]) ?? "" : raw.justification_text ?? "").trim(),
         });
     });
 
@@ -227,4 +288,61 @@ export function mergedSdgTitlesLine(projectData: unknown, section3: ReportData["
     return nums
         .map((n) => titleByNum.get(n) || findSdgById(n)?.title || `SDG ${n}`)
         .join(" · ");
+}
+
+/**
+ * Ordered rows for read-only snapshots (Section 6, etc.): union of opportunity + student mappings,
+ * plus loose goal numbers. Student row wins when the same goal appears on both sides.
+ */
+export function mergeReportSdgSnapshotRows(
+    projectData: unknown,
+    section3: ReportData["section3"],
+): ReportSdgRow[] {
+    const nums = uniqueMergedSdgGoalNumbers(projectData, section3);
+    if (!nums.length) return [];
+
+    const oppByGoal = new Map<number, ReportSdgRow>(
+        listOpportunityReportSdgs(projectData).map((r) => [r.goalNumber, r]),
+    );
+    const studByGoal = new Map<number, ReportSdgRow>(
+        listStudentReportSdgs(section3).map((r) => [r.goalNumber, r]),
+    );
+
+    return nums.map((n) => {
+        const stud = studByGoal.get(n);
+        const opp = oppByGoal.get(n);
+        if (stud) return stud;
+        if (opp) return opp;
+        return {
+            goalNumber: n,
+            title: titleForGoal(n),
+            targetId: "",
+            indicatorId: "",
+            source: "student",
+            role: "primary",
+        };
+    });
+}
+
+/** Labels for snapshot UI: goals like "SDG 8, SDG 10"; targets/indicators from merged rows. */
+export function formatMergedSdgGoalsSnapshotLabels(rows: ReportSdgRow[]): {
+    goalsLine: string;
+    targetsLine: string;
+} {
+    if (!rows.length) {
+        return { goalsLine: "—", targetsLine: "—" };
+    }
+    const goalsLine = rows.map((r) => `SDG ${r.goalNumber}`).join(", ");
+    const parts = rows
+        .map((r) => {
+            const t = r.targetId?.trim();
+            const i = r.indicatorId?.trim();
+            if (t && i) return `${t} (${i})`;
+            if (t) return t;
+            if (i) return i;
+            return "";
+        })
+        .filter(Boolean);
+    const targetsLine = parts.length ? [...new Set(parts)].join(", ") : "—";
+    return { goalsLine, targetsLine };
 }

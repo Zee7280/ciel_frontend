@@ -171,7 +171,7 @@ export default function AttendancePendingQueuePanel({
                     return (
                         <div
                             key={id || `row-${idx}`}
-                            className="group flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-slate-300 hover:shadow-md lg:flex-row lg:items-stretch lg:gap-5"
+                            className="group flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-slate-300 hover:shadow-md"
                         >
                             <div className="flex-1 space-y-1 text-sm">
                                 <div className="flex flex-wrap items-center gap-2">
@@ -230,7 +230,7 @@ export default function AttendancePendingQueuePanel({
                                     />
                                 </label>
                             </div>
-                            <div className="grid grid-cols-3 gap-2 rounded-2xl border border-slate-100 bg-slate-50/60 p-2 lg:w-40 lg:grid-cols-1 lg:content-start">
+                            <div className="grid grid-cols-1 gap-2 rounded-2xl border border-slate-100 bg-slate-50/60 p-2 sm:grid-cols-3">
                                 <button
                                     type="button"
                                     disabled={acting !== null}

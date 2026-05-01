@@ -7,6 +7,11 @@ import { Input } from "./ui/input";
 import { Button } from "./ui/button";
 import { Textarea } from "./ui/textarea";
 import { useReportForm } from "../context/ReportContext";
+import { calculateEngagementMetrics, buildIndividualRosterFromSection1 } from "../utils/engagementMetrics";
+import {
+    formatMergedSdgGoalsSnapshotLabels,
+    mergeReportSdgSnapshotRows,
+} from "../utils/reportSdgMerge";
 import { FieldError } from "./ui/FieldError";
 import React, { useMemo, useEffect, useState } from "react";
 import clsx from "clsx";
@@ -376,7 +381,7 @@ function ResourceCard({
 }
 
 // ─── Main Component ────────────────────────────────────────────────────────────
-export default function Section6Resources() {
+export default function Section6Resources({ projectData }: { projectData?: unknown } = {}) {
     const { data, updateSection, getFieldError, saveReport } = useReportForm();
     const { section1, section3, section4, section6 } = data;
     const { use_resources, resources } = section6;
@@ -393,16 +398,41 @@ export default function Section6Resources() {
         update('resources', next);
     };
 
+    const verifiedHoursSnapshot = useMemo(() => {
+        const logs = section1.attendance_logs || [];
+        if (logs.length > 0) {
+            const teamSize = (section1.participation_type === "team" ? section1.team_members.length : 0) + 1;
+            const req = data.required_hours || 16;
+            const rosterIds = buildIndividualRosterFromSection1(section1, section1.team_lead?.id);
+            const calc = calculateEngagementMetrics(logs, req, teamSize, undefined, rosterIds);
+            return Number(calc.total_verified_hours.toFixed(1));
+        }
+        const stored = Number(section1.metrics?.total_verified_hours);
+        return Number.isFinite(stored) ? Number(stored.toFixed(1)) : 0;
+    }, [
+        section1.attendance_logs,
+        section1.participation_type,
+        section1.team_members,
+        section1.team_lead?.id,
+        section1.metrics?.total_verified_hours,
+        data.required_hours,
+    ]);
+
+    const { goalsLine: mappedSdgsDisplay, targetsLine: mappedSdgTargetsDisplay } = useMemo(() => {
+        const rows = mergeReportSdgSnapshotRows(projectData ?? null, section3);
+        return formatMergedSdgGoalsSnapshotLabels(rows);
+    }, [projectData, section3]);
+
     // ── Auto-generated narrative ──────────────────────────────────────────────
     const autoNarrative = useMemo(() => {
         if (use_resources === 'no' || use_resources === '') {
-            return `Resource Model: Volunteer-Based Implementation. Total Verified Hours: ${section1.metrics.total_verified_hours}h. Financial Mobilization: 0.`;
+            return `Resource Model: Volunteer-Based Implementation. Total Verified Hours: ${verifiedHoursSnapshot}h. Financial Mobilization: 0.`;
         }
         if (resources.length === 0) return "Resource narrative will appear once entries are added.";
         const typesUsed = [...new Set(resources.map(r => r.type).filter(Boolean))];
         const allSources = [...new Set(resources.flatMap(r => r.sources || []).filter(Boolean))];
         return `The project mobilized ${typesUsed.length > 0 ? typesUsed.slice(0, 2).join(' and ').toLowerCase() : 'resources'} from ${allSources.length > 0 ? allSources.slice(0, 2).join(' and ').toLowerCase() : 'contributing sources'}, enabling structured delivery of activities and beneficiary engagement. A total of ${resources.length} resource ${resources.length === 1 ? 'category was' : 'categories were'} recorded to support implementation.`;
-    }, [use_resources, resources, section1.metrics.total_verified_hours]);
+    }, [use_resources, resources, verifiedHoursSnapshot]);
 
     useEffect(() => {
         if (section6.summary_text !== autoNarrative) {
@@ -471,10 +501,10 @@ export default function Section6Resources() {
                     <div className="relative z-10 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
 
                         {[
-                            { label: "Primary SDG", val: section3.primary_sdg.goal_number ? `SDG ${section3.primary_sdg.goal_number}` : "—" },
-                            { label: "SDG Target", val: section3.primary_sdg.target_id || "—" },
+                            { label: "SDG Goals", val: mappedSdgsDisplay },
+                            { label: "SDG Targets", val: mappedSdgTargetsDisplay },
                             { label: "Beneficiaries", val: `${section4.project_summary?.distinct_total_beneficiaries || "0"} Reached` },
-                            { label: "Verified Hours", val: `${section1.metrics.total_verified_hours}h` },
+                            { label: "Verified Hours", val: `${verifiedHoursSnapshot}h` },
                             { label: "Activity Types", val: `${(section4.activity_blocks || []).filter((a: any) => a.type).length} Recorded` },
                             { label: "Outputs", val: `${(section4.activity_blocks || []).reduce((acc: number, b: any) => acc + (b.outputs?.length || 0), 0)} Recorded` },
                         ].map(({ label, val }) => (
@@ -485,7 +515,7 @@ export default function Section6Resources() {
                                     {label}
                                 </p>
 
-                                <p className="text-sm font-black text-slate-900 truncate">
+                                <p className="text-sm font-black text-slate-900 truncate" title={typeof val === "string" ? val : undefined}>
                                     {val}
                                 </p>
 
@@ -603,7 +633,7 @@ export default function Section6Resources() {
 
                                 {[
                                     { label: "Resource Model", val: "Volunteer-Based" },
-                                    { label: "Verified Hours", val: `${section1.metrics.total_verified_hours}h` },
+                                    { label: "Verified Hours", val: `${verifiedHoursSnapshot}h` },
                                     { label: "Financial Mobilization", val: "0" }
                                 ].map(({ label, val }) => (
 

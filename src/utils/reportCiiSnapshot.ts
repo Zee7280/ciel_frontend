@@ -27,6 +27,17 @@ function coerceScore(value: unknown): number | null {
     return null;
 }
 
+function readNumberAfter(text: string, pattern: RegExp): number | null {
+    const match = text.match(pattern);
+    if (!match?.[1]) return null;
+    const parsed = Number(match[1]);
+    return Number.isFinite(parsed) ? parsed : null;
+}
+
+function clampScore(score: number): number {
+    return Math.min(100, Math.max(0, score));
+}
+
 function normalizeCiiObject(raw: unknown): ReportCiiSnapshot | null {
     if (!raw || typeof raw !== "object") {
         const scalar = coerceScore(raw);
@@ -60,6 +71,29 @@ function normalizeCiiObject(raw: unknown): ReportCiiSnapshot | null {
         : undefined;
 
     return { totalScore: score, level, breakdown, suggestions };
+}
+
+function parseAdjustedCiiFromAuditText(text: unknown): ReportCiiSnapshot | null {
+    if (typeof text !== "string" || !text.trim()) return null;
+
+    const finalAdjusted =
+        readNumberAfter(text, /\bFinal\s+Adjusted\s+CII\s+Score\s*[:=-]?\s*(\d+(?:\.\d+)?)\s*(?:\/\s*100)?/i) ??
+        readNumberAfter(text, /\bAdjusted\s+CII\s+Score\s*[:=-]?\s*(\d+(?:\.\d+)?)\s*(?:\/\s*100)?/i) ??
+        readNumberAfter(text, /\bFinal\s+CII\s+(?:Index\s+)?Score\s*[:=-]?\s*(\d+(?:\.\d+)?)\s*(?:\/\s*100)?/i);
+
+    if (finalAdjusted !== null) {
+        const totalScore = clampScore(finalAdjusted);
+        return { totalScore, level: deriveCiiLevel(totalScore) };
+    }
+
+    const raw = readNumberAfter(text, /\bRaw\s+CII\s+Score\s*[:=-]?\s*(\d+(?:\.\d+)?)\s*(?:\/\s*100)?/i);
+    const penalty = readNumberAfter(text, /\bPenalty\s+Applied\s*[:=-]?\s*(\d+(?:\.\d+)?)/i);
+    if (raw === null || penalty === null) return null;
+
+    const auditCap = readNumberAfter(text, /\bAudit\s+Cap\s+Applied\s*[:=-]?\s*(\d+(?:\.\d+)?)/i);
+    const adjustedBeforeCap = raw - penalty;
+    const totalScore = clampScore(auditCap === null ? adjustedBeforeCap : Math.min(adjustedBeforeCap, auditCap));
+    return { totalScore, level: deriveCiiLevel(totalScore) };
 }
 
 function parseCiiFromSummaryText(text: unknown): ReportCiiSnapshot | null {
@@ -103,10 +137,20 @@ export function readPersistedCiiSnapshot(report: unknown): ReportCiiSnapshot | n
         record.impactScore,
     ];
 
+    const adjustedSnapshot = parseAdjustedCiiFromAuditText(section11.summary_text);
+
     for (const candidate of candidates) {
         const snapshot = normalizeCiiObject(candidate);
-        if (snapshot) return snapshot;
+        if (snapshot) {
+            return adjustedSnapshot
+                ? {
+                      ...snapshot,
+                      totalScore: adjustedSnapshot.totalScore,
+                      level: adjustedSnapshot.level,
+                  }
+                : snapshot;
+        }
     }
 
-    return parseCiiFromSummaryText(section11.summary_text);
+    return adjustedSnapshot ?? parseCiiFromSummaryText(section11.summary_text);
 }

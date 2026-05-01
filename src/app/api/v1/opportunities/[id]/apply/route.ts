@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { extractJsonErrorMessage, normalizeNestHttpMessage } from "@/utils/applyOpportunityUx";
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
     try {
@@ -13,19 +14,23 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
             }
         });
 
-        const data = await response.json();
+        let data: Record<string, unknown> = {};
+        try {
+            data = (await response.json()) as Record<string, unknown>;
+        } catch {
+            data = {};
+        }
 
         if (!response.ok) {
-            return NextResponse.json(
-                { error: data.message || "Operation failed" },
-                { status: response.status }
-            );
+            const merged = extractJsonErrorMessage(data);
+            const msg = merged || normalizeNestHttpMessage(data?.error) || "Operation failed";
+            return NextResponse.json({ error: msg, message: msg }, { status: response.status });
         }
 
         return NextResponse.json(data);
 
     } catch (error) {
         console.error("Error in opportunities apply proxy:", error);
-        return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+        return NextResponse.json({ error: "Internal Server Error", message: "Internal Server Error" }, { status: 500 });
     }
 }

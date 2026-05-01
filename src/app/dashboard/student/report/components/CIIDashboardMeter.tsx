@@ -3,13 +3,26 @@
 import React, { useMemo } from 'react';
 import { useReportForm } from '../context/ReportContext';
 import { calculateCII } from '../utils/calculateCII';
+import { readPersistedCiiSnapshot } from '@/utils/reportCiiSnapshot';
 import { CheckCircle2, ChevronRight, TrendingUp, AlertTriangle } from 'lucide-react';
 import clsx from 'clsx';
 
 export default function CIIDashboardMeter() {
     const { data } = useReportForm();
 
-    const ciiResult = useMemo(() => calculateCII(data), [data]);
+    const ciiResult = useMemo(() => {
+        const calculated = calculateCII(data);
+        const persisted = readPersistedCiiSnapshot(data);
+        return persisted
+            ? {
+                  ...calculated,
+                  ...persisted,
+                  totalScore: Math.round(persisted.totalScore),
+                  breakdown: calculated.breakdown,
+                  suggestions: persisted.suggestions ?? calculated.suggestions,
+              }
+            : calculated;
+    }, [data]);
 
     const { totalScore, level, breakdown, suggestions } = ciiResult;
 

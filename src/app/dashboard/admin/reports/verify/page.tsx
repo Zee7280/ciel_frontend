@@ -32,6 +32,41 @@ interface Report {
 
 type ReportStatusFilter = 'all' | 'submitted' | 'pending' | 'verified' | 'rejected';
 
+function normalizeStatus(value: string | null | undefined): string {
+    if (!value) return '';
+    return value.trim().toLowerCase().replace(/[\s-]+/g, '_');
+}
+
+function reportMatchesTab(report: Report, tab: ReportStatusFilter): boolean {
+    if (tab === 'all') return true;
+    const statuses = [
+        normalizeStatus(report.status),
+        normalizeStatus(report.admin_status),
+        normalizeStatus(report.partner_status),
+    ].filter(Boolean);
+
+    if (tab === 'pending') {
+        return statuses.some((status) =>
+            status.includes('pending') ||
+            status.includes('submitted') ||
+            status.includes('under_review') ||
+            status.includes('awaiting'),
+        );
+    }
+    if (tab === 'submitted') {
+        return statuses.some((status) => status === 'submitted' || status.includes('under_review'));
+    }
+    if (tab === 'verified') {
+        return statuses.some((status) =>
+            status === 'verified' || status === 'approved' || status === 'partner_verified',
+        );
+    }
+    if (tab === 'rejected') {
+        return statuses.some((status) => status === 'rejected');
+    }
+    return true;
+}
+
 export default function AdminReportsVerificationPage() {
     const router = useRouter();
     const [reports, setReports] = useState<Report[]>([]);
@@ -43,6 +78,11 @@ export default function AdminReportsVerificationPage() {
 
     useEffect(() => {
         fetchOrganizations();
+    }, []);
+
+    useEffect(() => {
+        // Keep UX deterministic: default view opens on pending queue.
+        setActiveTab('pending');
     }, []);
 
     useEffect(() => {
@@ -73,11 +113,6 @@ export default function AdminReportsVerificationPage() {
             // Add organization filter if selected
             if (selectedOrg && selectedOrg !== 'all') {
                 apiUrl += `organizationId=${selectedOrg}&`;
-            }
-
-            // Add status filter
-            if (activeTab !== 'all') {
-                apiUrl += `status=${activeTab}`;
             }
 
             console.log('🌐 ADMIN API URL:', apiUrl);
@@ -126,11 +161,15 @@ export default function AdminReportsVerificationPage() {
         );
     };
 
-    const filteredReports = reports.filter(report =>
-        report.student_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        report.project_title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (report.organization_name && report.organization_name.toLowerCase().includes(searchQuery.toLowerCase()))
-    );
+    const filteredReports = reports.filter((report) => {
+        const q = searchQuery.toLowerCase();
+        const matchesSearch =
+            report.student_name.toLowerCase().includes(q) ||
+            report.student_email.toLowerCase().includes(q) ||
+            report.project_title.toLowerCase().includes(q) ||
+            (report.organization_name && report.organization_name.toLowerCase().includes(q));
+        return matchesSearch && reportMatchesTab(report, activeTab);
+    });
 
     const statusOptions = [
         { id: 'pending', label: 'Pending' },

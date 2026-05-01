@@ -27,6 +27,40 @@ function parseClockToMinutes(t: string | undefined): number | null {
     return parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
 }
 
+/** Same prefix/compare rules as Section1 participation — aligns log rows with roster cards. */
+function engagementParticipantCompareKey(id: string | undefined | null): string {
+    if (!id) return "";
+    if (id.startsWith("lead:")) return id.slice("lead:".length);
+    const m = /^member:\d+:(.+)$/.exec(id);
+    if (m?.[1]) return m[1];
+    return id;
+}
+
+function engagementParticipantIdsMatch(a: string | undefined | null, b: string | undefined | null): boolean {
+    if (!a || !b) return false;
+    if (a === b) return true;
+    return engagementParticipantCompareKey(a) === engagementParticipantCompareKey(b);
+}
+
+/**
+ * Roster IDs for team reports — must stay aligned with Section1 rawParticipants /
+ * attendance log prefixed ids (`lead:…`, `member:idx:…`).
+ */
+export function buildIndividualRosterFromSection1(section1: {
+    participation_type?: string;
+    team_lead?: { id?: string | null };
+    team_members?: Array<{ id?: string; participantId?: string; cnic?: string; email?: string }>;
+}, leadParticipantId?: string | null): string[] | undefined {
+    if (section1.participation_type !== "team") return undefined;
+    const leadId = leadParticipantId ?? section1.team_lead?.id ?? null;
+    if (!leadId) return undefined;
+    const ids: string[] = [`lead:${leadId}`];
+    (section1.team_members ?? []).forEach((m, idx) => {
+        ids.push(`member:${idx}:${m?.id ?? m?.participantId ?? m?.cnic ?? m?.email ?? "anon"}`);
+    });
+    return ids;
+}
+
 /** Prefer stored `hours`; otherwise derive from start/end clock times on the same day. */
 export function effectiveHoursFromLog(log: AttendanceLog): number {
     const direct = Number(log.hours);
@@ -57,6 +91,8 @@ export interface IndividualMetric {
 
 export interface CalculatedMetrics {
     total_verified_hours: number;
+    /** Count of roster-attributed attendance rows (same basis as totals when team roster is applied). */
+    verified_session_count: number;
     total_active_days: number;
     engagement_span: number;
     attendance_frequency: number;
@@ -73,7 +109,9 @@ export function calculateEngagementMetrics(
     logs: AttendanceLog[], 
     requiredHours: number = 16, 
     teamSize: number = 1,
-    leadProfile?: any
+    leadProfile?: any,
+    /** When set for team flows, splits hours strictly by roster participant (fixes merged "Team Lead" card). */
+    individualRosterIds?: readonly string[],
 ): CalculatedMetrics {
     const redFlags: string[] = [];
     const countedLogs = filterAttendanceLogsForVerifiedMetrics(logs || []);
@@ -81,6 +119,7 @@ export function calculateEngagementMetrics(
     if (!countedLogs || countedLogs.length === 0) {
         return {
             total_verified_hours: 0,
+            verified_session_count: 0,
             total_active_days: 0,
             engagement_span: 0,
             attendance_frequency: 0,
@@ -92,19 +131,71 @@ export function calculateEngagementMetrics(
         };
     }
 
+    const rosterIds =
+        individualRosterIds && individualRosterIds.length > 0 ? individualRosterIds : null;
+    /** Team flows: ignore bulk rows that cannot be attributed to current roster — they inflated totals vs individual cards. */
+    const aggregateLogs = rosterIds
+        ? countedLogs.filter((log) =>
+              rosterIds.some((id) => engagementParticipantIdsMatch(log.participantId, id)),
+          )
+        : countedLogs;
+
+    if (
+        rosterIds &&
+        countedLogs.length > aggregateLogs.length
+    ) {
+        const n = countedLogs.length - aggregateLogs.length;
+        redFlags.push(
+            `Excluded ${n} attendance row(s) not attributed to the current team roster (bulk API noise or stale participants).`,
+        );
+    }
+
+    if (rosterIds && aggregateLogs.length === 0) {
+        if (countedLogs.length > 0) {
+            redFlags.push(
+                "Team roster attribution: approved attendance rows did not match any current team member.",
+            );
+        }
+        return {
+            total_verified_hours: 0,
+            verified_session_count: 0,
+            total_active_days: 0,
+            engagement_span: 0,
+            attendance_frequency: 0,
+            weekly_continuity: 0,
+            eis_score: 0,
+            engagement_category: "Band A – Emerging Service Participant",
+            hec_compliance: "below",
+            individual_metrics:
+                rosterIds?.map((pId) => ({
+                    student_id: pId,
+                    individual_hours: 0,
+                    gateway_status: "INCOMPLETE" as const,
+                    completion_percentage: 0,
+                    team_eis: 0,
+                    bonus: 0,
+                    final_score: null,
+                    band: "Incomplete",
+                    final_status: "INCOMPLETE",
+                    evidence_status: "Missing",
+                })) ?? [],
+            redFlags,
+        };
+    }
+
     // 1. INPUT VARIABLES
     const RHS = requiredHours;
     const N = teamSize > 0 ? teamSize : 1;
     const projectGoal = RHS * N;
     
-    const totalHours = countedLogs.reduce((sum, log) => sum + effectiveHoursFromLog(log), 0);
-    const uniqueDays = new Set(countedLogs.map(log => log.date)).size;
+    const totalHours = aggregateLogs.reduce((sum, log) => sum + effectiveHoursFromLog(log), 0);
+    const uniqueDays = new Set(aggregateLogs.map(log => log.date)).size;
 
     // --- AUDIT: Red Flag Detection ---
     const hoursPerDay: Record<string, number> = {};
     const patterns: Record<string, number> = {};
     
-    countedLogs.forEach(log => {
+    aggregateLogs.forEach(log => {
         const h = effectiveHoursFromLog(log);
         hoursPerDay[log.date] = (hoursPerDay[log.date] || 0) + h;
 
@@ -128,7 +219,7 @@ export function calculateEngagementMetrics(
         if (!leadProfile.cnic) redFlags.push("Missing National ID Attribution");
     }
 
-    const dates = countedLogs.map(log => new Date(log.date).getTime());
+    const dates = aggregateLogs.map(log => new Date(log.date).getTime());
     const minDate = Math.min(...dates);
     const maxDate = Math.max(...dates);
     const spanMs = maxDate - minDate;
@@ -136,14 +227,14 @@ export function calculateEngagementMetrics(
     const projectSpan = Math.max(1, spanDays / 7);
 
     const weeksWithVisits = new Set();
-    countedLogs.forEach(log => {
+    aggregateLogs.forEach(log => {
         const d = new Date(log.date);
         const startOfYear = new Date(d.getFullYear(), 0, 1);
         const weekNum = Math.ceil((((d.getTime() - startOfYear.getTime()) / 86400000) + startOfYear.getDay() + 1) / 7);
         weeksWithVisits.add(`${d.getFullYear()}-W${weekNum}`);
     });
     const activeWeeks = weeksWithVisits.size;
-    const avgFrequency = activeWeeks > 0 ? countedLogs.length / activeWeeks : 0;
+    const avgFrequency = activeWeeks > 0 ? aggregateLogs.length / activeWeeks : 0;
 
     // 2. TEAM EIS CALCULATION (MAX = 100)
     let hoursScore = 0;
@@ -169,14 +260,35 @@ export function calculateEngagementMetrics(
     // 3. INDIVIDUAL SCORE & BONUS
     const studentHoursMap: Record<string, number> = {};
     const studentEvidenceMap: Record<string, boolean> = {};
-    countedLogs.forEach(log => {
-        const pId = log.participantId || 'unknown';
-        studentHoursMap[pId] = (studentHoursMap[pId] || 0) + effectiveHoursFromLog(log);
-        if (log.evidence_file) studentEvidenceMap[pId] = true;
-    });
 
-    const individualMetrics: IndividualMetric[] = Object.keys(studentHoursMap).map(pId => {
-        const ih = studentHoursMap[pId];
+    const rosterForIndividuals = rosterIds;
+
+    if (rosterForIndividuals) {
+        for (const id of rosterForIndividuals) {
+            studentHoursMap[id] = 0;
+            studentEvidenceMap[id] = false;
+        }
+        aggregateLogs.forEach((log) => {
+            const logPid = log.participantId;
+            for (const rosterId of rosterForIndividuals) {
+                if (engagementParticipantIdsMatch(logPid, rosterId)) {
+                    studentHoursMap[rosterId] = (studentHoursMap[rosterId] ?? 0) + effectiveHoursFromLog(log);
+                    if (log.evidence_file) studentEvidenceMap[rosterId] = true;
+                    return;
+                }
+            }
+        });
+    } else {
+        aggregateLogs.forEach(log => {
+            const pId = log.participantId || "unknown";
+            studentHoursMap[pId] = (studentHoursMap[pId] || 0) + effectiveHoursFromLog(log);
+            if (log.evidence_file) studentEvidenceMap[pId] = true;
+        });
+    }
+
+    const individualKeysOrdered = rosterForIndividuals ?? Object.keys(studentHoursMap);
+    const individualMetrics: IndividualMetric[] = individualKeysOrdered.map((pId) => {
+        const ih = studentHoursMap[pId] ?? 0;
         const evidenceUploaded = studentEvidenceMap[pId] || false;
         let gateway: "ELIGIBLE" | "INCOMPLETE" = ih < RHS ? "INCOMPLETE" : "ELIGIBLE";
 
@@ -226,6 +338,7 @@ export function calculateEngagementMetrics(
 
     return {
         total_verified_hours: Number(totalHours.toFixed(1)),
+        verified_session_count: aggregateLogs.length,
         total_active_days: uniqueDays,
         engagement_span: spanDays,
         attendance_frequency: Number(avgFrequency.toFixed(1)),

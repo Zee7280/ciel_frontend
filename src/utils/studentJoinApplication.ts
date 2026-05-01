@@ -5,6 +5,13 @@
 
 import { isOpportunityPubliclyLive } from "@/utils/opportunityWorkflow";
 
+/** Listing statuses where an approved student may still open / continue the impact report (incl. post‑live wrap‑up). */
+function opportunityStatusAllowsStudentReportFlow(raw: Record<string, unknown>): boolean {
+    const st = lower(raw.status);
+    if (st === "completed" || st === "finalized") return true;
+    return isOpportunityPubliclyLive(raw);
+}
+
 function lower(v: unknown): string {
     if (v == null) return "";
     return String(v).trim().toLowerCase();
@@ -80,26 +87,18 @@ export function canStudentShowStartReportCta(
     opts?: { isStudentOwner?: boolean },
 ): boolean {
     if (opts?.isStudentOwner) {
-        const st = lower(raw.status);
-        if (st === "completed") return true;
-        return isOpportunityPubliclyLive(raw);
+        return opportunityStatusAllowsStudentReportFlow(raw);
     }
     const app = pickJoinApplicationStatus(raw);
     if (!app) {
-        const st = lower(raw.status);
-        if (st === "completed") return true;
-        return isOpportunityPubliclyLive(raw);
+        return opportunityStatusAllowsStudentReportFlow(raw);
     }
     if (isJoinApplicationRejectedStatus(app)) return false;
     if (isJoinApplicationPendingStatus(app)) return false;
     if (isJoinApplicationApprovedStatus(app)) {
-        const st = lower(raw.status);
-        if (st === "completed") return true;
-        return isOpportunityPubliclyLive(raw);
+        return opportunityStatusAllowsStudentReportFlow(raw);
     }
-    const st = lower(raw.status);
-    if (st === "completed") return true;
-    return isOpportunityPubliclyLive(raw);
+    return opportunityStatusAllowsStudentReportFlow(raw);
 }
 
 /** Short badge line for pending join (faculty vs admin queue). */
@@ -114,7 +113,11 @@ export function joinApplicationPendingLabel(raw: Record<string, unknown>): strin
 export function canStudentAccessReportForProjectPayload(raw: Record<string, unknown>): boolean {
     const status = lower(raw.status);
     const allowedLegacy = ["active", "approved", "verified"];
-    const eligible = status === "completed" || isOpportunityPubliclyLive(raw) || allowedLegacy.includes(status);
+    const eligible =
+        status === "completed" ||
+        status === "finalized" ||
+        isOpportunityPubliclyLive(raw) ||
+        allowedLegacy.includes(status);
     if (!eligible) return false;
 
     const app = pickJoinApplicationStatus(raw);

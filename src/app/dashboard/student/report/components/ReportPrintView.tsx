@@ -3,7 +3,7 @@ import { useReportForm } from "../context/ReportContext";
 import type { ReportData } from "../context/ReportContext";
 import { Award, CheckCircle } from "lucide-react";
 import { calculateCII } from "../utils/calculateCII";
-import { calculateEngagementMetrics } from "../utils/engagementMetrics";
+import { calculateEngagementMetrics, buildIndividualRosterFromSection1 } from "../utils/engagementMetrics";
 import { deriveCertificateProjectDisplay } from "../utils/certificateDisplay";
 import { parseSection11AuditSummary } from "@/lib/parseCIIauditSummary";
 import ReportVerificationQr from "@/components/ReportVerificationQr";
@@ -12,9 +12,10 @@ import { pickImpactVerifyUrlFromPayload } from "@/utils/reportVerificationUrl";
 import { readPersistedCiiSnapshot } from "@/utils/reportCiiSnapshot";
 import { extractIssueFields, parseAuditSummaryIntoSections } from "@/lib/parseAuditSummarySections";
 import {
-    formatMergedSdgGoalsLabel,
+    formatSdgGoalPadded,
     listOpportunityReportSdgs,
     listStudentReportSdgs,
+    mergeReportSdgSnapshotRows,
     uniqueMergedSdgGoalNumbers,
 } from "../utils/reportSdgMerge";
 
@@ -97,6 +98,120 @@ function normalizePrintAnswer(a: unknown): ReactNode {
     return a as ReactNode;
 }
 
+function printObject(value: unknown): Record<string, unknown> | null {
+    return value && typeof value === "object" && !Array.isArray(value)
+        ? (value as Record<string, unknown>)
+        : null;
+}
+
+function firstNonBlank(...values: unknown[]): string {
+    for (const value of values) {
+        if (value === null || value === undefined) continue;
+        if (Array.isArray(value)) {
+            const joined = value.map((item) => String(item).trim()).filter(Boolean).join(", ");
+            if (joined) return joined;
+            continue;
+        }
+        const text = String(value).trim();
+        if (text && text.toLowerCase() !== "undefined" && text.toLowerCase() !== "null") return text;
+    }
+    return "";
+}
+
+function firstOutcomeArray(section5: unknown): unknown[] {
+    const record = printObject(section5);
+    if (!record) return [];
+    for (const key of [
+        "measurable_outcomes",
+        "measurableOutcomes",
+        "outcomes",
+        "outcome_metrics",
+        "outcomeMetrics",
+        "beneficiary_outcomes",
+        "impact_outcomes",
+    ]) {
+        const value = record[key];
+        if (Array.isArray(value)) return value;
+        if (typeof value === "string" && value.trim().startsWith("[")) {
+            try {
+                const parsed = JSON.parse(value) as unknown;
+                if (Array.isArray(parsed)) return parsed;
+            } catch {
+                /* ignore non-JSON strings */
+            }
+        }
+    }
+    return [];
+}
+
+type PrintableOutcome = {
+    metric: string;
+    baseline: string;
+    endline: string;
+    unit: string;
+    outcomeArea: string;
+    explanation: string;
+};
+
+function normalizePrintableOutcome(raw: unknown): PrintableOutcome | null {
+    if (typeof raw === "string") {
+        const metric = firstNonBlank(raw);
+        return metric ? { metric, baseline: "", endline: "", unit: "", outcomeArea: "", explanation: "" } : null;
+    }
+
+    const record = printObject(raw);
+    if (!record) return null;
+
+    const metric = firstNonBlank(
+        record.metric,
+        record.metric_name,
+        record.metricName,
+        record.title,
+        record.name,
+        record.indicator,
+        record.description,
+    );
+    const outcomeArea = firstNonBlank(
+        record.outcome_area_other,
+        record.outcomeAreaOther,
+        record.outcome_sub_category,
+        record.outcomeSubCategory,
+        record.outcome_area,
+        record.outcomeArea,
+        record.category,
+        record.area,
+        record.dimension,
+    );
+    const explanation = firstNonBlank(
+        record.measurement_explanation,
+        record.measurementExplanation,
+        record.explanation,
+        record.evidence,
+        record.notes,
+    );
+    const baseline = firstNonBlank(record.baseline, record.baseline_value, record.baselineValue, record.start_value, record.before);
+    const endline = firstNonBlank(
+        record.endline,
+        record.endline_value,
+        record.endlineValue,
+        record.achieved,
+        record.actual,
+        record.final_value,
+        record.after,
+    );
+    const unit = firstNonBlank(record.unit_other, record.unitOther, record.unit, record.unit_label, record.unitLabel);
+
+    if (!metric && !outcomeArea && !explanation && !baseline && !endline) return null;
+    return {
+        metric: metric || outcomeArea || "Measured outcome",
+        baseline,
+        endline,
+        unit,
+        outcomeArea,
+        explanation,
+    };
+}
+
 export default function ReportPrintView({ projectData, reportData }: Props) {
     let data = reportData;
     try {
@@ -109,11 +224,16 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
     const teamSize =
         (data.section1?.participation_type === "team" ? data.section1?.team_members?.length || 0 : 0) + 1;
     const reqH = data.required_hours ?? 16;
+    const rosterIds = buildIndividualRosterFromSection1(
+        data.section1 ?? {},
+        data.section1?.team_lead?.id,
+    );
     const engagementRecalc = calculateEngagementMetrics(
         data.section1?.attendance_logs || [],
         reqH,
         teamSize,
         data.section1?.team_lead,
+        rosterIds,
     );
 
     const storedVerified = Number(data.section1?.metrics?.total_verified_hours);
@@ -239,10 +359,22 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
             "",
     }).headline;
     const teamMembers = data.section1.team_members || [];
+    const sdgProjectData =
+        projectData && typeof projectData === "object"
+            ? { ...(data as Record<string, unknown>), ...(projectData as Record<string, unknown>) }
+            : data;
 
-    const opportunitySdgRows = listOpportunityReportSdgs(projectData);
+    const opportunitySdgRows = listOpportunityReportSdgs(sdgProjectData);
     const studentSdgRows = listStudentReportSdgs(data.section3);
-    const mergedSdgNums = uniqueMergedSdgGoalNumbers(projectData, data.section3);
+    const mergedSdgNums = uniqueMergedSdgGoalNumbers(sdgProjectData, data.section3);
+    const mergedSdgRows = mergeReportSdgSnapshotRows(sdgProjectData, data.section3);
+    const primarySdgDisplay =
+        studentSdgRows.find((row) => row.role === "primary") ||
+        opportunitySdgRows.find((row) => row.role === "primary") ||
+        mergedSdgRows[0];
+    const printableOutcomes = firstOutcomeArray(data.section5)
+        .map(normalizePrintableOutcome)
+        .filter((outcome): outcome is PrintableOutcome => Boolean(outcome));
 
     const formatSdgRowAnswer = (r: (typeof opportunitySdgRows)[number]) => {
         const t = r.targetId || "—";
@@ -479,25 +611,24 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
                 <div className="grid grid-cols-1 items-stretch gap-6 md:grid-cols-2 md:gap-x-10">
                     <div className="flex min-h-[8rem] items-center gap-6 rounded-2xl bg-slate-900 p-6 text-white shadow-lg">
                         <div className="text-5xl font-black tabular-nums opacity-40">
-                            {(() => {
-                                const gn = data.section3.primary_sdg?.goal_number;
-                                if (gn === null || gn === undefined || String(gn).trim() === "") return "—";
-                                const num = Number(gn);
-                                if (Number.isFinite(num) && num >= 1 && num <= 9) return `0${num}`;
-                                if (Number.isFinite(num) && num >= 10) return String(num);
-                                return String(gn);
-                            })()}
+                            {primarySdgDisplay ? formatSdgGoalPadded(primarySdgDisplay.goalNumber) : "—"}
                         </div>
                         <div className="min-w-0 space-y-1">
-                            <p className="text-[9px] font-black uppercase tracking-[0.25em] text-white/60">Student primary goal</p>
+                            <p className="text-[9px] font-black uppercase tracking-[0.25em] text-white/60">
+                                {primarySdgDisplay?.source === "opportunity" ? "Opportunity primary goal" : "Student primary goal"}
+                            </p>
                             <p className="text-sm font-black uppercase leading-snug">
-                                {data.section3.primary_sdg?.goal_title || "—"}
+                                {primarySdgDisplay?.title || "—"}
                             </p>
                         </div>
                     </div>
                     <QandA
-                        q="Student primary — target & indicator"
-                        a={`${data.section3.primary_sdg?.target_id || "T/A"} — ${data.section3.primary_sdg?.indicator_id || "I/A"}`}
+                        q="Primary — target & indicator"
+                        a={
+                            primarySdgDisplay
+                                ? `${primarySdgDisplay.targetId || "T/A"} — ${primarySdgDisplay.indicatorId || "I/A"}`
+                                : ""
+                        }
                     />
                 </div>
                 {studentSdgRows.filter((r) => r.role === "secondary").length > 0 ? (
@@ -573,41 +704,55 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
                     question="What specific measurable changes were observed at the end of the project?"
                 />
                 <div className="space-y-6">
-                    {data.section5.measurable_outcomes?.map((outcome: any, i: number) => (
-                        <div
-                            key={i}
-                            className="grid grid-cols-1 gap-8 rounded-2xl border border-slate-200 bg-slate-50/90 p-6 shadow-sm md:grid-cols-2 md:gap-10 md:p-8 break-inside-avoid"
-                        >
-                            <div className="min-w-0">
-                                <p className="mb-2 text-[10px] font-black uppercase tracking-widest text-slate-400">
-                                    Outcome {i + 1}
-                                </p>
-                                <p className="mb-6 text-lg font-black leading-snug text-slate-900 underline decoration-slate-200 decoration-2 underline-offset-4 sm:text-xl">
-                                    {outcome.metric}
-                                </p>
-                                <div className="flex flex-wrap items-center justify-start gap-6 sm:gap-10">
-                                    <div className="flex flex-col items-center">
-                                        <span className="mb-2 text-[8px] font-black uppercase tracking-widest text-slate-400">
-                                            Baseline
-                                        </span>
-                                        <div className="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-center font-black tabular-nums text-slate-600">
-                                            {outcome.baseline} {outcome.unit}
+                    {printableOutcomes.length > 0 ? (
+                        printableOutcomes.map((outcome, i) => (
+                            <div
+                                key={`${outcome.metric}-${i}`}
+                                className="grid grid-cols-1 gap-8 rounded-2xl border border-slate-200 bg-slate-50/90 p-6 shadow-sm md:grid-cols-2 md:gap-10 md:p-8 break-inside-avoid"
+                            >
+                                <div className="min-w-0">
+                                    <p className="mb-2 text-[10px] font-black uppercase tracking-widest text-slate-400">
+                                        Outcome {i + 1}
+                                    </p>
+                                    <p className="mb-6 text-lg font-black leading-snug text-slate-900 underline decoration-slate-200 decoration-2 underline-offset-4 sm:text-xl">
+                                        {outcome.metric}
+                                    </p>
+                                    {(outcome.baseline || outcome.endline) && (
+                                        <div className="flex flex-wrap items-center justify-start gap-6 sm:gap-10">
+                                            <div className="flex flex-col items-center">
+                                                <span className="mb-2 text-[8px] font-black uppercase tracking-widest text-slate-400">
+                                                    Baseline
+                                                </span>
+                                                <div className="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-center font-black tabular-nums text-slate-600">
+                                                    {outcome.baseline || "—"} {outcome.unit}
+                                                </div>
+                                            </div>
+                                            <div className="mt-6 hidden h-0.5 w-8 shrink-0 bg-slate-200 sm:block" aria-hidden />
+                                            <div className="flex flex-col items-center">
+                                                <span className="mb-2 text-[8px] font-black uppercase tracking-widest text-slate-900">
+                                                    Achieved
+                                                </span>
+                                                <div className="rounded-2xl bg-slate-900 px-5 py-3 text-center font-black tabular-nums text-white shadow-md">
+                                                    {outcome.endline || "—"} {outcome.unit}
+                                                </div>
+                                            </div>
                                         </div>
-                                    </div>
-                                    <div className="mt-6 hidden h-0.5 w-8 shrink-0 bg-slate-200 sm:block" aria-hidden />
-                                    <div className="flex flex-col items-center">
-                                        <span className="mb-2 text-[8px] font-black uppercase tracking-widest text-slate-900">
-                                            Achieved
-                                        </span>
-                                        <div className="rounded-2xl bg-slate-900 px-5 py-3 text-center font-black tabular-nums text-white shadow-md">
-                                            {outcome.endline} {outcome.unit}
-                                        </div>
-                                    </div>
+                                    )}
+                                </div>
+                                <div className="space-y-4">
+                                    <QandA q="Impact dimension" a={outcome.outcomeArea} />
+                                    <QandA q="Measurement note" a={outcome.explanation} />
                                 </div>
                             </div>
-                            <QandA q="Impact dimension" a={outcome.outcome_area} />
-                        </div>
-                    ))}
+                        ))
+                    ) : (
+                        <QandA
+                            q="Measured outcomes"
+                            a={data.section5.observed_change || data.section5.summary_text || "No measurable outcomes were listed."}
+                            fullWidth
+                        />
+                    )}
+                    <QandA q="Observed change narrative" a={data.section5.observed_change} fullWidth />
                     <QandA q="Core implementation challenges" a={data.section5.challenges} fullWidth />
                 </div>
 
@@ -873,9 +1018,20 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
                             </div>
                             <div className={printDossierTone.metricTile}>
                                 <p className={printDossierTone.labelMuted}>Strategic SDGs</p>
-                                <p className={`${printDossierTone.metricValue} !text-2xl sm:!text-3xl leading-none`}>
-                                    {formatMergedSdgGoalsLabel(mergedSdgNums)}
-                                </p>
+                                {mergedSdgNums.length ? (
+                                    <div className="flex flex-wrap gap-1.5">
+                                        {mergedSdgNums.map((num) => (
+                                            <span
+                                                key={num}
+                                                className="rounded-lg bg-slate-900 px-2.5 py-1 text-sm font-black leading-none text-white sm:text-base"
+                                            >
+                                                SDG {formatSdgGoalPadded(num)}
+                                            </span>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <p className={printDossierTone.metricValue}>—</p>
+                                )}
                             </div>
                             <div className={printDossierTone.metricTile}>
                                 <p className={printDossierTone.labelMuted}>Verified</p>

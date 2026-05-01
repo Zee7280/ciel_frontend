@@ -15,7 +15,8 @@ import AttendanceForm from "../../engagement/components/AttendanceForm";
 import AttendanceSummaryTable from "../../engagement/components/AttendanceSummaryTable";
 import EngagementOverview from "../../engagement/components/EngagementOverview";
 import TeamVerification from "./TeamVerification";
-import { calculateEngagementMetrics } from "../utils/engagementMetrics";
+import { prepareReportEvidenceForSave } from "../utils/evidenceUpload";
+import { buildIndividualRosterFromSection1, calculateEngagementMetrics, effectiveHoursFromLog } from "../utils/engagementMetrics";
 import { isAttendanceLogCountedForVerifiedMetrics } from "@/utils/attendanceApprovalEligibility";
 import { normalizeEngagementAttendanceLog } from "@/utils/engagementAttendanceMap";
 import { calculateSection1CII } from "@/utils/reportQuality";
@@ -132,13 +133,15 @@ export default function Section1Participation({ projectData }: { projectData?: a
     const [verifiedMetrics, setVerifiedMetrics] = React.useState<any>(
         data.section1.metrics.total_verified_hours > 0 ? {
             totalHours: data.section1.metrics.total_verified_hours,
+            sessionCount: data.section1.metrics.verified_session_count,
             eis: data.section1.metrics.eis_score,
             activeDays: data.section1.metrics.total_active_days,
             spanWeeks: Math.ceil(data.section1.metrics.engagement_span / 7),
             frequency: data.section1.metrics.attendance_frequency,
             weeklyContinuity: data.section1.metrics.weekly_continuity,
             category: data.section1.metrics.engagement_category,
-            hecStatus: data.section1.metrics.hec_compliance
+            hecStatus: data.section1.metrics.hec_compliance,
+            individual_metrics: data.section1.metrics.individual_metrics,
         } : null
     );
     const [verifiedSummary, setVerifiedSummary] = React.useState<string>(data.section1.verified_summary || "");
@@ -396,10 +399,18 @@ export default function Section1Participation({ projectData }: { projectData?: a
             if (res && res.ok) {
                 // Calculate metrics locally since we have all the data
                 const teamSize = 1 + team_members.length;
-                const calc = calculateEngagementMetrics(data.section1.attendance_logs, requiredHoursPerStudent, teamSize, data.section1.team_lead);
+                const rosterIds = buildIndividualRosterFromSection1(data.section1, participantId ?? data.section1.team_lead?.id);
+                const calc = calculateEngagementMetrics(
+                    data.section1.attendance_logs,
+                    requiredHoursPerStudent,
+                    teamSize,
+                    data.section1.team_lead,
+                    rosterIds,
+                );
 
                 const finalMetrics = {
                     totalHours: calc.total_verified_hours,
+                    sessionCount: calc.verified_session_count,
                     activeDays: calc.total_active_days,
                     spanWeeks: Math.ceil(calc.engagement_span / 7),
                     frequency: calc.attendance_frequency,
@@ -410,7 +421,8 @@ export default function Section1Participation({ projectData }: { projectData?: a
                     evidenceCount: data.section1.attendance_logs.filter(l => l.evidence_file).length,
                     evidenceRatio: Math.round((data.section1.attendance_logs.filter(l => l.evidence_file).length / data.section1.attendance_logs.length) * 100),
                     redFlags: calc.redFlags,
-                    isNonCompliant: calc.isNonCompliant
+                    isNonCompliant: calc.isNonCompliant,
+                    individual_metrics: calc.individual_metrics,
                 };
 
                 setVerifiedMetrics(finalMetrics);
@@ -608,9 +620,11 @@ export default function Section1Participation({ projectData }: { projectData?: a
 
                 // Recalculate metrics
                 const teamSize = 1 + data.section1.team_members.length;
-                const calc = calculateEngagementMetrics(uniqueLogs as any, requiredHoursPerStudent, teamSize);
+                const rosterIds = buildIndividualRosterFromSection1(data.section1, participantId ?? data.section1.team_lead?.id);
+                const calc = calculateEngagementMetrics(uniqueLogs as any, requiredHoursPerStudent, teamSize, undefined, rosterIds);
                 setVerifiedMetrics({
                     totalHours: calc.total_verified_hours,
+                    sessionCount: calc.verified_session_count,
                     activeDays: calc.total_active_days,
                     spanWeeks: Math.ceil(calc.engagement_span / 7),
                     frequency: calc.attendance_frequency,
@@ -619,7 +633,8 @@ export default function Section1Participation({ projectData }: { projectData?: a
                     category: calc.engagement_category,
                     hecStatus: calc.hec_compliance,
                     evidenceCount: uniqueLogs.filter((l: any) => l.evidence_file).length,
-                    evidenceRatio: Math.round((uniqueLogs.filter((l: any) => l.evidence_file).length / (uniqueLogs.length || 1)) * 100)
+                    evidenceRatio: Math.round((uniqueLogs.filter((l: any) => l.evidence_file).length / (uniqueLogs.length || 1)) * 100),
+                    individual_metrics: calc.individual_metrics,
                 });
             }
         } catch (err) {
@@ -630,6 +645,21 @@ export default function Section1Participation({ projectData }: { projectData?: a
 
 
     const projectGoal = requiredHoursPerStudent * (1 + team_members.length);
+
+    /** Sum hours only for roster members (matches per-student cards); excludes other project participants in bulk API. */
+    const collectiveProjectHours = React.useMemo(() => {
+        const logs = data.section1.attendance_logs || [];
+        const total = rawParticipants.reduce((sum, u) => {
+            const perMember = logs
+                .filter((l: { participantId?: string }) =>
+                    engagementParticipantIdsMatch(l.participantId, u.id),
+                )
+                .reduce((acc: number, log: (typeof logs)[number]) => acc + effectiveHoursFromLog(log), 0);
+            return sum + perMember;
+        }, 0);
+        return Math.round(total * 100) / 100;
+    }, [data.section1.attendance_logs, rawParticipants]);
+
     const isMinimumHoursMet = rawParticipants.every(u => {
         const hours = data.section1.attendance_logs
             .filter(
@@ -868,19 +898,24 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                                 try {
                                                     const projectId = data.project_id || projectIdFromUrl || '';
                                                     if (projectId) {
-                                                        await authenticatedFetch(`/api/v1/student/reports/draft`, {
-                                                            method: 'POST',
-                                                            body: JSON.stringify({
+                                                        const payload = await prepareReportEvidenceForSave(
+                                                            {
                                                                 ...data,
                                                                 project_id: projectId,
                                                                 section1: {
                                                                     ...data.section1,
                                                                     team_members: newMembers,
-                                                                    participation_type: newType
+                                                                    participation_type: newType,
                                                                 },
-                                                                status: 'continue'
-                                                            })
-                                                        });
+                                                                status: "continue",
+                                                            },
+                                                            projectId,
+                                                        );
+                                                        await authenticatedFetch(
+                                                            `/api/v1/student/reports/draft`,
+                                                            { method: "POST", body: JSON.stringify(payload) },
+                                                            { timeoutMs: 120000 },
+                                                        );
                                                     }
                                                 } catch (err) {
                                                     console.error('Auto-save after member verification failed:', err);
@@ -922,14 +957,18 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                             },
                                             {
                                                 label: "Collective Hours",
-                                                value: data.section1.attendance_logs.reduce((acc: number, log: any) => acc + (Number(log.hours) || 0), 0),
+                                                value: collectiveProjectHours,
                                                 sub: "Total Project Engagement",
                                                 color: "bg-slate-50 border-slate-100 text-slate-600",
                                                 icon: Users
                                             },
                                             {
                                                 label: "Team Compliance",
-                                                value: `${Math.round((data.section1.attendance_logs.reduce((acc: number, log: any) => acc + (Number(log.hours) || 0), 0) / projectGoal) * 100)}%`,
+                                                value: `${
+                                                    projectGoal > 0
+                                                        ? Math.round((collectiveProjectHours / projectGoal) * 100)
+                                                        : 0
+                                                }%`,
                                                 sub: "Aggregated Progress",
                                                 color: "bg-slate-50 border-slate-100 text-slate-600",
                                                 icon: Activity
@@ -978,45 +1017,54 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                                 </div>
 
                                                 <div className="flex gap-8">
-                                                    {[
-                                                        {
-                                                            label: "Logged",
-                                                            val: data.section1.attendance_logs
-                                                                .filter((l: any) => {
-                                                                    if (!selectedParticipantId) return true;
-                                                                    return engagementParticipantIdsMatch(
-                                                                        l.participantId,
-                                                                        selectedParticipantId,
-                                                                    );
-                                                                })
-
-                                                                .reduce((acc: number, log: any) => acc + (Number(log.hours) || 0), 0),
-                                                            color: "text-report-primary"
-                                                        },
-                                                        {
-                                                            label: "Remaining",
-                                                            val: Math.max(0, requiredHoursPerStudent - data.section1.attendance_logs
-                                                                .filter((l: any) => {
-                                                                    if (!selectedParticipantId) return true;
-                                                                    return engagementParticipantIdsMatch(
-                                                                        l.participantId,
-                                                                        selectedParticipantId,
-                                                                    );
-                                                                })
-
-                                                                .reduce((acc: number, log: any) => acc + (Number(log.hours) || 0), 0)),
-                                                            color: "text-amber-600"
-                                                        }
-                                                    ]
-.map((m, i) => (
-                                                        <div key={i} className="text-center">
-                                                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">{m.label}</p>
-                                                            <div className="flex items-baseline justify-center gap-1">
-                                                                <span className={clsx("report-h3 !text-3xl font-black", m.color)}>{m.val}</span>
-                                                                <span className="text-[10px] font-bold text-slate-300">HRS</span>
+                                                    {(() => {
+                                                        const participantLogs = data.section1.attendance_logs.filter(
+                                                            (l: { participantId?: string }) => {
+                                                                if (!selectedParticipantId) return true;
+                                                                return engagementParticipantIdsMatch(
+                                                                    l.participantId,
+                                                                    selectedParticipantId,
+                                                                );
+                                                            },
+                                                        );
+                                                        const loggedEff = participantLogs.reduce(
+                                                            (acc: number, log: (typeof participantLogs)[number]) =>
+                                                                acc + effectiveHoursFromLog(log),
+                                                            0,
+                                                        );
+                                                        const loggedRounded = Math.round(loggedEff * 100) / 100;
+                                                        const participantStats = [
+                                                            {
+                                                                label: "Logged",
+                                                                val: loggedRounded,
+                                                                color: "text-report-primary",
+                                                            },
+                                                            {
+                                                                label: "Remaining",
+                                                                val: Math.max(
+                                                                    0,
+                                                                    Math.round(
+                                                                        (requiredHoursPerStudent - loggedEff) *
+                                                                            100,
+                                                                    ) / 100,
+                                                                ),
+                                                                color: "text-amber-600",
+                                                            },
+                                                        ];
+                                                        return participantStats.map((m, i) => (
+                                                            <div key={i} className="text-center">
+                                                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">
+                                                                    {m.label}
+                                                                </p>
+                                                                <div className="flex items-baseline justify-center gap-1">
+                                                                    <span className={clsx("report-h3 !text-3xl font-black", m.color)}>
+                                                                        {m.val}
+                                                                    </span>
+                                                                    <span className="text-[10px] font-bold text-slate-300">HRS</span>
+                                                                </div>
                                                             </div>
-                                                        </div>
-                                                    ))}
+                                                        ));
+                                                    })()}
                                                 </div>
                                             </div>
                                         </div>
@@ -1254,7 +1302,9 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                             ...verifiedMetrics, 
                                             projectGoal, 
                                             requiredHours: requiredHoursPerStudent,
-                                            individual_metrics: data.section1.metrics.individual_metrics
+                                            individual_metrics:
+                                                verifiedMetrics.individual_metrics ??
+                                                data.section1.metrics.individual_metrics,
                                         }}
                                         isTeam={participation_type === 'team'}
                                         participantNames={participantNamesMap}

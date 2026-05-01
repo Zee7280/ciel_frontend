@@ -17,6 +17,11 @@ import {
     composeInternationalPhone,
     parsePhoneForDisplay,
 } from "@/utils/countryCallingCodes";
+import {
+    messageFromApplyProxyError,
+    normalizeNestHttpMessage,
+    resolveApplyOpportunityToastMessage,
+} from "@/utils/applyOpportunityUx";
 
 export type ApplySuccessMeta = {
     applicationId?: string;
@@ -55,11 +60,25 @@ function defaultPakistaniUniversity(profileValue: string): string {
     return pakistaniUniversities[0] ?? "";
 }
 
-// Generate a short unique team ID (e.g. TM-2024-XXXX)
+/** Backend requires non-empty unique `team_id` for every team application. */
 function generateTeamId() {
     const year = new Date().getFullYear();
-    const rand = Math.random().toString(36).substring(2, 6).toUpperCase();
-    return `TM-${year}-${rand}`;
+    const a = Math.random().toString(36).slice(2, 10).toUpperCase();
+    const b = Math.random().toString(36).slice(2, 6).toUpperCase();
+    return `TM-${year}-${a}-${b}`;
+}
+
+/** Only fields the apply API persists — omit OTP / verification UI state so backend never sees junk keys. */
+function teamMemberRowForApplyApi(m: TeamMember) {
+    return {
+        name: m.name,
+        cnic: m.cnic,
+        mobile: composeInternationalPhone(m.phoneCountryKey, m.phoneNational),
+        email: m.email,
+        university: m.university,
+        program: m.program,
+        role: m.role,
+    };
 }
 
 export default function ApplicationDialog({
@@ -143,12 +162,12 @@ export default function ApplicationDialog({
         }
     }, [open, opportunityId]);
 
-    // Auto-generate team ID when switching to team mode
+    // Backend rejects empty team_id — keep a trimmed value whenever user is in team mode
     useEffect(() => {
-        if (participationType === 'team' && !teamId) {
+        if (participationType === "team" && !teamId.trim()) {
             setTeamId(generateTeamId());
         }
-    }, [participationType]);
+    }, [participationType, teamId]);
 
     const handleAddMember = () => {
         setTeamMembers([
@@ -330,6 +349,10 @@ export default function ApplicationDialog({
             }
         }
 
+        // Team apply: always send a non-empty team_id string (never rely on JSON omitting undefined)
+        const resolvedTeamId =
+            participationType === "team" ? (teamId.trim() || generateTeamId()) : undefined;
+
         // Validation for team
         if (participationType === "team") {
             for (let i = 0; i < teamMembers.length; i++) {
@@ -351,36 +374,27 @@ export default function ApplicationDialog({
             }
         }
 
+        // Sync displayed team ID only once we actually send — avoids jitter if validation aborted above
+        if (participationType === "team" && resolvedTeamId && !teamId.trim()) {
+            setTeamId(resolvedTeamId);
+        }
+
         setIsSubmitting(true);
         try {
             const payload = {
-                participation_type: participationType,
-                team_id: participationType === 'team' ? teamId : undefined,
+                participation_type: participationType === "team" ? "team" : "individual",
+                ...(participationType === "team" && resolvedTeamId
+                    ? { team_id: resolvedTeamId }
+                    : {}),
                 primary_faculty_email: primaryFacultyEmail,
                 secondary_faculty_email: secondaryFacultyEmail || undefined,
                 attendance_approver_type: attendanceApproverType,
+                // Individual: omit team_members — backend treats any member row with an email as team apply
+                // and then requires team_id; lead profile comes from the authenticated student.
                 team_members:
                     participationType === "team"
-                        ? teamMembers.map((m) => {
-                              const { phoneCountryKey, phoneNational, ...rest } = m;
-                              return {
-                                  ...rest,
-                                  mobile: composeInternationalPhone(phoneCountryKey, phoneNational),
-                              };
-                          })
-                        : teamMembers.length > 0
-                          ? teamMembers.map((m, i) => {
-                                const role = i === 0 && (!m.role || m.role === "Member") ? "Lead" : m.role;
-                                // CNIC is collected at engagement identity verification for individuals
-                                // (avoids asking twice when it is not returned on the project record).
-                                const { cnic: _cnic, phoneCountryKey, phoneNational, ...rest } = m;
-                                return {
-                                    ...rest,
-                                    role,
-                                    mobile: composeInternationalPhone(phoneCountryKey, phoneNational),
-                                };
-                            })
-                          : undefined,
+                        ? teamMembers.map(teamMemberRowForApplyApi)
+                        : undefined,
                 ...(applicantPhoneE164
                     ? { contact_phone_e164: applicantPhoneE164 }
                     : {}),
@@ -410,17 +424,34 @@ export default function ApplicationDialog({
                             : typeof d.applicationStatus === "string"
                               ? d.applicationStatus
                               : undefined;
-                    toast.success(typeof data.message === "string" ? data.message : "Application submitted successfully!");
+                    const okMsg =
+                        typeof data.message === "string"
+                            ? data.message
+                            : normalizeNestHttpMessage(data.message) || "";
+                    toast.success(okMsg.trim() ? okMsg : "Application submitted successfully!");
                     onSuccess(opportunityId!, {
                         applicationId,
                         applicationStatus: applicationStatus ?? "pending_approval",
                     });
                     onOpenChange(false);
                 } else {
-                    toast.error(data.message || "Failed to submit application");
+                    toast.error(
+                        resolveApplyOpportunityToastMessage(
+                            normalizeNestHttpMessage(data.message) || undefined,
+                        ),
+                    );
                 }
-            } else {
+            } else if (!res) {
                 toast.error("Failed to connect to server");
+            } else {
+                let errPayload: Record<string, unknown> | null = null;
+                try {
+                    errPayload = (await res.json()) as Record<string, unknown>;
+                } catch {
+                    errPayload = null;
+                }
+                const apiMsg = messageFromApplyProxyError(errPayload);
+                toast.error(resolveApplyOpportunityToastMessage(apiMsg || undefined));
             }
         } catch (error) {
             console.error("Error applying", error);

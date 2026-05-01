@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { authenticatedFetch } from '@/utils/api';
 import {
@@ -15,6 +15,10 @@ import ReportPrintView from '../../../student/report/components/ReportPrintView'
 import { applyEngagementTeamScopeToReport } from '@/utils/reportTeamScope';
 import AttendanceSummaryTable from '../../../student/engagement/components/AttendanceSummaryTable';
 import { checkReportQuality, QualityAlert } from '@/utils/reportQuality';
+import { readPersistedCiiSnapshot } from '@/utils/reportCiiSnapshot';
+import type { ReportData } from '../../../student/report/context/ReportContext';
+import { mergeReportSdgSnapshotRows } from '../../../student/report/utils/reportSdgMerge';
+import { getReportProjectContextDisplay } from '@/utils/reportProjectContext';
 
 function normalizeKey(value: unknown): string {
     return String(value ?? "")
@@ -80,6 +84,12 @@ export default function ReportDetailPage() {
     const [feedback, setFeedback] = useState('');
     const [isVerifying, setIsVerifying] = useState(false);
     const [qualityAlerts, setQualityAlerts] = useState<QualityAlert[]>([]);
+    const ciiSnapshot = useMemo(() => (report ? readPersistedCiiSnapshot(report) : null), [report]);
+    const sdgMappingRows = useMemo(
+        () => (report ? mergeReportSdgSnapshotRows(report, report.section3 as ReportData["section3"]) : []),
+        [report],
+    );
+    const projectContextDisplay = useMemo(() => getReportProjectContextDisplay(report), [report]);
 
     useEffect(() => {
         fetchReportDetail();
@@ -288,6 +298,21 @@ export default function ReportDetailPage() {
                         </div>
 
                         <div className="flex flex-col items-end gap-2">
+                            {ciiSnapshot ? (
+                                <div className="mb-2 flex items-center gap-3 rounded-2xl border border-indigo-100 bg-indigo-50/90 px-4 py-3 text-right">
+                                    <TrendingUp className="h-4 w-4 shrink-0 text-indigo-700" aria-hidden />
+                                    <div>
+                                        <p className="text-[10px] font-black uppercase tracking-widest text-indigo-700">CII index</p>
+                                        <p className="text-2xl font-black tabular-nums text-slate-900">
+                                            {Math.round(ciiSnapshot.totalScore)}
+                                            <span className="text-base font-semibold text-slate-500">/100</span>
+                                        </p>
+                                        <p className="max-w-[12rem] text-xs font-semibold leading-snug text-slate-600">
+                                            {ciiSnapshot.level}
+                                        </p>
+                                    </div>
+                                </div>
+                            ) : null}
                             <span className={clsx(
                                 'px-4 py-2 rounded-xl text-sm font-bold uppercase tracking-wide border',
                                 report.status === 'verified' && 'bg-green-50 text-green-700 border-green-200',
@@ -451,7 +476,7 @@ export default function ReportDetailPage() {
                                         </div>
                                         <div>
                                             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Partner Organization</p>
-                                            <p className="font-bold text-slate-900">{report.opportunity?.organization_name || report.opportunity?.organization || "N/A"}</p>
+                                            <p className="font-bold text-slate-900">{projectContextDisplay.partnerOrganization}</p>
                                         </div>
                                     </div>
                                     <div className="p-5 bg-slate-50 rounded-2xl border border-slate-100 flex items-start gap-4">
@@ -460,7 +485,7 @@ export default function ReportDetailPage() {
                                         </div>
                                         <div>
                                             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Project Location</p>
-                                            <p className="font-bold text-slate-900">{report.opportunity?.city || report.opportunity?.location_district || "N/A"}</p>
+                                            <p className="font-bold text-slate-900">{projectContextDisplay.projectLocation}</p>
                                         </div>
                                     </div>
                                     <div className="p-5 bg-slate-50 rounded-2xl border border-slate-100 flex items-start gap-4">
@@ -469,9 +494,7 @@ export default function ReportDetailPage() {
                                         </div>
                                         <div>
                                             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Timeline</p>
-                                            <p className="font-bold text-slate-900">
-                                                {report.opportunity?.start_date ? new Date(report.opportunity.start_date).toLocaleDateString() : "—"} to {report.opportunity?.end_date ? new Date(report.opportunity.end_date).toLocaleDateString() : "—"}
-                                            </p>
+                                            <p className="font-bold text-slate-900">{projectContextDisplay.timelineLabel}</p>
                                         </div>
                                     </div>
                                     <div className="p-5 bg-slate-50 rounded-2xl border border-slate-100 flex items-start gap-4">
@@ -480,7 +503,7 @@ export default function ReportDetailPage() {
                                         </div>
                                         <div>
                                             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Credit Hours</p>
-                                            <p className="font-bold text-slate-900">{report.opportunity?.hours || "0"} Hours Credit</p>
+                                            <p className="font-bold text-slate-900">{projectContextDisplay.creditHoursLabel}</p>
                                         </div>
                                     </div>
                                 </div>
@@ -504,14 +527,26 @@ export default function ReportDetailPage() {
                                     <h2 className="text-3xl font-black text-slate-900">03. SDG Mapping</h2>
                                 </div>
                                 <LabelValue label="Contribution Logic / Purpose" value={report.section3?.contribution_intent_statement || report.section3?.primary_sdg_explanation} fullWidth />
-                                {(report.section3?.secondary_sdgs && report.section3.secondary_sdgs.length > 0) && (
+                                {sdgMappingRows.length > 0 && (
                                     <div className="mt-4">
-                                        <h3 className="font-bold text-slate-800 text-sm mb-2 border-b pb-1">Secondary SDGs</h3>
+                                        <h3 className="font-bold text-slate-800 text-sm mb-2 border-b pb-1">All aligned SDGs</h3>
                                         <div className="grid grid-cols-1 gap-3">
-                                            {report.section3.secondary_sdgs.map((sdg: any, i: number) => (
-                                                <div key={i} className="p-3 bg-slate-50 rounded-xl border border-slate-100">
-                                                    <span className="inline-block px-2 py-0.5 bg-indigo-600 text-white text-[10px] font-black rounded mr-2 uppercase">Goal {sdg.goal_number || sdg.sdg_id}</span>
-                                                    <p className="inline text-sm text-slate-700">{sdg.justification_text || sdg.justification}</p>
+                                            {sdgMappingRows.map((sdg) => (
+                                                <div key={`${sdg.source}-${sdg.role}-${sdg.goalNumber}`} className="p-3 bg-slate-50 rounded-xl border border-slate-100">
+                                                    <div className="flex flex-wrap items-center gap-2">
+                                                        <span className="inline-block px-2 py-0.5 bg-indigo-600 text-white text-[10px] font-black rounded uppercase">Goal {sdg.goalNumber}</span>
+                                                        <span className="text-sm font-bold text-slate-800">{sdg.title}</span>
+                                                        <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-500">
+                                                            {sdg.source} {sdg.role}
+                                                        </span>
+                                                    </div>
+                                                    {(sdg.targetId || sdg.indicatorId || sdg.justification) && (
+                                                        <p className="mt-2 text-xs leading-relaxed text-slate-600">
+                                                            {[sdg.targetId ? `Target ${sdg.targetId}` : "", sdg.indicatorId ? `Indicator ${sdg.indicatorId}` : "", sdg.justification]
+                                                                .filter(Boolean)
+                                                                .join(" · ")}
+                                                        </p>
+                                                    )}
                                                 </div>
                                             ))}
                                         </div>

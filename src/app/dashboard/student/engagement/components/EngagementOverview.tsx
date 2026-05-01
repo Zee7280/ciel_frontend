@@ -5,6 +5,8 @@ import clsx from "clsx";
 
 interface EngagementMetrics {
     totalHours: number;
+    /** Roster-scoped attendance row count (teams); falls back in UI if omitted. */
+    sessionCount?: number;
     activeDays: number;
     spanWeeks: number;
     frequency: number;
@@ -15,6 +17,8 @@ interface EngagementMetrics {
     evidenceCount: number;
     evidenceRatio: number;
     requiredHours?: number;
+    /** Per-student requirement × team size (Section 1); used for team institutional cards. */
+    projectGoal?: number;
     individual_metrics?: any[];
     intensity?: {
         volume: number;
@@ -34,10 +38,18 @@ export default function EngagementOverview({ metrics, isTeam = false, participan
     hideIntensityHero?: boolean,
 }) {
     const requiredHours = metrics.requiredHours || 16;
-    
+    const projectCapacityHours =
+        isTeam && typeof metrics.projectGoal === "number" && metrics.projectGoal > 0
+            ? metrics.projectGoal
+            : requiredHours;
+    const totalSessionsDisplay =
+        typeof metrics.sessionCount === "number"
+            ? metrics.sessionCount
+            : Math.round(metrics.frequency * metrics.spanWeeks) || 0;
+
     // Fallback intensity if not provided by backend logic
     const intensity = metrics.intensity || {
-        volume: Math.min(100, (metrics.totalHours / (requiredHours * (isTeam ? 3 : 1))) * 100),
+        volume: Math.min(100, (metrics.totalHours / projectCapacityHours) * 100),
         continuity: metrics.weeklyContinuity || 0,
         span: Math.min(100, (metrics.spanWeeks / 12) * 100),
         frequency: Math.min(100, (metrics.frequency / 3) * 100)
@@ -180,7 +192,7 @@ export default function EngagementOverview({ metrics, isTeam = false, participan
                         <div className="space-y-4">
                             <div className="flex justify-between items-baseline">
                                 <span className="text-[10px] font-bold text-slate-500 uppercase tracking-tight">Required (RHS)</span>
-                                <span className="text-sm font-black text-slate-900">{requiredHours} <span className="text-[8px] opacity-40">HRS</span></span>
+                                <span className="text-sm font-black text-slate-900">{projectCapacityHours} <span className="text-[8px] opacity-40">HRS</span></span>
                             </div>
                             <div className="flex justify-between items-baseline">
                                 <span className="text-[10px] font-bold text-slate-500 uppercase tracking-tight">Verified (Hs)</span>
@@ -195,15 +207,15 @@ export default function EngagementOverview({ metrics, isTeam = false, participan
                         <div className="space-y-4">
                             <div className="flex justify-between items-baseline">
                                 <span className="text-[10px] font-bold text-slate-500 uppercase tracking-tight">Ratio (%)</span>
-                                <span className="text-sm font-black text-slate-900">{Math.round((metrics.totalHours / requiredHours) * 100)}%</span>
+                                <span className="text-sm font-black text-slate-900">{Math.round((metrics.totalHours / projectCapacityHours) * 100)}%</span>
                             </div>
                             <div className="flex justify-between items-center">
                                 <span className="text-[10px] font-bold text-slate-500 uppercase tracking-tight">Eligibility</span>
                                 <span className={clsx(
                                     "px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest border",
-                                    metrics.totalHours >= requiredHours ? "bg-emerald-50 text-emerald-600 border-emerald-100" : "bg-amber-50 text-amber-600 border-amber-100"
+                                    metrics.totalHours >= projectCapacityHours ? "bg-emerald-50 text-emerald-600 border-emerald-100" : "bg-amber-50 text-amber-600 border-amber-100"
                                 )}>
-                                    {metrics.totalHours >= requiredHours ? "ELIGIBLE" : "INCOMPLETE"}
+                                    {metrics.totalHours >= projectCapacityHours ? "ELIGIBLE" : "INCOMPLETE"}
                                 </span>
                             </div>
                         </div>
@@ -232,14 +244,14 @@ export default function EngagementOverview({ metrics, isTeam = false, participan
                                 <span className="text-[10px] font-bold text-slate-500 uppercase tracking-tight">Bonus Status</span>
                                 <span className={clsx(
                                     "px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest border",
-                                    metrics.totalHours >= 32 ? "bg-indigo-50 text-indigo-600 border-indigo-100" : "bg-slate-50 text-slate-400 border-slate-100"
+                                    metrics.totalHours >= projectCapacityHours * 2 ? "bg-indigo-50 text-indigo-600 border-indigo-100" : "bg-slate-50 text-slate-400 border-slate-100"
                                 )}>
-                                    {metrics.totalHours >= 32 ? "GOLD BONUS" : "NOT APPLICABLE"}
+                                    {metrics.totalHours >= projectCapacityHours * 2 ? "GOLD BONUS" : "NOT APPLICABLE"}
                                 </span>
                             </div>
                             <div className="flex justify-between items-baseline">
                                 <span className="text-[10px] font-bold text-slate-500 uppercase tracking-tight">Total Sessions</span>
-                                <span className="text-sm font-black text-slate-900">{metrics.frequency * metrics.spanWeeks || 0} <span className="text-[8px] opacity-40">SESS.</span></span>
+                                <span className="text-sm font-black text-slate-900">{totalSessionsDisplay} <span className="text-[8px] opacity-40">SESS.</span></span>
                             </div>
                         </div>
                     </div>
@@ -259,7 +271,7 @@ export default function EngagementOverview({ metrics, isTeam = false, participan
                             <div key={i} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100/50">
                                 <div className="space-y-1">
                                     <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                                        {participantNames[m.student_id] || 'Team Lead'}
+                                        {participantNames[m.student_id] ?? "Participant"}
                                     </p>
                                     <div className="flex items-center gap-2">
                                         <span className="text-lg font-black text-slate-900">{m.individual_hours}</span>
@@ -298,7 +310,15 @@ export default function EngagementOverview({ metrics, isTeam = false, participan
                     { label: 'Frequency', value: metrics.frequency, unit: 'v/wk', icon: Activity, color: 'text-rose-600', bg: 'bg-rose-50' },
                     { label: 'Evidence', value: Math.round(metrics.evidenceRatio), unit: '%', icon: Database, color: 'text-amber-600', bg: 'bg-amber-50' },
                 ].map((m, i) => (
-                    <div key={i} className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow group/card">
+                    <div
+                        key={i}
+                        title={
+                            m.label === "Frequency"
+                                ? "Average verified attendance entries per week that had at least one log (sessions ÷ active weeks with logs)."
+                                : undefined
+                        }
+                        className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow group/card"
+                    >
                         <div className={`w-10 h-10 rounded-xl ${m.bg} ${m.color} flex items-center justify-center mb-4 group-hover/card:scale-110 transition-transform`}>
                             <m.icon className="w-5 h-5" />
                         </div>

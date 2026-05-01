@@ -4,12 +4,13 @@ import type { ReportData } from "../context/ReportContext";
 import { formatDisplayId } from "@/utils/displayIds";
 import { Award, ShieldCheck, Globe } from "lucide-react";
 import { calculateCII } from "../utils/calculateCII";
-import { calculateEngagementMetrics } from "../utils/engagementMetrics";
+import { calculateEngagementMetrics, buildIndividualRosterFromSection1 } from "../utils/engagementMetrics";
 import { deriveCertificateProjectDisplay } from "../utils/certificateDisplay";
 import { mergedSdgTitlesLine, uniqueMergedSdgGoalNumbers } from "../utils/reportSdgMerge";
 import ReportVerificationQr from "@/components/ReportVerificationQr";
 import { isInstitutionallyVerifiedReport } from "@/utils/institutionalReportVerification";
 import { pickImpactVerifyUrlFromPayload } from "@/utils/reportVerificationUrl";
+import { readPersistedCiiSnapshot } from "@/utils/reportCiiSnapshot";
 
 type TeamMember = ReportData["section1"]["team_members"][number];
 
@@ -201,14 +202,9 @@ export default function CertificateView({ projectData }: { projectData?: unknown
     const engagementRecalc = useMemo(() => {
         const teamSize = (section1.participation_type === "team" ? section1.team_members.length : 0) + 1;
         const req = data.required_hours || 16;
-        return calculateEngagementMetrics(section1.attendance_logs || [], req, teamSize, section1.team_lead);
-    }, [
-        section1.attendance_logs,
-        section1.participation_type,
-        section1.team_members,
-        section1.team_lead,
-        data.required_hours,
-    ]);
+        const rosterIds = buildIndividualRosterFromSection1(section1, section1.team_lead?.id);
+        return calculateEngagementMetrics(section1.attendance_logs || [], req, teamSize, section1.team_lead, rosterIds);
+    }, [section1, data.required_hours]);
 
     const verifiedHours = useMemo(() => {
         const stored = Number(section1.metrics?.total_verified_hours);
@@ -257,9 +253,13 @@ export default function CertificateView({ projectData }: { projectData?: unknown
     }, [data, section1, verifiedHours, engagementSpanDays, engagementRecalc]);
 
     const ciiScore = useMemo(() => {
+        const persisted = readPersistedCiiSnapshot(data);
+        if (persisted) {
+            return Math.min(100, Math.max(0, Math.round(persisted.totalScore)));
+        }
         const totalScore = calculateCII(reportForCii).totalScore;
         return Math.min(100, Math.max(0, Math.round(totalScore)));
-    }, [reportForCii]);
+    }, [data, reportForCii]);
 
     const ciiBadge = useMemo(() => getCiiCertificateBadge(ciiScore), [ciiScore]);
 

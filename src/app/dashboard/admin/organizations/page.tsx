@@ -66,6 +66,8 @@ export default function AdminOrganizationsPage() {
 
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [activeActionMenu, setActiveActionMenu] = useState<number | string | null>(null);
+    const [selectedOrg, setSelectedOrg] = useState<any | null>(null);
+    const [isDetailsLoading, setIsDetailsLoading] = useState(false);
     const [formData, setFormData] = useState({ name: "", email: "", contact: "", type: "ngo", password: "" });
 
     const handleAddOrganization = async (e: React.FormEvent) => {
@@ -120,6 +122,44 @@ export default function AdminOrganizationsPage() {
             toast.error("Action failed");
         }
         setActiveActionMenu(null);
+    };
+
+    const openOrganizationDetails = async (org: any) => {
+        setSelectedOrg(org);
+        setIsDetailsLoading(true);
+        setActiveActionMenu(null);
+        try {
+            const res = await authenticatedFetch(`/api/v1/admin/organizations/${org.id}`);
+            if (res && res.ok) {
+                const data = await res.json();
+                const details = data?.data ?? data;
+                setSelectedOrg((prev: any) => ({ ...(prev || {}), ...(details || {}) }));
+            } else {
+                toast.error("Failed to load organization details");
+            }
+        } catch (error) {
+            console.error("Error loading organization details", error);
+            toast.error("Failed to load organization details");
+        } finally {
+            setIsDetailsLoading(false);
+        }
+    };
+
+    const readOrgValue = (org: any, keys: string[], fallback: string = "N/A") => {
+        for (const key of keys) {
+            const value = org?.[key];
+            if (value !== undefined && value !== null && value !== "") {
+                return String(value);
+            }
+        }
+        return fallback;
+    };
+
+    const formatDateValue = (value: any) => {
+        if (!value) return "N/A";
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return String(value);
+        return date.toLocaleString();
     };
 
     return (
@@ -222,6 +262,12 @@ export default function AdminOrganizationsPage() {
                                             {/* Action Dropdown */}
                                             {activeActionMenu === org.id && (
                                                 <div className="absolute right-8 top-12 w-48 bg-white rounded-lg shadow-xl border border-slate-100 z-50 py-1 text-left">
+                                                    <button
+                                                        onClick={() => openOrganizationDetails(org)}
+                                                        className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 font-medium"
+                                                    >
+                                                        View Details
+                                                    </button>
                                                     <button
                                                         onClick={() => handleAction(org.id, 'approve')}
                                                         className="w-full text-left px-4 py-2 text-sm text-green-600 hover:bg-green-50 font-medium"
@@ -326,6 +372,102 @@ export default function AdminOrganizationsPage() {
                                 Complete Onboarding
                             </button>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Organization Details Modal */}
+            {selectedOrg && (
+                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+                    <div className="bg-white rounded-2xl w-full max-w-3xl p-6 shadow-2xl animate-in zoom-in-95 duration-200 max-h-[85vh] overflow-y-auto">
+                        <div className="flex justify-between items-center mb-2">
+                            <h2 className="text-xl font-bold text-slate-900">Organization Details</h2>
+                            <button onClick={() => setSelectedOrg(null)} className="text-slate-400 hover:text-slate-600">
+                                <AlertCircle className="w-6 h-6 rotate-45" />
+                            </button>
+                        </div>
+                        <p className="text-sm text-slate-500 mb-6">Review organization profile and verification metadata.</p>
+
+                        {isDetailsLoading ? (
+                            <div className="h-36 flex items-center justify-center">
+                                <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                                <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-4">
+                                    <p className="text-slate-500 text-xs font-semibold uppercase tracking-wide">Organization Name</p>
+                                    <p className="text-slate-900 font-bold mt-1">{readOrgValue(selectedOrg, ["name", "organization_name"])}</p>
+                                </div>
+                                <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-4">
+                                    <p className="text-slate-500 text-xs font-semibold uppercase tracking-wide">Email</p>
+                                    <p className="text-slate-900 mt-1 break-all">{readOrgValue(selectedOrg, ["email"])}</p>
+                                </div>
+                                <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-4">
+                                    <p className="text-slate-500 text-xs font-semibold uppercase tracking-wide">Contact Person</p>
+                                    <p className="text-slate-900 mt-1">{readOrgValue(selectedOrg, ["contact_person", "contact", "contact_name"])}</p>
+                                </div>
+                                <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-4">
+                                    <p className="text-slate-500 text-xs font-semibold uppercase tracking-wide">Type</p>
+                                    <p className="text-slate-900 uppercase mt-1">{readOrgValue(selectedOrg, ["organization_type", "type"])}</p>
+                                </div>
+                                <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-4">
+                                    <p className="text-slate-500 text-xs font-semibold uppercase tracking-wide">Status</p>
+                                    <p className="text-slate-900 capitalize mt-1">{readOrgValue(selectedOrg, ["status", "verification_status"], "Unknown")}</p>
+                                </div>
+                                <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-4">
+                                    <p className="text-slate-500 text-xs font-semibold uppercase tracking-wide">Active Projects</p>
+                                    <p className="text-slate-900 mt-1">{readOrgValue(selectedOrg, ["active_projects_count", "projects"], "0")}</p>
+                                </div>
+                                <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-4">
+                                    <p className="text-slate-500 text-xs font-semibold uppercase tracking-wide">Phone</p>
+                                    <p className="text-slate-900 mt-1">{readOrgValue(selectedOrg, ["phone", "phone_number", "mobile"])}</p>
+                                </div>
+                                <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-4">
+                                    <p className="text-slate-500 text-xs font-semibold uppercase tracking-wide">Website</p>
+                                    <p className="text-slate-900 mt-1 break-all">{readOrgValue(selectedOrg, ["website", "website_url"])}</p>
+                                </div>
+                                <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-4 md:col-span-2">
+                                    <p className="text-slate-500 text-xs font-semibold uppercase tracking-wide">Address</p>
+                                    <p className="text-slate-900 mt-1">{readOrgValue(selectedOrg, ["address", "full_address", "street_address"])}</p>
+                                </div>
+                                <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-4">
+                                    <p className="text-slate-500 text-xs font-semibold uppercase tracking-wide">City</p>
+                                    <p className="text-slate-900 mt-1">{readOrgValue(selectedOrg, ["city"])}</p>
+                                </div>
+                                <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-4">
+                                    <p className="text-slate-500 text-xs font-semibold uppercase tracking-wide">State / Province</p>
+                                    <p className="text-slate-900 mt-1">{readOrgValue(selectedOrg, ["state", "province"])}</p>
+                                </div>
+                                <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-4">
+                                    <p className="text-slate-500 text-xs font-semibold uppercase tracking-wide">Country</p>
+                                    <p className="text-slate-900 mt-1">{readOrgValue(selectedOrg, ["country"])}</p>
+                                </div>
+                                <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-4">
+                                    <p className="text-slate-500 text-xs font-semibold uppercase tracking-wide">Postal Code</p>
+                                    <p className="text-slate-900 mt-1">{readOrgValue(selectedOrg, ["postal_code", "zip_code"])}</p>
+                                </div>
+                                <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-4">
+                                    <p className="text-slate-500 text-xs font-semibold uppercase tracking-wide">Registration Number</p>
+                                    <p className="text-slate-900 mt-1">{readOrgValue(selectedOrg, ["registration_number", "reg_no", "license_number"])}</p>
+                                </div>
+                                <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-4">
+                                    <p className="text-slate-500 text-xs font-semibold uppercase tracking-wide">Tax Number</p>
+                                    <p className="text-slate-900 mt-1">{readOrgValue(selectedOrg, ["tax_number", "ntn", "tax_id"])}</p>
+                                </div>
+                                <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-4">
+                                    <p className="text-slate-500 text-xs font-semibold uppercase tracking-wide">Created At</p>
+                                    <p className="text-slate-900 mt-1">{formatDateValue(selectedOrg?.created_at || selectedOrg?.createdAt)}</p>
+                                </div>
+                                <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-4">
+                                    <p className="text-slate-500 text-xs font-semibold uppercase tracking-wide">Updated At</p>
+                                    <p className="text-slate-900 mt-1">{formatDateValue(selectedOrg?.updated_at || selectedOrg?.updatedAt)}</p>
+                                </div>
+                                <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-4 md:col-span-2">
+                                    <p className="text-slate-500 text-xs font-semibold uppercase tracking-wide">Verified At</p>
+                                    <p className="text-slate-900 mt-1">{formatDateValue(selectedOrg?.verified_at || selectedOrg?.verifiedAt)}</p>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
             )}

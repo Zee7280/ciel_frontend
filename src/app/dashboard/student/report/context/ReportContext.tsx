@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { ValidationError, validateSection1, validateSection2, validateSection3, validateSection4, validateSection5, validateSection6, validateSection7, validateSection8, validateSection9, validateSection10, getIncompleteSectionsSummary, type SectionIncompleteInfo } from '../utils/validation';
-import { calculateEngagementMetrics } from '../utils/engagementMetrics';
+import { calculateEngagementMetrics, buildIndividualRosterFromSection1 } from '../utils/engagementMetrics';
 import type { ReportCIIauditMeta } from '@/lib/parseCIIauditSummary';
 import { pickImpactVerifyUrlFromPayload } from '@/utils/reportVerificationUrl';
 import { prepareReportEvidenceForSave } from '../utils/evidenceUpload';
@@ -89,6 +89,7 @@ export interface ReportData {
         }>;
         metrics: {
             total_verified_hours: number;
+            verified_session_count?: number;
             total_active_days: number;
             engagement_span: number;
             attendance_frequency: number;
@@ -317,6 +318,7 @@ const defaultReportData: ReportData = {
         attendance_logs: [],
         metrics: {
             total_verified_hours: 0,
+            verified_session_count: 0,
             total_active_days: 0,
             engagement_span: 0,
             attendance_frequency: 0,
@@ -561,7 +563,14 @@ export function ReportProvider({ children }: { children: React.ReactNode }) {
     // Auto-calculate Section 1 metrics when logs, team size, or required hours change
     useEffect(() => {
         const teamSize = (data.section1.participation_type === 'team' ? data.section1.team_members.length : 0) + 1;
-        const metrics = calculateEngagementMetrics(data.section1.attendance_logs, data.required_hours, teamSize);
+        const rosterIds = buildIndividualRosterFromSection1(data.section1, data.section1.team_lead?.id);
+        const metrics = calculateEngagementMetrics(
+            data.section1.attendance_logs,
+            data.required_hours,
+            teamSize,
+            undefined,
+            rosterIds,
+        );
 
         // Deep compare or just check if meaningful change occurred to avoid loop
         if (JSON.stringify(metrics) !== JSON.stringify(data.section1.metrics)) {
@@ -736,7 +745,7 @@ export function ReportProvider({ children }: { children: React.ReactNode }) {
                 method: 'POST',
                 body: JSON.stringify(dataForSave)
             }, {
-                timeoutMs: 30000
+                timeoutMs: 120000
             });
 
             if (!res || !res.ok) throw new Error('Save failed');

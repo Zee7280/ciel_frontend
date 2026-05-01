@@ -21,6 +21,7 @@ import { getIncompleteSectionsSummary } from './utils/validation';
 import { pickImpactVerifyUrlFromPayload } from '@/utils/reportVerificationUrl';
 import { prepareReportEvidenceForSave } from './utils/evidenceUpload';
 import { normalizeEngagementAttendanceLog } from '@/utils/engagementAttendanceMap';
+import { readPersistedCiiSnapshot } from '@/utils/reportCiiSnapshot';
 
 // Import New Sections
 import Section1Participation from './components/Section1Participation';
@@ -37,6 +38,54 @@ import Section11Summary from './components/Section11Summary'; // New
 import PreReportGuide from './components/PreReportGuide';
 
 type ProjectDetails = { title?: string } & Record<string, unknown>;
+
+type SaveReportResult = { ok: true } | { ok: false; message: string };
+
+function formatSaveCatchError(error: unknown, mode: "save" | "submit" = "save"): string {
+    const fallback =
+        mode === "submit"
+            ? "Could not submit report. Please try again."
+            : "Could not save progress. Please try again.";
+    const timeoutMsg =
+        mode === "submit"
+            ? "Submit timed out. Check your connection and try again."
+            : "Save timed out. Check your connection and try again.";
+    if (error instanceof Error) {
+        if (error.name === "AbortError") {
+            return timeoutMsg;
+        }
+        const m = error.message || "";
+        if (m.includes("Evidence upload failed")) {
+            const hint = mode === "submit" ? "then try submitting again." : "then save again.";
+            return `${m} Fix or remove the file, ${hint}`;
+        }
+        if (m.trim()) return m;
+    }
+    return fallback;
+}
+
+/** Parses JSON/text error bodies from backend `fetch` responses. */
+async function httpFailureUserMessage(res: Response, actionLabel: string): Promise<string> {
+    const prefix = `${actionLabel} (HTTP ${res.status}).`;
+    if (res.status === 413) {
+        return `${prefix} Payload too large. Remove or re-upload heavy attachments / evidence files, save again — or ask an admin to increase the API body-size limit on the server.`;
+    }
+    try {
+        const ct = res.headers.get("content-type") || "";
+        if (ct.includes("application/json")) {
+            const j = (await res.json()) as Record<string, unknown>;
+            const msg =
+                (typeof j.message === "string" && j.message.trim()) ||
+                (typeof j.error === "string" && j.error.trim()) ||
+                (typeof j.detail === "string" && j.detail.trim());
+            return msg ? `${prefix} ${msg}` : prefix;
+        }
+        const text = (await res.text()).trim();
+        return text ? `${prefix} ${text.slice(0, 240)}` : prefix;
+    } catch {
+        return prefix;
+    }
+}
 
 function ReportFormContent() {
     const router = useRouter();
@@ -226,8 +275,9 @@ function ReportFormContent() {
             setIsSaving(true);
             let updatedData = { ...data };
 
-            // Auto-generate AI Summary for specific sections
+            // Auto-generate AI Summary for specific sections (non-blocking for navigation if save succeeds)
             const sectionsToSummarize = [2, 3, 4, 5, 8, 9, 10];
+            let aiSummaryIssue: string | null = null;
             if (sectionsToSummarize.includes(activeStep) && isValid) {
                 setAiStatus('Analyzing Data & Writing Summary...');
                 try {
@@ -244,17 +294,27 @@ function ReportFormContent() {
                             }
                         };
                         updateSection(sectionKey, { summary_text: summaryRes.summary });
+                    } else if (summaryRes.error) {
+                        aiSummaryIssue = summaryRes.error;
                     }
                 } catch (error) {
                     console.error('Failed to auto-generate summary', error);
+                    aiSummaryIssue =
+                        error instanceof Error ? error.message : 'Auto-summary request failed.';
                 }
             }
-            
+
             setAiStatus('Saving Progress...');
-            const saved = await handleSave(true, updatedData);
-            if (!saved) {
-                toast.error('Could not save progress. Please try again.');
+            const saveResult = await handleSave(true, updatedData);
+            if (!saveResult.ok) {
+                toast.error(saveResult.message);
                 return;
+            }
+
+            if (aiSummaryIssue) {
+                toast.warning(
+                    `Step saved, but the auto-summary did not complete: ${aiSummaryIssue} You can edit the summary field on this step or try Next again.`,
+                );
             }
             
             if (!isValid) {
@@ -279,10 +339,15 @@ function ReportFormContent() {
         }
     };
 
-    const handleSave = async (silent = false, customData = data): Promise<boolean> => {
-        if (isReadOnly) return false;
+    const handleSave = async (silent = false, customData = data): Promise<SaveReportResult> => {
         if (!isSaving) setIsSaving(true);
         try {
+            if (isReadOnly) {
+                const message = 'This report is locked and cannot be edited.';
+                if (!silent) toast.error(message);
+                return { ok: false, message };
+            }
+
             setAiStatus('Uploading Evidence...');
             const projectIdForSave = customData.project_id || projectId || '';
             const dataForSave = projectIdForSave
@@ -296,17 +361,30 @@ function ReportFormContent() {
                     status: 'continue'
                 })
             }, {
-                timeoutMs: 30000
+                timeoutMs: 120000
             });
 
-            if (!res || !res.ok) throw new Error('Save failed');
+            if (!res) {
+                const message =
+                    'Save failed: no response from server (session may have expired). Sign in again and retry.';
+                if (!silent) toast.error(message);
+                return { ok: false, message };
+            }
+
+            if (!res.ok) {
+                const message = await httpFailureUserMessage(res, "Could not save draft");
+                if (!silent) toast.error(message);
+                return { ok: false, message };
+            }
+
             if (projectIdForSave) setFullData(dataForSave);
             if (!silent) toast.success('Progress saved');
-            return true;
+            return { ok: true };
         } catch (error) {
             console.error(error);
-            if (!silent) toast.error('Failed to save progress');
-            return false;
+            const message = formatSaveCatchError(error, "save");
+            if (!silent) toast.error(message);
+            return { ok: false, message };
         } finally {
             setIsSaving(false);
             setAiStatus(null);
@@ -368,6 +446,10 @@ function ReportFormContent() {
                             audit_meta: section11Res.auditMeta ?? null,
                         },
                     };
+                    submitData = {
+                        ...submitData,
+                        cii_index: readPersistedCiiSnapshot(submitData) ?? ciiResult,
+                    };
                     updateSection('section11', submitData.section11);
                 }
             } catch (aiError) {
@@ -386,7 +468,17 @@ function ReportFormContent() {
                 timeoutMs: 45000
             });
 
-            if (!res || !res.ok) throw new Error('Submission failed');
+            if (!res) {
+                toast.error(
+                    'Submit failed: no response from server (session may have expired). Sign in again and retry.',
+                );
+                return;
+            }
+            if (!res.ok) {
+                const message = await httpFailureUserMessage(res, "Could not submit report");
+                toast.error(message);
+                return;
+            }
 
             toast.success('Report submitted! Redirecting to payment...');
             setTimeout(() => {
@@ -394,7 +486,7 @@ function ReportFormContent() {
             }, 2000);
         } catch (error) {
             console.error(error);
-            toast.error('Failed to submit report');
+            toast.error(formatSaveCatchError(error, "submit"));
         } finally {
             setIsSaving(false);
             setAiStatus(null);
@@ -576,7 +668,7 @@ function ReportFormContent() {
                     {activeStep === 3 && <Section3SDGMapping projectData={projectDetails} />}
                     {activeStep === 4 && <Section4Activities />}
                     {activeStep === 5 && <Section5Outcomes />}
-                    {activeStep === 6 && <Section6Resources />}
+                    {activeStep === 6 && <Section6Resources projectData={projectDetails} />}
                     {activeStep === 7 && <Section7Partnerships />}
                     {activeStep === 8 && <Section8Evidence />}
                     {activeStep === 9 && <Section9Reflection />}
