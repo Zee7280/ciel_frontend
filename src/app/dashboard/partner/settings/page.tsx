@@ -76,16 +76,16 @@ export default function PartnerSettingsPage() {
     }
 
     return (
-        <div className="p-8 max-w-4xl mx-auto">
+        <div className="mx-auto max-w-4xl p-0 lg:p-8">
             {/* Header */}
             <div className="mb-8">
-                <h1 className="text-3xl font-bold text-slate-900">Settings</h1>
+                <h1 className="text-2xl font-bold text-slate-900 sm:text-3xl">Settings</h1>
                 <p className="text-slate-500">Manage your account preferences and settings</p>
             </div>
 
             <div className="space-y-6">
                 {/* Notifications Settings */}
-                <div className="bg-white rounded-2xl border border-slate-100 p-6">
+                <div className="rounded-2xl border border-slate-100 bg-white p-5 sm:p-6">
                     <div className="flex items-center gap-3 mb-6">
                         <Bell className="w-6 h-6 text-blue-600" />
                         <div>
@@ -94,7 +94,7 @@ export default function PartnerSettingsPage() {
                         </div>
                     </div>
                     <div className="space-y-4">
-                        <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
+                        <div className="flex items-start justify-between gap-4 rounded-lg bg-slate-50 p-4">
                             <div>
                                 <h3 className="font-semibold text-slate-900">Email Notifications</h3>
                                 <p className="text-sm text-slate-500">Receive updates via email</p>
@@ -112,7 +112,7 @@ export default function PartnerSettingsPage() {
                                 <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
                             </label>
                         </div>
-                        <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
+                        <div className="flex items-start justify-between gap-4 rounded-lg bg-slate-50 p-4">
                             <div>
                                 <h3 className="font-semibold text-slate-900">Push Notifications</h3>
                                 <p className="text-sm text-slate-500">Receive browser notifications</p>
@@ -130,7 +130,7 @@ export default function PartnerSettingsPage() {
                                 <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
                             </label>
                         </div>
-                        <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
+                        <div className="flex items-start justify-between gap-4 rounded-lg bg-slate-50 p-4">
                             <div>
                                 <h3 className="font-semibold text-slate-900">SMS Notifications</h3>
                                 <p className="text-sm text-slate-500">Receive text messages</p>
@@ -152,7 +152,7 @@ export default function PartnerSettingsPage() {
                 </div>
 
                 {/* Privacy Settings */}
-                <div className="bg-white rounded-2xl border border-slate-100 p-6">
+                <div className="rounded-2xl border border-slate-100 bg-white p-5 sm:p-6">
                     <div className="flex items-center gap-3 mb-6">
                         <Shield className="w-6 h-6 text-green-600" />
                         <div>
@@ -175,7 +175,7 @@ export default function PartnerSettingsPage() {
                                 <option value="private">Private - Only visible to you</option>
                             </select>
                         </div>
-                        <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
+                        <div className="flex items-start justify-between gap-4 rounded-lg bg-slate-50 p-4">
                             <div>
                                 <h3 className="font-semibold text-slate-900">Show Email Address</h3>
                                 <p className="text-sm text-slate-500">Display email on public profile</p>
@@ -197,7 +197,7 @@ export default function PartnerSettingsPage() {
                 </div>
 
                 {/* Appearance Settings */}
-                <div className="bg-white rounded-2xl border border-slate-100 p-6">
+                <div className="rounded-2xl border border-slate-100 bg-white p-5 sm:p-6">
                     <div className="flex items-center gap-3 mb-6">
                         <Palette className="w-6 h-6 text-purple-600" />
                         <div>
@@ -208,7 +208,7 @@ export default function PartnerSettingsPage() {
                     <div className="space-y-4">
                         <div className="p-4 bg-slate-50 rounded-lg">
                             <h3 className="font-semibold text-slate-900 mb-3">Theme</h3>
-                            <div className="grid grid-cols-2 gap-3">
+                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                                 <button
                                     onClick={() => setSettings(prev => ({ ...prev, theme: "light" }))}
                                     className={`p-4 border-2 rounded-lg transition-all ${settings.theme === "light"
@@ -252,7 +252,7 @@ export default function PartnerSettingsPage() {
                     <button
                         onClick={handleSave}
                         disabled={isSaving}
-                        className="px-8 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors flex items-center gap-2"
+                        className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-8 py-3 font-semibold text-white transition-colors hover:bg-blue-700 sm:w-auto"
                     >
                         {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
                         Save All Settings

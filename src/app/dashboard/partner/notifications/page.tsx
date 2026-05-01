@@ -96,11 +96,11 @@ export default function PartnerNotificationsPage() {
     const unreadCount = notifications.filter(n => !n.isRead).length;
 
     return (
-        <div className="p-8">
+        <div className="p-0 lg:p-8">
             {/* Header */}
-            <div className="flex justify-between items-center mb-8">
-                <div>
-                    <h1 className="text-3xl font-bold text-slate-900">Notifications</h1>
+            <div className="mb-8 flex flex-col items-stretch justify-between gap-4 sm:flex-row sm:items-center">
+                <div className="min-w-0">
+                    <h1 className="text-2xl font-bold text-slate-900 sm:text-3xl">Notifications</h1>
                     <p className="text-slate-500">
                         {unreadCount > 0 ? `${unreadCount} unread notification${unreadCount > 1 ? 's' : ''}` : 'All caught up!'}
                     </p>
@@ -153,7 +153,7 @@ export default function PartnerNotificationsPage() {
                                     {getIcon(notification.type)}
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                    <div className="flex items-start justify-between gap-4 mb-2">
+                                    <div className="mb-2 flex flex-col items-start justify-between gap-1 sm:flex-row sm:gap-4">
                                         <h3 className="font-bold text-slate-900">{notification.title}</h3>
                                         <span className="text-xs text-slate-500 whitespace-nowrap">
                                             {new Date(notification.createdAt).toLocaleDateString()}

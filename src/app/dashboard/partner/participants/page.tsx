@@ -57,19 +57,19 @@ export default function PartnerParticipantsPage() {
     });
 
     return (
-        <div className="p-8">
-            <div className="flex justify-between items-center mb-8">
-                <div>
-                    <h1 className="text-3xl font-bold text-slate-900">Student Participants</h1>
+        <div className="p-0 lg:p-8">
+            <div className="mb-8 flex flex-col items-stretch justify-between gap-4 lg:flex-row lg:items-center">
+                <div className="min-w-0">
+                    <h1 className="text-2xl font-bold text-slate-900 sm:text-3xl">Student Participants</h1>
                     <p className="text-slate-500">View and manage students joined in your opportunities.</p>
                 </div>
-                <div className="flex gap-3">
+                <div className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2 lg:w-auto">
                     <div className="relative">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                         <input
                             type="text"
                             placeholder="Search students..."
-                            className="pl-9 pr-4 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:border-blue-500 w-64 bg-white"
+                            className="w-full rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-4 text-sm outline-none focus:border-blue-500 lg:w-64"
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                         />
@@ -77,7 +77,7 @@ export default function PartnerParticipantsPage() {
                     <div className="relative">
                         <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                         <select
-                            className="pl-9 pr-4 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:border-blue-500 bg-white appearance-none cursor-pointer"
+                            className="w-full appearance-none rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-4 text-sm outline-none focus:border-blue-500"
                             value={statusFilter}
                             onChange={(e) => setStatusFilter(e.target.value)}
                         >
@@ -90,8 +90,9 @@ export default function PartnerParticipantsPage() {
                 </div>
             </div>
 
-            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-                <table className="w-full text-left">
+            <div className="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm">
+                <div className="overflow-x-auto">
+                <table className="min-w-[860px] w-full text-left">
                     <thead className="bg-slate-50 border-b border-slate-100 text-slate-500 uppercase text-xs font-bold tracking-wider">
                         <tr>
                             <th className="p-6">Student Name</th>
@@ -166,6 +167,7 @@ export default function PartnerParticipantsPage() {
                         )}
                     </tbody>
                 </table>
+                </div>
             </div>
         </div>
     );

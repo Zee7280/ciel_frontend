@@ -550,7 +550,7 @@ export default function OpportunityPostingPage() {
                     </div>
                     {isLoadingProfile ? <Loader2 className="w-5 h-5 animate-spin text-slate-400" /> : <CheckCircle className="w-5 h-5 text-green-500" />}
                 </div>
-                <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6 opacity-75 pointer-events-none grayscale-[0.5]">
+                <div className="grid grid-cols-1 gap-6 p-5 opacity-75 pointer-events-none grayscale-[0.5] sm:p-6 md:grid-cols-2">
                     {isLoadingProfile ? (
                         <div className="col-span-2 text-center py-4 text-slate-400">Loading organization details...</div>
                     ) : (
@@ -596,7 +596,7 @@ export default function OpportunityPostingPage() {
                     </div>
                 </div>
 
-                <div className="p-8 space-y-8">
+                <div className="space-y-8 p-5 sm:p-8">
                     {/* B1. Title */}
                     <div>
                         <label className="block text-sm font-bold text-slate-900 mb-2">B1. Opportunity Title <span className="text-red-500">*</span></label>
@@ -797,23 +797,23 @@ export default function OpportunityPostingPage() {
                                         <p className="text-xs text-slate-500">
                                             Start/end dates and daily times are optional for all timeline types.
                                         </p>
-                                        <div className="flex gap-2 flex-wrap">
+                                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto_1fr] sm:items-center">
                                             <input
                                                 type="date"
-                                                className="flex-1 min-w-[140px] px-3 py-2 border border-slate-200 rounded-lg text-sm"
+                                                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
                                                 value={formData.dates.start}
                                                 onChange={(e) => setFormData({ ...formData, dates: { ...formData.dates, start: e.target.value } })}
                                             />
                                             <span className="self-center text-slate-400">-</span>
                                             <input
                                                 type="date"
-                                                className="flex-1 min-w-[140px] px-3 py-2 border border-slate-200 rounded-lg text-sm"
+                                                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
                                                 value={formData.dates.end}
                                                 onChange={(e) => setFormData({ ...formData, dates: { ...formData.dates, end: e.target.value } })}
                                             />
                                         </div>
-                                        <div className="flex gap-2 flex-wrap items-center">
-                                            <div className="flex-1 min-w-[140px]">
+                                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 sm:items-center">
+                                            <div>
                                                 <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">From time</label>
                                                 <input
                                                     type="time"
@@ -827,7 +827,7 @@ export default function OpportunityPostingPage() {
                                                     }
                                                 />
                                             </div>
-                                            <div className="flex-1 min-w-[140px]">
+                                            <div>
                                                 <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">To time</label>
                                                 <input
                                                     type="time"
@@ -895,7 +895,7 @@ export default function OpportunityPostingPage() {
                     {expandedSections.includes('C') ? <ChevronUp className="w-5 h-5 text-slate-400" /> : <ChevronDown className="w-5 h-5 text-slate-400" />}
                 </div>
 
-                <div className={`p-8 space-y-6 ${!expandedSections.includes('C') ? 'hidden' : ''}`}>
+                <div className={`space-y-6 p-5 sm:p-8 ${!expandedSections.includes('C') ? 'hidden' : ''}`}>
                     <div className="bg-amber-50 p-4 rounded-xl border border-amber-100 flex gap-3 text-sm text-amber-800 mb-6">
                         <AlertCircle className="w-5 h-5 flex-shrink-0" />
                         <div>
@@ -1085,7 +1085,7 @@ export default function OpportunityPostingPage() {
                     {expandedSections.includes('D') ? <ChevronUp className="w-5 h-5 text-slate-400" /> : <ChevronDown className="w-5 h-5 text-slate-400" />}
                 </div>
 
-                <div className={`p-8 space-y-6 ${!expandedSections.includes('D') ? 'hidden' : ''}`}>
+                <div className={`space-y-6 p-5 sm:p-8 ${!expandedSections.includes('D') ? 'hidden' : ''}`}>
                     {/* D1. Project Objective */}
                     <div>
                         <label className="block text-sm font-bold text-slate-900 mb-2">D1. Project Objective <span className="text-red-500">*</span></label>
@@ -1223,7 +1223,7 @@ export default function OpportunityPostingPage() {
                     {expandedSections.includes('E') ? <ChevronUp className="w-5 h-5 text-slate-400" /> : <ChevronDown className="w-5 h-5 text-slate-400" />}
                 </div>
 
-                <div className={`p-8 space-y-6 ${!expandedSections.includes('E') ? 'hidden' : ''}`}>
+                <div className={`space-y-6 p-5 sm:p-8 ${!expandedSections.includes('E') ? 'hidden' : ''}`}>
                     <div>
                         <label className="block text-sm font-bold text-slate-900 mb-2">E1. Student Responsibilities (Bullet List) <span className="text-red-500">*</span></label>
                         <textarea spellCheck={true}
@@ -1353,7 +1353,7 @@ export default function OpportunityPostingPage() {
                     </h2>
                     {expandedSections.includes('F') ? <ChevronUp className="w-5 h-5 text-slate-400" /> : <ChevronDown className="w-5 h-5 text-slate-400" />}
                 </div>
-                <div className={`p-8 space-y-8 ${!expandedSections.includes('F') ? 'hidden' : ''}`}>
+                <div className={`space-y-8 p-5 sm:p-8 ${!expandedSections.includes('F') ? 'hidden' : ''}`}>
                     <p className="text-sm text-slate-600">
                         The organization posting this opportunity is the <strong>Executing Organization</strong>. This section establishes accountability, verification, and a safe environment for students.
                     </p>
@@ -1675,7 +1675,7 @@ export default function OpportunityPostingPage() {
                     </h2>
                     {expandedSections.includes('G') ? <ChevronUp className="w-5 h-5 text-slate-400" /> : <ChevronDown className="w-5 h-5 text-slate-400" />}
                 </div>
-                <div className={`p-8 space-y-6 ${!expandedSections.includes('G') ? 'hidden' : ''}`}>
+                <div className={`space-y-6 p-5 sm:p-8 ${!expandedSections.includes('G') ? 'hidden' : ''}`}>
                     <label className="block text-sm font-bold text-slate-900 mb-2">G1. How will student participation be verified?</label>
                     <div className="space-y-3">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -1746,7 +1746,7 @@ export default function OpportunityPostingPage() {
                     </h2>
                     {expandedSections.includes('H') ? <ChevronUp className="w-5 h-5 text-slate-400" /> : <ChevronDown className="w-5 h-5 text-slate-400" />}
                 </div>
-                <div className={`p-8 space-y-4 ${!expandedSections.includes('H') ? 'hidden' : ''}`}>
+                <div className={`space-y-4 p-5 sm:p-8 ${!expandedSections.includes('H') ? 'hidden' : ''}`}>
                     <label className="flex items-center gap-3 p-4 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-50">
                         <input
                             type="radio"
@@ -1885,7 +1885,7 @@ export default function OpportunityPostingPage() {
             </div>
 
             {/* SECTION I: SUBMIT CONTEXT */}
-            <div className="bg-slate-900 rounded-2xl text-white p-8 space-y-4">
+            <div className="space-y-4 rounded-2xl bg-slate-900 p-5 text-white sm:p-8">
                 <h2 className="text-xl font-bold flex items-center gap-2">
                     <CheckCircle className="w-6 h-6 text-green-400" /> Section I: Before you submit
                 </h2>
@@ -1898,7 +1898,7 @@ export default function OpportunityPostingPage() {
                 </p>
             </div>
 
-            <div className="fixed bottom-0 left-0 md:left-64 right-0 p-4 bg-white border-t border-slate-200 z-50 flex justify-end gap-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+            <div className="fixed bottom-24 left-0 right-0 z-50 flex justify-end gap-3 border-t border-slate-200 bg-white p-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] lg:left-64 lg:bottom-0 lg:gap-4">
                 <button
                     type="button"
                     onClick={() => router.push("/dashboard/partner/requests")}

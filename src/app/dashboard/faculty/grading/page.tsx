@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { FileText, Download, CheckCircle, MessageSquare, Star } from "lucide-react";
+import { FileText, Download, Star } from "lucide-react";
 import { Button } from "@/app/dashboard/student/report/components/ui/button";
 import { Badge } from "@/app/dashboard/student/report/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/app/dashboard/student/report/components/ui/card";
@@ -32,9 +32,9 @@ export default function FacultyGradingPage() {
     ];
 
     return (
-        <div className="space-y-6 max-w-7xl mx-auto p-4 pb-20">
+        <div className="mx-auto max-w-7xl space-y-6 p-0 pb-20 sm:p-4">
             <div>
-                <h1 className="text-3xl font-bold text-slate-900">Student Grading</h1>
+                <h1 className="text-2xl font-bold text-slate-900 sm:text-3xl">Student Grading</h1>
                 <p className="text-slate-500">Review final impact reports and assign grades.</p>
             </div>
 
@@ -51,7 +51,7 @@ export default function FacultyGradingPage() {
                                     onClick={() => setSelectedReport(report.id)}
                                     className={`p-3 rounded-lg border cursor-pointer transition-all ${selectedReport === report.id ? 'bg-blue-50 border-blue-200 ring-1 ring-blue-200' : 'bg-white border-slate-100 hover:border-slate-300'}`}
                                 >
-                                    <div className="flex justify-between items-start mb-1">
+                                    <div className="mb-1 flex items-start justify-between gap-2">
                                         <h4 className="font-bold text-slate-800 text-sm">{report.studentName}</h4>
                                         {report.grade ? (
                                             <Badge variant="secondary" className="bg-green-100 text-green-700">{report.grade}</Badge>
@@ -71,7 +71,7 @@ export default function FacultyGradingPage() {
                     {selectedReport ? (
                         <Card className="h-full">
                             <CardHeader className="border-b border-slate-100 bg-slate-50/50">
-                                <div className="flex justify-between items-center">
+                                <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
                                     <div>
                                         <CardTitle className="text-xl">Impact Report Review</CardTitle>
                                         <CardDescription>Ali Khan - Community Clean-up Drive</CardDescription>
@@ -81,7 +81,7 @@ export default function FacultyGradingPage() {
                                     </Button>
                                 </div>
                             </CardHeader>
-                            <CardContent className="p-6 space-y-8">
+                            <CardContent className="space-y-8 p-5 sm:p-6">
                                 <div className="space-y-4">
                                     <div className="bg-slate-50 p-4 rounded-lg border border-slate-100">
                                         <h3 className="font-bold text-slate-900 mb-2">Section 1: Project Overview</h3>
@@ -124,7 +124,7 @@ export default function FacultyGradingPage() {
                                         <Textarea placeholder="Great work on the SDG alignment..." className="h-32" />
                                     </div>
 
-                                    <div className="flex justify-end gap-3 pt-4">
+                                    <div className="flex flex-col justify-end gap-3 pt-4 sm:flex-row">
                                         <Button variant="outline">Save Draft</Button>
                                         <Button>Submit Grade</Button>
                                     </div>

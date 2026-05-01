@@ -105,11 +105,11 @@ export default function PartnerRequestsPage() {
 
     return (
         <div className="w-full pb-32 space-y-6">
-            <div className="flex justify-between items-center mb-6">
-                <div>
+            <div className="mb-6 flex flex-col items-stretch justify-between gap-4 sm:flex-row sm:items-center">
+                <div className="min-w-0">
                     <h1 className="text-2xl font-bold text-slate-900">My Opportunities</h1>
                 </div>
-                <Link href="/dashboard/partner/requests/new" className="bg-blue-600 text-white px-4 py-2 rounded-lg font-bold text-sm hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm">
+                <Link href="/dashboard/partner/requests/new" className="flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white shadow-sm transition-colors hover:bg-blue-700">
                     <Plus className="w-4 h-4" /> Post New
                 </Link>
             </div>
@@ -132,7 +132,7 @@ export default function PartnerRequestsPage() {
             ) : (
                 <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
                     <div className="overflow-x-auto min-h-[300px]">
-                        <table className="w-full text-left border-collapse">
+                        <table className="min-w-[900px] w-full border-collapse text-left">
                             <thead>
                                 <tr className="bg-slate-50 border-b border-slate-200 text-xs uppercase tracking-wider text-slate-500 font-bold">
                                     <th className="px-6 py-4">Project Name</th>

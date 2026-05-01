@@ -67,10 +67,10 @@ export default function PartnerImpactPage() {
     };
 
     return (
-        <div className="p-8">
+        <div className="p-0 lg:p-8">
             {/* Header */}
             <div className="mb-8">
-                <h1 className="text-3xl font-bold text-slate-900">Impact Dashboard</h1>
+                <h1 className="text-2xl font-bold text-slate-900 sm:text-3xl">Impact Dashboard</h1>
                 <p className="text-slate-500">Track your organization's measurable impact and SDG alignment</p>
             </div>
 
@@ -118,7 +118,7 @@ export default function PartnerImpactPage() {
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* SDG Distribution */}
-                <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm">
+                <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm sm:p-6">
                     <div className="flex items-center gap-3 mb-6">
                         <PieChart className="w-6 h-6 text-blue-600" />
                         <h2 className="text-xl font-bold text-slate-900">SDG Alignment</h2>
@@ -131,7 +131,7 @@ export default function PartnerImpactPage() {
                                     <div className={`w-10 h-10 ${sdgColors[parseInt(sdg)] || 'bg-slate-500'} rounded-lg flex items-center justify-center text-white font-bold text-sm`}>
                                         {sdg}
                                     </div>
-                                    <div className="flex-1">
+                                    <div className="min-w-0 flex-1">
                                         <div className="flex justify-between mb-1">
                                             <span className="text-sm font-semibold text-slate-700">SDG {sdg}</span>
                                             <span className="text-sm font-bold text-slate-900">{percentage}%</span>
@@ -149,7 +149,7 @@ export default function PartnerImpactPage() {
                 </div>
 
                 {/* Monthly Trend */}
-                <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm">
+                <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm sm:p-6">
                     <div className="flex items-center gap-3 mb-6">
                         <BarChart3 className="w-6 h-6 text-green-600" />
                         <h2 className="text-xl font-bold text-slate-900">Monthly Growth</h2>

@@ -104,14 +104,14 @@ export default function PartnerDashboard() {
     return (
         <div className="space-y-8">
             {/* Welcome Section */}
-            <div className="bg-gradient-to-r from-blue-900 to-indigo-800 rounded-3xl p-8 text-white relative overflow-hidden">
+            <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-blue-900 to-indigo-800 p-5 text-white sm:p-8">
                 <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -mr-16 -mt-16"></div>
                 <div className="relative z-10">
-                    <h2 className="text-3xl font-bold mb-2">Welcome, Partner</h2>
+                    <h2 className="mb-2 text-2xl font-bold sm:text-3xl">Welcome, Partner</h2>
                     <p className="text-blue-100 max-w-xl">Manage your project requests, track volunteer engagement, and report impact directly through the CIEL Partner Portal.</p>
-                    <div className="mt-6 flex gap-4">
-                        <Link href="/dashboard/partner/requests/new" className="bg-white text-blue-900 px-6 py-2.5 rounded-xl font-bold text-sm hover:bg-blue-50 transition-colors inline-block">Post New Request</Link>
-                        <button className="bg-blue-800 text-white border border-blue-700 px-6 py-2.5 rounded-xl font-bold text-sm hover:bg-blue-700 transition-colors">View Reports</button>
+                    <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:gap-4">
+                        <Link href="/dashboard/partner/requests/new" className="inline-flex justify-center rounded-xl bg-white px-6 py-2.5 text-sm font-bold text-blue-900 transition-colors hover:bg-blue-50">Post New Request</Link>
+                        <button className="rounded-xl border border-blue-700 bg-blue-800 px-6 py-2.5 text-sm font-bold text-white transition-colors hover:bg-blue-700">View Reports</button>
                     </div>
                 </div>
             </div>
@@ -120,8 +120,8 @@ export default function PartnerDashboard() {
 
             {/* Pending Verifications Alert */}
             {pendingVerifications > 0 && (
-                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
+                <div className="flex flex-col items-stretch justify-between gap-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 sm:flex-row sm:items-center">
+                    <div className="flex items-start gap-3 sm:items-center">
                         <div className="p-2 bg-amber-100 rounded-full text-amber-600">
                             <AlertCircle className="w-5 h-5" />
                         </div>
@@ -130,7 +130,7 @@ export default function PartnerDashboard() {
                             <p className="text-sm text-amber-700">You have {pendingVerifications} student reports waiting for your approval.</p>
                         </div>
                     </div>
-                    <Link href="/dashboard/partner/verification" className="bg-amber-600 text-white px-4 py-2 rounded-lg font-bold text-sm hover:bg-amber-700 transition-colors">
+                    <Link href="/dashboard/partner/verification" className="inline-flex justify-center rounded-lg bg-amber-600 px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-amber-700">
                         Review Now
                     </Link>
                 </div>
@@ -157,7 +157,7 @@ export default function PartnerDashboard() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 {/* Project Requests */}
                 <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
-                    <div className="flex items-center justify-between mb-6">
+                    <div className="mb-6 flex items-center justify-between gap-3">
                         <h3 className="font-bold text-slate-800 text-lg">Recent Project Requests</h3>
                         <Link href="/dashboard/partner/requests" className="text-sm font-bold text-blue-600 hover:underline">View All</Link>
                     </div>
@@ -165,16 +165,16 @@ export default function PartnerDashboard() {
                         {recentProjects.length > 0 ? (
                             recentProjects.map((project) => (
                                 <div key={project.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 border border-slate-50 rounded-xl hover:border-slate-100 hover:shadow-sm transition-all">
-                                    <div className="flex items-center gap-4">
+                                    <div className="flex min-w-0 items-center gap-4">
                                         <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-600">
                                             <FileText className="w-5 h-5" />
                                         </div>
-                                        <div>
-                                            <h4 className="font-bold text-slate-800">{project.title}</h4>
+                                        <div className="min-w-0">
+                                            <h4 className="truncate font-bold text-slate-800">{project.title}</h4>
                                             <p className="text-xs text-slate-500">{project.location} • {project.volunteersNeeded} Volunteers Needed</p>
                                         </div>
                                     </div>
-                                    <div className="flex items-center gap-3">
+                                    <div className="flex items-center justify-between gap-3 sm:justify-end">
                                         <div className="flex -space-x-2">
                                             {/* Mock avatars */}
                                             <div className="w-8 h-8 rounded-full bg-slate-200 border-2 border-white"></div>

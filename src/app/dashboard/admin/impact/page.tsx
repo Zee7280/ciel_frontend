@@ -43,24 +43,24 @@ export default function AdminImpactPage() {
     }, []);
 
     return (
-        <div className="p-8">
-            <div className="flex justify-between items-center mb-8">
-                <div>
-                    <h1 className="text-3xl font-bold text-slate-900">Impact Analytics</h1>
+        <div className="p-0 lg:p-8">
+            <div className="mb-8 flex flex-col items-stretch justify-between gap-4 sm:flex-row sm:items-center">
+                <div className="min-w-0">
+                    <h1 className="text-2xl font-bold text-slate-900 sm:text-3xl">Impact Analytics</h1>
                     <p className="text-slate-500">Deep dive into social impact metrics.</p>
                 </div>
-                <div className="flex gap-2">
+                <div className="grid grid-cols-1 gap-2 sm:flex">
                     <select className="bg-white border border-slate-200 rounded-lg px-4 py-2 text-sm font-bold text-slate-700 outline-none">
                         <option>Last 6 Months</option>
                         <option>This Year</option>
                     </select>
-                    <button className="bg-blue-600 text-white px-4 py-2 rounded-lg font-bold text-sm">Download Report</button>
+                    <button className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white">Download Report</button>
                 </div>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 {/* Hours Trend */}
-                <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+                <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm sm:p-6">
                     <h3 className="font-bold text-slate-900 mb-6 flex items-center gap-2">
                         <Clock className="w-5 h-5 text-blue-500" /> Volunteering Hours Trend
                     </h3>
@@ -78,7 +78,7 @@ export default function AdminImpactPage() {
                 </div>
 
                 {/* SDG Impact */}
-                <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+                <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm sm:p-6">
                     <h3 className="font-bold text-slate-900 mb-6 flex items-center gap-2">
                         <Globe className="w-5 h-5 text-green-500" /> Impact by SDG
                     </h3>

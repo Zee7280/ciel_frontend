@@ -462,12 +462,12 @@ export default function StudentDashboard() {
 
             {firstProjectForTracker ? <StudentProgressTracker projectId={firstProjectForTracker} /> : null}
 
-            <div className="flex flex-col items-center justify-between gap-4 rounded-2xl bg-blue-600 p-6 text-white shadow-lg shadow-blue-100 md:flex-row">
-                <div className="flex items-center gap-4">
+            <div className="flex flex-col items-stretch justify-between gap-4 rounded-2xl bg-blue-600 p-5 text-white shadow-lg shadow-blue-100 sm:p-6 md:flex-row md:items-center">
+                <div className="flex min-w-0 items-start gap-4 sm:items-center">
                     <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/20">
                         <TrendingUp className="h-6 w-6" />
                     </div>
-                    <div>
+                    <div className="min-w-0">
                         <h3 className="text-lg font-bold">Verified Impact Tracking (Section 1)</h3>
                         <p className="text-sm opacity-80">
                             Authenticate your identity and log attendance directly within your Project Report.
@@ -475,7 +475,7 @@ export default function StudentDashboard() {
                     </div>
                 </div>
                 <Link href="/dashboard/student/projects">
-                    <Button className="h-11 bg-white px-8 font-bold text-blue-600 hover:bg-blue-50">Go to Project Reports</Button>
+                    <Button className="h-11 w-full bg-white px-8 font-bold text-blue-600 hover:bg-blue-50 sm:w-auto">Go to Project Reports</Button>
                 </Link>
             </div>
 
@@ -517,14 +517,14 @@ export default function StudentDashboard() {
                         activeProjects.map((project) => (
                             <div
                                 key={project.id}
-                                className="group flex items-center justify-between border-b border-slate-50 p-6 transition-colors last:border-none hover:bg-slate-50"
+                                className="group flex flex-col items-stretch justify-between gap-4 border-b border-slate-50 p-4 transition-colors last:border-none hover:bg-slate-50 sm:flex-row sm:items-center sm:p-6"
                             >
-                                <div className="flex items-center gap-4">
+                                <div className="flex min-w-0 items-center gap-4">
                                     <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-blue-50 text-sm font-bold text-blue-600">
                                         {project.title.substring(0, 2).toUpperCase()}
                                     </div>
-                                    <div>
-                                        <h4 className="font-bold text-slate-800 transition-colors group-hover:text-blue-600">{project.title}</h4>
+                                    <div className="min-w-0">
+                                        <h4 className="truncate font-bold text-slate-800 transition-colors group-hover:text-blue-600">{project.title}</h4>
                                         <p className="text-xs text-slate-500">
                                             {project.category} • {project.status}
                                             {project.report_status ? (
@@ -533,18 +533,18 @@ export default function StudentDashboard() {
                                         </p>
                                     </div>
                                 </div>
-                                <div className="flex items-center gap-3">
-                                    <Link href={`/dashboard/student/report?projectId=${project.id}`}>
+                                <div className="flex items-center gap-3 sm:justify-end">
+                                    <Link href={`/dashboard/student/report?projectId=${project.id}`} className="w-full sm:w-auto">
                                         <Button
                                             size="sm"
                                             variant={
                                                 project.status?.toLowerCase() === "verified" || project.progress >= 80 ? "default" : "outline"
                                             }
-                                            className={
+                                            className={`w-full sm:w-auto ${
                                                 project.status?.toLowerCase() === "verified" || project.progress >= 80
                                                     ? "border-none bg-green-600 text-white shadow-md shadow-green-100 hover:bg-green-700"
                                                     : ""
-                                            }
+                                            }`}
                                         >
                                             {project.status?.toLowerCase() === "verified" || project.progress >= 80
                                                 ? "Get CII Certificate"

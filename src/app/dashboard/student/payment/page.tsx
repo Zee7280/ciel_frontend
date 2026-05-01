@@ -219,18 +219,18 @@ function PaymentContent() {
     }
 
     return (
-        <div className="max-w-4xl mx-auto py-8 px-4 space-y-8">
-            <div className="flex items-center justify-between">
-                <div>
+        <div className="mx-auto max-w-4xl space-y-8 px-0 py-4 sm:px-4 sm:py-8">
+            <div className="flex flex-col items-stretch justify-between gap-4 sm:flex-row sm:items-center">
+                <div className="min-w-0">
                     <Button variant="ghost" size="sm" onClick={() => router.back()} className="mb-2 -ml-2 text-slate-400 hover:text-slate-600">
                         <ArrowLeft className="w-4 h-4 mr-1" /> Back
                     </Button>
-                    <h1 className="text-3xl font-black text-slate-900 tracking-tight">Complete Payment</h1>
+                    <h1 className="text-2xl font-black tracking-tight text-slate-900 sm:text-3xl">Complete Payment</h1>
                     <p className="text-slate-500 font-medium">
                         Please transfer <span className="font-semibold text-slate-700">{REPORTING_FEE_DISPLAY}</span> per student to the account below and upload the proof.
                     </p>
                 </div>
-                <div className="bg-blue-50 text-blue-700 px-4 py-2 rounded-2xl border border-blue-100 flex items-center gap-2">
+                <div className="flex items-center justify-center gap-2 rounded-2xl border border-blue-100 bg-blue-50 px-4 py-2 text-blue-700 sm:justify-start">
                     <CreditCard className="w-5 h-5" />
                     <span className="font-black text-lg">{bankInfo.amount}</span>
                 </div>
@@ -326,8 +326,8 @@ function PaymentContent() {
 
                             <div className="flex flex-col">
                                 <span className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Account Number</span>
-                                <div className="flex items-center justify-between group p-3 bg-slate-50 rounded-xl border border-slate-100">
-                                    <span className="font-mono font-bold text-slate-900 tracking-wider font-bold">{bankInfo.accountNumber}</span>
+                                <div className="group flex items-center justify-between gap-3 rounded-xl border border-slate-100 bg-slate-50 p-3">
+                                    <span className="break-all font-mono font-bold tracking-wider text-slate-900">{bankInfo.accountNumber}</span>
                                     <button onClick={() => handleCopy(bankInfo.accountNumber, 'Account Number')} className="text-blue-600 hover:text-blue-800 p-2 bg-white rounded-lg shadow-sm">
                                         <Copy className="w-4 h-4" />
                                     </button>
@@ -336,8 +336,8 @@ function PaymentContent() {
 
                             <div className="flex flex-col">
                                 <span className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">IBAN</span>
-                                <div className="flex items-center justify-between group p-3 bg-slate-50 rounded-xl border border-slate-100">
-                                    <span className="font-mono font-bold text-slate-900 tracking-wider text-xs">{bankInfo.iban}</span>
+                                <div className="group flex items-center justify-between gap-3 rounded-xl border border-slate-100 bg-slate-50 p-3">
+                                    <span className="break-all font-mono text-xs font-bold tracking-wider text-slate-900">{bankInfo.iban}</span>
                                     <button onClick={() => handleCopy(bankInfo.iban, 'IBAN')} className="text-blue-600 hover:text-blue-800 p-2 bg-white rounded-lg shadow-sm">
                                         <Copy className="w-4 h-4" />
                                     </button>

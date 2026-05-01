@@ -245,10 +245,10 @@ export default function FacultyProfilePage() {
     const displayName = typeof user?.name === "string" ? user.name : formData.name || "Faculty";
 
     return (
-        <div className="max-w-5xl mx-auto space-y-8 pb-12">
+        <div className="mx-auto max-w-5xl space-y-6 pb-12 sm:space-y-8">
             <div>
-                <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Faculty Profile</h1>
-                <p className="text-slate-500 mt-2 text-lg">Complete your details so approvals and messaging use the right contact information.</p>
+                <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Faculty Profile</h1>
+                <p className="mt-2 text-base text-slate-500 sm:text-lg">Complete your details so approvals and messaging use the right contact information.</p>
             </div>
 
             {missingProfile.length > 0 ? (
@@ -307,15 +307,15 @@ export default function FacultyProfilePage() {
                 </div>
 
                 <div className="lg:col-span-8">
-                    <div className="bg-white p-8 rounded-3xl border border-slate-100 shadow-xl shadow-slate-200/50">
-                        <div className="flex items-center justify-between mb-8 border-b border-slate-100 pb-4">
+                    <div className="rounded-3xl border border-slate-100 bg-white p-5 shadow-xl shadow-slate-200/50 sm:p-8">
+                        <div className="mb-6 flex items-center justify-between border-b border-slate-100 pb-4 sm:mb-8">
                             <div>
                                 <h3 className="text-xl font-bold text-slate-900">Personal details</h3>
                                 <p className="text-slate-500 text-sm mt-1">Name, institution, and phone are required for a complete profile.</p>
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 md:gap-8">
                             <div className="md:col-span-2">
                                 <label className="block text-sm font-semibold text-slate-700 mb-2.5">Full name</label>
                                 <div className="relative group">
@@ -413,11 +413,11 @@ export default function FacultyProfilePage() {
                             </div>
                         </div>
 
-                        <div className="pt-8 flex justify-end border-t border-slate-50 mt-8">
+                        <div className="mt-8 flex justify-end border-t border-slate-50 pt-8">
                             <Button
                                 onClick={handleSave}
                                 disabled={isSaving}
-                                className="bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white min-w-[150px] h-12 rounded-xl text-base font-medium shadow-lg shadow-violet-500/30 transition-all hover:scale-[1.02]"
+                                className="h-12 w-full min-w-[150px] rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 text-base font-medium text-white shadow-lg shadow-violet-500/30 transition-all hover:scale-[1.02] hover:from-violet-700 hover:to-indigo-700 sm:w-auto"
                             >
                                 {isSaving ? (
                                     <Loader2 className="w-5 h-5 animate-spin mr-2" />

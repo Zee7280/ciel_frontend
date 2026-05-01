@@ -215,10 +215,10 @@ export default function ReportDetailPage() {
     const canSubmitDecision = partnerCanSubmitDecision(report);
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-50 p-8">
+        <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-50 p-0 sm:p-6 lg:p-8">
             <div className="max-w-7xl mx-auto space-y-6">
                 {/* Header */}
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col items-stretch justify-between gap-3 sm:flex-row sm:items-center">
                     <button
                         onClick={() => router.back()}
                         className="flex items-center gap-2 px-4 py-2 text-slate-700 hover:bg-white rounded-lg font-medium transition-all"
@@ -226,7 +226,7 @@ export default function ReportDetailPage() {
                         <ArrowLeft className="w-4 h-4" />
                         Back to impact reports
                     </button>
-                    <div className="flex items-center gap-3">
+                    <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                         <span className="px-4 py-2 bg-indigo-50 text-indigo-700 rounded-xl text-xs font-black border border-indigo-200 uppercase tracking-widest">
                             Single-Page Dossier Mode
                         </span>
@@ -266,18 +266,18 @@ export default function ReportDetailPage() {
                 )}
 
                 {/* Student & Opportunity Info */}
-                <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm">
-                    <div className="flex items-start justify-between">
-                        <div className="flex items-start gap-6">
+                <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-8">
+                    <div className="flex flex-col items-stretch justify-between gap-5 lg:flex-row lg:items-start">
+                        <div className="flex min-w-0 items-start gap-4 sm:gap-6">
                             <div className="w-16 h-16 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white font-black text-2xl border-4 border-slate-100">
                                 {report.student.name.charAt(0)}
                             </div>
-                            <div>
+                            <div className="min-w-0">
                                 <h1 className="text-2xl font-black text-slate-900 mb-2">{report.student.name}</h1>
                                 <div className="space-y-1 text-sm">
                                     <div className="flex items-center gap-2 text-slate-600">
                                         <User className="w-4 h-4" />
-                                        <span className="font-medium">{report.student.email}</span>
+                                        <span className="break-all font-medium">{report.student.email}</span>
                                     </div>
                                     <div className="flex items-center gap-2 text-slate-600">
                                         <Building2 className="w-4 h-4" />
@@ -297,7 +297,7 @@ export default function ReportDetailPage() {
                             </div>
                         </div>
 
-                        <div className="flex flex-col items-end gap-2">
+                        <div className="flex w-full flex-col items-stretch gap-2 sm:w-auto sm:items-end">
                             {ciiSnapshot ? (
                                 <div className="mb-2 flex items-center gap-3 rounded-2xl border border-indigo-100 bg-indigo-50/90 px-4 py-3 text-right">
                                     <TrendingUp className="h-4 w-4 shrink-0 text-indigo-700" aria-hidden />
@@ -342,9 +342,9 @@ export default function ReportDetailPage() {
                 </div>
 
                 {/* Report Content - Unified Scrollable Dossier */}
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+                <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-12 lg:gap-8">
                     {/* Sticky Table of Contents */}
-                    <div className="lg:col-span-3 sticky top-8 space-y-4">
+                    <div className="space-y-4 lg:sticky lg:top-8 lg:col-span-3">
                         <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm">
                             <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
                                 <List className="w-4 h-4 text-indigo-500" />
@@ -414,7 +414,7 @@ export default function ReportDetailPage() {
                     {/* All Sections rendered vertically */}
                     <div className="lg:col-span-9 space-y-8">
                         {/* Section 1 */}
-                        <div id="section1" className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm scroll-mt-8">
+                        <div id="section1" className="scroll-mt-8 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-8">
                             <div className="space-y-6">
                                 <div className="flex items-center gap-4 mb-2">
                                     <div className="w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-600">
@@ -460,7 +460,7 @@ export default function ReportDetailPage() {
                         </div>
 
                         {/* Section 2 */}
-                        <div id="section2" className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm scroll-mt-8">
+                        <div id="section2" className="scroll-mt-8 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-8">
                             <div className="space-y-8">
                                 <div className="flex items-center gap-4">
                                     <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center">
@@ -518,7 +518,7 @@ export default function ReportDetailPage() {
                         </div>
 
                         {/* Section 3 */}
-                        <div id="section3" className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm scroll-mt-8">
+                        <div id="section3" className="scroll-mt-8 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-8">
                             <div className="space-y-6">
                                 <div className="flex items-center gap-4">
                                     <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center">
@@ -556,7 +556,7 @@ export default function ReportDetailPage() {
                         </div>
 
                         {/* Section 4 */}
-                        <div id="section4" className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm scroll-mt-8">
+                        <div id="section4" className="scroll-mt-8 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-8">
                             <div className="space-y-8">
                                 <div className="flex items-center gap-4">
                                     <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
@@ -603,7 +603,7 @@ export default function ReportDetailPage() {
                         </div>
 
                         {/* Section 5 */}
-                        <div id="section5" className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm scroll-mt-8">
+                        <div id="section5" className="scroll-mt-8 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-8">
                             <div className="space-y-6">
                                 <div className="flex items-center gap-4">
                                     <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
@@ -619,7 +619,7 @@ export default function ReportDetailPage() {
                         </div>
 
                         {/* Section 6 */}
-                        <div id="section6" className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm scroll-mt-8">
+                        <div id="section6" className="scroll-mt-8 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-8">
                             <div className="space-y-6">
                                 <div className="flex items-center gap-4">
                                     <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center">
@@ -630,7 +630,7 @@ export default function ReportDetailPage() {
                                 <LabelValue label="Used External Resources" value={report.section6?.use_resources} />
                                 {report.section6?.resources && report.section6.resources.length > 0 && (
                                     <div className="mt-4 overflow-x-auto">
-                                        <table className="w-full text-sm border-collapse border border-slate-200">
+                                        <table className="min-w-[620px] w-full border-collapse border border-slate-200 text-sm">
                                             <thead>
                                                 <tr className="bg-slate-50 text-left">
                                                     <th className="border border-slate-200 p-2 text-[10px] font-black uppercase tracking-widest text-slate-400">Type</th>
@@ -656,7 +656,7 @@ export default function ReportDetailPage() {
                         </div>
 
                         {/* Section 7 */}
-                        <div id="section7" className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm scroll-mt-8">
+                        <div id="section7" className="scroll-mt-8 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-8">
                             <div className="space-y-6">
                                 <div className="flex items-center gap-4">
                                     <div className="w-12 h-12 rounded-2xl bg-cyan-50 text-cyan-600 flex items-center justify-center">
@@ -682,7 +682,7 @@ export default function ReportDetailPage() {
                         </div>
 
                         {/* Section 8 */}
-                        <div id="section8" className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm scroll-mt-8">
+                        <div id="section8" className="scroll-mt-8 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-8">
                             <div className="space-y-6">
                                 <div className="flex items-center gap-4">
                                     <div className="w-12 h-12 rounded-2xl bg-slate-100 text-slate-600 flex items-center justify-center">
@@ -720,7 +720,7 @@ export default function ReportDetailPage() {
                         </div>
 
                         {/* Section 9 */}
-                        <div id="section9" className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm scroll-mt-8">
+                        <div id="section9" className="scroll-mt-8 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-8">
                             <div className="space-y-8">
                                 <div className="flex items-center gap-4">
                                     <div className="w-12 h-12 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center">
@@ -748,7 +748,7 @@ export default function ReportDetailPage() {
                         </div>
 
                         {/* Section 10 */}
-                        <div id="section10" className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm scroll-mt-8">
+                        <div id="section10" className="scroll-mt-8 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-8">
                             <div className="space-y-6">
                                 <div className="flex items-center gap-4">
                                     <div className="w-12 h-12 rounded-2xl bg-teal-50 text-teal-600 flex items-center justify-center">
@@ -765,7 +765,7 @@ export default function ReportDetailPage() {
                         </div>
 
                         {/* Summary View */}
-                        <div id="section11" className="bg-white rounded-[3rem] p-12 border border-slate-200 shadow-xl scroll-mt-8 overflow-hidden relative">
+                        <div id="section11" className="relative scroll-mt-8 overflow-hidden rounded-[2rem] border border-slate-200 bg-white p-5 shadow-xl sm:rounded-[3rem] sm:p-12">
                             <div className="absolute top-0 right-0 p-8 opacity-5">
                                 <FileText className="w-64 h-64 text-slate-900" />
                             </div>
@@ -784,7 +784,7 @@ export default function ReportDetailPage() {
                 </div>
 
                 {canSubmitDecision && (
-                    <div id="actions" className="bg-white rounded-[3rem] p-12 border border-slate-200 shadow-xl mt-12 mb-20 relative overflow-hidden">
+                    <div id="actions" className="relative mt-12 mb-20 overflow-hidden rounded-[2rem] border border-slate-200 bg-white p-5 shadow-xl sm:rounded-[3rem] sm:p-12">
                         <div className="absolute top-0 right-0 p-8 opacity-5">
                             <CheckCircle2 className="w-32 h-32" />
                         </div>

@@ -187,17 +187,17 @@ export default function DashboardHeader() {
     };
 
     return (
-        <header className="h-20 bg-white border-b border-slate-200 flex items-center justify-between px-8 sticky top-0 z-30 ml-64 font-sans">
-            <div>
-                <h1 className="text-xl font-black tracking-tight text-slate-900">
+        <header className="sticky top-0 z-30 flex min-h-16 items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 py-3 font-sans sm:px-6 lg:ml-64 lg:h-20 lg:px-8">
+            <div className="min-w-0">
+                <h1 className="truncate text-base font-black tracking-tight text-slate-900 sm:text-xl">
                     {isStudentHome ? `Welcome back, ${firstName}!` : getTitle()}
                 </h1>
-                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                <p className="truncate text-[10px] font-bold uppercase tracking-wider text-slate-400">
                     {isStudentHome ? "Overview" : `Welcome back, ${firstName}`}
                 </p>
             </div>
 
-            <div className="flex items-center gap-6">
+            <div className="flex shrink-0 items-center gap-2 sm:gap-4 lg:gap-6">
                 <div className="relative hidden md:block">
                     <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                     <input
@@ -322,12 +322,12 @@ export default function DashboardHeader() {
                     </button>
                 )}
 
-                <div className="flex items-center gap-4 pl-6 border-l border-slate-100">
+                <div className="flex items-center gap-2 border-l border-slate-100 pl-2 sm:gap-4 sm:pl-4 lg:pl-6">
                     <div className="text-right hidden md:block">
                         <div className="text-sm font-black text-slate-900 leading-none mb-1">{user?.name || "Guest User"}</div>
                         <div className="text-[10px] text-slate-400 font-bold uppercase tracking-widest leading-none">{user?.role || "Visitor"}</div>
                     </div>
-                    <div className="w-11 h-11 rounded-xl bg-slate-100 flex items-center justify-center border-2 border-slate-50 overflow-hidden shadow-sm group hover:border-blue-200 transition-all cursor-pointer">
+                    <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl border-2 border-slate-50 bg-slate-100 shadow-sm transition-all hover:border-blue-200 sm:h-11 sm:w-11">
                         {getProfileImage() ? (
                             <img src={getProfileImage()} alt="Profile" className="w-full h-full object-cover" />
                         ) : (
@@ -336,7 +336,7 @@ export default function DashboardHeader() {
                     </div>
                     <button
                         onClick={handleLogout}
-                        className="p-2.5 text-slate-300 hover:text-[#4285F4] hover:bg-slate-50 rounded-xl transition-all group"
+                        className="hidden rounded-xl p-2.5 text-slate-300 transition-all hover:bg-slate-50 hover:text-[#4285F4] sm:block"
                         title="Sign Out"
                     >
                         <LogOut className="w-5 h-5 group-hover:translate-x-0.5 transition-transform" />

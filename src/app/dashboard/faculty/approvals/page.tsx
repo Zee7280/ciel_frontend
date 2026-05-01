@@ -267,7 +267,7 @@ export default function FacultyApprovalsPage() {
                 </Button>
             </div>
 
-            <div className="flex gap-4 items-center bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+            <div className="flex items-center gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
                 <div className="relative flex-1">
                     <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                     <input
@@ -301,9 +301,9 @@ export default function FacultyApprovalsPage() {
                     filtered.map((project) => (
                         <Card key={project.id} className="overflow-hidden">
                             <div className="flex flex-col md:flex-row">
-                                <div className="p-6 flex-1 space-y-4">
-                                    <div className="flex justify-between items-start">
-                                        <div>
+                                <div className="flex-1 space-y-4 p-5 sm:p-6">
+                                    <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
+                                        <div className="min-w-0">
                                             <div className="flex items-center gap-2 mb-1 flex-wrap">
                                                 <h3 className="font-bold text-lg text-slate-900">{project.projectTitle}</h3>
                                                 {tab === "pending" ? (
@@ -322,7 +322,7 @@ export default function FacultyApprovalsPage() {
                                                     <strong className="text-slate-700">{project.studentName}</strong> ({formatDisplayId(project.studentId, "STU")})
                                                 </span>
                                                 {project.studentEmail ? (
-                                                    <span className="text-slate-600">· {project.studentEmail}</span>
+                                                    <span className="break-all text-slate-600">· {project.studentEmail}</span>
                                                 ) : null}
                                                 <span className="hidden sm:inline w-1 h-1 bg-slate-300 rounded-full shrink-0" />
                                                 <span>Submitted {project.submittedDate}</span>
@@ -352,7 +352,7 @@ export default function FacultyApprovalsPage() {
                                     </div>
                                 </div>
 
-                                <div className="bg-slate-50 border-l border-slate-100 p-6 flex flex-row md:flex-col justify-center gap-3 w-full md:w-48">
+                                <div className="flex w-full flex-col justify-center gap-3 border-t border-slate-100 bg-slate-50 p-5 sm:flex-row md:w-48 md:flex-col md:border-l md:border-t-0 md:p-6">
                                     {tab === "pending" ? (
                                         <>
                                             <Button
@@ -399,7 +399,7 @@ export default function FacultyApprovalsPage() {
                     }
                 }}
             >
-                <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+                <DialogContent className="max-h-[90vh] w-[calc(100vw-2rem)] max-w-3xl overflow-y-auto">
                     <DialogHeader>
                         <DialogTitle>Student opportunity</DialogTitle>
                         <DialogDescription>
@@ -442,7 +442,7 @@ export default function FacultyApprovalsPage() {
             </Dialog>
 
             <Dialog open={rejectOpen} onOpenChange={(open) => !open && !rejectSubmitting && closeRejectDialog()}>
-                <DialogContent className="sm:max-w-md">
+                <DialogContent className="w-[calc(100vw-2rem)] max-w-md sm:max-w-md">
                     <DialogHeader>
                         <DialogTitle>Reject with feedback</DialogTitle>
                         <DialogDescription>

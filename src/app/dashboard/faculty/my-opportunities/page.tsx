@@ -113,7 +113,7 @@ export default function FacultyMyOpportunitiesPage() {
     }, []);
 
     return (
-        <div className="space-y-6 max-w-5xl mx-auto p-4 pb-20">
+        <div className="mx-auto max-w-5xl space-y-6 p-0 pb-20 sm:p-4">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
                     <h1 className="text-2xl font-bold text-slate-900">My Opportunities</h1>
@@ -122,8 +122,8 @@ export default function FacultyMyOpportunitiesPage() {
                         After approval, monitor applicants and use Student Grading for academic oversight.
                     </p>
                 </div>
-                <Link href="/dashboard/faculty/create-opportunity">
-                    <Button className="gap-2">
+                <Link href="/dashboard/faculty/create-opportunity" className="w-full sm:w-auto">
+                    <Button className="w-full gap-2 sm:w-auto">
                         <Plus className="w-4 h-4" />
                         Create opportunity
                     </Button>
@@ -156,7 +156,7 @@ export default function FacultyMyOpportunitiesPage() {
                         return (
                         <li
                             key={r.id}
-                            className="bg-white rounded-xl border border-slate-100 shadow-sm p-5 flex flex-col md:flex-row md:items-center md:justify-between gap-4"
+                            className="flex flex-col gap-4 rounded-xl border border-slate-100 bg-white p-5 shadow-sm md:flex-row md:items-center md:justify-between"
                         >
                             <div className="space-y-1 min-w-0">
                                 <div className="flex flex-wrap items-center gap-2">
@@ -200,8 +200,8 @@ export default function FacultyMyOpportunitiesPage() {
                                 ) : null}
                             </div>
                             <div className="flex shrink-0 gap-2">
-                                <Link href={`/dashboard/faculty/create-opportunity?edit=${encodeURIComponent(r.id)}`}>
-                                    <Button variant="outline" size="sm" className="gap-1.5">
+                                <Link href={`/dashboard/faculty/create-opportunity?edit=${encodeURIComponent(r.id)}`} className="w-full sm:w-auto">
+                                    <Button variant="outline" size="sm" className="w-full gap-1.5 sm:w-auto">
                                         <Pencil className="w-3.5 h-3.5" />
                                         Edit
                                     </Button>

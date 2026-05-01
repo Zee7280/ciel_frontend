@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState, useEffect, useLayoutEffect } from "react";
-import { LayoutDashboard, BookOpen, Users, Settings, PieChart, LogOut, FileText, Heart, Building2, CheckCircle, Briefcase, FileBarChart, ShieldAlert, Bell, User, Flag, MessageSquare, Plus, CreditCard, ClipboardList, CalendarClock, LifeBuoy } from "lucide-react";
+import { LayoutDashboard, Users, Settings, PieChart, LogOut, FileText, Building2, CheckCircle, Briefcase, FileBarChart, ShieldAlert, Bell, User, MessageSquare, Plus, CreditCard, ClipboardList, CalendarClock, LifeBuoy, type LucideProps } from "lucide-react";
 import clsx from "clsx";
 import { authenticatedFetch } from "@/utils/api";
 import { fetchStudentDashboardData } from "@/utils/student-dashboard-fetch";
@@ -83,8 +83,8 @@ export default function Sidebar() {
     }, [isStudent]);
 
     // Helper icons import
-    function FolderOpen(props: any) { return <FileText {...props} /> }
-    function Globe(props: any) { return <Building2 {...props} /> }
+    function FolderOpen(props: LucideProps) { return <FileText {...props} /> }
+    function Globe(props: LucideProps) { return <Building2 {...props} /> }
 
     const roleLinks = [
         // Student
@@ -157,7 +157,8 @@ export default function Sidebar() {
     const links = [dashboardLink, ...roleLinks, settingsLink];
 
     return (
-        <aside className="w-64 bg-slate-900 text-white min-h-screen fixed left-0 top-0 flex flex-col z-40">
+        <>
+        <aside className="fixed left-0 top-0 z-40 hidden min-h-screen w-64 flex-col bg-slate-900 text-white lg:flex">
             <div className="h-24 flex items-center px-4 border-b border-slate-800">
                 <Link href="/" className="flex items-center gap-3">
                     <div className="relative flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white/5 p-1">
@@ -217,5 +218,42 @@ export default function Sidebar() {
                 </button>
             </div>
         </aside>
+
+        <nav
+            className="fixed inset-x-0 bottom-0 z-50 border-t border-slate-200 bg-white/95 px-3 py-2 shadow-[0_-12px_30px_-20px_rgba(15,23,42,0.45)] backdrop-blur lg:hidden"
+            aria-label="Dashboard navigation"
+        >
+            <div className="flex gap-2 overflow-x-auto pb-1">
+                {links.map((link) => {
+                    const isActive =
+                        pathname === link.href ||
+                        (link.href === "/dashboard/student/payments" && pathname === "/dashboard/student/payment");
+                    return (
+                        <Link
+                            key={link.href}
+                            href={link.href}
+                            className={clsx(
+                                "relative flex min-w-[4.75rem] flex-col items-center justify-center gap-1 rounded-2xl px-3 py-2 text-[10px] font-bold transition-colors",
+                                isActive ? "bg-blue-600 text-white shadow-sm" : "text-slate-500 hover:bg-slate-100 hover:text-slate-900",
+                            )}
+                        >
+                            <link.icon className="h-5 w-5" />
+                            <span className="line-clamp-1 max-w-[4.5rem] text-center leading-tight">{link.label}</span>
+                            {link.label === "Messages" && unreadCount > 0 && (
+                                <span className="absolute right-2 top-1 rounded-full bg-slate-900 px-1.5 py-0.5 text-[9px] font-bold leading-none text-white">
+                                    {unreadCount > 99 ? "99+" : unreadCount}
+                                </span>
+                            )}
+                            {link.label === "Impact History" && impactHistoryBadge > 0 && (
+                                <span className="absolute right-2 top-1 rounded-full bg-amber-500 px-1.5 py-0.5 text-[9px] font-bold leading-none text-white">
+                                    {impactHistoryBadge > 99 ? "99+" : impactHistoryBadge}
+                                </span>
+                            )}
+                        </Link>
+                    );
+                })}
+            </div>
+        </nav>
+        </>
     );
 }

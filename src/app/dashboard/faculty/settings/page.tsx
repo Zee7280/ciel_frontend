@@ -92,14 +92,14 @@ export default function FacultySettingsPage() {
     }
 
     return (
-        <div className="mx-auto max-w-4xl p-8">
+        <div className="mx-auto max-w-4xl p-0 lg:p-8">
             <div className="mb-8">
-                <h1 className="text-3xl font-bold text-slate-900">Settings</h1>
+                <h1 className="text-2xl font-bold text-slate-900 sm:text-3xl">Settings</h1>
                 <p className="text-slate-500">Manage your faculty account preferences and settings</p>
             </div>
 
             <div className="space-y-6">
-                <div className="rounded-2xl border border-slate-100 bg-white p-6">
+                <div className="rounded-2xl border border-slate-100 bg-white p-5 sm:p-6">
                     <div className="mb-6 flex items-center gap-3">
                         <Bell className="h-6 w-6 text-blue-600" />
                         <div>
@@ -109,7 +109,7 @@ export default function FacultySettingsPage() {
                     </div>
 
                     <div className="space-y-4">
-                        <div className="flex items-center justify-between rounded-lg bg-slate-50 p-4">
+                        <div className="flex items-start justify-between gap-4 rounded-lg bg-slate-50 p-4">
                             <div>
                                 <h3 className="font-semibold text-slate-900">Email Notifications</h3>
                                 <p className="text-sm text-slate-500">Receive updates via email</p>
@@ -128,7 +128,7 @@ export default function FacultySettingsPage() {
                             </label>
                         </div>
 
-                        <div className="flex items-center justify-between rounded-lg bg-slate-50 p-4">
+                        <div className="flex items-start justify-between gap-4 rounded-lg bg-slate-50 p-4">
                             <div>
                                 <h3 className="font-semibold text-slate-900">Push Notifications</h3>
                                 <p className="text-sm text-slate-500">Receive browser notifications</p>
@@ -147,7 +147,7 @@ export default function FacultySettingsPage() {
                             </label>
                         </div>
 
-                        <div className="flex items-center justify-between rounded-lg bg-slate-50 p-4">
+                        <div className="flex items-start justify-between gap-4 rounded-lg bg-slate-50 p-4">
                             <div>
                                 <h3 className="font-semibold text-slate-900">SMS Notifications</h3>
                                 <p className="text-sm text-slate-500">Receive text messages</p>
@@ -168,7 +168,7 @@ export default function FacultySettingsPage() {
                     </div>
                 </div>
 
-                <div className="rounded-2xl border border-slate-100 bg-white p-6">
+                <div className="rounded-2xl border border-slate-100 bg-white p-5 sm:p-6">
                     <div className="mb-6 flex items-center gap-3">
                         <Shield className="h-6 w-6 text-green-600" />
                         <div>
@@ -196,7 +196,7 @@ export default function FacultySettingsPage() {
                             </select>
                         </div>
 
-                        <div className="flex items-center justify-between rounded-lg bg-slate-50 p-4">
+                        <div className="flex items-start justify-between gap-4 rounded-lg bg-slate-50 p-4">
                             <div>
                                 <h3 className="font-semibold text-slate-900">Show Email Address</h3>
                                 <p className="text-sm text-slate-500">Display email on public profile</p>
@@ -222,7 +222,7 @@ export default function FacultySettingsPage() {
                         type="button"
                         onClick={handleSave}
                         disabled={isSaving}
-                        className="flex items-center gap-2 rounded-lg bg-blue-600 px-8 py-3 font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-70"
+                        className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-8 py-3 font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-70 sm:w-auto"
                     >
                         {isSaving ? <Loader2 className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />}
                         Save All Settings

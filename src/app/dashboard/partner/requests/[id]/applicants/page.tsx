@@ -201,32 +201,32 @@ export default function ManageApplicantsPage() {
     const selectedTeamRows = teamRowsForDialog(selectedTeam, applicants);
 
     if (isLoading) {
-        return <div className="p-8 flex justify-center items-center"><Loader2 className="w-8 h-8 animate-spin text-blue-600" /></div>;
+        return <div className="flex items-center justify-center p-0 lg:p-8"><Loader2 className="w-8 h-8 animate-spin text-blue-600" /></div>;
     }
 
     return (
-        <div className="p-8 max-w-7xl mx-auto">
+        <div className="mx-auto max-w-7xl p-0 lg:p-8">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
                 <div>
                     <Link href="/dashboard/partner/requests" className="inline-flex items-center gap-2 text-slate-500 hover:text-slate-800 mb-2 transition-colors">
                         <ArrowLeft className="w-4 h-4" /> Back to Opportunities
                     </Link>
-                    <h1 className="text-3xl font-bold text-slate-900">Manage Applicants</h1>
+                    <h1 className="text-2xl font-bold text-slate-900 sm:text-3xl">Manage Applicants</h1>
                     <p className="text-slate-500">Opportunity ID: <span className="font-mono text-xs bg-slate-100 px-2 py-1 rounded" title={String(id)}>{formatDisplayId(id, "OPP")}</span></p>
                 </div>
-                <div className="flex gap-2">
+                <div className="grid w-full grid-cols-1 gap-2 sm:grid-cols-[minmax(0,16rem)_auto] md:w-auto">
                     <div className="relative">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                         <input
                             type="text"
                             placeholder="Search students..."
-                            className="pl-10 pr-4 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-500 w-64"
+                            className="w-full rounded-lg border border-slate-200 py-2 pl-10 pr-4 text-sm focus:border-blue-500 focus:outline-none"
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                         />
                     </div>
                     <select
-                        className="px-4 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-500 bg-white"
+                        className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm focus:border-blue-500 focus:outline-none"
                         value={filterStatus}
                         onChange={(e) => setFilterStatus(e.target.value)}
                     >
@@ -239,8 +239,9 @@ export default function ManageApplicantsPage() {
                 </div>
             </div>
 
-            <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
-                <table className="w-full text-left text-sm">
+            <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+                <div className="overflow-x-auto">
+                <table className="min-w-[860px] w-full text-left text-sm">
                     <thead className="bg-slate-50 border-b border-slate-200">
                         <tr>
                             <th className="px-6 py-4 font-bold text-slate-700">Student / Team</th>
@@ -353,11 +354,12 @@ export default function ManageApplicantsPage() {
                         )}
                     </tbody>
                 </table>
+                </div>
             </div>
 
             {/* Team Details Dialog */}
             <Dialog open={isTeamDialogOpen} onOpenChange={setIsTeamDialogOpen}>
-                <DialogContent className="max-w-2xl">
+                <DialogContent className="w-[calc(100vw-2rem)] max-w-2xl">
                     <DialogHeader>
                         <DialogTitle className="flex items-center gap-2">
                             <Users className="w-5 h-5 text-indigo-600" />
@@ -370,8 +372,9 @@ export default function ManageApplicantsPage() {
                     </DialogHeader>
 
                     <div className="py-4">
-                        <div className="bg-slate-50 rounded-xl overflow-hidden border border-slate-100">
-                            <table className="w-full text-left text-sm">
+                        <div className="overflow-hidden rounded-xl border border-slate-100 bg-slate-50">
+                            <div className="overflow-x-auto">
+                            <table className="min-w-[520px] w-full text-left text-sm">
                                 <thead className="bg-slate-100 border-b border-slate-200">
                                     <tr>
                                         <th className="px-4 py-3 font-bold text-slate-700">Name</th>
@@ -401,6 +404,7 @@ export default function ManageApplicantsPage() {
                                     )}
                                 </tbody>
                             </table>
+                            </div>
                         </div>
                     </div>
 

@@ -69,7 +69,7 @@ export default function EngagementDashboard() {
     }
 
     return (
-        <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+        <div className="mx-auto max-w-6xl space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700 sm:space-y-8">
             <header className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
                 <div>
                     <div className="flex items-center gap-2 mb-2">
@@ -83,7 +83,7 @@ export default function EngagementDashboard() {
             {metrics && <EngagementOverview metrics={metrics} />}
 
             {/* Auto-Summary Section */}
-            <section className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden p-8 space-y-6">
+            <section className="space-y-6 overflow-hidden rounded-3xl border border-slate-100 bg-white p-5 shadow-sm sm:p-8">
                 <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center text-slate-600">
                         <FileText className="w-5 h-5" />
@@ -94,7 +94,7 @@ export default function EngagementDashboard() {
                     </div>
                 </div>
 
-                <div className="bg-slate-50/50 p-6 rounded-2xl border border-slate-100 italic text-slate-700 leading-relaxed font-medium">
+                <div className="rounded-2xl border border-slate-100 bg-slate-50/50 p-4 text-sm italic leading-relaxed text-slate-700 font-medium sm:p-6 sm:text-base">
                     "{summary || "No active engagement logs found to generate a narrative. Start logging your attendance to see your impact narrative here."}"
                 </div>
 
@@ -129,19 +129,19 @@ function OnboardingView() {
     }, []);
 
     return (
-        <div className="max-w-4xl mx-auto py-12 px-4 space-y-12">
+        <div className="mx-auto max-w-4xl space-y-8 px-0 py-6 sm:px-4 sm:py-12 sm:space-y-12">
             <div className="text-center space-y-4">
                 <div className="w-20 h-20 bg-blue-50 text-blue-600 rounded-3xl flex items-center justify-center mx-auto shadow-xl shadow-blue-100/50 mb-6">
                     <Shield className="w-10 h-10" />
                 </div>
-                <h1 className="text-4xl font-black text-slate-900 tracking-tight">Verified Participation</h1>
-                <p className="text-slate-500 text-lg font-medium max-w-xl mx-auto">
+                <h1 className="text-3xl font-black tracking-tight text-slate-900 sm:text-4xl">Verified Participation</h1>
+                <p className="mx-auto max-w-xl text-base font-medium text-slate-500 sm:text-lg">
                     To generate a verified Section 1 for your report, you must first authenticate your identity and log your project hours.
                 </p>
             </div>
 
             <div className="bg-white rounded-[2rem] border border-slate-100 shadow-sm overflow-hidden">
-                <div className="p-8 border-b border-slate-50 bg-slate-50/30">
+                <div className="border-b border-slate-50 bg-slate-50/30 p-5 sm:p-8">
                     <h2 className="text-xl font-bold text-slate-900 tracking-tight">Step 1: Select Active Project</h2>
                     <p className="text-sm text-slate-500 font-medium">Which project are you currently working on?</p>
                 </div>
@@ -154,18 +154,18 @@ function OnboardingView() {
                     ) : projects.length > 0 ? (
                         <div className="space-y-3">
                             {projects.map((p) => (
-                                <div key={p.id} className="group p-6 rounded-2xl border border-slate-100 hover:border-blue-200 hover:bg-blue-50/50 transition-all flex items-center justify-between">
-                                    <div className="flex items-center gap-4">
+                                <div key={p.id} className="group flex flex-col items-stretch justify-between gap-4 rounded-2xl border border-slate-100 p-4 transition-all hover:border-blue-200 hover:bg-blue-50/50 sm:flex-row sm:items-center sm:p-6">
+                                    <div className="flex min-w-0 items-center gap-4">
                                         <div className="w-12 h-12 bg-white rounded-xl border border-slate-100 flex items-center justify-center text-slate-400 group-hover:text-blue-600 group-hover:border-blue-100 transition-colors font-black">
                                             {p.title.charAt(0)}
                                         </div>
-                                        <div>
-                                            <h3 className="font-bold text-slate-900 group-hover:text-blue-700 transition-colors">{p.title}</h3>
+                                        <div className="min-w-0">
+                                            <h3 className="truncate font-bold text-slate-900 transition-colors group-hover:text-blue-700">{p.title}</h3>
                                             <p className="text-xs text-slate-400 font-bold uppercase tracking-wider">{p.category}</p>
                                         </div>
                                     </div>
-                                    <Link href={`/dashboard/student/engagement/verify?projectId=${p.id}`}>
-                                        <button className="flex items-center gap-2 px-6 py-2.5 bg-slate-900 text-white rounded-xl font-bold text-sm hover:scale-105 transition-all active:scale-95 shadow-lg shadow-slate-200">
+                                    <Link href={`/dashboard/student/engagement/verify?projectId=${p.id}`} className="w-full sm:w-auto">
+                                        <button className="flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900 px-6 py-2.5 text-sm font-bold text-white shadow-lg shadow-slate-200 transition-all hover:scale-105 active:scale-95 sm:w-auto">
                                             Verify Identity <ChevronRight className="w-4 h-4" />
                                         </button>
                                     </Link>

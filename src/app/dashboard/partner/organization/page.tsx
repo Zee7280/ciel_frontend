@@ -339,14 +339,14 @@ export default function OrganizationProfilePage() {
 
     return (
         <div className="w-full space-y-6">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
+            <div className="mb-8 flex flex-col items-stretch justify-between gap-4 sm:flex-row sm:items-center">
                 <div>
                     <h1 className="text-2xl font-bold text-slate-900">My Organization</h1>
                     <p className="text-slate-500 text-sm mt-1">Manage your organization profile and public trading settings.</p>
                 </div>
                 <button
                     onClick={() => setIsEditing(!isEditing)}
-                    className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl font-bold text-sm text-slate-700 hover:bg-slate-50 hover:text-blue-600 transition-colors shadow-sm"
+                    className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 shadow-sm transition-colors hover:bg-slate-50 hover:text-blue-600"
                 >
                     <Edit className="w-4 h-4" /> {isEditing ? "Cancel Editing" : "Edit Profile"}
                 </button>
@@ -432,7 +432,7 @@ export default function OrganizationProfilePage() {
                 {/* Right Column: Forms */}
                 <div className="xl:col-span-8 space-y-6">
                     {/* 1. Basic Information */}
-                    <div className="bg-white p-8 rounded-2xl border border-slate-100 shadow-sm">
+                    <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm sm:p-8">
                         <h3 className="font-bold text-slate-900 mb-6 text-lg border-b border-slate-100 pb-4">Basic Information</h3>
                         <div className="space-y-6">
                             <div>
@@ -498,7 +498,7 @@ export default function OrganizationProfilePage() {
                     </div>
 
                     {/* 2. Contact Information */}
-                    <div className="bg-white p-8 rounded-2xl border border-slate-100 shadow-sm">
+                    <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm sm:p-8">
                         <h3 className="font-bold text-slate-900 mb-6 text-lg border-b border-slate-100 pb-4">Contact Information</h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div className="md:col-span-2">
@@ -579,7 +579,7 @@ export default function OrganizationProfilePage() {
                     </div>
 
                     {/* 3. Compliance Acknowledgements */}
-                    <div className="bg-white p-8 rounded-2xl border border-slate-100 shadow-sm">
+                    <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm sm:p-8">
                         <h3 className="font-bold text-slate-900 mb-6 text-lg border-b border-slate-100 pb-4">Compliance & Policies</h3>
                         <div className="space-y-4">
                             <div className="flex items-start gap-3 p-4 bg-slate-50 rounded-xl">
@@ -615,17 +615,17 @@ export default function OrganizationProfilePage() {
                     </div>
 
                     {isEditing && (
-                        <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-slate-200 z-50 flex justify-end gap-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] md:static md:shadow-none md:border-t-0 md:bg-transparent md:p-0">
+                        <div className="fixed bottom-24 left-0 right-0 z-50 flex justify-end gap-3 border-t border-slate-200 bg-white p-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] md:static md:border-t-0 md:bg-transparent md:p-0 md:shadow-none">
                             <button
                                 onClick={() => setIsEditing(false)}
-                                className="px-6 py-2 rounded-lg text-slate-600 hover:bg-slate-50 font-bold"
+                                className="rounded-lg px-6 py-2 font-bold text-slate-600 hover:bg-slate-50"
                             >
                                 Cancel
                             </button>
                             <button
                                 onClick={handleSave}
                                 disabled={isSaving}
-                                className="px-6 py-2 rounded-lg bg-blue-600 text-white font-bold hover:bg-blue-700 disabled:opacity-70 flex items-center gap-2"
+                                className="flex items-center gap-2 rounded-lg bg-blue-600 px-6 py-2 font-bold text-white hover:bg-blue-700 disabled:opacity-70"
                             >
                                 {isSaving && <Loader2 className="w-4 h-4 animate-spin" />}
                                 {isSaving ? "Saving..." : "Save Changes"}

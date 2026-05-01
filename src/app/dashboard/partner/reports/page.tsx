@@ -272,18 +272,18 @@ export default function PartnerReportsPage() {
     };
 
     return (
-        <div className="p-8">
+        <div className="p-0 lg:p-8">
             {/* Header */}
-            <div className="flex justify-between items-center mb-8">
-                <div>
-                    <h1 className="text-3xl font-bold text-slate-900">Impact Reports</h1>
+            <div className="mb-8 flex flex-col items-stretch justify-between gap-4 sm:flex-row sm:items-center">
+                <div className="min-w-0">
+                    <h1 className="text-2xl font-bold text-slate-900 sm:text-3xl">Impact Reports</h1>
                     <p className="text-slate-500">Review, manage, and track submitted impact reports</p>
                 </div>
             </div>
 
             {/* Filters */}
-            <div className="flex gap-4 mb-6">
-                <div className="relative flex-1 max-w-md">
+            <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,28rem)_auto]">
+                <div className="relative min-w-0">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
                     <input
                         type="text"
@@ -296,7 +296,7 @@ export default function PartnerReportsPage() {
                 <div className="relative">
                     <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
                     <select
-                        className="pl-10 pr-8 py-3 border border-slate-200 rounded-lg outline-none focus:border-blue-500 bg-white appearance-none cursor-pointer font-medium"
+                        className="w-full appearance-none rounded-lg border border-slate-200 bg-white py-3 pl-10 pr-8 font-medium outline-none focus:border-blue-500"
                         value={statusFilter}
                         onChange={(e) => setStatusFilter(e.target.value)}
                     >
@@ -325,10 +325,10 @@ export default function PartnerReportsPage() {
                     filteredReports.map((report) => (
                         <div
                             key={report.id}
-                            className="bg-white rounded-2xl border border-slate-100 p-6 hover:shadow-lg transition-all duration-300 hover:-translate-y-1"
+                            className="rounded-2xl border border-slate-100 bg-white p-5 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg sm:p-6"
                         >
                             {/* Status Badge */}
-                            <div className="flex justify-between items-start mb-4">
+                            <div className="mb-4 flex items-start justify-between gap-3">
                                 <div className="flex flex-col gap-1.5 min-w-0">
                                     <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold uppercase w-fit max-w-full ${getStatusColor(report.status)}`}>
                                         {getStatusIcon(report.status)}
@@ -398,7 +398,7 @@ export default function PartnerReportsPage() {
                             {/* Report Info */}
                             <h3 className="text-lg font-bold text-slate-900 mb-2">{cardTitle(report)}</h3>
                             {isStudentImpactReportRow(report) && (report.student_name || report.project_title || report.organization_name || report.organization || report.student_email) && (
-                                <p className="text-xs text-slate-500 mb-1 leading-relaxed">
+                                <p className="mb-1 break-words text-xs leading-relaxed text-slate-500">
                                     {[report.student_name, report.project_title, report.organization_name ?? report.organization, report.student_email].filter(Boolean).join(" · ")}
                                 </p>
                             )}

@@ -487,10 +487,10 @@ export default function AdminApprovalsPage() {
     }, [selectedOpportunity, opportunityDetail]);
 
     return (
-        <div className="p-8">
+        <div className="p-0 lg:p-8">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold text-slate-900 mb-2">Pending Approvals</h1>
+                    <h1 className="mb-2 text-2xl font-bold text-slate-900 sm:text-3xl">Pending Approvals</h1>
                     <p className="text-slate-500">Review and approve registration requests and project proposals.</p>
                 </div>
 
@@ -512,7 +512,7 @@ export default function AdminApprovalsPage() {
             </div>
 
             {/* Tabs */}
-            <div className="flex gap-6 border-b border-slate-200 mb-8">
+            <div className="mb-8 flex gap-6 overflow-x-auto border-b border-slate-200">
                 <button
                     onClick={() => setActiveTab("registrations")}
                     className={`pb-4 px-2 text-sm font-bold transition-colors relative ${activeTab === "registrations" ? "text-blue-600" : "text-slate-500 hover:text-slate-700"}`}
@@ -549,8 +549,8 @@ export default function AdminApprovalsPage() {
             <div className="grid grid-cols-1 gap-4">
                 {activeTab === "registrations" ? (
                     paginatedItems.map((req) => (
-                        <div key={req.id} className="bg-white p-6 rounded-xl border border-slate-100 shadow-sm flex items-center justify-between">
-                            <div>
+                        <div key={req.id} className="flex flex-col items-stretch justify-between gap-4 rounded-xl border border-slate-100 bg-white p-5 shadow-sm sm:p-6 lg:flex-row lg:items-center">
+                            <div className="min-w-0">
                                 <h3 className="text-lg font-bold text-slate-900">{req.name}</h3>
                                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-slate-500 mt-1">
                                     <span className="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded font-bold text-[10px] uppercase tracking-wider">{req.organization_type || "User"}</span>
@@ -572,16 +572,16 @@ export default function AdminApprovalsPage() {
                                     </span>
                                 </div>
                             </div>
-                            <div className="flex items-center gap-3">
+                            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
                                 <button
                                     onClick={() => handleRejectClick(req.id, 'user')}
-                                    className="px-4 py-2 bg-slate-100 text-slate-600 rounded-lg text-sm font-bold hover:bg-red-50 hover:text-red-600 flex items-center gap-2 transition-colors">
+                                    className="flex items-center justify-center gap-2 rounded-lg bg-slate-100 px-4 py-2 text-sm font-bold text-slate-600 transition-colors hover:bg-red-50 hover:text-red-600">
                                     <XCircle className="w-4 h-4" /> Reject
                                 </button>
                                 <button
                                     onClick={() => handleApprove(req.id, 'user')}
                                     disabled={approveSubmittingKey === `user:${req.id}`}
-                                    className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold hover:bg-blue-700 flex items-center gap-2 transition-colors shadow-lg shadow-blue-200 disabled:opacity-60 disabled:cursor-not-allowed">
+                                    className="flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white shadow-lg shadow-blue-200 transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60">
                                     {approveSubmittingKey === `user:${req.id}` ? (
                                         <>
                                             <Loader2 className="w-4 h-4 animate-spin" /> Approving...
@@ -601,8 +601,8 @@ export default function AdminApprovalsPage() {
                         const flowLabel = readFlowStatus(projRow);
                         const canAdminApprove = readAdminCanApprove(projRow);
                         return (
-                        <div key={proj.id} className="bg-white p-6 rounded-xl border border-slate-100 shadow-sm flex items-center justify-between">
-                            <div>
+                        <div key={proj.id} className="flex flex-col items-stretch justify-between gap-4 rounded-xl border border-slate-100 bg-white p-5 shadow-sm sm:p-6 lg:flex-row lg:items-center">
+                            <div className="min-w-0">
                                 <h3 className="text-lg font-bold text-slate-900">{proj.title}</h3>
                                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-slate-500 mt-1">
                                     <span className="font-bold text-blue-600">{proj.partner_name || "Unknown Partner"}</span>
@@ -623,7 +623,7 @@ export default function AdminApprovalsPage() {
                                     </span>
                                 </div>
                             </div>
-                            <div className="flex items-center gap-2 sm:gap-3 flex-wrap justify-end">
+                            <div className="flex flex-wrap items-center justify-start gap-2 sm:gap-3 lg:justify-end">
                                 <button
                                     type="button"
                                     title="View full opportunity details"

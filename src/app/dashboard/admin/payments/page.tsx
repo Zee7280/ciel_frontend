@@ -334,14 +334,14 @@ export default function AdminPaymentsPage() {
     }[activeTab];
 
     return (
-        <div className="p-8 space-y-8">
-            <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-3xl font-black text-slate-900 tracking-tight">Payment Verification</h1>
+        <div className="space-y-6 p-0 sm:space-y-8 lg:p-8">
+            <div className="flex flex-col items-stretch justify-between gap-4 sm:flex-row sm:items-center">
+                <div className="min-w-0">
+                    <h1 className="text-2xl font-black tracking-tight text-slate-900 sm:text-3xl">Payment Verification</h1>
                     <p className="text-slate-500 font-medium">Review and approve manual bank transfer receipts from students.</p>
                 </div>
                 <div className="flex items-center gap-3">
-                    <div className="bg-white border border-slate-200 rounded-xl px-4 py-2 flex items-center gap-2 shadow-sm">
+                    <div className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 shadow-sm">
                         <CreditCard className="w-5 h-5 text-blue-600" />
                         <span className="font-bold text-slate-700">{pendingCount} Pending</span>
                     </div>
@@ -415,7 +415,7 @@ export default function AdminPaymentsPage() {
                         </div>
                     ) : (
                         <div className="overflow-x-auto">
-                            <table className="w-full text-left border-collapse">
+                            <table className="min-w-[980px] w-full border-collapse text-left">
                                 <thead>
                                     <tr className="bg-slate-50 border-b border-slate-100">
                                         <th className="px-6 py-4 text-xs font-black text-slate-400 uppercase tracking-widest">Student</th>
@@ -545,8 +545,8 @@ export default function AdminPaymentsPage() {
 
             {/* Proof Preview Dialog */}
             <Dialog open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
-                <DialogContent className="max-w-3xl h-[80vh] flex flex-col p-0 overflow-hidden">
-                    <DialogHeader className="p-6 border-b border-slate-100">
+                <DialogContent className="flex h-[85vh] w-[calc(100vw-2rem)] max-w-3xl flex-col overflow-hidden p-0">
+                    <DialogHeader className="border-b border-slate-100 p-4 sm:p-6">
                         <DialogTitle className="flex items-center gap-3 text-xl font-black tracking-tight">
                             <FileText className="w-6 h-6 text-blue-600" />
                             Payment Receipt Preview
@@ -555,7 +555,7 @@ export default function AdminPaymentsPage() {
                             Review the transfer slip uploaded by <span className="text-slate-900 font-bold">{selectedPayment?.studentName}</span>.
                         </DialogDescription>
                     </DialogHeader>
-                    <div className="flex-1 overflow-auto bg-slate-900 p-8 flex items-center justify-center">
+                    <div className="flex flex-1 items-center justify-center overflow-auto bg-slate-900 p-4 sm:p-8">
                         {selectedPayment?.proofUrl ? (
                             <img 
                                 src={selectedPayment.proofUrl} 
@@ -569,8 +569,8 @@ export default function AdminPaymentsPage() {
                             </div>
                         )}
                     </div>
-                    <DialogFooter className="p-6 border-t border-slate-100 flex items-center justify-between">
-                        <div className="flex items-center gap-4">
+                    <DialogFooter className="flex flex-col gap-3 border-t border-slate-100 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-6">
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
                             <Button variant="outline" className="gap-2" onClick={() => window.open(selectedPayment?.proofUrl, '_blank')}>
                                 <ExternalLink className="w-4 h-4" /> Open Full
                             </Button>
@@ -578,11 +578,11 @@ export default function AdminPaymentsPage() {
                                 <Download className="w-4 h-4" /> Download
                             </Button>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                             <Button variant="ghost" onClick={() => setIsPreviewOpen(false)}>Close</Button>
                             {selectedPayment?.status === 'pending' ? (
                                 <Button 
-                                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-8"
+                                    className="bg-emerald-600 px-8 font-bold text-white hover:bg-emerald-700"
                                     onClick={() => {
                                         setIsPreviewOpen(false);
                                         setActionType('approve');
@@ -599,7 +599,7 @@ export default function AdminPaymentsPage() {
 
             {/* Action Dialog (Approve/Reject) */}
             <Dialog open={isActionOpen} onOpenChange={setIsActionOpen}>
-                <DialogContent className="max-w-md">
+                <DialogContent className="w-[calc(100vw-2rem)] max-w-md">
                     <DialogHeader>
                         <DialogTitle className="text-xl font-black tracking-tight">
                             {actionType === 'approve' ? 'Approve Payment' : 'Reject Payment'}
@@ -655,7 +655,7 @@ export default function AdminPaymentsPage() {
             </Dialog>
 
             <Dialog open={isRevertOpen} onOpenChange={(open) => { setIsRevertOpen(open); if (!open) setRevertReason(""); }}>
-                <DialogContent className="max-w-md">
+                <DialogContent className="w-[calc(100vw-2rem)] max-w-md">
                     <DialogHeader>
                         <DialogTitle className="text-xl font-black tracking-tight">Revert approval?</DialogTitle>
                         <DialogDescription className="font-medium">

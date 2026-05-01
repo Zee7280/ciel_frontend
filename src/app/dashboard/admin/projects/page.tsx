@@ -897,17 +897,17 @@ export default function AdminProjectsPage() {
     ];
 
     return (
-        <div className="p-8 max-w-7xl mx-auto">
+        <div className="mx-auto max-w-7xl p-0 lg:p-8">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
                 <div>
-                    <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">Projects Overview</h1>
+                    <h1 className="text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl">Projects Overview</h1>
                     <p className="text-slate-500 mt-1 text-base">Monitor all active and past social impact projects.</p>
                 </div>
                 <button
                     type="button"
                     onClick={handleExport}
                     disabled={!filteredRows.length}
-                    className="bg-slate-900 text-white px-5 py-2.5 rounded-xl font-bold text-sm hover:bg-slate-800 transition-all shadow-lg shadow-slate-200 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900 px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-slate-200 transition-all hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
                 >
                     <FileDown className="w-4 h-4" /> Export report
                 </button>
@@ -924,8 +924,8 @@ export default function AdminProjectsPage() {
                         className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-50 border border-transparent focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-50/50 transition-all outline-none font-medium text-slate-700 text-sm"
                     />
                 </div>
-                <div className="flex flex-wrap gap-3 shrink-0">
-                    <div className="relative min-w-[160px]">
+                <div className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2 lg:w-auto lg:shrink-0">
+                    <div className="relative min-w-0 sm:min-w-[160px]">
                         <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
                         <select
                             value={statusFilter}
@@ -940,7 +940,7 @@ export default function AdminProjectsPage() {
                             ))}
                         </select>
                     </div>
-                    <div className="relative min-w-[160px]">
+                    <div className="relative min-w-0 sm:min-w-[160px]">
                         <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
                         <select
                             value={locationFilter}
@@ -958,7 +958,7 @@ export default function AdminProjectsPage() {
                 </div>
             </div>
 
-            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-visible min-h-[320px]">
+            <div className="min-h-[320px] overflow-x-auto overflow-y-visible rounded-2xl border border-slate-100 bg-white shadow-sm">
                 {filteredRows.length === 0 && !isLoading ? (
                     <div className="text-center py-24 px-4">
                         <Briefcase className="w-12 h-12 text-slate-300 mx-auto mb-4" />
@@ -1074,7 +1074,7 @@ export default function AdminProjectsPage() {
                         role="dialog"
                         aria-modal="true"
                         aria-labelledby="incomplete-applicants-title"
-                        className="fixed left-1/2 top-1/2 z-[70] w-[min(100%-1.5rem,28rem)] max-h-[min(85vh,32rem)] -translate-x-1/2 -translate-y-1/2 rounded-2xl bg-white shadow-2xl border border-slate-200 flex flex-col overflow-hidden"
+                        className="fixed left-1/2 top-1/2 z-[70] flex max-h-[min(85vh,32rem)] w-[calc(100vw-1.5rem)] max-w-[28rem] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl"
                     >
                         <div className="flex items-start justify-between gap-3 px-5 py-4 border-b border-slate-100 shrink-0">
                             <div className="min-w-0">
@@ -1202,7 +1202,7 @@ export default function AdminProjectsPage() {
                         role="dialog"
                         aria-modal="true"
                         aria-labelledby="team-overview-title"
-                        className="fixed left-1/2 top-1/2 z-[90] w-[min(100%-1.5rem,72rem)] max-h-[min(90vh,46rem)] -translate-x-1/2 -translate-y-1/2 rounded-2xl bg-white shadow-2xl border border-slate-200 flex flex-col overflow-hidden"
+                        className="fixed left-1/2 top-1/2 z-[90] flex max-h-[min(90vh,46rem)] w-[calc(100vw-1.5rem)] max-w-[72rem] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl"
                     >
                         <div className="flex items-start justify-between gap-3 px-5 py-4 border-b border-slate-100 shrink-0">
                             <div className="min-w-0">
@@ -1336,7 +1336,7 @@ export default function AdminProjectsPage() {
                                                 </div>
                                             </div>
                                             <div className="overflow-x-auto">
-                                                <table className="w-full text-left text-sm">
+                                                <table className="min-w-[760px] w-full text-left text-sm">
                                                     <thead className="bg-white border-b border-slate-100">
                                                         <tr>
                                                             <th className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wide text-slate-500">Member</th>

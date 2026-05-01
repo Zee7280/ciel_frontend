@@ -516,8 +516,8 @@ export default function VerifyWorkPage() {
                         <Card key={row.id} className="overflow-hidden">
                             <div className="flex flex-col md:flex-row">
                                 <div className="p-6 flex-1 space-y-4">
-                                    <div className="flex justify-between items-start gap-4">
-                                        <div>
+                            <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
+                                        <div className="min-w-0">
                                             <div className="flex items-center gap-2 mb-2 flex-wrap">
                                                 <h3 className="font-bold text-lg text-slate-900">{row.projectTitle}</h3>
                                                 <Badge
@@ -531,12 +531,12 @@ export default function VerifyWorkPage() {
                                                     {tab === "pending" ? "Pending partner review" : row.workflowLabel}
                                                 </Badge>
                                             </div>
-                                            <p className="text-slate-500 text-sm flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4">
+                                    <p className="flex flex-col gap-1 text-sm text-slate-500 sm:flex-row sm:items-center sm:gap-4">
                                                 <span className="inline-flex items-center gap-1">
                                                     <User className="w-3.5 h-3.5" />
                                                     <strong className="text-slate-700">{row.studentName}</strong> ({formatDisplayId(row.studentId, "STU")})
                                                 </span>
-                                                {row.studentEmail ? <span className="text-slate-600">· {row.studentEmail}</span> : null}
+                                                {row.studentEmail ? <span className="break-all text-slate-600">· {row.studentEmail}</span> : null}
                                                 <span>Submitted {row.submittedDate}</span>
                                             </p>
                                         </div>
@@ -566,7 +566,7 @@ export default function VerifyWorkPage() {
                                     </div>
                                 </div>
 
-                                <div className="bg-slate-50 border-l border-slate-100 p-6 flex flex-row md:flex-col justify-center gap-3 w-full md:w-56">
+                                <div className="flex w-full flex-col justify-center gap-3 border-t border-slate-100 bg-slate-50 p-5 sm:flex-row md:w-56 md:flex-col md:border-l md:border-t-0 md:p-6">
                                     {tab === "pending" ? (
                                         <>
                                             <Button
@@ -614,7 +614,7 @@ export default function VerifyWorkPage() {
                     }
                 }}
             >
-                <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+                <DialogContent className="max-h-[90vh] w-[calc(100vw-2rem)] max-w-3xl overflow-y-auto">
                     <DialogHeader>
                         <DialogTitle>Partner approval request</DialogTitle>
                         <DialogDescription>
@@ -808,7 +808,7 @@ export default function VerifyWorkPage() {
                 </DialogContent>
             </Dialog>
             <Dialog open={rejectOpen} onOpenChange={(open) => !open && !rejectSubmitting && closeRejectDialog()}>
-                <DialogContent className="sm:max-w-md">
+                <DialogContent className="w-[calc(100vw-2rem)] max-w-md sm:max-w-md">
                     <DialogHeader>
                         <DialogTitle>Reject with feedback</DialogTitle>
                         <DialogDescription>

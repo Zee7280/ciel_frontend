@@ -258,16 +258,16 @@ export default function AdminUsersPage() {
     };
 
     return (
-        <div className="p-8 relative">
+        <div className="relative p-0 lg:p-8">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold text-slate-900">User Management</h1>
+                    <h1 className="text-2xl font-bold text-slate-900 sm:text-3xl">User Management</h1>
                     <p className="text-slate-500">Manage all registered users and their roles.</p>
                 </div>
 
-                <div className="flex items-center gap-3 w-full md:w-auto">
+                <div className="grid w-full grid-cols-1 gap-3 sm:grid-cols-[1fr_auto_auto] md:w-auto md:items-center">
                     {/* Search */}
-                    <div className="relative flex-1 md:w-64">
+                    <div className="relative min-w-0 md:w-64">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                         <input
                             type="text"
@@ -282,7 +282,7 @@ export default function AdminUsersPage() {
                     <div className="relative">
                         <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                         <select
-                            className="pl-9 pr-8 py-2 rounded-lg border border-slate-200 text-sm focus:ring-2 focus:ring-blue-500 outline-none appearance-none bg-white cursor-pointer"
+                            className="w-full appearance-none rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-8 text-sm outline-none focus:ring-2 focus:ring-blue-500"
                             value={roleFilter}
                             onChange={(e) => setRoleFilter(e.target.value)}
                         >
@@ -302,7 +302,7 @@ export default function AdminUsersPage() {
                             setFormData({ name: "", email: "", password: "", role: "student", status: "active" });
                             setIsAddModalOpen(true);
                         }}
-                        className="bg-blue-600 text-white px-4 py-2 rounded-lg font-bold text-sm hover:bg-blue-700 transition-colors flex items-center gap-2 whitespace-nowrap"
+                        className="flex items-center justify-center gap-2 whitespace-nowrap rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-blue-700"
                     >
                         <Plus className="w-4 h-4" /> Add User
                     </button>
@@ -310,7 +310,7 @@ export default function AdminUsersPage() {
             </div>
 
             {/* Table */}
-            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-visible min-h-[400px] relative">
+            <div className="relative min-h-[400px] overflow-x-auto overflow-y-visible rounded-2xl border border-slate-100 bg-white shadow-sm">
 
                 <DataTable
                     columns={[
@@ -510,9 +510,9 @@ export default function AdminUsersPage() {
             {/* Modals Overlay */}
             {(isAddModalOpen || isEditModalOpen) && (
                 <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-                    <div className="bg-white rounded-2xl w-full max-w-2xl p-8 shadow-2xl animate-in zoom-in-95 duration-200">
-                        <div className="flex justify-between items-center mb-6">
-                            <h2 className="text-2xl font-bold text-slate-900">
+                    <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-5 shadow-2xl animate-in zoom-in-95 duration-200 sm:p-8">
+                        <div className="mb-6 flex items-start justify-between gap-4">
+                            <h2 className="text-xl font-bold text-slate-900 sm:text-2xl">
                                 {isAddModalOpen ? "Add New User" : "Edit User"}
                             </h2>
                             <button onClick={() => { setIsAddModalOpen(false); setIsEditModalOpen(false); }} className="text-slate-400 hover:text-slate-600">
@@ -539,7 +539,7 @@ export default function AdminUsersPage() {
                                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                                 />
                             </div>
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                 <div>
                                     <label className="block text-sm font-bold text-slate-700 mb-1">Role</label>
                                     <select

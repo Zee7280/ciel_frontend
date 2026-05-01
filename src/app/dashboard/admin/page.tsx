@@ -93,11 +93,11 @@ export default function AdminDashboard() {
     };
 
     return (
-        <div className="space-y-8 p-8 max-w-[1600px] mx-auto">
+        <div className="mx-auto max-w-[1600px] space-y-6 p-0 sm:space-y-8 lg:p-8">
             {/* Header */}
             <div>
-                <h1 className="text-4xl font-extrabold text-slate-900 tracking-tight">Platform Overview</h1>
-                <p className="text-slate-500 mt-2 text-lg">Real-time system activity and performance metrics.</p>
+                <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl">Platform Overview</h1>
+                <p className="mt-2 text-base text-slate-500 sm:text-lg">Real-time system activity and performance metrics.</p>
             </div>
 
             <PendingActionCards summary={pendingSummary} emptyMessage="No platform approvals are pending right now." />
@@ -143,7 +143,7 @@ export default function AdminDashboard() {
                 </div>
 
                 {/* Opportunities */}
-                <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-xl shadow-slate-200/40 relative overflow-hidden group hover:shadow-2xl hover:shadow-amber-900/10 transition-all duration-300">
+                <div className="group relative overflow-hidden rounded-3xl border border-slate-100 bg-white p-6 shadow-xl shadow-slate-200/40 transition-all duration-300 hover:shadow-2xl hover:shadow-amber-900/10">
                     <div className="absolute top-0 right-0 p-6 opacity-10 group-hover:opacity-20 transition-opacity">
                         <Briefcase className="w-24 h-24 text-amber-500 transform -rotate-12 translate-x-4 -translate-y-4" />
                     </div>
@@ -153,7 +153,7 @@ export default function AdminDashboard() {
                             <h3 className="font-bold text-slate-600">Opportunities</h3>
                         </div>
                         <div className="text-4xl font-black text-slate-900 tracking-tight mb-2">{metrics?.opportunities?.toLocaleString() || 0}</div>
-                        <div className="text-sm font-medium text-slate-500 leading-relaxed max-w-[80%]">Active volunteering & internship slots available.</div>
+                        <div className="max-w-full text-sm font-medium leading-relaxed text-slate-500 sm:max-w-[80%]">Active volunteering & internship slots available.</div>
                         <div className="mt-auto pt-6">
                             <Link href="/dashboard/admin/projects">
                                 <button className="text-amber-600 font-bold text-sm flex items-center gap-2 hover:gap-3 transition-all group-hover:text-amber-700">View All <ArrowRight className="w-4 h-4" /></button>
@@ -208,8 +208,8 @@ export default function AdminDashboard() {
             {/* Layout Grid for Charts & Reports */}
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
                 {/* SDG Chart */}
-                <div className="xl:col-span-2 bg-white p-8 rounded-3xl border border-slate-100 shadow-xl shadow-slate-200/40">
-                    <div className="flex items-center justify-between mb-8">
+                <div className="rounded-3xl border border-slate-100 bg-white p-5 shadow-xl shadow-slate-200/40 sm:p-8 xl:col-span-2">
+                    <div className="mb-6 flex items-center justify-between sm:mb-8">
                         <div>
                             <h3 className="text-xl font-extrabold text-slate-900 flex items-center gap-3">
                                 <TrendingUp className="w-6 h-6 text-slate-400" /> Impact Distribution by SDG
@@ -218,7 +218,7 @@ export default function AdminDashboard() {
                         </div>
                     </div>
 
-                    <div className="h-[350px] w-full bg-slate-50/50 rounded-2xl p-4 border border-dashed border-slate-200">
+                    <div className="h-[320px] w-full overflow-x-auto rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 p-3 sm:h-[350px] sm:p-4">
                         <ResponsiveContainer width="100%" height="100%">
                             <BarChart data={chartData} layout="vertical" margin={{ top: 10, right: 30, left: 40, bottom: 5 }}>
                                 <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#e2e8f0" />

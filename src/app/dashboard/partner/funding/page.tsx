@@ -70,15 +70,15 @@ export default function PartnerFundingPage() {
     };
 
     return (
-        <div className="p-8">
+        <div className="p-0 lg:p-8">
             {/* Header */}
             <div className="mb-8">
-                <h1 className="text-3xl font-bold text-slate-900">Funding Opportunities</h1>
+                <h1 className="text-2xl font-bold text-slate-900 sm:text-3xl">Funding Opportunities</h1>
                 <p className="text-slate-500">Explore and apply for funding to scale your impact</p>
             </div>
 
             {/* Tabs */}
-            <div className="flex gap-4 mb-6 border-b border-slate-200">
+            <div className="mb-6 flex gap-4 overflow-x-auto border-b border-slate-200">
                 <button
                     onClick={() => setActiveTab("opportunities")}
                     className={`pb-3 px-4 font-semibold transition-colors relative ${activeTab === "opportunities"
@@ -116,7 +116,7 @@ export default function PartnerFundingPage() {
                             key={opp.id}
                             className="bg-white rounded-2xl border border-slate-100 p-6 hover:shadow-lg transition-all duration-300"
                         >
-                            <div className="flex justify-between items-start mb-4">
+                            <div className="mb-4 flex items-start justify-between gap-3">
                                 <h3 className="text-xl font-bold text-slate-900">{opp.title}</h3>
                                 <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${getStatusColor(opp.status)}`}>
                                     {opp.status}
@@ -157,11 +157,11 @@ export default function PartnerFundingPage() {
                     {applications.map((app) => (
                         <div
                             key={app.id}
-                            className="bg-white rounded-2xl border border-slate-100 p-6 flex items-center justify-between hover:shadow-md transition-shadow"
+                            className="flex flex-col items-stretch justify-between gap-4 rounded-2xl border border-slate-100 bg-white p-5 transition-shadow hover:shadow-md sm:flex-row sm:items-center sm:p-6"
                         >
-                            <div className="flex-1">
+                            <div className="min-w-0 flex-1">
                                 <h3 className="text-lg font-bold text-slate-900 mb-2">{app.fundingTitle}</h3>
-                                <div className="flex items-center gap-6 text-sm text-slate-600">
+                                <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-slate-600">
                                     <span className="flex items-center gap-2">
                                         <DollarSign className="w-4 h-4" />
                                         ${app.amount.toLocaleString()}

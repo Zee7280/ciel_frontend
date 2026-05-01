@@ -11,20 +11,21 @@ export default function PartnerVolunteersPage() {
     ]);
 
     return (
-        <div className="p-8">
-            <div className="flex justify-between items-center mb-8">
-                <div>
-                    <h1 className="text-3xl font-bold text-slate-900">My Volunteers</h1>
+        <div className="p-0 lg:p-8">
+            <div className="mb-8 flex flex-col items-stretch justify-between gap-4 sm:flex-row sm:items-center">
+                <div className="min-w-0">
+                    <h1 className="text-2xl font-bold text-slate-900 sm:text-3xl">My Volunteers</h1>
                     <p className="text-slate-500">Track and manage volunteers across all projects.</p>
                 </div>
-                <div className="relative">
+                <div className="relative w-full sm:w-auto">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                    <input type="text" placeholder="Search volunteers..." className="pl-9 pr-4 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:border-blue-500 w-64" />
+                    <input type="text" placeholder="Search volunteers..." className="w-full rounded-lg border border-slate-200 py-2 pl-9 pr-4 text-sm outline-none focus:border-blue-500 sm:w-64" />
                 </div>
             </div>
 
             <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-                <table className="w-full text-left">
+                <div className="overflow-x-auto">
+                <table className="min-w-[760px] w-full text-left">
                     <thead className="bg-slate-50 border-b border-slate-100 text-slate-500 uppercase text-xs font-bold tracking-wider">
                         <tr>
                             <th className="p-6">Volunteer</th>
@@ -69,6 +70,7 @@ export default function PartnerVolunteersPage() {
                         ))}
                     </tbody>
                 </table>
+                </div>
             </div>
         </div>
     );

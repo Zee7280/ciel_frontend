@@ -151,9 +151,9 @@ export default function AdminJoinApplicationsPage() {
     };
 
     return (
-        <div className="space-y-6 max-w-7xl mx-auto p-4 pb-20">
+        <div className="mx-auto max-w-7xl space-y-6 p-0 pb-20 sm:p-4">
             <div>
-                <h1 className="text-3xl font-bold text-slate-900">Join applications (CIEL)</h1>
+                <h1 className="text-2xl font-bold text-slate-900 sm:text-3xl">Join applications (CIEL)</h1>
                 <p className="text-slate-500 max-w-3xl">
                     Final queue for students who applied to partner opportunities (after faculty where required). Approving
                     here should create enrollment / participation so the student can open their report. This is separate from
@@ -180,7 +180,7 @@ export default function AdminJoinApplicationsPage() {
                 </div>
             ) : null}
 
-            <div className="flex gap-4 items-center bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+            <div className="flex items-center gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
                 <input
                     type="text"
                     value={search}
@@ -277,7 +277,7 @@ export default function AdminJoinApplicationsPage() {
                                         </div>
                                     ) : null}
                                 </div>
-                                <div className="bg-slate-50 border-t md:border-t-0 md:border-l border-slate-100 p-6 flex flex-row md:flex-col justify-center gap-3 w-full md:w-52">
+                                <div className="flex w-full flex-col justify-center gap-3 border-t border-slate-100 bg-slate-50 p-5 sm:flex-row md:w-52 md:flex-col md:border-l md:border-t-0 md:p-6">
                                     {tab === "pending" ? (
                                         <>
                                             <Button
@@ -314,7 +314,7 @@ export default function AdminJoinApplicationsPage() {
             </div>
 
             <Dialog open={rejectOpen} onOpenChange={setRejectOpen}>
-                <DialogContent>
+                <DialogContent className="w-[calc(100vw-2rem)] max-w-lg">
                     <DialogHeader>
                         <DialogTitle>Reject application</DialogTitle>
                         <DialogDescription>Optional notes are stored for audit.</DialogDescription>

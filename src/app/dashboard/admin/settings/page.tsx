@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Save, Loader2, Settings, Shield, Globe, Mail } from "lucide-react";
+import { Save, Loader2, Shield, Globe, Mail } from "lucide-react";
 import { authenticatedFetch } from "@/utils/api";
 
 export default function AdminSettingsPage() {
@@ -65,16 +65,16 @@ export default function AdminSettingsPage() {
     }
 
     return (
-        <div className="p-8 max-w-4xl mx-auto">
-            <div className="flex justify-between items-center mb-8">
-                <div>
-                    <h1 className="text-3xl font-bold text-slate-900 mb-2">System Settings</h1>
+        <div className="mx-auto max-w-4xl p-0 lg:p-8">
+            <div className="mb-8 flex flex-col items-stretch justify-between gap-4 sm:flex-row sm:items-center">
+                <div className="min-w-0">
+                    <h1 className="mb-2 text-2xl font-bold text-slate-900 sm:text-3xl">System Settings</h1>
                     <p className="text-slate-500">Configure global platform settings.</p>
                 </div>
                 <button
                     onClick={handleSave}
                     disabled={isSaving}
-                    className="bg-blue-600 text-white px-6 py-2.5 rounded-xl font-bold text-sm hover:bg-blue-700 transition-all flex items-center gap-2 disabled:opacity-70"
+                    className="flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-6 py-2.5 text-sm font-bold text-white transition-all hover:bg-blue-700 disabled:opacity-70"
                 >
                     {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                     Save Changes
@@ -83,7 +83,7 @@ export default function AdminSettingsPage() {
 
             <div className="space-y-6">
                 {/* General Settings */}
-                <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+                <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm sm:p-6">
                     <h3 className="text-lg font-bold text-slate-900 mb-6 flex items-center gap-2">
                         <Globe className="w-5 h-5 text-blue-500" /> General Information
                     </h3>
@@ -113,12 +113,12 @@ export default function AdminSettingsPage() {
                 </div>
 
                 {/* System Control */}
-                <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+                <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm sm:p-6">
                     <h3 className="text-lg font-bold text-slate-900 mb-6 flex items-center gap-2">
                         <Shield className="w-5 h-5 text-red-500" /> System Control
                     </h3>
                     <div className="space-y-4">
-                        <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl">
+                        <div className="flex items-start justify-between gap-4 rounded-xl bg-slate-50 p-4">
                             <div>
                                 <div className="font-bold text-slate-900">Maintenance Mode</div>
                                 <div className="text-sm text-slate-500">Disable access for all non-admin users.</div>
@@ -134,7 +134,7 @@ export default function AdminSettingsPage() {
                             </label>
                         </div>
 
-                        <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl">
+                        <div className="flex items-start justify-between gap-4 rounded-xl bg-slate-50 p-4">
                             <div>
                                 <div className="font-bold text-slate-900">Allow Registrations</div>
                                 <div className="text-sm text-slate-500">Enable new user signups.</div>

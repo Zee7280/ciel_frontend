@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Button } from "../report/components/ui/button";
-import { Bell, Lock, Shield, Mail, Smartphone } from "lucide-react";
+import { Bell, Lock } from "lucide-react";
 import { toast } from "sonner";
 
 export default function StudentSettingsPage() {
@@ -19,21 +19,21 @@ export default function StudentSettingsPage() {
     };
 
     return (
-        <div className="max-w-4xl mx-auto space-y-8 pb-20">
+        <div className="mx-auto max-w-4xl space-y-6 pb-20 sm:space-y-8">
             <div>
                 <h1 className="text-2xl font-bold text-slate-900">Settings</h1>
                 <p className="text-slate-500">Manage your account preferences and security settings.</p>
             </div>
 
             <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-                <div className="p-6 border-b border-slate-100">
+                <div className="border-b border-slate-100 p-5 sm:p-6">
                     <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
                         <Bell className="w-5 h-5 text-blue-500" />
                         Notification Preferences
                     </h2>
                 </div>
-                <div className="p-6 space-y-6">
-                    <div className="flex items-center justify-between">
+                <div className="space-y-6 p-5 sm:p-6">
+                    <div className="flex items-start justify-between gap-4">
                         <div className="space-y-1">
                             <h3 className="font-medium text-slate-900">Email Notifications</h3>
                             <p className="text-sm text-slate-500">Receive updates about your projects and reports via email.</p>
@@ -49,7 +49,7 @@ export default function StudentSettingsPage() {
                         </label>
                     </div>
 
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-start justify-between gap-4">
                         <div className="space-y-1">
                             <h3 className="font-medium text-slate-900">SMS Notifications</h3>
                             <p className="text-sm text-slate-500">Get important alerts directly to your phone.</p>
@@ -65,7 +65,7 @@ export default function StudentSettingsPage() {
                         </label>
                     </div>
 
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-start justify-between gap-4">
                         <div className="space-y-1">
                             <h3 className="font-medium text-slate-900">Platform Updates</h3>
                             <p className="text-sm text-slate-500">Be the first to know about new features and improvements.</p>
@@ -84,25 +84,25 @@ export default function StudentSettingsPage() {
             </div>
 
             <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-                <div className="p-6 border-b border-slate-100">
+                <div className="border-b border-slate-100 p-5 sm:p-6">
                     <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
                         <Lock className="w-5 h-5 text-blue-500" />
                         Security
                     </h2>
                 </div>
-                <div className="p-6 space-y-6">
-                    <div className="flex items-center justify-between">
+                <div className="space-y-6 p-5 sm:p-6">
+                    <div className="flex flex-col items-stretch justify-between gap-4 sm:flex-row sm:items-center">
                         <div className="space-y-1">
                             <h3 className="font-medium text-slate-900">Change Password</h3>
                             <p className="text-sm text-slate-500">Update your password regularly to keep your account secure.</p>
                         </div>
-                        <Button variant="outline">Update Password</Button>
+                        <Button variant="outline" className="w-full sm:w-auto">Update Password</Button>
                     </div>
                 </div>
             </div>
 
             <div className="flex justify-end">
-                <Button onClick={handleSave} className="bg-blue-600 hover:bg-blue-700 text-white min-w-[120px]">
+                <Button onClick={handleSave} className="w-full min-w-[120px] bg-blue-600 text-white hover:bg-blue-700 sm:w-auto">
                     Save Changes
                 </Button>
             </div>

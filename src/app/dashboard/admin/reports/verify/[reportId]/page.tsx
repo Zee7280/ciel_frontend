@@ -519,10 +519,10 @@ export default function AdminReportDetailPage() {
     }
 
     return (
-        <div className={clsx(adminDossier.shell, "p-6 sm:p-8")}>
+        <div className={clsx(adminDossier.shell, "p-0 sm:p-6 lg:p-8")}>
             <div className="max-w-7xl mx-auto space-y-6">
                 {/* Header */}
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col items-stretch justify-between gap-3 sm:flex-row sm:items-center">
                     <button
                         onClick={() => router.back()}
                         className="flex items-center gap-2 px-4 py-2 text-slate-700 hover:bg-white rounded-lg font-medium transition-all"
@@ -530,7 +530,7 @@ export default function AdminReportDetailPage() {
                         <ArrowLeft className="w-4 h-4" />
                         Back to Reports
                     </button>
-                    <div className="flex items-center gap-3">
+                    <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                         <span className="rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-2 text-xs font-semibold uppercase tracking-widest text-indigo-800">
                             Single-page dossier
                         </span>
@@ -573,17 +573,17 @@ export default function AdminReportDetailPage() {
 
                 {/* Student & Opportunity Info */}
                 <div className={clsx(adminDossier.cardLg, "p-6 sm:p-8")}>
-                    <div className="flex items-start justify-between">
-                        <div className="flex items-start gap-6">
+                    <div className="flex flex-col items-stretch justify-between gap-5 lg:flex-row lg:items-start">
+                        <div className="flex min-w-0 items-start gap-4 sm:gap-6">
                             <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full border-4 border-slate-100 bg-gradient-to-br from-indigo-600 to-indigo-800 text-2xl font-bold text-white">
                                 {report.student.name.charAt(0)}
                             </div>
-                            <div>
+                            <div className="min-w-0">
                                 <h1 className="mb-2 text-2xl font-bold tracking-tight text-slate-900">{report.student.name}</h1>
                                 <div className="space-y-1 text-sm font-medium text-slate-600">
                                     <div className="flex items-center gap-2">
                                         <User className="h-4 w-4 shrink-0 text-slate-400" />
-                                        <span>{report.student.email}</span>
+                                        <span className="break-all">{report.student.email}</span>
                                     </div>
                                     <div className="flex items-center gap-2">
                                         <Building2 className="h-4 w-4 shrink-0 text-slate-400" />
@@ -656,9 +656,9 @@ export default function AdminReportDetailPage() {
                 </div>
 
                 {/* Report Content - Unified Scrollable Dossier */}
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+                <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-12 lg:gap-8">
                     {/* Sticky Table of Contents */}
-                    <div className="sticky top-8 space-y-4 lg:col-span-3">
+                    <div className="space-y-4 lg:sticky lg:top-8 lg:col-span-3">
                         <div className={clsx(adminDossier.card, "p-5 sm:p-6")}>
                             <div className="mb-4 flex items-center justify-between gap-2">
                                 <h3 className={clsx(adminDossier.microLabel, "flex items-center gap-2 tracking-widest text-slate-400")}>
@@ -1039,7 +1039,7 @@ export default function AdminReportDetailPage() {
                                 <LabelValue label="Used external resources" value={report.section6?.use_resources} />
                                 {report.section6?.resources && report.section6.resources.length > 0 && (
                                     <div className="mt-4 overflow-x-auto">
-                                        <table className="w-full text-sm border-collapse border border-slate-200">
+                                        <table className="min-w-[620px] w-full border-collapse border border-slate-200 text-sm">
                                             <thead>
                                                 <tr className="bg-slate-50 text-left">
                                                     <th className="border border-slate-200 p-2">Type</th>
@@ -1345,8 +1345,8 @@ export default function AdminReportDetailPage() {
 
             {/* Sticky Action Bar for quick access while scrolling */}
             {showStickyActions && !isVerifying && report.admin_status !== "approved" && (
-                <div className="animate-in fade-in slide-in-from-bottom-10 fixed bottom-8 left-1/2 z-50 w-full max-w-3xl -translate-x-1/2 px-6 duration-500">
-                    <div className="flex items-center justify-between gap-4 rounded-[2rem] border border-white/10 bg-slate-900/90 p-4 shadow-2xl ring-1 ring-white/15 backdrop-blur-xl sm:gap-6">
+                <div className="fixed bottom-24 left-1/2 z-50 w-full max-w-3xl -translate-x-1/2 px-3 duration-500 animate-in fade-in slide-in-from-bottom-10 sm:bottom-8 sm:px-6">
+                    <div className="flex flex-col gap-3 rounded-[2rem] border border-white/10 bg-slate-900/90 p-3 shadow-2xl ring-1 ring-white/15 backdrop-blur-xl sm:flex-row sm:items-center sm:justify-between sm:gap-6 sm:p-4">
                         <div className="ml-1 flex items-center gap-3 sm:ml-3">
                             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-2 border-white/20 bg-indigo-600 text-sm font-bold text-white">
                                 {report.student.name.charAt(0)}
@@ -1357,18 +1357,18 @@ export default function AdminReportDetailPage() {
                             </div>
                         </div>
 
-                        <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+                        <div className="grid shrink-0 grid-cols-2 gap-2 sm:flex sm:items-center sm:gap-3">
                             <button
                                 type="button"
                                 onClick={() => handleVerify("approve")}
-                                className="flex items-center gap-2 rounded-full bg-emerald-600 px-5 py-2.5 text-xs font-semibold uppercase tracking-widest text-white shadow-lg shadow-emerald-900/25 transition-transform hover:bg-emerald-500 active:scale-95 sm:px-6"
+                                className="flex items-center justify-center gap-2 rounded-full bg-emerald-600 px-5 py-2.5 text-xs font-semibold uppercase tracking-widest text-white shadow-lg shadow-emerald-900/25 transition-transform hover:bg-emerald-500 active:scale-95 sm:px-6"
                             >
                                 <CheckCircle2 className="h-3.5 w-3.5" strokeWidth={2} /> Approve
                             </button>
                             <button
                                 type="button"
                                 onClick={() => handleVerify("reject")}
-                                className="flex items-center gap-2 rounded-full bg-white/10 px-5 py-2.5 text-xs font-semibold uppercase tracking-widest text-white transition-colors hover:bg-white/20 active:scale-95 sm:px-6"
+                                className="flex items-center justify-center gap-2 rounded-full bg-white/10 px-5 py-2.5 text-xs font-semibold uppercase tracking-widest text-white transition-colors hover:bg-white/20 active:scale-95 sm:px-6"
                             >
                                 <XCircle className="h-3.5 w-3.5 text-red-400" strokeWidth={2} /> Reject
                             </button>
@@ -1376,7 +1376,7 @@ export default function AdminReportDetailPage() {
                                 type="button"
                                 onClick={() => handleVerify("reject", "editable")}
                                 disabled={report.status === "rejected"}
-                                className="flex items-center gap-2 rounded-full bg-amber-500 px-5 py-2.5 text-xs font-semibold uppercase tracking-widest text-slate-950 shadow-lg shadow-amber-950/20 transition-transform hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-50 active:scale-95 sm:px-6"
+                                className="flex items-center justify-center gap-2 rounded-full bg-amber-500 px-5 py-2.5 text-xs font-semibold uppercase tracking-widest text-slate-950 shadow-lg shadow-amber-950/20 transition-transform hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-50 active:scale-95 sm:px-6"
                                 title="Return this report so the student can revise and resubmit it."
                             >
                                 <PencilLine className="h-3.5 w-3.5" strokeWidth={2} /> Editable

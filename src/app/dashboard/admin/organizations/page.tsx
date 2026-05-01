@@ -163,22 +163,22 @@ export default function AdminOrganizationsPage() {
     };
 
     return (
-        <div className="p-8 relative">
-            <div className="flex justify-between items-center mb-8">
-                <div>
-                    <h1 className="text-3xl font-bold text-slate-900">Organizations</h1>
+        <div className="relative p-0 lg:p-8">
+            <div className="mb-8 flex flex-col items-stretch justify-between gap-4 sm:flex-row sm:items-center">
+                <div className="min-w-0">
+                    <h1 className="text-2xl font-bold text-slate-900 sm:text-3xl">Organizations</h1>
                     <p className="text-slate-500">Manage NGO and Corporate partners.</p>
                 </div>
                 <button
                     onClick={() => setIsAddModalOpen(true)}
-                    className="bg-blue-600 text-white px-4 py-2 rounded-lg font-bold text-sm hover:bg-blue-700 transition-colors flex items-center gap-2"
+                    className="flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-blue-700"
                 >
                     <Building2 className="w-4 h-4" /> Onboard Organization
                 </button>
             </div>
 
             {/* Filters */}
-            <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm mb-6 flex gap-4">
+            <div className="mb-6 flex flex-col gap-3 rounded-xl border border-slate-100 bg-white p-4 shadow-sm sm:flex-row sm:gap-4">
                 <div className="relative flex-1">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
                     <input
@@ -189,7 +189,7 @@ export default function AdminOrganizationsPage() {
                         onChange={(e) => setSearchQuery(e.target.value)}
                     />
                 </div>
-                <button className="flex items-center gap-2 px-4 py-2 border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 font-bold text-sm">
+                <button className="flex items-center justify-center gap-2 rounded-lg border border-slate-200 px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-50">
                     <Filter className="w-4 h-4" /> Filter
                 </button>
             </div>
@@ -207,7 +207,8 @@ export default function AdminOrganizationsPage() {
                     </div>
                 ) : (
                     <>
-                        <table className="w-full text-left">
+                        <div className="overflow-x-auto">
+                        <table className="min-w-[900px] w-full text-left">
                             <thead className="bg-slate-50 border-b border-slate-100 text-slate-500 uppercase text-xs font-bold tracking-wider">
                                 <tr>
                                     <th className="p-6">Organization</th>
@@ -293,6 +294,7 @@ export default function AdminOrganizationsPage() {
                                 ))}
                             </tbody>
                         </table>
+                        </div>
                         {/* Pagination Controls */}
                         <div className="bg-slate-50 p-4 border-t border-slate-100">
                             <PaginationControls
@@ -310,8 +312,8 @@ export default function AdminOrganizationsPage() {
             {/* Onboard Modal */}
             {isAddModalOpen && (
                 <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-                    <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl animate-in zoom-in-95 duration-200">
-                        <div className="flex justify-between items-center mb-6">
+                    <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-5 shadow-2xl animate-in zoom-in-95 duration-200 sm:p-6">
+                        <div className="mb-6 flex items-start justify-between gap-4">
                             <h2 className="text-xl font-bold text-slate-900">Onboard New Organization</h2>
                             <button onClick={() => setIsAddModalOpen(false)} className="text-slate-400 hover:text-slate-600">
                                 <AlertCircle className="w-6 h-6 rotate-45" />
@@ -379,8 +381,8 @@ export default function AdminOrganizationsPage() {
             {/* Organization Details Modal */}
             {selectedOrg && (
                 <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-                    <div className="bg-white rounded-2xl w-full max-w-3xl p-6 shadow-2xl animate-in zoom-in-95 duration-200 max-h-[85vh] overflow-y-auto">
-                        <div className="flex justify-between items-center mb-2">
+                    <div className="max-h-[85vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white p-5 shadow-2xl animate-in zoom-in-95 duration-200 sm:p-6">
+                        <div className="mb-2 flex items-start justify-between gap-4">
                             <h2 className="text-xl font-bold text-slate-900">Organization Details</h2>
                             <button onClick={() => setSelectedOrg(null)} className="text-slate-400 hover:text-slate-600">
                                 <AlertCircle className="w-6 h-6 rotate-45" />

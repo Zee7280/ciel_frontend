@@ -201,7 +201,7 @@ export default function FacultyJoinApplicationsPage() {
                 </div>
             ) : null}
 
-            <div className="flex gap-4 items-center bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+            <div className="flex items-center gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
                 <input
                     type="text"
                     value={search}
@@ -225,7 +225,7 @@ export default function FacultyJoinApplicationsPage() {
                     filtered.map((row) => (
                         <Card key={row.id} className="overflow-hidden">
                             <div className="flex flex-col md:flex-row">
-                                <div className="p-6 flex-1 space-y-3">
+                                <div className="flex-1 space-y-3 p-5 sm:p-6">
                                     <div className="flex flex-wrap items-center gap-2">
                                         <h3 className="font-bold text-lg text-slate-900">{row.opportunityTitle}</h3>
                                         <Badge variant="outline" className="bg-slate-50 text-slate-600 border-slate-200 text-[10px]">
@@ -243,13 +243,13 @@ export default function FacultyJoinApplicationsPage() {
                                     </div>
                                     <p className="text-slate-600 text-sm">
                                         <strong>{row.studentName}</strong>
-                                        {row.studentEmail ? <span className="text-slate-500"> · {row.studentEmail}</span> : null}
+                                        {row.studentEmail ? <span className="break-all text-slate-500"> · {row.studentEmail}</span> : null}
                                     </p>
                                     <p className="text-xs text-slate-400 font-mono">
                                         Opportunity ID: {formatDisplayId(row.opportunityId, "OPP")}
                                     </p>
                                 </div>
-                                <div className="bg-slate-50 border-t md:border-t-0 md:border-l border-slate-100 p-6 flex flex-row md:flex-col justify-center gap-3 w-full md:w-52">
+                                <div className="flex w-full flex-col justify-center gap-3 border-t border-slate-100 bg-slate-50 p-5 sm:flex-row md:w-52 md:flex-col md:border-l md:border-t-0 md:p-6">
                                     {tab === "pending" ? (
                                         <>
                                             <Button
@@ -293,7 +293,7 @@ export default function FacultyJoinApplicationsPage() {
                     if (!open) setListingRecord(null);
                 }}
             >
-                <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+                <DialogContent className="max-h-[90vh] w-[calc(100vw-2rem)] max-w-3xl overflow-y-auto">
                     <DialogHeader>
                         <DialogTitle>Opportunity listing</DialogTitle>
                         <DialogDescription>
@@ -312,7 +312,7 @@ export default function FacultyJoinApplicationsPage() {
             </Dialog>
 
             <Dialog open={rejectOpen} onOpenChange={setRejectOpen}>
-                <DialogContent>
+                <DialogContent className="w-[calc(100vw-2rem)] max-w-lg">
                     <DialogHeader>
                         <DialogTitle>Reject application</DialogTitle>
                         <DialogDescription>Your comments help the student understand what to change.</DialogDescription>

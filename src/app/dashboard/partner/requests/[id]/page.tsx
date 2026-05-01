@@ -513,7 +513,7 @@ function OpportunityDetailsContent() {
                 {/* Document View */}
                 <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden print:border-none print:shadow-none">
                     {/* Title Section */}
-                    <div className="p-8 border-b border-slate-100 bg-slate-50/50 print:bg-white print:border-none">
+                    <div className="border-b border-slate-100 bg-slate-50/50 p-5 print:border-none print:bg-white sm:p-8">
                         <div className="flex justify-between items-start mb-4">
                             <div>
                                 <h1 className="text-3xl font-bold text-slate-900 mb-2">{formData.title}</h1>
@@ -584,7 +584,7 @@ function OpportunityDetailsContent() {
                     {/* Content Grid */}
                     <div className="grid grid-cols-1 md:grid-cols-12 divide-y md:divide-y-0 md:divide-x divide-slate-100">
                         {/* Left Column: Organization & key details */}
-                        <div className="p-8 space-y-8 md:col-span-4 lg:col-span-3 bg-slate-50/30">
+                        <div className="space-y-8 bg-slate-50/30 p-5 sm:p-8 md:col-span-4 lg:col-span-3">
                             <div>
                                 <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4">Organization</h3>
                                 <div className="space-y-4">
@@ -624,7 +624,7 @@ function OpportunityDetailsContent() {
                         </div>
 
                         {/* Middle/Right Column: Main Details */}
-                        <div className="p-8 space-y-8 md:col-span-8 lg:col-span-9">
+                        <div className="space-y-8 p-5 sm:p-8 md:col-span-8 lg:col-span-9">
                             {/* Stats Cards */}
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                                 <div className="p-4 rounded-xl bg-orange-50 border border-orange-100">
@@ -760,7 +760,7 @@ function OpportunityDetailsContent() {
                     </div>
                     <CheckCircle className="w-5 h-5 text-green-500" />
                 </div>
-                <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6 opacity-75 grayscale-[0.5] pointer-events-none">
+                <div className="grid grid-cols-1 gap-6 p-5 opacity-75 grayscale-[0.5] pointer-events-none sm:p-6 md:grid-cols-2">
                     <div>
                         <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Organization Name</label>
                         <input type="text" value={orgDetails.organizationName} readOnly className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2 text-slate-700 font-medium" />
@@ -801,7 +801,7 @@ function OpportunityDetailsContent() {
                     </div>
                 </div>
 
-                <div className={`p-8 space-y-8 ${!expandedSections.includes('B') ? 'hidden' : ''}`}>
+                <div className={`space-y-8 p-5 sm:p-8 ${!expandedSections.includes('B') ? 'hidden' : ''}`}>
                     {/* B1. Title */}
                     <div>
                         <label className="block text-sm font-bold text-slate-900 mb-2">B1. Opportunity Title <span className="text-red-500">*</span></label>
@@ -1033,7 +1033,7 @@ function OpportunityDetailsContent() {
                     {expandedSections.includes('C') ? <ChevronUp className="w-5 h-5 text-slate-400" /> : <ChevronDown className="w-5 h-5 text-slate-400" />}
                 </div>
 
-                <div className={`p-8 space-y-6 ${!expandedSections.includes('C') ? 'hidden' : ''}`}>
+                <div className={`space-y-6 p-5 sm:p-8 ${!expandedSections.includes('C') ? 'hidden' : ''}`}>
                     {/* C1. Primary SDG */}
                     <div>
                         <label className="block text-sm font-bold text-slate-900 mb-2">C1. Select PRIMARY SDG <span className="text-red-500">*</span></label>
@@ -1224,7 +1224,7 @@ function OpportunityDetailsContent() {
                     {expandedSections.includes('D') ? <ChevronUp className="w-5 h-5 text-slate-400" /> : <ChevronDown className="w-5 h-5 text-slate-400" />}
                 </div>
 
-                <div className={`p-8 space-y-6 ${!expandedSections.includes('D') ? 'hidden' : ''}`}>
+                <div className={`space-y-6 p-5 sm:p-8 ${!expandedSections.includes('D') ? 'hidden' : ''}`}>
                     <div>
                         <label className="block text-sm font-bold text-slate-900 mb-2">D1. Project Objective <span className="text-red-500">*</span></label>
                         <textarea spellCheck={true}
@@ -1330,7 +1330,7 @@ function OpportunityDetailsContent() {
                     {expandedSections.includes('E') ? <ChevronUp className="w-5 h-5 text-slate-400" /> : <ChevronDown className="w-5 h-5 text-slate-400" />}
                 </div>
 
-                <div className={`p-8 space-y-6 ${!expandedSections.includes('E') ? 'hidden' : ''}`}>
+                <div className={`space-y-6 p-5 sm:p-8 ${!expandedSections.includes('E') ? 'hidden' : ''}`}>
                     <div>
                         <label className="block text-sm font-bold text-slate-900 mb-2">E1. Student Responsibilities</label>
                         <textarea spellCheck={true}
@@ -1523,7 +1523,7 @@ function OpportunityDetailsContent() {
                     </h2>
                     {expandedSections.includes('G') ? <ChevronUp className="w-5 h-5 text-slate-400" /> : <ChevronDown className="w-5 h-5 text-slate-400" />}
                 </div>
-                <div className={`p-8 space-y-6 ${!expandedSections.includes('G') ? 'hidden' : ''}`}>
+                <div className={`space-y-6 p-5 sm:p-8 ${!expandedSections.includes('G') ? 'hidden' : ''}`}>
                     <label className="block text-sm font-bold text-slate-900 mb-2">G1. Verification of participation</label>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         {["Attendance sheets", "Supervisor sign-off", "Photos of activities", "Assessment sheets", "Digital logs"].map(v => {
@@ -1652,7 +1652,7 @@ function OpportunityDetailsContent() {
             </div >
 
             {/* Action Bar for Edit Mode */}
-            < div className="fixed bottom-0 left-0 md:left-64 right-0 p-4 bg-white border-t border-slate-200 z-50 flex justify-end gap-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]" >
+            < div className="fixed bottom-24 left-0 right-0 z-50 flex justify-end gap-3 border-t border-slate-200 bg-white p-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] lg:left-64 lg:bottom-0 lg:gap-4" >
                 <button
                     onClick={() => router.replace(pathname)}
                     className="px-6 py-2 border border-slate-200 text-slate-600 font-bold rounded-xl hover:bg-slate-50 flex items-center gap-2"

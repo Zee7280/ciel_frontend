@@ -32,12 +32,13 @@ export default function AdminReportsPage() {
     }, []);
 
     return (
-        <div className="p-8">
-            <h1 className="text-3xl font-bold text-slate-900 mb-2">Reports & Moderation</h1>
+        <div className="space-y-6 p-0 lg:p-8">
+            <h1 className="mb-2 text-2xl font-bold text-slate-900 sm:text-3xl">Reports & Moderation</h1>
             <p className="text-slate-500 mb-8">Handle user reports, flags, and system alerts.</p>
 
             <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-                <table className="w-full text-left">
+                <div className="overflow-x-auto">
+                <table className="min-w-[760px] w-full text-left">
                     <thead className="bg-slate-50 border-b border-slate-100 text-slate-500 uppercase text-xs font-bold tracking-wider">
                         <tr>
                             <th className="p-6">Report Subject</th>
@@ -98,6 +99,7 @@ export default function AdminReportsPage() {
                         )}
                     </tbody>
                 </table>
+                </div>
             </div>
         </div>
     );

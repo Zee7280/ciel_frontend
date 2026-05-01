@@ -45,14 +45,14 @@ export default function AdminAuditLogsPage() {
     const totalPages = Math.ceil(totalItems / itemsPerPage);
 
     return (
-        <div className="p-8">
-            <div className="flex justify-between items-center mb-6">
-                <div>
-                    <h1 className="text-3xl font-bold text-slate-900 mb-2">Audit Logs</h1>
+        <div className="p-0 lg:p-8">
+            <div className="mb-6 flex flex-col items-stretch justify-between gap-4 sm:flex-row sm:items-center">
+                <div className="min-w-0">
+                    <h1 className="mb-2 text-2xl font-bold text-slate-900 sm:text-3xl">Audit Logs</h1>
                     <p className="text-slate-500">System security and action logs.</p>
                 </div>
                 {/* Search */}
-                <div className="relative w-72">
+                <div className="relative w-full sm:w-72">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                     <input
                         type="text"
@@ -64,7 +64,7 @@ export default function AdminAuditLogsPage() {
                 </div>
             </div>
 
-            <div className="bg-slate-900 rounded-2xl p-6 text-slate-300 font-mono text-sm overflow-hidden shadow-2xl">
+            <div className="overflow-hidden rounded-2xl bg-slate-900 p-4 font-mono text-sm text-slate-300 shadow-2xl sm:p-6">
                 <div className="flex items-center gap-2 mb-6 text-slate-400 border-b border-slate-800 pb-4">
                     <Terminal className="w-5 h-5" /> system_audit.log
                 </div>
@@ -77,11 +77,11 @@ export default function AdminAuditLogsPage() {
                         <div className="text-center p-8 text-slate-500">No logs found.</div>
                     ) : (
                         displayedLogs.map((log) => (
-                            <div key={log.id} className="flex flex-col md:flex-row md:items-center gap-2 md:gap-8 hover:bg-slate-800 p-3 rounded transition-colors group border-b border-slate-800/50 last:border-0">
-                                <span className="text-slate-500 min-w-[160px] text-xs">
+                            <div key={log.id} className="group flex flex-col gap-2 rounded border-b border-slate-800/50 p-3 transition-colors last:border-0 hover:bg-slate-800 md:flex-row md:items-center md:gap-8">
+                                <span className="min-w-0 text-xs text-slate-500 md:min-w-[160px]">
                                     {log.created_at ? new Date(log.created_at).toLocaleString() : "N/A"}
                                 </span>
-                                <span className={`font-bold min-w-[140px] uppercase tracking-wider text-xs px-2 py-0.5 rounded bg-slate-800/50 w-fit
+                                <span className={`w-fit min-w-0 rounded bg-slate-800/50 px-2 py-0.5 text-xs font-bold uppercase tracking-wider md:min-w-[140px]
                                     ${log.action.includes('FAIL') || log.action.includes('REJECT') ? 'text-red-400' :
                                         log.action.includes('DELETE') ? 'text-amber-400' : 'text-blue-400'}`}>
                                     {log.action}
@@ -93,7 +93,7 @@ export default function AdminAuditLogsPage() {
                                     <span className="text-emerald-400">{log.target || "N/A"}</span>
                                     {log.target_type && <span className="text-slate-600 text-xs italic">({log.target_type})</span>}
                                 </div>
-                                <div className="text-right">
+                                <div className="text-left md:text-right">
                                     <span className="text-slate-600 text-xs block">{log.ip}</span>
                                     {log.details && (
                                         <span className="text-slate-500 text-[10px] mt-1 block max-w-[200px] truncate">

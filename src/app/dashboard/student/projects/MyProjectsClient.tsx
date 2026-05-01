@@ -1241,26 +1241,26 @@ export default function MyProjectsPage() {
 
             {/* Team Details Dialog */}
             <Dialog open={isTeamDialogOpen} onOpenChange={setIsTeamDialogOpen}>
-                <DialogContent className="max-w-4xl p-0 overflow-hidden gap-0">
-                    <DialogHeader className="p-6 bg-slate-50/50 border-b border-slate-100">
-                        <div className="flex items-center gap-3">
+                <DialogContent className="max-h-[90vh] w-[calc(100vw-2rem)] max-w-4xl overflow-hidden p-0 gap-0">
+                    <DialogHeader className="border-b border-slate-100 bg-slate-50/50 p-4 sm:p-6">
+                        <div className="flex items-start gap-3 sm:items-center">
                             <div className="w-10 h-10 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600 border border-indigo-100">
                                 <Users className="w-5 h-5" />
                             </div>
-                            <div>
-                                <DialogTitle className="text-xl text-slate-900">
+                            <div className="min-w-0 pr-6">
+                                <DialogTitle className="text-lg text-slate-900 sm:text-xl">
                                     Project Team
                                 </DialogTitle>
-                                <DialogDescription className="text-slate-500 mt-1">
+                                <DialogDescription className="mt-1 line-clamp-2 text-slate-500">
                                     Collaborators for <span className="font-medium text-slate-700">{selectedTeamProject?.title}</span>
                                 </DialogDescription>
                             </div>
                         </div>
                     </DialogHeader>
 
-                    <div className="p-6">
-                        <div className="rounded-xl border border-slate-200 overflow-hidden shadow-sm">
-                            <table className="w-full text-left text-sm">
+                    <div className="max-h-[65vh] overflow-y-auto p-4 sm:p-6">
+                        <div className="overflow-x-auto rounded-xl border border-slate-200 shadow-sm">
+                            <table className="min-w-[720px] w-full text-left text-sm">
                                 <thead className="bg-slate-50 border-b border-slate-200">
                                     <tr>
                                         <th className="px-6 py-4 font-semibold text-slate-700">Team Member</th>
@@ -1336,7 +1336,7 @@ export default function MyProjectsPage() {
                         </div>
                     </div>
 
-                    <DialogFooter className="p-6 pt-0">
+                    <DialogFooter className="p-4 pt-0 sm:p-6 sm:pt-0">
                         <Button onClick={() => setIsTeamDialogOpen(false)} className="w-full sm:w-auto bg-slate-900 text-white hover:bg-slate-800">
                             Close
                         </Button>
@@ -1356,11 +1356,11 @@ export default function MyProjectsPage() {
                     }
                 }}
             >
-                <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto p-0 gap-0">
-                    <DialogHeader className="p-6 bg-slate-50/60 border-b border-slate-100">
+                <DialogContent className="max-h-[90vh] w-[calc(100vw-2rem)] max-w-5xl overflow-y-auto p-0 gap-0">
+                    <DialogHeader className="border-b border-slate-100 bg-slate-50/60 p-4 sm:p-6">
                         <div className="flex items-start justify-between gap-4">
-                            <div>
-                                <DialogTitle className="text-2xl text-slate-900">
+                            <div className="min-w-0 pr-6">
+                                <DialogTitle className="text-xl text-slate-900 sm:text-2xl">
                                     {String(detailView?.title ?? selectedProject?.title ?? "Opportunity")}
                                 </DialogTitle>
                                 <DialogDescription className="text-slate-500 mt-1">
