@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { resolveBackendApiV1Base } from "@/utils/backendApiV1Base";
 
-/** Proxies Nest `GET /partners/impact/metrics`. */
+/** Proxies Nest `GET /partners/students/analytics`. */
 export async function GET(request: Request) {
     try {
         const base = resolveBackendApiV1Base();
@@ -9,7 +9,7 @@ export async function GET(request: Request) {
             return NextResponse.json({ success: false, message: "Backend URL not configured" }, { status: 500 });
         }
         const authHeader = request.headers.get("Authorization");
-        const response = await fetch(`${base}/partners/impact/metrics`, {
+        const response = await fetch(`${base}/partners/students/analytics`, {
             headers: {
                 Authorization: authHeader || "",
                 "Content-Type": "application/json",
@@ -21,7 +21,7 @@ export async function GET(request: Request) {
         }
         return NextResponse.json(data);
     } catch (e) {
-        console.error("partners/impact/metrics GET proxy:", e);
+        console.error("partners/students/analytics GET proxy:", e);
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }
 }

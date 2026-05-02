@@ -10,7 +10,7 @@ interface ImpactMetrics {
     totalProjects: number;
     totalHours: number;
     sdgDistribution: { [key: number]: number };
-    monthlyTrend: { month: string; beneficiaries: number }[];
+    monthlyTrend: { month: string; beneficiaries: number; hours?: number }[];
 }
 
 export default function PartnerImpactPage() {
@@ -155,17 +155,28 @@ export default function PartnerImpactPage() {
                         <h2 className="text-xl font-bold text-slate-900">Monthly Growth</h2>
                     </div>
                     <div className="space-y-4">
-                        {metrics?.monthlyTrend.map((item, index) => {
-                            const maxValue = Math.max(...(metrics?.monthlyTrend.map(m => m.beneficiaries) || [1]));
-                            const percentage = (item.beneficiaries / maxValue) * 100;
+                        {(metrics?.monthlyTrend ?? []).map((item, index) => {
+                            const trendValues = (metrics?.monthlyTrend ?? []).map((m) => m.hours ?? m.beneficiaries);
+                            const maxValue = Math.max(...trendValues, 1);
+                            const displayValue = item.hours ?? item.beneficiaries;
+                            const percentage = (displayValue / maxValue) * 100;
 
                             return (
                                 <div key={index} className="flex items-center gap-3">
                                     <span className="text-sm font-semibold text-slate-600 w-12">{item.month}</span>
                                     <div className="flex-1">
                                         <div className="flex justify-between mb-1">
-                                            <span className="text-xs text-slate-500">Beneficiaries</span>
-                                            <span className="text-sm font-bold text-slate-900">{item.beneficiaries.toLocaleString()}</span>
+                                            <span className="text-xs text-slate-500">
+                                                {item.hours != null ? "Verified hours" : "Beneficiaries"}
+                                            </span>
+                                            <span className="text-sm font-bold text-slate-900">
+                                                {typeof item.hours === "number"
+                                                    ? item.hours.toLocaleString(undefined, {
+                                                          maximumFractionDigits: 1,
+                                                          minimumFractionDigits: Number.isInteger(item.hours) ? 0 : 1,
+                                                      })
+                                                    : item.beneficiaries.toLocaleString()}
+                                            </span>
                                         </div>
                                         <div className="w-full bg-slate-100 rounded-full h-3">
                                             <div

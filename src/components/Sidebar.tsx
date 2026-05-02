@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState, useEffect, useLayoutEffect, useCallback } from "react";
-import { LayoutDashboard, Users, Settings, PieChart, LogOut, FileText, Building2, CheckCircle, Briefcase, FileBarChart, ShieldAlert, History, Bell, User, MessageSquare, Plus, CreditCard, ClipboardList, CalendarClock, LifeBuoy, Link2, type LucideProps } from "lucide-react";
+import { LayoutDashboard, Users, Settings, PieChart, LogOut, FileText, Building2, CheckCircle, Briefcase, FileBarChart, ShieldAlert, History, Bell, User, MessageSquare, Plus, CreditCard, ClipboardList, CalendarClock, LifeBuoy, Link2, GraduationCap, type LucideProps } from "lucide-react";
 import clsx from "clsx";
 import { authenticatedFetch, isTokenValid } from "@/utils/api";
 import {
@@ -96,6 +96,29 @@ export default function Sidebar() {
         return () => window.removeEventListener("ciel_user_updated", read);
     }, [isPartner, pathname]);
 
+    const [isUniversityPartnerOrg, setIsUniversityPartnerOrg] = useState(false);
+    useEffect(() => {
+        if (!isPartner) {
+            setIsUniversityPartnerOrg(false);
+            return;
+        }
+        const read = () => {
+            try {
+                const raw = localStorage.getItem("ciel_user") || localStorage.getItem("user");
+                const u = raw
+                    ? (JSON.parse(raw) as { orgType?: string; organization_type?: string; type?: string })
+                    : null;
+                const t = String(u?.orgType || u?.organization_type || u?.type || "").toLowerCase();
+                setIsUniversityPartnerOrg(t.includes("university"));
+            } catch {
+                setIsUniversityPartnerOrg(false);
+            }
+        };
+        read();
+        window.addEventListener("ciel_user_updated", read);
+        return () => window.removeEventListener("ciel_user_updated", read);
+    }, [isPartner]);
+
     const hasInboxNotificationsNav = isStudent || isPartner || isFaculty || isAdmin;
 
     /**
@@ -182,6 +205,9 @@ export default function Sidebar() {
             { label: "Verify Work", href: "/dashboard/partner/verification", icon: CheckCircle },
             { label: "Reports", href: "/dashboard/partner/reports", icon: FileText },
             { label: "Impact", href: "/dashboard/partner/impact", icon: FileBarChart },
+            ...(isUniversityPartnerOrg
+                ? [{ label: "Institution analytics", href: "/dashboard/partner/university-analytics", icon: GraduationCap }]
+                : []),
             { label: "Messages", href: "/dashboard/partner/messages", icon: MessageSquare },
             { label: "Funding", href: "/dashboard/partner/funding", icon: PieChart },
             { label: "Notifications", href: "/dashboard/partner/notifications", icon: Bell },
