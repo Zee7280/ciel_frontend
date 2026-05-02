@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState, useEffect, useLayoutEffect, useCallback } from "react";
-import { LayoutDashboard, Users, Settings, PieChart, LogOut, FileText, Building2, CheckCircle, Briefcase, FileBarChart, ShieldAlert, History, Bell, User, MessageSquare, Plus, CreditCard, ClipboardList, CalendarClock, LifeBuoy, type LucideProps } from "lucide-react";
+import { LayoutDashboard, Users, Settings, PieChart, LogOut, FileText, Building2, CheckCircle, Briefcase, FileBarChart, ShieldAlert, History, Bell, User, MessageSquare, Plus, CreditCard, ClipboardList, CalendarClock, LifeBuoy, Link2, type LucideProps } from "lucide-react";
 import clsx from "clsx";
 import { authenticatedFetch, isTokenValid } from "@/utils/api";
 import {
@@ -16,7 +16,8 @@ import {
     readDashboardNavRoleFromStorage,
     type DashboardNavRole,
 } from "@/utils/dashboardNavRole";
-import { CIEL_NOTIFICATIONS_UNREAD_EVENT, type CielNotificationsUnreadEventDetail, broadcastUnreadNotificationsCount } from "@/utils/cielNotificationsUnread";
+import { clearFacultyScopeSession } from "@/utils/facultyScopeSession";
+import { CIEL_NOTIFICATIONS_UNREAD_EVENT, type CielNotificationsUnreadEventDetail } from "@/utils/cielNotificationsUnread";
 
 export default function Sidebar() {
     const pathname = usePathname();
@@ -29,6 +30,7 @@ export default function Sidebar() {
         localStorage.removeItem("ciel_user");
         localStorage.removeItem("ciel_token");
         clearStudentDashboardCache();
+        clearFacultyScopeSession();
         router.push("/login");
     };
 
@@ -71,24 +73,35 @@ export default function Sidebar() {
     const isFaculty = navRole === "faculty";
     const isAdmin = navRole === "admin";
 
+    const [partnerMembershipNav, setPartnerMembershipNav] = useState(false);
+    useEffect(() => {
+        if (!isPartner) {
+            setPartnerMembershipNav(false);
+            return;
+        }
+        const read = () => {
+            try {
+                const raw = localStorage.getItem("ciel_user") || localStorage.getItem("user");
+                const u = raw ? (JSON.parse(raw) as { requires_membership_payment?: boolean; account_status?: string }) : null;
+                const pending =
+                    u?.requires_membership_payment === true ||
+                    String(u?.account_status || "").toLowerCase() === "pending_membership_payment";
+                setPartnerMembershipNav(Boolean(pending));
+            } catch {
+                setPartnerMembershipNav(false);
+            }
+        };
+        read();
+        window.addEventListener("ciel_user_updated", read);
+        return () => window.removeEventListener("ciel_user_updated", read);
+    }, [isPartner, pathname]);
+
     const hasInboxNotificationsNav = isStudent || isPartner || isFaculty || isAdmin;
 
-    const refreshNotificationUnreadFromApi = useCallback(async () => {
-        if (!isTokenValid(localStorage.getItem("ciel_token"))) return;
-        try {
-            const res = await authenticatedFetch("/api/v1/notifications/unread-count", {}, { redirectToLogin: false });
-            if (!res?.ok) return;
-            const data = (await res.json()) as { success?: boolean; data?: { count?: number } };
-            if (data.success && typeof data.data?.count === "number") {
-                const count = data.data.count;
-                setNotificationUnreadCount(count);
-                broadcastUnreadNotificationsCount(count);
-            }
-        } catch {
-            /* non-fatal */
-        }
-    }, []);
-
+    /**
+     * Notification unread count: single network source — `DashboardHeader` polls `/notifications/unread-count`
+     * and broadcasts `CIEL_NOTIFICATIONS_UNREAD_EVENT`. Sidebar only mirrors localStorage + that event to avoid duplicate requests.
+     */
     useEffect(() => {
         if (!hasInboxNotificationsNav) {
             setNotificationUnreadCount(0);
@@ -106,8 +119,6 @@ export default function Sidebar() {
             }
         };
         syncFromLs();
-        void refreshNotificationUnreadFromApi();
-        const poll = setInterval(() => void refreshNotificationUnreadFromApi(), 30000);
         const handler = (e: Event) => {
             const ce = e as CustomEvent<CielNotificationsUnreadEventDetail>;
             if (typeof ce.detail?.count === "number") {
@@ -117,11 +128,10 @@ export default function Sidebar() {
         window.addEventListener(CIEL_NOTIFICATIONS_UNREAD_EVENT, handler);
         window.addEventListener("ciel_user_updated", syncFromLs);
         return () => {
-            clearInterval(poll);
             window.removeEventListener(CIEL_NOTIFICATIONS_UNREAD_EVENT, handler);
             window.removeEventListener("ciel_user_updated", syncFromLs);
         };
-    }, [hasInboxNotificationsNav, refreshNotificationUnreadFromApi]);
+    }, [hasInboxNotificationsNav]);
 
     useEffect(() => {
         if (!isStudent) {
@@ -163,6 +173,9 @@ export default function Sidebar() {
         // Partner
         ...(isPartner ? [
             { label: "My Organization", href: "/dashboard/partner/organization", icon: Building2 },
+            ...(partnerMembershipNav
+                ? [{ label: "Membership fee", href: "/dashboard/partner/membership-payment", icon: CreditCard }]
+                : []),
             { label: "My Opportunities", href: "/dashboard/partner/requests", icon: Briefcase },
             { label: "Create Opportunity", href: "/dashboard/partner/requests/new", icon: Plus },
             { label: "Attendance review", href: "/dashboard/partner/attendance-review", icon: CalendarClock },
@@ -191,6 +204,8 @@ export default function Sidebar() {
         ...(isAdmin ? [
             { label: "Users", href: "/dashboard/admin/users", icon: Users },
             { label: "Organizations", href: "/dashboard/admin/organizations", icon: Building2 },
+            { label: "Faculty ↔ University scope", href: "/dashboard/admin/faculty-university-scope", icon: Link2 },
+            { label: "Org membership fees", href: "/dashboard/admin/org-membership", icon: CreditCard },
             { label: "Opportunity Request Approvals", href: "/dashboard/admin/approvals", icon: CheckCircle },
             { label: "Applications & Reports Approvals", href: "/dashboard/admin/join-applications", icon: ClipboardList },
             { label: "Payments", href: "/dashboard/admin/payments", icon: CreditCard },

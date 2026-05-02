@@ -217,8 +217,19 @@ function SignUpContent() {
                 throw new Error(err.message || err.error || "Signup failed");
             }
             const signupData = await signupRes.json();
+            const createdUser = signupData?.data?.user ?? signupData?.user;
+            const needsMembershipFlow =
+                createdUser?.requires_membership_payment === true ||
+                String(createdUser?.account_status ?? "")
+                    .trim()
+                    .toLowerCase() === "pending_membership_payment";
             const loginQs = new URLSearchParams();
-            loginQs.set("signup", signupData.user?.status === "pending" ? "pending" : "success");
+            const su = needsMembershipFlow
+                ? "membership"
+                : createdUser?.account_status === "pending" || createdUser?.status === "pending"
+                  ? "pending"
+                  : "success";
+            loginQs.set("signup", su);
             if (postAuthRedirectNext) {
                 loginQs.set("next", postAuthRedirectNext);
             }

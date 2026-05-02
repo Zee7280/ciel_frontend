@@ -8,6 +8,10 @@ import {
     isPartnerOrganizationComplete,
     isStudentProfileComplete,
 } from "@/utils/profileCompletion";
+import {
+    partnerNeedsMembershipPayment,
+    partnerPathAllowedDuringMembershipPending,
+} from "@/utils/membershipPayment";
 
 /**
  * Redirects student/partner/faculty to their profile until required fields exist on the cached user
@@ -40,6 +44,10 @@ export default function ProfileCompletionGate({ children }: { children: React.Re
         }
 
         if (pathname.startsWith("/dashboard/partner")) {
+            if (partnerNeedsMembershipPayment(user) && !partnerPathAllowedDuringMembershipPending(pathname)) {
+                router.replace("/dashboard/partner/membership-payment");
+                return;
+            }
             if (pathname.startsWith("/dashboard/partner/organization")) return;
             const token = localStorage.getItem("ciel_token");
             const userId = user.id ?? user.userId ?? user.user_id;

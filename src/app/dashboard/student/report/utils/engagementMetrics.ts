@@ -290,15 +290,15 @@ export function calculateEngagementMetrics(
     const individualMetrics: IndividualMetric[] = individualKeysOrdered.map((pId) => {
         const ih = studentHoursMap[pId] ?? 0;
         const evidenceUploaded = studentEvidenceMap[pId] || false;
-        let gateway: "ELIGIBLE" | "INCOMPLETE" = ih < RHS ? "INCOMPLETE" : "ELIGIBLE";
+        const gateway: "ELIGIBLE" | "INCOMPLETE" = ih < RHS ? "INCOMPLETE" : "ELIGIBLE";
 
         let bonus = 0;
         if (gateway === "ELIGIBLE" && redFlags.length === 0 && ih > RHS) {
             bonus = Math.min(2.0, ((ih - RHS) / RHS) * 2.0);
         }
 
-        let finalScore: number | null = gateway === "INCOMPLETE" ? null : Math.round(teamEIS + (bonus * 5)); // Scaling bonus to EIS 100-point scale
-        let finalStatus = gateway === "INCOMPLETE" ? "INCOMPLETE" : (finalScore! < 50 ? "LOW" : "COMPLETE");
+        const finalScore: number | null = gateway === "INCOMPLETE" ? null : Math.round(teamEIS + (bonus * 5)); // Scaling bonus to EIS 100-point scale
+        const finalStatus = gateway === "INCOMPLETE" ? "INCOMPLETE" : (finalScore! < 50 ? "LOW" : "COMPLETE");
         let band = "Incomplete";
 
         if (gateway === "ELIGIBLE" && finalScore !== null) {

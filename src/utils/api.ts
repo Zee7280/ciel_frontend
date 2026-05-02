@@ -102,17 +102,14 @@ export async function authenticatedFetch(
 
     if (response.status === 401) {
         if (redirectToLogin) {
-            // Double check: only redirect if our local token is also expired
-            // This prevents redirect on server-side permission errors (403-like 401s)
-            if (!isTokenValid(token)) {
-                console.log("Fetcher: 401 + token expired. Redirecting to login...");
-                if (typeof window !== "undefined") {
-                    localStorage.removeItem("ciel_token");
-                    clearStudentDashboardCache();
-                    window.location.replace("/login");
-                }
-            } else {
-                console.warn("Fetcher: 401 received but local token still valid. Skipping redirect.");
+            // Server rejected the session — redirect even if JWT `exp` is still in the future
+            // (revoked token, backend out of sync, etc.). Callers that must not navigate (e.g.
+            // login bootstrap, background unread polls) pass `redirectToLogin: false`.
+            console.log("Fetcher: 401 Unauthorized. Redirecting to login...");
+            if (typeof window !== "undefined") {
+                localStorage.removeItem("ciel_token");
+                clearStudentDashboardCache();
+                window.location.replace("/login");
             }
         } else {
             console.log("Fetcher: 401 detected in background. Skipping redirect.");

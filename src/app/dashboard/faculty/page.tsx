@@ -12,6 +12,8 @@ import {
     TrendingUp,
     Layers,
     Activity,
+    Building2,
+    Link2,
 } from "lucide-react";
 import {
     ResponsiveContainer,
@@ -27,6 +29,7 @@ import {
 } from "recharts";
 import { authenticatedFetch } from "@/utils/api";
 import PendingActionCards, { type PendingSummary } from "@/components/dashboard/PendingActionCards";
+import { writeFacultyScopeSession, readFacultyDashboardViewPreference, writeFacultyDashboardViewPreference, type FacultyDashboardViewClient } from "@/utils/facultyScopeSession";
 
 type FacultyCourse = {
     id?: string;
@@ -67,7 +70,18 @@ type ActivityItem = {
     at?: string;
 };
 
+type FacultyDashboardViewMode = FacultyDashboardViewClient;
+
 type FacultyDashboardStats = {
+    /** combined | personal | university — which slice stats are for */
+    dashboard_view?: FacultyDashboardViewMode;
+    requested_dashboard_view?: FacultyDashboardViewMode;
+    faculty_view_modes_available?: FacultyDashboardViewMode[];
+    /** Present when admin assigned delegated university visibility */
+    university_scope?: {
+        organization_id?: string;
+        organization_name?: string;
+    } | null;
     students_active?: number;
     hours_verified?: number;
     pending_approvals?: number;
@@ -98,13 +112,11 @@ function normalizeDistribution(raw?: DistributionPoint[]) {
     }));
 }
 
-function ChartEmpty({ message }: { message: string }) {
+function ChartEmpty({ message, hint }: { message: string; hint?: string }) {
     return (
         <div className="flex h-full min-h-[220px] flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50/80 px-6 text-center">
             <p className="text-sm font-semibold text-slate-600">{message}</p>
-            <p className="mt-1 text-xs text-slate-500">
-                Backend can attach this series on <code className="rounded bg-slate-200/80 px-1 py-0.5">GET /api/v1/faculty/dashboard</code>.
-            </p>
+            {hint ? <p className="mt-2 max-w-sm text-xs leading-relaxed text-slate-500">{hint}</p> : null}
         </div>
     );
 }
@@ -112,15 +124,47 @@ function ChartEmpty({ message }: { message: string }) {
 export default function FacultyDashboard() {
     const [stats, setStats] = useState<FacultyDashboardStats | null>(null);
     const [isLoading, setIsLoading] = useState(true);
+    const [viewHydrated, setViewHydrated] = useState(false);
+    const [dashboardView, setDashboardView] = useState<FacultyDashboardViewMode>("combined");
 
     useEffect(() => {
+        setDashboardView(readFacultyDashboardViewPreference());
+        setViewHydrated(true);
+    }, []);
+
+    useEffect(() => {
+        if (!viewHydrated) return;
         const fetchStats = async () => {
             try {
-                const res = await authenticatedFetch(`/api/v1/faculty/dashboard`);
+                setIsLoading(true);
+                const res = await authenticatedFetch(
+                    `/api/v1/faculty/dashboard?view=${encodeURIComponent(dashboardView)}`,
+                );
                 if (res && res.ok) {
                     const data = await res.json();
                     if (data.success) {
-                        setStats(data.data);
+                        const d = data.data as FacultyDashboardStats;
+                        setStats(d);
+                        const modes: FacultyDashboardViewMode[] = d.faculty_view_modes_available?.length
+                            ? d.faculty_view_modes_available
+                            : d.university_scope
+                              ? ["combined", "personal", "university"]
+                              : ["combined", "personal"];
+                        if (!modes.includes(dashboardView)) {
+                            setDashboardView("combined");
+                            writeFacultyDashboardViewPreference("combined");
+                        }
+                        const effective = d.dashboard_view;
+                        const requested = (data.data as { requested_dashboard_view?: FacultyDashboardViewMode })
+                            .requested_dashboard_view;
+                        if (
+                            requested === "university" &&
+                            effective === "combined" &&
+                            !d.university_scope
+                        ) {
+                            setDashboardView("combined");
+                            writeFacultyDashboardViewPreference("combined");
+                        }
                     }
                 }
             } catch (error) {
@@ -131,7 +175,21 @@ export default function FacultyDashboard() {
         };
 
         fetchStats();
-    }, []);
+    }, [dashboardView, viewHydrated]);
+
+    /** Header badge + cross-page hint; does not affect APIs. */
+    useEffect(() => {
+        if (isLoading) return;
+        const scope = stats?.university_scope;
+        if (scope?.organization_name) {
+            writeFacultyScopeSession({
+                organization_name: scope.organization_name,
+                organization_id: scope.organization_id,
+            });
+        } else {
+            writeFacultyScopeSession(null);
+        }
+    }, [isLoading, stats?.university_scope]);
 
     const hoursChartData = useMemo(() => normalizeHoursTrend(stats?.hours_trend), [stats?.hours_trend]);
     const distributionChartData = useMemo(() => normalizeDistribution(stats?.impact_distribution), [stats?.impact_distribution]);
@@ -148,6 +206,43 @@ export default function FacultyDashboard() {
         }, 0);
         return { courseCount: courses.length, totalEnrolled, totalPendingGrading };
     }, [stats?.courses]);
+
+    const viewModes: FacultyDashboardViewMode[] = useMemo(() => {
+        if (stats?.faculty_view_modes_available?.length) {
+            return stats.faculty_view_modes_available;
+        }
+        return stats?.university_scope ? ["combined", "personal", "university"] : ["combined", "personal"];
+    }, [stats?.faculty_view_modes_available, stats?.university_scope]);
+
+    const activeDashboardView = viewModes.includes(dashboardView) ? dashboardView : "combined";
+
+    const viewLabels: Record<FacultyDashboardViewMode, string> = {
+        combined: "All activity",
+        personal: "My supervision",
+        university: "University only",
+    };
+
+    const setView = (v: FacultyDashboardViewMode) => {
+        writeFacultyDashboardViewPreference(v);
+        setDashboardView(v);
+    };
+
+    /** UX-only: explain empty dashboard under delegated scope without changing any API behavior. */
+    const delegatedDashboardLooksEmpty = useMemo(() => {
+        if (isLoading || !stats?.university_scope?.organization_name) return false;
+        const courses = stats.courses ?? [];
+        const pendingGrading = courses.reduce((sum, c) => {
+            const n = typeof c.pending_grading === "number" ? c.pending_grading : c.pending ?? 0;
+            return sum + n;
+        }, 0);
+        return (
+            (stats.students_active ?? 0) === 0 &&
+            (stats.hours_verified ?? 0) === 0 &&
+            (stats.pending_approvals ?? 0) === 0 &&
+            courses.length === 0 &&
+            pendingGrading === 0
+        );
+    }, [isLoading, stats]);
 
     const recentActivity = stats?.recent_activity ?? [];
     const pendingSummary: PendingSummary = stats?.pendingSummary ?? {
@@ -178,6 +273,36 @@ export default function FacultyDashboard() {
                 <div>
                     <h1 className="text-2xl font-bold text-slate-900">Faculty Dashboard</h1>
                     <p className="text-slate-500">Overview of student activities and impact.</p>
+                    {viewModes.length > 1 ? (
+                        <div className="mt-4 flex max-w-2xl flex-col gap-2">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                View scope · like switching profiles
+                            </p>
+                            <div className="flex flex-wrap gap-2 rounded-xl border border-slate-200 bg-slate-50/80 p-1.5">
+                                {viewModes.map((m) => (
+                                    <button
+                                        key={m}
+                                        type="button"
+                                        onClick={() => setView(m)}
+                                        disabled={isLoading}
+                                        className={
+                                            "rounded-lg px-3 py-2 text-xs font-bold transition sm:text-sm " +
+                                            (activeDashboardView === m
+                                                ? "bg-indigo-600 text-white shadow-sm"
+                                                : "bg-white text-slate-700 ring-1 ring-slate-200/80 hover:bg-slate-50")
+                                        }
+                                    >
+                                        {viewLabels[m]}
+                                    </button>
+                                ))}
+                            </div>
+                            <p className="text-[11px] leading-relaxed text-slate-500">
+                                <strong>All activity</strong> merges your listings with university-wide visibility (if
+                                assigned). <strong>My supervision</strong> is only projects where you are the named
+                                supervisor. <strong>University only</strong> is the delegated org slice.
+                            </p>
+                        </div>
+                    ) : null}
                 </div>
                 <Link
                     href="/dashboard/faculty/analytics"
@@ -187,6 +312,83 @@ export default function FacultyDashboard() {
                     Impact analytics
                 </Link>
             </div>
+
+            {stats?.university_scope?.organization_name ? (
+                <div className="relative overflow-hidden rounded-2xl border-2 border-indigo-400/70 bg-gradient-to-br from-indigo-100/90 via-white to-violet-50 p-5 shadow-lg shadow-indigo-900/10 ring-2 ring-indigo-200/60">
+                    <div className="pointer-events-none absolute -right-8 -top-8 h-32 w-32 rounded-full bg-indigo-400/20 blur-2xl" />
+                    <div className="relative flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                        <div className="flex min-w-0 gap-4">
+                            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-indigo-600 text-white shadow-md">
+                                <Building2 className="h-8 w-8" aria-hidden />
+                            </div>
+                            <div className="min-w-0">
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <p className="text-lg font-black tracking-tight text-indigo-950">
+                                        University delegated access
+                                    </p>
+                                    <span className="inline-flex items-center gap-1 rounded-full border border-emerald-400/50 bg-emerald-100/90 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-emerald-900 shadow-sm">
+                                        <Link2 className="h-3 w-3" aria-hidden />
+                                        Active
+                                    </span>
+                                </div>
+                                <p className="mt-2 text-sm font-medium leading-relaxed text-indigo-950/90">
+                                    Use <strong>View scope</strong> above to switch between <strong>All activity</strong>,{" "}
+                                    <strong>My supervision</strong>, and <strong>University only</strong> (Instagram-style
+                                    context). By default, totals merge both your listings and university-matched activity.
+                                </p>
+                                <p className="mt-2 text-sm font-medium leading-relaxed text-indigo-950/90">
+                                    Totals in <strong>All activity</strong> include students whose profile{" "}
+                                    <strong>University</strong> or <strong>Institution</strong> matches{" "}
+                                    <strong className="break-words rounded-md bg-white/90 px-1.5 py-0.5 ring-1 ring-indigo-300/80">
+                                        {stats.university_scope.organization_name}
+                                    </strong>
+                                    , together with your existing supervision-linked activity.
+                                </p>
+                                <ul className="mt-3 space-y-1.5 text-xs font-medium text-indigo-950/85">
+                                    <li className="flex gap-2">
+                                        <GraduationCap className="mt-0.5 h-4 w-4 shrink-0 text-indigo-600" aria-hidden />
+                                        <span>Matching uses the same normalized text as the organization name (spacing and spelling matter).</span>
+                                    </li>
+                                    <li className="flex gap-2">
+                                        <Link2 className="mt-0.5 h-4 w-4 shrink-0 text-indigo-600" aria-hidden />
+                                        <span>Your role stays <strong>faculty</strong>; normal approvals and workflows behave as before.</span>
+                                    </li>
+                                </ul>
+                                {delegatedDashboardLooksEmpty ? (
+                                    <div className="mt-4 rounded-xl border border-amber-300/70 bg-amber-50/95 px-3 py-2.5 text-xs font-medium leading-relaxed text-amber-950 shadow-sm">
+                                        <strong className="font-bold">Tiles still at zero?</strong> Ensure students use that exact
+                                        institution name on their profile and have enrollments, verified hours, or pending items.
+                                        Empty charts only mean no data yet — not a broken delegation.
+                                    </div>
+                                ) : null}
+                                <div className="mt-4 flex flex-wrap gap-2 border-t border-indigo-200/60 pt-4">
+                                    <span className="w-full text-[11px] font-bold uppercase tracking-wide text-indigo-900/70">
+                                        Related pages (same scoped students)
+                                    </span>
+                                    <Link
+                                        href="/dashboard/faculty/approvals"
+                                        className="rounded-lg bg-white px-3 py-1.5 text-xs font-bold text-indigo-700 ring-1 ring-indigo-300/70 hover:bg-indigo-50"
+                                    >
+                                        Opportunity request approvals
+                                    </Link>
+                                    <Link
+                                        href="/dashboard/faculty/join-applications"
+                                        className="rounded-lg bg-white px-3 py-1.5 text-xs font-bold text-indigo-700 ring-1 ring-indigo-300/70 hover:bg-indigo-50"
+                                    >
+                                        Applications & reports
+                                    </Link>
+                                    <Link
+                                        href="/dashboard/faculty/my-opportunities"
+                                        className="rounded-lg bg-white px-3 py-1.5 text-xs font-bold text-indigo-700 ring-1 ring-indigo-300/70 hover:bg-indigo-50"
+                                    >
+                                        My opportunities
+                                    </Link>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            ) : null}
 
             <PendingActionCards summary={pendingSummary} emptyMessage="No approvals or grading items are pending." />
 
@@ -235,7 +437,10 @@ export default function FacultyDashboard() {
                             <div className="h-10 w-10 animate-spin rounded-full border-4 border-indigo-500 border-t-transparent" />
                         </div>
                     ) : hoursChartData.length === 0 ? (
-                        <ChartEmpty message="No trend data yet" />
+                        <ChartEmpty
+                            message="No verified hours trend yet"
+                            hint="Once students log verified hours on projects you supervise (or that match your university scope), a chart will appear here."
+                        />
                     ) : (
                         <div className="h-[280px] w-full">
                             <ResponsiveContainer width="100%" height="100%">
@@ -265,7 +470,7 @@ export default function FacultyDashboard() {
                                 <span className="text-[10px] font-bold uppercase tracking-wide">Courses</span>
                             </div>
                             <p className="text-2xl font-bold text-slate-900">{isLoading ? "-" : courseSummaries.courseCount}</p>
-                            <p className="mt-0.5 text-[11px] text-slate-500">From dashboard payload</p>
+                            <p className="mt-0.5 text-[11px] text-slate-500">Projects in your scope</p>
                         </div>
                         <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
                             <div className="mb-2 flex items-center gap-2 text-slate-500">
@@ -273,7 +478,7 @@ export default function FacultyDashboard() {
                                 <span className="text-[10px] font-bold uppercase tracking-wide">Enrolled</span>
                             </div>
                             <p className="text-2xl font-bold text-slate-900">{isLoading ? "-" : courseSummaries.totalEnrolled}</p>
-                            <p className="mt-0.5 text-[11px] text-slate-500">Sum across courses</p>
+                            <p className="mt-0.5 text-[11px] text-slate-500">Total enrolled seats</p>
                         </div>
                     </div>
                     <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
@@ -295,8 +500,8 @@ export default function FacultyDashboard() {
                                 ))}
                             </div>
                         ) : recentActivity.length === 0 ? (
-                            <p className="text-xs text-slate-500">
-                                Activity will list here when the API includes <code className="rounded bg-slate-100 px-1">recent_activity</code>.
+                            <p className="text-xs leading-relaxed text-slate-500">
+                                No recent activity yet. Submissions, approvals, and milestones will show here when they occur.
                             </p>
                         ) : (
                             <ul className="max-h-[200px] space-y-2 overflow-y-auto pr-1">
@@ -329,7 +534,10 @@ export default function FacultyDashboard() {
                         <div className="h-10 w-10 animate-spin rounded-full border-4 border-indigo-500 border-t-transparent" />
                     </div>
                 ) : distributionChartData.length === 0 ? (
-                    <ChartEmpty message="No distribution data yet" />
+                    <ChartEmpty
+                        message="No impact mix to show yet"
+                        hint="When your projects include SDG or impact tags, a breakdown can appear here."
+                    />
                 ) : (
                     <div className="h-[260px] w-full">
                         <ResponsiveContainer width="100%" height="100%">
@@ -408,15 +616,6 @@ export default function FacultyDashboard() {
                         </div>
                     );
                 })}
-
-                {!isLoading && (stats?.courses?.length ?? 0) === 0 ? (
-                    <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center lg:col-span-3">
-                        <p className="text-sm font-semibold text-slate-700">No courses found</p>
-                        <p className="mt-1 text-xs text-slate-500">
-                            Course cards will appear here when dashboard API returns faculty course data.
-                        </p>
-                    </div>
-                ) : null}
             </div>
         </div>
     );

@@ -45,7 +45,7 @@ export function calculateCII(data: ReportData): CIIResult {
         totalVerifiedTeamHours: (data.section1?.team_members?.reduce((sum, member) => sum + (parseFloat(member.hours) || 0), 0) || 0) + (parseFloat(data.section1?.team_lead?.hours) || 0),
     });
 
-    let participation = section1Result.finalScore;
+    const participation = section1Result.finalScore;
     let context = 0;
     let sdg = 0;
     let outputs = 0;
