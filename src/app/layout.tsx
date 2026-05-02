@@ -17,9 +17,6 @@ const dancingScript = Dancing_Script({
 export const metadata: Metadata = {
   title: "CIEL PK - Community Impact Education Lab",
   description: "Where Youth, Universities & Communities Create Measurable Impact",
-  icons: {
-    icon: "/iel-pk-logo.png",
-  },
 };
 
 import { Toaster } from "sonner";

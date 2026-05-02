@@ -24,13 +24,15 @@ import {
 } from "@/utils/facultyApprovals";
 import { formatDisplayId } from "@/utils/displayIds";
 import { getStoredCurrentUserId } from "@/utils/currentUser";
-import { resolveStudentOpportunityWorkflow, type OpportunityWorkflowStage } from "@/utils/opportunityWorkflow";
+import { resolveStudentOpportunityWorkflow, type OpportunityWorkflowStage, isFacultyApprovalCompleteForPartnerGate } from "@/utils/opportunityWorkflow";
 
 type PartnerApprovalRow = FacultyApprovalRow & {
     workflowStageKey: OpportunityWorkflowStage;
     workflowLabel: string;
     queueMessage: string;
     partnerDecision: string;
+    /** False until faculty step is done — backend returns 400 if partner acts earlier. */
+    partnerDecisionActionsEnabled: boolean;
 };
 
 function lower(value: unknown): string {
@@ -111,6 +113,7 @@ function mapPartnerApprovalRows(payload: unknown, currentUserId: string): Partne
                 workflowLabel: workflow.badgeLabel,
                 queueMessage: workflow.queueMessage,
                 partnerDecision: lower(raw.partner_approval_status ?? raw.partner_status),
+                partnerDecisionActionsEnabled: isFacultyApprovalCompleteForPartnerGate(raw),
             };
         })
         .filter((row) => {
@@ -279,6 +282,20 @@ export default function VerifyWorkPage() {
 
     const handleApprove = async (id: string) => {
         if (approveSubmittingId === id) return;
+        const listRow = rows.find((r) => r.id === id);
+        const detailMatches =
+            detailRecord &&
+            id === pickStr(detailRecord, "id", "opportunity_id", "opportunityId");
+        const facultyGateOk =
+            listRow != null
+                ? listRow.partnerDecisionActionsEnabled
+                : detailMatches
+                  ? isFacultyApprovalCompleteForPartnerGate(detailRecord as Record<string, unknown>)
+                  : true;
+        if (!facultyGateOk) {
+            toast.error("Partner verification is only available after faculty approval.");
+            return;
+        }
         setApproveSubmittingId(id);
         try {
             const res = await authenticatedFetch(`/api/v1/partner/approvals/${id}/approve`, {
@@ -372,6 +389,21 @@ export default function VerifyWorkPage() {
 
     const confirmReject = async () => {
         if (!rejectTargetId) return;
+        const listRow = rows.find((r) => r.id === rejectTargetId);
+        const detailMatches =
+            detailRecord &&
+            rejectTargetId === pickStr(detailRecord, "id", "opportunity_id", "opportunityId");
+        const facultyGateOk =
+            listRow != null
+                ? listRow.partnerDecisionActionsEnabled
+                : detailMatches
+                  ? isFacultyApprovalCompleteForPartnerGate(detailRecord as Record<string, unknown>)
+                  : true;
+        if (!facultyGateOk) {
+            toast.error("Partner verification is only available after faculty approval.");
+            closeRejectDialog();
+            return;
+        }
         const reason = rejectComment.trim();
         if (reason.length < 3) {
             toast.error("Please add feedback for the student (at least 3 characters).");
@@ -423,6 +455,8 @@ export default function VerifyWorkPage() {
     }, [rows, search, tab]);
 
     const partnerBlock = detailRecord ? detailPartnerBlock(detailRecord) : null;
+    const detailPartnerActionsEnabled =
+        Boolean(detailRecord) && isFacultyApprovalCompleteForPartnerGate(detailRecord as Record<string, unknown>);
     const studentBlock = detailRecord ? detailStudentBlock(detailRecord) : null;
     const detailCreatorId = detailRecord
         ? pickStr(detailRecord, "creatorId", "creator_id", "student_id", "studentId", "created_by")
@@ -569,10 +603,15 @@ export default function VerifyWorkPage() {
                                 <div className="flex w-full flex-col justify-center gap-3 border-t border-slate-100 bg-slate-50 p-5 sm:flex-row md:w-56 md:flex-col md:border-l md:border-t-0 md:p-6">
                                     {tab === "pending" ? (
                                         <>
+                                            {!row.partnerDecisionActionsEnabled ? (
+                                                <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                                                    Faculty approval is required before you can approve or reject (CIEL rule).
+                                                </p>
+                                            ) : null}
                                             <Button
                                                 className="w-full bg-green-600 hover:bg-green-700"
                                                 onClick={() => void handleApprove(row.id)}
-                                                disabled={approveSubmittingId === row.id}
+                                                disabled={approveSubmittingId === row.id || !row.partnerDecisionActionsEnabled}
                                             >
                                                 {approveSubmittingId === row.id ? (
                                                     <>
@@ -584,7 +623,12 @@ export default function VerifyWorkPage() {
                                                     </>
                                                 )}
                                             </Button>
-                                            <Button variant="destructive" className="w-full" onClick={() => openRejectDialog(row.id)}>
+                                            <Button
+                                                variant="destructive"
+                                                className="w-full"
+                                                onClick={() => openRejectDialog(row.id)}
+                                                disabled={!row.partnerDecisionActionsEnabled}
+                                            >
                                                 <XCircle className="w-4 h-4 mr-2" /> Reject
                                             </Button>
                                         </>
@@ -781,15 +825,25 @@ export default function VerifyWorkPage() {
                                     ) : null}
                                 </div>
                             ) : null}
+                            {detailActionId && !detailPartnerActionsEnabled ? (
+                                <div className="rounded-xl border border-amber-200 bg-amber-50/80 p-4 text-sm text-amber-950">
+                                    Partner verification is only available after faculty approval. This request will unlock approve/reject once
+                                    faculty has approved.
+                                </div>
+                            ) : null}
                             {detailActionId ? (
                                 <div className="flex flex-wrap justify-end gap-2 pt-4 border-t border-slate-200">
-                                    <Button variant="destructive" onClick={() => detailActionId && openRejectDialog(detailActionId)}>
+                                    <Button
+                                        variant="destructive"
+                                        onClick={() => detailActionId && openRejectDialog(detailActionId)}
+                                        disabled={!detailPartnerActionsEnabled}
+                                    >
                                         <XCircle className="w-4 h-4 mr-2" /> Reject
                                     </Button>
                                     <Button
                                         className="bg-green-600 hover:bg-green-700"
                                         onClick={() => void handleApprove(detailActionId)}
-                                        disabled={approveSubmittingId === detailActionId}
+                                        disabled={approveSubmittingId === detailActionId || !detailPartnerActionsEnabled}
                                     >
                                         {approveSubmittingId === detailActionId ? (
                                             <>

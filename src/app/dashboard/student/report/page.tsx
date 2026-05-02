@@ -22,6 +22,7 @@ import { pickImpactVerifyUrlFromPayload } from '@/utils/reportVerificationUrl';
 import { prepareReportEvidenceForSave } from './utils/evidenceUpload';
 import { normalizeEngagementAttendanceLog } from '@/utils/engagementAttendanceMap';
 import { readPersistedCiiSnapshot } from '@/utils/reportCiiSnapshot';
+import { pickReportStatusFromCheckRow } from '@/utils/studentBrowseReportCta';
 
 // Import New Sections
 import Section1Participation from './components/Section1Participation';
@@ -85,6 +86,12 @@ async function httpFailureUserMessage(res: Response, actionLabel: string): Promi
     } catch {
         return prefix;
     }
+}
+
+/** Same lifecycle tokens as browse / My Projects (`pickReportStatusFromCheckRow`) — never infer from payload size. */
+function shouldSkipPreReportGuide(reportForState: Record<string, unknown>): boolean {
+    const w = pickReportStatusFromCheckRow(reportForState);
+    return w === "continue" || w === "rejected" || w === "draft";
 }
 
 function ReportFormContent() {
@@ -248,7 +255,7 @@ function ReportFormContent() {
                         setShowGuide(false);
                         setStep(11);
                         setReadOnly(true);
-                    } else if (reportForState.status === "continue" || Object.keys(reportForState).length > 2) {
+                    } else if (shouldSkipPreReportGuide(reportForState)) {
                         setShowGuide(false);
                     }
                 }
@@ -534,7 +541,10 @@ function ReportFormContent() {
             <div className="max-w-none mx-auto px-4 md:px-8 py-5">
                 <PreReportGuide
                     projectTitle={projectDetails?.title}
-                    onStart={() => setShowGuide(false)}
+                    onStart={() => {
+                        setStep(1);
+                        setShowGuide(false);
+                    }}
                 />
             </div>
         );

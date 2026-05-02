@@ -427,6 +427,16 @@ export function formatOpportunityDetailStatusBadge(project: Record<string, unkno
     return "—";
 }
 
+/** Align with backend: partner approve/reject must not run until faculty step is complete. */
+export function isFacultyApprovalCompleteForPartnerGate(project: Record<string, unknown>): boolean {
+    return (
+        truthyApproved(project.faculty_verified) ||
+        truthyApproved(project.liaison_verified) ||
+        lower(project.faculty_verification_status) === "faculty_verified" ||
+        lower(project.faculty_approval_status) === "approved"
+    );
+}
+
 /**
  * Resolves UI copy for list/detail views. Extend mappings when API stabilizes.
  */
@@ -487,11 +497,7 @@ export function resolveStudentOpportunityWorkflow(project: Record<string, unknow
         partEarly === "awaiting" ||
         partEarly === "required";
 
-    const facultyStepDone =
-        truthyApproved(project.faculty_verified) ||
-        truthyApproved(project.liaison_verified) ||
-        lower(project.faculty_verification_status) === "faculty_verified" ||
-        lower(project.faculty_approval_status) === "approved";
+    const facultyStepDone = isFacultyApprovalCompleteForPartnerGate(project);
 
     if (facultyStepDone) {
         if (
