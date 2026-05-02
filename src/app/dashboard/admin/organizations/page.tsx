@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Search, Filter, MoreVertical, Building2, Globe, ShieldCheck, AlertCircle, Loader2 } from "lucide-react";
+import { Search, Filter, MoreVertical, Building2, Globe, ShieldCheck, AlertCircle, Loader2, UserPlus } from "lucide-react";
 import { PaginationControls } from "@/components/ui/PaginationControls";
 import { authenticatedFetch } from "@/utils/api";
 import { toast } from "sonner";
@@ -162,12 +162,53 @@ export default function AdminOrganizationsPage() {
         return date.toLocaleString();
     };
 
+    const isUniversityOrganization = (org: any) => {
+        const t = String(org?.organization_type || org?.type || org?.orgType || "").toLowerCase();
+        return t.includes("university");
+    };
+
+    const [isMemberModalOpen, setIsMemberModalOpen] = useState(false);
+    const [memberForm, setMemberForm] = useState({
+        name: "",
+        email: "",
+        password: "",
+        role: "university" as "university" | "organization_admin",
+    });
+
+    const handleAddUniversityMember = async (e: React.FormEvent) => {
+        e.preventDefault();
+        const orgId = selectedOrg?.id;
+        if (!orgId) return;
+        try {
+            const res = await authenticatedFetch(`/api/v1/admin/organizations/${orgId}/members`, {
+                method: "POST",
+                body: JSON.stringify({
+                    name: memberForm.name,
+                    email: memberForm.email,
+                    password: memberForm.password,
+                    role: memberForm.role,
+                }),
+            });
+            const data = await res?.json().catch(() => ({}));
+            if (!res?.ok) {
+                toast.error(data?.message || data?.error || "Failed to add staff account");
+                return;
+            }
+            toast.success("University staff account created");
+            setIsMemberModalOpen(false);
+            setMemberForm({ name: "", email: "", password: "", role: "university" });
+        } catch (err) {
+            console.error(err);
+            toast.error("Failed to add staff account");
+        }
+    };
+
     return (
         <div className="relative p-0 lg:p-8">
             <div className="mb-8 flex flex-col items-stretch justify-between gap-4 sm:flex-row sm:items-center">
                 <div className="min-w-0">
                     <h1 className="text-2xl font-bold text-slate-900 sm:text-3xl">Organizations</h1>
-                    <p className="text-slate-500">Manage NGO and Corporate partners.</p>
+                    <p className="text-slate-500">Manage NGO, corporate, and university partners.</p>
                 </div>
                 <button
                     onClick={() => setIsAddModalOpen(true)}
@@ -357,6 +398,7 @@ export default function AdminOrganizationsPage() {
                                 >
                                     <option value="ngo">NGO</option>
                                     <option value="corporate">Corporate</option>
+                                    <option value="university">University</option>
                                     <option value="school">Educational Institute</option>
                                 </select>
                             </div>
@@ -470,6 +512,96 @@ export default function AdminOrganizationsPage() {
                                 </div>
                             </div>
                         )}
+
+                        {selectedOrg && isUniversityOrganization(selectedOrg) && (
+                            <div className="mt-6 border-t border-slate-100 pt-4">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsMemberModalOpen(true)}
+                                    className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-indigo-700"
+                                >
+                                    <UserPlus className="h-4 w-4" />
+                                    Add university staff login
+                                </button>
+                                <p className="mt-2 text-xs text-slate-500">
+                                    Creates another user attached to this organization (e.g. operations team). Requires admin.
+                                </p>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {isMemberModalOpen && selectedOrg && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+                    <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl">
+                        <div className="mb-4 flex items-start justify-between gap-4">
+                            <h3 className="text-lg font-bold text-slate-900">Add university staff</h3>
+                            <button
+                                type="button"
+                                onClick={() => setIsMemberModalOpen(false)}
+                                className="text-slate-400 hover:text-slate-600"
+                                aria-label="Close"
+                            >
+                                <AlertCircle className="h-6 w-6 rotate-45" />
+                            </button>
+                        </div>
+                        <p className="mb-4 text-sm text-slate-500">
+                            Organization: <strong>{readOrgValue(selectedOrg, ["name"])}</strong>
+                        </p>
+                        <form onSubmit={handleAddUniversityMember} className="space-y-3">
+                            <div>
+                                <label className="mb-1 block text-sm font-semibold text-slate-700">Full name</label>
+                                <input
+                                    required
+                                    className="w-full rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-blue-500"
+                                    value={memberForm.name}
+                                    onChange={(e) => setMemberForm({ ...memberForm, name: e.target.value })}
+                                />
+                            </div>
+                            <div>
+                                <label className="mb-1 block text-sm font-semibold text-slate-700">Email</label>
+                                <input
+                                    required
+                                    type="email"
+                                    className="w-full rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-blue-500"
+                                    value={memberForm.email}
+                                    onChange={(e) => setMemberForm({ ...memberForm, email: e.target.value })}
+                                />
+                            </div>
+                            <div>
+                                <label className="mb-1 block text-sm font-semibold text-slate-700">Temporary password</label>
+                                <input
+                                    required
+                                    type="password"
+                                    className="w-full rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-blue-500"
+                                    value={memberForm.password}
+                                    onChange={(e) => setMemberForm({ ...memberForm, password: e.target.value })}
+                                />
+                            </div>
+                            <div>
+                                <label className="mb-1 block text-sm font-semibold text-slate-700">Role</label>
+                                <select
+                                    className="w-full rounded-lg border border-slate-200 px-3 py-2 outline-none focus:border-blue-500"
+                                    value={memberForm.role}
+                                    onChange={(e) =>
+                                        setMemberForm({
+                                            ...memberForm,
+                                            role: e.target.value as "university" | "organization_admin",
+                                        })
+                                    }
+                                >
+                                    <option value="university">University operator</option>
+                                    <option value="organization_admin">Organization admin</option>
+                                </select>
+                            </div>
+                            <button
+                                type="submit"
+                                className="mt-2 w-full rounded-xl bg-blue-600 py-3 font-bold text-white hover:bg-blue-700"
+                            >
+                                Create account
+                            </button>
+                        </form>
                     </div>
                 </div>
             )}

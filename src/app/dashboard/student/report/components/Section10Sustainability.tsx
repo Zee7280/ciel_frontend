@@ -65,8 +65,8 @@ export default function Section10Sustainability() {
     const getWordCount = (text: string) => (text || '').trim().split(/\s+/).filter(w => w.length > 0).length;
     const cdWords = getWordCount(continuation_details);
 
-    let minWords = 100;
-    let maxWords = 200;
+    const minWords = 100;
+    const maxWords = 200;
     let explanationPrompt = "";
     if (continuation_status === 'yes') {
         explanationPrompt = "Explain: Who will continue the activity? What system or structure supports continuation? Were materials/tools transferred? Is a partner formally responsible?";

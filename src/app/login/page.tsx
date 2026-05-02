@@ -18,6 +18,7 @@ import {
     isSafeInternalReturnPath,
 } from "@/utils/verificationReturnUrl";
 import { getDashboardHomePathForRole } from "@/utils/dashboardNavRole";
+import { partnerNeedsMembershipPayment, notifyCielUserUpdated } from "@/utils/membershipPayment";
 import {
     clearStudentDashboardCache,
     fetchStudentDashboardData,
@@ -101,6 +102,7 @@ function syncStoredUser(user: Record<string, unknown>) {
     const s = JSON.stringify(user);
     localStorage.setItem("ciel_user", s);
     localStorage.setItem("user", s);
+    notifyCielUserUpdated();
 }
 
 function normalizeNonEmptyString(value: unknown): string {
@@ -380,9 +382,14 @@ function LoginContent() {
                                 u = hydratedUser;
                                 syncStoredUser(u);
                             }
-                            profilePath = !orgData || !isPartnerOrganizationComplete(orgData)
-                                ? "/dashboard/partner/organization"
-                                : null;
+                            if (partnerNeedsMembershipPayment(u)) {
+                                profilePath = "/dashboard/partner/membership-payment";
+                            } else {
+                                profilePath =
+                                    !orgData || !isPartnerOrganizationComplete(orgData)
+                                        ? "/dashboard/partner/organization"
+                                        : null;
+                            }
                         } else {
                             profilePath = profileCompletionRedirectPath(String(role), u);
                         }
@@ -491,6 +498,16 @@ function LoginContent() {
                                     <h3 className="text-4xl font-black text-slate-900 tracking-tight mb-3 italic">Welcome Back</h3>
                                     <p className="text-slate-500 font-medium">Please enter your details to sign in.</p>
                                 </div>
+
+                                {searchParams.get("signup") === "membership" && (
+                                    <div className="mb-6 flex items-start gap-3 rounded-2xl border border-blue-100 bg-blue-50/90 p-4 text-left text-xs font-semibold text-blue-900">
+                                        <CheckCircle className="mt-0.5 h-4 w-4 shrink-0 text-blue-600" />
+                                        <span>
+                                            Your university or corporate account was created. After you sign in, you will
+                                            complete the one-time membership fee (or wait for an admin to activate you).
+                                        </span>
+                                    </div>
+                                )}
 
                                 <form onSubmit={handleLogin} className="space-y-6">
                                     <div className="space-y-1.5">

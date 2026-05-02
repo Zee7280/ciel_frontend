@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useLayoutEffect, useRef, useCallback } from "react";
 import { usePathname } from "next/navigation";
-import { AlertCircle, Bell, CheckCircle, Clock, Info, Loader2, LogOut, Search, User } from "lucide-react";
+import { AlertCircle, Bell, CheckCircle, Clock, GraduationCap, Info, Loader2, LogOut, Search, User } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
     dashboardNavRoleFromPathname,
@@ -12,6 +12,12 @@ import {
 import { authenticatedFetch, isTokenValid } from "@/utils/api";
 import { CIEL_NOTIFICATIONS_UNREAD_EVENT, type CielNotificationsUnreadEventDetail, broadcastUnreadNotificationsCount } from "@/utils/cielNotificationsUnread";
 import { clearStudentDashboardCache } from "@/utils/student-dashboard-cache";
+import {
+    CIEL_FACULTY_SCOPE_EVENT,
+    clearFacultyScopeSession,
+    readFacultyScopeSession,
+    type FacultyScopeSessionPayload,
+} from "@/utils/facultyScopeSession";
 
 type HeaderNotification = {
     id: number;
@@ -37,10 +43,24 @@ export default function DashboardHeader() {
         localStorage.removeItem("ciel_user");
         localStorage.removeItem("ciel_token");
         clearStudentDashboardCache();
+        clearFacultyScopeSession();
         router.push("/login");
     };
 
     const [user, setUser] = useState<{ name: string; role: string; email: string; image?: string; logoUrl?: string; notifications_count?: number } | null>(null);
+
+    const [facultyDelegatedScope, setFacultyDelegatedScope] = useState<FacultyScopeSessionPayload | null>(null);
+
+    useEffect(() => {
+        if (navRole !== "faculty") {
+            setFacultyDelegatedScope(null);
+            return;
+        }
+        const sync = () => setFacultyDelegatedScope(readFacultyScopeSession());
+        sync();
+        window.addEventListener(CIEL_FACULTY_SCOPE_EVENT, sync);
+        return () => window.removeEventListener(CIEL_FACULTY_SCOPE_EVENT, sync);
+    }, [navRole, pathname]);
 
     const getTitle = () => {
         if (navRole === "student") return "Student Dashboard";
@@ -240,9 +260,20 @@ export default function DashboardHeader() {
     return (
         <header className="sticky top-0 z-30 flex min-h-16 items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 py-3 font-sans sm:px-6 lg:ml-64 lg:h-20 lg:px-8">
             <div className="min-w-0">
-                <h1 className="truncate text-base font-black tracking-tight text-slate-900 sm:text-xl">
-                    {isStudentHome ? `Welcome back, ${firstName}!` : getTitle()}
-                </h1>
+                <div className="flex flex-wrap items-center gap-2">
+                    <h1 className="truncate text-base font-black tracking-tight text-slate-900 sm:text-xl">
+                        {isStudentHome ? `Welcome back, ${firstName}!` : getTitle()}
+                    </h1>
+                    {navRole === "faculty" && facultyDelegatedScope?.organization_name ? (
+                        <span
+                            className="inline-flex max-w-[min(100%,14rem)] items-center gap-1 rounded-full border border-indigo-300 bg-indigo-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-indigo-900 shadow-sm sm:max-w-[20rem]"
+                            title="Admin-assigned university-wide visibility for matching student profiles"
+                        >
+                            <GraduationCap className="h-3.5 w-3.5 shrink-0 text-indigo-600" aria-hidden />
+                            <span className="truncate">Uni scope: {facultyDelegatedScope.organization_name}</span>
+                        </span>
+                    ) : null}
+                </div>
                 <p className="truncate text-[10px] font-bold uppercase tracking-wider text-slate-400">
                     {isStudentHome ? "Overview" : `Welcome back, ${firstName}`}
                 </p>
