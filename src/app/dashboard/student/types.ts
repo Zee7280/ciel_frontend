@@ -14,6 +14,11 @@ export interface ActiveProject {
     progress: number;
     /** Present only when a report row exists; includes pending_payment, payment_under_review, draft, submitted, … */
     report_status?: string;
+    /** Opportunity requirement per student (hours). */
+    required_hours_per_student?: number;
+    participation_type?: string;
+    academic_integration_type?: string | null;
+    team_size?: number;
 }
 
 export interface Deadline {
@@ -95,6 +100,14 @@ export interface DashboardPendingSummary {
     items: DashboardPendingSummaryItem[];
 }
 
+/** Account-level analytics from `GET …/me/dashboard` (optional for older backends). */
+export interface StudentDashboardAnalytics {
+    profile_completion_percent: number;
+    completed_required_fields: number;
+    total_required_fields: number;
+    verified: boolean;
+}
+
 export interface DashboardData {
     stats: DashboardStats;
     activeProjects: ActiveProject[];
@@ -103,4 +116,5 @@ export interface DashboardData {
     quickActions?: DashboardQuickActions;
     notificationsPreview?: DashboardNotificationsPreview;
     pendingSummary?: DashboardPendingSummary;
+    student_analytics?: StudentDashboardAnalytics;
 }

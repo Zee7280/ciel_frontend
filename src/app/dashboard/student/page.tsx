@@ -16,6 +16,9 @@ import {
     Bell,
     Wallet,
     FileCheck,
+    UserCircle,
+    ShieldCheck,
+    Users,
 } from "lucide-react";
 import Link from "next/link";
 import { Button } from "./report/components/ui/button";
@@ -27,7 +30,11 @@ import type {
     DashboardOverview,
     DashboardStats,
 } from "./types";
-import { readStudentDashboardCache } from "@/utils/student-dashboard-fetch";
+import {
+    fetchStudentDashboardData,
+    persistStudentDashboardCache,
+    readStudentDashboardCache,
+} from "@/utils/student-dashboard-fetch";
 import StudentProgressTracker from "./components/StudentProgressTracker";
 import PendingActionCards from "@/components/dashboard/PendingActionCards";
 
@@ -95,6 +102,23 @@ function mergeStudentOverview(data: DashboardData): DashboardOverview {
     };
 }
 
+function formatParticipationType(t?: string): string | null {
+    if (!t) return null;
+    const x = t.trim().toLowerCase();
+    if (x === "team") return "Team";
+    if (x === "individual") return "Individual";
+    return t;
+}
+
+function projectHasAnalyticsFields(p: ActiveProject): boolean {
+    return (
+        p.required_hours_per_student != null ||
+        !!p.participation_type ||
+        p.academic_integration_type != null ||
+        p.team_size != null
+    );
+}
+
 function notificationCategoryLabel(c?: DashboardNotificationCategory | string) {
     if (!c) return null;
     const labels: Record<string, string> = {
@@ -133,14 +157,38 @@ export default function StudentDashboard() {
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
-        try {
-            const payload = readStudentDashboardCache();
-            if (payload) setData(payload);
-        } catch (error) {
-            console.error("Failed to load dashboard cache:", error);
-        } finally {
-            setIsLoading(false);
-        }
+        let cancelled = false;
+
+        const load = async () => {
+            let cached: DashboardData | null = null;
+            try {
+                cached = readStudentDashboardCache();
+                if (cached) {
+                    setData(cached);
+                    setIsLoading(false);
+                }
+            } catch (error) {
+                console.error("Failed to load dashboard cache:", error);
+            }
+
+            try {
+                const fresh = await fetchStudentDashboardData({ redirectToLogin: true });
+                if (cancelled) return;
+                if (fresh) {
+                    setData(fresh);
+                    persistStudentDashboardCache(fresh);
+                }
+            } catch (error) {
+                console.error("Failed to fetch student dashboard:", error);
+            } finally {
+                if (!cancelled && !cached) setIsLoading(false);
+            }
+        };
+
+        void load();
+        return () => {
+            cancelled = true;
+        };
     }, []);
 
     const overview = useMemo(() => mergeStudentOverview(data), [data]);
@@ -178,6 +226,24 @@ export default function StudentDashboard() {
             </div>
 
             <PendingActionCards summary={data.pendingSummary} emptyMessage="You are all caught up on approvals, reports, payments, and deadlines." />
+
+            {/* Summary stats — `data.stats` from dashboard API; placed high so metrics stay above the fold */}
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+                {statItems.map((stat, index) => (
+                    <div
+                        key={index}
+                        className="flex items-center gap-4 rounded-2xl border border-slate-100 bg-white p-5 shadow-[0_4px_20px_-10px_rgba(0,0,0,0.05)]"
+                    >
+                        <div className={`flex h-12 w-12 items-center justify-center rounded-xl ${stat.iconBg} ${stat.iconText}`}>
+                            <stat.icon className="h-6 w-6" />
+                        </div>
+                        <div>
+                            <h3 className="text-2xl font-bold text-slate-800">{stat.value}</h3>
+                            <p className="text-sm font-medium text-slate-500">{stat.label}</p>
+                        </div>
+                    </div>
+                ))}
+            </div>
 
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-3 lg:gap-8">
                 <div className="space-y-6 lg:col-span-2">
@@ -337,6 +403,62 @@ export default function StudentDashboard() {
                 </div>
 
                 <div className="space-y-6">
+                    {data.student_analytics ? (
+                        <div className="rounded-3xl border border-slate-200/80 bg-white p-6 shadow-sm">
+                            <div className="mb-4 flex items-center justify-between gap-2">
+                                <h3 className="text-sm font-black uppercase tracking-wider text-slate-400">Your account</h3>
+                                <UserCircle className="h-5 w-5 text-slate-300" />
+                            </div>
+                            <div className="space-y-4">
+                                <div>
+                                    <div className="flex items-center justify-between gap-2 text-xs font-bold text-slate-500">
+                                        <span>Profile completion</span>
+                                        <span className="text-slate-800">
+                                            {data.student_analytics.profile_completion_percent}%
+                                        </span>
+                                    </div>
+                                    <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100">
+                                        <div
+                                            className="h-full rounded-full bg-blue-600 transition-[width]"
+                                            style={{
+                                                width: `${Math.min(100, Math.max(0, data.student_analytics.profile_completion_percent))}%`,
+                                            }}
+                                        />
+                                    </div>
+                                    <p className="mt-1 text-[11px] text-slate-400">
+                                        {data.student_analytics.completed_required_fields} of{" "}
+                                        {data.student_analytics.total_required_fields} required fields
+                                    </p>
+                                </div>
+                                <div className="flex items-center justify-between gap-3 rounded-2xl border border-slate-100 bg-slate-50/80 px-4 py-3">
+                                    <div className="flex items-center gap-2 min-w-0">
+                                        <ShieldCheck
+                                            className={`h-5 w-5 shrink-0 ${
+                                                data.student_analytics.verified ? "text-emerald-600" : "text-amber-500"
+                                            }`}
+                                        />
+                                        <div className="min-w-0">
+                                            <p className="text-xs font-black text-slate-800">Verification</p>
+                                            <p className="text-[11px] font-medium text-slate-500">
+                                                {data.student_analytics.verified
+                                                    ? "Profile and identity verified"
+                                                    : "Complete verification to unlock all flows"}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                                {data.student_analytics.profile_completion_percent < 100 || !data.student_analytics.verified ? (
+                                    <Link
+                                        href="/dashboard/student/profile"
+                                        className="inline-flex w-full items-center justify-center rounded-xl border border-blue-200 bg-blue-50/80 py-2.5 text-sm font-bold text-blue-700 transition hover:bg-blue-100"
+                                    >
+                                        Update profile
+                                    </Link>
+                                ) : null}
+                            </div>
+                        </div>
+                    ) : null}
+
                     <div className="rounded-3xl border border-slate-200/80 bg-white p-6 shadow-sm">
                         <h3 className="mb-4 text-sm font-black uppercase tracking-wider text-slate-400">Upcoming deadlines</h3>
                         {deadlines.length > 0 ? (
@@ -434,24 +556,6 @@ export default function StudentDashboard() {
                 </div>
             </div>
 
-            {/* Summary stats (legacy metrics; still populated from API) */}
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-                {statItems.map((stat, index) => (
-                    <div
-                        key={index}
-                        className="flex items-center gap-4 rounded-2xl border border-slate-100 bg-white p-5 shadow-[0_4px_20px_-10px_rgba(0,0,0,0.05)]"
-                    >
-                        <div className={`flex h-12 w-12 items-center justify-center rounded-xl ${stat.iconBg} ${stat.iconText}`}>
-                            <stat.icon className="h-6 w-6" />
-                        </div>
-                        <div>
-                            <h3 className="text-2xl font-bold text-slate-800">{stat.value}</h3>
-                            <p className="text-sm font-medium text-slate-500">{stat.label}</p>
-                        </div>
-                    </div>
-                ))}
-            </div>
-
             {firstProjectForTracker ? <StudentProgressTracker projectId={firstProjectForTracker} /> : null}
 
             <div className="flex flex-col items-stretch justify-between gap-4 rounded-2xl bg-blue-600 p-5 text-white shadow-lg shadow-blue-100 sm:p-6 md:flex-row md:items-center">
@@ -523,6 +627,32 @@ export default function StudentDashboard() {
                                                 <span className="text-slate-400"> • Report: {project.report_status}</span>
                                             ) : null}
                                         </p>
+                                        {projectHasAnalyticsFields(project) ? (
+                                            <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[11px] text-slate-500">
+                                                {project.required_hours_per_student != null ? (
+                                                    <span className="font-semibold text-slate-600">
+                                                        Required:{" "}
+                                                        <span className="font-black text-slate-800">
+                                                            {project.required_hours_per_student}h
+                                                        </span>
+                                                    </span>
+                                                ) : null}
+                                                {formatParticipationType(project.participation_type) ? (
+                                                    <span>{formatParticipationType(project.participation_type)}</span>
+                                                ) : null}
+                                                {project.academic_integration_type ? (
+                                                    <span className="max-w-[220px] truncate" title={project.academic_integration_type}>
+                                                        {project.academic_integration_type}
+                                                    </span>
+                                                ) : null}
+                                                {project.team_size != null && project.participation_type === "team" ? (
+                                                    <span className="inline-flex items-center gap-1 font-medium text-slate-600">
+                                                        <Users className="h-3.5 w-3.5 shrink-0 opacity-70" />
+                                                        Team {project.team_size}
+                                                    </span>
+                                                ) : null}
+                                            </div>
+                                        ) : null}
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-3 sm:justify-end">
