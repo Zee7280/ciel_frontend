@@ -83,7 +83,9 @@ export default function DashboardHeader() {
               ? "/dashboard/partner/notifications"
               : navRole === "faculty"
                 ? "/dashboard/faculty/notifications"
-                : null;
+                : navRole === "admin"
+                  ? "/dashboard/admin/notifications"
+                  : null;
 
     const [notifOpen, setNotifOpen] = useState(false);
     const [notifLoading, setNotifLoading] = useState(false);

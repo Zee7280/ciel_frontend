@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { resolveBackendApiV1Base } from "@/utils/backendApiV1Base";
 
 export async function PUT(
     req: NextRequest,
@@ -15,9 +16,13 @@ export async function PUT(
         }
 
         const token = authHeader.split(" ")[1];
+        const apiBase = resolveBackendApiV1Base();
+        if (!apiBase) {
+            return NextResponse.json({ success: false, message: "Server misconfiguration: backend URL not set" }, { status: 500 });
+        }
 
         const response = await fetch(
-            `${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/notifications/${id}/read`,
+            `${apiBase}/notifications/${id}/read`,
             {
                 method: "PUT",
                 headers: {

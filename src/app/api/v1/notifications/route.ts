@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { resolveBackendApiV1Base } from "@/utils/backendApiV1Base";
 
 export async function GET(req: NextRequest) {
     try {
@@ -15,7 +16,11 @@ export async function GET(req: NextRequest) {
         const status = searchParams.get("status");
         const type = searchParams.get("type");
 
-        let backendUrl = `${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/notifications`;
+        const apiBase = resolveBackendApiV1Base();
+        if (!apiBase) {
+            return NextResponse.json({ success: false, message: "Server misconfiguration: backend URL not set" }, { status: 500 });
+        }
+        let backendUrl = `${apiBase}/notifications`;
         const params = [];
         if (status) params.push(`status=${status}`);
         if (type) params.push(`type=${type}`);

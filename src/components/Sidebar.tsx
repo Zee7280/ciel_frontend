@@ -71,7 +71,7 @@ export default function Sidebar() {
     const isFaculty = navRole === "faculty";
     const isAdmin = navRole === "admin";
 
-    const hasInboxNotificationsNav = isStudent || isPartner || isFaculty;
+    const hasInboxNotificationsNav = isStudent || isPartner || isFaculty || isAdmin;
 
     const refreshNotificationUnreadFromApi = useCallback(async () => {
         if (!isTokenValid(localStorage.getItem("ciel_token"))) return;
@@ -198,6 +198,7 @@ export default function Sidebar() {
             { label: "Student Reports", href: "/dashboard/admin/reports/verify", icon: FileText },
             { label: "Impact", href: "/dashboard/admin/impact", icon: FileBarChart },
             { label: "Messages", href: "/dashboard/admin/messages", icon: MessageSquare },
+            { label: "Notifications", href: "/dashboard/admin/notifications", icon: Bell },
             { label: "Help & Support", href: "/dashboard/admin/support", icon: LifeBuoy },
             { label: "Audit Logs", href: "/dashboard/admin/audit-logs", icon: History },
             { label: "Issue Logs", href: "/dashboard/admin/issue-logs", icon: ShieldAlert },

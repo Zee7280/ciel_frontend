@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { resolveBackendApiV1Base } from "@/utils/backendApiV1Base";
 
 export async function GET(req: NextRequest) {
     try {
@@ -11,7 +12,11 @@ export async function GET(req: NextRequest) {
         if (!token || token === "null" || token === "undefined") {
             return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
         }
-        const backendUrl = `${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/notifications/unread-count`;
+        const apiBase = resolveBackendApiV1Base();
+        if (!apiBase) {
+            return NextResponse.json({ success: false, message: "Server misconfiguration: backend URL not set" }, { status: 500 });
+        }
+        const backendUrl = `${apiBase}/notifications/unread-count`;
 
         const response = await fetch(backendUrl, {
             method: "GET",

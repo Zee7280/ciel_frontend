@@ -1,4 +1,4 @@
-/** Dispatched on `window` when dashboard chrome learns the unread inbox count (student/partner/faculty). */
+/** Dispatched on `window` when dashboard chrome learns the unread inbox count (all roles with notifications). */
 export const CIEL_NOTIFICATIONS_UNREAD_EVENT = "ciel_notifications_unread" as const;
 
 export type CielNotificationsUnreadEventDetail = {
