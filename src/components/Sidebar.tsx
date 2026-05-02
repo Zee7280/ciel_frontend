@@ -2,17 +2,21 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useState, useEffect, useLayoutEffect } from "react";
+import { useState, useEffect, useLayoutEffect, useCallback } from "react";
 import { LayoutDashboard, Users, Settings, PieChart, LogOut, FileText, Building2, CheckCircle, Briefcase, FileBarChart, ShieldAlert, History, Bell, User, MessageSquare, Plus, CreditCard, ClipboardList, CalendarClock, LifeBuoy, type LucideProps } from "lucide-react";
 import clsx from "clsx";
-import { authenticatedFetch } from "@/utils/api";
-import { fetchStudentDashboardData } from "@/utils/student-dashboard-fetch";
+import { authenticatedFetch, isTokenValid } from "@/utils/api";
+import {
+    CIEL_STUDENT_DASHBOARD_CACHE_EVENT,
+    clearStudentDashboardCache,
+    readStudentDashboardCache,
+} from "@/utils/student-dashboard-fetch";
 import {
     dashboardNavRoleFromPathname,
     readDashboardNavRoleFromStorage,
     type DashboardNavRole,
 } from "@/utils/dashboardNavRole";
-import { CIEL_NOTIFICATIONS_UNREAD_EVENT, type CielNotificationsUnreadEventDetail } from "@/utils/cielNotificationsUnread";
+import { CIEL_NOTIFICATIONS_UNREAD_EVENT, type CielNotificationsUnreadEventDetail, broadcastUnreadNotificationsCount } from "@/utils/cielNotificationsUnread";
 
 export default function Sidebar() {
     const pathname = usePathname();
@@ -24,6 +28,7 @@ export default function Sidebar() {
     const handleLogout = () => {
         localStorage.removeItem("ciel_user");
         localStorage.removeItem("ciel_token");
+        clearStudentDashboardCache();
         router.push("/login");
     };
 
@@ -34,6 +39,7 @@ export default function Sidebar() {
         if (!isMessagesPage) return;
 
         const fetchUnreadCount = async () => {
+            if (!isTokenValid(localStorage.getItem("ciel_token"))) return;
             try {
                 const res = await authenticatedFetch("/api/v1/chat/unread-count", {}, { redirectToLogin: false });
                 if (res && res.ok) {
@@ -67,6 +73,22 @@ export default function Sidebar() {
 
     const hasInboxNotificationsNav = isStudent || isPartner || isFaculty;
 
+    const refreshNotificationUnreadFromApi = useCallback(async () => {
+        if (!isTokenValid(localStorage.getItem("ciel_token"))) return;
+        try {
+            const res = await authenticatedFetch("/api/v1/notifications/unread-count", {}, { redirectToLogin: false });
+            if (!res?.ok) return;
+            const data = (await res.json()) as { success?: boolean; data?: { count?: number } };
+            if (data.success && typeof data.data?.count === "number") {
+                const count = data.data.count;
+                setNotificationUnreadCount(count);
+                broadcastUnreadNotificationsCount(count);
+            }
+        } catch {
+            /* non-fatal */
+        }
+    }, []);
+
     useEffect(() => {
         if (!hasInboxNotificationsNav) {
             setNotificationUnreadCount(0);
@@ -84,6 +106,8 @@ export default function Sidebar() {
             }
         };
         syncFromLs();
+        void refreshNotificationUnreadFromApi();
+        const poll = setInterval(() => void refreshNotificationUnreadFromApi(), 30000);
         const handler = (e: Event) => {
             const ce = e as CustomEvent<CielNotificationsUnreadEventDetail>;
             if (typeof ce.detail?.count === "number") {
@@ -93,28 +117,30 @@ export default function Sidebar() {
         window.addEventListener(CIEL_NOTIFICATIONS_UNREAD_EVENT, handler);
         window.addEventListener("ciel_user_updated", syncFromLs);
         return () => {
+            clearInterval(poll);
             window.removeEventListener(CIEL_NOTIFICATIONS_UNREAD_EVENT, handler);
             window.removeEventListener("ciel_user_updated", syncFromLs);
         };
-    }, [hasInboxNotificationsNav]);
+    }, [hasInboxNotificationsNav, refreshNotificationUnreadFromApi]);
 
     useEffect(() => {
         if (!isStudent) {
             setImpactHistoryBadge(0);
             return;
         }
-        const loadImpactHint = async () => {
+        const syncBadge = () => {
             try {
-                const data = await fetchStudentDashboardData({ redirectToLogin: false });
+                const data = readStudentDashboardCache();
                 const n = data?.overview?.impactHistoryBadgeCount;
                 if (typeof n === "number" && n >= 0) setImpactHistoryBadge(n);
+                else setImpactHistoryBadge(0);
             } catch {
-                /* optional hint */
+                setImpactHistoryBadge(0);
             }
         };
-        loadImpactHint();
-        const t = setInterval(loadImpactHint, 60000);
-        return () => clearInterval(t);
+        syncBadge();
+        window.addEventListener(CIEL_STUDENT_DASHBOARD_CACHE_EVENT, syncBadge);
+        return () => window.removeEventListener(CIEL_STUDENT_DASHBOARD_CACHE_EVENT, syncBadge);
     }, [isStudent]);
 
     // Helper icons import

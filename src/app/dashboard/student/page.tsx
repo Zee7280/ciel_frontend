@@ -27,9 +27,16 @@ import type {
     DashboardOverview,
     DashboardStats,
 } from "./types";
-import { fetchStudentDashboardData } from "@/utils/student-dashboard-fetch";
+import { readStudentDashboardCache } from "@/utils/student-dashboard-fetch";
 import StudentProgressTracker from "./components/StudentProgressTracker";
 import PendingActionCards from "@/components/dashboard/PendingActionCards";
+
+/** Shown when login prefetch did not populate cache yet — same UI, zeros / empty lists. */
+const EMPTY_STUDENT_DASHBOARD: DashboardData = {
+    stats: { activeCourses: 0, impactPoints: 0, projectsCompleted: 0, hoursVolunteered: 0 },
+    activeProjects: [],
+    deadlines: [],
+};
 
 function normStatus(s: string) {
     return s.toLowerCase();
@@ -122,41 +129,26 @@ function DeadlineIcon({ type }: { type: string }) {
 }
 
 export default function StudentDashboard() {
-    const [data, setData] = useState<DashboardData | null>(null);
+    const [data, setData] = useState<DashboardData>(EMPTY_STUDENT_DASHBOARD);
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
-        const fetchData = async () => {
-            try {
-                const payload = await fetchStudentDashboardData();
-                if (payload) setData(payload);
-            } catch (error) {
-                console.error("Failed to fetch dashboard data:", error);
-            } finally {
-                setIsLoading(false);
-            }
-        };
-
-        fetchData();
+        try {
+            const payload = readStudentDashboardCache();
+            if (payload) setData(payload);
+        } catch (error) {
+            console.error("Failed to load dashboard cache:", error);
+        } finally {
+            setIsLoading(false);
+        }
     }, []);
 
-    const overview = useMemo(() => {
-        if (!data) return null;
-        return mergeStudentOverview(data);
-    }, [data]);
+    const overview = useMemo(() => mergeStudentOverview(data), [data]);
 
     if (isLoading) {
         return (
             <div className="flex min-h-[400px] items-center justify-center">
                 <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-            </div>
-        );
-    }
-
-    if (!data || !overview) {
-        return (
-            <div className="py-10 text-center">
-                <p className="text-slate-500">Failed to load dashboard data.</p>
             </div>
         );
     }

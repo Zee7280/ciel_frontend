@@ -1,6 +1,14 @@
 import { authenticatedFetch } from "@/utils/api";
 import type { DashboardData } from "@/app/dashboard/student/types";
 
+export {
+    CIEL_STUDENT_DASHBOARD_CACHE_EVENT,
+    CIEL_STUDENT_DASHBOARD_CACHE_KEY,
+    clearStudentDashboardCache,
+    persistStudentDashboardCache,
+    readStudentDashboardCache,
+} from "@/utils/student-dashboard-cache";
+
 /** Prefer new JWT-scoped routes; fall back to legacy `/api/v1/student/dashboard`. */
 const STUDENT_DASHBOARD_PATHS = [
     "/api/v1/students/me/dashboard",

@@ -18,6 +18,11 @@ import {
     isSafeInternalReturnPath,
 } from "@/utils/verificationReturnUrl";
 import { getDashboardHomePathForRole } from "@/utils/dashboardNavRole";
+import {
+    clearStudentDashboardCache,
+    fetchStudentDashboardData,
+    persistStudentDashboardCache,
+} from "@/utils/student-dashboard-fetch";
 
 function toRecord(value: unknown): Record<string, unknown> | null {
     if (!value || typeof value !== "object" || Array.isArray(value)) return null;
@@ -345,6 +350,19 @@ function LoginContent() {
                     // Fallback to basic data
                     syncStoredUser(loginUser);
                 }
+            }
+
+            const roleNormalized = String(role).trim().toLowerCase().replace(/\s+/g, "_");
+            if (authToken && roleNormalized === "student") {
+                try {
+                    clearStudentDashboardCache();
+                    const dash = await fetchStudentDashboardData({ redirectToLogin: false });
+                    if (dash) persistStudentDashboardCache(dash);
+                } catch {
+                    /* dashboard prefetch is optional */
+                }
+            } else {
+                clearStudentDashboardCache();
             }
 
             let targetPath = getDashboardHomePathForRole(role);

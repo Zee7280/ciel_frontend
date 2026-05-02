@@ -11,6 +11,7 @@ import {
 } from "@/utils/dashboardNavRole";
 import { authenticatedFetch } from "@/utils/api";
 import { CIEL_NOTIFICATIONS_UNREAD_EVENT, type CielNotificationsUnreadEventDetail, broadcastUnreadNotificationsCount } from "@/utils/cielNotificationsUnread";
+import { clearStudentDashboardCache } from "@/utils/student-dashboard-cache";
 
 type HeaderNotification = {
     id: number;
@@ -35,6 +36,7 @@ export default function DashboardHeader() {
     const handleLogout = () => {
         localStorage.removeItem("ciel_user");
         localStorage.removeItem("ciel_token");
+        clearStudentDashboardCache();
         router.push("/login");
     };
 

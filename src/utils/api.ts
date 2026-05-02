@@ -1,3 +1,5 @@
+import { clearStudentDashboardCache } from "@/utils/student-dashboard-cache";
+
 const BASE_URL = process.env.NEXT_PUBLIC_APP_API_BASE_URL || process.env.NEXT_PUBLIC_BACKEND_BASE_URL || "http://localhost:3000";
 
 /** Decode JWT payload segment (base64url per RFC 7519). Plain `atob` fails on `-` / `_` and unpadded segments. */
@@ -43,6 +45,7 @@ export async function authenticatedFetch(
         console.log("Fetcher: Token expired or missing. Redirecting to login...");
         if (typeof window !== "undefined") {
             localStorage.removeItem("ciel_token");
+            clearStudentDashboardCache();
             window.location.replace("/login");
         }
         return null;
@@ -103,6 +106,7 @@ export async function authenticatedFetch(
                 console.log("Fetcher: 401 + token expired. Redirecting to login...");
                 if (typeof window !== "undefined") {
                     localStorage.removeItem("ciel_token");
+                    clearStudentDashboardCache();
                     window.location.replace("/login");
                 }
             } else {
