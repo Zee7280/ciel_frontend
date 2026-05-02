@@ -7,7 +7,10 @@ export async function GET(req: NextRequest) {
             return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
         }
 
-        const token = authHeader.split(" ")[1];
+        const token = authHeader.slice("Bearer ".length).trim();
+        if (!token || token === "null" || token === "undefined") {
+            return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
+        }
         const backendUrl = `${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/notifications/unread-count`;
 
         const response = await fetch(backendUrl, {

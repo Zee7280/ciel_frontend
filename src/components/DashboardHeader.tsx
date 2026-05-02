@@ -9,7 +9,7 @@ import {
     readDashboardNavRoleFromStorage,
     type DashboardNavRole,
 } from "@/utils/dashboardNavRole";
-import { authenticatedFetch } from "@/utils/api";
+import { authenticatedFetch, isTokenValid } from "@/utils/api";
 import { CIEL_NOTIFICATIONS_UNREAD_EVENT, type CielNotificationsUnreadEventDetail, broadcastUnreadNotificationsCount } from "@/utils/cielNotificationsUnread";
 import { clearStudentDashboardCache } from "@/utils/student-dashboard-cache";
 
@@ -95,6 +95,7 @@ export default function DashboardHeader() {
 
     const refreshUnreadInboxCount = useCallback(async () => {
         if (!notificationHref) return;
+        if (!isTokenValid(localStorage.getItem("ciel_token"))) return;
         try {
             const res = await authenticatedFetch("/api/v1/notifications/unread-count", {}, { redirectToLogin: false });
             if (!res?.ok) return;

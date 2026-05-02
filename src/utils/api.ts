@@ -40,13 +40,15 @@ export async function authenticatedFetch(
     const token = localStorage.getItem("ciel_token");
     const redirectToLogin = config.redirectToLogin ?? true;
 
-    // If token is already expired locally, redirect immediately without making the API call
-    if (!isTokenValid(token) && redirectToLogin) {
-        console.log("Fetcher: Token expired or missing. Redirecting to login...");
-        if (typeof window !== "undefined") {
-            localStorage.removeItem("ciel_token");
-            clearStudentDashboardCache();
-            window.location.replace("/login");
+    // Never call the API with a missing/expired token (avoids Authorization: Bearer null and pointless 401s)
+    if (!isTokenValid(token)) {
+        if (redirectToLogin) {
+            console.log("Fetcher: Token expired or missing. Redirecting to login...");
+            if (typeof window !== "undefined") {
+                localStorage.removeItem("ciel_token");
+                clearStudentDashboardCache();
+                window.location.replace("/login");
+            }
         }
         return null;
     }

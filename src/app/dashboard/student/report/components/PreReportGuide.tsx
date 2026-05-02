@@ -159,13 +159,22 @@ const colorMap: Record<string, { bg: string; icon: string; border: string; badge
 };
 
 export default function PreReportGuide({ projectTitle, onStart }: { projectTitle?: string; onStart: () => void }) {
+    const handleDownloadPdf = () => {
+        window.print();
+    };
+
     return (
         <div className="max-w-[1600px] mx-auto py-4 animate-in fade-in duration-500">
             <div className="max-w-[1600px] mx-auto py-4 relative">
 
-                {/* Right side button */}
-                <div className="hidden lg:block absolute top-6 right-0">
-                    <button className="px-6 py-3 bg-blue-600 text-white text-sm font-semibold rounded-xl shadow-lg hover:bg-blue-700 transition">
+                {/* Right side button (desktop); uses print dialog → Save as PDF */}
+                <div className="hidden lg:block absolute top-6 right-0 z-10 print:hidden">
+                    <button
+                        type="button"
+                        onClick={handleDownloadPdf}
+                        className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 text-white text-sm font-semibold rounded-xl shadow-lg hover:bg-blue-700 transition"
+                    >
+                        <Download className="w-4 h-4 shrink-0" aria-hidden />
                         Download PDF
                     </button>
                 </div>
@@ -191,6 +200,17 @@ export default function PreReportGuide({ projectTitle, onStart }: { projectTitle
                             Your report is divided into <strong>11 sections</strong>. Each section records a different part of your project.
                             Review what you need to collect for each section — then start your report when ready.
                         </p>
+
+                        <div className="flex justify-center lg:hidden print:hidden">
+                            <button
+                                type="button"
+                                onClick={handleDownloadPdf}
+                                className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 text-white text-sm font-semibold rounded-xl shadow-lg hover:bg-blue-700 transition"
+                            >
+                                <Download className="w-4 h-4 shrink-0" aria-hidden />
+                                Download PDF
+                            </button>
+                        </div>
                     </div>
 
                     {/* Sections grid */}
@@ -255,7 +275,7 @@ export default function PreReportGuide({ projectTitle, onStart }: { projectTitle
                     </div>
 
                     {/* CTA */}
-                    <div className="flex justify-center lg:justify-start pb-8">
+                    <div className="flex justify-center lg:justify-start pb-8 print:hidden">
                         <Button
                             onClick={onStart}
                             className="h-14 px-12 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-black text-base shadow-xl shadow-blue-200 transition-all"
