@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState, useEffect, useLayoutEffect, useCallback } from "react";
-import { LayoutDashboard, Users, Settings, PieChart, LogOut, FileText, Building2, CheckCircle, Briefcase, FileBarChart, ShieldAlert, History, Bell, User, MessageSquare, Plus, CreditCard, ClipboardList, CalendarClock, LifeBuoy, Link2, GraduationCap, type LucideProps } from "lucide-react";
+import { LayoutDashboard, Users, Settings, PieChart, LogOut, FileText, Building2, CheckCircle, Briefcase, FileBarChart, ShieldAlert, History, Bell, User, MessageSquare, Plus, CreditCard, ClipboardList, CalendarClock, LifeBuoy, Link2, GraduationCap, Globe2, type LucideProps } from "lucide-react";
 import clsx from "clsx";
 import { authenticatedFetch, isTokenValid } from "@/utils/api";
 import {
@@ -237,6 +237,7 @@ export default function Sidebar() {
             { label: "Payments", href: "/dashboard/admin/payments", icon: CreditCard },
             { label: "All projects", href: "/dashboard/admin/projects", icon: Briefcase },
             { label: "Student Reports", href: "/dashboard/admin/reports/verify", icon: FileText },
+            { label: "CIEL Master", href: "/dashboard/admin/master-analytics", icon: Globe2 },
             { label: "Impact", href: "/dashboard/admin/impact", icon: FileBarChart },
             { label: "Messages", href: "/dashboard/admin/messages", icon: MessageSquare },
             { label: "Notifications", href: "/dashboard/admin/notifications", icon: Bell },
