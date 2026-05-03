@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { authenticatedFetch } from "@/utils/api";
+import { authenticatedFetch, resolveSameOriginApiPath } from "@/utils/api";
 import {
     Users,
     Briefcase,
@@ -75,31 +75,50 @@ const shortcutLinks = [
     },
 ];
 
+const DASHBOARD_FETCH = { timeoutMs: 60_000 } as const;
+
 export default function AdminDashboard() {
     const [data, setData] = useState<AdminDashboardData | null>(null);
     const [isLoading, setIsLoading] = useState(true);
-    const [loadError, setLoadError] = useState(false);
+    const [loadError, setLoadError] = useState<string | null>(null);
     const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
 
     const fetchData = useCallback(async () => {
         setIsLoading(true);
-        setLoadError(false);
+        setLoadError(null);
         try {
-            const res = await authenticatedFetch(`/api/v1/admin/dashboard`);
+            const res = await authenticatedFetch(
+                resolveSameOriginApiPath("/api/v1/admin/dashboard"),
+                {},
+                DASHBOARD_FETCH,
+            );
             if (!res) {
-                setLoadError(true);
+                setLoadError("Unable to load dashboard (session or network).");
                 return;
             }
-            const result = await res.json();
-            if (result.success) {
+            if (!res.ok) {
+                const errBody = (await res.json().catch(() => ({}))) as { message?: string; error?: string };
+                setLoadError(
+                    (typeof errBody.message === "string" && errBody.message) ||
+                        (typeof errBody.error === "string" && errBody.error) ||
+                        `Dashboard request failed (${res.status}).`,
+                );
+                return;
+            }
+            const result = await res.json().catch(() => null);
+            if (result?.success && result.data) {
                 setData(result.data);
                 setUpdatedAt(new Date());
             } else {
-                setLoadError(true);
+                setLoadError("Dashboard response was not successful.");
             }
         } catch (error) {
             console.error("Failed to fetch admin stats", error);
-            setLoadError(true);
+            setLoadError(
+                error instanceof Error && error.name === "AbortError"
+                    ? "Request timed out. Try refresh."
+                    : "Could not refresh stats. Check your connection.",
+            );
         } finally {
             setIsLoading(false);
         }
@@ -111,8 +130,16 @@ export default function AdminDashboard() {
 
     const { metrics, sdgDistribution } = data || {};
 
-    const chartData: SdgDistributionPoint[] =
-        sdgDistribution && sdgDistribution.length > 0 ? sdgDistribution : [];
+    const chartData: SdgDistributionPoint[] = (sdgDistribution ?? [])
+        .map((d) => {
+            const row = d as SdgDistributionPoint;
+            return {
+                name: String(row?.name ?? "").trim() || "Unknown",
+                value: typeof row?.value === "number" && Number.isFinite(row.value) ? row.value : Number(row?.value) || 0,
+                color: row?.color,
+            };
+        })
+        .filter((d) => d.value > 0);
 
     const totalUsers = metrics?.totalUsers?.total ?? 0;
     const studentCount = metrics?.totalUsers?.students ?? 0;
@@ -159,8 +186,8 @@ export default function AdminDashboard() {
                         </p>
                     ) : null}
                     {loadError ? (
-                        <p className="mt-2 text-sm font-medium text-amber-700">
-                            Could not refresh stats. Check your connection and try again.
+                        <p className="mt-2 text-sm font-medium text-amber-800">
+                            <strong className="font-bold">Notice:</strong> {loadError}
                         </p>
                     ) : null}
                 </div>
@@ -352,15 +379,38 @@ export default function AdminDashboard() {
                     </div>
 
                     <div className="min-h-[320px] w-full rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 p-3 sm:min-h-[350px] sm:p-4">
-                        {chartData.length === 0 ? (
-                            <div className="flex h-[300px] flex-col items-center justify-center gap-2 text-center sm:h-[320px]">
-                                <GraduationCap className="h-12 w-12 text-slate-300" />
-                                <p className="max-w-sm text-sm font-medium text-slate-500">
-                                    No SDG-tagged listings yet, or projects do not have SDG text set. Data appears here once
-                                    opportunities include SDG labels.
+                        {loadError ? (
+                            <div className="flex min-h-[280px] flex-col items-center justify-center gap-2 rounded-xl bg-amber-50/80 px-6 py-10 text-center">
+                                <p className="text-sm font-semibold text-amber-900">SDG chart needs a successful dashboard load.</p>
+                                <p className="max-w-md text-xs text-amber-800/90">{loadError}</p>
+                                <button
+                                    type="button"
+                                    onClick={() => void fetchData()}
+                                    className="mt-2 rounded-lg bg-amber-600 px-4 py-2 text-xs font-bold text-white hover:bg-amber-700"
+                                >
+                                    Retry
+                                </button>
+                            </div>
+                        ) : chartData.length === 0 ? (
+                            <div className="flex min-h-[280px] flex-col items-center justify-center gap-3 rounded-xl border border-slate-200 bg-white/80 px-6 py-10 text-center">
+                                <GraduationCap className="h-12 w-12 text-slate-400" />
+                                <p className="max-w-md text-sm font-semibold text-slate-700">
+                                    No SDG breakdown to show yet.
                                 </p>
+                                <p className="max-w-md text-xs text-slate-500">
+                                    This chart counts <strong className="font-semibold">opportunities</strong> by their SDG label.
+                                    If all listings use empty or missing SDG fields, or there are zero opportunities, you will see
+                                    this empty state — it is not a loading error.
+                                </p>
+                                {(metrics?.opportunities ?? 0) > 0 ? (
+                                    <p className="text-xs font-medium text-slate-600">
+                                        You have {(metrics?.opportunities ?? 0).toLocaleString()} listing(s); add or edit SDG on
+                                        titles to populate this chart.
+                                    </p>
+                                ) : null}
                             </div>
                         ) : (
+                            <div className="h-[320px] w-full min-h-[280px] sm:h-[350px]">
                             <ResponsiveContainer width="100%" height="100%">
                                 <BarChart
                                     data={chartData}
@@ -396,6 +446,7 @@ export default function AdminDashboard() {
                                     </Bar>
                                 </BarChart>
                             </ResponsiveContainer>
+                            </div>
                         )}
                     </div>
                 </div>

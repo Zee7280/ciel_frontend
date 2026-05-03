@@ -19,7 +19,7 @@ import {
     CardHeader,
     CardTitle,
 } from "@/app/dashboard/student/report/components/ui/card";
-import { authenticatedFetch } from "@/utils/api";
+import { authenticatedFetch, resolveSameOriginApiPath } from "@/utils/api";
 
 type TypeMixRow = { participation_type: string; count: number };
 
@@ -53,7 +53,11 @@ export default function AdminMasterAnalyticsPage() {
         setLoading(true);
         setError(null);
         try {
-            const res = await authenticatedFetch("/api/v1/admin/master-analytics", {}, { redirectToLogin: true });
+            const res = await authenticatedFetch(
+                resolveSameOriginApiPath("/api/v1/admin/master-analytics"),
+                {},
+                { redirectToLogin: true, timeoutMs: 60_000 },
+            );
             if (!res) return;
             if (res.status === 401 || res.status === 403) {
                 setError("You do not have access to CIEL Master analytics.");

@@ -32,6 +32,18 @@ export function isTokenValid(token: string | null): boolean {
     return payload.exp * 1000 > Date.now();
 }
 
+/**
+ * Browser: turn `/api/...` into `https://current-host/api/...` so the request uses Next.js route handlers.
+ * If `NEXT_PUBLIC_APP_API_BASE_URL` points at the raw Nest host, relative `/api/v1/...` calls would miss BFF
+ * proxies (or hit CORS), which breaks admin analytics on e.g. cielpk.com.
+ */
+export function resolveSameOriginApiPath(path: string): string {
+    if (typeof window === "undefined") return path;
+    const p = path.startsWith("/") ? path : `/${path}`;
+    if (!p.startsWith("/api/")) return path;
+    return `${window.location.origin.replace(/\/$/, "")}${p}`;
+}
+
 export async function authenticatedFetch(
     url: string,
     options: RequestInit = {},
