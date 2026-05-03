@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { resolveBackendApiV1Base } from "@/utils/backendApiV1Base";
 
-/** Proxies Nest `GET /faculty/analytics` (supports `?view=combined|personal|university`). */
+/** Proxies Nest `GET /faculty/analytics` (forwards full query string: view + analytics filters). */
 export async function GET(request: Request) {
     try {
         const base = resolveBackendApiV1Base();

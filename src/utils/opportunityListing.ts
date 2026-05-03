@@ -52,14 +52,51 @@ export function pickUniversityLabel(raw: Record<string, unknown>): string {
     const fromCreator = nestedStr(raw.creator, ["university", "institution", "university_name"]);
     if (fromCreator) return fromCreator;
 
+    const ps = raw.participation_scope;
+    if (ps && typeof ps === "object") {
+        const po = ps as Record<string, unknown>;
+        const creatorUni = str(po.creator_university_name);
+        if (creatorUni) return creatorUni;
+        const uniNames = po.university_names;
+        if (Array.isArray(uniNames)) {
+            const names = uniNames.map((x) => str(x)).filter(Boolean);
+            if (names.length === 1) return names[0];
+            if (names.length > 1) return names.join(", ");
+        }
+    }
+
+    const restrictedCol = raw.restricted_universities;
+    if (Array.isArray(restrictedCol)) {
+        const names = restrictedCol.map((x) => str(x)).filter(Boolean);
+        if (names.length === 1) return names[0];
+        if (names.length > 1) return names.join(", ");
+    }
+
     const linkage = raw.visibility_and_academic_linkage;
     if (linkage && typeof linkage === "object") {
         const names = (linkage as Record<string, unknown>).restricted_university_names;
         if (Array.isArray(names)) {
             const first = names.map((x) => str(x)).filter(Boolean);
-            if (first.length) return first.join(", ");
+            if (first.length === 1) return first[0];
+            if (first.length > 1) return first.join(", ");
         }
     }
+
+    if (ps && typeof ps === "object") {
+        const rule = str((ps as Record<string, unknown>).rule).toLowerCase();
+        if (rule.includes("open_all")) {
+            return "Open (all universities)";
+        }
+    }
+
+    if (pickVisibilityBucket(raw) === "open") {
+        return "Open (all universities)";
+    }
+    const vis = str(raw.visibility).toLowerCase();
+    if (vis === "public") {
+        return "Open (all universities)";
+    }
+
     return "Unspecified";
 }
 
