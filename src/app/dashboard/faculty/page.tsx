@@ -383,6 +383,13 @@ export default function FacultyDashboard() {
                                     >
                                         My opportunities
                                     </Link>
+                                    <Link
+                                        href="/dashboard/faculty/analytics?view=university"
+                                        className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-bold text-white shadow-sm ring-1 ring-indigo-700/30 hover:bg-indigo-700"
+                                        onClick={() => writeFacultyDashboardViewPreference("university")}
+                                    >
+                                        University impact analytics
+                                    </Link>
                                 </div>
                             </div>
                         </div>

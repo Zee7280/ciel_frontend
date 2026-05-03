@@ -20,6 +20,7 @@ import { authenticatedFetch } from "@/utils/api";
 import {
     CIEL_FACULTY_DASHBOARD_VIEW_EVENT,
     readFacultyDashboardViewPreference,
+    writeFacultyDashboardViewPreference,
     type FacultyDashboardViewClient,
 } from "@/utils/facultyScopeSession";
 
@@ -79,11 +80,13 @@ export default function FacultyAnalyticsPage() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
-    useEffect(() => {
-        setView(readFacultyDashboardViewPreference());
-    }, []);
-
     const load = useCallback(async () => {
+        if (typeof window !== "undefined") {
+            const raw = new URLSearchParams(window.location.search).get("view");
+            if (raw === "university" || raw === "personal" || raw === "combined") {
+                writeFacultyDashboardViewPreference(raw);
+            }
+        }
         const v = readFacultyDashboardViewPreference();
         setView(v);
         setLoading(true);
