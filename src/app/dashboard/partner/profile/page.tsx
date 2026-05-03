@@ -2,10 +2,11 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { User, Mail, Phone, Building, Camera, Lock, Loader2, Save, MapPin } from "lucide-react";
+import { User, Mail, Phone, Building, Camera, Lock, Loader2, Save, MapPin, ChevronDown } from "lucide-react";
 import { authenticatedFetch } from "@/utils/api";
 import { toast } from "sonner";
 import { missingProfileFieldsForRole } from "@/utils/profileCompletion";
+import { PAKISTAN_REGION_OPTIONS } from "@/utils/pakistanRegions";
 
 interface Profile {
     id: number;
@@ -320,6 +321,12 @@ export default function PartnerProfilePage() {
         return missingProfileFieldsForRole(String(profile.role || "ngo"), u);
     }, [profile]);
 
+    const partnerCityInList = useMemo(() => {
+        const c = profile?.city?.trim() ?? "";
+        if (!c) return false;
+        return (PAKISTAN_REGION_OPTIONS as readonly string[]).includes(c);
+    }, [profile?.city]);
+
     if (isLoading) {
         return (
             <div className="flex items-center justify-center h-screen">
@@ -431,14 +438,27 @@ export default function PartnerProfilePage() {
                                 <MapPin className="w-4 h-4 inline mr-2" />
                                 City / location <span className="text-red-500">*</span>
                             </label>
-                            <input
-                                type="text"
-                                value={profile?.city || ""}
-                                onChange={(e) => setProfile((prev) => (prev ? { ...prev, city: e.target.value } : null))}
-                                disabled={!isEditing}
-                                className="w-full px-4 py-3 border border-slate-200 rounded-lg outline-none focus:border-blue-500 disabled:bg-slate-50 disabled:text-slate-600"
-                                placeholder="e.g. Karachi"
-                            />
+                            <div className="relative">
+                                <select
+                                    value={profile?.city || ""}
+                                    onChange={(e) =>
+                                        setProfile((prev) => (prev ? { ...prev, city: e.target.value } : null))
+                                    }
+                                    disabled={!isEditing}
+                                    className="w-full px-4 py-3 pr-10 border border-slate-200 rounded-lg outline-none focus:border-blue-500 disabled:bg-slate-50 disabled:text-slate-600 appearance-none cursor-pointer"
+                                >
+                                    <option value="">Select city</option>
+                                    {profile?.city?.trim() && !partnerCityInList ? (
+                                        <option value={profile.city}>{profile.city} (current)</option>
+                                    ) : null}
+                                    {PAKISTAN_REGION_OPTIONS.map((c) => (
+                                        <option key={c} value={c}>
+                                            {c}
+                                        </option>
+                                    ))}
+                                </select>
+                                <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                            </div>
                         </div>
                     </div>
 

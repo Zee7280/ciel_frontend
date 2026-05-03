@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-import { Building2, MapPin, Mail, Phone, Edit, CheckCircle, Upload, Loader2 } from "lucide-react";
+import { useState, useEffect, useRef, useMemo } from "react";
+import { Building2, MapPin, Mail, Phone, Edit, CheckCircle, Upload, Loader2, ChevronDown } from "lucide-react";
 import { authenticatedFetch } from "@/utils/api";
 import { toast } from "sonner";
 import PhoneConnectivityRow from "@/components/ui/PhoneConnectivityRow";
@@ -10,6 +10,7 @@ import {
     DEFAULT_PHONE_COUNTRY_KEY,
     parsePhoneForDisplay,
 } from "@/utils/countryCallingCodes";
+import { PAKISTAN_PROVINCE_OPTIONS, PAKISTAN_REGION_OPTIONS } from "@/utils/pakistanRegions";
 
 const normalizeText = (value: unknown) =>
     typeof value === "string" ? value : value == null ? "" : String(value);
@@ -82,6 +83,15 @@ export default function OrganizationProfilePage() {
         isSafeguardingAcknowledged: false,
         isDataPolicyAcknowledged: false
     });
+
+    const orgCityInList = useMemo(
+        () => (PAKISTAN_REGION_OPTIONS as readonly string[]).includes(orgData.city.trim()),
+        [orgData.city]
+    );
+    const orgRegionInList = useMemo(
+        () => (PAKISTAN_PROVINCE_OPTIONS as readonly string[]).includes(orgData.region.trim()),
+        [orgData.region]
+    );
 
     useEffect(() => {
         const fetchProfile = async () => {
@@ -470,12 +480,24 @@ export default function OrganizationProfilePage() {
                                 <div>
                                     <label className="block text-sm font-bold text-slate-500 uppercase mb-1">City</label>
                                     {isEditing ? (
-                                        <input
-                                            type="text"
-                                            className="w-full px-4 py-2 rounded-lg border border-slate-200 outline-none focus:border-blue-500"
-                                            value={orgData.city}
-                                            onChange={(e) => setOrgData({ ...orgData, city: e.target.value })}
-                                        />
+                                        <div className="relative">
+                                            <select
+                                                className="w-full appearance-none cursor-pointer rounded-lg border border-slate-200 px-4 py-2 pr-10 outline-none focus:border-blue-500"
+                                                value={orgData.city}
+                                                onChange={(e) => setOrgData({ ...orgData, city: e.target.value })}
+                                            >
+                                                <option value="">Select city</option>
+                                                {orgData.city.trim() && !orgCityInList ? (
+                                                    <option value={orgData.city}>{orgData.city} (current)</option>
+                                                ) : null}
+                                                {PAKISTAN_REGION_OPTIONS.map((c) => (
+                                                    <option key={c} value={c}>
+                                                        {c}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                            <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                                        </div>
                                     ) : (
                                         <div className="flex items-center gap-2 text-slate-700"><MapPin className="w-4 h-4 text-slate-400" /> {orgData.city || "N/A"}</div>
                                     )}
@@ -483,12 +505,24 @@ export default function OrganizationProfilePage() {
                                 <div>
                                     <label className="block text-sm font-bold text-slate-500 uppercase mb-1">Region / Province</label>
                                     {isEditing ? (
-                                        <input
-                                            type="text"
-                                            className="w-full px-4 py-2 rounded-lg border border-slate-200 outline-none focus:border-blue-500"
-                                            value={orgData.region}
-                                            onChange={(e) => setOrgData({ ...orgData, region: e.target.value })}
-                                        />
+                                        <div className="relative">
+                                            <select
+                                                className="w-full appearance-none cursor-pointer rounded-lg border border-slate-200 px-4 py-2 pr-10 outline-none focus:border-blue-500"
+                                                value={orgData.region}
+                                                onChange={(e) => setOrgData({ ...orgData, region: e.target.value })}
+                                            >
+                                                <option value="">Select province / territory</option>
+                                                {orgData.region.trim() && !orgRegionInList ? (
+                                                    <option value={orgData.region}>{orgData.region} (current)</option>
+                                                ) : null}
+                                                {PAKISTAN_PROVINCE_OPTIONS.map((p) => (
+                                                    <option key={p} value={p}>
+                                                        {p}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                            <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                                        </div>
                                     ) : (
                                         <div className="text-slate-700">{orgData.region || "N/A"}</div>
                                     )}

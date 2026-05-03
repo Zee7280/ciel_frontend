@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import dynamic from "next/dynamic";
 import { findSdgById, opportunityFormSdgList } from "@/utils/sdgData";
 import { pakistaniUniversities } from "@/utils/universityData";
+import { PAKISTAN_REGION_OPTIONS } from "@/utils/pakistanRegions";
 import { isPartnerOrganizationComplete } from "@/utils/profileCompletion";
 
 function isValidEmail(value: string) {
@@ -731,14 +732,33 @@ export default function OpportunityPostingPage() {
                                 <label className="block text-sm font-bold text-slate-900 mb-3">B4. Location Details <span className="text-red-500">*</span></label>
                                 <div className="space-y-3">
                                     <div className="relative">
-                                        <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                                        <input
-                                            type="text"
-                                            placeholder="City / Area (e.g. Lahore, Township)"
-                                            className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 outline-none focus:border-blue-500 text-sm"
+                                        <MapPin className="absolute left-3 top-1/2 z-10 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                                        <select
                                             value={formData.location.city}
-                                            onChange={(e) => setFormData({ ...formData, location: { ...formData.location, city: e.target.value } })}
-                                        />
+                                            onChange={(e) =>
+                                                setFormData({
+                                                    ...formData,
+                                                    location: { ...formData.location, city: e.target.value },
+                                                })
+                                            }
+                                            className="w-full pl-10 pr-10 py-3 rounded-xl border border-slate-200 outline-none focus:border-blue-500 text-sm appearance-none cursor-pointer bg-white"
+                                        >
+                                            <option value="">Select city / area</option>
+                                            {formData.location.city.trim() &&
+                                            !(PAKISTAN_REGION_OPTIONS as readonly string[]).includes(
+                                                formData.location.city.trim()
+                                            ) ? (
+                                                <option value={formData.location.city}>
+                                                    {formData.location.city} (current)
+                                                </option>
+                                            ) : null}
+                                            {PAKISTAN_REGION_OPTIONS.map((c) => (
+                                                <option key={c} value={c}>
+                                                    {c}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                                     </div>
 
                                     <div className="space-y-2">

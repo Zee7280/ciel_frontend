@@ -3,11 +3,12 @@
 import { useEffect, useState, useRef, useMemo } from "react";
 import { Button } from "../report/components/ui/button";
 import { authenticatedFetch } from "@/utils/api";
-import { Loader2, Mail, MapPin, Building2, User, Save, Camera, Sparkles } from "lucide-react";
+import { Loader2, Mail, MapPin, Building2, User, Save, Camera, Sparkles, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import Image from "next/image";
 import { missingProfileFieldsForRole } from "@/utils/profileCompletion";
 import { pakistaniUniversities } from "@/utils/universityData";
+import { PAKISTAN_REGION_OPTIONS } from "@/utils/pakistanRegions";
 import PhoneConnectivityRow from "@/components/ui/PhoneConnectivityRow";
 import {
     composeInternationalPhone,
@@ -256,6 +257,11 @@ export default function StudentProfilePage() {
         [formData.institution]
     );
 
+    const cityInList = useMemo(
+        () => (PAKISTAN_REGION_OPTIONS as readonly string[]).includes(formData.city.trim()),
+        [formData.city]
+    );
+
     if (isLoading) {
         return (
             <div className="flex justify-center items-center h-full min-h-[500px]">
@@ -421,14 +427,23 @@ export default function StudentProfilePage() {
                             <div>
                                 <label className="block text-sm font-semibold text-slate-700 mb-2.5">City</label>
                                 <div className="relative group">
-                                    <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 group-focus-within:text-blue-600 transition-colors" />
-                                    <input
-                                        type="text"
+                                    <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 group-focus-within:text-blue-600 transition-colors z-10 pointer-events-none" />
+                                    <select
                                         value={formData.city}
                                         onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                                        className="w-full pl-12 pr-4 py-3.5 rounded-2xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all duration-200 font-medium text-slate-800 placeholder:text-slate-400"
-                                        placeholder="Your City"
-                                    />
+                                        className="w-full pl-12 pr-10 py-3.5 rounded-2xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all duration-200 font-medium text-slate-800 appearance-none cursor-pointer"
+                                    >
+                                        <option value="">Select city</option>
+                                        {formData.city.trim() && !cityInList ? (
+                                            <option value={formData.city}>{formData.city} (current)</option>
+                                        ) : null}
+                                        {PAKISTAN_REGION_OPTIONS.map((c) => (
+                                            <option key={c} value={c}>
+                                                {c}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                                 </div>
                             </div>
 
