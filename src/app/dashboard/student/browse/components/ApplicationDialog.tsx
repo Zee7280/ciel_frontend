@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../../report/components/ui/dialog";
 import { Button } from "../../report/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "../../report/components/ui/radio-group";
@@ -21,6 +21,7 @@ import {
     messageFromApplyProxyError,
     normalizeNestHttpMessage,
     resolveApplyOpportunityToastMessage,
+    isAlreadyAppliedApplyErrorMessage,
 } from "@/utils/applyOpportunityUx";
 
 export type ApplySuccessMeta = {
@@ -89,6 +90,7 @@ export default function ApplicationDialog({
     opportunityTitle,
     attendanceApproverType = "faculty",
 }: ApplicationDialogProps) {
+    const submitLockRef = useRef(false);
     const [participationType, setParticipationType] = useState<"individual" | "team">("individual");
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [primaryFacultyEmail, setPrimaryFacultyEmail] = useState("");
@@ -379,7 +381,10 @@ export default function ApplicationDialog({
             setTeamId(resolvedTeamId);
         }
 
+        if (submitLockRef.current) return;
+
         setIsSubmitting(true);
+        submitLockRef.current = true;
         try {
             const payload = {
                 participation_type: participationType === "team" ? "team" : "individual",
@@ -409,21 +414,30 @@ export default function ApplicationDialog({
             });
 
             if (res && res.ok) {
-                const data = await res.json();
-                if (data.success) {
-                    const d = (data.data ?? {}) as Record<string, unknown>;
-                    const applicationId =
-                        typeof d.application_id === "string"
-                            ? d.application_id
-                            : typeof d.applicationId === "string"
-                              ? d.applicationId
-                              : undefined;
-                    const applicationStatus =
-                        typeof d.application_status === "string"
-                            ? d.application_status
-                            : typeof d.applicationStatus === "string"
-                              ? d.applicationStatus
-                              : undefined;
+                let data: Record<string, unknown> = {};
+                try {
+                    data = (await res.json()) as Record<string, unknown>;
+                } catch {
+                    data = {};
+                }
+
+                const inner = (data.data ?? {}) as Record<string, unknown>;
+                const applicationId =
+                    typeof inner.application_id === "string"
+                        ? inner.application_id
+                        : typeof inner.applicationId === "string"
+                          ? inner.applicationId
+                          : undefined;
+                const applicationStatus =
+                    typeof inner.application_status === "string"
+                        ? inner.application_status
+                        : typeof inner.applicationStatus === "string"
+                          ? inner.applicationStatus
+                          : undefined;
+
+                const successFlag = data.success === true || data.success === "true";
+
+                if (successFlag || applicationId) {
                     const okMsg =
                         typeof data.message === "string"
                             ? data.message
@@ -451,13 +465,23 @@ export default function ApplicationDialog({
                     errPayload = null;
                 }
                 const apiMsg = messageFromApplyProxyError(errPayload);
-                toast.error(resolveApplyOpportunityToastMessage(apiMsg || undefined));
+
+                if (isAlreadyAppliedApplyErrorMessage(apiMsg)) {
+                    toast.info(resolveApplyOpportunityToastMessage("Already applied to this opportunity"));
+                    onSuccess(opportunityId!, {
+                        applicationStatus: "pending_approval",
+                    });
+                    onOpenChange(false);
+                } else {
+                    toast.error(resolveApplyOpportunityToastMessage(apiMsg || undefined));
+                }
             }
         } catch (error) {
             console.error("Error applying", error);
             toast.error("An error occurred while applying");
         } finally {
             setIsSubmitting(false);
+            submitLockRef.current = false;
         }
     };
 

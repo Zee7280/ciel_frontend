@@ -36,8 +36,9 @@ import {
     pickReportStatusFromCheckRow,
     resolveStudentBrowseReportCta,
 } from "@/utils/studentBrowseReportCta";
-import { Loader2, MapPin, Calendar, Clock, Globe, CheckCircle2, LayoutGrid, List, Users, Mail, Phone, GraduationCap } from "lucide-react";
+import { Loader2, MapPin, Calendar, Clock, Globe, CheckCircle2, LayoutGrid, List, Users, Mail, Phone, GraduationCap, Share2 } from "lucide-react";
 import Link from "next/link";
+import { toast } from "sonner";
 import ApplicationDialog from "./components/ApplicationDialog";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "../report/components/ui/dialog";
 
@@ -98,6 +99,24 @@ interface BrowseOpportunity {
 
 function lower(value: unknown): string {
     return typeof value === "string" ? value.trim().toLowerCase() : "";
+}
+
+/** Same public URL as My Projects “Copy share link” (`/projects/[id]`). */
+function buildBrowseOpportunityShareUrl(opportunityId: string): string {
+    if (typeof window === "undefined") return "";
+    const id = encodeURIComponent(opportunityId);
+    return `${window.location.origin}/projects/${id}`;
+}
+
+async function copyBrowseOpportunityShareLink(opportunityId: string): Promise<void> {
+    const url = buildBrowseOpportunityShareUrl(opportunityId);
+    if (!url) return;
+    try {
+        await navigator.clipboard.writeText(url);
+        toast.success("Project link copied");
+    } catch {
+        toast.error("Could not copy link");
+    }
 }
 
 /** API stores per-student hours on `timeline.expected_hours`; list payloads often omit legacy `hours`. */
@@ -317,6 +336,7 @@ export default function StudentBrowseOpportunitiesPage() {
         setApplyingId(null);
         setApplyingTitle(undefined);
         setApplyingAttendanceApproverType("faculty");
+        void fetchOpportunities({ silent: true });
     };
 
     useEffect(() => {
@@ -603,9 +623,20 @@ export default function StudentBrowseOpportunitiesPage() {
                                 </div>
 
                                 <div className="flex items-center justify-between gap-2 rounded-b-xl border-t border-slate-100 bg-white px-5 py-4">
-                                    <Link href={`/dashboard/student/browse/${op.id}`} className="text-sm font-medium text-slate-600 underline-offset-4 hover:text-slate-900 hover:underline">
-                                        View details
-                                    </Link>
+                                    <div className="flex min-w-0 items-center gap-2">
+                                        <Link href={`/dashboard/student/browse/${op.id}`} className="text-sm font-medium text-slate-600 underline-offset-4 hover:text-slate-900 hover:underline">
+                                            View details
+                                        </Link>
+                                        <button
+                                            type="button"
+                                            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-slate-200 text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-900"
+                                            aria-label="Copy share link"
+                                            title="Copy share link"
+                                            onClick={() => void copyBrowseOpportunityShareLink(op.id)}
+                                        >
+                                            <Share2 className="h-4 w-4" />
+                                        </button>
+                                    </div>
                                     {op.applyLocked ? (
                                         <div className="flex items-center gap-2">
                                             {/* Report Button - Only show if APPLICATION is approved/active */}
@@ -719,10 +750,21 @@ export default function StudentBrowseOpportunitiesPage() {
                                     </div>
                                 </div>
 
-                                <div className="mt-2 flex w-full gap-3 md:mt-0 md:w-auto">
-                                    <Link href={`/dashboard/student/browse/${op.id}`} className="flex-1 md:flex-none">
-                                        <Button variant="outline" className="w-full border-slate-200 font-medium">Details</Button>
-                                    </Link>
+                                <div className="mt-2 flex w-full flex-wrap items-center gap-3 md:mt-0 md:w-auto">
+                                    <div className="flex flex-1 items-center gap-2 md:flex-none">
+                                        <Link href={`/dashboard/student/browse/${op.id}`} className="min-w-0 flex-1 md:flex-none">
+                                            <Button variant="outline" className="w-full border-slate-200 font-medium">Details</Button>
+                                        </Link>
+                                        <button
+                                            type="button"
+                                            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-slate-200 text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-900"
+                                            aria-label="Copy share link"
+                                            title="Copy share link"
+                                            onClick={() => void copyBrowseOpportunityShareLink(op.id)}
+                                        >
+                                            <Share2 className="h-4 w-4" />
+                                        </button>
+                                    </div>
                                     {op.applyLocked ? (
                                         <div className="flex items-center gap-2 flex-1 md:flex-none justify-end">
                                             {/* Report Button - Only show if APPLICATION is approved/active */}

@@ -92,3 +92,9 @@ export function resolveApplyOpportunityToastMessage(backendMessage: string | und
     }
     return base;
 }
+
+/** True when backend rejects duplicate apply — treat as success for closing modal + listing sync. */
+export function isAlreadyAppliedApplyErrorMessage(message: string | undefined): boolean {
+    const m = normalizeNestHttpMessage(message || "").toLowerCase();
+    return m.includes("already applied to this opportunity");
+}

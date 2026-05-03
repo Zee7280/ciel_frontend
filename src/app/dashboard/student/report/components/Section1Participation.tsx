@@ -73,6 +73,28 @@ function readFacultyEmails(...records: unknown[]): { primary: string; secondary:
     return { primary: "", secondary: "" };
 }
 
+/** Matches backend partner fallback in resolveAttendanceVerificationReviewer (display-only hint). */
+function pickPartnerReviewerEmailFromProject(projectData: unknown): string {
+    if (!projectData || typeof projectData !== "object") return "";
+    const p = projectData as Record<string, unknown>;
+    const asObj = (v: unknown): Record<string, unknown> | null =>
+        v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : null;
+    const candidates: unknown[] = [
+        asObj(p.partner_organization)?.official_email,
+        asObj(p.partner_organization)?.officialEmail,
+        asObj(p.executing_organization)?.official_email,
+        asObj(p.executing_organization)?.officialEmail,
+        asObj(p.partnerOrganization)?.official_email,
+        asObj(p.partnerOrganization)?.officialEmail,
+        asObj(p.supervision)?.partner_email,
+        asObj(p.supervision)?.partnerEmail,
+    ];
+    for (const v of candidates) {
+        if (typeof v === "string" && v.trim()) return v.trim();
+    }
+    return "";
+}
+
 function pickTeamId(record: unknown): string {
     if (!record || typeof record !== "object") return "";
     const source = record as Record<string, unknown>;
@@ -202,6 +224,36 @@ export default function Section1Participation({ projectData }: { projectData?: a
     const [teamId, setTeamId] = React.useState<string>('');
     const [primaryFacultyEmail, setPrimaryFacultyEmail] = React.useState<string>('');
     const [secondaryFacultyEmail, setSecondaryFacultyEmail] = React.useState<string>('');
+
+    const partnerReviewerEmailHint = React.useMemo(
+        () => pickPartnerReviewerEmailFromProject(projectData),
+        [projectData],
+    );
+
+    const attendanceVerifyRecipientLines = React.useMemo(() => {
+        const primary = primaryFacultyEmail.trim();
+        const secondary = secondaryFacultyEmail.trim();
+        const partner = partnerReviewerEmailHint.trim();
+        if (primary) {
+            return {
+                detail: `Notification email will be sent to: ${primary}.`,
+                extra: secondary
+                    ? `Secondary faculty on file: ${secondary} (primary address is notified first).`
+                    : null,
+            };
+        }
+        if (partner) {
+            return {
+                detail: `If no faculty reviewer is linked for this enrolment, notification is sent to the organisation contact: ${partner}.`,
+                extra: null,
+            };
+        }
+        return {
+            detail:
+                "Notification is sent to your linked faculty reviewer when available; otherwise to the opportunity partner organisation.",
+            extra: null,
+        };
+    }, [primaryFacultyEmail, secondaryFacultyEmail, partnerReviewerEmailHint]);
 
     // Scroll to Top on Step Change
     React.useEffect(() => {
@@ -495,7 +547,15 @@ export default function Section1Participation({ projectData }: { projectData?: a
             return;
         }
         const confirmed = window.confirm(
-            "Are you sure you want to verify attendance? After confirmation, attendance entries will be locked for editing.",
+            (() => {
+                const target =
+                    primaryFacultyEmail.trim() ||
+                    partnerReviewerEmailHint.trim() ||
+                    "";
+                const base =
+                    "Are you sure you want to verify attendance? After confirmation, attendance entries will be locked for editing.";
+                return target ? `${base}\n\nEmail will be sent to: ${target}` : base;
+            })(),
         );
         if (!confirmed) return;
 
@@ -557,10 +617,18 @@ export default function Section1Participation({ projectData }: { projectData?: a
         }
 
         const reviewerLabel = reviewerType ? `${reviewerType} reviewer` : "assigned reviewer";
+        const previewEmail =
+            primaryFacultyEmail.trim() ||
+            partnerReviewerEmailHint.trim() ||
+            "";
         toast.success(
             serverNotified
-                ? `Attendance sent for verification. ${reviewerLabel} has been notified.`
-                : "Attendance sent for verification and locked.",
+                ? previewEmail
+                    ? `Attendance sent for verification. ${reviewerLabel} notified at ${previewEmail}.`
+                    : `Attendance sent for verification. ${reviewerLabel} has been notified.`
+                : previewEmail
+                  ? `Attendance sent for verification and locked. Intended reviewer email: ${previewEmail}.`
+                  : "Attendance sent for verification and locked.",
         );
     };
 
@@ -1098,6 +1166,12 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                                         </p>
                                                         <p className="text-xs text-slate-500">
                                                             Attendance is locked. Reviewer decision required for any further changes.
+                                                            {(primaryFacultyEmail.trim() || partnerReviewerEmailHint.trim()) ? (
+                                                                <span className="mt-1 block font-medium text-slate-600">
+                                                                    Email was requested for:{" "}
+                                                                    {primaryFacultyEmail.trim() || partnerReviewerEmailHint.trim()}
+                                                                </span>
+                                                            ) : null}
                                                         </p>
                                                     </div>
                                                 ) : (
@@ -1121,7 +1195,11 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                                             )}
                                                         </Button>
                                                         <p className="text-[11px] font-medium text-slate-500">
-                                                            One-time action: this locks attendance editing and triggers reviewer email notification.
+                                                            One-time action: locks attendance editing and sends one verification email.
+                                                            <span className="mt-1 block text-slate-600">{attendanceVerifyRecipientLines.detail}</span>
+                                                            {attendanceVerifyRecipientLines.extra ? (
+                                                                <span className="mt-0.5 block text-slate-500">{attendanceVerifyRecipientLines.extra}</span>
+                                                            ) : null}
                                                         </p>
                                                     </div>
                                                 )}

@@ -65,6 +65,24 @@ function formatSaveCatchError(error: unknown, mode: "save" | "submit" = "save"):
     return fallback;
 }
 
+/** NestJS / common API envelopes: `message` string or validation array. */
+function extractJsonApiMessage(j: Record<string, unknown>): string {
+    const m = j.message;
+    if (typeof m === "string" && m.trim()) return m.trim();
+    if (Array.isArray(m)) {
+        const parts = m
+            .filter((x): x is string => typeof x === "string")
+            .map((s) => s.trim())
+            .filter(Boolean);
+        if (parts.length) return parts.join(" ");
+    }
+    for (const k of ["error", "detail"] as const) {
+        const v = j[k];
+        if (typeof v === "string" && v.trim()) return v.trim();
+    }
+    return "";
+}
+
 /** Parses JSON/text error bodies from backend `fetch` responses. */
 async function httpFailureUserMessage(res: Response, actionLabel: string): Promise<string> {
     const prefix = `${actionLabel} (HTTP ${res.status}).`;
@@ -75,11 +93,14 @@ async function httpFailureUserMessage(res: Response, actionLabel: string): Promi
         const ct = res.headers.get("content-type") || "";
         if (ct.includes("application/json")) {
             const j = (await res.json()) as Record<string, unknown>;
-            const msg =
-                (typeof j.message === "string" && j.message.trim()) ||
-                (typeof j.error === "string" && j.error.trim()) ||
-                (typeof j.detail === "string" && j.detail.trim());
-            return msg ? `${prefix} ${msg}` : prefix;
+            const serverMsg = extractJsonApiMessage(j);
+            if (serverMsg && (res.status === 403 || res.status === 401)) {
+                return serverMsg;
+            }
+            if (serverMsg) {
+                return `${prefix} ${serverMsg}`;
+            }
+            return prefix;
         }
         const text = (await res.text()).trim();
         return text ? `${prefix} ${text.slice(0, 240)}` : prefix;
