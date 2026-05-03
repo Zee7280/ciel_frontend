@@ -8,13 +8,16 @@ import { isTokenValid } from "@/utils/api";
 import { readStoredCurrentUser } from "@/utils/currentUser";
 import { readDashboardNavRoleFromStorage } from "@/utils/dashboardNavRole";
 
-/** Logged-in users: dashboard “my projects” area. Guests: public catalog at `/projects`. */
+/**
+ * Main-site "Projects" nav target. Uses the public `/projects` catalog for guests and faculty
+ * (browse opportunities). Other roles go to their dashboard project surfaces.
+ */
 function projectsNavHrefForSession(isLoggedIn: boolean): string {
     if (!isLoggedIn) return "/projects";
     const role = readDashboardNavRoleFromStorage();
     if (role === "admin") return "/dashboard/admin/projects";
     if (role === "partner") return "/dashboard/partner/requests";
-    if (role === "faculty") return "/dashboard/faculty/my-opportunities";
+    if (role === "faculty") return "/projects";
     return "/dashboard/student/projects";
 }
 

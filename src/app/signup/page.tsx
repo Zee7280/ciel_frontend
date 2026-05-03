@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import Link from "next/link";
-import { ArrowRight, Mail, Lock, AlertCircle, Loader2, CheckCircle, School, Landmark, ArrowLeft, Building2, User, GraduationCap, Phone, Globe, Heart, Eye, EyeOff, ShieldCheck } from "lucide-react";
+import { ArrowRight, Mail, Lock, AlertCircle, Loader2, CheckCircle, School, Landmark, ArrowLeft, Building2, User, GraduationCap, Phone, Globe, Heart, Eye, EyeOff, ShieldCheck, ChevronDown } from "lucide-react";
 import Image from "next/image";
 import clsx from "clsx";
 import PhoneConnectivityRow from "@/components/ui/PhoneConnectivityRow";
@@ -62,13 +62,16 @@ function SignUpContent() {
         if (roleParam && roles.find(r => r.id === roleParam)) {
             setRole(roleParam);
             setStep("form");
-            if (emailParam || tokenParam) {
-                setFormData(prev => ({ 
-                    ...prev, 
-                    email: emailParam || prev.email,
-                    token: tokenParam || prev.token
-                }));
-            }
+            setFormData((prev) => ({
+                ...prev,
+                ...(["university", "ngo", "corporate"].includes(roleParam) ? { orgType: roleParam } : {}),
+                ...(emailParam || tokenParam
+                    ? {
+                          email: emailParam || prev.email,
+                          token: tokenParam || prev.token,
+                      }
+                    : {}),
+            }));
         }
     }, [searchParams]);
 
@@ -291,6 +294,12 @@ function SignUpContent() {
         return () => clearTimeout(t);
     }, [resendCooldown]);
 
+    const institutionSelectClass = (hasError: boolean) =>
+        clsx(
+            "w-full cursor-pointer px-5 py-4 pr-12 rounded-2xl border-2 bg-slate-50/50 focus:bg-white outline-none transition-all font-bold text-slate-800 appearance-none",
+            hasError ? "border-red-500 focus:border-red-500" : "border-slate-100 focus:border-emerald-600",
+        );
+
     const activeRoleData = roles.find(r => r.id === (hoveredRole || role));
     const displayTitle = step === 'otp'
         ? 'Verify Email'
@@ -436,16 +445,39 @@ function SignUpContent() {
                                                 <label className="text-[11px] font-black uppercase tracking-widest text-slate-400 ml-1">
                                                     {role === 'university' ? "Institution Name" : role === 'corporate' ? "Company Name" : "Organization Name"}
                                                 </label>
-                                                <input
-                                                    type="text"
-                                                    value={formData.orgName}
-                                                    onChange={(e) => handleGenericChange("orgName", e.target.value)}
-                                                    className={clsx(
-                                                        "w-full px-5 py-4 rounded-2xl border-2 bg-slate-50/50 focus:bg-white outline-none transition-all font-bold text-slate-800 placeholder:text-slate-300",
-                                                        errors.orgName ? "border-red-500 focus:border-red-500" : "border-slate-100 focus:border-emerald-600"
-                                                    )}
-                                                    placeholder="e.g. Hope Foundation"
-                                                />
+                                                {role === 'university' ? (
+                                                    <div className="relative">
+                                                        <select
+                                                            value={formData.orgName}
+                                                            onChange={(e) => handleGenericChange("orgName", e.target.value)}
+                                                            aria-invalid={!!errors.orgName}
+                                                            aria-label="Institution name"
+                                                            className={institutionSelectClass(!!errors.orgName)}
+                                                        >
+                                                            <option value="">Select institution</option>
+                                                            {pakistaniUniversities.map((u) => (
+                                                                <option key={u} value={u}>
+                                                                    {u}
+                                                                </option>
+                                                            ))}
+                                                        </select>
+                                                        <ChevronDown
+                                                            className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400"
+                                                            aria-hidden
+                                                        />
+                                                    </div>
+                                                ) : (
+                                                    <input
+                                                        type="text"
+                                                        value={formData.orgName}
+                                                        onChange={(e) => handleGenericChange("orgName", e.target.value)}
+                                                        className={clsx(
+                                                            "w-full px-5 py-4 rounded-2xl border-2 bg-slate-50/50 focus:bg-white outline-none transition-all font-bold text-slate-800 placeholder:text-slate-300",
+                                                            errors.orgName ? "border-red-500 focus:border-red-500" : "border-slate-100 focus:border-emerald-600"
+                                                        )}
+                                                        placeholder="e.g. Hope Foundation"
+                                                    />
+                                                )}
                                                 {errors.orgName && <p className="text-[10px] text-red-500 font-black uppercase tracking-widest ml-1">{errors.orgName}</p>}
                                             </div>
 
@@ -500,19 +532,26 @@ function SignUpContent() {
                                         <div className="grid grid-cols-2 gap-4">
                                             <div className="space-y-1.5">
                                                 <label className="text-[11px] font-black uppercase tracking-widest text-slate-400 ml-1">Institution</label>
-                                                <select
-                                                    value={formData.institution}
-                                                    onChange={(e) => handleGenericChange("institution", e.target.value)}
-                                                    className={clsx(
-                                                        "w-full px-5 py-4 rounded-2xl border-2 bg-slate-50/50 focus:bg-white outline-none transition-all font-bold text-slate-800 appearance-none",
-                                                        errors.institution ? "border-red-500 focus:border-red-500" : "border-slate-100 focus:border-emerald-600"
-                                                    )}
-                                                >
-                                                    <option value="">Select Institution</option>
-                                                    {pakistaniUniversities.map(u => (
-                                                        <option key={u} value={u}>{u}</option>
-                                                    ))}
-                                                </select>
+                                                <div className="relative">
+                                                    <select
+                                                        value={formData.institution}
+                                                        onChange={(e) => handleGenericChange("institution", e.target.value)}
+                                                        aria-invalid={!!errors.institution}
+                                                        aria-label="Institution"
+                                                        className={institutionSelectClass(!!errors.institution)}
+                                                    >
+                                                        <option value="">Select institution</option>
+                                                        {pakistaniUniversities.map((u) => (
+                                                            <option key={u} value={u}>
+                                                                {u}
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                    <ChevronDown
+                                                        className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400"
+                                                        aria-hidden
+                                                    />
+                                                </div>
                                                 {errors.institution && <p className="text-[10px] text-red-500 font-black uppercase tracking-widest ml-1">{errors.institution}</p>}
                                             </div>
                                             <div className="space-y-1.5">
