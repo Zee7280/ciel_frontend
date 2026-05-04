@@ -19,11 +19,36 @@ import { Label } from "@/app/dashboard/student/report/components/ui/label";
 import { toast } from "sonner";
 import {
     type FacultyApprovalRow,
+    type FacultyApprovalVisibility,
     normalizeFacultyApprovalsResponse,
 } from "@/utils/facultyApprovals";
 import { formatDisplayId } from "@/utils/displayIds";
 import { getStoredCurrentUserEmail } from "@/utils/currentUser";
 import { FacultyOpportunityDetailBody } from "@/components/faculty/FacultyOpportunityDetailBody";
+
+function ApprovalVisibilityBadges({ visibility }: { visibility?: FacultyApprovalVisibility }) {
+    if (!visibility) return null;
+    const listed = (
+        <Badge variant="outline" className="border-emerald-200 bg-emerald-50 text-xs font-medium text-emerald-900">
+            Listed supervisor
+        </Badge>
+    );
+    const uni = (
+        <Badge variant="outline" className="border-indigo-200 bg-indigo-50 text-xs font-medium text-indigo-900">
+            University scope
+        </Badge>
+    );
+    if (visibility === "both") {
+        return (
+            <span className="flex flex-wrap items-center gap-1.5">
+                {listed}
+                {uni}
+            </span>
+        );
+    }
+    if (visibility === "named_supervisor") return listed;
+    return uni;
+}
 
 export default function FacultyApprovalsPage() {
     const [tab, setTab] = useState<"pending" | "history">("pending");
@@ -243,8 +268,13 @@ export default function FacultyApprovalsPage() {
                     <strong className="text-slate-600 font-semibold">student readiness</strong>. Approve to move the
                     request forward, or reject with comments so they can revise.
                 </p>
-                <p className="text-slate-500 text-sm mt-2">
-                    Past decisions appear under <span className="font-medium text-slate-600">Approval history</span>.
+                <p className="mt-2 text-sm text-slate-600">
+                    <strong className="font-semibold text-slate-800">Why do I see a request?</strong>{" "}
+                    <span className="text-slate-600">
+                        <em>Listed supervisor</em> means you are the faculty contact on the submission.{" "}
+                        <em>University scope</em> means your account is assigned that university&rsquo;s liaison queue, so
+                        you may see other supervisors&rsquo; students from the same institution alongside your own listings.
+                    </span>
                 </p>
             </div>
 
@@ -304,14 +334,15 @@ export default function FacultyApprovalsPage() {
                                 <div className="flex-1 space-y-4 p-5 sm:p-6">
                                     <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
                                         <div className="min-w-0">
-                                            <div className="flex items-center gap-2 mb-1 flex-wrap">
-                                                <h3 className="font-bold text-lg text-slate-900">{project.projectTitle}</h3>
+                                            <div className="mb-1 flex flex-wrap items-center gap-2">
+                                                <h3 className="text-lg font-bold text-slate-900">{project.projectTitle}</h3>
+                                                <ApprovalVisibilityBadges visibility={project.approvalVisibility} />
                                                 {tab === "pending" ? (
-                                                    <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">
-                                                        <Clock className="w-3 h-3 mr-1" /> Pending review
+                                                    <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-700">
+                                                        <Clock className="mr-1 h-3 w-3" /> Pending review
                                                     </Badge>
                                                 ) : (
-                                                    <Badge variant="outline" className="bg-slate-100 text-slate-700 border-slate-200">
+                                                    <Badge variant="outline" className="border-slate-200 bg-slate-100 text-slate-700">
                                                         {formatHistoryStatus(project)}
                                                     </Badge>
                                                 )}

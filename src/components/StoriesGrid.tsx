@@ -4,6 +4,13 @@ import { useEffect, useState } from "react";
 import { ArrowRight, GraduationCap, Heart, Leaf, Users, Target, Search } from "lucide-react";
 import { useRouter } from "next/navigation";
 
+/** Landing “Live projects” grid: backend returns all public live rows; we cap here for layout/perf (override via env). */
+const HOME_OPPORTUNITIES_LIMIT = (() => {
+    const raw = Number.parseInt(process.env.NEXT_PUBLIC_HOME_OPPORTUNITIES_LIMIT ?? "", 10);
+    if (Number.isFinite(raw) && raw >= 4 && raw <= 48) return raw;
+    return 12;
+})();
+
 interface Opportunity {
     id: string;
     title: string;
@@ -33,12 +40,17 @@ export default function StoriesGrid() {
     useEffect(() => {
         const fetchOpportunities = async () => {
             try {
-                const backendUrl = process.env.NEXT_PUBLIC_BACKEND_BASE_URL;
-                const response = await fetch(`${backendUrl}/public/opportunities`);
+                const backendUrl = (process.env.NEXT_PUBLIC_BACKEND_BASE_URL || "").replace(/\/$/, "");
+                if (!backendUrl) {
+                    console.error("StoriesGrid: NEXT_PUBLIC_BACKEND_BASE_URL is not set");
+                    setOpportunities([]);
+                    return;
+                }
+                const response = await fetch(`${backendUrl}/public/opportunities`, { cache: "no-store" });
                 if (response.ok) {
                     const result = await response.json();
                     if (result.success && Array.isArray(result.data)) {
-                        setOpportunities(result.data.slice(0, 4));
+                        setOpportunities(result.data.slice(0, HOME_OPPORTUNITIES_LIMIT));
                     }
                 }
             } catch (error) {
@@ -91,7 +103,7 @@ export default function StoriesGrid() {
 
                 <div className="flex flex-wrap justify-center gap-6 md:gap-8">
                     {loading ? (
-                        [1, 2, 3, 4].map((i) => (
+                        Array.from({ length: Math.min(HOME_OPPORTUNITIES_LIMIT, 8) }, (_, i) => i + 1).map((i) => (
                             <div
                                 key={i}
                                 className={`${cardShell} h-[380px] animate-pulse border-slate-100`}
@@ -115,11 +127,21 @@ export default function StoriesGrid() {
 
                             return (
                                 <article key={opp.id} className={cardShell}>
-                                    <div className="bg-[#3A72AA] px-5 py-3 text-center">
+                                    <div className="flex items-center justify-center gap-2 bg-[#3A72AA] px-5 py-3 text-center">
+                                        <span className="relative flex h-2.5 w-2.5 shrink-0" title="Live — open for participation">
+                                            <span
+                                                className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-300 opacity-60"
+                                                aria-hidden
+                                            />
+                                            <span
+                                                className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-400 ring-2 ring-white/40"
+                                                aria-hidden
+                                            />
+                                        </span>
                                         <span className="text-sm font-semibold tracking-wide text-white">
                                             {opp.participant_count != null
-                                                ? `Active (${opp.participant_count})`
-                                                : "Verified Project"}
+                                                ? `Live · Active (${opp.participant_count})`
+                                                : "Live · Verified Project"}
                                         </span>
                                     </div>
 

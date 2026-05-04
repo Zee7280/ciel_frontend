@@ -1,3 +1,6 @@
+/** Why this row appears for the logged-in faculty (see backend FacultyService.getApprovals). */
+export type FacultyApprovalVisibility = "named_supervisor" | "university_scope" | "both";
+
 export type FacultyApprovalRow = {
     id: string;
     projectTitle: string;
@@ -10,6 +13,7 @@ export type FacultyApprovalRow = {
     sdg?: string;
     opportunityStatus?: string;
     workflowStage?: string | null;
+    approvalVisibility?: FacultyApprovalVisibility;
 };
 
 function pickStr(raw: Record<string, unknown>, ...keys: string[]): string {
@@ -18,6 +22,12 @@ function pickStr(raw: Record<string, unknown>, ...keys: string[]): string {
         if (typeof v === "string" && v.trim()) return v.trim();
     }
     return "";
+}
+
+function pickApprovalVisibility(raw: Record<string, unknown>): FacultyApprovalVisibility | undefined {
+    const v = pickStr(raw, "approvalVisibility", "approval_visibility");
+    if (v === "named_supervisor" || v === "university_scope" || v === "both") return v;
+    return undefined;
 }
 
 function pickNum(raw: Record<string, unknown>, ...keys: string[]): number | undefined {
@@ -69,6 +79,7 @@ export function mapFacultyApprovalBackendRow(raw: unknown): FacultyApprovalRow |
         sdg: pickStr(r, "sdg", "primary_sdg", "sdg_label") || undefined,
         opportunityStatus: pickStr(r, "opportunityStatus", "status", "opportunity_status") || undefined,
         workflowStage: pickStr(r, "workflowStage", "workflow_stage", "approval_stage") || null,
+        approvalVisibility: pickApprovalVisibility(r),
     };
 }
 

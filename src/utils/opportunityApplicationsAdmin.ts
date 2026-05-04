@@ -19,6 +19,9 @@ export type OpportunityApplicationListRow = {
     facultyReviewerName?: string;
     facultyApprovalStatus?: string;
     primaryFacultyEmail?: string;
+    /** From apply payload — applicant/lead is shown separately as studentName/studentEmail. */
+    participationType?: string;
+    teamMembers?: { name: string; email: string }[];
 };
 
 function pickStr(raw: Record<string, unknown>, ...keys: string[]): string {
@@ -39,6 +42,21 @@ export function extractOpportunityApplicationsArray(payload: unknown): unknown[]
         }
     }
     return [];
+}
+
+function pickTeamMembers(raw: Record<string, unknown>): { name: string; email: string }[] | undefined {
+    const v = raw["team_members"] ?? raw["teamMembers"];
+    if (!Array.isArray(v)) return undefined;
+    const out: { name: string; email: string }[] = [];
+    for (const item of v) {
+        if (!item || typeof item !== "object") continue;
+        const o = item as Record<string, unknown>;
+        const email = typeof o.email === "string" ? o.email.trim() : "";
+        if (!email) continue;
+        const name = typeof o.name === "string" && o.name.trim() ? o.name.trim() : "—";
+        out.push({ name, email });
+    }
+    return out.length ? out : undefined;
 }
 
 export function mapOpportunityApplicationListRow(raw: unknown): OpportunityApplicationListRow | null {
@@ -78,6 +96,9 @@ export function mapOpportunityApplicationListRow(raw: unknown): OpportunityAppli
         facultyReviewerName: pickStr(r, "faculty_reviewer_name", "facultyReviewerName", "reviewed_by_faculty_name") || undefined,
         facultyApprovalStatus,
         primaryFacultyEmail: pickStr(r, "primary_faculty_email", "primaryFacultyEmail", "faculty_email") || undefined,
+        participationType:
+            pickStr(r, "participation_type", "participationType") || undefined,
+        teamMembers: pickTeamMembers(r),
     };
 }
 
