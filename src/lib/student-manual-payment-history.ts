@@ -1,5 +1,5 @@
 import { authenticatedFetch } from "@/utils/api";
-import { REPORTING_FEE_DISPLAY } from "@/config/reportingFee";
+import { REPORTING_FEE_DISPLAY, formatPkrAmount } from "@/config/reportingFee";
 
 /** Logged-in student id from persisted session (matches other student flows). */
 export function readStudentIdFromCielUser(): string | null {
@@ -50,6 +50,46 @@ function pickStr(obj: Record<string, unknown>, keys: string[]): string {
 function pickStrOrNull(obj: Record<string, unknown>, keys: string[]): string | null {
     const s = pickStr(obj, keys);
     return s === "" ? null : s;
+}
+
+function pickNumericPkr(obj: Record<string, unknown>, keys: string[]): number | null {
+    for (const k of keys) {
+        const v = obj[k];
+        if (v == null) continue;
+        if (typeof v === "number" && Number.isFinite(v)) return Math.round(v);
+        const n = Number(String(v).replace(/,/g, ""));
+        if (Number.isFinite(n) && !Number.isNaN(n)) return Math.round(n);
+    }
+    return null;
+}
+
+/** Display string for history row: API label, then paid amount, then numeric fee fields, else per-student default. */
+function pickAmountDisplayString(paymentSource: Record<string, unknown>, paidAmountPkr: number | null): string {
+    const labelKeys = ["amountDisplay", "amount_label", "amountLabel", "fee_label", "feeLabel"];
+    for (const k of labelKeys) {
+        const v = paymentSource[k];
+        if (typeof v === "string" && v.trim()) return v.trim();
+    }
+    if (paidAmountPkr != null) return formatPkrAmount(paidAmountPkr);
+    const fromNumeric = pickNumericPkr(paymentSource, [
+        "expected_fee_pkr",
+        "expectedFeePkr",
+        "fee_pkr",
+        "feePkr",
+        "total_fee_pkr",
+        "totalFeePkr",
+        "amount_pkr",
+        "amountPkr",
+    ]);
+    if (fromNumeric != null) return formatPkrAmount(fromNumeric);
+    const amt = paymentSource.amount;
+    if (typeof amt === "number" && Number.isFinite(amt)) return formatPkrAmount(Math.round(amt));
+    if (typeof amt === "string" && amt.trim()) {
+        const n = Number(amt.replace(/,/g, ""));
+        if (Number.isFinite(n) && !Number.isNaN(n)) return formatPkrAmount(Math.round(n));
+        return amt.trim();
+    }
+    return REPORTING_FEE_DISPLAY;
 }
 
 function pickPaidAmountPkr(obj: Record<string, unknown>): number | null {
@@ -108,11 +148,13 @@ export function normalizeStudentManualPaymentHistoryItem(raw: unknown): StudentM
     const opportunityId = pickStrOrNull(row, ["opportunityId", "opportunity_id"]);
     const opportunity = normalizeOpportunity(row.opportunity);
 
+    const amount = pickAmountDisplayString(paymentSource, paidAmountPkr);
+
     return {
         payment: {
             id,
             status,
-            amount: REPORTING_FEE_DISPLAY,
+            amount,
             paidAmountPkr,
             proofUrl,
             feedback,

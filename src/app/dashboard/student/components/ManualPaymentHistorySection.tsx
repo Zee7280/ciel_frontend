@@ -101,10 +101,6 @@ export function ManualPaymentHistorySection({
                                             icon: Clock3,
                                         };
                             const StatusIcon = statusConfig.icon;
-                            const paidLine =
-                                payment.paidAmountPkr != null
-                                    ? `${payment.paidAmountPkr.toLocaleString("en-PK")} PKR transferred`
-                                    : null;
                             const statusLabel = payment.status.replace(/_/g, " ");
 
                             return (
@@ -151,18 +147,13 @@ export function ManualPaymentHistorySection({
                                             </div>
                                         </div>
 
-                                        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                                        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
                                             <div className="rounded-2xl border border-slate-200 bg-slate-50/80 px-3 py-2.5">
-                                                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Fee</p>
+                                                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
+                                                    Amount (PKR)
+                                                </p>
                                                 <p className="mt-1 text-sm font-bold text-slate-900">{payment.amount}</p>
                                             </div>
-
-                                            {paidLine ? (
-                                                <div className="rounded-2xl border border-blue-100 bg-blue-50/70 px-3 py-2.5">
-                                                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-500">Paid</p>
-                                                    <p className="mt-1 text-sm font-bold text-slate-900">{paidLine}</p>
-                                                </div>
-                                            ) : null}
 
                                             <div className="rounded-2xl border border-slate-200 bg-white px-3 py-2.5">
                                                 <div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">

@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect, Suspense } from 'react';
+import React, { useState, useEffect, useMemo, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { authenticatedFetch } from '@/utils/api';
 import { toast } from 'sonner';
@@ -23,7 +23,13 @@ import {
     fetchStudentManualPaymentHistory,
     type StudentManualPaymentHistoryRow,
 } from '@/lib/student-manual-payment-history';
-import { REPORTING_FEE_DISPLAY, REPORTING_FEE_PKR } from '@/config/reportingFee';
+import {
+    REPORTING_FEE_DISPLAY,
+    REPORTING_FEE_PKR,
+    computeReportingFeeTotalPkr,
+    formatPkrAmount,
+    resolveReportPaymentHeadcountMerged,
+} from '@/config/reportingFee';
 import { ManualPaymentHistorySection } from '../components/ManualPaymentHistorySection';
 
 function PaymentContent() {
@@ -34,25 +40,33 @@ function PaymentContent() {
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
     const [projectDetails, setProjectDetails] = useState<any>(null);
-    const [bankInfo, setBankInfo] = useState({
+    const bankInfo = {
         bankName: "UNITED Bank Limited (UBL)",
         accountTitle: "CIEL International",
         accountNumber: "0374251663933",
         iban: "PK14UNIL0109000251663933",
-        amount: REPORTING_FEE_DISPLAY,
-    });
+    };
     const [proofFile, setProofFile] = useState<File | null>(null);
     /** PKR the student actually transferred (digits only in state). */
     const [paidAmountPkr, setPaidAmountPkr] = useState(String(REPORTING_FEE_PKR));
     const [paymentSubmitted, setPaymentSubmitted] = useState(false);
     const [manualPaymentHistory, setManualPaymentHistory] = useState<StudentManualPaymentHistoryRow[]>([]);
     const [manualPaymentHistoryLoading, setManualPaymentHistoryLoading] = useState(true);
+    /** Billable students: project API + report Section 1 roster (max of both). */
+    const [feeHeadcount, setFeeHeadcount] = useState(1);
+
+    const reportingFeeTotalPkr = useMemo(() => computeReportingFeeTotalPkr(feeHeadcount), [feeHeadcount]);
+    const reportingFeeTotalDisplay = useMemo(
+        () => formatPkrAmount(reportingFeeTotalPkr),
+        [reportingFeeTotalPkr],
+    );
 
     useEffect(() => {
         if (!projectId) {
             router.push('/dashboard/student');
             return;
         }
+        setFeeHeadcount(1);
         fetchProjectDetails();
     }, [projectId]);
 
@@ -80,6 +94,22 @@ function PaymentContent() {
                 const data = await res.json();
                 const project = data.data || data;
                 setProjectDetails(project);
+
+                let reportPayload: unknown = null;
+                try {
+                    const reportRes = await authenticatedFetch(`/api/v1/student/reports/${projectId}`);
+                    if (reportRes?.ok) {
+                        const reportJson = await reportRes.json().catch(() => null);
+                        if (reportJson && typeof reportJson === "object") {
+                            reportPayload = (reportJson as { data?: unknown }).data ?? reportJson;
+                        }
+                    }
+                } catch {
+                    /* report optional */
+                }
+                const headcount = resolveReportPaymentHeadcountMerged(project, reportPayload);
+                setFeeHeadcount(headcount);
+                setPaidAmountPkr(String(computeReportingFeeTotalPkr(headcount)));
 
                 // 🚀 Check report/payment status to potentially skip this page
                 const storedUser = localStorage.getItem("ciel_user");
@@ -227,12 +257,21 @@ function PaymentContent() {
                     </Button>
                     <h1 className="text-2xl font-black tracking-tight text-slate-900 sm:text-3xl">Complete Payment</h1>
                     <p className="text-slate-500 font-medium">
-                        Please transfer <span className="font-semibold text-slate-700">{REPORTING_FEE_DISPLAY}</span> per student to the account below and upload the proof.
+                        Please transfer <span className="font-semibold text-slate-700">{REPORTING_FEE_DISPLAY}</span> per
+                        student
+                        {feeHeadcount > 1 ? (
+                            <>
+                                {" "}
+                                (<span className="font-semibold text-slate-700">{feeHeadcount} students</span> →{" "}
+                                <span className="font-semibold text-slate-700">{reportingFeeTotalDisplay}</span> total)
+                            </>
+                        ) : null}{" "}
+                        to the account below and upload the proof.
                     </p>
                 </div>
                 <div className="flex items-center justify-center gap-2 rounded-2xl border border-blue-100 bg-blue-50 px-4 py-2 text-blue-700 sm:justify-start">
                     <CreditCard className="w-5 h-5" />
-                    <span className="font-black text-lg">{bankInfo.amount}</span>
+                    <span className="font-black text-lg">{reportingFeeTotalDisplay}</span>
                 </div>
             </div>
 
@@ -278,9 +317,14 @@ function PaymentContent() {
                         <div className="flex w-full flex-col gap-4 min-[520px]:flex-row min-[520px]:flex-wrap min-[520px]:items-center min-[520px]:justify-between min-[520px]:gap-6">
                             <div className="text-left">
                                 <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                                    Amount Due (per student)
+                                    {feeHeadcount > 1 ? "Total amount due" : "Amount due"}
                                 </p>
-                                <p className="text-xl font-black text-slate-900">{bankInfo.amount}</p>
+                                <p className="text-xl font-black text-slate-900">{reportingFeeTotalDisplay}</p>
+                                {feeHeadcount > 1 ? (
+                                    <p className="text-xs font-semibold text-slate-500">
+                                        {feeHeadcount} students × {REPORTING_FEE_DISPLAY}
+                                    </p>
+                                ) : null}
                             </div>
                             <div className="hidden h-10 w-px min-[520px]:block shrink-0 bg-slate-200" aria-hidden />
                             <div className="flex min-w-[12rem] items-center gap-2 text-sm italic text-slate-500">
@@ -373,7 +417,7 @@ function PaymentContent() {
                                 inputMode="numeric"
                                 autoComplete="off"
                                 className="font-bold text-slate-900 border-slate-200"
-                                placeholder={`e.g. ${REPORTING_FEE_PKR}`}
+                                placeholder={`e.g. ${reportingFeeTotalPkr}`}
                                 value={paidAmountPkr}
                                 onChange={(e) => setPaidAmountPkr(e.target.value.replace(/\D/g, ''))}
                             />
