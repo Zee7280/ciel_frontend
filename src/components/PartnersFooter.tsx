@@ -25,53 +25,51 @@ const HOME_PARTNER_LOGOS = [
 
 export default function PartnersFooter() {
     return (
-        <section className="py-12 bg-white border-t border-slate-100" aria-labelledby="home-partners-heading">
-            <div className="max-w-7xl mx-auto px-6 flex flex-col items-center gap-8">
-                <h2 id="home-partners-heading" className="text-sm font-semibold uppercase tracking-wider text-slate-500">
-                    Partner organisations
-                </h2>
-            </div>
-
-            {/* Full-bleed row + left→right marquee (duplicate strip for seamless loop) */}
+        <section
+            className="relative overflow-hidden border-t border-slate-200/90 bg-gradient-to-b from-slate-50 via-white to-white py-14 md:py-16"
+            aria-labelledby="home-partners-heading"
+        >
             <div
-                className="relative w-full overflow-hidden"
-                role="region"
-                aria-label="Partner organisation logos"
-            >
-                <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-16 bg-gradient-to-r from-white to-transparent md:w-24" />
-                <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-16 bg-gradient-to-l from-white to-transparent md:w-24" />
+                className="pointer-events-none absolute inset-0 opacity-100"
+                style={{
+                    background: `radial-gradient(ellipse 85% 55% at 50% -15%, rgba(0, 86, 179, 0.07), transparent 55%)`,
+                }}
+                aria-hidden
+            />
 
-                <div className="partner-marquee-ltr-track gap-16 py-2 md:gap-24 hover:[animation-play-state:paused]">
+            <div className="relative mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+                <header className="mb-10 text-center md:mb-12">
+                    <h2
+                        id="home-partners-heading"
+                        className="text-[11px] font-semibold uppercase tracking-[0.28em] text-[#0056B3]/90 md:text-xs"
+                    >
+                        Partner organisations
+                    </h2>
+                    <p className="mx-auto mt-3 max-w-lg text-xs leading-relaxed text-slate-500 md:text-sm">
+                        Trusted collaborators advancing education and impact across Pakistan.
+                    </p>
+                </header>
+
+                <ul
+                    role="list"
+                    className="mx-auto grid max-w-6xl grid-cols-2 items-stretch gap-6 sm:grid-cols-3 sm:gap-8 lg:grid-cols-5 lg:gap-6 xl:gap-8 [&>li]:flex [&>li]:justify-center"
+                    aria-label="Partner organisation logos"
+                >
                     {HOME_PARTNER_LOGOS.map(({ src, alt }) => (
-                        <div
-                            key={src}
-                            className="flex h-[72px] min-w-[160px] max-w-[280px] shrink-0 items-center justify-center px-4 opacity-95"
-                        >
-                            <Image
-                                src={src}
-                                alt={alt}
-                                width={280}
-                                height={90}
-                                className="max-h-[72px] w-auto max-w-[260px] object-contain"
-                            />
-                        </div>
+                        <li key={src} className="min-w-0">
+                            <div className="group flex h-[5.75rem] w-full max-w-[212px] items-center justify-center rounded-2xl border border-slate-200/75 bg-white p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_1px_3px_rgba(15,23,42,0.06)] transition duration-300 ease-out hover:border-[#0056B3]/28 hover:shadow-[0_12px_32px_-16px_rgba(0,86,179,0.2)] sm:h-[6rem] lg:max-w-none lg:rounded-xl">
+                                <Image
+                                    src={src}
+                                    alt={alt}
+                                    width={220}
+                                    height={88}
+                                    sizes="(max-width:640px) 42vw, 160px"
+                                    className="h-[2.875rem] w-auto max-h-[3rem] max-w-[min(100%,10.5rem)] object-contain object-center grayscale-[18%] contrast-[1.03] transition duration-300 ease-out group-hover:scale-[1.03] group-hover:grayscale-0 group-hover:contrast-100 sm:h-[3.125rem] sm:max-h-[3.25rem]"
+                                />
+                            </div>
+                        </li>
                     ))}
-                    {HOME_PARTNER_LOGOS.map(({ src, alt }) => (
-                        <div
-                            key={`${src}-dup`}
-                            className="flex h-[72px] min-w-[160px] max-w-[280px] shrink-0 items-center justify-center px-4 opacity-95"
-                            aria-hidden="true"
-                        >
-                            <Image
-                                src={src}
-                                alt=""
-                                width={280}
-                                height={90}
-                                className="max-h-[72px] w-auto max-w-[260px] object-contain"
-                            />
-                        </div>
-                    ))}
-                </div>
+                </ul>
             </div>
         </section>
     );

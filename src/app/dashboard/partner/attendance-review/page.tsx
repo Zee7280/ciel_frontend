@@ -114,6 +114,7 @@ export default function PartnerAttendanceReviewPage() {
 
     return (
         <AttendanceReviewDashboard
+            variant="partner"
             backHref="/dashboard/partner/requests"
             backLabel="Back to opportunities"
             eyebrow="Partner workspace"

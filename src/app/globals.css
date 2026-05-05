@@ -127,45 +127,6 @@ body {
     }
   }
 
-  /** Partner logos: seamless horizontal marquee (left → right drift). */
-  @keyframes partnerMarqueeLtr {
-    from {
-      transform: translateX(-50%);
-    }
-
-    to {
-      transform: translateX(0);
-    }
-  }
-
-  .partner-marquee-ltr-track {
-    display: flex;
-    flex-direction: row;
-    flex-wrap: nowrap;
-    align-items: center;
-    width: max-content;
-    animation: partnerMarqueeLtr 36s linear infinite;
-    will-change: transform;
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .partner-marquee-ltr-track {
-      animation: none;
-      transform: none;
-      width: 100%;
-      max-width: 56rem;
-      margin-inline: auto;
-      justify-content: center;
-      flex-wrap: wrap;
-      row-gap: 1.5rem;
-      column-gap: 2rem;
-    }
-
-    .partner-marquee-ltr-track>[aria-hidden="true"] {
-      display: none;
-    }
-  }
-
   /* Standardized Report Typography */
   .report-h2 {
     font-family: var(--font-sans);
