@@ -1112,6 +1112,15 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
                                 q={`Partner ${i + 1}`}
                                 a={[
                                     `${p.name} (${p.type_other || p.type} organization)`,
+                                    p.pakistan_contact_name?.trim()
+                                        ? `Pakistan contact: ${p.pakistan_contact_name}`
+                                        : "",
+                                    p.pakistan_contact_number?.trim()
+                                        ? `Number: ${p.pakistan_contact_number}`
+                                        : "",
+                                    p.pakistan_contact_email?.trim()
+                                        ? `Email: ${p.pakistan_contact_email}`
+                                        : "",
                                     p.role?.length ? `Role: ${p.role.join(", ")}` : "",
                                     p.contribution?.length ? `Contribution: ${p.contribution.join(", ")}` : "",
                                     p.verification ? `Verification: ${p.verification}` : "",

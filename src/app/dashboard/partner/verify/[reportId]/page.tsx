@@ -1026,6 +1026,13 @@ export default function ReportDetailPage() {
                                                     <strong className="text-slate-900">{String(p.name || "")}</strong>
                                                     <span className="text-[10px] font-black bg-white px-2 py-0.5 rounded border border-slate-100 uppercase text-slate-400">{String(p.type_other || p.type || "")}</span>
                                                 </div>
+                                                {[p.pakistan_contact_name, p.pakistan_contact_number, p.pakistan_contact_email].some(Boolean) && (
+                                                    <div className="mt-1 space-y-0.5 text-slate-600 text-xs">
+                                                        {Boolean(p.pakistan_contact_name) && <div>Contact (Pakistan): {String(p.pakistan_contact_name)}</div>}
+                                                        {Boolean(p.pakistan_contact_number) && <div>Number: {String(p.pakistan_contact_number)}</div>}
+                                                        {Boolean(p.pakistan_contact_email) && <div>Email: {String(p.pakistan_contact_email)}</div>}
+                                                    </div>
+                                                )}
                                                 {Boolean(p.role) && <div className="mt-1 text-slate-600 text-xs">Role: {Array.isArray(p.role) ? p.role.join(", ") : String(p.role)}</div>}
                                                 {Boolean(p.contribution) && <div className="mt-1 text-slate-600 text-xs">Contributions: {Array.isArray(p.contribution) ? p.contribution.join(", ") : String(p.contribution)}</div>}
                                                 {Boolean(p.verification) && <div className="mt-1 text-slate-600 text-xs">Verification: {String(p.verification)}</div>}

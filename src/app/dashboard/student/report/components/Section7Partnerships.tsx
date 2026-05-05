@@ -162,6 +162,40 @@ function PartnerCard({
                 <FieldError message={getFieldError(`partners.${idx}.name`)} />
             </div>
 
+            {/* Pakistan contact (optional capture for verification / coordination) */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-5">
+                <div className="space-y-2">
+                    <Label className="report-label">Contact Name in Pakistan</Label>
+                    <input
+                        type="text"
+                        placeholder="e.g. Representative or focal person name..."
+                        value={p.pakistan_contact_name ?? ''}
+                        onChange={e => onUpdate('pakistan_contact_name', e.target.value)}
+                        className="w-full h-13 bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-3 font-bold text-slate-700 text-sm outline-none focus:border-indigo-200 transition-all"
+                    />
+                </div>
+                <div className="space-y-2">
+                    <Label className="report-label">Number</Label>
+                    <input
+                        type="tel"
+                        placeholder="e.g. +92 ..."
+                        value={p.pakistan_contact_number ?? ''}
+                        onChange={e => onUpdate('pakistan_contact_number', e.target.value)}
+                        className="w-full h-13 bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-3 font-bold text-slate-700 text-sm outline-none focus:border-indigo-200 transition-all"
+                    />
+                </div>
+                <div className="space-y-2">
+                    <Label className="report-label">Email</Label>
+                    <input
+                        type="email"
+                        placeholder="Official or project contact email..."
+                        value={p.pakistan_contact_email ?? ''}
+                        onChange={e => onUpdate('pakistan_contact_email', e.target.value)}
+                        className="w-full h-13 bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-3 font-bold text-slate-700 text-sm outline-none focus:border-indigo-200 transition-all"
+                    />
+                </div>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-5">
                 {/* Left: Type + Role */}
                 <div className="space-y-4">
@@ -290,7 +324,16 @@ export default function Section7Partnerships() {
     const update = (field: string, val: any) => updateSection('section7', { [field]: val });
 
     const addPartner = () =>
-        update('partners', [...partners, { name: '', type: '', role: [], contribution: [], verification: '' }]);
+        update('partners', [...partners, {
+            name: '',
+            pakistan_contact_name: '',
+            pakistan_contact_number: '',
+            pakistan_contact_email: '',
+            type: '',
+            role: [],
+            contribution: [],
+            verification: ''
+        }]);
     const removePartner = (i: number) =>
         update('partners', partners.filter((_, idx) => idx !== i));
     const updatePartner = (i: number, field: string, val: any) => {

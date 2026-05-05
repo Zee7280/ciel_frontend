@@ -11,6 +11,9 @@ interface AttendanceEntry {
     end_time: string;
     hours: number;
     activity_type: string;
+    /** Session notes / narrative from attendance log (normalized snake_case or camelCase from API). */
+    description?: string | null;
+    session_description?: string | null;
     entryStatus?: 'pending' | 'verified' | 'flagged';
     /** From backend attendance approval (null = legacy). */
     approval_status?: string | null;
@@ -50,6 +53,14 @@ function isRejectedEntry(entry: AttendanceEntry): boolean {
 }
 
 /** Normalized `approval_remark` or raw backend `approvalActionReason` (report verify pages pass raw logs). */
+function pickDescription(entry: AttendanceEntry): string {
+    const e = entry as AttendanceEntry & { sessionDescription?: string | null };
+    for (const v of [entry.description, entry.session_description, e.sessionDescription]) {
+        if (typeof v === "string" && v.trim()) return v.trim();
+    }
+    return "";
+}
+
 function resolvedRejectRemark(entry: AttendanceEntry): string {
     const candidates = [entry.approval_remark, entry.approvalActionReason, entry.approval_action_reason];
     for (const c of candidates) {
@@ -68,7 +79,7 @@ export default function AttendanceSummaryTable({ entries, onDelete, isLocked = f
 }) {
     const [remarkOpenId, setRemarkOpenId] = React.useState<string | null>(null);
     const actionCol = !isLocked && !!onDelete;
-    const colSpan = actionCol ? 7 : 6;
+    const colSpan = actionCol ? 8 : 7;
 
     const toggleRemarkRow = (id: string) => {
         setRemarkOpenId((prev) => (prev === id ? null : id));
@@ -109,11 +120,12 @@ export default function AttendanceSummaryTable({ entries, onDelete, isLocked = f
             ) : null}
 
             <div className="w-full min-w-0 overflow-x-auto selection:bg-report-primary/10">
-                <table className="w-full text-left border-collapse min-w-[820px]">
+                <table className="w-full text-left border-collapse min-w-[960px]">
                     <thead>
                         <tr className="bg-slate-50/80 backdrop-blur-sm border-b border-slate-100">
                             <th className="px-5 py-5 text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">Date & Session</th>
                             <th className="px-5 py-5 text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">Activity Type</th>
+                            <th className="px-5 py-5 text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">Description</th>
                             <th className="px-5 py-5 text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">Student</th>
                             <th className="px-5 py-5 text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">Duration</th>
                             <th className="px-5 py-5 text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">Approval</th>
@@ -122,7 +134,9 @@ export default function AttendanceSummaryTable({ entries, onDelete, isLocked = f
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50">
-                        {entries.map((entry) => (
+                        {entries.map((entry) => {
+                            const descText = pickDescription(entry);
+                            return (
                             <React.Fragment key={entry.id}>
                             <tr className="hover:bg-report-primary-soft/10 transition-all group border-b border-slate-50 last:border-0">
                                 <td className="px-5 py-7">
@@ -147,6 +161,17 @@ export default function AttendanceSummaryTable({ entries, onDelete, isLocked = f
                                         </div>
                                         <span className="text-xs font-black text-slate-700 uppercase tracking-wider">{entry.activity_type}</span>
                                     </div>
+                                </td>
+                                <td className="max-w-[14rem] px-5 py-7 align-top lg:max-w-xs">
+                                    {descText ? (
+                                        <p className="text-xs font-medium leading-relaxed text-slate-600 line-clamp-4">
+                                            {descText}
+                                        </p>
+                                    ) : (
+                                        <span className="text-[9px] font-black uppercase tracking-[0.15em] text-slate-300">
+                                            No description
+                                        </span>
+                                    )}
                                 </td>
                                 <td className="px-5 py-7">
                                     <div className="flex items-center gap-2">
@@ -232,7 +257,8 @@ export default function AttendanceSummaryTable({ entries, onDelete, isLocked = f
                                 </tr>
                             ) : null}
                             </React.Fragment>
-                        ))}
+                            );
+                        })}
                     </tbody>
                 </table>
             </div>

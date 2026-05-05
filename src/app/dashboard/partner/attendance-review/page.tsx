@@ -117,9 +117,8 @@ export default function PartnerAttendanceReviewPage() {
             backHref="/dashboard/partner/requests"
             backLabel="Back to opportunities"
             eyebrow="Partner workspace"
-            title="Attendance review"
-            description="Open pending engagement sessions for opportunities you own. Counts show how many sessions are still waiting per project. Only items routed to your account appear in the queue."
-            reviewerBadge="Partner queue"
+            title="Attendance Verification"
+            description="Choose an opportunity, open the pending queue, then approve, reject, or request revision. Only sessions routed to your account appear."
             projects={projects}
             projectId={projectId}
             setProjectId={setProjectId}
@@ -129,8 +128,8 @@ export default function PartnerAttendanceReviewPage() {
             countsLoading={countsLoading}
             onRefreshCounts={refreshAllPendingCounts}
             onQueuePendingCountChanged={handlePanelPendingCount}
-            queueTitle="Pending attendance"
-            queueDescription="Sessions awaiting your approval for the selected project. Use Refresh after actions or to pick up changes from students."
+            queueTitle="Review Individual Attendance Records"
+            queueDescription="Refresh after you take action or when students submit updates."
         />
     );
 }

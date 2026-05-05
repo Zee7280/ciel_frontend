@@ -6,20 +6,6 @@ import { useEffect, useState } from "react";
 import clsx from "clsx";
 import { isTokenValid } from "@/utils/api";
 import { readStoredCurrentUser } from "@/utils/currentUser";
-import { readDashboardNavRoleFromStorage } from "@/utils/dashboardNavRole";
-
-/**
- * Main-site "Projects" nav target. Uses the public `/projects` catalog for guests and faculty
- * (browse opportunities). Other roles go to their dashboard project surfaces.
- */
-function projectsNavHrefForSession(isLoggedIn: boolean): string {
-    if (!isLoggedIn) return "/projects";
-    const role = readDashboardNavRoleFromStorage();
-    if (role === "admin") return "/dashboard/admin/projects";
-    if (role === "partner") return "/dashboard/partner/requests";
-    if (role === "faculty") return "/projects";
-    return "/dashboard/student/projects";
-}
 
 export default function Navbar() {
     const pathname = usePathname();
@@ -30,12 +16,10 @@ export default function Navbar() {
         setIsLoggedIn(isTokenValid(token) && !!readStoredCurrentUser());
     }, [pathname]);
 
-    const projectsHref = projectsNavHrefForSession(isLoggedIn);
-
     const navItems = [
         { name: "Home", href: "/" },
         { name: "About Us", href: "/about" },
-        { name: "Projects", href: projectsHref },
+        { name: "Projects", href: "/projects" },
         { name: "Contact Us", href: "/contact" },
     ];
 

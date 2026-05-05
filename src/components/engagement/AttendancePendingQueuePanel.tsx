@@ -1,11 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Loader2, RefreshCw, CheckCircle, XCircle, Flag, ExternalLink } from "lucide-react";
+import { Loader2, RefreshCw, CheckCircle2, XCircle, AlertTriangle, ExternalLink } from "lucide-react";
 import { authenticatedFetch } from "@/utils/api";
 import { toast } from "sonner";
 import { normalizeEngagementAttendanceLog } from "@/utils/engagementAttendanceMap";
 import { extractPendingAttendanceRows } from "@/utils/engagementPendingAttendanceResponse";
+import clsx from "clsx";
 
 type PendingRow = Record<string, unknown>;
 
@@ -25,18 +26,37 @@ function participantDisplay(raw: Record<string, unknown>): { name: string; detai
     return { name, detail };
 }
 
-function approvalBadgeClass(status: string): string {
-    const s = status.toLowerCase();
-    if (s === "approved") return "bg-emerald-50 text-emerald-800 border-emerald-200";
-    if (s === "rejected") return "bg-rose-50 text-rose-800 border-rose-200";
-    if (s === "flagged") return "bg-amber-50 text-amber-900 border-amber-200";
-    if (s === "pending") return "bg-slate-50 text-slate-700 border-slate-200";
-    return "bg-slate-50 text-slate-600 border-slate-200";
+function formatDisplayDate(raw: string): string {
+    const s = raw.trim();
+    if (!s) return "—";
+    const parsed = Date.parse(s);
+    if (!Number.isNaN(parsed)) {
+        return new Date(parsed).toLocaleDateString("en-GB", {
+            day: "numeric",
+            month: "short",
+            year: "numeric",
+        });
+    }
+    return s;
+}
+
+/** Display-only: friendlier time labels without changing API payloads */
+function formatDisplayTimeSegment(raw: string): string {
+    const s = raw.trim();
+    if (!s) return "";
+    const m = s.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+    if (!m) return s;
+    let h = parseInt(m[1], 10);
+    const min = m[2];
+    const ap = h >= 12 ? "PM" : "AM";
+    if (h === 0) h = 12;
+    else if (h > 12) h -= 12;
+    return `${h}:${min} ${ap}`;
 }
 
 export default function AttendancePendingQueuePanel({
     projectId,
-    title = "Pending attendance",
+    title = "Review Individual Attendance Records",
     description,
     autoLoadOnProjectIdChange = false,
     onPendingCountChanged,
@@ -95,7 +115,7 @@ export default function AttendancePendingQueuePanel({
     const act = async (logId: string, action: "approve" | "reject" | "flag") => {
         const reason = pickStr(reasonByLogId[logId]);
         if ((action === "reject" || action === "flag") && !reason) {
-            toast.error("Please enter a short reason for reject/flag.");
+            toast.error("Please enter a short reason for reject or revision request.");
             return;
         }
         const key = `${logId}:${action}`;
@@ -119,7 +139,13 @@ export default function AttendancePendingQueuePanel({
                 toast.error(msg);
                 return;
             }
-            toast.success(`Attendance ${action === "approve" ? "approved" : action === "reject" ? "rejected" : "flagged"}.`);
+            const okMsg =
+                action === "approve"
+                    ? "Attendance approved."
+                    : action === "reject"
+                      ? "Attendance rejected."
+                      : "Revision requested.";
+            toast.success(okMsg);
             setReasonByLogId((prev) => {
                 const next = { ...prev };
                 delete next[logId];
@@ -134,17 +160,19 @@ export default function AttendancePendingQueuePanel({
     };
 
     return (
-        <div className="space-y-4 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-            <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
-                <div>
-                    <h2 className="text-xl font-black tracking-tight text-slate-950">{title}</h2>
-                    {description ? <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-500">{description}</p> : null}
+        <div className="overflow-hidden rounded-xl border border-slate-200/90 bg-white shadow-sm">
+            <div className="flex flex-col gap-3 border-b border-slate-100 bg-white px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+                <div className="min-w-0">
+                    <h2 className="text-base font-bold text-slate-900">{title}</h2>
+                    {description ? (
+                        <p className="mt-1 max-w-2xl text-sm leading-relaxed text-slate-600">{description}</p>
+                    ) : null}
                 </div>
                 <button
                     type="button"
                     onClick={() => void load()}
                     disabled={loading || !projectId.trim()}
-                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-slate-800 hover:shadow-md disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none"
+                    className="inline-flex shrink-0 items-center justify-center gap-2 rounded-[10px] border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-[#0056B3]/35 hover:bg-[#0056B3]/[0.04] hover:text-[#0056B3] disabled:cursor-not-allowed disabled:opacity-50"
                 >
                     {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
                     {autoLoadOnProjectIdChange ? "Refresh" : "Load queue"}
@@ -152,117 +180,194 @@ export default function AttendancePendingQueuePanel({
             </div>
 
             {rows.length === 0 && !loading ? (
-                <p className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 px-4 py-8 text-center text-sm leading-6 text-slate-500">
+                <p className="mx-4 mb-4 mt-4 rounded-[10px] border border-dashed border-slate-200 bg-slate-50/80 px-4 py-8 text-center text-sm text-slate-600 sm:mx-5">
                     {!projectId.trim()
-                        ? "Select a project from the list first. Counts on each row show how many sessions are still pending for that opportunity."
+                        ? "Select a project first. Only sessions routed to your role appear here."
                         : autoLoadOnProjectIdChange
-                          ? "No pending attendance for this project right now. You can select another project or use Refresh to check again."
-                          : 'No rows loaded yet. Choose a project and press "Load queue" (only pending items for your role are returned).'}
+                          ? "No pending attendance for this project. Try another opportunity or refresh."
+                          : 'No rows loaded yet. Press "Load queue" after choosing a project.'}
                 </p>
             ) : null}
 
-            <div className="space-y-4">
-                {rows.map((raw, idx) => {
-                    const rawObj = raw as Record<string, unknown>;
-                    const row = normalizeEngagementAttendanceLog(rawObj);
-                    const id = pickStr(row.id);
-                    const st = pickStr(row.approval_status ?? raw.approvalStatus).toLowerCase() || "pending";
-                    const who = participantDisplay(rawObj);
-                    return (
-                        <div
-                            key={id || `row-${idx}`}
-                            className="group flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-slate-300 hover:shadow-md"
-                        >
-                            <div className="flex-1 space-y-1 text-sm">
-                                <div className="flex flex-wrap items-center gap-2">
-                                    <span className={`rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-widest ${approvalBadgeClass(st)}`}>
-                                        {st}
-                                    </span>
-                                    {pickStr(row.opportunity_creator_kind) ? (
-                                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                                            Creator: {pickStr(row.opportunity_creator_kind)}
-                                        </span>
-                                    ) : null}
-                                </div>
-                                {who.name ? (
-                                    <div className="mt-3 rounded-2xl border border-slate-100 bg-slate-50/60 px-4 py-3">
-                                        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Participant</p>
-                                        <p className="mt-1 font-bold text-slate-950">{who.name}</p>
-                                        {who.detail ? <p className="text-xs text-slate-600 mt-0.5">{who.detail}</p> : null}
-                                    </div>
-                                ) : null}
-                                <p className="pt-2 font-bold text-slate-950">
-                                    {pickStr(row.activity_type) || "Session"} · {Number(row.hours || 0).toFixed(2)} hrs
-                                </p>
-                                <p className="text-slate-600">
-                                    {pickStr(row.date)} · {pickStr(row.start_time)} — {pickStr(row.end_time)}
-                                </p>
-                                {pickStr(row.location) ? <p className="text-xs text-slate-500">{pickStr(row.location)}</p> : null}
-                                {(() => {
-                                    const rawUrl = pickStr(rawObj.evidenceUrl ?? rawObj.evidence_url ?? rawObj.evidenceURL);
-                                    const fromRow =
-                                        typeof row.evidence_file === "string" && /^https?:\/\//i.test(row.evidence_file.trim())
-                                            ? row.evidence_file.trim()
-                                            : "";
-                                    const url = fromRow || (rawUrl.startsWith("http") ? rawUrl : "");
-                                    if (!url) return null;
-                                    return (
-                                        <p className="pt-1">
-                                            <a
-                                                href={url}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="inline-flex items-center gap-1 text-xs font-bold text-blue-600 underline decoration-blue-200 underline-offset-2 hover:text-blue-800"
-                                            >
-                                                View evidence
-                                                <ExternalLink className="h-3 w-3" aria-hidden />
-                                            </a>
-                                        </p>
-                                    );
-                                })()}
-                                <label className="block pt-2">
-                                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Reason (reject/flag)</span>
-                                    <input
-                                        className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
-                                        placeholder="Required when rejecting or flagging"
-                                        value={reasonByLogId[id] || ""}
-                                        onChange={(e) => setReasonByLogId((prev) => ({ ...prev, [id]: e.target.value }))}
-                                    />
-                                </label>
-                            </div>
-                            <div className="grid grid-cols-1 gap-2 rounded-2xl border border-slate-100 bg-slate-50/60 p-2 sm:grid-cols-3">
-                                <button
-                                    type="button"
-                                    disabled={acting !== null}
-                                    onClick={() => void act(id, "approve")}
-                                    className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-emerald-700/10 bg-emerald-600 px-3 py-3 text-xs font-bold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-emerald-700 hover:shadow-md active:translate-y-0 disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none"
-                                >
-                                    {acting === `${id}:approve` ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle className="h-3.5 w-3.5" />}
-                                    Approve
-                                </button>
-                                <button
-                                    type="button"
-                                    disabled={acting !== null}
-                                    onClick={() => void act(id, "reject")}
-                                    className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-rose-700/10 bg-rose-600 px-3 py-3 text-xs font-bold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-rose-700 hover:shadow-md active:translate-y-0 disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none"
-                                >
-                                    {acting === `${id}:reject` ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <XCircle className="h-3.5 w-3.5" />}
-                                    Reject
-                                </button>
-                                <button
-                                    type="button"
-                                    disabled={acting !== null}
-                                    onClick={() => void act(id, "flag")}
-                                    className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-amber-300 bg-amber-50 px-3 py-3 text-xs font-bold text-amber-900 shadow-sm transition hover:-translate-y-0.5 hover:border-amber-400 hover:bg-amber-100 hover:shadow-md active:translate-y-0 disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none"
-                                >
-                                    {acting === `${id}:flag` ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Flag className="h-3.5 w-3.5" />}
-                                    Flag
-                                </button>
-                            </div>
-                        </div>
-                    );
-                })}
-            </div>
+            {loading && rows.length === 0 ? (
+                <div className="flex justify-center py-16 text-[#0056B3]">
+                    <Loader2 className="h-8 w-8 animate-spin" aria-hidden />
+                </div>
+            ) : null}
+
+            {rows.length > 0 ? (
+                <div className="overflow-x-auto px-2 pb-4 pt-2 sm:px-4">
+                    <table className="w-full min-w-[920px] border-collapse text-left text-sm">
+                        <thead>
+                            <tr className="border-b border-slate-200 bg-slate-50/90">
+                                <th className="whitespace-nowrap px-3 py-3.5 text-xs font-bold uppercase tracking-wide text-slate-600 sm:px-4">
+                                    Date
+                                </th>
+                                <th className="whitespace-nowrap px-3 py-3.5 text-xs font-bold uppercase tracking-wide text-slate-600 sm:px-4">
+                                    Location
+                                </th>
+                                <th className="whitespace-nowrap px-3 py-3.5 text-xs font-bold uppercase tracking-wide text-slate-600 sm:px-4">
+                                    Time
+                                </th>
+                                <th className="whitespace-nowrap px-3 py-3.5 text-xs font-bold uppercase tracking-wide text-slate-600 sm:px-4">
+                                    Work type
+                                </th>
+                                <th className="min-w-[140px] px-3 py-3.5 text-xs font-bold uppercase tracking-wide text-slate-600 sm:px-4">
+                                    Participant
+                                </th>
+                                <th className="min-w-[160px] px-3 py-3.5 text-xs font-bold uppercase tracking-wide text-slate-600 sm:px-4">
+                                    Description
+                                </th>
+                                <th className="whitespace-nowrap px-3 py-3.5 text-xs font-bold uppercase tracking-wide text-slate-600 sm:px-4">
+                                    Evidence
+                                </th>
+                                <th className="min-w-[220px] px-3 py-3.5 text-xs font-bold uppercase tracking-wide text-slate-600 sm:px-4">
+                                    Actions
+                                </th>
+                                </tr>
+                        </thead>
+                        <tbody>
+                            {rows.map((raw, idx) => {
+                                const rawObj = raw as Record<string, unknown>;
+                                const row = normalizeEngagementAttendanceLog(rawObj);
+                                const id = pickStr(row.id);
+                                const who = participantDisplay(rawObj);
+                                const rawUrl = pickStr(rawObj.evidenceUrl ?? rawObj.evidence_url ?? rawObj.evidenceURL);
+                                const fromRow =
+                                    typeof row.evidence_file === "string" && /^https?:\/\//i.test(row.evidence_file.trim())
+                                        ? row.evidence_file.trim()
+                                        : "";
+                                const evidenceUrl = fromRow || (rawUrl.startsWith("http") ? rawUrl : "");
+                                const workType = pickStr(row.activity_type) || "—";
+                                const desc = pickStr(row.description) || "—";
+                                const st = pickStr(row.start_time);
+                                const et = pickStr(row.end_time);
+                                const t1 = formatDisplayTimeSegment(st) || st;
+                                const t2 = formatDisplayTimeSegment(et) || et;
+                                const timeRange = [t1, t2].filter(Boolean).join(" – ");
+                                const timeCell = timeRange || "—";
+
+                                return (
+                                    <tr
+                                        key={id || `row-${idx}`}
+                                        className={clsx(
+                                            "border-b border-slate-100 transition-colors hover:bg-sky-50/50",
+                                            idx % 2 === 0 ? "bg-white" : "bg-slate-50/40",
+                                        )}
+                                    >
+                                        <td className="whitespace-nowrap px-3 py-3 align-top text-slate-800 sm:px-4">
+                                            {formatDisplayDate(pickStr(row.date))}
+                                        </td>
+                                        <td className="max-w-[200px] px-3 py-3 align-top text-slate-700 sm:px-4">
+                                            {pickStr(row.location) || "—"}
+                                        </td>
+                                        <td className="whitespace-nowrap px-3 py-3 align-top text-slate-700 sm:px-4">
+                                            {timeCell}
+                                        </td>
+                                        <td className="max-w-[140px] px-3 py-3 align-top text-slate-700 sm:px-4">{workType}</td>
+                                        <td className="px-3 py-3 align-top text-slate-800 sm:px-4">
+                                            {who.name ? (
+                                                <>
+                                                    <span className="font-medium">{who.name}</span>
+                                                    {who.detail ? (
+                                                        <span className="mt-0.5 block text-xs text-slate-500">{who.detail}</span>
+                                                    ) : null}
+                                                </>
+                                            ) : (
+                                                "—"
+                                            )}
+                                        </td>
+                                        <td className="max-w-[220px] px-3 py-3 align-top text-slate-600 sm:px-4">
+                                            <span className="line-clamp-3">{desc}</span>
+                                        </td>
+                                        <td className="whitespace-nowrap px-3 py-3 align-top sm:px-4">
+                                            {evidenceUrl ? (
+                                                <a
+                                                    href={evidenceUrl}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="inline-flex items-center gap-1 font-semibold text-[#0056B3] underline decoration-[#0056B3]/35 underline-offset-2 hover:text-[#004494]"
+                                                >
+                                                    View
+                                                    <ExternalLink className="h-3.5 w-3.5" aria-hidden />
+                                                </a>
+                                            ) : (
+                                                <span className="inline-flex items-center gap-1 text-sm font-semibold text-amber-800">
+                                                    <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600" aria-hidden />
+                                                    Missing
+                                                </span>
+                                            )}
+                                        </td>
+                                        <td className="px-3 py-3 align-top sm:px-4">
+                                            <div className="flex flex-col gap-2">
+                                                <div className="flex flex-wrap gap-2">
+                                                    <button
+                                                        type="button"
+                                                        disabled={acting !== null}
+                                                        onClick={() => void act(id, "approve")}
+                                                        className={clsx(
+                                                            "inline-flex items-center justify-center gap-1 rounded-[10px] border-2 border-emerald-600 bg-white px-2.5 py-1.5 text-xs font-bold text-emerald-700 transition hover:bg-emerald-50 disabled:opacity-50",
+                                                        )}
+                                                    >
+                                                        {acting === `${id}:approve` ? (
+                                                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                                        ) : (
+                                                            <CheckCircle2 className="h-3.5 w-3.5" />
+                                                        )}
+                                                        Approve
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        disabled={acting !== null}
+                                                        onClick={() => void act(id, "reject")}
+                                                        className={clsx(
+                                                            "inline-flex items-center justify-center gap-1 rounded-[10px] border-2 border-red-600 bg-white px-2.5 py-1.5 text-xs font-bold text-red-700 transition hover:bg-red-50 disabled:opacity-50",
+                                                        )}
+                                                    >
+                                                        {acting === `${id}:reject` ? (
+                                                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                                        ) : (
+                                                            <XCircle className="h-3.5 w-3.5" />
+                                                        )}
+                                                        Reject
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        disabled={acting !== null}
+                                                        onClick={() => void act(id, "flag")}
+                                                        className={clsx(
+                                                            "inline-flex items-center justify-center gap-1 rounded-[10px] border-2 border-amber-600 bg-white px-2.5 py-1.5 text-xs font-bold text-amber-900 transition hover:bg-amber-50 disabled:opacity-50",
+                                                        )}
+                                                    >
+                                                        {acting === `${id}:flag` ? (
+                                                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                                        ) : (
+                                                            <AlertTriangle className="h-3.5 w-3.5" />
+                                                        )}
+                                                        Request revision
+                                                    </button>
+                                                </div>
+                                                <label className="block">
+                                                    <span className="sr-only">Reason for rejection or revision</span>
+                                                    <textarea
+                                                        rows={2}
+                                                        className="w-full resize-y rounded-[10px] border border-slate-200 bg-white px-2.5 py-2 text-xs text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-[#0056B3]/40 focus:ring-2 focus:ring-[#0056B3]/12"
+                                                        placeholder="Reason (required for reject / request revision)"
+                                                        value={reasonByLogId[id] || ""}
+                                                        onChange={(e) =>
+                                                            setReasonByLogId((prev) => ({ ...prev, [id]: e.target.value }))
+                                                        }
+                                                    />
+                                                </label>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                </div>
+            ) : null}
         </div>
     );
 }

@@ -95,7 +95,11 @@ export default function ContactPage() {
                                 </div>
                                 <div>
                                     <h3 className="font-bold text-slate-900 mb-1">Call Us</h3>
-                                    <p className="text-slate-600 font-bold">+92 300 1234567</p>
+                                    <p className="text-slate-600 font-bold">
+                                        <a href="tel:+923712243575" className="hover:text-emerald-600 transition-colors">
+                                            0371-2243575
+                                        </a>
+                                    </p>
                                     <p className="text-slate-500 text-sm mt-1">Mon-Fri, 9am - 5pm EST</p>
                                 </div>
                             </div>

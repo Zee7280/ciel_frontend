@@ -175,7 +175,6 @@ export default function FacultyAttendanceReviewPage() {
             eyebrow="Faculty approvals"
             title="Attendance review"
             description="Review attendance sessions students log for your opportunities. Pending counts are fetched per project—the list below shows where work is waiting. Approve, reject, or flag each session in the queue; routing matches the existing CIEL reviewer rules."
-            reviewerBadge="Faculty queue"
             projects={projects}
             projectId={projectId}
             setProjectId={setProjectId}

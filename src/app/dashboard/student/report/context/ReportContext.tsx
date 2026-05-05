@@ -238,6 +238,9 @@ export interface ReportData {
         has_partners: 'yes' | 'no' | '';
         partners: Array<{
             name: string;
+            pakistan_contact_name?: string;
+            pakistan_contact_number?: string;
+            pakistan_contact_email?: string;
             type: string;
             type_other?: string;
             role: string[]; // Multi-select — role in project

@@ -1461,6 +1461,13 @@ export default function AdminReportDetailPage() {
                                             >
                                                 <span className="font-semibold text-slate-900">{String(p.name || "")}</span>{" "}
                                                 <span className="text-slate-500">({String(p.type_other || p.type || "")})</span>
+                                                {[p.pakistan_contact_name, p.pakistan_contact_number, p.pakistan_contact_email].some(Boolean) && (
+                                                    <div className="mt-1.5 space-y-0.5 text-slate-600 text-xs">
+                                                        {Boolean(p.pakistan_contact_name) && <div>Contact (Pakistan): {String(p.pakistan_contact_name)}</div>}
+                                                        {Boolean(p.pakistan_contact_number) && <div>Number: {String(p.pakistan_contact_number)}</div>}
+                                                        {Boolean(p.pakistan_contact_email) && <div>Email: {String(p.pakistan_contact_email)}</div>}
+                                                    </div>
+                                                )}
                                                 {Boolean(p.role) && (
                                                     <div className="mt-1.5 text-slate-600">Role: {Array.isArray(p.role) ? p.role.join(", ") : String(p.role)}</div>
                                                 )}
