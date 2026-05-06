@@ -31,6 +31,7 @@ import {
     resolveReportPaymentHeadcountMerged,
 } from '@/config/reportingFee';
 import { ManualPaymentHistorySection } from '../components/ManualPaymentHistorySection';
+import { CepExperienceFeedbackPrompt } from '@/components/feedback/CepExperienceFeedbackPrompt';
 
 function PaymentContent() {
     const searchParams = useSearchParams();
@@ -224,27 +225,30 @@ function PaymentContent() {
 
     if (paymentSubmitted) {
         return (
-            <div className="max-w-2xl mx-auto py-12 px-4 text-center space-y-6">
-                <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6 border-4 border-white shadow-lg">
-                    <CheckCircle2 className="w-10 h-10 text-green-600" />
+            <>
+                <CepExperienceFeedbackPrompt eligibilityReady />
+                <div className="max-w-2xl mx-auto py-12 px-4 text-center space-y-6">
+                    <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6 border-4 border-white shadow-lg">
+                        <CheckCircle2 className="w-10 h-10 text-green-600" />
+                    </div>
+                    <h1 className="text-3xl font-black text-slate-900 tracking-tight">Payment Proof Submitted!</h1>
+                    <p className="text-slate-500 font-medium max-w-md mx-auto">
+                        Thank you! Our admin team will verify your payment slip. Once approved, you'll be able to download your certificate (cii) and final report.
+                    </p>
+                    <div className="pt-4 max-w-lg mx-auto text-left">
+                        <ManualPaymentHistorySection
+                            rows={manualPaymentHistory}
+                            loading={manualPaymentHistoryLoading}
+                            currentProjectId={projectId}
+                        />
+                    </div>
+                    <div className="pt-8">
+                        <Button onClick={() => router.push('/dashboard/student/projects')} className="bg-blue-600 hover:bg-blue-700 text-white px-8 font-bold rounded-xl shadow-lg shadow-blue-200 transition-all">
+                            Back to My Projects
+                        </Button>
+                    </div>
                 </div>
-                <h1 className="text-3xl font-black text-slate-900 tracking-tight">Payment Proof Submitted!</h1>
-                <p className="text-slate-500 font-medium max-w-md mx-auto">
-                    Thank you! Our admin team will verify your payment slip. Once approved, you'll be able to download your certificate (cii) and final report.
-                </p>
-                <div className="pt-4 max-w-lg mx-auto text-left">
-                    <ManualPaymentHistorySection
-                        rows={manualPaymentHistory}
-                        loading={manualPaymentHistoryLoading}
-                        currentProjectId={projectId}
-                    />
-                </div>
-                <div className="pt-8">
-                    <Button onClick={() => router.push('/dashboard/student/projects')} className="bg-blue-600 hover:bg-blue-700 text-white px-8 font-bold rounded-xl shadow-lg shadow-blue-200 transition-all">
-                        Back to My Projects
-                    </Button>
-                </div>
-            </div>
+            </>
         );
     }
 

@@ -1,6 +1,9 @@
 /** Why this row appears for the logged-in faculty (see backend FacultyService.getApprovals). */
 export type FacultyApprovalVisibility = "named_supervisor" | "university_scope" | "both";
 
+/** Which approve/reject API the Faculty Hub must call (`partner_ack` uses `/partner/approvals`). */
+export type FacultyApprovalAction = "faculty_review" | "partner_ack";
+
 export type FacultyApprovalRow = {
     id: string;
     projectTitle: string;
@@ -14,6 +17,7 @@ export type FacultyApprovalRow = {
     opportunityStatus?: string;
     workflowStage?: string | null;
     approvalVisibility?: FacultyApprovalVisibility;
+    approvalAction?: FacultyApprovalAction;
 };
 
 function pickStr(raw: Record<string, unknown>, ...keys: string[]): string {
@@ -27,6 +31,13 @@ function pickStr(raw: Record<string, unknown>, ...keys: string[]): string {
 function pickApprovalVisibility(raw: Record<string, unknown>): FacultyApprovalVisibility | undefined {
     const v = pickStr(raw, "approvalVisibility", "approval_visibility");
     if (v === "named_supervisor" || v === "university_scope" || v === "both") return v;
+    return undefined;
+}
+
+function pickApprovalAction(raw: Record<string, unknown>): FacultyApprovalAction | undefined {
+    const v = pickStr(raw, "approvalAction", "approval_action").toLowerCase();
+    if (v === "partner_ack") return "partner_ack";
+    if (v === "faculty_review") return "faculty_review";
     return undefined;
 }
 
@@ -80,6 +91,7 @@ export function mapFacultyApprovalBackendRow(raw: unknown): FacultyApprovalRow |
         opportunityStatus: pickStr(r, "opportunityStatus", "status", "opportunity_status") || undefined,
         workflowStage: pickStr(r, "workflowStage", "workflow_stage", "approval_stage") || null,
         approvalVisibility: pickApprovalVisibility(r),
+        approvalAction: pickApprovalAction(r),
     };
 }
 

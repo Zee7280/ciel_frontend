@@ -37,6 +37,8 @@ import {
 } from "@/utils/student-dashboard-fetch";
 import StudentProgressTracker from "./components/StudentProgressTracker";
 import PendingActionCards from "@/components/dashboard/PendingActionCards";
+import { CepExperienceFeedbackPrompt } from "@/components/feedback/CepExperienceFeedbackPrompt";
+import { studentEligibleForCepExperienceFeedback } from "@/utils/cepFeedbackEligibility";
 
 /** Shown when login prefetch did not populate cache yet — same UI, zeros / empty lists. */
 const EMPTY_STUDENT_DASHBOARD: DashboardData = {
@@ -192,6 +194,10 @@ export default function StudentDashboard() {
     }, []);
 
     const overview = useMemo(() => mergeStudentOverview(data), [data]);
+    const cepFeedbackEligible = useMemo(
+        () => studentEligibleForCepExperienceFeedback(data.activeProjects ?? []),
+        [data.activeProjects],
+    );
 
     if (isLoading) {
         return (
@@ -681,6 +687,8 @@ export default function StudentDashboard() {
                     )}
                 </div>
             </div>
+
+            <CepExperienceFeedbackPrompt eligibilityReady={cepFeedbackEligible} />
         </div>
     );
 }

@@ -241,8 +241,18 @@ function stakeholderRows(d: Record<string, unknown>): {
             department,
             phone,
         },
-        facultyEmail: pickDetailStr(sup, "contact", "official_email", "faculty_email"),
-        facultyName: pickDetailStr(sup, "supervisor_name", "supervisorName"),
+        facultyEmail: (() => {
+            const fromSup = pickDetailStr(sup, "contact", "official_email", "faculty_email");
+            return fromSup || pickDetailStr(po, "official_email", "email");
+        })(),
+        facultyName: (() => {
+            const fromSup = pickDetailStr(sup, "supervisor_name", "supervisorName");
+            const fromSupEmail = pickDetailStr(sup, "contact", "official_email", "faculty_email");
+            return (
+                fromSup ||
+                (!fromSupEmail ? pickDetailStr(po, "contact_person_name", "contact_person") : "")
+            );
+        })(),
         partnerOrg:
             pickDetailStr(sup, "partner_org_name", "external_partner_org_name") ||
             pickDetailStr(ext, "organization_name") ||

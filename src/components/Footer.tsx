@@ -90,17 +90,29 @@ export default function Footer() {
 
                     <div className="flex items-center gap-6">
                         {[
-                            { icon: Facebook, href: '#' },
-                            { icon: Twitter, href: '#' },
-                            { icon: Instagram, href: '#' },
-                            { icon: Linkedin, href: '#' },
-                            { icon: Globe, href: '#' },
-                            { icon: Youtube, href: '#' }
+                            { icon: Facebook, href: "#" },
+                            { icon: Twitter, href: "#" },
                         ].map((social, i) => (
-                            <Link key={i} href={social.href} className="text-slate-400 hover:text-[#4285F4] transition-colors">
+                            <Link key={`s-${i}`} href={social.href} className="text-slate-400 hover:text-[#4285F4] transition-colors">
                                 <social.icon className="w-5 h-5" />
                             </Link>
                         ))}
+                        <a
+                            href="https://www.instagram.com/cielpakistan?igsh=M2ptN3FwcnBsNXdw&utm_source=qr"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-slate-400 hover:text-[#4285F4] transition-colors"
+                            aria-label="CIEL PK on Instagram"
+                        >
+                            <Instagram className="w-5 h-5" />
+                        </a>
+                        {[{ icon: Linkedin, href: "#" }, { icon: Globe, href: "#" }, { icon: Youtube, href: "#" }].map(
+                            (social, i) => (
+                                <Link key={`e-${i}`} href={social.href} className="text-slate-400 hover:text-[#4285F4] transition-colors">
+                                    <social.icon className="w-5 h-5" />
+                                </Link>
+                            ),
+                        )}
                     </div>
                 </div>
             </div>

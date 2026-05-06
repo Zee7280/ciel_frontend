@@ -156,8 +156,14 @@ function stakeholderRows(d: Record<string, unknown>): {
             ? (d.partner_organization as Record<string, unknown>)
             : null;
 
-    const facultyEmail = pickDetailStr(sup, "contact", "official_email", "faculty_email");
-    const facultyName = pickDetailStr(sup, "supervisor_name", "supervisorName");
+    const facultyEmailSup = pickDetailStr(sup, "contact", "official_email", "faculty_email");
+    const facultyNameSup = pickDetailStr(sup, "supervisor_name", "supervisorName");
+    /** Align with backend: faculty dashboard may authorize via partner_organization.official_email. */
+    const facultyEmail =
+        facultyEmailSup || pickDetailStr(po, "official_email", "email");
+    const facultyName =
+        facultyNameSup ||
+        (!facultyEmailSup ? pickDetailStr(po, "contact_person_name", "contact_person") : "");
     const partnerOrg =
         pickDetailStr(sup, "partner_org_name", "external_partner_org_name") ||
         pickDetailStr(ext, "organization_name") ||

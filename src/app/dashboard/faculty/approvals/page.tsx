@@ -18,6 +18,7 @@ import { Textarea } from "@/app/dashboard/student/report/components/ui/textarea"
 import { Label } from "@/app/dashboard/student/report/components/ui/label";
 import { toast } from "sonner";
 import {
+    type FacultyApprovalAction,
     type FacultyApprovalRow,
     type FacultyApprovalVisibility,
     normalizeFacultyApprovalsResponse,
@@ -30,7 +31,7 @@ function ApprovalVisibilityBadges({ visibility }: { visibility?: FacultyApproval
     if (!visibility) return null;
     const listed = (
         <Badge variant="outline" className="border-emerald-200 bg-emerald-50 text-xs font-medium text-emerald-900">
-            Listed supervisor
+            Listed on submission
         </Badge>
     );
     const uni = (
@@ -62,10 +63,12 @@ export default function FacultyApprovalsPage() {
     const [detailRecord, setDetailRecord] = useState<Record<string, unknown> | null>(null);
     /** When set, detail dialog shows Approve/Reject for this opportunity id (pending tab only). */
     const [detailActionId, setDetailActionId] = useState<string | null>(null);
+    const [detailActionKind, setDetailActionKind] = useState<FacultyApprovalAction>("faculty_review");
     const [approveSubmittingId, setApproveSubmittingId] = useState<string | null>(null);
 
     const [rejectOpen, setRejectOpen] = useState(false);
     const [rejectTargetId, setRejectTargetId] = useState<string | null>(null);
+    const [rejectActionKind, setRejectActionKind] = useState<FacultyApprovalAction>("faculty_review");
     const [rejectComment, setRejectComment] = useState("");
     const [rejectSubmitting, setRejectSubmitting] = useState(false);
     const autoOpenedIdRef = useRef<string | null>(null);
@@ -111,11 +114,23 @@ export default function FacultyApprovalsPage() {
         }
     };
 
-    const openOpportunityDetail = async (opportunityId: string, options?: { showActions?: boolean }) => {
+    const resolveApprovalActionForId = (opportunityId: string): FacultyApprovalAction => {
+        const row = pendingProjects.find((p) => p.id === opportunityId);
+        return row?.approvalAction === "partner_ack" ? "partner_ack" : "faculty_review";
+    };
+
+    const openOpportunityDetail = async (
+        opportunityId: string,
+        options?: { showActions?: boolean; approvalAction?: FacultyApprovalAction },
+    ) => {
         setDetailOpen(true);
         setDetailLoading(true);
         setDetailRecord(null);
         setDetailActionId(options?.showActions ? opportunityId : null);
+        setDetailActionKind(
+            options?.approvalAction ??
+                (options?.showActions ? resolveApprovalActionForId(opportunityId) : "faculty_review"),
+        );
         try {
             const res = await authenticatedFetch(`/api/v1/opportunities/detail`, {
                 method: "POST",
@@ -186,21 +201,29 @@ export default function FacultyApprovalsPage() {
         if (!sourceRows.some((row) => row.id === opportunityId)) return;
 
         autoOpenedIdRef.current = opportunityId;
-        void openOpportunityDetail(opportunityId, { showActions: targetTab === "pending" });
+        void openOpportunityDetail(opportunityId, {
+            showActions: targetTab === "pending",
+            approvalAction: resolveApprovalActionForId(opportunityId),
+        });
     }, [historyProjects, isLoading, pendingProjects]);
 
-    const handleApprove = async (id: string) => {
+    const handleApprove = async (id: string, action: FacultyApprovalAction = "faculty_review") => {
         if (approveSubmittingId === id) return;
         setApproveSubmittingId(id);
         try {
-            const res = await authenticatedFetch(`/api/v1/faculty/approvals/${id}/approve`, {
+            const endpoint =
+                action === "partner_ack"
+                    ? `/api/v1/partner/approvals/${id}/approve`
+                    : `/api/v1/faculty/approvals/${id}/approve`;
+            const res = await authenticatedFetch(endpoint, {
                 method: "POST",
             });
             if (res && res.ok) {
-                toast.success("Project Approved Successfully");
+                toast.success(action === "partner_ack" ? "Partner acknowledgement submitted" : "Project approved successfully");
                 setPendingProjects((prev) => prev.filter((p) => p.id !== id));
                 setDetailOpen(false);
                 setDetailActionId(null);
+                setDetailActionKind("faculty_review");
                 void loadLists();
             } else {
                 toast.error("Failed to approve project");
@@ -213,8 +236,9 @@ export default function FacultyApprovalsPage() {
         }
     };
 
-    const openRejectDialog = (id: string) => {
+    const openRejectDialog = (id: string, action: FacultyApprovalAction = "faculty_review") => {
         setRejectTargetId(id);
+        setRejectActionKind(action);
         setRejectComment("");
         setRejectOpen(true);
     };
@@ -222,6 +246,7 @@ export default function FacultyApprovalsPage() {
     const closeRejectDialog = () => {
         setRejectOpen(false);
         setRejectTargetId(null);
+        setRejectActionKind("faculty_review");
         setRejectComment("");
     };
 
@@ -234,7 +259,11 @@ export default function FacultyApprovalsPage() {
         }
         setRejectSubmitting(true);
         try {
-            const res = await authenticatedFetch(`/api/v1/faculty/approvals/${rejectTargetId}/reject`, {
+            const rejectEndpoint =
+                rejectActionKind === "partner_ack"
+                    ? `/api/v1/partner/approvals/${rejectTargetId}/reject`
+                    : `/api/v1/faculty/approvals/${rejectTargetId}/reject`;
+            const res = await authenticatedFetch(rejectEndpoint, {
                 method: "POST",
                 body: JSON.stringify({ reason }),
             });
@@ -271,9 +300,12 @@ export default function FacultyApprovalsPage() {
                 <p className="mt-2 text-sm text-slate-600">
                     <strong className="font-semibold text-slate-800">Why do I see a request?</strong>{" "}
                     <span className="text-slate-600">
-                        <em>Listed supervisor</em> means you are the faculty contact on the submission.{" "}
-                        <em>University scope</em> means your account is assigned that university&rsquo;s liaison queue, so
-                        you may see other supervisors&rsquo; students from the same institution alongside your own listings.
+                        <em>Listed on submission</em> means you match the supervising faculty fields or the partner
+                        organization&rsquo;s official contact on the record. Some rows ask for <strong>partner</strong>{" "}
+                        acknowledgement rather than faculty gate review — Approve/Reject calls the partner workflow (same login).
+                        {" "}
+                        <em>University scope</em> means your account is assigned that university&rsquo;s liaison queue, so you
+                        may see other supervisors&rsquo; students from the same institution alongside your own listings.
                     </span>
                 </p>
             </div>
@@ -337,6 +369,11 @@ export default function FacultyApprovalsPage() {
                                             <div className="mb-1 flex flex-wrap items-center gap-2">
                                                 <h3 className="text-lg font-bold text-slate-900">{project.projectTitle}</h3>
                                                 <ApprovalVisibilityBadges visibility={project.approvalVisibility} />
+                                                {project.approvalAction === "partner_ack" ? (
+                                                    <Badge variant="outline" className="border-violet-200 bg-violet-50 text-violet-900 text-xs">
+                                                        Partner acknowledgement
+                                                    </Badge>
+                                                ) : null}
                                                 {tab === "pending" ? (
                                                     <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-700">
                                                         <Clock className="mr-1 h-3 w-3" /> Pending review
@@ -388,7 +425,9 @@ export default function FacultyApprovalsPage() {
                                         <>
                                             <Button
                                                 className="w-full bg-green-600 hover:bg-green-700"
-                                                onClick={() => void handleApprove(project.id)}
+                                                onClick={() =>
+                                                    void handleApprove(project.id, project.approvalAction ?? "faculty_review")
+                                                }
                                                 disabled={approveSubmittingId === project.id}
                                             >
                                                 {approveSubmittingId === project.id ? (
@@ -401,7 +440,13 @@ export default function FacultyApprovalsPage() {
                                                     </>
                                                 )}
                                             </Button>
-                                            <Button variant="destructive" className="w-full" onClick={() => openRejectDialog(project.id)}>
+                                            <Button
+                                                variant="destructive"
+                                                className="w-full"
+                                                onClick={() =>
+                                                    openRejectDialog(project.id, project.approvalAction ?? "faculty_review")
+                                                }
+                                            >
                                                 <XCircle className="w-4 h-4 mr-2" /> Reject
                                             </Button>
                                         </>
@@ -409,7 +454,12 @@ export default function FacultyApprovalsPage() {
                                     <Button
                                         variant="ghost"
                                         className="w-full"
-                                        onClick={() => void openOpportunityDetail(project.id, { showActions: tab === "pending" })}
+                                        onClick={() =>
+                                            void openOpportunityDetail(project.id, {
+                                                showActions: tab === "pending",
+                                                approvalAction: project.approvalAction,
+                                            })
+                                        }
                                     >
                                         <Eye className="w-4 h-4 mr-2" /> {tab === "pending" ? "Review full details" : "Opportunity details"}
                                     </Button>
@@ -427,6 +477,7 @@ export default function FacultyApprovalsPage() {
                     if (!open) {
                         setDetailRecord(null);
                         setDetailActionId(null);
+                        setDetailActionKind("faculty_review");
                     }
                 }}
             >
@@ -447,12 +498,19 @@ export default function FacultyApprovalsPage() {
                             <FacultyOpportunityDetailBody d={detailRecord} />
                             {detailActionId ? (
                                 <div className="flex flex-wrap justify-end gap-2 pt-4 border-t border-slate-200">
-                                    <Button variant="destructive" onClick={() => detailActionId && openRejectDialog(detailActionId)}>
+                                    <Button
+                                        variant="destructive"
+                                        onClick={() =>
+                                            detailActionId && openRejectDialog(detailActionId, detailActionKind)
+                                        }
+                                    >
                                         <XCircle className="w-4 h-4 mr-2" /> Reject
                                     </Button>
                                     <Button
                                         className="bg-green-600 hover:bg-green-700"
-                                        onClick={() => void handleApprove(detailActionId)}
+                                        onClick={() =>
+                                            detailActionId && void handleApprove(detailActionId, detailActionKind)
+                                        }
                                         disabled={approveSubmittingId === detailActionId}
                                     >
                                         {approveSubmittingId === detailActionId ? (

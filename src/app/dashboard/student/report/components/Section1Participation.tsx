@@ -22,7 +22,20 @@ import { normalizeEngagementAttendanceLog } from "@/utils/engagementAttendanceMa
 import { calculateSection1CII } from "@/utils/reportQuality";
 import { calculateCII } from "../utils/calculateCII";
 import { resolveScopedTeamMembers } from "@/utils/reportTeamScope";
-import { resolveAttendanceApproverType } from "@/utils/attendanceApproverRouting";
+
+/** Copy for verify-attendance UX: no reviewer emails shown; NGO/partner first, faculty fallback. */
+const ATTENDANCE_VERIFICATION_INFO = {
+    lockNote:
+        "One-time step: after you confirm, attendance stays locked until approval is complete.",
+    routing:
+        "Your attendance approval goes to the NGO or partner organisation linked to this project when one exists. If there is no NGO or partner on record, your faculty supervisor handles approval instead.",
+    confirmBody:
+        "Your attendance entries will lock for editing. The request goes to your NGO or partner when this project has one linked; otherwise your faculty supervisor receives it.",
+    afterSent:
+        "Attendance is locked until a reviewer completes approval.",
+    afterSentWho:
+        "NGO or partner is notified when linked; if not, your faculty supervisor receives the request.",
+} as const;
 
 /** Align dropdown ids (`lead:uuid`, `member:0:…`) with API `participantId` (bare uuid/key). */
 function engagementParticipantCompareKey(id: string | undefined | null): string {
@@ -72,28 +85,6 @@ function readFacultyEmails(...records: unknown[]): { primary: string; secondary:
     }
 
     return { primary: "", secondary: "" };
-}
-
-/** Matches backend partner fallback in resolveAttendanceVerificationReviewer (display-only hint). */
-function pickPartnerReviewerEmailFromProject(projectData: unknown): string {
-    if (!projectData || typeof projectData !== "object") return "";
-    const p = projectData as Record<string, unknown>;
-    const asObj = (v: unknown): Record<string, unknown> | null =>
-        v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : null;
-    const candidates: unknown[] = [
-        asObj(p.partner_organization)?.official_email,
-        asObj(p.partner_organization)?.officialEmail,
-        asObj(p.executing_organization)?.official_email,
-        asObj(p.executing_organization)?.officialEmail,
-        asObj(p.partnerOrganization)?.official_email,
-        asObj(p.partnerOrganization)?.officialEmail,
-        asObj(p.supervision)?.partner_email,
-        asObj(p.supervision)?.partnerEmail,
-    ];
-    for (const v of candidates) {
-        if (typeof v === "string" && v.trim()) return v.trim();
-    }
-    return "";
 }
 
 function pickTeamId(record: unknown): string {
@@ -225,27 +216,6 @@ export default function Section1Participation({ projectData }: { projectData?: a
     const [teamId, setTeamId] = React.useState<string>('');
     const [primaryFacultyEmail, setPrimaryFacultyEmail] = React.useState<string>('');
     const [secondaryFacultyEmail, setSecondaryFacultyEmail] = React.useState<string>('');
-
-    const partnerReviewerEmailHint = React.useMemo(
-        () => pickPartnerReviewerEmailFromProject(projectData),
-        [projectData],
-    );
-
-    /** Partner-owned routing → partner org email; otherwise faculty supervisor email (aligned with `resolveAttendanceApproverType`). */
-    const attendanceVerificationNotice = React.useMemo(() => {
-        const approver = resolveAttendanceApproverType(
-            projectData && typeof projectData === "object" ? (projectData as Record<string, unknown>) : undefined,
-        );
-        const partnerEmail = partnerReviewerEmailHint.trim();
-        const facultyEmail = primaryFacultyEmail.trim();
-        const email = approver === "partner" ? partnerEmail : facultyEmail;
-        const displayLine = email
-            ? `Notification email will be sent to: ${email}.`
-            : approver === "partner"
-              ? "Notification email will be sent to the partner organisation contact on file."
-              : "Notification email will be sent to your faculty supervisor on file.";
-        return { approver, email, displayLine };
-    }, [projectData, partnerReviewerEmailHint, primaryFacultyEmail]);
 
     // Scroll to Top on Step Change
     React.useEffect(() => {
@@ -539,15 +509,10 @@ export default function Section1Participation({ projectData }: { projectData?: a
             return;
         }
         const confirmed = window.confirm(
-            (() => {
-                const target =
-                    attendanceVerificationNotice.approver === "partner"
-                        ? partnerReviewerEmailHint.trim()
-                        : primaryFacultyEmail.trim();
-                const base =
-                    "Are you sure you want to verify attendance? After confirmation, attendance entries will be locked for editing.";
-                return target ? `${base}\n\nEmail will be sent to: ${target}` : base;
-            })(),
+            "Request attendance verification?\n\n" +
+                ATTENDANCE_VERIFICATION_INFO.confirmBody +
+                " " +
+                ATTENDANCE_VERIFICATION_INFO.lockNote,
         );
         if (!confirmed) return;
 
@@ -564,7 +529,6 @@ export default function Section1Participation({ projectData }: { projectData?: a
 
         let serverNotified = false;
         let requestType = "created";
-        let reviewerType: "faculty" | "partner" | "" = "";
         try {
             const res = await authenticatedFetch(
                 `/api/v1/engagement/project/${encodeURIComponent(projectIdFromUrl)}/attendance/verify-request`,
@@ -583,10 +547,6 @@ export default function Section1Participation({ projectData }: { projectData?: a
                 const json = await res.json().catch(() => ({}));
                 serverNotified = Boolean(json?.emailNotified);
                 requestType = typeof json?.type === "string" ? json.type : "created";
-                reviewerType =
-                    json?.reviewerType === "faculty" || json?.reviewerType === "partner"
-                        ? json.reviewerType
-                        : "";
             } else {
                 toast.warning("Verification locked. Email notify endpoint not available yet.");
             }
@@ -608,16 +568,10 @@ export default function Section1Participation({ projectData }: { projectData?: a
             return;
         }
 
-        const reviewerLabel = reviewerType ? `${reviewerType} reviewer` : "assigned reviewer";
-        const previewEmail = attendanceVerificationNotice.email;
         toast.success(
             serverNotified
-                ? previewEmail
-                    ? `Attendance sent for verification. ${reviewerLabel} notified at ${previewEmail}.`
-                    : `Attendance sent for verification. ${reviewerLabel} has been notified.`
-                : previewEmail
-                  ? `Attendance sent for verification and locked. Intended reviewer email: ${previewEmail}.`
-                  : "Attendance sent for verification and locked.",
+                ? "Attendance submitted for verification. The assigned reviewer has been notified."
+                : "Attendance locked for verification.",
         );
     };
 
@@ -1154,16 +1108,10 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                                             Verification request sent
                                                         </p>
                                                         <p className="text-xs text-slate-500">
-                                                            Attendance is locked. Reviewer decision required for any further changes.
-                                                            {attendanceVerificationNotice.email ? (
-                                                                <span className="mt-1 block font-medium text-slate-600">
-                                                                    Notification email was sent to: {attendanceVerificationNotice.email}
-                                                                </span>
-                                                            ) : (
-                                                                <span className="mt-1 block text-slate-500">
-                                                                    {attendanceVerificationNotice.displayLine}
-                                                                </span>
-                                                            )}
+                                                            {ATTENDANCE_VERIFICATION_INFO.afterSent}
+                                                            <span className="mt-1 block text-slate-600">
+                                                                {ATTENDANCE_VERIFICATION_INFO.afterSentWho}
+                                                            </span>
                                                         </p>
                                                     </div>
                                                 ) : (
@@ -1187,10 +1135,8 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                                             )}
                                                         </Button>
                                                         <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-xs leading-relaxed text-slate-600">
-                                                            <p className="text-slate-700">
-                                                                One-time action: locks attendance editing and sends one verification email.
-                                                            </p>
-                                                            <p className="mt-2 text-slate-600">{attendanceVerificationNotice.displayLine}</p>
+                                                            <p className="text-slate-700">{ATTENDANCE_VERIFICATION_INFO.lockNote}</p>
+                                                            <p className="mt-2 text-slate-600">{ATTENDANCE_VERIFICATION_INFO.routing}</p>
                                                         </div>
                                                     </div>
                                                 )}
