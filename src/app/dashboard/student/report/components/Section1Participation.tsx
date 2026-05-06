@@ -304,6 +304,20 @@ export default function Section1Participation({ projectData }: { projectData?: a
                         setIsSubmitted(true);
                     }
 
+                    const tlLead = data.section1.team_lead as Record<string, unknown>;
+                    const partCnicDigits = String(myPart?.cnic ?? "")
+                        .replace(/\D/g, "")
+                        .slice(0, 13);
+                    const leadCnicDigits = String(tlLead?.cnic ?? "")
+                        .replace(/\D/g, "")
+                        .slice(0, 13);
+                    const resolvedLeadCnic =
+                        partCnicDigits.length === 13
+                            ? partCnicDigits
+                            : leadCnicDigits.length === 13
+                              ? leadCnicDigits
+                              : partCnicDigits || leadCnicDigits || String(myPart.cnic ?? tlLead.cnic ?? "");
+
                     // Always refresh team_lead ID and name from the backend record
                     updateSection('section1', {
                         team_lead: {
@@ -312,7 +326,7 @@ export default function Section1Participation({ projectData }: { projectData?: a
                             verified: true,
                             name: myPart.fullName || myPart.name || myPart.studentName || data.section1.team_lead.name,
                             fullName: myPart.fullName || myPart.name || myPart.studentName || (data.section1.team_lead as any).fullName,
-                            cnic: myPart.cnic || (data.section1.team_lead as any).cnic,
+                            cnic: resolvedLeadCnic,
                             email: myPart.email || (data.section1.team_lead as any).email,
                             mobile: myPart.mobile || (data.section1.team_lead as any).mobile,
                             universityName: myPart.universityName || (data.section1.team_lead as any).universityName,

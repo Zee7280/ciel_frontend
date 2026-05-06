@@ -699,27 +699,27 @@ export default function ApplicationDialog({
                                             <h4 className="text-sm font-bold text-slate-500 uppercase tracking-wider">Member Details</h4>
                                         </div>
 
-                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
-                                            <div className="space-y-1.5">
+                                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-12 lg:gap-x-5 lg:gap-y-4 lg:items-start">
+                                            <div className="space-y-1.5 md:col-span-1 lg:col-span-3">
                                                 <Label className="text-xs font-medium text-slate-600">Full Name *</Label>
                                                 <Input
                                                     value={member.name}
                                                     onChange={(e) => updateMember(index, 'name', e.target.value)}
                                                     placeholder="As appear on CNIC"
-                                                    className={`h-9 bg-white ${member.role === "Lead" ? "bg-slate-50 cursor-default" : ""}`}
+                                                    className={`h-10 bg-white ${member.role === "Lead" ? "bg-slate-50 cursor-default" : ""}`}
                                                     readOnly={member.role === "Lead"}
                                                 />
                                             </div>
-                                            <div className="space-y-1.5">
+                                            <div className="space-y-1.5 md:col-span-1 lg:col-span-3">
                                                 <Label className="text-xs font-medium text-slate-600">CNIC (13 digits) *</Label>
                                                 <Input
                                                     value={member.cnic}
                                                     onChange={(e) => updateMember(index, 'cnic', e.target.value)}
                                                     placeholder="35202..."
-                                                    className="h-9 bg-white"
+                                                    className="h-10 bg-white"
                                                 />
                                             </div>
-                                            <div className="space-y-1.5 lg:col-span-2">
+                                            <div className="space-y-1.5 md:col-span-2 lg:col-span-6">
                                                 <Label className="text-xs font-medium text-slate-600">Mobile Number *</Label>
                                                 <PhoneConnectivityRow
                                                     usePortalCountryPicker
@@ -730,17 +730,16 @@ export default function ApplicationDialog({
                                                     maxNationalDigits={15}
                                                     placeholderNational="3001234567"
                                                     readOnly={member.role === "Lead"}
-                                                    selectClassName="border-slate-200 focus-visible:border-indigo-400 h-9 rounded-md text-xs py-0 min-h-0"
-                                                    inputClassName="border-slate-200 h-9 rounded-md text-sm py-0 min-h-0"
-                                                    rowClassName="items-stretch gap-2"
+                                                    selectClassName="border-slate-200 focus-visible:border-indigo-400 h-10 min-h-10 rounded-md text-xs py-0 box-border shrink-0"
+                                                    inputClassName="border-slate-200 h-10 min-h-10 rounded-md text-sm py-0 box-border"
+                                                    rowClassName="items-center gap-2"
                                                 />
                                             </div>
 
-                                            {/* University - moved to 2nd row or shared */}
-                                            <div className="space-y-1.5">
+                                            <div className="space-y-1.5 md:col-span-1 lg:col-span-3">
                                                 <Label className="text-xs font-medium text-slate-600">University *</Label>
                                                 <select
-                                                    className={`flex h-9 w-full rounded-md border border-input px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-100 ${member.role === "Lead" ? "bg-slate-50" : "bg-white"}`}
+                                                    className={`flex h-10 w-full rounded-md border border-input px-3 py-0 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-100 box-border leading-normal ${member.role === "Lead" ? "bg-slate-50" : "bg-white"}`}
                                                     value={member.university}
                                                     onChange={(e) => updateMember(index, 'university', e.target.value)}
                                                     disabled={member.role === "Lead"}
@@ -753,24 +752,23 @@ export default function ApplicationDialog({
                                                 </select>
                                             </div>
 
-                                            {/* Email Verification Row - spans full or separate */}
-                                            <div className="lg:col-span-2 space-y-1.5">
+                                            <div className="space-y-1.5 md:col-span-2 lg:col-span-9">
                                                 <Label className="text-xs font-medium text-slate-600">Email Verification *</Label>
-                                                <div className="flex gap-2">
+                                                <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch">
                                                     <Input
                                                         value={member.email}
                                                         onChange={(e) => updateMember(index, 'email', e.target.value)}
                                                         placeholder="email@example.com"
                                                         type="email"
-                                                        className={`h-9 bg-white ${member.verificationStatus === 'verified' ? 'border-green-500 ring-green-500/20' : ''}`}
+                                                        className={`h-10 min-h-10 flex-1 min-w-0 bg-white ${member.verificationStatus === 'verified' ? 'border-green-500 ring-green-500/20' : ''}`}
                                                         readOnly={member.verificationStatus === 'verified'}
                                                     />
                                                     <Button
-                                                        size="sm"
-                                                        className={`min-w-[100px] ${member.verificationStatus === 'verified' ? 'bg-green-600 hover:bg-green-700' : 'bg-slate-900'}`}
+                                                        type="button"
+                                                        size="default"
+                                                        className={`h-10 min-h-10 shrink-0 px-4 sm:min-w-[100px] ${member.verificationStatus === 'verified' ? 'bg-green-600 hover:bg-green-700' : 'bg-slate-900'}`}
                                                         onClick={() => handleVerifyEmail(index)}
                                                         disabled={member.verificationStatus === 'verified' || member.verificationStatus === 'sending' || !member.email}
-                                                        type="button"
                                                     >
                                                         {member.verificationStatus === 'sending' ? (
                                                             <Loader2 className="w-4 h-4 animate-spin" />
@@ -781,13 +779,21 @@ export default function ApplicationDialog({
                                                         )}
                                                     </Button>
                                                 </div>
-                                                {member.verificationStatus === 'verified' && <p className="text-[10px] text-green-600 font-medium">Email verified successfully.</p>}
-                                                {member.verificationStatus === 'unverified' && member.email && <p className="text-[10px] text-slate-400">Click Verify to send OTP code.</p>}
-                                                {member.verificationStatus === 'otp_sent' && <p className="text-[10px] text-blue-600 font-medium">OTP code has been sent to this email.</p>}
+                                                <div className="min-h-[1.125rem] space-y-0.5">
+                                                    {member.verificationStatus === 'verified' && (
+                                                        <p className="text-[10px] text-green-600 font-medium">Email verified successfully.</p>
+                                                    )}
+                                                    {member.verificationStatus === 'unverified' && member.email && (
+                                                        <p className="text-[10px] text-slate-400">Click Verify to send OTP code.</p>
+                                                    )}
+                                                    {member.verificationStatus === 'otp_sent' && (
+                                                        <p className="text-[10px] text-blue-600 font-medium">OTP code has been sent to this email.</p>
+                                                    )}
+                                                </div>
                                             </div>
 
                                             {member.showOtpInput && (
-                                                <div className="lg:col-span-2 mt-2 p-4 bg-blue-50/50 rounded-xl border border-blue-100 animate-in slide-in-from-top-2 duration-300">
+                                                <div className="md:col-span-2 lg:col-span-12 mt-0 p-4 bg-blue-50/50 rounded-xl border border-blue-100 animate-in slide-in-from-top-2 duration-300">
                                                     <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-end">
                                                         <div className="flex-1 space-y-1.5 w-full">
                                                             <div className="flex justify-between items-center">

@@ -12,6 +12,11 @@ import { composeInternationalPhone, parsePhoneForDisplay } from "@/utils/country
 import clsx from "clsx";
 import { useRef, useEffect } from "react";
 
+/** PK CNIC UI is 13 numeric digits — normalize API/localStorage quirks (spacing, coercion). */
+function normalizePakistaniCnicDigits(value: unknown): string {
+    return String(value ?? "").replace(/\D/g, "").slice(0, 13);
+}
+
 export interface Participant {
     id: string;
     fullName: string;
@@ -60,7 +65,7 @@ export default function IdentityVerification({
 
     const [formData, setFormData] = useState({
         fullName: initialData.fullName || '',
-        cnic: initialData.cnic || '',
+        cnic: normalizePakistaniCnicDigits(initialData?.cnic),
         email: initialData.email || '',
         universityId: initialData.universityId || '',
         universityName: initialData.universityName || '',
@@ -148,9 +153,9 @@ export default function IdentityVerification({
     // CNIC: draft/API first, then account profile (cnic or national_id). Applies to all flows including /engagement/verify.
     useEffect(() => {
         setFormData((prev) => {
-            if (prev.cnic.replace(/\D/g, "").length === 13) return prev;
+            if (normalizePakistaniCnicDigits(prev.cnic).length === 13) return prev;
 
-            const fromInitial = String(initialData?.cnic ?? "").replace(/\D/g, "").slice(0, 13);
+            const fromInitial = normalizePakistaniCnicDigits(initialData?.cnic);
             if (fromInitial.length === 13) {
                 return { ...prev, cnic: fromInitial };
             }
@@ -159,14 +164,54 @@ export default function IdentityVerification({
             if (!storedUserStr) return prev;
             try {
                 const u = JSON.parse(storedUserStr);
-                const raw = String(u.cnic || u.national_id || "").replace(/\D/g, "").slice(0, 13);
+                const raw = normalizePakistaniCnicDigits(u.cnic ?? u.national_id);
                 if (raw.length !== 13) return prev;
                 return { ...prev, cnic: raw };
             } catch {
                 return prev;
             }
         });
-    }, [initialData?.cnic]);
+    }, [initialData?.cnic, initialData?.id]);
+
+    // Team leads: report/draft payloads can briefly carry truncated CNIC. Engagement row is authoritative once saved.
+    useEffect(() => {
+        if (!isTeamLead || !projectId.trim()) return;
+        let cancelled = false;
+        (async () => {
+            try {
+                const res = await authenticatedFetch(`/api/v1/engagement/my`);
+                if (!res?.ok || cancelled) return;
+                const body = await res.json().catch(() => null);
+                const rows: unknown[] = Array.isArray(body?.data) ? body.data : [];
+                const pid = projectId.trim();
+                const candidate = rows.find((r): r is Record<string, unknown> => {
+                    if (!r || typeof r !== "object") return false;
+                    const row = r as Record<string, unknown>;
+                    const rp = String(row.projectId ?? "");
+                    const leadFlag =
+                        Boolean(row.isTeamLead) ||
+                        row.is_team_lead === true ||
+                        String(row.is_team_lead ?? "").toLowerCase() === "true";
+                    return rp === pid && leadFlag;
+                }) ?? rows.find((r): r is Record<string, unknown> => {
+                    if (!r || typeof r !== "object") return false;
+                    return String((r as Record<string, unknown>).projectId ?? "") === pid;
+                }) ?? null;
+
+                const d = normalizePakistaniCnicDigits(candidate?.cnic);
+                if (d.length !== 13 || cancelled) return;
+
+                setFormData((prev) =>
+                    normalizePakistaniCnicDigits(prev.cnic).length === 13 ? prev : { ...prev, cnic: d },
+                );
+            } catch {
+                /* non-blocking */
+            }
+        })();
+        return () => {
+            cancelled = true;
+        };
+    }, [isTeamLead, projectId]);
 
     const handleChangeEmail = () => {
         setOtpSent(prev => ({ ...prev, email: false }));
@@ -252,11 +297,13 @@ export default function IdentityVerification({
         }
     };
 
-    const isPersonalValid = formData.fullName && formData.cnic.length === 13 && otpVerified.email;
+    const cnicNormalized = normalizePakistaniCnicDigits(formData.cnic);
+    const isPersonalValid =
+        !!formData.fullName.trim() && cnicNormalized.length === 13 && otpVerified.email;
     const isAcademicValid = formData.universityId && formData.universityName && formData.academicProgram;
 
     /** Verified / email-linked records can still lack CNIC (e.g. individual apply). Keep CNIC editable until 13 digits are saved. */
-    const cnicDigitsLen = formData.cnic.replace(/\D/g, "").length;
+    const cnicDigitsLen = cnicNormalized.length;
     const cnicFieldLocked =
         (otpVerified.email || !!initialData.verified) && cnicDigitsLen === 13;
 

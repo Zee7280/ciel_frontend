@@ -215,6 +215,46 @@ export function resolvePhoneCountryDialEntry(phoneCountryKey: string): CountryDi
   return def ?? COUNTRY_DIAL_PICKER_ENTRIES[0]!;
 }
 
+/** E.164 from a dial string like `+92` and national digits (no leading `+`). */
+export function composeE164FromDialCode(countryDial: string, nationalDigits: string): string {
+  const d = digitsOnly(countryDial);
+  const n = digitsOnly(nationalDigits);
+  if (!n) return "";
+  if (!d) return n;
+  if (n.startsWith(d)) return `+${n}`;
+  return `+${d}${n}`;
+}
+
+function trimPhoneishUnknown(value: unknown): string {
+  if (typeof value === "string") return value.trim();
+  if (typeof value === "number" && Number.isFinite(value)) {
+    /* rare JSON numeric phone fragments (avoid String(object)) */
+    return String(Math.trunc(value));
+  }
+  return "";
+}
+
+/**
+ * Value to pass into {@link parsePhoneForDisplay} when hydrating profile from API/localStorage:
+ * prefers `contact` if already international; otherwise combines `countryCode` + national `phone`.
+ */
+export function rawPhoneForProfileDisplay(
+  contact: unknown,
+  phone: unknown,
+  countryCode: unknown,
+): string {
+  const c = trimPhoneishUnknown(contact);
+  if (c.startsWith("+")) return c;
+
+  const p = trimPhoneishUnknown(phone);
+  const cc = trimPhoneishUnknown(countryCode);
+
+  if (p.startsWith("+")) return p;
+  if (cc && p) return composeE164FromDialCode(cc, p);
+
+  return c || p || "";
+}
+
 /**
  * Split a stored phone string into select key + national digits for UI.
  * Falls back to PK|+92 and full digit string as national if no dial matches.

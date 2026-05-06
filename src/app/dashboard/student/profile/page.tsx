@@ -14,6 +14,7 @@ import {
     composeInternationalPhone,
     DEFAULT_PHONE_COUNTRY_KEY,
     parsePhoneForDisplay,
+    rawPhoneForProfileDisplay,
 } from "@/utils/countryCallingCodes";
 
 export default function StudentProfilePage() {
@@ -60,10 +61,12 @@ export default function StudentProfilePage() {
                 try {
                     const parsedUser = JSON.parse(storedUserStr);
                     setUser(parsedUser);
-                    const rawPhone = parsedUser.contact || parsedUser.phone || "";
-                    const phoneParts = parsePhoneForDisplay(
-                        typeof rawPhone === "string" ? rawPhone : String(rawPhone ?? "")
+                    const rawPhone = rawPhoneForProfileDisplay(
+                        parsedUser.contact,
+                        parsedUser.phone,
+                        parsedUser.countryCode,
                     );
+                    const phoneParts = parsePhoneForDisplay(rawPhone);
                     setPhoneCountryKey(phoneParts.phoneCountryKey);
                     setPhoneNational(phoneParts.national);
                     const contactE164 = composeInternationalPhone(

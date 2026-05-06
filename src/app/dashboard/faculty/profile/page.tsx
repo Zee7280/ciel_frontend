@@ -7,6 +7,7 @@ import { Loader2, Mail, Phone, MapPin, Building2, User, Save, Camera, Graduation
 import { toast } from "sonner";
 import { missingProfileFieldsForRole } from "@/utils/profileCompletion";
 import { PAKISTAN_REGION_OPTIONS } from "@/utils/pakistanRegions";
+import { rawPhoneForProfileDisplay } from "@/utils/countryCallingCodes";
 
 const backendAssetBaseUrl = (process.env.NEXT_PUBLIC_BACKEND_BASE_URL || "").replace(/\/api\/v1\/?$/, "").replace(/\/$/, "");
 
@@ -70,10 +71,11 @@ export default function FacultyProfilePage() {
                     setFormData({
                         name: typeof parsedUser.name === "string" ? parsedUser.name : "",
                         email: typeof parsedUser.email === "string" ? parsedUser.email : "",
-                        contact:
-                            (typeof parsedUser.contact === "string" && parsedUser.contact) ||
-                            (typeof parsedUser.phone === "string" && parsedUser.phone) ||
-                            "",
+                        contact: rawPhoneForProfileDisplay(
+                            parsedUser.contact,
+                            parsedUser.phone,
+                            parsedUser.countryCode,
+                        ),
                         institution:
                             (typeof parsedUser.institution === "string" && parsedUser.institution) ||
                             (typeof parsedUser.university === "string" && parsedUser.university) ||
