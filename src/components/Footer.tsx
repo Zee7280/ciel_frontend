@@ -72,12 +72,13 @@ export default function Footer() {
                         </div>
 
                         <a
-                            href="https://wa.me/923001234567"
+                            href="https://wa.me/923712243575"
                             target="_blank"
+                            rel="noopener noreferrer"
                             className="bg-[#25D366] hover:bg-[#128C7E] text-white px-6 py-3 rounded-full flex items-center gap-3 transition-all duration-300 shadow-lg hover:shadow-xl font-bold"
                         >
                             <MessageCircle className="w-5 h-5 fill-white" />
-                            <span>WhatsApp Us</span>
+                            <span>WhatsApp — 0371-2243575 (24/7)</span>
                         </a>
                     </div>
                 </div>

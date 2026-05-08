@@ -1,7 +1,18 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Loader2, RefreshCw, CheckCircle2, XCircle, AlertTriangle, ExternalLink, UserCircle } from "lucide-react";
+import {
+    Loader2,
+    RefreshCw,
+    CheckCircle2,
+    XCircle,
+    AlertTriangle,
+    ExternalLink,
+    UserCircle,
+    ClipboardList,
+    Inbox,
+    Users,
+} from "lucide-react";
 import { authenticatedFetch } from "@/utils/api";
 import { toast } from "sonner";
 import { normalizeEngagementAttendanceLog } from "@/utils/engagementAttendanceMap";
@@ -269,103 +280,195 @@ export default function AttendancePendingQueuePanel({
     return (
         <div
             className={clsx(
-                "overflow-hidden border border-slate-200 bg-white shadow-sm",
-                isPartner ? "rounded-xl border-slate-200/90" : "rounded-lg",
+                "overflow-hidden border bg-white",
+                isPartner
+                    ? "rounded-2xl border-slate-200/80 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_8px_24px_-12px_rgba(15,23,42,0.12)]"
+                    : "rounded-xl border-slate-200 shadow-sm",
                 scrollTableInPanel && "flex min-h-0 flex-1 flex-col",
             )}
         >
-            <div className="flex flex-col gap-3 border-b border-slate-100 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
-                <div className="min-w-0">
-                    <h2 className={clsx("text-base text-slate-900", isPartner ? "font-bold" : "font-semibold")}>{title}</h2>
-                    {description ? (
-                        <p
+            <div
+                className={clsx(
+                    "flex flex-col gap-3 border-b px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5",
+                    isPartner
+                        ? "border-slate-200/70 bg-gradient-to-r from-white via-slate-50/40 to-[#0056B3]/[0.03]"
+                        : "border-slate-100",
+                )}
+            >
+                <div className="flex min-w-0 items-start gap-3">
+                    <div
+                        className={clsx(
+                            "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl",
+                            isPartner
+                                ? "bg-gradient-to-br from-[#0056B3] to-[#003F85] text-white shadow-md shadow-[#0056B3]/20"
+                                : "bg-slate-100 text-slate-700",
+                        )}
+                        aria-hidden
+                    >
+                        <ClipboardList className="h-5 w-5" />
+                    </div>
+                    <div className="min-w-0">
+                        <h2
                             className={clsx(
-                                "mt-1 max-w-2xl text-sm text-slate-600",
-                                isPartner && "leading-relaxed",
+                                "text-base text-slate-900 sm:text-[17px]",
+                                isPartner ? "font-bold tracking-tight" : "font-semibold",
                             )}
                         >
-                            {description}
-                        </p>
-                    ) : null}
+                            {title}
+                        </h2>
+                        {description ? (
+                            <p
+                                className={clsx(
+                                    "mt-1 max-w-2xl text-sm text-slate-600",
+                                    isPartner && "leading-relaxed",
+                                )}
+                            >
+                                {description}
+                            </p>
+                        ) : null}
+                    </div>
                 </div>
-                <button
-                    type="button"
-                    onClick={() => void load()}
-                    disabled={loading || !projectId.trim()}
-                    className={clsx(
-                        "inline-flex shrink-0 items-center justify-center gap-2 border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm transition disabled:cursor-not-allowed disabled:opacity-50",
-                        isPartner
-                            ? "rounded-[10px] px-4 font-semibold hover:border-[#0056B3]/35 hover:bg-[#0056B3]/[0.04] hover:text-[#0056B3]"
-                            : "rounded-lg hover:bg-slate-50",
-                    )}
-                >
-                    {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-                    {autoLoadOnProjectIdChange ? "Refresh" : "Load queue"}
-                </button>
+                <div className="flex shrink-0 items-center gap-2">
+                    {tableRows.length > 0 ? (
+                        <span
+                            className={clsx(
+                                "hidden items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold sm:inline-flex",
+                                isPartner
+                                    ? "bg-[#0056B3]/[0.08] text-[#0056B3] ring-1 ring-inset ring-[#0056B3]/15"
+                                    : "bg-slate-100 text-slate-700 ring-1 ring-inset ring-slate-200",
+                            )}
+                            aria-label={`${tableRows.length} pending`}
+                        >
+                            <span
+                                className={clsx(
+                                    "h-1.5 w-1.5 rounded-full",
+                                    isPartner ? "bg-[#0056B3]" : "bg-slate-500",
+                                )}
+                            />
+                            {tableRows.length} pending
+                        </span>
+                    ) : null}
+                    <button
+                        type="button"
+                        onClick={() => void load()}
+                        disabled={loading || !projectId.trim()}
+                        className={clsx(
+                            "inline-flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium shadow-sm transition disabled:cursor-not-allowed disabled:opacity-50",
+                            isPartner
+                                ? "rounded-[10px] bg-gradient-to-r from-[#0056B3] to-[#004494] px-4 font-semibold text-white shadow-[#0056B3]/20 hover:shadow-md hover:shadow-[#0056B3]/30"
+                                : "rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50",
+                        )}
+                    >
+                        {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                        {autoLoadOnProjectIdChange ? "Refresh" : "Load queue"}
+                    </button>
+                </div>
             </div>
 
             {isPartner && rowsAfterTeamScope.length > 0 && partnerSelectedMemberKey && selectedMemberLabel ? (
-                <div className="flex items-center gap-3 border-b border-slate-100 bg-[#0056B3]/[0.06] px-4 py-3 sm:px-5">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#0056B3]/[0.12]">
-                        <UserCircle className="h-6 w-6 text-[#0056B3]" aria-hidden />
+                <div className="flex items-center gap-3 border-b border-[#0056B3]/10 bg-gradient-to-r from-[#0056B3]/[0.07] via-[#0056B3]/[0.04] to-transparent px-4 py-3.5 sm:px-5">
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#0056B3] to-[#003F85] text-white shadow-md shadow-[#0056B3]/25">
+                        <UserCircle className="h-6 w-6" aria-hidden />
                     </div>
-                    <div className="min-w-0">
-                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Selected member</p>
+                    <div className="min-w-0 flex-1">
+                        <p className="text-[10.5px] font-bold uppercase tracking-wider text-[#0056B3]/70">
+                            Selected member
+                        </p>
                         <p className="truncate text-sm font-bold text-slate-900">{selectedMemberLabel.name}</p>
                         {selectedMemberLabel.subtitle ? (
                             <p className="truncate text-xs text-slate-600">{selectedMemberLabel.subtitle}</p>
                         ) : null}
                     </div>
+                    {tableRows.length > 0 ? (
+                        <span className="hidden rounded-lg bg-white/70 px-2.5 py-1 text-xs font-semibold text-[#0056B3] ring-1 ring-inset ring-[#0056B3]/15 backdrop-blur-sm sm:inline-flex">
+                            {tableRows.length} session{tableRows.length !== 1 ? "s" : ""}
+                        </span>
+                    ) : null}
                 </div>
             ) : null}
 
             {partnerAwaitingTeamPick && !loading ? (
-                <p
+                <div
                     className={clsx(
-                        "mx-4 mb-4 mt-4 border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-600 sm:mx-5",
-                        isPartner ? "rounded-[10px] bg-slate-50/80" : "rounded-lg bg-slate-50",
+                        "mx-4 mb-4 mt-4 flex flex-col items-center gap-3 border border-dashed px-4 py-10 text-center sm:mx-5",
+                        isPartner
+                            ? "rounded-[14px] border-[#0056B3]/20 bg-gradient-to-br from-white via-slate-50/40 to-[#0056B3]/[0.03]"
+                            : "rounded-lg border-slate-200 bg-slate-50",
                     )}
                 >
-                    Select a team for this project, then choose a member to review their pending sessions.
-                </p>
+                    <div
+                        className={clsx(
+                            "flex h-12 w-12 items-center justify-center rounded-2xl",
+                            isPartner ? "bg-[#0056B3]/10 text-[#0056B3]" : "bg-slate-200 text-slate-600",
+                        )}
+                    >
+                        <Users className="h-6 w-6" aria-hidden />
+                    </div>
+                    <p className="max-w-md text-sm leading-relaxed text-slate-600">
+                        Select a team for this project, then choose a member to review their pending sessions.
+                    </p>
+                </div>
             ) : null}
 
             {rows.length === 0 && !loading && !partnerAwaitingTeamPick ? (
-                <p
+                <div
                     className={clsx(
-                        "mx-4 mb-4 mt-4 border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-600 sm:mx-5",
-                        isPartner ? "rounded-[10px] bg-slate-50/80" : "rounded-lg bg-slate-50",
+                        "mx-4 mb-4 mt-4 flex flex-col items-center gap-3 border border-dashed px-4 py-10 text-center sm:mx-5",
+                        isPartner
+                            ? "rounded-[14px] border-[#0056B3]/20 bg-gradient-to-br from-white via-slate-50/40 to-[#0056B3]/[0.03]"
+                            : "rounded-lg border-slate-200 bg-slate-50",
                     )}
                 >
-                    {!projectId.trim()
-                        ? "Select a project first. Only sessions routed to your role appear here."
-                        : autoLoadOnProjectIdChange
-                          ? "No pending attendance for this project. Try another opportunity or refresh."
-                          : 'No rows loaded yet. Press "Load queue" after choosing a project.'}
-                </p>
+                    <div
+                        className={clsx(
+                            "flex h-12 w-12 items-center justify-center rounded-2xl",
+                            isPartner ? "bg-[#0056B3]/10 text-[#0056B3]" : "bg-slate-200 text-slate-600",
+                        )}
+                    >
+                        <Inbox className="h-6 w-6" aria-hidden />
+                    </div>
+                    <p className="max-w-md text-sm leading-relaxed text-slate-600">
+                        {!projectId.trim()
+                            ? "Select a project first. Only sessions routed to your role appear here."
+                            : autoLoadOnProjectIdChange
+                              ? "No pending attendance for this project. Try another opportunity or refresh."
+                              : 'No rows loaded yet. Press "Load queue" after choosing a project.'}
+                    </p>
+                </div>
             ) : null}
 
             {rows.length > 0 && rowsAfterTeamScope.length === 0 && !loading && !partnerAwaitingTeamPick && isPartner ? (
-                <p
-                    className={clsx(
-                        "mx-4 mb-4 mt-4 border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-600 sm:mx-5",
-                        "rounded-[10px] bg-slate-50/80",
-                    )}
-                >
-                    No pending attendance rows for this team. Try another team or refresh after new submissions.
-                </p>
+                <div className="mx-4 mb-4 mt-4 flex flex-col items-center gap-3 rounded-[14px] border border-dashed border-[#0056B3]/20 bg-gradient-to-br from-white via-slate-50/40 to-[#0056B3]/[0.03] px-4 py-10 text-center sm:mx-5">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#0056B3]/10 text-[#0056B3]">
+                        <Users className="h-6 w-6" aria-hidden />
+                    </div>
+                    <p className="max-w-md text-sm leading-relaxed text-slate-600">
+                        No pending attendance rows for this team. Try another team or refresh after new submissions.
+                    </p>
+                </div>
             ) : null}
 
             {loading && rows.length === 0 ? (
-                <div className={clsx("flex justify-center py-16", isPartner ? "text-[#0056B3]" : "text-slate-400")}>
+                <div
+                    className={clsx(
+                        "flex flex-col items-center justify-center gap-3 py-16",
+                        isPartner ? "text-[#0056B3]" : "text-slate-400",
+                    )}
+                >
                     <Loader2 className="h-8 w-8 animate-spin" aria-hidden />
+                    <p className="text-xs font-medium text-slate-500">Loading attendance records…</p>
                 </div>
             ) : null}
 
             {rowsAfterTeamScope.length > 0 && isPartner && tableRows.length === 0 && !loading ? (
-                <p className="mx-4 mb-4 mt-4 rounded-[10px] border border-dashed border-slate-200 bg-slate-50/80 px-4 py-8 text-center text-sm text-slate-600 sm:mx-5">
-                    No attendance rows for this member in the pending queue.
-                </p>
+                <div className="mx-4 mb-4 mt-4 flex flex-col items-center gap-3 rounded-[14px] border border-dashed border-[#0056B3]/20 bg-gradient-to-br from-white via-slate-50/40 to-[#0056B3]/[0.03] px-4 py-10 text-center sm:mx-5">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#0056B3]/10 text-[#0056B3]">
+                        <UserCircle className="h-6 w-6" aria-hidden />
+                    </div>
+                    <p className="max-w-md text-sm leading-relaxed text-slate-600">
+                        No attendance rows for this member in the pending queue.
+                    </p>
+                </div>
             ) : null}
 
             {tableRows.length > 0 ? (
@@ -382,94 +485,33 @@ export default function AttendancePendingQueuePanel({
                         )}
                     >
                         <thead>
-                            <tr
-                                className={clsx(
-                                    "bg-slate-50",
-                                    isPartner ? "border-b border-slate-200 bg-slate-50/90" : "border-y border-slate-200",
-                                )}
-                            >
-                                <th
-                                    className={clsx(
-                                        "whitespace-nowrap px-3 py-3 text-xs text-slate-700 sm:px-4",
-                                        isPartner
-                                            ? "py-3.5 font-bold uppercase tracking-wide text-slate-600"
-                                            : "font-medium",
-                                    )}
-                                >
-                                    Date
-                                </th>
-                                <th
-                                    className={clsx(
-                                        "whitespace-nowrap px-3 py-3 text-xs text-slate-700 sm:px-4",
-                                        isPartner
-                                            ? "py-3.5 font-bold uppercase tracking-wide text-slate-600"
-                                            : "font-medium",
-                                    )}
-                                >
-                                    Location
-                                </th>
-                                <th
-                                    className={clsx(
-                                        "whitespace-nowrap px-3 py-3 text-xs text-slate-700 sm:px-4",
-                                        isPartner
-                                            ? "py-3.5 font-bold uppercase tracking-wide text-slate-600"
-                                            : "font-medium",
-                                    )}
-                                >
-                                    Time
-                                </th>
-                                <th
-                                    className={clsx(
-                                        "whitespace-nowrap px-3 py-3 text-xs text-slate-700 sm:px-4",
-                                        isPartner
-                                            ? "py-3.5 font-bold uppercase tracking-wide text-slate-600"
-                                            : "font-medium",
-                                    )}
-                                >
-                                    Work type
-                                </th>
-                                {!partnerHideParticipantColumn ? (
+                            <tr>
+                                {[
+                                    { label: "Date", extra: "whitespace-nowrap" },
+                                    { label: "Location", extra: "whitespace-nowrap" },
+                                    { label: "Time", extra: "whitespace-nowrap" },
+                                    { label: "Work type", extra: "whitespace-nowrap" },
+                                    ...(!partnerHideParticipantColumn
+                                        ? [{ label: "Participant", extra: "min-w-[140px]" }]
+                                        : []),
+                                    { label: "Description", extra: "min-w-[160px]" },
+                                    { label: "Evidence", extra: "whitespace-nowrap" },
+                                    { label: "Actions", extra: "min-w-[220px]" },
+                                ].map((col) => (
                                     <th
+                                        key={col.label}
                                         className={clsx(
-                                            "min-w-[140px] px-3 py-3 text-xs text-slate-700 sm:px-4",
+                                            "px-3 py-3 text-[11px] sm:px-4",
+                                            col.extra,
+                                            "sticky top-0 z-10 backdrop-blur",
                                             isPartner
-                                                ? "py-3.5 font-bold uppercase tracking-wide text-slate-600"
-                                                : "font-medium",
+                                                ? "border-b border-slate-200/80 bg-slate-50/95 py-3.5 font-bold uppercase tracking-wider text-slate-600"
+                                                : "border-y border-slate-200 bg-slate-50 font-semibold uppercase tracking-wide text-slate-600",
                                         )}
                                     >
-                                        Participant
+                                        {col.label}
                                     </th>
-                                ) : null}
-                                <th
-                                    className={clsx(
-                                        "min-w-[160px] px-3 py-3 text-xs text-slate-700 sm:px-4",
-                                        isPartner
-                                            ? "py-3.5 font-bold uppercase tracking-wide text-slate-600"
-                                            : "font-medium",
-                                    )}
-                                >
-                                    Description
-                                </th>
-                                <th
-                                    className={clsx(
-                                        "whitespace-nowrap px-3 py-3 text-xs text-slate-700 sm:px-4",
-                                        isPartner
-                                            ? "py-3.5 font-bold uppercase tracking-wide text-slate-600"
-                                            : "font-medium",
-                                    )}
-                                >
-                                    Evidence
-                                </th>
-                                <th
-                                    className={clsx(
-                                        "min-w-[220px] px-3 py-3 text-xs text-slate-700 sm:px-4",
-                                        isPartner
-                                            ? "py-3.5 font-bold uppercase tracking-wide text-slate-600"
-                                            : "font-medium",
-                                    )}
-                                >
-                                    Actions
-                                </th>
+                                ))}
                             </tr>
                         </thead>
                         <tbody>
@@ -501,74 +543,83 @@ export default function AttendancePendingQueuePanel({
                                     <tr
                                         key={id || `row-${idx}`}
                                         className={clsx(
-                                            "border-b border-slate-100 transition",
+                                            "border-b border-slate-100 transition-colors",
                                             isPartner
                                                 ? clsx(
-                                                      "hover:bg-sky-50/50",
+                                                      "hover:bg-[#0056B3]/[0.035]",
                                                       idx % 2 === 0 ? "bg-white" : "bg-slate-50/40",
                                                   )
                                                 : "bg-white hover:bg-slate-50/80",
                                         )}
                                     >
-                                        <td className="whitespace-nowrap px-3 py-3 align-top text-slate-800 sm:px-4">
-                                            {formatDisplayDate(pickStr(row.date))}
+                                        <td className="whitespace-nowrap px-3 py-3.5 align-top sm:px-4">
+                                            <span className="font-semibold text-slate-900">
+                                                {formatDisplayDate(pickStr(row.date))}
+                                            </span>
                                         </td>
-                                        <td className="max-w-[200px] px-3 py-3 align-top text-slate-700 sm:px-4">
-                                            {pickStr(row.location) || "—"}
+                                        <td className="max-w-[200px] px-3 py-3.5 align-top text-slate-700 sm:px-4">
+                                            {pickStr(row.location) || (
+                                                <span className="text-slate-400">—</span>
+                                            )}
                                         </td>
-                                        <td className="whitespace-nowrap px-3 py-3 align-top text-slate-700 sm:px-4">
-                                            {timeCell}
+                                        <td className="whitespace-nowrap px-3 py-3.5 align-top sm:px-4">
+                                            <span
+                                                className={clsx(
+                                                    "inline-flex items-center rounded-md px-2 py-1 text-xs font-semibold tabular-nums",
+                                                    isPartner
+                                                        ? "bg-[#0056B3]/[0.08] text-[#0056B3] ring-1 ring-inset ring-[#0056B3]/10"
+                                                        : "bg-slate-100 text-slate-700 ring-1 ring-inset ring-slate-200",
+                                                )}
+                                            >
+                                                {timeCell}
+                                            </span>
                                         </td>
-                                        <td className="max-w-[140px] px-3 py-3 align-top text-slate-700 sm:px-4">{workType}</td>
+                                        <td className="max-w-[140px] px-3 py-3.5 align-top sm:px-4">
+                                            <span className="inline-flex items-center rounded-md bg-slate-100 px-2 py-1 text-xs font-medium text-slate-700 ring-1 ring-inset ring-slate-200">
+                                                {workType}
+                                            </span>
+                                        </td>
                                         {!partnerHideParticipantColumn ? (
-                                            <td className="px-3 py-3 align-top text-slate-800 sm:px-4">
+                                            <td className="px-3 py-3.5 align-top text-slate-800 sm:px-4">
                                                 {who.name ? (
                                                     <>
-                                                        <span className="font-medium">{who.name}</span>
+                                                        <span className="font-semibold text-slate-900">{who.name}</span>
                                                         {who.detail ? (
                                                             <span className="mt-0.5 block text-xs text-slate-500">{who.detail}</span>
                                                         ) : null}
                                                     </>
                                                 ) : (
-                                                    "—"
+                                                    <span className="text-slate-400">—</span>
                                                 )}
                                             </td>
                                         ) : null}
-                                        <td className="max-w-[220px] px-3 py-3 align-top text-slate-600 sm:px-4">
-                                            <span className="line-clamp-3">{desc}</span>
+                                        <td className="max-w-[220px] px-3 py-3.5 align-top text-slate-600 sm:px-4">
+                                            <span className="line-clamp-3 leading-relaxed">{desc}</span>
                                         </td>
-                                        <td className="whitespace-nowrap px-3 py-3 align-top sm:px-4">
+                                        <td className="whitespace-nowrap px-3 py-3.5 align-top sm:px-4">
                                             {evidenceUrl ? (
                                                 <a
                                                     href={evidenceUrl}
                                                     target="_blank"
                                                     rel="noopener noreferrer"
                                                     className={clsx(
-                                                        "inline-flex items-center gap-1 font-medium underline underline-offset-2",
+                                                        "inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition",
                                                         isPartner
-                                                            ? "font-semibold text-[#0056B3] decoration-[#0056B3]/35 hover:text-[#004494]"
-                                                            : "text-slate-900 decoration-slate-300 hover:text-slate-700",
+                                                            ? "bg-[#0056B3]/10 text-[#0056B3] ring-1 ring-inset ring-[#0056B3]/15 hover:bg-[#0056B3]/15"
+                                                            : "bg-slate-100 text-slate-800 ring-1 ring-inset ring-slate-200 hover:bg-slate-200",
                                                     )}
                                                 >
-                                                    View
                                                     <ExternalLink className="h-3.5 w-3.5" aria-hidden />
+                                                    View
                                                 </a>
                                             ) : (
-                                                <span
-                                                    className={clsx(
-                                                        "inline-flex items-center gap-1 font-medium text-amber-800",
-                                                        isPartner && "text-sm font-semibold",
-                                                    )}
-                                                >
-                                                    <AlertTriangle
-                                                        className={clsx("h-4 w-4 shrink-0", isPartner && "text-amber-600")}
-                                                        aria-hidden
-                                                    />
+                                                <span className="inline-flex items-center gap-1.5 rounded-lg bg-amber-50 px-2.5 py-1.5 text-xs font-semibold text-amber-800 ring-1 ring-inset ring-amber-200">
+                                                    <AlertTriangle className="h-3.5 w-3.5 shrink-0" aria-hidden />
                                                     Missing
                                                 </span>
                                             )}
                                         </td>
-                                        <td className="px-3 py-3 align-top sm:px-4">
+                                        <td className="px-3 py-3.5 align-top sm:px-4">
                                             <div className="flex flex-col gap-2">
                                                 <div className="flex flex-wrap gap-2">
                                                     <button
@@ -576,9 +627,9 @@ export default function AttendancePendingQueuePanel({
                                                         disabled={acting !== null}
                                                         onClick={() => void act(id, "approve")}
                                                         className={clsx(
-                                                            "inline-flex items-center justify-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition disabled:opacity-50",
+                                                            "inline-flex items-center justify-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-semibold shadow-sm transition disabled:opacity-50",
                                                             isPartner
-                                                                ? "rounded-[10px] border-2 border-emerald-600 bg-white font-bold text-emerald-700 hover:bg-emerald-50"
+                                                                ? "rounded-[10px] border-emerald-600 bg-emerald-600 text-white hover:bg-emerald-700"
                                                                 : "border-emerald-500 bg-emerald-50 text-emerald-800 hover:bg-emerald-100",
                                                         )}
                                                     >
@@ -594,8 +645,10 @@ export default function AttendancePendingQueuePanel({
                                                         disabled={acting !== null}
                                                         onClick={() => void act(id, "reject")}
                                                         className={clsx(
-                                                            "inline-flex items-center justify-center gap-1 rounded-lg border border-red-500 bg-white px-2.5 py-1.5 text-xs font-semibold text-red-700 transition hover:bg-red-50 disabled:opacity-50",
-                                                            isPartner && "rounded-[10px] border-2 border-red-600 font-bold",
+                                                            "inline-flex items-center justify-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-semibold shadow-sm transition disabled:opacity-50",
+                                                            isPartner
+                                                                ? "rounded-[10px] border-red-200 bg-white text-red-700 hover:border-red-300 hover:bg-red-50"
+                                                                : "border-red-500 bg-white text-red-700 hover:bg-red-50",
                                                         )}
                                                     >
                                                         {acting === `${id}:reject` ? (
@@ -610,8 +663,10 @@ export default function AttendancePendingQueuePanel({
                                                         disabled={acting !== null}
                                                         onClick={() => void act(id, "flag")}
                                                         className={clsx(
-                                                            "inline-flex items-center justify-center gap-1 rounded-lg border border-amber-500 bg-white px-2.5 py-1.5 text-xs font-semibold text-amber-800 transition hover:bg-amber-50 disabled:opacity-50",
-                                                            isPartner && "rounded-[10px] border-2 border-amber-600 font-bold text-amber-900",
+                                                            "inline-flex items-center justify-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-semibold shadow-sm transition disabled:opacity-50",
+                                                            isPartner
+                                                                ? "rounded-[10px] border-amber-200 bg-white text-amber-800 hover:border-amber-300 hover:bg-amber-50"
+                                                                : "border-amber-500 bg-white text-amber-800 hover:bg-amber-50",
                                                         )}
                                                     >
                                                         {acting === `${id}:flag` ? (

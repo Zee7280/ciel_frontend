@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState, useEffect, useLayoutEffect, useCallback } from "react";
-import { LayoutDashboard, Users, Settings, PieChart, LogOut, FileText, Building2, CheckCircle, Briefcase, FileBarChart, ShieldAlert, History, Bell, User, MessageSquare, Plus, CreditCard, ClipboardList, CalendarClock, LifeBuoy, Link2, GraduationCap, Globe2, type LucideProps } from "lucide-react";
+import { LayoutDashboard, Users, Settings, PieChart, LogOut, FileText, Building2, CheckCircle, Briefcase, FileBarChart, ShieldAlert, History, Bell, User, MessageSquare, Plus, CreditCard, ClipboardList, CalendarClock, LifeBuoy, Link2, GraduationCap, Globe2, PlayCircle, Mail, type LucideProps } from "lucide-react";
 import clsx from "clsx";
 import { authenticatedFetch, isTokenValid } from "@/utils/api";
 import {
@@ -190,6 +190,7 @@ export default function Sidebar() {
             { label: "Payments", href: "/dashboard/student/payments", icon: CreditCard },
             { label: "Messages", href: "/dashboard/student/messages", icon: MessageSquare },
             { label: "Notifications", href: "/dashboard/student/notifications", icon: Bell },
+            { label: "Platform tutorial", href: "/dashboard/student/tutorials", icon: PlayCircle },
             { label: "Help & Support", href: "/dashboard/student/help", icon: LifeBuoy },
             { label: "My Profile", href: "/dashboard/student/profile", icon: User },
         ] : []),
@@ -211,6 +212,7 @@ export default function Sidebar() {
             { label: "Messages", href: "/dashboard/partner/messages", icon: MessageSquare },
             { label: "Funding", href: "/dashboard/partner/funding", icon: PieChart },
             { label: "Notifications", href: "/dashboard/partner/notifications", icon: Bell },
+            { label: "Platform tutorial", href: "/dashboard/partner/tutorials", icon: PlayCircle },
         ] : []),
         // Faculty 
         ...(isFaculty ? [
@@ -224,6 +226,7 @@ export default function Sidebar() {
             // { label: "Student Grading", href: "/dashboard/faculty/grading", icon: FileText },
             { label: "Messages", href: "/dashboard/faculty/messages", icon: MessageSquare },
             { label: "Notifications", href: "/dashboard/faculty/notifications", icon: Bell },
+            { label: "Platform tutorial", href: "/dashboard/faculty/tutorials", icon: PlayCircle },
             { label: "Impact Analytics", href: "/dashboard/faculty/analytics", icon: PieChart },
         ] : []),
         // Admin
@@ -241,6 +244,8 @@ export default function Sidebar() {
             { label: "Impact", href: "/dashboard/admin/impact", icon: FileBarChart },
             { label: "Messages", href: "/dashboard/admin/messages", icon: MessageSquare },
             { label: "Notifications", href: "/dashboard/admin/notifications", icon: Bell },
+            { label: "Platform tutorial", href: "/dashboard/admin/tutorials", icon: PlayCircle },
+            { label: "Send email", href: "/dashboard/admin/email", icon: Mail },
             { label: "Help & Support", href: "/dashboard/admin/support", icon: LifeBuoy },
             { label: "Audit Logs", href: "/dashboard/admin/audit-logs", icon: History },
             { label: "Issue Logs", href: "/dashboard/admin/issue-logs", icon: ShieldAlert },

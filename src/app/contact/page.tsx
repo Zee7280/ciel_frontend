@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import { Mail, Phone, MapPin, Send, ArrowRight, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
+import { Mail, Phone, MapPin, Send, ArrowRight, Loader2, CheckCircle2, AlertCircle, MessageCircle } from "lucide-react";
 
 export default function ContactPage() {
     const [formData, setFormData] = useState({
@@ -101,6 +101,26 @@ export default function ContactPage() {
                                         </a>
                                     </p>
                                     <p className="text-slate-500 text-sm mt-1">Mon-Fri, 9am - 5pm EST</p>
+                                </div>
+                            </div>
+
+                            <div className="flex items-start gap-4 p-6 bg-slate-50 rounded-2xl hover:bg-emerald-50 transition-colors group">
+                                <div className="p-3 bg-white rounded-full shadow-sm text-emerald-500 group-hover:text-emerald-600">
+                                    <MessageCircle className="w-6 h-6" />
+                                </div>
+                                <div>
+                                    <h3 className="font-bold text-slate-900 mb-1">WhatsApp</h3>
+                                    <p className="text-slate-600 font-bold">
+                                        <a
+                                            href="https://wa.me/923712243575"
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="hover:text-emerald-600 transition-colors"
+                                        >
+                                            0371-2243575
+                                        </a>
+                                    </p>
+                                    <p className="text-slate-500 text-sm mt-1">24/7 messaging</p>
                                 </div>
                             </div>
 

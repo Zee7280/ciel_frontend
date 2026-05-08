@@ -20,7 +20,7 @@ export const metadata: Metadata = {
 };
 
 import { Toaster } from "sonner";
-import Script from "next/script";
+import FloatingSupportButton from "@/components/FloatingSupportButton";
 
 export default function RootLayout({
   children,
@@ -34,6 +34,7 @@ export default function RootLayout({
         className={`${outfit.variable} ${dancingScript.variable} font-sans antialiased text-slate-800 bg-slate-50`}
       >
         {children}
+        <FloatingSupportButton />
         <Toaster position="top-center" richColors />
       </body>
     </html>

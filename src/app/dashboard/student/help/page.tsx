@@ -13,8 +13,9 @@ import {
 } from "lucide-react";
 import { authenticatedFetch } from "@/utils/api";
 import { toast } from "sonner";
+import PlatformTutorialsPanel from "@/components/platform/PlatformTutorialsPanel";
 
-type HelpTab = "faqs" | "my_tickets" | "submit" | "track";
+type HelpTab = "faqs" | "my_tickets" | "submit" | "track" | "tutorials";
 
 type FaqItem = { id: string; question: string; answer: string; category?: string };
 
@@ -28,8 +29,6 @@ type SupportTicket = {
     updatedAt?: string;
     description?: string;
 };
-
-
 
 function pickTicketList(payload: unknown): SupportTicket[] {
     if (!payload || typeof payload !== "object") return [];
@@ -59,7 +58,7 @@ function pickTicketOne(payload: unknown): SupportTicket | null {
 }
 
 export default function StudentHelpPage() {
-    const [tab, setTab] = useState<HelpTab>("faqs");
+    const [tab, setTab] = useState<HelpTab>("tutorials");
     const [faqs, setFaqs] = useState<FaqItem[]>([]);
 
     const [tickets, setTickets] = useState<SupportTicket[]>([]);
@@ -126,6 +125,7 @@ export default function StudentHelpPage() {
     const tabs = useMemo(
         () =>
             [
+                { id: "tutorials" as const, label: "Platform tutorial" },
                 { id: "faqs" as const, label: "FAQs" },
                 { id: "my_tickets" as const, label: "My tickets" },
                 { id: "submit" as const, label: "Submit ticket" },
@@ -288,7 +288,19 @@ export default function StudentHelpPage() {
                 ))}
             </div>
 
-            <div className="mx-auto max-w-4xl">
+            <div className="mx-auto max-w-6xl">
+                {tab === "tutorials" && (
+                    <PlatformTutorialsPanel
+                        visible={tab === "tutorials"}
+                        emptyDescription={
+                            <>
+                                Platform guides will appear here when your administrator publishes them under{" "}
+                                <span className="font-semibold text-slate-700">Admin → Platform tutorial</span>.
+                            </>
+                        }
+                    />
+                )}
+
                 {tab === "faqs" && (
                     <div className="space-y-3">
                         {faqs.map((item) => (
