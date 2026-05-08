@@ -19,6 +19,30 @@ function readPositiveHeadcount(value: unknown): number | null {
 }
 
 /**
+ * Report API merges `team_members` from participation rows — one element per billed student (includes team lead).
+ * Draft Section 1 uses `team_members` as additional members only; headcount then is `members.length + 1` for team mode.
+ */
+function isParticipationShapedTeamRoster(members: unknown[]): boolean {
+    if (!Array.isArray(members) || members.length === 0) return false;
+    for (const m of members) {
+        if (!m || typeof m !== "object") continue;
+        const o = m as Record<string, unknown>;
+        if ("isTeamLead" in o || "is_team_lead" in o) return true;
+        if ("studentId" in o || "student_id" in o) return true;
+    }
+    return false;
+}
+
+function headcountFromTeamMembersList(participationType: string, membersRaw: unknown): number | null {
+    if (!Array.isArray(membersRaw) || membersRaw.length === 0) return null;
+    const len = membersRaw.length;
+    const part = participationType.toLowerCase();
+    if (part !== "team") return null;
+    const fullRoster = isParticipationShapedTeamRoster(membersRaw);
+    return fullRoster ? Math.max(1, len) : Math.max(1, len + 1);
+}
+
+/**
  * Billable student count for the reporting fee (fee per student × this number).
  * Prefers `team_size` / `teamSize` from the API; otherwise team lead + `team_members` / `teamMembers` length; else 1.
  */
@@ -33,7 +57,8 @@ export function resolveReportPaymentHeadcountFromProject(project: unknown): numb
     const membersLen = Array.isArray(membersRaw) ? membersRaw.length : 0;
 
     const part = String(p.participation_type ?? p.participationType ?? "").toLowerCase();
-    if (part === "team" && membersLen > 0) return membersLen + 1;
+    const fromList = headcountFromTeamMembersList(part, membersRaw);
+    if (fromList != null) return fromList;
     if (membersLen > 0) return membersLen + 1;
 
     return 1;
@@ -58,7 +83,8 @@ export function resolveReportPaymentHeadcountFromReport(report: unknown): number
     const membersRaw = s1.team_members ?? s1.teamMembers;
     const membersLen = Array.isArray(membersRaw) ? membersRaw.length : 0;
     const part = String(s1.participation_type ?? s1.participationType ?? "").toLowerCase();
-    if (part === "team" && membersLen > 0) return membersLen + 1;
+    const fromList = headcountFromTeamMembersList(part, membersRaw);
+    if (fromList != null) return fromList;
     if (membersLen > 0) return membersLen + 1;
     return 1;
 }

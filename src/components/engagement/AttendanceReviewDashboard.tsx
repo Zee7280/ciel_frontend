@@ -1,7 +1,7 @@
 "use client";
 
 import type { MutableRefObject } from "react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
     ArrowLeft,
@@ -13,6 +13,13 @@ import {
     Users,
 } from "lucide-react";
 import clsx from "clsx";
+import { authenticatedFetch } from "@/utils/api";
+import {
+    buildPartnerTeamBuckets,
+    PARTNER_ATTENDANCE_ALL_TEAMS,
+    PARTNER_ATTENDANCE_AWAIT_TEAM,
+    type PartnerTeamBucket,
+} from "@/utils/engagementPartnerTeamScope";
 import AttendancePendingQueuePanel, { type PartnerParticipantChip } from "@/components/engagement/AttendancePendingQueuePanel";
 
 /** Primary accent aligned with Attendance Verification reference */
@@ -82,6 +89,8 @@ export default function AttendanceReviewDashboard({
     queueTitle,
     queueDescription,
     variant = "default",
+    /** Full-width layout with in-panel table scroll (faculty + partner attendance review). */
+    wideQueueLayout = false,
 }: {
     backHref: string;
     backLabel: string;
@@ -101,14 +110,19 @@ export default function AttendanceReviewDashboard({
     queueDescription: string;
     /** Partner attendance verification shell; faculty uses plain `default`. */
     variant?: "default" | "partner";
+    wideQueueLayout?: boolean;
 }) {
     const isPartner = variant === "partner";
+    const stretchViewport = wideQueueLayout;
     const [listTab, setListTab] = useState<ListTab>("all");
     const [query, setQuery] = useState("");
     const [refreshingCounts, setRefreshingCounts] = useState(false);
     const [partnerRoster, setPartnerRoster] = useState<PartnerParticipantChip[]>([]);
     const [partnerQueueRows, setPartnerQueueRows] = useState(0);
     const [selectedParticipantKey, setSelectedParticipantKey] = useState("");
+    const [partnerTeamBuckets, setPartnerTeamBuckets] = useState<PartnerTeamBucket[]>([]);
+    const [partnerTeamsLoading, setPartnerTeamsLoading] = useState(false);
+    const [selectedTeamKey, setSelectedTeamKey] = useState(PARTNER_ATTENDANCE_AWAIT_TEAM);
 
     const filteredRows = useMemo(() => {
         let list = [...projects];
@@ -138,15 +152,67 @@ export default function AttendanceReviewDashboard({
         setPartnerRoster([]);
         setPartnerQueueRows(0);
         setSelectedParticipantKey("");
+        setPartnerTeamBuckets([]);
+        setSelectedTeamKey(PARTNER_ATTENDANCE_AWAIT_TEAM);
     }, [projectId, isPartner]);
 
     useEffect(() => {
+        if (!isPartner || !projectId.trim()) {
+            return;
+        }
+        let cancelled = false;
+        (async () => {
+            setPartnerTeamsLoading(true);
+            try {
+                const res = await authenticatedFetch(
+                    `/api/v1/engagement/project/${encodeURIComponent(projectId.trim())}/team`,
+                );
+                if (!res?.ok) {
+                    if (!cancelled) {
+                        setPartnerTeamBuckets([]);
+                        setSelectedTeamKey(PARTNER_ATTENDANCE_ALL_TEAMS);
+                    }
+                    return;
+                }
+                const json = await res.json();
+                const teamRows = Array.isArray(json?.data) ? json.data : Array.isArray(json) ? json : [];
+                const buckets = buildPartnerTeamBuckets(teamRows);
+                if (cancelled) return;
+                setPartnerTeamBuckets(buckets);
+                if (buckets.length === 0) {
+                    setSelectedTeamKey(PARTNER_ATTENDANCE_ALL_TEAMS);
+                } else if (buckets.length === 1) {
+                    setSelectedTeamKey(buckets[0].key);
+                } else {
+                    setSelectedTeamKey(PARTNER_ATTENDANCE_AWAIT_TEAM);
+                }
+            } catch {
+                if (!cancelled) {
+                    setPartnerTeamBuckets([]);
+                    setSelectedTeamKey(PARTNER_ATTENDANCE_ALL_TEAMS);
+                }
+            } finally {
+                if (!cancelled) setPartnerTeamsLoading(false);
+            }
+        })();
+        return () => {
+            cancelled = true;
+        };
+    }, [isPartner, projectId]);
+
+    useEffect(() => {
         if (!isPartner) return;
+        setSelectedParticipantKey("");
+    }, [selectedTeamKey, isPartner]);
+
+    useEffect(() => {
+        if (!isPartner) return;
+        if (selectedTeamKey === PARTNER_ATTENDANCE_AWAIT_TEAM) return;
         if (partnerRoster.length === 0) return;
         if (!partnerRoster.some((p) => p.key === selectedParticipantKey)) {
             setSelectedParticipantKey(partnerRoster[0].key);
         }
-    }, [isPartner, partnerRoster, selectedParticipantKey]);
+    }, [isPartner, partnerRoster, selectedParticipantKey, selectedTeamKey]);
 
     const handlePartnerQueueSnapshot = useCallback((summary: { participants: PartnerParticipantChip[]; rowCount: number }) => {
         setPartnerRoster(summary.participants);
@@ -167,15 +233,55 @@ export default function AttendanceReviewDashboard({
         }
     };
 
-    const teamCrumbLabel = selected?.subtitle?.trim() || "Team cohort";
     const oppIdTail = projectId.replace(/\W/g, "").slice(-8).toUpperCase() || "—";
     const partnerStepProjectDone = Boolean(projectId && selected);
-    const partnerStepMembersDone = partnerRoster.length > 0;
-    const partnerStepEntriesActive = partnerQueueRows > 0;
+    const partnerStepTeamResolved =
+        isPartner && partnerStepProjectDone && selectedTeamKey !== PARTNER_ATTENDANCE_AWAIT_TEAM;
+    const partnerTeamScopeLabel =
+        selectedTeamKey === PARTNER_ATTENDANCE_AWAIT_TEAM
+            ? "Select team"
+            : selectedTeamKey === PARTNER_ATTENDANCE_ALL_TEAMS
+              ? "All cohorts"
+              : (partnerTeamBuckets.find((b) => b.key === selectedTeamKey)?.label ?? "Team");
+    const partnerStepMembersDone =
+        partnerStepTeamResolved &&
+        (partnerRoster.length === 0 || Boolean(selectedParticipantKey.trim()));
+
+    const selectedTeamBucket = partnerTeamBuckets.find((b) => b.key === selectedTeamKey) ?? null;
+
+    function partnerTeamIdLabel(key: string): string | null {
+        if (key === PARTNER_ATTENDANCE_ALL_TEAMS || key === PARTNER_ATTENDANCE_AWAIT_TEAM) return null;
+        const i = key.indexOf(":");
+        const tail = (i >= 0 ? key.slice(i + 1) : key).trim();
+        return tail || null;
+    }
+
+    function partnerMemberAvatar(name: string, key: string): { initials: string; avatarClass: string } {
+        const cleaned = name.trim() || "?";
+        const parts = cleaned.split(/\s+/).filter(Boolean);
+        const initials =
+            parts.length >= 2
+                ? `${parts[0]![0] ?? ""}${parts[1]![0] ?? ""}`.toUpperCase()
+                : cleaned.slice(0, 2).toUpperCase() || "?";
+        const PALETTE = ["bg-[#0056B3]", "bg-emerald-500", "bg-violet-600", "bg-rose-500", "bg-teal-600", "bg-orange-600"] as const;
+        let h = 0;
+        for (let i = 0; i < key.length; i++) h = ((h << 5) - h + key.charCodeAt(i)) | 0;
+        const avatarClass = PALETTE[(Math.abs(h) >>> 0) % PALETTE.length] ?? PALETTE[0];
+        return { initials, avatarClass };
+    }
 
     return (
-        <div className="mx-auto max-w-[1400px] space-y-6 px-4 py-6 sm:px-6 lg:px-8">
-            <header className={clsx(isPartner ? "space-y-5" : "space-y-4")}>
+        <div
+            className={clsx(
+                "px-4 py-6 sm:px-6 lg:px-8",
+                stretchViewport ? "mx-auto w-full max-w-none space-y-4 py-4" : "mx-auto max-w-[1400px] space-y-6",
+            )}
+        >
+            <header
+                className={clsx(
+                    isPartner && !stretchViewport ? "space-y-5" : stretchViewport ? "space-y-2" : "space-y-4",
+                )}
+            >
                 <Link
                     href={backHref}
                     className={clsx(
@@ -189,25 +295,30 @@ export default function AttendanceReviewDashboard({
                     {backLabel}
                 </Link>
                 <div>
-                    <p
-                        className={clsx(
-                            "text-xs uppercase tracking-wider text-slate-500",
-                            isPartner ? "font-semibold" : "font-medium tracking-wider",
-                        )}
-                    >
-                        {eyebrow}
-                    </p>
+                    {eyebrow.trim() ? (
+                        <p
+                            className={clsx(
+                                "text-xs uppercase tracking-wider text-slate-500",
+                                isPartner ? "font-semibold" : "font-medium tracking-wider",
+                            )}
+                        >
+                            {eyebrow}
+                        </p>
+                    ) : null}
                     <h1
                         className={clsx(
-                            "mt-1 text-2xl tracking-tight text-slate-900",
+                            "text-2xl tracking-tight text-slate-900",
                             isPartner ? "font-bold sm:text-[1.65rem]" : "font-semibold sm:text-3xl",
+                            eyebrow.trim() ? "mt-1" : null,
                         )}
                     >
                         {title}
                     </h1>
-                    <p className={clsx("mt-2 max-w-2xl text-sm text-slate-600", isPartner && "leading-relaxed")}>
-                        {description}
-                    </p>
+                    {description.trim() ? (
+                        <p className={clsx("mt-2 max-w-2xl text-sm text-slate-600", isPartner && "leading-relaxed")}>
+                            {description}
+                        </p>
+                    ) : null}
                 </div>
 
                 {isPartner ? (
@@ -218,51 +329,56 @@ export default function AttendanceReviewDashboard({
                                     {selected?.title ?? "Project title"}
                                 </span>
                                 <span className="mx-1.5 text-slate-300">→</span>
-                                <span className={clsx(selected ? "text-slate-700" : "text-slate-400")}>{teamCrumbLabel}</span>
+                                <span
+                                    className={clsx(
+                                        selectedTeamKey !== PARTNER_ATTENDANCE_AWAIT_TEAM ? "text-slate-700" : "text-slate-400",
+                                    )}
+                                >
+                                    {partnerTeamScopeLabel}
+                                </span>
                                 <span className="mx-1.5 text-slate-300">→</span>
                                 <span className={clsx(partnerRoster.length > 0 ? "text-slate-700" : "text-slate-400")}>
                                     Group members ({partnerRoster.length})
                                 </span>
                                 <span className="mx-1.5 text-slate-300">→</span>
-                                <span className={clsx(partnerStepEntriesActive ? accent : "text-slate-400")}>
+                                <span className={clsx(partnerStepMembersDone ? accent : "text-slate-400")}>
                                     Review individual attendance records
                                 </span>
                             </p>
                         </nav>
 
-                        <div
-                            aria-label="Verification steps"
-                            className="flex flex-wrap items-stretch gap-x-1 gap-y-4 border-b border-slate-100 pb-5 sm:gap-x-2"
-                        >
-                            {(
-                                [
-                                    { n: 1, label: "Project title", done: partnerStepProjectDone },
-                                    { n: 2, label: "Team name", done: partnerStepProjectDone },
-                                    { n: 3, label: "Group members", done: partnerStepMembersDone },
-                                    {
-                                        n: 4,
-                                        label: "Attendance entries",
-                                        done: false,
-                                        current: partnerStepEntriesActive,
-                                    },
-                                ] as const
-                            ).map((step, i, arr) => {
-                                const isDone = Boolean("done" in step && step.done);
-                                const isCurrent = Boolean("current" in step && step.current);
-                                const pendingPrimary =
-                                    !isDone &&
-                                    !isCurrent &&
-                                    ((step.n === 1 && !partnerStepProjectDone) ||
-                                        (step.n === 3 && partnerStepProjectDone && !partnerStepMembersDone));
+                        <div aria-label="Verification steps" className="border-b border-slate-100 pb-6">
+                            <div className="-mx-1 overflow-x-auto px-1 sm:overflow-visible">
+                                <div className="flex min-w-[36rem] items-center pb-px sm:min-w-0">
+                                {(
+                                    [
+                                        { n: 1, label: "Project title", done: partnerStepProjectDone },
+                                        { n: 2, label: "Team name", done: partnerStepTeamResolved },
+                                        { n: 3, label: "Group members", done: partnerStepMembersDone },
+                                        {
+                                            n: 4,
+                                            label: "Attendance entries",
+                                            done: false,
+                                            current: partnerStepMembersDone,
+                                        },
+                                    ] as const
+                                ).map((step, i) => {
+                                    const isDone = Boolean("done" in step && step.done);
+                                    const isCurrent = Boolean("current" in step && step.current);
+                                    const pendingPrimary =
+                                        !isDone &&
+                                        !isCurrent &&
+                                        ((step.n === 1 && !partnerStepProjectDone) ||
+                                            (step.n === 2 && partnerStepProjectDone && !partnerStepTeamResolved) ||
+                                            (step.n === 3 && partnerStepTeamResolved && !partnerStepMembersDone));
+                                    const connectorFilled =
+                                        i === 1
+                                            ? partnerStepProjectDone
+                                            : i === 2
+                                              ? partnerStepTeamResolved
+                                              : partnerStepMembersDone;
 
-                                return (
-                                    <div
-                                        key={step.n}
-                                        className={clsx(
-                                            "flex min-w-[10rem] flex-1 items-center gap-2.5 sm:min-w-[8rem]",
-                                            i < arr.length - 1 && "sm:border-r sm:border-slate-100 sm:pr-2",
-                                        )}
-                                    >
+                                    const circle = (
                                         <div
                                             className={clsx(
                                                 "flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-2 text-sm font-bold transition-colors",
@@ -280,15 +396,30 @@ export default function AttendanceReviewDashboard({
                                         >
                                             {isDone ? <Check className="h-5 w-5" strokeWidth={2.5} /> : step.n}
                                         </div>
-                                        <div className="min-w-0 flex-1">
-                                            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                                                Step {step.n}
-                                            </p>
-                                            <p className="truncate text-xs font-semibold text-slate-900 sm:text-sm">{step.label}</p>
-                                        </div>
-                                    </div>
-                                );
-                            })}
+                                    );
+
+                                    return (
+                                        <Fragment key={step.n}>
+                                            {i > 0 ? (
+                                                <div
+                                                    className={clsx(
+                                                        "h-0.5 min-w-[0.75rem] flex-1 shrink",
+                                                        connectorFilled ? "bg-[#0056B3]" : "bg-slate-200",
+                                                    )}
+                                                    aria-hidden
+                                                />
+                                            ) : null}
+                                            <div className="flex w-[min(7.75rem,calc((100%-3rem)/4))] shrink-0 flex-col items-center text-center">
+                                                {circle}
+                                                <p className="mt-2 px-1 text-[11px] font-semibold leading-tight text-slate-700 sm:text-xs">
+                                                    {step.label}
+                                                </p>
+                                            </div>
+                                        </Fragment>
+                                    );
+                                })}
+                                </div>
+                            </div>
                         </div>
                     </>
                 ) : null}
@@ -307,10 +438,25 @@ export default function AttendanceReviewDashboard({
                     />
                 </div>
             ) : (
-                <div className="grid gap-6 lg:grid-cols-12 lg:gap-8">
-                    <div className="space-y-4 lg:col-span-4">
+                <div
+                    className={clsx(
+                        "grid gap-6 lg:grid-cols-12 lg:gap-8",
+                        stretchViewport && "min-h-[calc(100dvh-11rem)] lg:items-stretch",
+                    )}
+                >
+                    <div
+                        className={clsx(
+                            "space-y-4 lg:col-span-4",
+                            stretchViewport && "flex min-h-0 max-h-[calc(100dvh-11rem)] flex-col gap-4 lg:col-span-3",
+                        )}
+                    >
                         {isPartner ? (
-                            <div className="rounded-xl border border-slate-200/90 bg-white p-4 shadow-sm">
+                            <div
+                                className={clsx(
+                                    "rounded-xl border border-slate-200/90 bg-white p-4 shadow-sm",
+                                    stretchViewport && "flex min-h-0 flex-1 flex-col",
+                                )}
+                            >
                                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                                     <div className="flex gap-1 rounded-[10px] bg-slate-100 p-1">
                                         <button
@@ -366,7 +512,12 @@ export default function AttendanceReviewDashboard({
                                     />
                                 </label>
 
-                                <div className="mt-4 max-h-[min(28rem,calc(100vh-14rem))] space-y-2 overflow-y-auto overscroll-contain pr-1">
+                                <div
+                                    className={clsx(
+                                        "mt-4 space-y-2 overflow-y-auto overscroll-contain pr-1",
+                                        stretchViewport ? "min-h-0 flex-1" : "max-h-[min(28rem,calc(100vh-14rem))]",
+                                    )}
+                                >
                                     {filteredRows.length === 0 ? (
                                         <div className="rounded-[10px] border border-dashed border-slate-200 bg-slate-50/50 px-4 py-10 text-center text-sm text-slate-600">
                                             No matches. Try{" "}
@@ -421,7 +572,11 @@ export default function AttendanceReviewDashboard({
                                 </div>
                             </div>
                         ) : (
-                            <>
+                            <div
+                                className={clsx(
+                                    stretchViewport && "flex min-h-0 flex-1 flex-col gap-4",
+                                )}
+                            >
                                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                                     <div className="flex gap-1 rounded-lg bg-slate-100 p-1">
                                         <button
@@ -477,7 +632,14 @@ export default function AttendanceReviewDashboard({
                                     />
                                 </label>
 
-                                <div className="max-h-[min(28rem,calc(100vh-14rem))] space-y-2 overflow-y-auto overscroll-contain pr-1">
+                                <div
+                                    className={clsx(
+                                        "space-y-2 overflow-y-auto overscroll-contain pr-1",
+                                        stretchViewport
+                                            ? "min-h-0 flex-1 max-h-none"
+                                            : "max-h-[min(28rem,calc(100vh-14rem))]",
+                                    )}
+                                >
                                     {filteredRows.length === 0 ? (
                                         <div className="rounded-lg border border-dashed border-slate-200 bg-white px-4 py-10 text-center text-sm text-slate-600">
                                             No matches. Try{" "}
@@ -520,116 +682,218 @@ export default function AttendanceReviewDashboard({
                                         })
                                     )}
                                 </div>
-                            </>
+                            </div>
                         )}
                     </div>
 
-                    <div className={clsx("lg:col-span-8", isPartner ? "space-y-4" : "space-y-3")}>
+                    <div
+                        className={clsx(
+                            stretchViewport ? "flex min-h-0 flex-col lg:col-span-9" : "lg:col-span-8",
+                            isPartner ? "space-y-4" : "space-y-3",
+                            stretchViewport && "max-h-[calc(100dvh-11rem)]",
+                        )}
+                    >
                         {selected ? (
-                            <>
+                            <div className={clsx(stretchViewport && "flex min-h-0 flex-1 flex-col gap-3")}>
                                 {isPartner ? (
-                                    <div className="grid gap-4 lg:grid-cols-3">
-                                        <div className="flex gap-4 rounded-xl border border-slate-200/90 bg-white p-4 shadow-sm lg:flex-col lg:gap-3">
+                                    <div className={clsx("flex shrink-0 flex-col gap-4", stretchViewport && "gap-3")}>
+                                        <div className="flex items-start gap-5 rounded-xl border border-slate-200/90 bg-white p-5 shadow-sm sm:gap-6">
                                             <div
                                                 className={clsx(
-                                                    "flex h-12 w-12 shrink-0 items-center justify-center rounded-xl lg:h-14 lg:w-14",
+                                                    "flex h-14 w-14 shrink-0 items-center justify-center rounded-xl sm:h-[4.25rem] sm:w-[4.25rem]",
                                                     accentSoftBg,
                                                 )}
                                             >
-                                                <BookOpen className={clsx("h-6 w-6 lg:h-7 lg:w-7", accent)} aria-hidden />
+                                                <BookOpen className={clsx("h-7 w-7 sm:h-8 sm:w-8", accent)} aria-hidden />
                                             </div>
                                             <div className="min-w-0 flex-1">
-                                                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                                    Selected project
-                                                </p>
-                                                <p className="mt-1 text-sm font-bold leading-snug text-slate-900 sm:text-base">
+                                                <p className="text-lg font-bold leading-snug text-slate-900 md:text-xl">
                                                     {selected.title}
+                                                </p>
+                                                <p className="mt-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                                    Selected project
                                                 </p>
                                                 {selected.subtitle ? (
                                                     <p className="mt-2 text-xs text-slate-600 sm:text-sm">{selected.subtitle}</p>
                                                 ) : null}
+                                                <p className="mt-2 text-[11px] font-medium uppercase tracking-wide text-slate-400">
+                                                    OPP-{oppIdTail}
+                                                </p>
                                             </div>
                                         </div>
-                                        <div className="flex gap-4 rounded-xl border border-slate-200/90 bg-white p-4 shadow-sm lg:flex-col lg:gap-3">
+
+                                        <div className={clsx("grid gap-4 lg:grid-cols-2", stretchViewport && "gap-3 lg:gap-4")}>
+                                            <div className="flex gap-4 rounded-xl border border-slate-200/90 bg-white p-4 shadow-sm sm:p-5">
+                                                <div
+                                                    className={clsx(
+                                                        "flex h-12 w-12 shrink-0 items-center justify-center rounded-xl sm:h-14 sm:w-14",
+                                                        accentSoftBg,
+                                                    )}
+                                                >
+                                                    <Users className={clsx("h-6 w-6 sm:h-7 sm:w-7", accent)} aria-hidden />
+                                                </div>
+                                                <div className="min-w-0 flex-1">
+                                                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                                        Selected team
+                                                    </p>
+                                                    {partnerTeamsLoading ? (
+                                                        <div className="mt-3 flex items-center gap-2 text-sm text-slate-500">
+                                                            <Loader2
+                                                                className={clsx("h-5 w-5 shrink-0 animate-spin", accent)}
+                                                                aria-hidden
+                                                            />
+                                                            Loading teams…
+                                                        </div>
+                                                    ) : partnerTeamBuckets.length === 0 ? (
+                                                        <>
+                                                            <p className="mt-1 text-sm font-bold leading-snug text-slate-900 sm:text-base">
+                                                                All cohorts
+                                                            </p>
+                                                            <p className="mt-2 text-xs text-slate-600">
+                                                                No separate team registrations found — pending rows are shown
+                                                                together.
+                                                            </p>
+                                                        </>
+                                                    ) : (
+                                                        <div
+                                                            className={clsx(
+                                                                "mt-3 max-h-[10.5rem] space-y-2 overflow-y-auto pr-0.5",
+                                                                stretchViewport && "max-h-36 sm:max-h-44",
+                                                            )}
+                                                        >
+                                                            {partnerTeamBuckets.map((b) => {
+                                                                const sel = selectedTeamKey === b.key;
+                                                                return (
+                                                                    <button
+                                                                        key={b.key}
+                                                                        type="button"
+                                                                        onClick={() => setSelectedTeamKey(b.key)}
+                                                                        className={clsx(
+                                                                            "flex w-full items-start justify-between gap-2 rounded-[10px] border px-3 py-2.5 text-left text-sm transition",
+                                                                            sel
+                                                                                ? clsx(
+                                                                                      "border-[#0056B3]/40 bg-[#0056B3]/[0.08] ring-2",
+                                                                                      accentRing,
+                                                                                      "ring-offset-1 ring-offset-white",
+                                                                                  )
+                                                                                : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/80",
+                                                                        )}
+                                                                    >
+                                                                        <span className="min-w-0">
+                                                                            <span className="block truncate font-semibold text-slate-900">
+                                                                                {b.label}
+                                                                            </span>
+                                                                            {b.subtitle ? (
+                                                                                <span className="mt-0.5 block truncate text-xs text-slate-500">
+                                                                                    {b.subtitle}
+                                                                                </span>
+                                                                            ) : null}
+                                                                        </span>
+                                                                        {sel ? (
+                                                                            <Check
+                                                                                className={clsx("h-4 w-4 shrink-0", accent)}
+                                                                                aria-hidden
+                                                                            />
+                                                                        ) : (
+                                                                            <span
+                                                                                className="h-4 w-4 shrink-0 rounded-full border-2 border-slate-300"
+                                                                                aria-hidden
+                                                                            />
+                                                                        )}
+                                                                    </button>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    )}
+                                                    {selectedTeamBucket && partnerTeamIdLabel(selectedTeamBucket.key) ? (
+                                                        <p className="mt-3 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                                                            Team ID: {partnerTeamIdLabel(selectedTeamBucket.key)}
+                                                        </p>
+                                                    ) : null}
+                                                </div>
+                                            </div>
+
                                             <div
                                                 className={clsx(
-                                                    "flex h-12 w-12 shrink-0 items-center justify-center rounded-xl lg:h-14 lg:w-14",
-                                                    accentSoftBg,
+                                                    "flex flex-col rounded-xl border border-slate-200/90 bg-white p-4 shadow-sm sm:p-5",
+                                                    stretchViewport ? "min-h-[11rem]" : "min-h-[12rem]",
                                                 )}
                                             >
-                                                <Users className={clsx("h-6 w-6 lg:h-7 lg:w-7", accent)} aria-hidden />
-                                            </div>
-                                            <div className="min-w-0 flex-1">
                                                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                                    Selected team
+                                                    Group members ({partnerRoster.length})
                                                 </p>
-                                                <p className="mt-1 text-sm font-bold leading-snug text-slate-900 sm:text-base">
-                                                    {selected.subtitle?.trim() || "Partner organization queue"}
-                                                </p>
-                                                <p className="mt-2 text-xs font-medium text-slate-600">
-                                                    Team ID: OPP-{oppIdTail}
-                                                </p>
-                                            </div>
-                                        </div>
-                                        <div className="flex min-h-[12rem] flex-col rounded-xl border border-slate-200/90 bg-white p-4 shadow-sm">
-                                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                                Group members ({partnerRoster.length})
-                                            </p>
-                                            <div className="mt-3 max-h-56 flex-1 space-y-2 overflow-y-auto pr-0.5">
-                                                {partnerRoster.length === 0 ? (
-                                                    <p className="text-sm text-slate-500">
-                                                        {partnerQueueRows === 0
-                                                            ? "Load the pending queue to see participants from submitted sessions."
-                                                            : "No named participants in this queue."}
-                                                    </p>
-                                                ) : (
-                                                    partnerRoster.map((m) => {
-                                                        const sel = selectedParticipantKey === m.key;
-                                                        return (
-                                                            <button
-                                                                key={m.key}
-                                                                type="button"
-                                                                onClick={() => setSelectedParticipantKey(m.key)}
-                                                                className={clsx(
-                                                                    "flex w-full items-center justify-between gap-2 rounded-[10px] border px-3 py-2.5 text-left text-sm transition",
-                                                                    sel
-                                                                        ? clsx(
-                                                                              "border-[#0056B3]/40 bg-[#0056B3]/[0.08] ring-2",
-                                                                              accentRing,
-                                                                              "ring-offset-1 ring-offset-white",
-                                                                          )
-                                                                        : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/80",
-                                                                )}
-                                                            >
-                                                                <span className="min-w-0">
-                                                                    <span className="block truncate font-semibold text-slate-900">
-                                                                        {m.name}
-                                                                    </span>
-                                                                    {m.subtitle ? (
-                                                                        <span className="mt-0.5 block truncate text-xs text-slate-500">
-                                                                            {m.subtitle}
+                                                <div className="mt-3 min-h-[6rem] max-h-56 flex-1 space-y-2 overflow-y-auto pr-0.5">
+                                                    {partnerRoster.length === 0 ? (
+                                                        <p className="text-sm text-slate-500">
+                                                            {selectedTeamKey === PARTNER_ATTENDANCE_AWAIT_TEAM
+                                                                ? "Select a team to list members with pending sessions for that cohort."
+                                                                : partnerQueueRows === 0
+                                                                  ? "No pending rows for this filter yet. Refresh after students submit attendance."
+                                                                  : "No named participants in this filtered queue."}
+                                                        </p>
+                                                    ) : (
+                                                        partnerRoster.map((m) => {
+                                                            const sel = selectedParticipantKey === m.key;
+                                                            const { initials, avatarClass } = partnerMemberAvatar(
+                                                                m.name,
+                                                                m.key,
+                                                            );
+                                                            return (
+                                                                <button
+                                                                    key={m.key}
+                                                                    type="button"
+                                                                    onClick={() => setSelectedParticipantKey(m.key)}
+                                                                    className={clsx(
+                                                                        "flex w-full items-center justify-between gap-2 rounded-[10px] border px-3 py-2.5 text-left text-sm transition",
+                                                                        sel
+                                                                            ? clsx(
+                                                                                  "border-[#0056B3]/40 bg-[#0056B3]/[0.08] ring-2",
+                                                                                  accentRing,
+                                                                                  "ring-offset-1 ring-offset-white",
+                                                                              )
+                                                                            : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/80",
+                                                                    )}
+                                                                >
+                                                                    <span className="flex min-w-0 items-center gap-3">
+                                                                        <span
+                                                                            className={clsx(
+                                                                                "flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white shadow-inner",
+                                                                                avatarClass,
+                                                                            )}
+                                                                        >
+                                                                            {initials}
                                                                         </span>
-                                                                    ) : null}
-                                                                </span>
-                                                                {sel ? (
-                                                                    <Check
-                                                                        className={clsx("h-4 w-4 shrink-0", accent)}
-                                                                        aria-hidden
-                                                                    />
-                                                                ) : (
-                                                                    <span
-                                                                        className="h-4 w-4 shrink-0 rounded-full border-2 border-slate-300"
-                                                                        aria-hidden
-                                                                    />
-                                                                )}
-                                                            </button>
-                                                        );
-                                                    })
-                                                )}
+                                                                        <span className="min-w-0">
+                                                                            <span className="block truncate font-semibold text-slate-900">
+                                                                                {m.name}
+                                                                            </span>
+                                                                            {m.subtitle ? (
+                                                                                <span className="mt-0.5 block truncate text-xs text-slate-500">
+                                                                                    {m.subtitle}
+                                                                                </span>
+                                                                            ) : null}
+                                                                        </span>
+                                                                    </span>
+                                                                    {sel ? (
+                                                                        <Check
+                                                                            className={clsx("h-4 w-4 shrink-0", accent)}
+                                                                            aria-hidden
+                                                                        />
+                                                                    ) : (
+                                                                        <span
+                                                                            className="h-4 w-4 shrink-0 rounded-full border-2 border-slate-300"
+                                                                            aria-hidden
+                                                                        />
+                                                                    )}
+                                                                </button>
+                                                            );
+                                                        })
+                                                    )}
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
-                                ) : (
+                                ) : stretchViewport ? null : (
                                     <p className="text-sm text-slate-600">
                                         <span className="font-medium text-slate-900">{selected.title}</span>
                                         {selected.subtitle ? (
@@ -637,17 +901,21 @@ export default function AttendanceReviewDashboard({
                                         ) : null}
                                     </p>
                                 )}
-                                <AttendancePendingQueuePanel
-                                    projectId={projectId}
-                                    title={queueTitle}
-                                    description={queueDescription}
-                                    autoLoadOnProjectIdChange
-                                    onPendingCountChanged={onQueuePendingCountChanged}
-                                    presentation={isPartner ? "partner" : "default"}
-                                    onPartnerQueueSnapshot={isPartner ? handlePartnerQueueSnapshot : undefined}
-                                    partnerSelectedMemberKey={isPartner ? selectedParticipantKey : undefined}
-                                />
-                            </>
+                                <div className={clsx(isPartner && stretchViewport && "flex min-h-0 flex-1 flex-col")}>
+                                    <AttendancePendingQueuePanel
+                                        projectId={projectId}
+                                        title={queueTitle}
+                                        description={queueDescription}
+                                        autoLoadOnProjectIdChange
+                                        onPendingCountChanged={onQueuePendingCountChanged}
+                                        presentation={isPartner ? "partner" : "default"}
+                                        onPartnerQueueSnapshot={isPartner ? handlePartnerQueueSnapshot : undefined}
+                                        partnerSelectedMemberKey={isPartner ? selectedParticipantKey : undefined}
+                                        partnerScopedTeamFilter={isPartner ? selectedTeamKey : undefined}
+                                        scrollTableInPanel={stretchViewport}
+                                    />
+                                </div>
+                            </div>
                         ) : (
                             <div
                                 className={clsx(

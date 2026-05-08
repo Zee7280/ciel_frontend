@@ -40,6 +40,8 @@ import { readPersistedCiiSnapshot } from "@/utils/reportCiiSnapshot";
 import { applyEngagementTeamScopeToReport } from "@/utils/reportTeamScope";
 import { getReportProjectContextDisplay } from "@/utils/reportProjectContext";
 import { VERIFY_DOSSIER_FIELD_GRID } from "@/utils/verifyDossierFieldGrid";
+import { formatSection7PakistanDialForDisplay } from "@/utils/reportSection7PakistanDial";
+import { buildSection1ParticipationDisplay, resolveReportAuthorParticipationSnapshot } from "@/utils/reportSection1ParticipationDisplay";
 
 function normalizeAuditMeta(raw: unknown, summaryText: string): ReportCIIauditMeta | null {
     const fallback = summaryText ? parseSection11AuditSummary(summaryText) : null;
@@ -120,6 +122,7 @@ interface ReportDetail {
     id: string;
     project_id?: string;
     student: {
+        id?: string;
         name: string;
         email: string;
         university: string;
@@ -541,6 +544,28 @@ export default function AdminReportDetailPage() {
             return null;
         }
     }, [report]);
+
+    const section1ParticipationDisplay = useMemo(() => {
+        if (!report?.section1) return null;
+        const reqH =
+            typeof report.required_hours === "number" && report.required_hours > 0
+                ? report.required_hours
+                : typeof report.opportunity?.hours === "number" && report.opportunity.hours > 0
+                  ? report.opportunity.hours
+                  : 16;
+        return buildSection1ParticipationDisplay({
+            section1: report.section1,
+            requiredHours: reqH,
+            reportForFaculty: report,
+            projectData: report.opportunity,
+        });
+    }, [report]);
+
+    const reportAuthorParticipation = useMemo(() => {
+        if (!report?.section1) return null;
+        return resolveReportAuthorParticipationSnapshot(report.section1, report.student);
+    }, [report]);
+
     const evidenceFiles = useMemo(() => collectAdminEvidenceFiles(report), [report]);
     const sdgMappingRows = useMemo(
         () => (report ? mergeReportSdgSnapshotRows(report, report.section3 as ReportData["section3"]) : []),
@@ -951,14 +976,52 @@ export default function AdminReportDetailPage() {
                                 <LabelValue label="Participation Type" value={report.section1?.participation_type} />
                                 <div className={VERIFY_DOSSIER_FIELD_GRID}>
                                     <LabelValue label="Privacy consent" value={report.section1?.privacy_consent} />
-                                    <LabelValue label="Faculty supervisor email" value={report.section1?.faculty_supervisor_email} />
-                                    <LabelValue label="Attendance verification status" value={report.section1?.attendance_verification_status} />
+                                    <LabelValue label="Faculty supervisor email" value={section1ParticipationDisplay?.facultySupervisorEmail || report.section1?.faculty_supervisor_email} />
+                                    <LabelValue label="Attendance verification status" value={section1ParticipationDisplay?.attendanceVerificationStatus || report.section1?.attendance_verification_status} />
                                     <LabelValue label="Attendance requested at" value={report.section1?.attendance_verification_requested_at} />
                                     <LabelValue label="Attendance verification locked" value={report.section1?.attendance_verification_locked} />
                                     <LabelValue label="Email notified" value={report.section1?.attendance_verification_email_notified} />
                                     <LabelValue label="Review checklist" value={report.section1?.review_checked} fullWidth />
                                     <LabelValue label="Verified summary" value={report.section1?.verified_summary} fullWidth />
                                 </div>
+                                {reportAuthorParticipation && !reportAuthorParticipation.isTeamLeadAuthor ? (
+                                    <div className="mt-4">
+                                        <h3 className="font-bold text-slate-800 text-sm mb-2 border-b pb-1">
+                                            Report author (filing student)
+                                        </h3>
+                                        <div className={VERIFY_DOSSIER_FIELD_GRID}>
+                                            <LabelValue label="Name" value={reportAuthorParticipation.displayName} />
+                                            <LabelValue label="CNIC" value={reportAuthorParticipation.cnic} />
+                                            <LabelValue label="Mobile" value={reportAuthorParticipation.mobile} />
+                                            <LabelValue label="University" value={reportAuthorParticipation.university} />
+                                            <LabelValue label="Program" value={reportAuthorParticipation.degreeProgramYearLine} />
+                                            <LabelValue label="Email" value={reportAuthorParticipation.email} />
+                                            <LabelValue
+                                                label="Role"
+                                                value={
+                                                    reportAuthorParticipation.memberIndex >= 0
+                                                        ? String(
+                                                              report.section1?.team_members?.[reportAuthorParticipation.memberIndex]
+                                                                  ?.role ?? "",
+                                                          )
+                                                        : ""
+                                                }
+                                            />
+                                            <LabelValue
+                                                label="Hours"
+                                                value={
+                                                    section1ParticipationDisplay && reportAuthorParticipation.memberIndex >= 0
+                                                        ? section1ParticipationDisplay.memberHoursLine(
+                                                              reportAuthorParticipation.memberIndex,
+                                                              report.section1?.team_members?.[reportAuthorParticipation.memberIndex]
+                                                                  ?.hours,
+                                                          )
+                                                        : ""
+                                                }
+                                            />
+                                        </div>
+                                    </div>
+                                ) : null}
                                 <div className="mt-4">
                                     <h3 className="font-bold text-slate-800 text-sm mb-2 border-b pb-1">Team Lead</h3>
                                     <div className={VERIFY_DOSSIER_FIELD_GRID}>
@@ -969,8 +1032,8 @@ export default function AdminReportDetailPage() {
                                         <LabelValue label="Degree" value={report.section1?.team_lead?.degree} />
                                         <LabelValue label="Year" value={report.section1?.team_lead?.year} />
                                         <LabelValue label="Email" value={report.section1?.team_lead?.email} />
-                                        <LabelValue label="Role" value={report.section1?.team_lead?.role} />
-                                        <LabelValue label="Hours" value={report.section1?.team_lead?.hours} />
+                                        <LabelValue label="Role" value={section1ParticipationDisplay?.teamLeadRole || report.section1?.team_lead?.role} />
+                                        <LabelValue label="Hours" value={section1ParticipationDisplay?.teamLeadHours || report.section1?.team_lead?.hours} />
                                         <LabelValue label="Consent" value={report.section1?.team_lead?.consent} />
                                         <LabelValue label="Verified" value={report.section1?.team_lead?.verified} />
                                     </div>
@@ -990,7 +1053,10 @@ export default function AdminReportDetailPage() {
                                                         <LabelValue label="Mobile" value={member.mobile} />
                                                         <LabelValue label="University" value={member.university} />
                                                         <LabelValue label="Program" value={member.program} />
-                                                        <LabelValue label="Hours" value={member.hours} />
+                                                        <LabelValue
+                                                            label="Hours"
+                                                            value={section1ParticipationDisplay?.memberHoursLine(index, member.hours) || member.hours}
+                                                        />
                                                         <LabelValue label="Verified" value={member.verified} />
                                                     </div>
                                                 </div>
@@ -1464,7 +1530,12 @@ export default function AdminReportDetailPage() {
                                                 {[p.pakistan_contact_name, p.pakistan_contact_number, p.pakistan_contact_email].some(Boolean) && (
                                                     <div className="mt-1.5 space-y-0.5 text-slate-600 text-xs">
                                                         {Boolean(p.pakistan_contact_name) && <div>Contact (Pakistan): {String(p.pakistan_contact_name)}</div>}
-                                                        {Boolean(p.pakistan_contact_number) && <div>Number: {String(p.pakistan_contact_number)}</div>}
+                                                        {Boolean(p.pakistan_contact_number) && (
+                                                            <div>
+                                                                Phone:{" "}
+                                                                {formatSection7PakistanDialForDisplay(p.pakistan_contact_number)}
+                                                            </div>
+                                                        )}
                                                         {Boolean(p.pakistan_contact_email) && <div>Email: {String(p.pakistan_contact_email)}</div>}
                                                     </div>
                                                 )}

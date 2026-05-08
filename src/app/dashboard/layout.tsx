@@ -1,6 +1,7 @@
 import Sidebar from "@/components/Sidebar";
 import DashboardHeader from "@/components/DashboardHeader";
 import ProfileCompletionGate from "@/components/ProfileCompletionGate";
+import FloatingSupportButton from "@/components/FloatingSupportButton";
 
 export default function DashboardLayout({
     children,
@@ -20,6 +21,9 @@ export default function DashboardLayout({
                     <ProfileCompletionGate>{children}</ProfileCompletionGate>
                 </main>
             </div>
+            
+            {/* Floating Support Button */}
+            <FloatingSupportButton />
         </div>
     );
 }

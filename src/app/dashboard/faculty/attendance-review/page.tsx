@@ -172,9 +172,9 @@ export default function FacultyAttendanceReviewPage() {
         <AttendanceReviewDashboard
             backHref="/dashboard/faculty/approvals"
             backLabel="Back to approvals"
-            eyebrow="Faculty approvals"
+            eyebrow=""
             title="Attendance review"
-            description="Review attendance sessions students log for your opportunities. Pending counts are fetched per project—the list below shows where work is waiting. Approve, reject, or flag each session in the queue; routing matches the existing CIEL reviewer rules."
+            description=""
             projects={projects}
             projectId={projectId}
             setProjectId={setProjectId}
@@ -185,7 +185,8 @@ export default function FacultyAttendanceReviewPage() {
             onRefreshCounts={refreshAllPendingCounts}
             onQueuePendingCountChanged={handlePanelPendingCount}
             queueTitle="Pending attendance"
-            queueDescription="Sessions awaiting your decision for the selected opportunity. Use Refresh after actions or if another reviewer changes the queue."
+            queueDescription=""
+            wideQueueLayout
         />
     );
 }

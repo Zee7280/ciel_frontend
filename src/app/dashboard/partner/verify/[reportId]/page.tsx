@@ -20,6 +20,8 @@ import type { ReportData } from '../../../student/report/context/ReportContext';
 import { formatSdgGoalPadded, mergeReportSdgSnapshotRows } from '../../../student/report/utils/reportSdgMerge';
 import { getReportProjectContextDisplay } from '@/utils/reportProjectContext';
 import { VERIFY_DOSSIER_FIELD_GRID } from '@/utils/verifyDossierFieldGrid';
+import { formatSection7PakistanDialForDisplay } from '@/utils/reportSection7PakistanDial';
+import { buildSection1ParticipationDisplay, resolveReportAuthorParticipationSnapshot } from '@/utils/reportSection1ParticipationDisplay';
 
 function normalizeKey(value: unknown): string {
     return String(value ?? "")
@@ -55,6 +57,7 @@ function partnerCanSubmitDecision(report: ReportDetail): boolean {
 interface ReportDetail {
     id: string;
     student: {
+        id?: string;
         name: string;
         email: string;
         university: string;
@@ -253,6 +256,28 @@ export default function ReportDetailPage() {
         const total = section4Blocks.reduce((sum, block) => sum + (parseInt(String(block.sessions_count ?? "0"), 10) || 0), 0);
         return total > 0 ? total : section4Blocks.length || undefined;
     }, [report, section4Blocks]);
+
+    const section1ParticipationDisplay = useMemo(() => {
+        if (!report?.section1) return null;
+        const reqH =
+            typeof (report as ReportDetail & { required_hours?: number }).required_hours === "number" &&
+            (report as ReportDetail & { required_hours?: number }).required_hours! > 0
+                ? (report as ReportDetail & { required_hours?: number }).required_hours!
+                : typeof report.opportunity?.hours === "number" && report.opportunity.hours > 0
+                  ? report.opportunity.hours
+                  : 16;
+        return buildSection1ParticipationDisplay({
+            section1: report.section1,
+            requiredHours: reqH,
+            reportForFaculty: report,
+            projectData: report.opportunity,
+        });
+    }, [report]);
+
+    const reportAuthorParticipation = useMemo(() => {
+        if (!report?.section1) return null;
+        return resolveReportAuthorParticipationSnapshot(report.section1, report.student);
+    }, [report]);
 
     useEffect(() => {
         fetchReportDetail();
@@ -589,14 +614,52 @@ export default function ReportDetailPage() {
                                 <LabelValue label="Participation Type" value={report.section1?.participation_type} />
                                 <div className={VERIFY_DOSSIER_FIELD_GRID}>
                                     <LabelValue label="Privacy Consent" value={report.section1?.privacy_consent} />
-                                    <LabelValue label="Faculty Supervisor Email" value={report.section1?.faculty_supervisor_email} />
-                                    <LabelValue label="Attendance Verification Status" value={report.section1?.attendance_verification_status} />
+                                    <LabelValue label="Faculty Supervisor Email" value={section1ParticipationDisplay?.facultySupervisorEmail || report.section1?.faculty_supervisor_email} />
+                                    <LabelValue label="Attendance Verification Status" value={section1ParticipationDisplay?.attendanceVerificationStatus || report.section1?.attendance_verification_status} />
                                     <LabelValue label="Attendance Requested At" value={report.section1?.attendance_verification_requested_at} />
                                     <LabelValue label="Attendance Verification Locked" value={report.section1?.attendance_verification_locked} />
                                     <LabelValue label="Email Notified" value={report.section1?.attendance_verification_email_notified} />
                                     <LabelValue label="Review Checklist" value={report.section1?.review_checked} fullWidth />
                                     <LabelValue label="Verified Summary" value={report.section1?.verified_summary} fullWidth />
                                 </div>
+                                {reportAuthorParticipation && !reportAuthorParticipation.isTeamLeadAuthor ? (
+                                    <div className="mt-4">
+                                        <h3 className="font-bold text-slate-800 text-sm mb-2 border-b pb-1">
+                                            Report author (filing student)
+                                        </h3>
+                                        <div className={VERIFY_DOSSIER_FIELD_GRID}>
+                                            <LabelValue label="Name" value={reportAuthorParticipation.displayName} />
+                                            <LabelValue label="CNIC" value={reportAuthorParticipation.cnic} />
+                                            <LabelValue label="Mobile" value={reportAuthorParticipation.mobile} />
+                                            <LabelValue label="University" value={reportAuthorParticipation.university} />
+                                            <LabelValue label="Program" value={reportAuthorParticipation.degreeProgramYearLine} />
+                                            <LabelValue label="Email" value={reportAuthorParticipation.email} />
+                                            <LabelValue
+                                                label="Role"
+                                                value={
+                                                    reportAuthorParticipation.memberIndex >= 0
+                                                        ? String(
+                                                              report.section1?.team_members?.[reportAuthorParticipation.memberIndex]
+                                                                  ?.role ?? "",
+                                                          )
+                                                        : ""
+                                                }
+                                            />
+                                            <LabelValue
+                                                label="Hours"
+                                                value={
+                                                    section1ParticipationDisplay && reportAuthorParticipation.memberIndex >= 0
+                                                        ? section1ParticipationDisplay.memberHoursLine(
+                                                              reportAuthorParticipation.memberIndex,
+                                                              report.section1?.team_members?.[reportAuthorParticipation.memberIndex]
+                                                                  ?.hours,
+                                                          )
+                                                        : ""
+                                                }
+                                            />
+                                        </div>
+                                    </div>
+                                ) : null}
                                 <div className="mt-4">
                                     <h3 className="font-bold text-slate-800 text-sm mb-2 border-b pb-1">Team Lead</h3>
                                     <div className={VERIFY_DOSSIER_FIELD_GRID}>
@@ -607,8 +670,8 @@ export default function ReportDetailPage() {
                                         <LabelValue label="Degree" value={report.section1?.team_lead?.degree} />
                                         <LabelValue label="Year" value={report.section1?.team_lead?.year} />
                                         <LabelValue label="Email" value={report.section1?.team_lead?.email} />
-                                        <LabelValue label="Role" value={report.section1?.team_lead?.role} />
-                                        <LabelValue label="Hours" value={report.section1?.team_lead?.hours} />
+                                        <LabelValue label="Role" value={section1ParticipationDisplay?.teamLeadRole || report.section1?.team_lead?.role} />
+                                        <LabelValue label="Hours" value={section1ParticipationDisplay?.teamLeadHours || report.section1?.team_lead?.hours} />
                                         <LabelValue label="Consent" value={report.section1?.team_lead?.consent} />
                                         <LabelValue label="Verified" value={report.section1?.team_lead?.verified} />
                                     </div>
@@ -628,7 +691,7 @@ export default function ReportDetailPage() {
                                                         <LabelValue label="Mobile" value={member.mobile} />
                                                         <LabelValue label="University" value={member.university} />
                                                         <LabelValue label="Program" value={member.program} />
-                                                        <LabelValue label="Hours" value={member.hours} />
+                                                        <LabelValue label="Hours" value={section1ParticipationDisplay?.memberHoursLine(index, member.hours) || member.hours} />
                                                         <LabelValue label="Verified" value={member.verified} />
                                                     </div>
                                                 </div>
@@ -1029,7 +1092,12 @@ export default function ReportDetailPage() {
                                                 {[p.pakistan_contact_name, p.pakistan_contact_number, p.pakistan_contact_email].some(Boolean) && (
                                                     <div className="mt-1 space-y-0.5 text-slate-600 text-xs">
                                                         {Boolean(p.pakistan_contact_name) && <div>Contact (Pakistan): {String(p.pakistan_contact_name)}</div>}
-                                                        {Boolean(p.pakistan_contact_number) && <div>Number: {String(p.pakistan_contact_number)}</div>}
+                                                        {Boolean(p.pakistan_contact_number) && (
+                                                            <div>
+                                                                Phone:{' '}
+                                                                {formatSection7PakistanDialForDisplay(p.pakistan_contact_number)}
+                                                            </div>
+                                                        )}
                                                         {Boolean(p.pakistan_contact_email) && <div>Email: {String(p.pakistan_contact_email)}</div>}
                                                     </div>
                                                 )}

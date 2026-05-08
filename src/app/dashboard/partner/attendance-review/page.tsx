@@ -117,9 +117,10 @@ export default function PartnerAttendanceReviewPage() {
             variant="partner"
             backHref="/dashboard/partner/requests"
             backLabel="Back to opportunities"
-            eyebrow="Partner workspace"
+            wideQueueLayout
+            eyebrow=""
             title="Attendance Verification"
-            description="Choose an opportunity, open the pending queue, then approve, reject, or request revision. Only sessions routed to your account appear."
+            description=""
             projects={projects}
             projectId={projectId}
             setProjectId={setProjectId}
@@ -130,7 +131,7 @@ export default function PartnerAttendanceReviewPage() {
             onRefreshCounts={refreshAllPendingCounts}
             onQueuePendingCountChanged={handlePanelPendingCount}
             queueTitle="Review Individual Attendance Records"
-            queueDescription="Refresh after you take action or when students submit updates."
+            queueDescription=""
         />
     );
 }

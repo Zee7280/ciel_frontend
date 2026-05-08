@@ -1,12 +1,15 @@
 import type { ReactNode } from "react";
 import { useReportForm } from "../context/ReportContext";
 import type { ReportData } from "../context/ReportContext";
-import { Award, CheckCircle } from "lucide-react";
+import { Landmark } from "lucide-react";
 import { calculateCII } from "../utils/calculateCII";
-import { calculateEngagementMetrics, buildIndividualRosterFromSection1 } from "../utils/engagementMetrics";
+import { buildIndividualRosterFromSection1, calculateEngagementMetrics } from "../utils/engagementMetrics";
+import { formatSection7PakistanDialForDisplay } from "@/utils/reportSection7PakistanDial";
+import { buildSection1ParticipationDisplay, resolveReportAuthorParticipationSnapshot } from "@/utils/reportSection1ParticipationDisplay";
 import { deriveCertificateProjectDisplay } from "../utils/certificateDisplay";
 import { parseSection11AuditSummary } from "@/lib/parseCIIauditSummary";
 import ReportVerificationQr from "@/components/ReportVerificationQr";
+import { formatDisplayId } from "@/utils/displayIds";
 import { isInstitutionallyVerifiedReport } from "@/utils/institutionalReportVerification";
 import { pickImpactVerifyUrlFromPayload } from "@/utils/reportVerificationUrl";
 import { readPersistedCiiSnapshot } from "@/utils/reportCiiSnapshot";
@@ -25,16 +28,13 @@ interface Props {
     reportData?: unknown;
 }
 
-/** Print dossier: one rhythm for navy strip + intelligence dashboard (labels / values). */
-const printDossierTone = {
-    labelMuted: "text-[10px] font-black uppercase tracking-widest text-slate-400",
-    labelOnNavy: "text-[10px] font-black uppercase tracking-widest text-white/55",
-    metricTile:
-        "flex min-h-[7.5rem] flex-col justify-center gap-2 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:min-h-[7.75rem] sm:p-6",
-    metricValue: "text-3xl font-black tabular-nums leading-none text-slate-900 sm:text-4xl",
-    engagementValue: "text-xl font-black uppercase tracking-tight text-white sm:text-2xl",
-    matrixBlurb: "text-[10px] font-medium uppercase leading-relaxed tracking-wide text-white/60",
-} as const;
+/** Section-wise academic report rhythm: compact, print-friendly blocks. */
+const dossierSectionStack = "dossier-section-stack space-y-6 md:space-y-7";
+const dossierFieldGrid = "grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-x-6 md:gap-y-5";
+const dossierSubsectionEyebrow = "text-[9px] font-black uppercase tracking-[0.18em] text-[#0F8F83]";
+const dossierMetricStrip = "grid grid-cols-2 gap-4 md:gap-5 lg:grid-cols-4";
+const dossierBodyText = "text-[13px] leading-relaxed";
+const dossierLabel = "text-[9px] font-black uppercase leading-snug tracking-[0.18em]";
 
 function getCiiCertificateBadge(score: number) {
     if (score >= 85) {
@@ -152,6 +152,73 @@ function normalizePrintAnswer(a: unknown): ReactNode {
         return text || null;
     }
     return null;
+}
+
+type PrintableFileRecord = {
+    file?: File;
+    name?: string;
+    fileName?: string;
+    filename?: string;
+    originalName?: string;
+    size?: number;
+    bytes?: number;
+    file_size?: number;
+    size_bytes?: number;
+    type?: string;
+    mimeType?: string;
+    mimetype?: string;
+    url?: string;
+    path?: string;
+};
+
+function isNativeFile(value: unknown): value is File {
+    return typeof File !== "undefined" && value instanceof File;
+}
+
+function printableFileRecord(value: unknown): PrintableFileRecord | null {
+    return value && typeof value === "object" && !Array.isArray(value) && !isNativeFile(value)
+        ? (value as PrintableFileRecord)
+        : null;
+}
+
+function printableFileName(value: unknown, index: number): string {
+    if (typeof value === "string") {
+        const last = value.split(/[/?#]/).filter(Boolean).pop();
+        return last || `Evidence file ${index + 1}`;
+    }
+    if (isNativeFile(value)) return value.name || `Evidence file ${index + 1}`;
+    const record = printableFileRecord(value);
+    return firstNonBlank(
+        record?.name,
+        record?.fileName,
+        record?.filename,
+        record?.originalName,
+        record?.file?.name,
+        `Evidence file ${index + 1}`,
+    );
+}
+
+function printableFileHref(value: unknown): string {
+    if (typeof value === "string") return /^https?:\/\//i.test(value) || value.startsWith("/") ? value : "";
+    const record = printableFileRecord(value);
+    const href = firstNonBlank(record?.url, record?.path);
+    return /^https?:\/\//i.test(href) || href.startsWith("/") ? href : "";
+}
+
+function printableFileType(value: unknown): string {
+    if (isNativeFile(value)) return value.type || "";
+    const record = printableFileRecord(value);
+    return firstNonBlank(record?.type, record?.mimeType, record?.mimetype, record?.file?.type);
+}
+
+function printableFileSize(value: unknown): string {
+    const record = printableFileRecord(value);
+    const raw = isNativeFile(value)
+        ? value.size
+        : record?.size ?? record?.bytes ?? record?.file_size ?? record?.size_bytes ?? record?.file?.size;
+    return typeof raw === "number" && Number.isFinite(raw) && raw > 0
+        ? `${(raw / (1024 * 1024)).toFixed(2)} MB`
+        : "";
 }
 
 function printObject(value: unknown): Record<string, unknown> | null {
@@ -396,6 +463,84 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
                 );
 
     const mBase = data.section1?.metrics;
+    const section1ParticipationDisplay = buildSection1ParticipationDisplay({
+        section1: data.section1,
+        requiredHours: reqH,
+        reportForFaculty: data,
+        projectData,
+    });
+    const authorParticipation = resolveReportAuthorParticipationSnapshot(data.section1, data.student);
+    const dossierLeadRoleHoursLine = [section1ParticipationDisplay.teamLeadRole, section1ParticipationDisplay.teamLeadHours]
+        .filter(Boolean)
+        .join(" · ");
+
+    const tm = data.section1?.team_members ?? [];
+    const memberAuthor = !authorParticipation.isTeamLeadAuthor && authorParticipation.memberIndex >= 0;
+    const authorMemberRow = memberAuthor ? tm[authorParticipation.memberIndex] : undefined;
+    const dossierAuthorRoleHoursLine = memberAuthor
+        ? [
+              firstNonBlank(authorMemberRow && (authorMemberRow as { role?: string }).role),
+              section1ParticipationDisplay.memberHoursLine(authorParticipation.memberIndex, authorMemberRow?.hours),
+          ]
+              .filter(Boolean)
+              .join(" · ")
+        : dossierLeadRoleHoursLine;
+
+    const dossierProfilePrefix = authorParticipation.isTeamLeadAuthor ? "Lead" : "Student author";
+    const dossierFacultyEmail = section1ParticipationDisplay.facultySupervisorEmail;
+    const dossierAttendanceVerification = section1ParticipationDisplay.attendanceVerificationStatus;
+    const allApplicantRows = (() => {
+        const rows: Array<{
+            key: string;
+            name: string;
+            contact: string;
+            institutionProgram: string;
+            role: string;
+            hoursVerified: string;
+        }> = [];
+        const seen = new Set<string>();
+        const pushRow = (row: (typeof rows)[number]) => {
+            const normalizedKey = row.key.trim().toLowerCase();
+            if (!normalizedKey || seen.has(normalizedKey)) return;
+            seen.add(normalizedKey);
+            rows.push(row);
+        };
+
+        const lead = data.section1?.team_lead;
+        const leadName = firstNonBlank(lead?.fullName, lead?.name);
+        if (leadName || firstNonBlank(lead?.email, lead?.id)) {
+            pushRow({
+                key: firstNonBlank(lead?.id, lead?.email, lead?.cnic, leadName),
+                name: leadName || "Team lead",
+                contact: [lead?.email, lead?.mobile, lead?.cnic ? `CNIC: ${lead.cnic}` : ""].filter(Boolean).join(" · "),
+                institutionProgram: [lead?.university, lead?.degree, lead?.year].filter(Boolean).join(" · "),
+                role: firstNonBlank(lead?.role, "Team lead"),
+                hoursVerified: [
+                    dossierLeadRoleHoursLine || (lead?.hours ? `${lead.hours} hours` : ""),
+                    lead?.verified === undefined ? "" : lead.verified ? "Verified" : "Unverified",
+                ].filter(Boolean).join(" · "),
+            });
+        }
+
+        tm.forEach((m, i) => {
+            const ext = m as ReportData["section1"]["team_members"][number] & { email?: string; participantId?: string };
+            const name = firstNonBlank(m.fullName, m.name);
+            pushRow({
+                key: firstNonBlank(m.id, ext.participantId, ext.email, m.cnic, name),
+                name: name || `Applicant ${i + 1}`,
+                contact: [ext.email, m.mobile, m.cnic ? `CNIC: ${m.cnic}` : ""].filter(Boolean).join(" · "),
+                institutionProgram: [m.university, m.program].filter(Boolean).join(" · "),
+                role: firstNonBlank((m as { role?: string }).role, "Team member"),
+                hoursVerified: [
+                    section1ParticipationDisplay.memberHoursLine(i, m.hours),
+                    m.verified === undefined ? "" : m.verified ? "Verified" : "Unverified",
+                ].filter(Boolean).join(" · "),
+            });
+        });
+
+        return rows;
+    })();
+
     const engagementSpanForPrint =
         mBase?.engagement_span && mBase.engagement_span > 0
             ? mBase.engagement_span
@@ -549,21 +694,95 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
     const resolvedVerifyUrl = pickImpactVerifyUrlFromPayload(reportRow);
     const showVerificationQr = Boolean(resolvedVerifyUrl) && isInstitutionallyVerifiedReport(reportRow);
 
+    const dossierPayloadRoot = data as ReportData & Record<string, unknown>;
+    const apiStudentRecord =
+        dossierPayloadRoot.student &&
+        typeof dossierPayloadRoot.student === "object" &&
+        !Array.isArray(dossierPayloadRoot.student)
+            ? (dossierPayloadRoot.student as Record<string, unknown>)
+            : null;
+    const printHeaderUniversity = firstNonBlank(
+        authorParticipation.university,
+        apiStudentRecord?.university,
+        data.section1?.team_lead?.university,
+    );
+    const printHeaderDepartment = firstNonBlank(data.section2?.discipline);
+    const submissionDateRaw = firstNonBlank(dossierPayloadRoot.submission_date, dossierPayloadRoot.submissionDate);
+    const submissionDateMs = submissionDateRaw ? Date.parse(submissionDateRaw) : NaN;
+    const printHeaderSubmissionDate =
+        submissionDateRaw && Number.isFinite(submissionDateMs)
+            ? new Date(submissionDateMs).toLocaleDateString("en-GB", {
+              day: "numeric",
+              month: "short",
+              year: "numeric",
+          })
+            : submissionDateRaw || "—";
+    const printHeaderReportIdSource = firstNonBlank(data.report_id, data.id, data.project_id);
+    const printHeaderReportIdDisplay = printHeaderReportIdSource
+        ? formatDisplayId(printHeaderReportIdSource, "CPK")
+        : "—";
+
+    /** Dossier / print masthead accent (aligned with institutional report reference). */
+    const hdrInk = "#0056B3";
+    const sectionInk = "#071A33";
+    const tealInk = "#0F8F83";
+    const scorePercent = (score: number, max: number) => Math.round((score / max) * 100);
+    const finalScoreLevel =
+        totalScore >= 85
+            ? "Impact Contributor"
+            : totalScore >= 70
+              ? "Strong Impact Contributor"
+              : totalScore >= 55
+                ? "Developing Impact Contributor"
+                : totalScore >= 40
+                  ? "Emerging Community Contributor"
+                  : "Foundation Stage Contributor";
+    const finalScoreNarrative =
+        totalScore >= 85
+            ? "The student has demonstrated strong commitment, consistent engagement, quality reporting, and meaningful community contribution through verified experiential learning."
+            : totalScore >= 70
+              ? "The student has demonstrated credible community contribution with structured evidence and clear learning outcomes."
+              : "The student report documents emerging community contribution with opportunities for stronger evidence, continuity, and outcome measurement.";
+    const finalReportCardRows = [
+        {
+            label: "Engagement & Participation",
+            score: scorePercent(breakdown.participation, 10),
+            note: "Attendance, active role, and meaningful participation.",
+        },
+        {
+            label: "Quality of Work & Outputs",
+            score: scorePercent(breakdown.outputs, 15),
+            note: "Output scale and implementation structure.",
+        },
+        {
+            label: "Impact & Outcomes",
+            score: scorePercent(breakdown.outcomes, 20),
+            note: "Observed change and measurable community benefit.",
+        },
+        {
+            label: "Compliance & Professionalism",
+            score: scorePercent(breakdown.evidence, 12),
+            note: "Verification, ethics, and professional reporting standards.",
+        },
+    ];
+
     const SectionHeader = ({ title, number, question }: { title: string; number: number; question?: string }) => (
-        <div className="dossier-section-header mt-14 mb-8 first:mt-0 border-b-2 border-slate-900 pb-4 break-inside-avoid">
-            <div className="flex items-start gap-4">
-                <span className="mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-slate-900 text-sm font-black text-white shadow-md">
-                    {number}
+        <div className="dossier-section-header mt-12 mb-6 break-inside-avoid rounded-t-xl border-b-4 pb-0 first:mt-0 md:mt-14" style={{ borderBottomColor: sectionInk }}>
+            <div className="flex items-center gap-3 rounded-t-xl px-5 py-3 text-white md:px-6" style={{ backgroundColor: sectionInk }}>
+                <span className="flex h-7 min-w-10 shrink-0 items-center justify-center rounded bg-white/15 px-2 text-[10px] font-black tabular-nums tracking-widest">
+                    {String(number).padStart(2, "0")}
                 </span>
-                <div className="min-w-0 flex-1 space-y-2">
-                    <h2 className="report-h3 text-xl font-black tracking-tight text-slate-900 sm:!text-2xl">{title}</h2>
-                    {question ? (
-                        <p className="text-[10px] font-bold uppercase leading-relaxed tracking-widest text-slate-500">
-                            {question}
-                        </p>
-                    ) : null}
+                <div className="min-w-0 flex-1">
+                    <h2 className="report-h3 text-[13px] font-black uppercase tracking-[0.18em] text-white sm:text-sm">
+                        Section {number}: {title}
+                    </h2>
                 </div>
             </div>
+            {question ? (
+                <p className="border-x border-b border-slate-200 bg-slate-50/80 px-5 py-2.5 text-[10px] font-semibold leading-relaxed text-slate-600 md:px-6">
+                    {question}
+                </p>
+            ) : null}
         </div>
     );
 
@@ -574,15 +793,13 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
             normalized === undefined ||
             (typeof normalized === "string" && normalized.trim() === "");
         return (
-            <div
-                className={`dossier-qa flex min-h-0 flex-col ${fullWidth ? "md:col-span-2" : ""} break-inside-avoid`}
-            >
-                <span className="mb-2 text-[9px] font-black uppercase leading-relaxed tracking-[0.2em] text-slate-400">
+            <div className={`dossier-qa flex min-h-0 flex-col ${fullWidth ? "md:col-span-2" : ""} break-inside-avoid`}>
+                <span className={`mb-2 ${dossierLabel} text-slate-500`}>
                     {q}
                 </span>
-                <div className="flex min-h-[4.5rem] flex-1 flex-col rounded-xl border border-slate-200 bg-slate-50/90 px-4 py-3 shadow-sm">
+                <div className="flex min-h-[3.5rem] flex-1 flex-col rounded-xl border border-slate-200/80 bg-white px-4 py-3 shadow-sm transition-shadow duration-200 hover:shadow-md">
                     <div
-                        className={`text-[13px] font-semibold leading-relaxed text-slate-900 ${fullWidth ? "text-left sm:text-justify" : ""}`}
+                        className={`${dossierBodyText} font-medium text-slate-800 ${fullWidth ? "text-left sm:text-justify" : ""}`}
                     >
                         {showPending ? (
                             <span className="font-medium italic text-slate-400">Pending verification / not provided</span>
@@ -595,12 +812,69 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
         );
     };
 
+    const FileListQA = ({ q, files, fullWidth = false }: { q: string; files: unknown; fullWidth?: boolean }) => {
+        const items = (Array.isArray(files) ? files : files ? [files] : []).filter((item) => {
+            if (item === null || item === undefined) return false;
+            if (typeof item === "string") return item.trim().length > 0;
+            return true;
+        });
+
+        return (
+            <div className={`dossier-qa flex min-h-0 flex-col ${fullWidth ? "md:col-span-2" : ""} break-inside-avoid`}>
+                <span className={`mb-2 ${dossierLabel} text-slate-500`}>
+                    {q}
+                </span>
+                <div className="flex min-h-[3.5rem] flex-1 flex-col rounded-xl border border-slate-200/80 bg-white px-4 py-3 shadow-sm transition-shadow duration-200 hover:shadow-md">
+                    {items.length === 0 ? (
+                        <span className={`${dossierBodyText} font-medium italic text-slate-400`}>
+                            Pending verification / not provided
+                        </span>
+                    ) : (
+                        <div className="space-y-2.5">
+                            {items.map((item, index) => {
+                                const name = printableFileName(item, index);
+                                const href = printableFileHref(item);
+                                const meta = [printableFileSize(item), printableFileType(item)]
+                                    .filter(Boolean)
+                                    .join(" · ");
+                                return (
+                                    <div
+                                        key={`${name}-${index}`}
+                                        className="rounded-xl border border-slate-100 bg-slate-50/80 px-3.5 py-2.5 transition-colors duration-200 hover:bg-slate-100/80"
+                                    >
+                                        {href ? (
+                                            <a
+                                                href={href}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="break-words text-[13px] font-bold leading-snug text-[#0F8F83] underline decoration-[#0F8F83]/30 underline-offset-2 transition-colors duration-200 hover:text-[#0d7a70] focus-visible:ring-2 focus-visible:ring-[#0F8F83] focus-visible:ring-offset-2 focus-visible:outline-none rounded"
+                                            >
+                                                {name}
+                                            </a>
+                                        ) : (
+                                            <p className="break-words text-[13px] font-bold leading-snug text-slate-800">{name}</p>
+                                        )}
+                                        {meta ? (
+                                            <p className={`mt-1.5 ${dossierLabel} text-slate-500`}>
+                                                {meta}
+                                            </p>
+                                        ) : null}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
+            </div>
+        );
+    };
+
     const BlueprintCard = ({ row }: { row: PrintableBlueprintRow }) => (
-        <div className={`min-w-0 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm ${row.fullWidth ? "md:col-span-2" : ""}`}>
-            <p className="mb-2 text-[9px] font-black uppercase leading-relaxed tracking-[0.18em] text-slate-400">
+        <div className={`min-w-0 rounded-xl border border-slate-200/80 bg-white px-4 py-3 shadow-sm transition-shadow duration-200 hover:shadow-md ${row.fullWidth ? "md:col-span-2" : ""}`}>
+            <p className={`mb-2 ${dossierLabel} text-slate-500`}>
                 {row.label}
             </p>
-            <p className="whitespace-pre-wrap break-words text-[13px] font-semibold leading-relaxed text-slate-900">
+            <p className={`whitespace-pre-wrap break-words ${dossierBodyText} font-medium text-slate-800`}>
                 {row.value}
             </p>
         </div>
@@ -621,75 +895,269 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
     const formatCiiScore = (score: number) => Number.isInteger(score) ? String(score) : score.toFixed(1);
 
     return (
-        <div className="dossier-root group relative mx-auto max-w-4xl bg-white px-4 py-6 font-sans text-slate-900 sm:px-8 sm:py-10 print:max-w-none print:p-0">
+        <div className="dossier-root group relative mx-auto max-w-5xl bg-white px-4 py-6 font-sans text-slate-900 sm:px-8 sm:py-10 print:max-w-none print:p-0">
             <style dangerouslySetInnerHTML={{
                 __html: `
                 @media print {
                     @page { margin: 1cm; size: A4; }
                     body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-                    .print-container { width: 100% !important; margin: 0 !important; padding: 0 0.5cm !important; box-sizing: border-box; }
+                    .print-container { width: 100% !important; margin: 0 !important; padding: 0 !important; box-sizing: border-box; }
+                    .report-print-masthead {
+                        position: relative !important;
+                        top: auto !important;
+                        left: auto !important;
+                        right: auto !important;
+                        min-height: 0 !important;
+                        max-height: none !important;
+                        overflow: visible !important;
+                        z-index: auto !important;
+                        background: #fff !important;
+                    }
+                    .report-header-grid {
+                        display: grid !important;
+                        grid-template-columns: 4.25cm 1fr 3.1cm !important;
+                        gap: 0.45cm !important;
+                        align-items: start !important;
+                    }
+                    .report-header-brand {
+                        min-height: 1.55cm !important;
+                        display: flex !important;
+                        flex-direction: row !important;
+                        align-items: center !important;
+                        gap: 0.28cm !important;
+                        border-right: 1px solid #e2e8f0 !important;
+                        padding-right: 0.35cm !important;
+                    }
+                    .report-header-brand img {
+                        width: 0.82cm !important;
+                        height: 0.82cm !important;
+                    }
+                    .report-header-brand-title {
+                        font-size: 14px !important;
+                        line-height: 1 !important;
+                        letter-spacing: 0.03em !important;
+                    }
+                    .report-header-brand-tagline {
+                        margin-top: 0.12cm !important;
+                        max-width: 3.2cm !important;
+                        font-size: 7px !important;
+                        line-height: 1.25 !important;
+                    }
+                    .report-header-main {
+                        padding-top: 0.02cm !important;
+                    }
+                    .report-header-title {
+                        font-size: 14px !important;
+                        line-height: 1.12 !important;
+                        white-space: nowrap !important;
+                    }
+                    .report-header-subtitle {
+                        margin-top: 0.12cm !important;
+                        font-size: 8px !important;
+                        line-height: 1.25 !important;
+                    }
+                    .report-header-institution {
+                        margin-top: 0.28cm !important;
+                        gap: 0.15cm !important;
+                    }
+                    .report-header-institution svg {
+                        width: 0.34cm !important;
+                        height: 0.34cm !important;
+                    }
+                    .report-header-university {
+                        font-size: 8px !important;
+                        line-height: 1.2 !important;
+                    }
+                    .report-header-department {
+                        margin-top: 0.05cm !important;
+                        font-size: 7px !important;
+                        line-height: 1.2 !important;
+                    }
+                    .report-header-meta {
+                        display: flex !important;
+                        flex-direction: column !important;
+                        align-items: flex-end !important;
+                        gap: 0.16cm !important;
+                        border-top: 0 !important;
+                        padding-top: 0 !important;
+                    }
+                    .report-header-meta > div:first-child {
+                        justify-content: flex-end !important;
+                    }
+                    .report-header-meta > div:first-child > div {
+                        padding: 0.08cm !important;
+                    }
+                    .report-header-meta svg {
+                        width: 1.25cm !important;
+                        height: 1.25cm !important;
+                    }
+                    .report-header-meta-text {
+                        font-size: 7px !important;
+                        line-height: 1.2 !important;
+                        text-align: right !important;
+                    }
+                    .report-cover-page { break-after: auto !important; page-break-after: auto !important; }
+                    .dossier-section-header { margin-top: 1rem !important; }
                     .break-inside-avoid { page-break-inside: avoid !important; break-inside: avoid !important; }
                     .bg-slate-900 { background-color: #0f172a !important; }
                     .bg-slate-50 { background-color: #f8fafc !important; }
+                    .bg-\\[\\#0056B3\\] { background-color: #0056b3 !important; }
                     .text-slate-900 { color: #0f172a !important; }
                     .text-slate-400 { color: #94a3b8 !important; }
                     .text-slate-500 { color: #64748b !important; }
                     .border-slate-900 { border-color: #0f172a !important; }
                     .border-slate-200 { border-color: #e2e8f0 !important; }
+                    .border-\\[\\#0056B3\\] { border-color: #0056b3 !important; }
+                    .text-\\[\\#0056B3\\] { color: #0056b3 !important; }
+                    .text-teal-600 { color: #0d9488 !important; }
+                    table { page-break-inside: auto; break-inside: auto; }
+                    tr { page-break-inside: avoid; break-inside: avoid; }
                 }
             `}} />
 
             <div className="print-container bg-white">
-                {/* Header — aligned with certificate tone */}
-                <header className="mb-12 flex flex-col gap-10 border-b-8 border-slate-900 pb-10 sm:flex-row sm:items-start sm:justify-between sm:gap-8 print:mb-8 print:pb-8">
-                    <div className="flex min-w-0 flex-1 flex-col gap-6 sm:max-w-[55%]">
-                        <img
-                            src="/iel-pk-logo.png"
-                            alt="IEL PK"
-                            className="h-12 w-12 shrink-0 object-contain sm:h-14 sm:w-14 print:h-12 print:w-12"
-                            width={256}
-                            height={256}
-                        />
-                        <div>
-                            <div className="mb-3 flex items-center gap-2">
-                                <span className="h-[3px] w-10 shrink-0 bg-slate-900 print:w-8" />
-                                <span className="text-[10px] font-black uppercase tracking-[0.35em] text-slate-900 sm:text-[11px] sm:tracking-[0.45em]">
-                                    Verified impact record
-                                </span>
-                            </div>
-                            <h1 className="mb-1 text-4xl font-black uppercase leading-[0.9] tracking-tighter text-slate-900 sm:text-5xl print:text-4xl">
-                                Student dossier
-                            </h1>
-                            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
-                                Institutional documentation
+            <header className="report-print-masthead mb-8 break-inside-avoid border-b-[3px] border-[#071A33] bg-[radial-gradient(circle_at_top_left,rgba(15,143,131,0.06),transparent_34%),linear-gradient(180deg,#ffffff,#fbfdff)] pb-5 print:mb-5 print:pb-4">  <div className="report-header-grid grid grid-cols-1 gap-5 lg:grid-cols-[16rem_1fr_12rem] lg:items-start lg:gap-7">
+    
+    {/* Brand */}
+    <div className="report-header-brand flex min-h-[5.8rem] items-center gap-4 self-stretch lg:border-r lg:border-slate-200 lg:pr-7">
+      <img
+        src="/iel-pk-logo.png"
+        alt="CIEL PK Logo"
+        className="h-12 w-12 shrink-0 object-contain print:h-9 print:w-9"
+        width={256}
+        height={256}
+      />
+
+      <div className="min-w-0">
+        <p className="report-header-brand-title text-[2rem] font-black leading-none tracking-[0.08em] text-[#071A33] print:text-xl">
+          CIEL PK
+        </p>
+
+        <p className="report-header-brand-tagline mt-2 max-w-[12rem] text-[11px] font-semibold leading-snug text-[#0F8F83] print:text-[9px]">
+          Community Impact
+          <br />
+          Engagement & Learning
+        </p>
+      </div>
+    </div>
+
+    {/* Main Report Title */}
+    <div className="report-header-main min-w-0 lg:pt-1">
+      <h1 className="report-header-title text-[1.7rem] font-black leading-tight tracking-tight text-[#071A33] sm:text-[1.85rem] print:text-[1.25rem]">
+        CIEL PK Student Academic Report
+      </h1>
+
+      <p className="report-header-subtitle mt-2 text-[13px] font-medium leading-snug tracking-wide text-slate-600 print:text-[10px]">
+        Section-wise Academic Summary for Verified Community Impact
+      </p>
+
+      <div className="report-header-institution mt-5 flex items-start gap-3 print:mt-3">
+        <Landmark
+          className="mt-0.5 h-5 w-5 shrink-0 text-[#071A33] print:h-4 print:w-4"
+          aria-hidden
+        />
+
+        <div className="min-w-0">
+          <p className="report-header-university text-[13px] font-black leading-snug text-[#071A33] print:text-[10px]">
+            {printHeaderUniversity || "—"}
+          </p>
+
+          <p className="report-header-department mt-1 text-[12px] font-medium leading-snug text-slate-500 print:text-[9px]">
+            {printHeaderDepartment || "—"}
+          </p>
+        </div>
+      </div>
+    </div>
+
+    {/* QR + Report Meta */}
+    <div className="report-header-meta flex shrink-0 flex-col items-start gap-4 border-t border-slate-200 pt-5 sm:flex-row sm:items-start sm:justify-between lg:flex-col lg:items-end lg:border-t-0 lg:pt-0 print:gap-2">
+      {showVerificationQr ? (
+        <div className="flex w-full justify-start sm:justify-end">
+          <div className="rounded-lg border border-slate-300 bg-white p-2 shadow-sm print:rounded-md print:p-1.5">
+            <ReportVerificationQr
+              impactVerifyUrl={resolvedVerifyUrl ?? undefined}
+              size={78}
+              caption=""
+              className="items-end"
+            />
+          </div>
+        </div>
+      ) : null}
+
+      <div className="report-header-meta-text w-full space-y-1.5 text-left text-[11px] leading-snug sm:text-xs lg:text-right print:text-[8px]">
+        <p className="tabular-nums text-[#071A33]">
+          <span className="font-extrabold">Report ID:</span>{" "}
+          <span className="font-semibold">{printHeaderReportIdDisplay}</span>
+        </p>
+
+        <p className="text-[#071A33]">
+          <span className="font-extrabold">Submission Date:</span>{" "}
+          <span className="font-medium">{printHeaderSubmissionDate}</span>
+        </p>
+      </div>
+    </div>
+  </div>
+</header>
+                <section className="report-cover-page break-inside-avoid">
+                    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+                        <div className="border-b border-slate-200 pb-5 text-center">
+                            <p className="text-[10px] font-black uppercase tracking-[0.24em] text-[#0056B3]">
+                                Professional section-wise student report
+                            </p>
+                            <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-900 sm:text-3xl">
+                                Professional Section-wise Student Report
+                            </h2>
+                            <p className="mx-auto mt-2 max-w-2xl text-sm leading-relaxed text-slate-600">
+                                Verified academic summary for community impact engagement, experiential learning, and CIEL impact documentation.
                             </p>
                         </div>
-                    </div>
-                    <div className="flex w-full shrink-0 flex-col items-stretch gap-4 border-t border-slate-200 pt-8 text-left sm:w-[min(100%,20rem)] sm:border-t-0 sm:pt-10 sm:text-right print:w-64 print:items-end print:border-t-0 print:pt-4">
-                        <p
-                            className="text-lg font-black uppercase leading-snug tracking-tight text-slate-900 sm:text-xl print:text-base"
-                            title={dossierProjectHeadline}
-                        >
-                            {dossierProjectHeadline}
-                        </p>
-                        <div className="inline-flex items-center justify-center gap-2 self-stretch rounded-xl bg-slate-900 px-4 py-2.5 text-white sm:self-end print:self-end">
-                            <span className="text-[9px] font-black uppercase tracking-widest text-white/60">Dossier ID</span>
-                            <span className="text-[10px] font-bold uppercase tracking-widest">
-                                {data.project_id?.split("-")[0] || "CIEL"}—{new Date().getFullYear()}
-                            </span>
-                        </div>
-                        {showVerificationQr ? (
-                            <div className="mt-5 flex w-full flex-col items-center sm:items-end print:mt-4 print:items-end">
-                                <ReportVerificationQr
-                                    impactVerifyUrl={resolvedVerifyUrl ?? undefined}
-                                    size={96}
-                                    caption="Verify this dossier"
-                                    className="items-end"
-                                />
+
+                        <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-3 md:gap-5">
+                            <div className="rounded-xl border border-slate-200/80 bg-slate-50/80 p-5 shadow-sm transition-shadow duration-200 hover:shadow-md">
+                                <p className={`${dossierLabel} text-slate-500`}>Student profile</p>
+                                <p className="mt-2.5 text-base font-black text-slate-900">{authorParticipation.displayName || "—"}</p>
+                                <p className="mt-1 text-xs font-medium leading-relaxed text-slate-600">
+                                    {authorParticipation.degreeProgramYearLine || printHeaderDepartment || "Academic profile pending"}
+                                </p>
                             </div>
-                        ) : null}
+                            <div className="rounded-xl border border-slate-200/80 bg-slate-50/80 p-5 shadow-sm transition-shadow duration-200 hover:shadow-md">
+                                <p className={`${dossierLabel} text-slate-500`}>Current program</p>
+                                <p className="mt-2 text-base font-black text-slate-900">{printHeaderDepartment || "—"}</p>
+                                <p className="mt-1 text-xs font-medium leading-relaxed text-slate-600">{printHeaderUniversity || "—"}</p>
+                            </div>
+                            <div className="rounded-xl border border-slate-200/80 bg-slate-50/80 p-5 shadow-sm transition-shadow duration-200 hover:shadow-md">
+                                <p className={`${dossierLabel} text-slate-500`}>Entry to report</p>
+                                <p className="mt-2 text-base font-black text-slate-900">{printHeaderReportIdDisplay}</p>
+                                <p className="mt-1 text-xs font-medium leading-relaxed text-slate-600">Submitted {printHeaderSubmissionDate}</p>
+                            </div>
+                        </div>
+
+                        <div className="mt-6 rounded-xl border border-[#0F8F83]/20 bg-[#0F8F83]/5 p-5 shadow-sm">
+                            <p className={`${dossierLabel} text-[#0F8F83]`}>Report package</p>
+                            <p className="mt-2 text-sm font-medium leading-relaxed text-slate-700">
+                                This report packages student identity, project context, SDG mapping, operational metrics, outcomes, resources,
+                                partnerships, evidence, reflection, sustainability, and CII intelligence into a section-wise academic record.
+                            </p>
+                        </div>
+
+                        <div className="mt-5 grid grid-cols-2 gap-3 md:grid-cols-4">
+                            {[
+                                { label: "Verified hours", value: metrics.total_verified_hours, suffix: "hrs" },
+                                { label: "CII score", value: totalScore, suffix: "/100" },
+                                { label: "Compliance", value: data.section1.metrics?.hec_compliance || "—", suffix: "" },
+                                { label: "Readiness", value: isInstitutionallyVerifiedReport(reportRow) ? "Ready" : "Pending", suffix: "" },
+                            ].map((cell) => (
+                                <div key={cell.label} className="rounded-xl border border-slate-200/80 bg-white p-5 text-center shadow-sm transition-shadow duration-200 hover:shadow-md">
+                                    <p className={`${dossierLabel} text-slate-500`}>{cell.label}</p>
+                                    <p className="mt-2 text-lg font-black tabular-nums text-[#0056B3]">
+                                        {cell.value}
+                                        {cell.suffix ? <span className="ml-1 text-[10px] font-bold text-slate-500">{cell.suffix}</span> : null}
+                                    </p>
+                                </div>
+                            ))}
+                        </div>
                     </div>
-                </header>
+                </section>
 
                 {/* Section 1: Participation Profile */}
                 <SectionHeader
@@ -697,50 +1165,62 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
                     title="Participation profile"
                     question="Who participated in the project and what are their institutional credentials?"
                 />
-                <div className="grid grid-cols-1 gap-x-10 gap-y-6 md:grid-cols-2">
+                <div className={dossierSectionStack}>
+                    <div className={dossierFieldGrid}>
                     <QandA q="Participation structure" a={data.section1.participation_type === "team" ? "Team-based initiative" : "Individual project"} />
-                    <QandA q="Lead author / coordinator" a={data.section1.team_lead.fullName || data.section1.team_lead.name} />
-                    <QandA q="Host institution / university" a={data.section1.team_lead.university} />
+                    <QandA
+                        q={authorParticipation.isTeamLeadAuthor ? "Lead author / coordinator" : "Report author (team member)"}
+                        a={authorParticipation.displayName}
+                    />
+                    <QandA q="Host institution / university" a={authorParticipation.university} />
                     <QandA q="Verified total engagement" a={`${metrics.total_verified_hours} hours verified`} />
-                    <QandA q="Lead CNIC" a={data.section1.team_lead.cnic} />
-                    <QandA q="Lead mobile" a={data.section1.team_lead.mobile} />
-                    <QandA q="Lead email" a={data.section1.team_lead.email} />
-                    <QandA q="Lead degree / year" a={[data.section1.team_lead.degree, data.section1.team_lead.year].filter(Boolean).join(" · ")} />
-                    <QandA q="Lead role / hours" a={[data.section1.team_lead.role, data.section1.team_lead.hours ? `${data.section1.team_lead.hours} hours` : ""].filter(Boolean).join(" · ")} />
+                    <QandA q={`${dossierProfilePrefix} CNIC`} a={authorParticipation.cnic} />
+                    <QandA q={`${dossierProfilePrefix} mobile`} a={authorParticipation.mobile} />
+                    <QandA q={`${dossierProfilePrefix} email`} a={authorParticipation.email} />
+                    <QandA
+                        q={authorParticipation.isTeamLeadAuthor ? "Lead degree / year" : "Student author program"}
+                        a={authorParticipation.degreeProgramYearLine}
+                    />
+                    <QandA
+                        q={authorParticipation.isTeamLeadAuthor ? "Lead role / hours" : "Student author role / hours"}
+                        a={dossierAuthorRoleHoursLine}
+                    />
                     <QandA q="Privacy consent" a={data.section1.privacy_consent} />
-                    <QandA q="Faculty supervisor email" a={data.section1.faculty_supervisor_email} />
-                    <QandA q="Attendance verification status" a={data.section1.attendance_verification_status} />
+                    <QandA q="Faculty supervisor email" a={dossierFacultyEmail} />
+                    <QandA q="Attendance verification status" a={dossierAttendanceVerification} />
                     <QandA q="Verified summary" a={data.section1.verified_summary} fullWidth />
-                </div>
+                    </div>
 
-                {teamMembers.length > 0 && (
-                    <div className="mb-12 mt-4 break-inside-avoid">
-                        <span className="mb-3 block text-[9px] font-black uppercase tracking-[0.2em] text-slate-400">
-                            Team composition
-                        </span>
+                {allApplicantRows.length > 0 && (
+                    <div className="break-inside-avoid space-y-3">
+                        <p className={dossierSubsectionEyebrow}>All applicants / participant details</p>
                         <table className="w-full border-collapse overflow-hidden rounded-xl border border-slate-200 text-xs">
                             <thead>
                                 <tr className="bg-slate-900 text-[9px] font-black uppercase tracking-widest text-white">
-                                    <th className="w-[30%] px-4 py-3 text-left align-middle">Full name</th>
-                                    <th className="px-4 py-3 text-left align-middle">Institution / program</th>
-                                    <th className="px-4 py-3 text-left align-middle">Capacity / role</th>
-                                    <th className="px-4 py-3 text-left align-middle">Hours / verified</th>
+                                    <th className="w-[20%] px-3 py-3 text-left align-middle">Applicant</th>
+                                    <th className="w-[27%] px-3 py-3 text-left align-middle">Contact / ID</th>
+                                    <th className="w-[25%] px-3 py-3 text-left align-middle">Institution / program</th>
+                                    <th className="px-3 py-3 text-left align-middle">Role</th>
+                                    <th className="px-3 py-3 text-left align-middle">Hours / verified</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100 bg-white">
-                                {teamMembers.map((m: ReportData["section1"]["team_members"][number], i: number) => (
-                                    <tr key={i}>
-                                        <td className="px-4 py-3 align-top font-bold text-slate-900">
-                                            {(m as { fullName?: string }).fullName?.trim() || m.name}
+                                {allApplicantRows.map((row) => (
+                                    <tr key={row.key}>
+                                        <td className="px-3 py-3 align-top font-bold text-slate-900">
+                                            {row.name || "—"}
                                         </td>
-                                        <td className="px-4 py-3 align-top text-[10px] font-semibold leading-relaxed text-slate-600">
-                                            {[m.university, m.program].filter(Boolean).join(" · ")}
+                                        <td className="px-3 py-3 align-top text-[10px] font-semibold leading-relaxed text-slate-600">
+                                            {row.contact || "—"}
                                         </td>
-                                        <td className="px-4 py-3 align-top text-[10px] font-bold uppercase tracking-tight text-slate-600">
-                                            {(String((m as { role?: string }).role || "").trim() || "Team member")}
+                                        <td className="px-3 py-3 align-top text-[10px] font-semibold leading-relaxed text-slate-600">
+                                            {row.institutionProgram || "—"}
                                         </td>
-                                        <td className="px-4 py-3 align-top text-[10px] font-semibold text-slate-600">
-                                            {[m.hours ? `${m.hours} hours` : "", m.verified === undefined ? "" : m.verified ? "Verified" : "Unverified"].filter(Boolean).join(" · ")}
+                                        <td className="px-3 py-3 align-top text-[10px] font-bold uppercase tracking-tight text-slate-600">
+                                            {row.role || "—"}
+                                        </td>
+                                        <td className="px-3 py-3 align-top text-[10px] font-semibold text-slate-600">
+                                            {row.hoursVerified || "—"}
                                         </td>
                                     </tr>
                                 ))}
@@ -749,7 +1229,7 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
                     </div>
                 )}
 
-                <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-x-10">
+                    <div className={dossierFieldGrid}>
                     <QandA q="Engagement span" a={data.section1.metrics?.engagement_span ? `${data.section1.metrics.engagement_span} days` : ""} />
                     <QandA q="Verified session count" a={data.section1.metrics?.verified_session_count} />
                     <QandA q="Attendance frequency" a={data.section1.metrics?.attendance_frequency} />
@@ -759,6 +1239,7 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
                     <QandA q="Engagement category" a={data.section1.metrics?.engagement_category} />
                     <QandA q="Individual metrics" a={data.section1.metrics?.individual_metrics} fullWidth />
                     <QandA q="Engagement red flags" a={data.section1.metrics?.redFlags} fullWidth />
+                    </div>
                 </div>
 
                 {/* Section 2: Project Context */}
@@ -767,16 +1248,16 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
                     title="Project context"
                     question="What specific problem was addressed and how did it relate to your academic discipline?"
                 />
-                <div className="grid grid-cols-1 gap-6">
+                <div className={dossierSectionStack}>
                     {printableBlueprintRows.length > 0 ? (
-                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-x-10">
+                        <div className={dossierFieldGrid}>
                             {printableBlueprintRows.map((row) => (
                                 <BlueprintCard key={row.label} row={row} />
                             ))}
                         </div>
                     ) : null}
                     <QandA q="Core problem statement" a={data.section2.problem_statement} fullWidth />
-                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-x-10">
+                    <div className={dossierFieldGrid}>
                         <QandA q="Problem category" a={data.section2.problem_category} />
                         <QandA q="Primary beneficiary" a={data.section2.primary_beneficiary} />
                         <QandA q="Academic discipline" a={data.section2.discipline} />
@@ -788,124 +1269,159 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
                     </div>
                 </div>
 
-                {/* Section 3: SDG Impact */}
+                {/* Section 3: SDG Impact — unified subsection spacing + aligned primary row */}
                 <SectionHeader
                     number={3}
                     title="SDG impact mapping"
                     question="Which United Nations Sustainable Development Goals (SDGs) were prioritized by this project?"
                 />
-                {opportunitySdgRows.length > 0 ? (
-                    <div className="mb-8 space-y-4">
-                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">
-                            Opportunity-registered SDGs
-                        </p>
-                        <p className="text-xs font-medium leading-relaxed text-slate-600">
-                            These goals were set when the opportunity was published (partner / institution registration).
-                        </p>
-                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-x-10">
-                            {opportunitySdgRows.map((r, i) => {
-                                const secondaryIndex =
-                                    r.role === "secondary"
-                                        ? opportunitySdgRows.slice(0, i).filter((x) => x.role === "secondary").length + 1
-                                        : 0;
-                                const qLabel =
-                                    r.role === "primary"
-                                        ? "Primary SDG (opportunity)"
-                                        : `Secondary SDG (opportunity) ${secondaryIndex}`;
-                                return (
-                                    <QandA key={`opp-sdg-${r.goalNumber}-${i}`} q={qLabel} a={formatSdgRowAnswer(r)} />
-                                );
-                            })}
+                <div className={dossierSectionStack}>
+                    {opportunitySdgRows.length > 0 ? (
+                        <div className="break-inside-avoid rounded-xl border border-slate-200/80 bg-slate-50/70 p-5 shadow-sm md:p-6">
+                            <p className={dossierSubsectionEyebrow}>
+                                Opportunity-registered SDGs
+                            </p>
+                            <p className="mt-1 text-xs font-medium leading-relaxed text-slate-600">
+                                These goals were set when the opportunity was published (partner / institution registration).
+                            </p>
+                            <div className={`mt-3 ${dossierFieldGrid}`}>
+                                {opportunitySdgRows.map((r, i) => {
+                                    const secondaryIndex =
+                                        r.role === "secondary"
+                                            ? opportunitySdgRows.slice(0, i).filter((x) => x.role === "secondary").length + 1
+                                            : 0;
+                                    const qLabel =
+                                        r.role === "primary"
+                                            ? "Primary SDG (opportunity)"
+                                            : `Secondary SDG (opportunity) ${secondaryIndex}`;
+                                    return (
+                                        <QandA key={`opp-sdg-${r.goalNumber}-${i}`} q={qLabel} a={formatSdgRowAnswer(r)} />
+                                    );
+                                })}
+                            </div>
                         </div>
-                    </div>
-                ) : null}
+                    ) : null}
 
-                <p className="mb-4 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">
-                    Student project SDG mapping (accountability profile)
-                </p>
-                <div className="grid grid-cols-1 items-stretch gap-6 md:grid-cols-2 md:gap-x-10">
-                    <div className="flex min-h-[8rem] items-center gap-6 rounded-2xl bg-slate-900 p-6 text-white shadow-lg">
-                        <div className="text-5xl font-black tabular-nums opacity-40">
-                            {primarySdgDisplay ? formatSdgGoalPadded(primarySdgDisplay.goalNumber) : "—"}
-                        </div>
-                        <div className="min-w-0 space-y-1">
-                            <p className="text-[9px] font-black uppercase tracking-[0.25em] text-white/60">
-                                {primarySdgDisplay?.source === "opportunity" ? "Opportunity primary goal" : "Student primary goal"}
-                            </p>
-                            <p className="text-sm font-black uppercase leading-snug">
-                                {primarySdgDisplay?.title || "—"}
-                            </p>
-                        </div>
-                    </div>
-                    <QandA
-                        q="Primary — target & indicator"
-                        a={
-                            primarySdgDisplay
-                                ? `${primarySdgDisplay.targetId || "T/A"} — ${primarySdgDisplay.indicatorId || "I/A"}`
-                                : ""
-                        }
-                    />
-                </div>
-                {studentSdgRows.filter((r) => r.role === "secondary").length > 0 ? (
-                    <div className="mt-6 space-y-4">
-                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Student secondary SDGs</p>
-                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-x-10">
-                            {studentSdgRows
-                                .filter((r) => r.role === "secondary")
-                                .map((r, i) => (
-                                    <QandA
-                                        key={`stu-sec-${r.goalNumber}-${i}`}
-                                        q={`Secondary SDG (student) ${i + 1}`}
-                                        a={formatSdgRowAnswer(r)}
-                                    />
-                                ))}
-                        </div>
-                    </div>
-                ) : null}
-                {(data.section3.contribution_intent_statement || "").trim() ||
-                (data.section3.student_contribution_intent_statement || "").trim() ? (
-                    <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-x-10">
-                        {(data.section3.contribution_intent_statement || "").trim() ? (
-                            <QandA q="Contribution intent (pathway narrative)" a={data.section3.contribution_intent_statement} />
-                        ) : null}
-                        {(data.section3.student_contribution_intent_statement || "").trim() ? (
-                            <QandA
-                                q="Student contribution intent"
-                                a={data.section3.student_contribution_intent_statement}
-                            />
-                        ) : null}
-                    </div>
-                ) : null}
-                <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-x-10">
-                    <QandA q="Validation status" a={data.section3.validation_status} />
-                    <QandA q="Summary stage" a={data.section3.summary_stage} />
-                    <QandA q="Section summary" a={data.section3.summary_text} fullWidth />
-                    <QandA q="Raw secondary SDG entries" a={data.section3.secondary_sdgs} fullWidth />
-                </div>
-                <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-center">
-                    <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">All aligned goals (deduplicated)</p>
-                    <p className="text-sm font-black text-slate-900">
-                        {mergedSdgNums.length
-                            ? `${mergedSdgNums.length === 1 ? "Goal" : "Goals"} ${sdgGoalDisplay}`
-                            : "—"}
-                    </p>
-                    {sdgTitleLine ? (
-                        <p className="mt-1 text-[10px] font-semibold leading-snug text-slate-500">
-                            {sdgTitleLine}
+                    <div className="break-inside-avoid rounded-xl border border-slate-200/80 bg-white p-5 shadow-sm md:p-6">
+                        <p className={dossierSubsectionEyebrow}>
+                            Student project SDG mapping (accountability profile)
                         </p>
+                        <p className="mt-1 text-xs font-medium leading-relaxed text-slate-600">
+                            Student-selected primary goal and indicators below align to your Section 3 submission (audit trail).
+                        </p>
+                        <div className={`mt-3 ${dossierFieldGrid} md:items-stretch`}>
+                            <div className="flex min-h-0 flex-col">
+                                <span className="mb-1.5 min-h-[1.125rem] text-[8px] font-black uppercase leading-relaxed tracking-[0.18em] text-slate-500">
+                                    Primary goal
+                                </span>
+                                <div className="flex min-h-[7rem] flex-1 items-center gap-5 rounded-xl border border-[#0F8F83]/25 bg-[#0F8F83]/[0.06] px-5 py-5 text-slate-900 shadow-sm print:min-h-[6.5rem]">
+                                    <div className="rounded-xl bg-[#0F8F83] px-4 py-2.5 text-3xl font-black tabular-nums text-white shadow-md print:text-2xl">
+                                        {primarySdgDisplay ? formatSdgGoalPadded(primarySdgDisplay.goalNumber) : "—"}
+                                    </div>
+                                    <div className="min-w-0 space-y-1.5">
+                                        <p className="text-[8px] font-black uppercase tracking-[0.18em] text-[#0F8F83]">
+                                            {primarySdgDisplay?.source === "opportunity"
+                                                ? "Opportunity primary goal"
+                                                : "Student primary goal"}
+                                        </p>
+                                        <p className="text-sm font-black uppercase leading-snug tracking-tight text-slate-900">
+                                            {primarySdgDisplay?.title || "—"}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="flex min-h-0 flex-col">
+                                <span className="mb-1.5 min-h-[1.125rem] text-[8px] font-black uppercase leading-relaxed tracking-[0.18em] text-slate-500">
+                                    Primary — target &amp; indicator
+                                </span>
+                                <div className="flex min-h-[7rem] flex-1 flex-col justify-center rounded-xl border border-slate-200/80 bg-white px-5 py-5 shadow-sm print:min-h-[6.5rem]">
+                                    <p className="text-[13px] font-semibold leading-relaxed text-slate-900">
+                                        {primarySdgDisplay ? (
+                                            <>
+                                                <span className="rounded bg-[#0F8F83]/10 px-2 py-1 font-black tabular-nums text-[#0F8F83]">
+                                                    {primarySdgDisplay.targetId || "T/A"}
+                                                </span>
+                                                <span className="mx-1.5 font-bold text-slate-300">—</span>
+                                                <span className="rounded bg-[#0F8F83]/10 px-2 py-1 font-black tabular-nums text-[#0F8F83]">
+                                                    {primarySdgDisplay.indicatorId || "I/A"}
+                                                </span>
+                                            </>
+                                        ) : (
+                                            <span className="font-medium italic text-slate-400">Pending verification / not provided</span>
+                                        )}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {studentSdgRows.filter((r) => r.role === "secondary").length > 0 ? (
+                        <div className="break-inside-avoid rounded-xl border border-slate-200/80 bg-slate-50/70 p-5 shadow-sm md:p-6">
+                            <p className={dossierSubsectionEyebrow}>
+                                Student secondary SDGs
+                            </p>
+                            <div className={`mt-3 ${dossierFieldGrid}`}>
+                                {studentSdgRows
+                                    .filter((r) => r.role === "secondary")
+                                    .map((r, i) => (
+                                        <QandA
+                                            key={`stu-sec-${r.goalNumber}-${i}`}
+                                            q={`Secondary (student) ${i + 1}`}
+                                            a={formatSdgRowAnswer(r)}
+                                        />
+                                    ))}
+                            </div>
+                        </div>
+                    ) : null}
+
+                    {(data.section3.contribution_intent_statement || "").trim() ||
+                    (data.section3.student_contribution_intent_statement || "").trim() ? (
+                        <div className={dossierFieldGrid}>
+                            {(data.section3.contribution_intent_statement || "").trim() ? (
+                                <QandA q="Contribution intent (pathway narrative)" a={data.section3.contribution_intent_statement} />
+                            ) : null}
+                            {(data.section3.student_contribution_intent_statement || "").trim() ? (
+                                <QandA
+                                    q="Student contribution intent"
+                                    a={data.section3.student_contribution_intent_statement}
+                                />
+                            ) : null}
+                        </div>
+                    ) : null}
+
+                    <div className={dossierFieldGrid}>
+                        <QandA q="Validation status" a={data.section3.validation_status} />
+                        <QandA q="Summary stage" a={data.section3.summary_stage} />
+                        <QandA q="Section summary" a={data.section3.summary_text} fullWidth />
+                        <QandA q="Raw secondary SDG entries" a={data.section3.secondary_sdgs} fullWidth />
+                    </div>
+
+                    <div className="rounded-xl border border-[#0F8F83]/20 bg-[#0F8F83]/[0.04] px-5 py-5 text-center shadow-sm">
+                        <p className="text-[8px] font-black uppercase tracking-[0.18em] text-[#0F8F83]">
+                            All aligned goals (deduplicated)
+                        </p>
+                        <p className="mt-1 text-sm font-black text-slate-900">
+                            {mergedSdgNums.length
+                                ? `${mergedSdgNums.length === 1 ? "Goal" : "Goals"} ${sdgGoalDisplay}`
+                                : "—"}
+                        </p>
+                        {sdgTitleLine ? (
+                            <p className="mt-1.5 text-[10px] font-semibold leading-snug text-slate-500">{sdgTitleLine}</p>
+                        ) : null}
+                    </div>
+
+                    {mergedSdgRows.length > 0 ? (
+                        <div className={dossierFieldGrid}>
+                            {mergedSdgRows.map((r, i) => (
+                                <QandA
+                                    key={`merged-sdg-${r.goalNumber}-${i}`}
+                                    q={`Aligned SDG ${i + 1}`}
+                                    a={formatSdgRowAnswer(r)}
+                                />
+                            ))}
+                        </div>
                     ) : null}
                 </div>
-                {mergedSdgRows.length > 0 ? (
-                    <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-x-10">
-                        {mergedSdgRows.map((r, i) => (
-                            <QandA
-                                key={`merged-sdg-${r.goalNumber}-${i}`}
-                                q={`Aligned SDG ${i + 1}`}
-                                a={formatSdgRowAnswer(r)}
-                            />
-                        ))}
-                    </div>
-                ) : null}
 
                 {/* Section 4: Operational Metrics */}
                 <SectionHeader
@@ -913,7 +1429,8 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
                     title="Operational metrics"
                     question="What were the measurable outputs and beneficiary reach of the project?"
                 />
-                <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4">
+                <div className={dossierSectionStack}>
+                    <div className={dossierMetricStrip}>
                     {[
                         { label: "Verified hours", value: metrics.total_verified_hours, suffix: "hrs" },
                         { label: "Total reach", value: metrics.total_beneficiaries, suffix: "pax" },
@@ -933,9 +1450,9 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
                             </p>
                         </div>
                     ))}
-                </div>
-                <QandA q="Comprehensive activity description" a={activityDescriptionCombined} fullWidth />
-                <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-x-10">
+                    </div>
+                    <QandA q="Comprehensive activity description" a={activityDescriptionCombined} fullWidth />
+                    <div className={dossierFieldGrid}>
                     <QandA q="Counting method" a={data.section4.project_summary?.counting_method} />
                     <QandA q="Overall overlap" a={data.section4.project_summary?.overall_overlap} />
                     <QandA q="Overall delivery mode" a={data.section4.project_summary?.overall_delivery_mode} />
@@ -943,14 +1460,15 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
                     <QandA q="Overall geographic reach" a={data.section4.project_summary?.overall_geographic_reach} />
                     <QandA q="Project implementation explanation" a={data.section4.project_summary?.project_implementation_explanation} fullWidth />
                     <QandA q="Section summary" a={data.section4.summary_text} fullWidth />
-                </div>
+                    </div>
                 {section4Blocks.length > 0 ? (
-                    <div className="mt-8 space-y-5">
-                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Activity block details</p>
+                    <div className="space-y-3 break-inside-avoid">
+                        <p className={dossierSubsectionEyebrow}>Activity block details</p>
+                        <div className="space-y-4">
                         {section4Blocks.map((block, i) => (
                             <div key={String(block.id ?? i)} className="break-inside-avoid rounded-2xl border border-slate-200 bg-slate-50/90 p-5">
                                 <p className="mb-4 text-sm font-black text-slate-900">{firstNonBlank(block.title, `Activity ${i + 1}`)}</p>
-                                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-x-10">
+                                <div className={dossierFieldGrid}>
                                     <QandA q="Primary category" a={block.primary_category} />
                                     <QandA q="Sub-category" a={block.sub_category} />
                                     <QandA q="Other category" a={block.other_category_text} />
@@ -972,12 +1490,13 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
                                 </div>
                             </div>
                         ))}
+                        </div>
                     </div>
                 ) : null}
                 {section4Outputs.length > 0 ? (
-                    <div className="mt-8 space-y-5">
-                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Tangible output details</p>
-                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-x-10">
+                    <div className="space-y-3 break-inside-avoid">
+                        <p className={dossierSubsectionEyebrow}>Tangible output details</p>
+                        <div className={dossierFieldGrid}>
                             {section4Outputs.map(({ blockTitle, output, key }) => (
                                 <div key={key} className="break-inside-avoid rounded-2xl border border-slate-200 bg-white p-5">
                                     <p className="mb-1 text-sm font-black text-slate-900">{firstNonBlank(output.title, "Output")}</p>
@@ -993,6 +1512,7 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
                         </div>
                     </div>
                 ) : null}
+                </div>
 
                 {/* Section 5: Measurable Outcomes */}
                 <SectionHeader
@@ -1000,43 +1520,43 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
                     title="Systemic outcomes"
                     question="What specific measurable changes were observed at the end of the project?"
                 />
-                <div className="space-y-6">
+                <div className={dossierSectionStack}>
                     {printableOutcomes.length > 0 ? (
                         printableOutcomes.map((outcome, i) => (
                             <div
                                 key={`${outcome.metric}-${i}`}
-                                className="grid grid-cols-1 gap-8 rounded-2xl border border-slate-200 bg-slate-50/90 p-6 shadow-sm md:grid-cols-2 md:gap-10 md:p-8 break-inside-avoid"
+                                className="grid grid-cols-1 gap-5 rounded-xl border border-slate-200/80 bg-white p-4 shadow-sm transition-shadow duration-200 hover:shadow-md md:grid-cols-2 md:gap-6 break-inside-avoid"
                             >
                                 <div className="min-w-0">
-                                    <p className="mb-2 text-[10px] font-black uppercase tracking-widest text-slate-400">
+                                    <p className="mb-1.5 text-[8px] font-black uppercase tracking-[0.18em] text-[#0F8F83]">
                                         Outcome {i + 1}
                                     </p>
-                                    <p className="mb-6 text-lg font-black leading-snug text-slate-900 underline decoration-slate-200 decoration-2 underline-offset-4 sm:text-xl">
+                                    <p className="rounded-xl border border-[#0F8F83]/20 bg-[#0F8F83]/[0.05] px-3 py-3 text-base font-black leading-snug text-slate-900 sm:text-lg">
                                         {outcome.metric}
                                     </p>
                                     {(outcome.baseline || outcome.endline) && (
-                                        <div className="flex flex-wrap items-center justify-start gap-6 sm:gap-10">
-                                            <div className="flex flex-col items-center">
-                                                <span className="mb-2 text-[8px] font-black uppercase tracking-widest text-slate-400">
+                                        <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto_1fr] sm:items-end">
+                                            <div className="rounded-xl border border-slate-200/80 bg-slate-50/80 p-3 text-center">
+                                                <span className="text-[8px] font-black uppercase tracking-[0.18em] text-slate-500">
                                                     Baseline
                                                 </span>
-                                                <div className="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-center font-black tabular-nums text-slate-600">
+                                                <div className="mt-2 rounded bg-white px-3 py-2 text-sm font-black tabular-nums text-slate-700">
                                                     {outcome.baseline || "—"} {outcome.unit}
                                                 </div>
                                             </div>
-                                            <div className="mt-6 hidden h-0.5 w-8 shrink-0 bg-slate-200 sm:block" aria-hidden />
-                                            <div className="flex flex-col items-center">
-                                                <span className="mb-2 text-[8px] font-black uppercase tracking-widest text-slate-900">
+                                            <div className="hidden h-0.5 w-8 shrink-0 bg-[#0F8F83]/30 sm:block" aria-hidden />
+                                            <div className="rounded-xl border border-[#0F8F83]/25 bg-[#0F8F83]/[0.06] p-3 text-center">
+                                                <span className="text-[8px] font-black uppercase tracking-[0.18em] text-[#0F8F83]">
                                                     Achieved
                                                 </span>
-                                                <div className="rounded-2xl bg-slate-900 px-5 py-3 text-center font-black tabular-nums text-white shadow-md">
+                                                <div className="mt-2 rounded bg-[#0F8F83] px-3 py-2 text-sm font-black tabular-nums text-white">
                                                     {outcome.endline || "—"} {outcome.unit}
                                                 </div>
                                             </div>
                                         </div>
                                     )}
                                 </div>
-                                <div className="space-y-4">
+                                <div className="space-y-3">
                                     <QandA q="Impact dimension" a={outcome.outcomeArea} />
                                     <QandA q="Metric category" a={outcome.metricCategory} />
                                     <QandA q="Confidence level" a={outcome.confidence} />
@@ -1062,12 +1582,13 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
                     title="Resource utilization"
                     question="What resources were deployed and how were they sourced?"
                 />
-                <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-x-10">
+                <div className={dossierSectionStack}>
+                    <div className={dossierFieldGrid}>
                     <QandA q="Used external resources" a={data.section6.use_resources} />
-                    <QandA q="Resource evidence files" a={data.section6.evidence_files} />
-                </div>
+                    <FileListQA q="Resource evidence files" files={data.section6.evidence_files} />
+                    </div>
                 {data.section6.resources?.length > 0 ? (
-                    <div className="grid grid-cols-1 gap-6 md:grid-cols-2 md:gap-x-10">
+                    <div className={dossierFieldGrid}>
                         {data.section6.resources.map((r: ReportData["section6"]["resources"][number], i: number) => (
                             <QandA
                                 key={i}
@@ -1089,8 +1610,9 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
                         fullWidth
                     />
                 )}
-                <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-x-10">
+                    <div className={dossierFieldGrid}>
                     <QandA q="Section summary" a={data.section6.summary_text} fullWidth />
+                    </div>
                 </div>
 
                 {/* Section 7: Strategic Partnerships */}
@@ -1099,13 +1621,14 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
                     title="Strategic partnerships"
                     question="Which organizations or partners collaborated in the project?"
                 />
-                <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-x-10">
+                <div className={dossierSectionStack}>
+                    <div className={dossierFieldGrid}>
                     <QandA q="Has partners" a={data.section7.has_partners} />
                     <QandA q="Formalization status" a={data.section7.formalization_status} />
                     <QandA q="Formalization files" a={data.section7.formalization_files} fullWidth />
-                </div>
+                    </div>
                 {data.section7.partners?.length > 0 ? (
-                    <div className="grid grid-cols-1 gap-6 md:grid-cols-2 md:gap-x-10">
+                    <div className={dossierFieldGrid}>
                         {data.section7.partners.map((p: ReportData["section7"]["partners"][number], i: number) => (
                             <QandA
                                 key={i}
@@ -1116,7 +1639,7 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
                                         ? `Pakistan contact: ${p.pakistan_contact_name}`
                                         : "",
                                     p.pakistan_contact_number?.trim()
-                                        ? `Number: ${p.pakistan_contact_number}`
+                                        ? `Phone: ${formatSection7PakistanDialForDisplay(p.pakistan_contact_number)}`
                                         : "",
                                     p.pakistan_contact_email?.trim()
                                         ? `Email: ${p.pakistan_contact_email}`
@@ -1135,8 +1658,9 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
                         fullWidth
                     />
                 )}
-                <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-x-10">
+                    <div className={dossierFieldGrid}>
                     <QandA q="Section summary" a={data.section7.summary_text} fullWidth />
+                    </div>
                 </div>
 
                 {/* Section 8: Evidence & Ethics */}
@@ -1145,12 +1669,13 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
                     title="Evidence & ethics"
                     question="What evidence was captured and how were ethical standards maintained?"
                 />
-                <div className="grid grid-cols-1 gap-6 md:grid-cols-2 md:gap-x-10">
+                <div className={dossierSectionStack}>
+                    <div className={dossierFieldGrid}>
                     <QandA q="Has evidence" a={data.section8.has_evidence} />
                     <QandA q="Media visibility" a={data.section8.media_visible} />
                     <QandA q="Primary evidence types" a={data.section8.evidence_types} />
                     <QandA q="Evidence description" a={data.section8.description} fullWidth />
-                    <QandA q="Evidence files" a={data.section8.evidence_files} fullWidth />
+                    <FileListQA q="Evidence files" files={data.section8.evidence_files} fullWidth />
                     <QandA
                         q="Ethical declaration compliance"
                         a={
@@ -1162,8 +1687,9 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
                     />
                     <QandA q="Partner verification" a={data.section8.partner_verification} />
                     <QandA q="Partner verification type" a={data.section8.partner_verification_type} />
-                    <QandA q="Partner verification files" a={data.section8.partner_verification_files} fullWidth />
+                    <FileListQA q="Partner verification files" files={data.section8.partner_verification_files} fullWidth />
                     <QandA q="Section summary" a={data.section8.summary_text} fullWidth />
+                    </div>
                 </div>
 
                 {/* Section 9: Reflection */}
@@ -1172,8 +1698,8 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
                     title="Reflection & synthesis"
                     question="How has this project influenced your professional growth and academic understanding?"
                 />
-                <div className="space-y-6">
-                    <div className="grid grid-cols-1 gap-6 md:grid-cols-2 md:gap-x-10">
+                <div className={dossierSectionStack}>
+                    <div className={dossierFieldGrid}>
                         <QandA q="Academic integration" a={data.section9.academic_integration} />
                         <QandA q="Competency scores" a={data.section9.competency_scores} fullWidth />
                     </div>
@@ -1189,14 +1715,16 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
                     title="Sustainability & roadmap"
                     question="How will the impact of this project be sustained after your involvement concludes?"
                 />
-                <div className="mb-6 grid grid-cols-1 gap-6 md:grid-cols-2 md:gap-x-10">
+                <div className={dossierSectionStack}>
+                    <div className={dossierFieldGrid}>
                     <QandA q="Continuation strategy status" a={data.section10.continuation_status} />
                     <QandA q="Mechanisms" a={data.section10.mechanisms} />
                     <QandA q="Scaling potential" a={data.section10.scaling_potential} />
                     <QandA q="Policy influence" a={data.section10.policy_influence} />
+                    </div>
+                    <QandA q="Detailed roadmap for future continuity" a={data.section10.continuation_details} fullWidth />
+                    <QandA q="Section summary" a={data.section10.summary_text} fullWidth />
                 </div>
-                <QandA q="Detailed roadmap for future continuity" a={data.section10.continuation_details} fullWidth />
-                <QandA q="Section summary" a={data.section10.summary_text} fullWidth />
 
                 {/* Section 11: Impact Intelligence breakdown */}
                 <SectionHeader
@@ -1204,7 +1732,8 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
                     title="Impact intelligence analysis"
                     question="What is the detailed breakdown of the CII index score performance?"
                 />
-                <div className="mb-12 break-inside-avoid">
+                <div className={dossierSectionStack}>
+                    <div className="break-inside-avoid">
                     <table className="w-full border-collapse overflow-hidden rounded-xl border border-slate-200 text-xs">
                         <thead>
                             <tr className="bg-slate-900 text-[9px] font-black uppercase tracking-widest text-white">
@@ -1263,7 +1792,7 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
                 </div>
 
                 {dossierSectionWiseAuditBlocks.length > 0 ? (
-                    <div className="mt-10 break-inside-avoid">
+                    <div className="break-inside-avoid">
                         <p className="mb-1 text-[10px] font-black uppercase tracking-[0.25em] text-slate-500">
                             CII AI audit — section-wise review
                         </p>
@@ -1298,7 +1827,7 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
                 ) : null}
 
                 {dossierAuditMeta ? (
-                    <div className="mt-8 break-inside-avoid rounded-2xl border-2 border-slate-900 bg-slate-50 p-6 sm:p-8">
+                    <div className="break-inside-avoid rounded-2xl border-2 border-slate-900 bg-slate-50 p-6 sm:p-8">
                         <p className="mb-1 text-[10px] font-black uppercase tracking-[0.25em] text-slate-500">
                             Cross-section audit — CII transparency
                         </p>
@@ -1359,59 +1888,86 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
                         </div>
                     </div>
                 ) : null}
+                </div>
 
-                {/* Institutional Impact Summary */}
-                <div className="relative mt-16 overflow-hidden break-inside-avoid rounded-3xl border-4 border-slate-900 bg-slate-50 p-8 shadow-sm sm:mt-20 sm:rounded-[2.5rem] sm:p-12 md:p-14">
-                    <div className="relative z-10">
-                        <div className="mb-10 flex flex-col gap-6 border-b border-slate-200 pb-8 sm:flex-row sm:items-center sm:justify-between sm:pb-10">
-                            <div className="min-w-0 space-y-2">
-                                <p className={`block ${printDossierTone.labelMuted}`}>CIEL impact protocol</p>
-                                <h2 className="report-h2 !text-2xl !tracking-tight sm:!text-3xl">Intelligence dashboard</h2>
-                            </div>
-                            <Award className="mx-auto h-14 w-14 shrink-0 text-slate-900 opacity-[0.12] sm:mx-0 sm:h-[4.5rem] sm:w-[4.5rem]" strokeWidth={1.25} />
-                        </div>
-                        <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4 lg:gap-5">
-                            <div className={printDossierTone.metricTile}>
-                                <p className={printDossierTone.labelMuted}>Impact score</p>
-                                <p className={printDossierTone.metricValue}>
-                                    {totalScore}
-                                    <span className="ml-1 align-top text-[10px] font-bold tabular-nums text-slate-400 sm:text-xs">
-                                        /100
-                                    </span>
-                                </p>
-                            </div>
-                            <div className={printDossierTone.metricTile}>
-                                <p className={printDossierTone.labelMuted}>Hours logged</p>
-                                <p className={printDossierTone.metricValue}>{metrics.total_verified_hours}</p>
-                            </div>
-                            <div className={printDossierTone.metricTile}>
-                                <p className={printDossierTone.labelMuted}>Strategic SDGs</p>
-                                {mergedSdgNums.length ? (
-                                    <div className="min-w-0 space-y-1">
-                                        <p className="break-words text-xl font-black leading-tight text-slate-900 sm:text-2xl">
-                                            {mergedSdgNums.length === 1 ? "Goal" : "Goals"} {sdgGoalDisplay}
-                                        </p>
-                                        {sdgTitleLine ? (
-                                            <p className="text-[9px] font-semibold leading-snug text-slate-500">
-                                                {sdgTitleLine}
-                                            </p>
-                                        ) : null}
+                {/* Final CII Score & Report Card */}
+                <div className="mt-12 break-inside-avoid sm:mt-14">
+                    <div className="mb-5 inline-flex min-w-[min(100%,28rem)] items-center rounded-md px-4 py-2.5 text-white shadow-sm" style={{ backgroundColor: sectionInk }}>
+                        <span className="text-[12px] font-black uppercase tracking-[0.12em]">Final CII Score &amp; Report Card</span>
+                    </div>
+
+                    <div className="rounded-xl border border-teal-100 bg-teal-50/45 px-6 py-8 shadow-sm sm:px-10 sm:py-10">
+                        <div className="grid grid-cols-1 items-center gap-8 md:grid-cols-[12rem_1fr] md:gap-10">
+                            <div className="flex justify-center">
+                                <div
+                                    className="flex h-36 w-36 items-center justify-center rounded-full"
+                                    style={{
+                                        background: `conic-gradient(${tealInk} ${Math.max(0, Math.min(100, totalScore))}%, #dce8e7 0)`,
+                                    }}
+                                    aria-label={`CII score ${totalScore} out of 100`}
+                                >
+                                    <div className="flex h-28 w-28 flex-col items-center justify-center rounded-full bg-teal-50 text-center">
+                                        <span className="text-4xl font-black tabular-nums" style={{ color: tealInk }}>
+                                            {totalScore}
+                                        </span>
+                                        <span className="mt-1 text-sm font-bold text-slate-700">/100</span>
                                     </div>
-                                ) : (
-                                    <p className={printDossierTone.metricValue}>—</p>
-                                )}
+                                </div>
                             </div>
-                            <div className={printDossierTone.metricTile}>
-                                <p className={printDossierTone.labelMuted}>Verified</p>
-                                <p className={`${printDossierTone.metricValue} flex items-center`} aria-label="Verified">
-                                    <CheckCircle
-                                        className="h-[0.9em] w-[0.9em] shrink-0 text-slate-900/90"
-                                        strokeWidth={2}
-                                        aria-hidden
-                                    />
+
+                            <div className="min-w-0">
+                                <p className="text-sm font-black uppercase tracking-wide text-slate-900">CII Score</p>
+                                <h2 className="mt-2 text-3xl font-black leading-tight tracking-tight sm:text-4xl" style={{ color: tealInk }}>
+                                    {finalScoreLevel}
+                                </h2>
+                                <p className="mt-2 max-w-2xl text-sm font-medium leading-relaxed text-slate-700">
+                                    {finalScoreNarrative}
                                 </p>
                             </div>
                         </div>
+                    </div>
+
+                    <div className="mt-7 overflow-hidden rounded-sm border border-slate-200">
+                        <table className="w-full border-collapse text-sm">
+                            <thead>
+                                <tr style={{ backgroundColor: sectionInk }}>
+                                    <th className="w-[36%] px-4 py-3 text-left text-[10px] font-black uppercase tracking-widest text-white">
+                                        Category
+                                    </th>
+                                    <th className="w-[18%] px-4 py-3 text-left text-[10px] font-black uppercase tracking-widest text-white">
+                                        Score
+                                    </th>
+                                    <th className="px-4 py-3 text-left text-[10px] font-black uppercase tracking-widest text-white">
+                                        Report Card Note
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-200 bg-white">
+                                {finalReportCardRows.map((row) => (
+                                    <tr key={row.label}>
+                                        <td className="px-4 py-4 align-top text-[13px] font-semibold text-slate-800">{row.label}</td>
+                                        <td className="px-4 py-4 align-top text-[13px] font-black tabular-nums text-slate-900">
+                                            {row.score} / 100
+                                        </td>
+                                        <td className="px-4 py-4 align-top text-[13px] font-medium leading-relaxed text-slate-700">
+                                            {row.note}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div className="mt-7 rounded-sm border border-slate-200 bg-slate-50/80 px-5 py-4">
+                        <h3 className="text-lg font-black text-slate-900">Conclusion</h3>
+                        <p className="mt-2 text-sm font-medium leading-relaxed text-slate-700">
+                            This report presents the student contribution in an academic, audit-ready, and presentation-friendly format.
+                            The section-wise structure supports review, verification, institutional analytics, and evidence-based recognition
+                            of community impact.
+                        </p>
+                        <p className="mt-4 text-xl font-black leading-snug text-slate-900">
+                            Verified contribution to community. Strong learning. Real impact.
+                        </p>
                     </div>
                 </div>
 

@@ -7,6 +7,11 @@ import { toast } from "sonner";
 import { normalizeEngagementAttendanceLog } from "@/utils/engagementAttendanceMap";
 import { extractPendingAttendanceRows } from "@/utils/engagementPendingAttendanceResponse";
 import clsx from "clsx";
+import {
+    PARTNER_ATTENDANCE_ALL_TEAMS,
+    PARTNER_ATTENDANCE_AWAIT_TEAM,
+    partnerTeamBucketKey,
+} from "@/utils/engagementPartnerTeamScope";
 
 type PendingRow = Record<string, unknown>;
 
@@ -98,6 +103,10 @@ export default function AttendancePendingQueuePanel({
     presentation = "default",
     onPartnerQueueSnapshot,
     partnerSelectedMemberKey,
+    /** Partner: scope queue to a team bucket from project roster; `*` = all; await = no rows until pick. */
+    partnerScopedTeamFilter,
+    /** Faculty wide layout: table body scrolls inside the card (viewport-height column). */
+    scrollTableInPanel = false,
 }: {
     projectId: string;
     title?: string;
@@ -112,6 +121,8 @@ export default function AttendancePendingQueuePanel({
     onPartnerQueueSnapshot?: (summary: { participants: PartnerParticipantChip[]; rowCount: number }) => void;
     /** Partner only: when set, table shows only this participant's sessions (key from `PartnerParticipantChip`). */
     partnerSelectedMemberKey?: string;
+    partnerScopedTeamFilter?: string;
+    scrollTableInPanel?: boolean;
 }) {
     const isPartner = presentation === "partner";
     const [rows, setRows] = useState<PendingRow[]>([]);
@@ -164,28 +175,49 @@ export default function AttendancePendingQueuePanel({
     const partnerSnapRef = useRef(onPartnerQueueSnapshot);
     partnerSnapRef.current = onPartnerQueueSnapshot;
 
+    const rowsAfterTeamScope = useMemo(() => {
+        if (!isPartner) return rows;
+        const scope = partnerScopedTeamFilter ?? PARTNER_ATTENDANCE_ALL_TEAMS;
+        if (scope === PARTNER_ATTENDANCE_AWAIT_TEAM) return [];
+        if (scope === "" || scope === PARTNER_ATTENDANCE_ALL_TEAMS) return rows;
+        return rows.filter((raw) => {
+            const ro = raw as Record<string, unknown>;
+            const p = ro.participant;
+            if (!p || typeof p !== "object") return false;
+            return partnerTeamBucketKey(p as Record<string, unknown>) === scope;
+        });
+    }, [rows, isPartner, partnerScopedTeamFilter]);
+
     useEffect(() => {
         if (!isPartner || !partnerSnapRef.current) return;
         if (loading) return;
         partnerSnapRef.current({
-            participants: buildParticipantRoster(rows),
-            rowCount: rows.length,
+            participants: buildParticipantRoster(rowsAfterTeamScope),
+            rowCount: rowsAfterTeamScope.length,
         });
-    }, [isPartner, loading, rows]);
+    }, [isPartner, loading, rowsAfterTeamScope]);
 
     const tableRows = useMemo(() => {
         if (!isPartner) return rows;
-        if (!partnerSelectedMemberKey) return rows;
-        return rows.filter((raw) => participantKeyFromRaw(raw as Record<string, unknown>) === partnerSelectedMemberKey);
-    }, [rows, isPartner, partnerSelectedMemberKey]);
+        if (!partnerSelectedMemberKey) return rowsAfterTeamScope;
+        return rowsAfterTeamScope.filter(
+            (raw) => participantKeyFromRaw(raw as Record<string, unknown>) === partnerSelectedMemberKey,
+        );
+    }, [rowsAfterTeamScope, isPartner, partnerSelectedMemberKey]);
+
+    const scope = isPartner ? (partnerScopedTeamFilter ?? PARTNER_ATTENDANCE_ALL_TEAMS) : PARTNER_ATTENDANCE_ALL_TEAMS;
+    const partnerAwaitingTeamPick = isPartner && scope === PARTNER_ATTENDANCE_AWAIT_TEAM;
+    const partnerHideParticipantColumn = isPartner && Boolean(partnerSelectedMemberKey?.trim());
 
     const selectedMemberLabel = useMemo(() => {
-        if (!isPartner || !partnerSelectedMemberKey || rows.length === 0) return null;
-        const hit = rows.find((r) => participantKeyFromRaw(r as Record<string, unknown>) === partnerSelectedMemberKey);
+        if (!isPartner || !partnerSelectedMemberKey || rowsAfterTeamScope.length === 0) return null;
+        const hit = rowsAfterTeamScope.find(
+            (r) => participantKeyFromRaw(r as Record<string, unknown>) === partnerSelectedMemberKey,
+        );
         if (!hit) return { name: "Participant", subtitle: "" as string };
         const w = participantDisplay(hit as Record<string, unknown>);
         return { name: w.name || "Participant", subtitle: w.detail };
-    }, [isPartner, partnerSelectedMemberKey, rows]);
+    }, [isPartner, partnerSelectedMemberKey, rowsAfterTeamScope]);
 
     const act = async (logId: string, action: "approve" | "reject" | "flag") => {
         const reason = pickStr(reasonByLogId[logId]);
@@ -239,6 +271,7 @@ export default function AttendancePendingQueuePanel({
             className={clsx(
                 "overflow-hidden border border-slate-200 bg-white shadow-sm",
                 isPartner ? "rounded-xl border-slate-200/90" : "rounded-lg",
+                scrollTableInPanel && "flex min-h-0 flex-1 flex-col",
             )}
         >
             <div className="flex flex-col gap-3 border-b border-slate-100 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
@@ -271,7 +304,7 @@ export default function AttendancePendingQueuePanel({
                 </button>
             </div>
 
-            {isPartner && rows.length > 0 && partnerSelectedMemberKey && selectedMemberLabel ? (
+            {isPartner && rowsAfterTeamScope.length > 0 && partnerSelectedMemberKey && selectedMemberLabel ? (
                 <div className="flex items-center gap-3 border-b border-slate-100 bg-[#0056B3]/[0.06] px-4 py-3 sm:px-5">
                     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#0056B3]/[0.12]">
                         <UserCircle className="h-6 w-6 text-[#0056B3]" aria-hidden />
@@ -286,7 +319,18 @@ export default function AttendancePendingQueuePanel({
                 </div>
             ) : null}
 
-            {rows.length === 0 && !loading ? (
+            {partnerAwaitingTeamPick && !loading ? (
+                <p
+                    className={clsx(
+                        "mx-4 mb-4 mt-4 border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-600 sm:mx-5",
+                        isPartner ? "rounded-[10px] bg-slate-50/80" : "rounded-lg bg-slate-50",
+                    )}
+                >
+                    Select a team for this project, then choose a member to review their pending sessions.
+                </p>
+            ) : null}
+
+            {rows.length === 0 && !loading && !partnerAwaitingTeamPick ? (
                 <p
                     className={clsx(
                         "mx-4 mb-4 mt-4 border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-600 sm:mx-5",
@@ -301,21 +345,42 @@ export default function AttendancePendingQueuePanel({
                 </p>
             ) : null}
 
+            {rows.length > 0 && rowsAfterTeamScope.length === 0 && !loading && !partnerAwaitingTeamPick && isPartner ? (
+                <p
+                    className={clsx(
+                        "mx-4 mb-4 mt-4 border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-600 sm:mx-5",
+                        "rounded-[10px] bg-slate-50/80",
+                    )}
+                >
+                    No pending attendance rows for this team. Try another team or refresh after new submissions.
+                </p>
+            ) : null}
+
             {loading && rows.length === 0 ? (
                 <div className={clsx("flex justify-center py-16", isPartner ? "text-[#0056B3]" : "text-slate-400")}>
                     <Loader2 className="h-8 w-8 animate-spin" aria-hidden />
                 </div>
             ) : null}
 
-            {rows.length > 0 && isPartner && tableRows.length === 0 && !loading ? (
+            {rowsAfterTeamScope.length > 0 && isPartner && tableRows.length === 0 && !loading ? (
                 <p className="mx-4 mb-4 mt-4 rounded-[10px] border border-dashed border-slate-200 bg-slate-50/80 px-4 py-8 text-center text-sm text-slate-600 sm:mx-5">
                     No attendance rows for this member in the pending queue.
                 </p>
             ) : null}
 
             {tableRows.length > 0 ? (
-                <div className="overflow-x-auto px-2 pb-4 pt-2 sm:px-4">
-                    <table className="w-full min-w-[920px] border-collapse text-left text-sm">
+                <div
+                    className={clsx(
+                        "overflow-x-auto px-2 pb-4 pt-2 sm:px-4",
+                        scrollTableInPanel && "min-h-0 flex-1 overflow-y-auto overscroll-contain",
+                    )}
+                >
+                    <table
+                        className={clsx(
+                            "w-full border-collapse text-left text-sm",
+                            partnerHideParticipantColumn ? "min-w-[780px]" : "min-w-[920px]",
+                        )}
+                    >
                         <thead>
                             <tr
                                 className={clsx(
@@ -363,16 +428,18 @@ export default function AttendancePendingQueuePanel({
                                 >
                                     Work type
                                 </th>
-                                <th
-                                    className={clsx(
-                                        "min-w-[140px] px-3 py-3 text-xs text-slate-700 sm:px-4",
-                                        isPartner
-                                            ? "py-3.5 font-bold uppercase tracking-wide text-slate-600"
-                                            : "font-medium",
-                                    )}
-                                >
-                                    Participant
-                                </th>
+                                {!partnerHideParticipantColumn ? (
+                                    <th
+                                        className={clsx(
+                                            "min-w-[140px] px-3 py-3 text-xs text-slate-700 sm:px-4",
+                                            isPartner
+                                                ? "py-3.5 font-bold uppercase tracking-wide text-slate-600"
+                                                : "font-medium",
+                                        )}
+                                    >
+                                        Participant
+                                    </th>
+                                ) : null}
                                 <th
                                     className={clsx(
                                         "min-w-[160px] px-3 py-3 text-xs text-slate-700 sm:px-4",
@@ -453,18 +520,20 @@ export default function AttendancePendingQueuePanel({
                                             {timeCell}
                                         </td>
                                         <td className="max-w-[140px] px-3 py-3 align-top text-slate-700 sm:px-4">{workType}</td>
-                                        <td className="px-3 py-3 align-top text-slate-800 sm:px-4">
-                                            {who.name ? (
-                                                <>
-                                                    <span className="font-medium">{who.name}</span>
-                                                    {who.detail ? (
-                                                        <span className="mt-0.5 block text-xs text-slate-500">{who.detail}</span>
-                                                    ) : null}
-                                                </>
-                                            ) : (
-                                                "—"
-                                            )}
-                                        </td>
+                                        {!partnerHideParticipantColumn ? (
+                                            <td className="px-3 py-3 align-top text-slate-800 sm:px-4">
+                                                {who.name ? (
+                                                    <>
+                                                        <span className="font-medium">{who.name}</span>
+                                                        {who.detail ? (
+                                                            <span className="mt-0.5 block text-xs text-slate-500">{who.detail}</span>
+                                                        ) : null}
+                                                    </>
+                                                ) : (
+                                                    "—"
+                                                )}
+                                            </td>
+                                        ) : null}
                                         <td className="max-w-[220px] px-3 py-3 align-top text-slate-600 sm:px-4">
                                             <span className="line-clamp-3">{desc}</span>
                                         </td>

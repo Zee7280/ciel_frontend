@@ -56,6 +56,8 @@ export interface ReportData {
         };
         team_members: Array<{
             id?: string;
+            participantId?: string;
+            email?: string;
             name: string;
             fullName?: string;
             cnic: string;
@@ -308,6 +310,8 @@ export interface ReportData {
         audit_meta?: ReportCIIauditMeta | null;
     };
     required_hours?: number;
+    /** Report owner from API — used to align dossier with the filing student (may be a team member, not the lead). */
+    student?: { id?: string; name?: string; email?: string };
 }
 
 

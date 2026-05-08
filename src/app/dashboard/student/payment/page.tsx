@@ -42,11 +42,13 @@ function PaymentContent() {
     const [submitting, setSubmitting] = useState(false);
     const [projectDetails, setProjectDetails] = useState<any>(null);
     const bankInfo = {
-        bankName: "UNITED Bank Limited (UBL)",
-        accountTitle: "CIEL International",
-        accountNumber: "0374251663933",
-        iban: "PK14UNIL0109000251663933",
+        bankName: "Allied Bank Limited (ABL)",
+        accountTitle: "Fatima Khalid/Faizan Saadullah Khan",
+        accountNumber: "07800010140722710026",
+        iban: "PK65ABPA0010140722710026",
     };
+
+
     const [proofFile, setProofFile] = useState<File | null>(null);
     /** PKR the student actually transferred (digits only in state). */
     const [paidAmountPkr, setPaidAmountPkr] = useState(String(REPORTING_FEE_PKR));

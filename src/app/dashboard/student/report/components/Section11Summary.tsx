@@ -260,10 +260,10 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
     return (
         <div className="space-y-5 md:space-y-6 pb-10">
             {/* ── Section Header — Intelligence strip ── */}
-            <div className="space-y-3 md:space-y-4">
+            <div className="space-y-4 md:space-y-5">
                 <div
                     className={clsx(
-                        "flex flex-col lg:flex-row lg:items-stretch lg:justify-between gap-4 md:gap-5 p-4 md:p-5 bg-gradient-to-br from-white via-slate-50/50 to-white",
+                        "flex flex-col lg:flex-row lg:items-stretch lg:justify-between gap-5 md:gap-6 p-5 md:p-6 bg-gradient-to-br from-white via-slate-50/50 to-white",
                         surfaceCard,
                     )}
                 >
@@ -293,15 +293,15 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                     )}
                 </div>
 
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-5">
                     {stats.map((stat, i) => (
                         <div
                             key={i}
                             title={stat.tooltip}
                             className={clsx(
-                                "group relative overflow-hidden rounded-2xl border bg-white p-5 md:p-6 flex flex-col gap-3 shadow-sm transition-all duration-300",
+                                "group relative overflow-hidden rounded-2xl border bg-white p-6 flex flex-col gap-4 shadow-sm transition-all duration-300",
                                 showVerifiedImpactScores
-                                    ? "border-slate-200/80 hover:border-report-primary-border hover:shadow-md hover:shadow-report-primary-shadow"
+                                    ? "border-slate-200/80 hover:border-[#0F8F83]/30 hover:shadow-md"
                                     : "border-slate-200/60 bg-slate-50/40",
                             )}
                         >
@@ -383,7 +383,7 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                                 <button
                                     type="button"
                                     onClick={openRedFlagsModal}
-                                    className="inline-flex items-center justify-center gap-2 self-stretch sm:self-center rounded-xl border-2 border-amber-200 bg-amber-50/70 px-4 py-2.5 text-[10px] font-black uppercase tracking-widest text-amber-950 transition-colors hover:bg-amber-50 shrink-0"
+                                    className="inline-flex items-center justify-center gap-2 self-stretch sm:self-center rounded-xl border-2 border-amber-200 bg-amber-50/70 px-4 py-2.5 text-[10px] font-black uppercase tracking-widest text-amber-950 transition-all duration-200 hover:bg-amber-50 hover:border-amber-300 active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:ring-offset-2 shrink-0"
                                 >
                                     <Flag className="w-3.5 h-3.5 shrink-0" />
                                     Section-wise red flags
@@ -457,23 +457,23 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                 </div>
             )}
 
-            <div className="space-y-4 md:space-y-5">
+            <div className="space-y-5 md:space-y-6">
                 <div className="flex items-center gap-3">
-                    <div className="w-1 h-5 rounded-full bg-report-primary shrink-0" />
+                    <div className="w-1 h-6 rounded-full bg-[#0F8F83] shrink-0" />
                     <div className="min-w-0">
-                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-report-primary">Compliance</p>
-                        <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">
+                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#0F8F83]">Compliance</p>
+                        <h3 className="text-base font-black text-slate-900 uppercase tracking-widest">
                             Institutional compliance matrix
                         </h3>
                     </div>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-5">
                     {complianceItems.map((item, idx) => (
                         <div
                             key={idx}
                             className={clsx(
-                                "group flex flex-col gap-5 p-6 md:p-7 rounded-2xl border border-slate-200/80 bg-white shadow-sm transition-all duration-300 hover:shadow-md",
-                                item.check ? "ring-1 ring-report-primary-border" : "",
+                                "group flex flex-col gap-6 p-6 md:p-7 rounded-2xl border border-slate-200/80 bg-white shadow-sm transition-all duration-300 hover:shadow-md hover:border-[#0F8F83]/20",
+                                item.check ? "ring-2 ring-[#0F8F83]/20" : "",
                             )}
                         >
                             <div
@@ -537,7 +537,7 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                             <div className="grid w-full grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-3">
                                 <Button
                                     onClick={() => setShowPreview(true)}
-                                    className="bg-report-primary hover:opacity-90 text-white rounded-xl text-[11px] font-black uppercase tracking-wide transition-all shadow-md shadow-report-primary-shadow w-full min-h-12 px-3 py-3 whitespace-normal leading-snug sm:text-xs sm:tracking-widest"
+                                    className="bg-report-primary hover:bg-[#0049A3] active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-report-primary focus-visible:ring-offset-2 text-white rounded-xl text-[11px] font-black uppercase tracking-wide transition-all duration-200 shadow-md shadow-report-primary-shadow w-full min-h-12 px-3 py-3 whitespace-normal leading-snug sm:text-xs sm:tracking-widest"
                                 >
                                     <span className="inline-flex items-center justify-center gap-2">
                                         <Eye className="h-4 w-4 shrink-0" aria-hidden />
@@ -547,7 +547,7 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                                 <Button
                                     variant="outline"
                                     onClick={() => setShowCertificate(true)}
-                                    className="border-2 border-slate-200 text-slate-900 rounded-xl text-[11px] font-black uppercase tracking-wide transition-all hover:bg-slate-50 w-full min-h-12 px-3 py-3 whitespace-normal leading-snug sm:text-xs sm:tracking-widest"
+                                    className="border-2 border-slate-200 text-slate-900 rounded-xl text-[11px] font-black uppercase tracking-wide transition-all duration-200 hover:bg-slate-50 hover:border-slate-300 active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 w-full min-h-12 px-3 py-3 whitespace-normal leading-snug sm:text-xs sm:tracking-widest"
                                 >
                                     <span className="inline-flex items-center justify-center gap-2">
                                         <Download className="h-4 w-4 shrink-0" aria-hidden />
@@ -558,7 +558,7 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                                     type="button"
                                     variant="outline"
                                     onClick={openRedFlagsModal}
-                                    className="border-2 border-amber-200 bg-amber-50/60 text-amber-950 rounded-xl text-[11px] font-black uppercase tracking-wide transition-all hover:bg-amber-50 w-full min-h-12 px-3 py-3 whitespace-normal leading-snug sm:text-xs sm:tracking-widest"
+                                    className="border-2 border-amber-200 bg-amber-50/60 text-amber-950 rounded-xl text-[11px] font-black uppercase tracking-wide transition-all duration-200 hover:bg-amber-50 hover:border-amber-300 active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:ring-offset-2 w-full min-h-12 px-3 py-3 whitespace-normal leading-snug sm:text-xs sm:tracking-widest"
                                 >
                                     <span className="inline-flex items-center justify-center gap-2">
                                         <Flag className="h-4 w-4 shrink-0" aria-hidden />
@@ -583,10 +583,12 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                                 <Button
                                     type="button"
                                     onClick={() => router.push(paymentHref)}
-                                    className="bg-report-primary hover:opacity-90 text-white px-8 h-12 rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-md shadow-report-primary-shadow w-full sm:w-auto"
+                                    className="bg-report-primary hover:bg-[#0049A3] active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-report-primary focus-visible:ring-offset-2 text-white px-8 h-12 rounded-xl text-xs font-black uppercase tracking-widest transition-all duration-200 shadow-md shadow-report-primary-shadow w-full sm:w-auto"
                                 >
-                                    <CreditCard className="w-4 h-4 mr-2" />
-                                    Go to payment
+                                    <span className="inline-flex items-center gap-2">
+                                        <CreditCard className="w-4 h-4 shrink-0" />
+                                        <span>Go to payment</span>
+                                    </span>
                                 </Button>
                             </div>
                         </>
@@ -605,7 +607,7 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                                     type="button"
                                     variant="outline"
                                     onClick={() => router.push(paymentHref)}
-                                    className="border-2 border-slate-200 text-slate-900 px-8 h-12 rounded-xl text-xs font-black uppercase tracking-widest transition-all hover:bg-slate-50 w-full sm:w-auto"
+                                    className="border-2 border-slate-200 text-slate-900 px-8 h-12 rounded-xl text-xs font-black uppercase tracking-widest transition-all duration-200 hover:bg-slate-50 hover:border-slate-300 active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 w-full sm:w-auto"
                                 >
                                     View payment details
                                 </Button>
