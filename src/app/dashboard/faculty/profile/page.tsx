@@ -24,6 +24,7 @@ function normalizeImageUrl(value: unknown) {
 function profileImageFromUser(user: Record<string, unknown>) {
     return normalizeImageUrl(
         user.image ??
+        user.avatar ??
         user.avatar_url ??
         user.avatarUrl ??
         user.profile_image ??

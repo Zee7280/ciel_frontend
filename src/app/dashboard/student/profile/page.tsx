@@ -85,8 +85,9 @@ export default function StudentProfilePage() {
                         city: parsedUser.city || "",
                         bio: parsedUser.bio || ""
                     });
-                    if (parsedUser.image || parsedUser.avatar_url) {
-                        setImagePreview(parsedUser.image || parsedUser.avatar_url);
+                    const photoSrc = parsedUser.image || parsedUser.avatar_url || parsedUser.avatar;
+                    if (photoSrc) {
+                        setImagePreview(photoSrc);
                     }
                 } catch (e) {
                     console.error("Failed to parse user from local storage");

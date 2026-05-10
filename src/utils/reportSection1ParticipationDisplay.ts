@@ -134,10 +134,10 @@ export function resolveReportAuthorParticipationSnapshot(
     const fromLead = (): ReportAuthorParticipationSnapshot => ({
         isTeamLeadAuthor: true,
         memberIndex: -1,
-        displayName: firstNonBlank(lead?.fullName, lead?.name),
+        displayName: firstNonBlank(lead?.fullName, lead?.name, student?.name),
         cnic: firstNonBlank(lead?.cnic),
         mobile: firstNonBlank(lead?.mobile),
-        email: firstNonBlank(lead?.email),
+        email: firstNonBlank(lead?.email, student?.email),
         university: firstNonBlank(lead?.university),
         degreeProgramYearLine: [firstNonBlank(lead?.degree), firstNonBlank(lead?.year)].filter(Boolean).join(" · "),
     });

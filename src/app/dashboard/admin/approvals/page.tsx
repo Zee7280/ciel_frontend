@@ -14,6 +14,9 @@ import {
     MessageSquare,
     Eye,
     Loader2,
+    User,
+    Mail,
+    Phone,
 } from "lucide-react";
 import { PaginationControls } from "@/components/ui/PaginationControls";
 import { authenticatedFetch } from "@/utils/api";
@@ -779,6 +782,62 @@ export default function AdminApprovalsPage() {
                             ) : null}
 
                             <div className={`space-y-8 pr-2 ${opportunityDetailLoading ? "opacity-50 pointer-events-none" : ""}`}>
+                                {(() => {
+                                    const v = adminDetailView as Record<string, unknown>;
+                                    const raw = v.creator;
+                                    if (!raw || typeof raw !== "object") return null;
+                                    const cr = raw as Record<string, unknown>;
+                                    const creatorName = pickDetailStr(cr, "name");
+                                    const creatorEmail = pickDetailStr(cr, "email");
+                                    const creatorPhone = pickDetailStr(cr, "phone");
+                                    if (!creatorName && !creatorEmail && !creatorPhone) return null;
+                                    return (
+                                        <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-4 shadow-sm">
+                                            <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-800 mb-3">
+                                                Created by
+                                            </p>
+                                            <ul className="space-y-2 text-sm text-slate-800">
+                                                {creatorName ? (
+                                                    <li className="flex items-start gap-2">
+                                                        <User className="w-4 h-4 text-emerald-700 shrink-0 mt-0.5" />
+                                                        <span>
+                                                            <span className="text-slate-500">Name:</span>{" "}
+                                                            {creatorName}
+                                                        </span>
+                                                    </li>
+                                                ) : null}
+                                                {creatorEmail ? (
+                                                    <li className="flex items-start gap-2">
+                                                        <Mail className="w-4 h-4 text-emerald-700 shrink-0 mt-0.5" />
+                                                        <span>
+                                                            <span className="text-slate-500">Email:</span>{" "}
+                                                            <a
+                                                                href={`mailto:${creatorEmail}`}
+                                                                className="font-medium text-blue-600 hover:underline"
+                                                            >
+                                                                {creatorEmail}
+                                                            </a>
+                                                        </span>
+                                                    </li>
+                                                ) : null}
+                                                {creatorPhone ? (
+                                                    <li className="flex items-start gap-2">
+                                                        <Phone className="w-4 h-4 text-emerald-700 shrink-0 mt-0.5" />
+                                                        <span>
+                                                            <span className="text-slate-500">Phone:</span>{" "}
+                                                            <a
+                                                                href={`tel:${String(creatorPhone).replace(/\s/g, "")}`}
+                                                                className="font-medium text-blue-600 hover:underline"
+                                                            >
+                                                                {creatorPhone}
+                                                            </a>
+                                                        </span>
+                                                    </li>
+                                                ) : null}
+                                            </ul>
+                                        </div>
+                                    );
+                                })()}
                                 {(() => {
                                     const v = adminDetailView as Record<string, unknown>;
                                     const sh = stakeholderRows(v);

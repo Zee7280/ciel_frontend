@@ -91,9 +91,16 @@ export default function DashboardHeader() {
         return () => window.removeEventListener("ciel_user_updated", loadUserFromStorage);
     }, []);
 
-    // Helper to get image URL
+    // Prefer stored aliases — login payload carries `avatar` from API while header historically read `image` / partner `logoUrl`.
     const getProfileImage = () => {
-        return user?.image || user?.logoUrl;
+        const raw = user as Record<string, unknown> | undefined;
+        if (!raw) return undefined;
+        const picks = ["image", "logoUrl", "avatar_url", "avatarUrl", "avatar"] as const;
+        for (const k of picks) {
+            const v = raw[k];
+            if (typeof v === "string" && v.trim()) return v.trim();
+        }
+        return undefined;
     };
 
     const notificationHref =
@@ -417,11 +424,13 @@ export default function DashboardHeader() {
                         )}
                     </div>
                     <button
+                        type="button"
                         onClick={handleLogout}
-                        className="hidden rounded-xl p-2.5 text-slate-300 transition-all hover:bg-slate-50 hover:text-[#4285F4] sm:block"
-                        title="Sign Out"
+                        className="rounded-xl p-2.5 text-slate-400 transition-all hover:bg-slate-50 hover:text-[#4285F4]"
+                        aria-label="Log out"
+                        title="Log out"
                     >
-                        <LogOut className="w-5 h-5 group-hover:translate-x-0.5 transition-transform" />
+                        <LogOut className="h-5 w-5 shrink-0" aria-hidden />
                     </button>
                 </div>
             </div>

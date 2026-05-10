@@ -30,7 +30,8 @@ import {
 import { toast } from 'sonner';
 import clsx from 'clsx';
 import ReportPrintView from '../../../../student/report/components/ReportPrintView';
-import AttendanceSummaryTable from '../../../../student/engagement/components/AttendanceSummaryTable';
+import { AttendanceLogsDossierTable } from "@/components/verify/AttendanceLogsDossierTable";
+import { buildSection1AttendanceParticipantNameMap } from "@/utils/attendanceLogDisplay";
 import { checkReportQuality, QualityAlert } from '@/utils/reportQuality';
 import { parseSection11AuditSummary, type ReportCIIauditMeta } from "@/lib/parseCIIauditSummary";
 import type { ReportData } from "../../../../student/report/context/ReportContext";
@@ -40,6 +41,11 @@ import { readPersistedCiiSnapshot } from "@/utils/reportCiiSnapshot";
 import { applyEngagementTeamScopeToReport } from "@/utils/reportTeamScope";
 import { getReportProjectContextDisplay } from "@/utils/reportProjectContext";
 import { VERIFY_DOSSIER_FIELD_GRID } from "@/utils/verifyDossierFieldGrid";
+import {
+    EngagementIndividualMetricsTable,
+    engagementIndividualMetricsHaveTableRows,
+} from "@/components/verify/EngagementIndividualMetricsTable";
+import { CompetencyScoresTable } from "@/components/verify/CompetencyScoresTable";
 import { formatSection7PakistanDialForDisplay } from "@/utils/reportSection7PakistanDial";
 import { buildSection1ParticipationDisplay, resolveReportAuthorParticipationSnapshot } from "@/utils/reportSection1ParticipationDisplay";
 
@@ -1081,7 +1087,24 @@ export default function AdminReportDetailPage() {
                                             <LabelValue label="Engagement category" value={report.section1.metrics.engagement_category} />
                                             <LabelValue label="HEC compliance" value={report.section1.metrics.hec_compliance} />
                                             <LabelValue label="Red flags" value={report.section1.metrics.redFlags} fullWidth />
-                                            <LabelValue label="Individual metrics" value={report.section1.metrics.individual_metrics} fullWidth />
+                                            {engagementIndividualMetricsHaveTableRows(report.section1.metrics.individual_metrics) ? (
+                                                <div className="mb-4 flex min-w-0 flex-col md:col-span-2">
+                                                    <span className={clsx(adminDossier.microLabel, "mb-1.5 block tracking-wide")}>
+                                                        Individual metrics
+                                                    </span>
+                                                    <EngagementIndividualMetricsTable
+                                                        report={report}
+                                                        value={report.section1.metrics.individual_metrics}
+                                                        insetClassName={clsx(adminDossier.inset, "p-0 overflow-hidden")}
+                                                    />
+                                                </div>
+                                            ) : (
+                                                <LabelValue
+                                                    label="Individual metrics"
+                                                    value={report.section1.metrics.individual_metrics}
+                                                    fullWidth
+                                                />
+                                            )}
                                             <LabelValue label="Non-compliant" value={report.section1.metrics.isNonCompliant} />
                                         </div>
                                     </div>
@@ -1092,9 +1115,16 @@ export default function AdminReportDetailPage() {
                                         <h3 className={clsx(adminDossier.microLabel, "mb-3 border-b border-slate-100 pb-2 text-slate-400")}>
                                             Attendance & evidence logs
                                         </h3>
-                                        <AttendanceSummaryTable
-                                            entries={report.section1.attendance_logs}
-                                            isLocked={true}
+                                        <AttendanceLogsDossierTable
+                                            logs={report.section1.attendance_logs}
+                                            participantNames={buildSection1AttendanceParticipantNameMap({
+                                                section1: report.section1,
+                                                student: report.student,
+                                            })}
+                                            headerClassName={clsx(
+                                                "text-[9px] font-black uppercase tracking-widest text-white",
+                                                "bg-slate-900",
+                                            )}
                                         />
                                     </div>
                                 )}
@@ -1676,11 +1706,7 @@ export default function AdminReportDetailPage() {
                                         <h3 className={clsx(adminDossier.microLabel, "mb-3 border-b border-slate-100 pb-2 text-slate-400")}>
                                             Individual competency scores
                                         </h3>
-                                        <div className={VERIFY_DOSSIER_FIELD_GRID}>
-                                            {Object.entries(report.section9.competency_scores as Record<string, unknown>).map(([key, value]) => (
-                                                <LabelValue key={key} label={key.replace(/_/g, " ")} value={value} />
-                                            ))}
-                                        </div>
+                                        <CompetencyScoresTable scores={report.section9.competency_scores} className="-mx-1" />
                                     </div>
                                 ) : null}
                                 <LabelValue label="Section summary" value={report.section9?.summary_text} fullWidth />

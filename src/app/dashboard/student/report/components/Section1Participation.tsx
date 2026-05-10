@@ -239,7 +239,16 @@ export default function Section1Participation({ projectData }: { projectData?: a
         { id: 4, title: 'Metrics Dashboard' }
     ];
 
-    const participantNamesMap = Object.fromEntries(rawParticipants.map((u: any) => [u.id, u.name]));
+    const participantNamesMap = React.useMemo(() => {
+        const map: Record<string, string> = {};
+        for (const u of rawParticipants) {
+            const name = String((u as { name?: string }).name || "").trim() || "Participant";
+            map[u.id] = name;
+            const bare = engagementParticipantCompareKey(u.id);
+            if (bare && bare !== u.id) map[bare] = name;
+        }
+        return map;
+    }, [rawParticipants]);
 
     const isFetchingRef = React.useRef(false);
 
@@ -1336,8 +1345,8 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                                 data.section1.metrics.individual_metrics,
                                         }}
                                         isTeam={participation_type === 'team'}
-                                        participantNames={participantNamesMap}
                                         hideIntensityHero
+                                        report={data}
                                     />
 
 

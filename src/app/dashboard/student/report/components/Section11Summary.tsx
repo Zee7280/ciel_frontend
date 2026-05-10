@@ -825,7 +825,15 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                         {/* Modal Header */}
                         <div className="flex items-center justify-between px-8 py-6 border-b border-slate-100 sticky top-0 bg-white/95 backdrop-blur-xl rounded-t-[2rem] z-[110] print-no-ui">
                             <div className="flex items-center gap-4">
-                                <div className="w-10 h-10 rounded-xl bg-slate-900 text-white flex items-center justify-center shadow-lg"><Download className="w-5 h-5" /></div>
+                                <button
+                                    type="button"
+                                    onClick={handlePrint}
+                                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-900 text-white shadow-lg transition hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2"
+                                    aria-label="Save dossier as PDF — opens print dialog"
+                                    title="Save as PDF"
+                                >
+                                    <Download className="w-5 h-5" aria-hidden />
+                                </button>
                                 <div>
                                     <h3 className="text-sm font-black text-slate-900 uppercase tracking-tight">Official Project Dossier</h3>
                                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Institutional Impact Verification</p>
@@ -860,6 +868,15 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-3">
+                                    <button
+                                        type="button"
+                                        onClick={handlePrint}
+                                        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-900 text-white shadow-lg transition hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2"
+                                        aria-label="Save certificate as PDF — opens print dialog"
+                                        title="Save as PDF"
+                                    >
+                                        <Download className="w-5 h-5" aria-hidden />
+                                    </button>
                                     <Button
                                         onClick={handlePrint}
                                         className="bg-report-primary hover:opacity-90 text-white h-10 px-6 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 shadow-lg shadow-report-primary-shadow"

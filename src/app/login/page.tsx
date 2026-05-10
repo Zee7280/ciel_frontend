@@ -98,7 +98,22 @@ function buildStoredUser(payloadValue: unknown, role: unknown): Record<string, u
     return merged;
 }
 
+/** Persist canonical photo URL under common keys (`avatar` from API ↔ `image` for legacy UI). Do not mirror into `logoUrl` (partner org branding stays separate). */
+function normalizeStoredUserProfilePhotoAliases(user: Record<string, unknown>) {
+    const url =
+        normalizeNonEmptyString(user.image) ||
+        normalizeNonEmptyString(user.avatar_url) ||
+        normalizeNonEmptyString(user.avatarUrl) ||
+        normalizeNonEmptyString(user.avatar);
+    if (!url) return;
+    if (!normalizeNonEmptyString(user.image)) user.image = url;
+    if (!normalizeNonEmptyString(user.avatar_url)) user.avatar_url = url;
+    if (!normalizeNonEmptyString(user.avatarUrl)) user.avatarUrl = url;
+    if (!normalizeNonEmptyString(user.avatar)) user.avatar = url;
+}
+
 function syncStoredUser(user: Record<string, unknown>) {
+    normalizeStoredUserProfilePhotoAliases(user);
     const s = JSON.stringify(user);
     localStorage.setItem("ciel_user", s);
     localStorage.setItem("user", s);
@@ -212,7 +227,11 @@ function LoginContent() {
             });
             const data = await res.json().catch(() => ({}));
             if (res.ok && data.success) {
-                setForgotSuccess("Reset link sent! Check your email to reset your password.");
+                setForgotSuccess(
+                    typeof data.message === "string"
+                        ? data.message
+                        : "Reset link sent! Check your email to reset your password.",
+                );
                 // We keep the view as "forgot" so they see the success message
             } else {
                 setFpError(data.message || "Failed to send reset request.");

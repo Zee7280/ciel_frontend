@@ -24,6 +24,11 @@ interface AttendanceEntry {
     approval_action_reason?: string | null;
     evidence_file?: any;
     participantId?: string;
+    /** Organization / site label from form (`organizationName` / `location`). */
+    location?: string | null;
+    organizationName?: string | null;
+    locationPin?: string | null;
+    location_pin?: string | null;
 }
 
 function displayApprovalLabel(entry: AttendanceEntry): string {
@@ -52,7 +57,18 @@ function isRejectedEntry(entry: AttendanceEntry): boolean {
     return raw === "rejected";
 }
 
-/** Normalized `approval_remark` or raw backend `approvalActionReason` (report verify pages pass raw logs). */
+function pickEntryLocation(entry: AttendanceEntry): string {
+    const e = entry as AttendanceEntry & {
+        organizationName?: string | null;
+        locationPin?: string | null;
+        location_pin?: string | null;
+    };
+    const loc = [e.location, e.organizationName].find((x) => typeof x === "string" && x.trim())?.trim() ?? "";
+    const pin = [e.locationPin, e.location_pin].find((x) => typeof x === "string" && x.trim())?.trim() ?? "";
+    if (loc && pin) return `${loc}\n${pin}`;
+    return loc || pin || "—";
+}
+
 function pickDescription(entry: AttendanceEntry): string {
     const e = entry as AttendanceEntry & { sessionDescription?: string | null };
     for (const v of [entry.description, entry.session_description, e.sessionDescription]) {
@@ -69,6 +85,64 @@ function resolvedRejectRemark(entry: AttendanceEntry): string {
     return "";
 }
 
+function engagementParticipantBareId(id: string | undefined | null): string {
+    if (!id) return "";
+    if (id.startsWith("lead:")) return id.slice("lead:".length);
+    const m = /^member:\d+:(.+)$/.exec(id);
+    if (m?.[1]) return m[1];
+    return id;
+}
+
+function resolveParticipantDisplayName(participantId: string | undefined, participantNames: Record<string, string>): string {
+    if (!participantId) return "—";
+    const trimmedMap = (k: string) => (participantNames[k] || "").trim();
+    const direct = trimmedMap(participantId);
+    if (direct) return direct;
+    const bare = engagementParticipantBareId(participantId);
+    if (bare && trimmedMap(bare)) return trimmedMap(bare);
+    for (const [key, name] of Object.entries(participantNames)) {
+        const n = (name || "").trim();
+        if (!n) continue;
+        if (engagementParticipantBareId(key) === bare) return n;
+    }
+    return "Team member";
+}
+
+function isNativeFile(value: unknown): value is File {
+    return typeof File !== "undefined" && value instanceof File;
+}
+
+/** Resolved href for attendance evidence (API URL, path, or metadata object). */
+function resolveAttendanceEvidenceHref(evidence: unknown, entry: AttendanceEntry): string | null {
+    const ext = entry as AttendanceEntry & { evidenceUrl?: string; evidence_url?: string };
+    for (const v of [ext.evidenceUrl, ext.evidence_url]) {
+        if (typeof v === "string" && v.trim()) return v.trim();
+    }
+    if (typeof evidence === "string" && evidence.trim()) return evidence.trim();
+    if (evidence && typeof evidence === "object" && !Array.isArray(evidence) && !isNativeFile(evidence)) {
+        const o = evidence as Record<string, unknown>;
+        for (const k of ["url", "href", "path", "fileUrl", "file_url", "publicUrl", "public_url"]) {
+            const v = o[k];
+            if (typeof v === "string" && v.trim()) return v.trim();
+        }
+    }
+    return null;
+}
+
+function evidenceLinkLabel(href: string): string {
+    try {
+        if (href.startsWith("http")) {
+            const u = new URL(href);
+            const last = u.pathname.split("/").filter(Boolean).pop();
+            if (last) return decodeURIComponent(last);
+        }
+        const last = href.split(/[/?#]/).filter(Boolean).pop();
+        return last ? decodeURIComponent(last) : "Evidence";
+    } catch {
+        return "Evidence";
+    }
+}
+
 export default function AttendanceSummaryTable({ entries, onDelete, isLocked = false, participantNames = {}, embedded = false }: {
     entries: AttendanceEntry[],
     onDelete?: (id: string) => void,
@@ -79,7 +153,7 @@ export default function AttendanceSummaryTable({ entries, onDelete, isLocked = f
 }) {
     const [remarkOpenId, setRemarkOpenId] = React.useState<string | null>(null);
     const actionCol = !isLocked && !!onDelete;
-    const colSpan = actionCol ? 8 : 7;
+    const colSpan = actionCol ? 9 : 8;
 
     const toggleRemarkRow = (id: string) => {
         setRemarkOpenId((prev) => (prev === id ? null : id));
@@ -120,22 +194,29 @@ export default function AttendanceSummaryTable({ entries, onDelete, isLocked = f
             ) : null}
 
             <div className="w-full min-w-0 overflow-x-auto selection:bg-report-primary/10">
-                <table className="w-full text-left border-collapse min-w-[960px]">
+                <table className="w-full text-left border-collapse min-w-[1060px]">
                     <thead>
                         <tr className="bg-slate-50/80 backdrop-blur-sm border-b border-slate-100">
-                            <th className="px-5 py-5 text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">Date & Session</th>
-                            <th className="px-5 py-5 text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">Activity Type</th>
+                            <th className="px-5 py-5 text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">Date &amp; session</th>
+                            <th className="px-5 py-5 text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">Location / pin</th>
+                            <th className="px-5 py-5 text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">Activity type</th>
                             <th className="px-5 py-5 text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">Description</th>
-                            <th className="px-5 py-5 text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">Student</th>
+                            <th className="px-5 py-5 text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">Participant name</th>
                             <th className="px-5 py-5 text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">Duration</th>
                             <th className="px-5 py-5 text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">Approval</th>
-                            <th className="px-5 py-5 text-[10px] font-black uppercase tracking-[0.12em] text-slate-400 text-center">Evidence</th>
-                            {!isLocked && onDelete && <th className="px-5 py-5 text-[10px] font-black uppercase tracking-[0.12em] text-slate-400 text-right">Actions</th>}
+                            <th className="min-w-[10rem] px-5 py-5 text-left text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">Evidence link</th>
+                            {!isLocked && onDelete && (
+                                <th className="px-5 py-5 text-right text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">Actions</th>
+                            )}
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50">
                         {entries.map((entry) => {
                             const descText = pickDescription(entry);
+                            const participantLabel = resolveParticipantDisplayName(entry.participantId, participantNames);
+                            const evidenceHref = resolveAttendanceEvidenceHref(entry.evidence_file, entry);
+                            const localFile = isNativeFile(entry.evidence_file);
+                            const linkedNoUrl = !evidenceHref && entry.evidence_file && !localFile;
                             return (
                             <React.Fragment key={entry.id}>
                             <tr className="hover:bg-report-primary-soft/10 transition-all group border-b border-slate-50 last:border-0">
@@ -154,6 +235,9 @@ export default function AttendanceSummaryTable({ entries, onDelete, isLocked = f
                                         </div>
                                     </div>
                                 </td>
+                                <td className="max-w-[13rem] px-5 py-7 align-top whitespace-pre-wrap text-xs font-medium leading-relaxed text-slate-700">
+                                    {pickEntryLocation(entry)}
+                                </td>
                                 <td className="px-5 py-7">
                                     <div className="flex items-center gap-3">
                                         <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center text-slate-400 group-hover:bg-report-primary-soft group-hover:text-report-primary transition-colors">
@@ -162,9 +246,9 @@ export default function AttendanceSummaryTable({ entries, onDelete, isLocked = f
                                         <span className="text-xs font-black text-slate-700 uppercase tracking-wider">{entry.activity_type}</span>
                                     </div>
                                 </td>
-                                <td className="max-w-[14rem] px-5 py-7 align-top lg:max-w-xs">
+                                <td className="max-w-[18rem] px-5 py-7 align-top lg:max-w-md">
                                     {descText ? (
-                                        <p className="text-xs font-medium leading-relaxed text-slate-600 line-clamp-4">
+                                        <p className="text-xs font-medium leading-relaxed text-slate-600 whitespace-pre-wrap break-words">
                                             {descText}
                                         </p>
                                     ) : (
@@ -173,14 +257,17 @@ export default function AttendanceSummaryTable({ entries, onDelete, isLocked = f
                                         </span>
                                     )}
                                 </td>
-                                <td className="px-5 py-7">
-                                    <div className="flex items-center gap-2">
-                                        <div className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-[10px] font-black text-slate-500">
-                                            {(participantNames[entry.participantId || ''] || '??').charAt(0).toUpperCase()}
+                                <td className="min-w-[10rem] px-5 py-7 align-top">
+                                    <div className="flex items-start gap-2">
+                                        <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[11px] font-black text-slate-600">
+                                            {participantLabel.charAt(0).toUpperCase()}
                                         </div>
-                                        <span className="text-[10px] font-bold text-slate-600 uppercase tracking-tight">
-                                            {participantNames[entry.participantId || ''] || 'Team Member'}
-                                        </span>
+                                        <div className="min-w-0">
+                                            <p className="text-sm font-semibold leading-snug text-slate-900">{participantLabel}</p>
+                                            <p className="mt-0.5 break-all text-[10px] font-medium uppercase tracking-wide text-slate-400">
+                                                ID: {engagementParticipantBareId(entry.participantId) || "—"}
+                                            </p>
+                                        </div>
                                     </div>
                                 </td>
                                 <td className="px-5 py-7">
@@ -216,17 +303,27 @@ export default function AttendanceSummaryTable({ entries, onDelete, isLocked = f
                                         </span>
                                     )}
                                 </td>
-                                <td className="px-8 py-7 text-center">
-                                    {typeof entry.evidence_file === 'string' ? (
-                                        <a href={entry.evidence_file} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 px-5 py-2 bg-report-primary text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-md shadow-report-primary-shadow hover:opacity-90 transition-all cursor-pointer">
-                                            <CheckCircle2 className="w-3.5 h-3.5" /> VIEW
+                                <td className="min-w-[11rem] px-5 py-7 align-top">
+                                    {evidenceHref ? (
+                                        <a
+                                            href={evidenceHref}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="inline-flex max-w-full items-center gap-2 break-all rounded-xl border border-report-primary/25 bg-report-primary px-4 py-2.5 text-[11px] font-bold text-white shadow-sm shadow-report-primary-shadow transition hover:opacity-90"
+                                        >
+                                            <CheckCircle2 className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                                            <span className="min-w-0 underline-offset-2">{evidenceLinkLabel(evidenceHref)}</span>
                                         </a>
-                                    ) : entry.evidence_file ? (
-                                        <div className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-600 rounded-xl text-[9px] font-black border-2 border-emerald-100 uppercase tracking-widest">
-                                            <CheckCircle2 className="w-3.5 h-3.5" /> LINKED
-                                        </div>
+                                    ) : localFile ? (
+                                        <span className="text-xs font-medium text-slate-600">
+                                            {(entry.evidence_file as File).name || "File attached (save locally)"}
+                                        </span>
+                                    ) : linkedNoUrl ? (
+                                        <span className="text-[11px] font-semibold text-amber-800">
+                                            Evidence uploaded — URL not yet available
+                                        </span>
                                     ) : (
-                                        <span className="text-[9px] font-black text-slate-300 uppercase tracking-[0.2em]">No Evidence</span>
+                                        <span className="text-[11px] font-semibold text-slate-400">No evidence</span>
                                     )}
                                 </td>
                                 {!isLocked && onDelete && (

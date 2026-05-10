@@ -15,7 +15,7 @@ function extractUuidFromSyntheticStudentId(studentId: string): string | null {
     return m?.[1] ? m[1].toLowerCase() : null;
 }
 
-function resolveTeamMemberDisplayName(report: any, row: Record<string, unknown>): string {
+export function resolveTeamMemberDisplayName(report: any, row: Record<string, unknown>): string {
     const synthetic = normStr(row.student_id);
     const uuidFromSynthetic = synthetic ? extractUuidFromSyntheticStudentId(synthetic) : null;
 

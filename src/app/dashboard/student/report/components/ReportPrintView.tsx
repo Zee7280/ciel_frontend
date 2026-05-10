@@ -9,6 +9,13 @@ import { buildSection1ParticipationDisplay, resolveReportAuthorParticipationSnap
 import { deriveCertificateProjectDisplay } from "../utils/certificateDisplay";
 import { parseSection11AuditSummary } from "@/lib/parseCIIauditSummary";
 import ReportVerificationQr from "@/components/ReportVerificationQr";
+import { CompetencyScoresTable } from "@/components/verify/CompetencyScoresTable";
+import {
+    EngagementIndividualMetricsTable,
+    engagementIndividualMetricsHaveTableRows,
+} from "@/components/verify/EngagementIndividualMetricsTable";
+import { AttendanceLogsDossierTable } from "@/components/verify/AttendanceLogsDossierTable";
+import { buildSection1AttendanceParticipantNameMap } from "@/utils/attendanceLogDisplay";
 import { formatDisplayId } from "@/utils/displayIds";
 import { isInstitutionallyVerifiedReport } from "@/utils/institutionalReportVerification";
 import { pickImpactVerifyUrlFromPayload } from "@/utils/reportVerificationUrl";
@@ -644,6 +651,41 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
     };
 
     const metrics = calculateMetrics();
+    const metricsMerged = reportForCii.section1?.metrics;
+    const individualMetricsForPrint = engagementIndividualMetricsHaveTableRows(metricsMerged?.individual_metrics)
+        ? metricsMerged?.individual_metrics
+        : engagementRecalc.individual_metrics;
+
+    const engagementForPrintDossier = {
+        verified_session_count: metricsMerged?.verified_session_count ?? engagementRecalc.verified_session_count,
+        total_active_days: metricsMerged?.total_active_days ?? engagementRecalc.total_active_days,
+        engagement_span: metricsMerged?.engagement_span ?? engagementSpanForPrint,
+        attendance_frequency: metricsMerged?.attendance_frequency ?? engagementRecalc.attendance_frequency,
+        weekly_continuity: metricsMerged?.weekly_continuity ?? engagementRecalc.weekly_continuity,
+        eis_score: metricsMerged?.eis_score ?? engagementRecalc.eis_score,
+        engagement_category: metricsMerged?.engagement_category ?? engagementRecalc.engagement_category,
+        hec_compliance: metricsMerged?.hec_compliance ?? engagementRecalc.hec_compliance,
+        isNonCompliant:
+            metricsMerged?.isNonCompliant !== undefined
+                ? metricsMerged.isNonCompliant
+                : engagementRecalc.isNonCompliant,
+    };
+
+    const redFlagsForPrint = (() => {
+        const stored = metricsMerged?.redFlags;
+        if (Array.isArray(stored) && stored.length) {
+            return stored.filter((x): x is string => typeof x === "string");
+        }
+        const calc = engagementRecalc.redFlags;
+        return Array.isArray(calc) ? calc : [];
+    })();
+
+    const showEngagementDossierSection =
+        Boolean(metricsMerged) ||
+        (Array.isArray(data.section1?.attendance_logs) && data.section1.attendance_logs.length > 0) ||
+        engagementRecalc.total_verified_hours > 0 ||
+        redFlagsForPrint.length > 0;
+
     const projectRecord = printObject(projectData) ?? {};
 
     const dossierProjectHeadline = deriveCertificateProjectDisplay({
@@ -1229,17 +1271,63 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
                     </div>
                 )}
 
-                    <div className={dossierFieldGrid}>
-                    <QandA q="Engagement span" a={data.section1.metrics?.engagement_span ? `${data.section1.metrics.engagement_span} days` : ""} />
-                    <QandA q="Verified session count" a={data.section1.metrics?.verified_session_count} />
-                    <QandA q="Attendance frequency" a={data.section1.metrics?.attendance_frequency} />
-                    <QandA q="Weekly continuity" a={data.section1.metrics?.weekly_continuity} />
-                    <QandA q="EIS score" a={data.section1.metrics?.eis_score} />
-                    <QandA q="HEC compliance" a={data.section1.metrics?.hec_compliance} />
-                    <QandA q="Engagement category" a={data.section1.metrics?.engagement_category} />
-                    <QandA q="Individual metrics" a={data.section1.metrics?.individual_metrics} fullWidth />
-                    <QandA q="Engagement red flags" a={data.section1.metrics?.redFlags} fullWidth />
+                {showEngagementDossierSection ? (
+                    <div className="break-inside-avoid space-y-4">
+                        <p className={dossierSubsectionEyebrow}>Engagement analytics</p>
+                        <p className="text-xs font-medium leading-relaxed text-slate-600">
+                            Same engagement metrics shown to reviewers on institutional verify — EIS, compliance category, and per-member breakdown for teams.
+                        </p>
+                        <div className={dossierFieldGrid}>
+                            <QandA q="Verified session count" a={engagementForPrintDossier.verified_session_count} />
+                            <QandA q="Total active days" a={engagementForPrintDossier.total_active_days} />
+                            <QandA q="Engagement span (days)" a={engagementForPrintDossier.engagement_span} />
+                            <QandA q="Attendance frequency" a={engagementForPrintDossier.attendance_frequency} />
+                            <QandA q="Weekly continuity (%)" a={engagementForPrintDossier.weekly_continuity} />
+                            <QandA q="EIS score" a={engagementForPrintDossier.eis_score} />
+                            <QandA q="Engagement category" a={engagementForPrintDossier.engagement_category} />
+                            <QandA q="HEC compliance" a={engagementForPrintDossier.hec_compliance} />
+                            <QandA q="Non-compliant (engagement)" a={engagementForPrintDossier.isNonCompliant} />
+                        </div>
+                        {redFlagsForPrint.length > 0 ? (
+                            <div className="dossier-qa flex min-h-0 flex-col break-inside-avoid md:col-span-2">
+                                <span className={`mb-2 ${dossierLabel} text-slate-500`}>Engagement red flags</span>
+                                <div className="flex min-h-0 flex-1 flex-col rounded-xl border border-rose-200/80 bg-rose-50/50 px-4 py-3 shadow-sm">
+                                    <ul className={`${dossierBodyText} list-disc space-y-1.5 pl-5 font-medium text-rose-950`}>
+                                        {redFlagsForPrint.map((flag, i) => (
+                                            <li key={i}>{flag}</li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            </div>
+                        ) : null}
+                        {engagementIndividualMetricsHaveTableRows(individualMetricsForPrint) ? (
+                            <div className="dossier-qa flex min-h-0 flex-col break-inside-avoid">
+                                <span className={`mb-2 ${dossierLabel} text-slate-500`}>Individual metrics</span>
+                                <div className="flex min-h-0 flex-1 flex-col overflow-x-auto rounded-xl border border-slate-200/80 bg-white px-2 py-2 shadow-sm sm:px-3 sm:py-3">
+                                    <EngagementIndividualMetricsTable report={data} value={individualMetricsForPrint} />
+                                </div>
+                            </div>
+                        ) : null}
                     </div>
+                ) : null}
+
+                {Array.isArray(data.section1?.attendance_logs) && data.section1.attendance_logs.length > 0 ? (
+                    <div className="break-inside-avoid space-y-3">
+                        <p className={dossierSubsectionEyebrow}>Attendance &amp; evidence (submitted logs)</p>
+                        <p className="text-xs font-medium leading-relaxed text-slate-600">
+                            Each row reflects what the student uploaded: date, site / location, narrative, and proof-of-presence link where provided.
+                        </p>
+                        <div className="overflow-x-auto">
+                            <AttendanceLogsDossierTable
+                                logs={data.section1.attendance_logs}
+                                participantNames={buildSection1AttendanceParticipantNameMap({
+                                    section1: data.section1,
+                                    student: data.student,
+                                })}
+                            />
+                        </div>
+                    </div>
+                ) : null}
                 </div>
 
                 {/* Section 2: Project Context */}
@@ -1701,7 +1789,12 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
                 <div className={dossierSectionStack}>
                     <div className={dossierFieldGrid}>
                         <QandA q="Academic integration" a={data.section9.academic_integration} />
-                        <QandA q="Competency scores" a={data.section9.competency_scores} fullWidth />
+                    </div>
+                    <div className={`dossier-qa flex min-h-0 flex-col md:col-span-2 break-inside-avoid`}>
+                        <span className={`mb-2 ${dossierLabel} text-slate-500`}>Competency scores</span>
+                        <div className="flex min-h-[3.5rem] flex-1 flex-col rounded-xl border border-slate-200/80 bg-white px-4 py-3 shadow-sm transition-shadow duration-200 hover:shadow-md">
+                            <CompetencyScoresTable scores={data.section9.competency_scores} />
+                        </div>
                     </div>
                     <QandA q="Academic–professional synthesis" a={data.section9.academic_application} fullWidth />
                     <QandA q="Personal narrative & identity growth" a={data.section9.personal_learning} fullWidth />

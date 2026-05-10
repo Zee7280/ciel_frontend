@@ -26,50 +26,81 @@ const HOME_PARTNER_LOGOS = [
 export default function PartnersFooter() {
     return (
         <section
-            className="relative overflow-hidden border-t border-slate-200/90 bg-gradient-to-b from-slate-50 via-white to-white py-14 md:py-16"
+            className="relative overflow-hidden bg-white py-20 md:py-24"
             aria-labelledby="home-partners-heading"
         >
+            {/* Subtle top separator */}
+            <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-slate-200 to-transparent" />
+
+            {/* Background glow */}
             <div
-                className="pointer-events-none absolute inset-0 opacity-100"
+                className="pointer-events-none absolute inset-0"
                 style={{
-                    background: `radial-gradient(ellipse 85% 55% at 50% -15%, rgba(0, 86, 179, 0.07), transparent 55%)`,
+                    background: `radial-gradient(ellipse 70% 60% at 50% 0%, rgba(0,86,179,0.05) 0%, transparent 65%)`,
                 }}
                 aria-hidden
             />
 
             <div className="relative mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-                <header className="mb-10 text-center md:mb-12">
+                {/* Section heading */}
+                <header className="mb-14 text-center">
+                    <div className="mb-3 inline-flex items-center gap-2">
+                        <span className="h-px w-8 bg-[#0056B3]/40" />
+                        <span className="text-[10px] font-bold uppercase tracking-[0.32em] text-[#0056B3]">
+                            Partner Organisations
+                        </span>
+                        <span className="h-px w-8 bg-[#0056B3]/40" />
+                    </div>
                     <h2
                         id="home-partners-heading"
-                        className="text-[11px] font-semibold uppercase tracking-[0.28em] text-[#0056B3]/90 md:text-xs"
+                        className="text-2xl font-bold tracking-tight text-slate-800 sm:text-3xl"
                     >
-                        Partner organisations
+                        Trusted by leading organisations
                     </h2>
-                    <p className="mx-auto mt-3 max-w-lg text-xs leading-relaxed text-slate-500 md:text-sm">
-                        Trusted collaborators advancing education and impact across Pakistan.
+                    <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-slate-500">
+                        Collaborating with Pakistan&apos;s most impactful institutions to advance education and social impact.
                     </p>
                 </header>
 
+                {/* Logo grid */}
                 <ul
                     role="list"
-                    className="mx-auto grid max-w-6xl grid-cols-2 items-stretch gap-6 sm:grid-cols-3 sm:gap-8 lg:grid-cols-5 lg:gap-6 xl:gap-8 [&>li]:flex [&>li]:justify-center"
+                    className="mx-auto grid max-w-5xl grid-cols-2 items-center gap-5 sm:grid-cols-3 sm:gap-6 lg:grid-cols-5 lg:gap-5 xl:gap-6 [&>li]:flex [&>li]:justify-center"
                     aria-label="Partner organisation logos"
                 >
                     {HOME_PARTNER_LOGOS.map(({ src, alt }) => (
                         <li key={src} className="min-w-0">
-                            <div className="group flex h-[5.75rem] w-full max-w-[212px] items-center justify-center rounded-2xl border border-slate-200/75 bg-white p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_1px_3px_rgba(15,23,42,0.06)] transition duration-300 ease-out hover:border-[#0056B3]/28 hover:shadow-[0_12px_32px_-16px_rgba(0,86,179,0.2)] sm:h-[6rem] lg:max-w-none lg:rounded-xl">
+                            <div className="group relative flex h-[7.5rem] w-full items-center justify-center overflow-hidden rounded-2xl border border-slate-100 bg-white p-6 shadow-[0_2px_12px_rgba(15,23,42,0.07)] transition-all duration-300 ease-out hover:-translate-y-1 hover:border-[#0056B3]/20 hover:shadow-[0_16px_40px_-12px_rgba(0,86,179,0.22)] lg:h-[8rem]">
+                                {/* Card inner glow on hover */}
+                                <div className="pointer-events-none absolute inset-0 rounded-2xl opacity-0 transition-opacity duration-300 group-hover:opacity-100" style={{ background: `radial-gradient(ellipse 80% 60% at 50% 110%, rgba(0,86,179,0.06), transparent 70%)` }} aria-hidden />
                                 <Image
                                     src={src}
                                     alt={alt}
-                                    width={220}
-                                    height={88}
-                                    sizes="(max-width:640px) 42vw, 160px"
-                                    className="h-[2.875rem] w-auto max-h-[3rem] max-w-[min(100%,10.5rem)] object-contain object-center grayscale-[18%] contrast-[1.03] transition duration-300 ease-out group-hover:scale-[1.03] group-hover:grayscale-0 group-hover:contrast-100 sm:h-[3.125rem] sm:max-h-[3.25rem]"
+                                    width={240}
+                                    height={96}
+                                    sizes="(max-width:640px) 44vw, 170px"
+                                    className="relative h-14 w-auto max-h-[3.75rem] max-w-[min(100%,11rem)] object-contain object-center grayscale transition-all duration-300 ease-out group-hover:scale-105 group-hover:grayscale-0 sm:h-16 sm:max-h-[4rem]"
                                 />
                             </div>
                         </li>
                     ))}
                 </ul>
+
+                {/* Bottom stat strip */}
+                <div className="mt-14 flex flex-col items-center gap-2 sm:flex-row sm:justify-center sm:gap-10">
+                    <div className="flex items-center gap-2 text-slate-500">
+                        <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#0056B3]/60" />
+                        <span className="text-xs font-medium">5 partner organisations</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-slate-500">
+                        <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#0056B3]/60" />
+                        <span className="text-xs font-medium">Across Pakistan</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-slate-500">
+                        <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#0056B3]/60" />
+                        <span className="text-xs font-medium">Education &amp; Social Impact</span>
+                    </div>
+                </div>
             </div>
         </section>
     );

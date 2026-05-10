@@ -21,7 +21,13 @@ export default function FloatingSupportButton() {
     return (
         <>
             {/* Floating support + WhatsApp (stacked bottom-right) */}
-            <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-3 print:hidden">
+            {/* Bottom inset: clear dashboard pb-24 + mobile home indicator; avoid clipping FAB */}
+            <div
+                className="fixed right-4 z-[60] flex flex-col items-end gap-3 overflow-visible print:hidden sm:right-6"
+                style={{
+                    bottom: "calc(7rem + env(safe-area-inset-bottom, 0px))",
+                }}
+            >
                 {/* Support Menu (appears when open, above stacks) */}
                 {isOpen && (
                     <div className="absolute bottom-full right-0 mb-2 w-80 animate-in slide-in-from-bottom-4 duration-300">
@@ -52,7 +58,7 @@ export default function FloatingSupportButton() {
                                     href={`https://wa.me/${WHATSAPP_E164}`}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="flex items-center gap-4 p-4 rounded-xl border border-slate-100 bg-slate-50/60 hover:bg-slate-100 hover:shadow-sm transition-all duration-200 group"
+                                    className="flex items-start gap-4 p-4 rounded-xl border border-slate-100 bg-slate-50/60 hover:bg-slate-100 hover:shadow-sm transition-all duration-200 group"
                                 >
                                     <div className="w-10 h-10 rounded-xl bg-green-500 text-white flex items-center justify-center group-hover:bg-green-600 transition-all duration-200 shadow-sm shrink-0">
                                         <WhatsAppGlyph className="w-5 h-5" />
@@ -64,7 +70,16 @@ export default function FloatingSupportButton() {
                                                 24/7
                                             </span>
                                         </div>
-                                        <p className="text-xs text-slate-500 truncate">{WHATSAPP_DISPLAY}</p>
+                                        <div className="mt-2 inline-block rounded-lg border border-slate-200 bg-white p-1 shadow-inner">
+                                            <img
+                                                src="/whatsapp-support-qr.png"
+                                                alt="Scan QR code to open WhatsApp chat with CIEL PK support"
+                                                width={232}
+                                                height={232}
+                                                className="h-[6.5rem] w-[6.5rem] object-contain sm:h-28 sm:w-28"
+                                                decoding="async"
+                                            />
+                                        </div>
                                     </div>
                                 </a>
 
@@ -118,18 +133,6 @@ export default function FloatingSupportButton() {
                                         </p>
                                     </div>
                                 </a>
-                            </div>
-
-                            {/* Footer */}
-                            <div className="px-4 pb-4 pt-2">
-                                <div className="text-center space-y-1">
-                                    <p className="text-[10px] font-medium text-green-700 uppercase tracking-wider">
-                                        WhatsApp {WHATSAPP_DISPLAY} — 24/7
-                                    </p>
-                                    <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">
-                                        Average response time: 2 hours
-                                    </p>
-                                </div>
                             </div>
                         </div>
                     </div>

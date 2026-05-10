@@ -42,15 +42,30 @@ function pickApprovalRemark(e: Record<string, unknown>): string | null {
     ]);
 }
 
+function pickEvidenceUrlString(e: Record<string, unknown>): string | undefined {
+    for (const k of ["evidenceUrl", "evidence_url", "fileUrl", "file_url", "attachmentUrl", "attachment_url"]) {
+        const v = e[k];
+        if (typeof v === "string" && v.trim()) return v.trim();
+    }
+    return undefined;
+}
+
 export function normalizeEngagementAttendanceLog(
     e: Record<string, unknown>,
     options?: { participantPrefixedId?: string },
 ): Record<string, unknown> {
     const participantId =
         options?.participantPrefixedId ??
-        (e.participantId != null ? String(e.participantId) : undefined);
+        (e.participantId != null
+            ? String(e.participantId)
+            : e.participant_id != null
+              ? String(e.participant_id)
+              : undefined);
 
     const approval_remark = pickApprovalRemark(e);
+    const evidenceUrlStr = pickEvidenceUrlString(e);
+    const evidenceUploaded =
+        e.evidenceUploaded === true || e.evidenceUploaded === "true" || e.evidence_uploaded === true;
 
     return {
         ...e,
@@ -59,11 +74,13 @@ export function normalizeEngagementAttendanceLog(
         start_time: (e.startTime ?? e.start_time ?? "") as string,
         end_time: (e.endTime ?? e.end_time ?? "") as string,
         location: (e.organizationName ?? e.location ?? "") as string,
+        location_pin: (e.locationPin ?? e.location_pin ?? "") as string,
         activity_type: (e.activityType ?? e.activity_type ?? "") as string,
         description: (e.description ?? "") as string,
         hours: Number(e.sessionHours ?? e.hours ?? 0),
         participantId,
-        evidence_file: e.evidenceUrl ?? (e.evidenceUploaded === true ? true : e.evidenceUploaded === "true" ? true : undefined),
+        evidence_file:
+            evidenceUrlStr ?? (evidenceUploaded ? true : undefined),
         approval_status: (e.approval_status ?? e.approvalStatus ?? null) as string | null,
         approval_remark,
         assigned_approver_type: (e.assigned_approver_type ?? e.assignedApproverType ?? null) as string | null,

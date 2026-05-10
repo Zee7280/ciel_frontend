@@ -2,6 +2,10 @@
 
 import { Shield, Clock, TrendingUp, CheckCircle2, Calendar, Activity, Database, Zap } from "lucide-react";
 import clsx from "clsx";
+import {
+    EngagementIndividualMetricsTable,
+    engagementIndividualMetricsHaveTableRows,
+} from "@/components/verify/EngagementIndividualMetricsTable";
 
 interface EngagementMetrics {
     totalHours: number;
@@ -30,12 +34,13 @@ interface EngagementMetrics {
     isNonCompliant?: boolean;
 }
 
-export default function EngagementOverview({ metrics, isTeam = false, participantNames = {}, hideIntensityHero = false }: { 
+export default function EngagementOverview({ metrics, isTeam = false, hideIntensityHero = false, report = undefined }: { 
     metrics: EngagementMetrics, 
     isTeam?: boolean,
-    participantNames?: Record<string, string>,
     /** When true, hides the dark intensity / HEC compliance hero (used in report Section 1 only). */
     hideIntensityHero?: boolean,
+    /** Full report payload (e.g. `ReportData`) for resolving team member names on individual metrics rows. */
+    report?: unknown,
 }) {
     const requiredHours = metrics.requiredHours || 16;
     const projectCapacityHours =
@@ -258,48 +263,16 @@ export default function EngagementOverview({ metrics, isTeam = false, participan
                 </div>
             </div>
 
-            {/* Individual Completion Table - ONLY FOR TEAMS */}
-            {isTeam && metrics.individual_metrics && metrics.individual_metrics.length > 0 && (
+            {/* Individual metrics table — same layout as admin / partner verify + print dossier */}
+            {isTeam && engagementIndividualMetricsHaveTableRows(metrics.individual_metrics) ? (
                 <div className="bg-white rounded-3xl border border-slate-100 p-8 space-y-6 shadow-sm">
                     <div className="flex items-center gap-3">
                         <Activity className="w-5 h-5 text-report-primary" />
-                        <h3 className="text-sm font-black uppercase tracking-[0.2em] text-slate-900">Individual Completion Status</h3>
+                        <h3 className="text-sm font-black uppercase tracking-[0.2em] text-slate-900">Individual metrics</h3>
                     </div>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {metrics.individual_metrics.map((m, i) => (
-                            <div key={i} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100/50">
-                                <div className="space-y-1">
-                                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                                        {participantNames[m.student_id] ?? "Participant"}
-                                    </p>
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-lg font-black text-slate-900">{m.individual_hours}</span>
-                                        <span className="text-[9px] font-bold text-slate-400 uppercase">/ {requiredHours} hrs</span>
-                                    </div>
-                                </div>
-                                <div className="text-right space-y-2">
-                                    <div className="h-2 w-24 bg-slate-200 rounded-full overflow-hidden">
-                                        <div 
-                                            className={clsx(
-                                                "h-full transition-all duration-1000",
-                                                m.completion_percentage >= 100 ? "bg-emerald-500" : "bg-report-primary"
-                                            )} 
-                                            style={{ width: `${m.completion_percentage}%` }}
-                                        />
-                                    </div>
-                                    <p className={clsx(
-                                        "text-[9px] font-black uppercase tracking-widest",
-                                        m.gateway_status === 'ELIGIBLE' ? "text-emerald-500" : "text-amber-500"
-                                    )}>
-                                        {m.gateway_status === 'ELIGIBLE' ? 'Target Met' : 'In Progress'}
-                                    </p>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
+                    <EngagementIndividualMetricsTable report={report} value={metrics.individual_metrics} />
                 </div>
-            )}
+            ) : null}
 
             {/* Metrics Grid */}
             <div className="grid grid-cols-2 md:grid-cols-5 gap-4">

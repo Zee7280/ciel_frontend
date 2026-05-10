@@ -38,16 +38,22 @@ function mapTutorialPayload(row: Record<string, unknown>): PlatformTutorialItem 
 }
 
 const TUTORIALS_API = "/api/v1/tutorials";
+const TUTORIALS_PUBLIC_API = "/api/v1/public/tutorials";
 
 type PlatformTutorialsPanelProps = {
     /** When false, skips network fetch (e.g. Help page hidden tab). */
     visible?: boolean;
+    /**
+     * Homepage / public page: read via anonymous Next proxy. Dashboards keep default (JWT via BFF).
+     */
+    publicMode?: boolean;
     emptyTitle?: string;
     emptyDescription?: ReactNode;
 };
 
 export default function PlatformTutorialsPanel({
     visible = true,
+    publicMode = false,
     emptyTitle = "No tutorials yet",
     emptyDescription = 'Platform guides will appear here when your administrator publishes them under "Platform tutorial".',
 }: PlatformTutorialsPanelProps) {
@@ -58,7 +64,9 @@ export default function PlatformTutorialsPanel({
     const loadTutorials = useCallback(async () => {
         setLoading(true);
         try {
-            const res = await authenticatedFetch(TUTORIALS_API, {}, { redirectToLogin: false });
+            const res = publicMode
+                ? await fetch(TUTORIALS_PUBLIC_API, { credentials: "same-origin" })
+                : await authenticatedFetch(TUTORIALS_API, {}, { redirectToLogin: false });
             if (!res?.ok) {
                 setTutorials([]);
                 return;
@@ -74,7 +82,7 @@ export default function PlatformTutorialsPanel({
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [publicMode]);
 
     useEffect(() => {
         if (!visible) return;

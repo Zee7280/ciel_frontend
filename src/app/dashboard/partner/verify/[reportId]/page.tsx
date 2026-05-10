@@ -13,13 +13,19 @@ import { toast } from 'sonner';
 import clsx from 'clsx';
 import ReportPrintView from '../../../student/report/components/ReportPrintView';
 import { applyEngagementTeamScopeToReport } from '@/utils/reportTeamScope';
-import AttendanceSummaryTable from '../../../student/engagement/components/AttendanceSummaryTable';
+import { AttendanceLogsDossierTable } from "@/components/verify/AttendanceLogsDossierTable";
+import { buildSection1AttendanceParticipantNameMap } from "@/utils/attendanceLogDisplay";
 import { checkReportQuality, QualityAlert } from '@/utils/reportQuality';
 import { readPersistedCiiSnapshot } from '@/utils/reportCiiSnapshot';
 import type { ReportData } from '../../../student/report/context/ReportContext';
 import { formatSdgGoalPadded, mergeReportSdgSnapshotRows } from '../../../student/report/utils/reportSdgMerge';
 import { getReportProjectContextDisplay } from '@/utils/reportProjectContext';
 import { VERIFY_DOSSIER_FIELD_GRID } from '@/utils/verifyDossierFieldGrid';
+import {
+    EngagementIndividualMetricsTable,
+    engagementIndividualMetricsHaveTableRows,
+} from "@/components/verify/EngagementIndividualMetricsTable";
+import { CompetencyScoresTable } from "@/components/verify/CompetencyScoresTable";
 import { formatSection7PakistanDialForDisplay } from '@/utils/reportSection7PakistanDial';
 import { buildSection1ParticipationDisplay, resolveReportAuthorParticipationSnapshot } from '@/utils/reportSection1ParticipationDisplay';
 
@@ -714,7 +720,23 @@ export default function ReportDetailPage() {
                                             <LabelValue label="Engagement Category" value={report.section1.metrics.engagement_category} />
                                             <LabelValue label="HEC Compliance" value={report.section1.metrics.hec_compliance} />
                                             <LabelValue label="Red Flags" value={report.section1.metrics.redFlags} fullWidth />
-                                            <LabelValue label="Individual Metrics" value={report.section1.metrics.individual_metrics} fullWidth />
+                                            {engagementIndividualMetricsHaveTableRows(report.section1.metrics.individual_metrics) ? (
+                                                <div className="mb-4 flex min-w-0 flex-col md:col-span-2">
+                                                    <span className="font-bold text-slate-700 text-xs uppercase tracking-wider mb-1">
+                                                        Individual Metrics
+                                                    </span>
+                                                    <EngagementIndividualMetricsTable
+                                                        report={report}
+                                                        value={report.section1.metrics.individual_metrics}
+                                                    />
+                                                </div>
+                                            ) : (
+                                                <LabelValue
+                                                    label="Individual Metrics"
+                                                    value={report.section1.metrics.individual_metrics}
+                                                    fullWidth
+                                                />
+                                            )}
                                             <LabelValue label="Non-Compliant" value={report.section1.metrics.isNonCompliant} />
                                         </div>
                                     </div>
@@ -723,9 +745,12 @@ export default function ReportDetailPage() {
                                 {report.section1?.attendance_logs && report.section1.attendance_logs.length > 0 && (
                                     <div className="mt-8">
                                         <h3 className="font-bold text-slate-800 text-sm mb-4 border-b pb-1 uppercase tracking-widest text-slate-400">Attendance & Evidence Logs</h3>
-                                        <AttendanceSummaryTable
-                                            entries={report.section1.attendance_logs}
-                                            isLocked={true}
+                                        <AttendanceLogsDossierTable
+                                            logs={report.section1.attendance_logs}
+                                            participantNames={buildSection1AttendanceParticipantNameMap({
+                                                section1: report.section1,
+                                                student: report.student,
+                                            })}
                                         />
                                     </div>
                                 )}
@@ -1208,11 +1233,7 @@ export default function ReportDetailPage() {
                                         <h3 className="mb-3 border-b border-slate-100 pb-2 text-sm font-bold uppercase tracking-widest text-slate-400">
                                             Individual Competency Scores
                                         </h3>
-                                        <div className={VERIFY_DOSSIER_FIELD_GRID}>
-                                            {Object.entries(report.section9.competency_scores as Record<string, unknown>).map(([key, value]) => (
-                                                <LabelValue key={key} label={key.replace(/_/g, " ")} value={value} />
-                                            ))}
-                                        </div>
+                                        <CompetencyScoresTable scores={report.section9.competency_scores} />
                                     </div>
                                 ) : null}
                                 <LabelValue label="Section Summary" value={report.section9?.summary_text} fullWidth />
