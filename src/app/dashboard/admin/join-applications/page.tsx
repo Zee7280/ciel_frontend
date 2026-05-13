@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { CheckCircle, Clock, GraduationCap, Loader2, XCircle } from "lucide-react";
+import { CheckCircle, Clock, GraduationCap, Loader2, Users, XCircle } from "lucide-react";
 import Link from "next/link";
 import { authenticatedFetch } from "@/utils/api";
 import { Button } from "@/app/dashboard/student/report/components/ui/button";
@@ -76,8 +76,9 @@ export default function AdminJoinApplicationsPage() {
     const filtered = useMemo(() => {
         const q = search.trim().toLowerCase();
         if (!q) return visible;
-        return visible.filter((r) =>
-            [
+        return visible.filter((r) => {
+            const teamHay = (r.teamMembers ?? []).map((m) => `${m.name} ${m.email}`).join(" ");
+            return [
                 r.opportunityTitle,
                 r.studentName,
                 r.studentEmail,
@@ -87,11 +88,12 @@ export default function AdminJoinApplicationsPage() {
                 r.facultyReviewerName,
                 r.primaryFacultyEmail,
                 r.facultyApprovalStatus,
+                teamHay,
             ]
                 .join(" ")
                 .toLowerCase()
-                .includes(q),
-        );
+                .includes(q);
+        });
     }, [visible, search]);
 
     const handleApprove = async (applicationId: string) => {
@@ -225,8 +227,35 @@ export default function AdminJoinApplicationsPage() {
                                     </div>
                                     <p className="text-slate-600 text-sm">
                                         <strong>{row.studentName}</strong>
-                                        {row.studentEmail ? <span className="text-slate-500"> · {row.studentEmail}</span> : null}
+                                        {row.studentEmail ? (
+                                            <span className="break-all text-slate-500"> · {row.studentEmail}</span>
+                                        ) : null}
+                                        {row.participationType === "team" ? (
+                                            <span className="ml-1.5 rounded bg-violet-100 px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-violet-800">
+                                                Team
+                                            </span>
+                                        ) : null}
                                     </p>
+                                    {row.teamMembers && row.teamMembers.length > 0 ? (
+                                        <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                                            <p className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-600">
+                                                <Users className="h-3.5 w-3.5" aria-hidden />
+                                                Teammates ({row.teamMembers.length})
+                                            </p>
+                                            <ul className="space-y-1 text-sm text-slate-700">
+                                                {row.teamMembers.map((m, idx) => (
+                                                    <li key={`${m.email}-${idx}`} className="break-words">
+                                                        <strong className="text-slate-800">{m.name}</strong>
+                                                        <span className="break-all text-slate-600"> · {m.email}</span>
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                            <p className="mt-2 text-xs text-slate-500">
+                                                Applicant above is the team lead; listed peers are from the student&apos;s
+                                                application.
+                                            </p>
+                                        </div>
+                                    ) : null}
                                     <p className="text-xs text-slate-400 font-mono">Opportunity: {formatDisplayId(row.opportunityId, "OPP")}</p>
 
                                     {tab === "pending" ? (

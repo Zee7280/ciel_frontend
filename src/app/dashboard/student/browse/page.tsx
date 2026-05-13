@@ -354,12 +354,13 @@ export default function StudentBrowseOpportunitiesPage() {
         }
         try {
             const userId = getStoredCurrentUserId() || null;
+            // Backend defaults `limit` to 10 — without this, browse shows fewer rows than exist / than "My projects".
             const res = await authenticatedFetch(`/api/v1/students/opportunities`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({ student_id: userId })
+                body: JSON.stringify({ student_id: userId, page: 1, limit: 500 }),
             });
 
             if (res && res.ok) {

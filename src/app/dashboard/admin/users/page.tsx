@@ -19,6 +19,9 @@ import {
     ChevronLeft,
     ChevronRight,
     ChevronsRight,
+    CheckCircle2,
+    AlertCircle,
+    MinusCircle,
 } from "lucide-react";
 import DataTable from "react-data-table-component";
 
@@ -51,6 +54,9 @@ interface User {
     status: string;
     joinDate: string;
     orgName?: string;
+    /** From backend `findAllForAdmin`; absent on older APIs */
+    profile_complete?: boolean;
+    profile_missing_fields?: string[];
 }
 
 const ACTION_MENU_W = 144;
@@ -174,6 +180,8 @@ export default function AdminUsersPage() {
                 role: u.role,
                 status: u.status || "active",
                 joinDate: formatJoinDate(u.createdAt),
+                profile_complete: typeof u.profile_complete === "boolean" ? u.profile_complete : undefined,
+                profile_missing_fields: Array.isArray(u.profile_missing_fields) ? u.profile_missing_fields : undefined,
             }));
             setUsers(mappedUsers);
         } catch (error) {
@@ -354,6 +362,47 @@ export default function AdminUsersPage() {
                                     {user.status}
                                 </span>
                             )
+                        },
+                        {
+                            name: "Profile",
+                            cell: (user: User) => {
+                                const missing = user.profile_missing_fields?.length
+                                    ? user.profile_missing_fields
+                                          .map((f) => f.replace(/_/g, " "))
+                                          .join(", ")
+                                    : "";
+                                if (user.profile_complete === true) {
+                                    return (
+                                        <span
+                                            className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-800"
+                                            title="Required fields for submissions are filled"
+                                        >
+                                            <CheckCircle2 className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                                            Complete
+                                        </span>
+                                    );
+                                }
+                                if (user.profile_complete === false) {
+                                    return (
+                                        <span
+                                            className="inline-flex max-w-[220px] items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-900"
+                                            title={missing ? `Missing: ${missing}` : "Profile incomplete"}
+                                        >
+                                            <AlertCircle className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                                            <span className="truncate">Incomplete</span>
+                                        </span>
+                                    );
+                                }
+                                return (
+                                    <span
+                                        className="inline-flex items-center gap-1.5 text-xs text-slate-400"
+                                        title="Upgrade API or redeploy backend to see profile status"
+                                    >
+                                        <MinusCircle className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                                        —
+                                    </span>
+                                );
+                            },
                         },
                         {
                             name: "Joined Date",

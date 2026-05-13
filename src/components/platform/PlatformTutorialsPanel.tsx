@@ -16,7 +16,21 @@ export type PlatformTutorialItem = {
     duration?: string;
     documentUrl?: string;
     documentFilename?: string;
+    /** DB `sort_order` / API `sortOrder` — list sorted ascending (1, 2, 6…). */
+    sortOrder: number;
 };
+
+function parseTutorialSortOrder(row: Record<string, unknown>): number {
+    const raw =
+        row.sortOrder ??
+        row.sort_order ??
+        row.displayOrder ??
+        row.display_order ??
+        row.order;
+    if (typeof raw === "number" && Number.isFinite(raw)) return raw;
+    const n = parseInt(String(raw ?? "").trim(), 10);
+    return Number.isFinite(n) ? n : 0;
+}
 
 function mapTutorialPayload(row: Record<string, unknown>): PlatformTutorialItem | null {
     const id = String(row.id ?? "");
@@ -34,7 +48,15 @@ function mapTutorialPayload(row: Record<string, unknown>): PlatformTutorialItem 
             typeof row.documentUrl === "string" ? row.documentUrl : undefined,
         documentFilename:
             typeof row.documentFilename === "string" ? row.documentFilename : undefined,
+        sortOrder: parseTutorialSortOrder(row),
     };
+}
+
+function sortTutorialsByDisplayOrder(items: PlatformTutorialItem[]): PlatformTutorialItem[] {
+    return [...items].sort((a, b) => {
+        if (a.sortOrder !== b.sortOrder) return a.sortOrder - b.sortOrder;
+        return a.title.localeCompare(b.title, undefined, { sensitivity: "base" });
+    });
 }
 
 const TUTORIALS_API = "/api/v1/tutorials";
@@ -73,9 +95,11 @@ export default function PlatformTutorialsPanel({
             }
             const body = (await res.json()) as { success?: boolean; data?: unknown };
             const raw = Array.isArray(body.data) ? body.data : [];
-            const mapped = raw
-                .map((r) => mapTutorialPayload(r as Record<string, unknown>))
-                .filter(Boolean) as PlatformTutorialItem[];
+            const mapped = sortTutorialsByDisplayOrder(
+                raw
+                    .map((r) => mapTutorialPayload(r as Record<string, unknown>))
+                    .filter(Boolean) as PlatformTutorialItem[],
+            );
             setTutorials(mapped);
         } catch {
             setTutorials([]);
@@ -146,8 +170,9 @@ export default function PlatformTutorialsPanel({
                                 <PlayCircle className="h-5 w-5" />
                             </div>
                             <div className="min-w-0 flex-1">
-                                <p className="mb-1 text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">
-                                    {tutorial.category}
+                                <p className="mb-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">
+                                    <span className="tabular-nums text-slate-500">Order {tutorial.sortOrder}</span>
+                                    <span>{tutorial.category}</span>
                                 </p>
                                 <h3
                                     className={clsx(
@@ -183,8 +208,9 @@ export default function PlatformTutorialsPanel({
                         <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
                             <div className="mb-4 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                                 <div>
-                                    <p className="mb-2 text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">
-                                        {selected.category}
+                                    <p className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">
+                                        <span className="tabular-nums text-slate-500">Order {selected.sortOrder}</span>
+                                        <span>{selected.category}</span>
                                     </p>
                                     <h2 className="mb-2 text-xl font-bold text-slate-900">{selected.title}</h2>
                                     <p className="text-[13px] leading-relaxed text-slate-600">{selected.description}</p>

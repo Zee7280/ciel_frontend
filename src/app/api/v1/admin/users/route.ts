@@ -41,10 +41,8 @@ export async function GET(request: Request) {
             return NextResponse.json({ error: data.message || "Failed to fetch users" }, { status: response.status });
         }
 
-        return NextResponse.json({
-            success: true,
-            data: data // Assuming backend returns array or { data: [] }
-        });
+        // Pass through Nest `{ success, data: User[] }` — do not wrap again (would break `data.data` parsing on the client).
+        return NextResponse.json(data);
 
     } catch (error) {
         console.error("Users Proxy Error:", error);

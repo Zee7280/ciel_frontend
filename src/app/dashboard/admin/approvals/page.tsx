@@ -89,6 +89,27 @@ function approvalLabel(status: string): string {
     return status.replace(/_/g, " ");
 }
 
+/** GET /admin/users/pending: `team_members` may include lead (`is_team_lead`); list peers only for display. */
+function pendingBrowseTeammatesForDisplay(req: Record<string, unknown>): { name: string; email: string }[] {
+    const raw = req["team_members"] ?? req["teamMembers"];
+    if (!Array.isArray(raw)) return [];
+    const list: { name: string; email: string; is_team_lead?: boolean }[] = [];
+    for (const item of raw) {
+        if (!item || typeof item !== "object") continue;
+        const o = item as Record<string, unknown>;
+        const email = typeof o.email === "string" ? o.email.trim() : "";
+        if (!email) continue;
+        const name = typeof o.name === "string" && o.name.trim() ? o.name.trim() : "—";
+        const is_team_lead = o.is_team_lead === true || o.isTeamLead === true;
+        list.push({ name, email, is_team_lead });
+    }
+    if (list.some((m) => m.is_team_lead)) {
+        return list.filter((m) => !m.is_team_lead).map(({ name, email }) => ({ name, email }));
+    }
+    const leadEmail = typeof req.email === "string" ? req.email.trim().toLowerCase() : "";
+    return list.filter((m) => m.email.trim().toLowerCase() !== leadEmail).map(({ name, email }) => ({ name, email }));
+}
+
 function stakeholderRows(d: Record<string, unknown>): {
     student: { name: string; email: string; id: string; university: string; department: string; phone: string };
     facultyEmail: string;
@@ -434,9 +455,14 @@ export default function AdminApprovalsPage() {
                     readFlowStatus(item as Record<string, unknown>).toLowerCase().includes(lowerQuery)
                 );
             } else {
+                const row = item as Record<string, unknown>;
+                const teammates = pendingBrowseTeammatesForDisplay(row);
+                const teamHay = teammates.map((m) => `${m.name} ${m.email}`).join(" ");
                 return (
                     item.name?.toLowerCase().includes(lowerQuery) ||
-                    item.email?.toLowerCase().includes(lowerQuery)
+                    item.email?.toLowerCase().includes(lowerQuery) ||
+                    (typeof item.opportunity === "string" && item.opportunity.toLowerCase().includes(lowerQuery)) ||
+                    teamHay.toLowerCase().includes(lowerQuery)
                 );
             }
         });
@@ -557,7 +583,12 @@ export default function AdminApprovalsPage() {
             <>
             <div className="grid grid-cols-1 gap-4">
                 {activeTab === "registrations" ? (
-                    paginatedItems.map((req) => (
+                    paginatedItems.map((req) => {
+                        const reqRow = req as Record<string, unknown>;
+                        const teammates = pendingBrowseTeammatesForDisplay(reqRow);
+                        const orgLower = String(req.organization_type ?? "").toLowerCase();
+                        const isTeamCard = orgLower === "team" || teammates.length > 0;
+                        return (
                         <div key={req.id} className="flex flex-col items-stretch justify-between gap-4 rounded-xl border border-slate-100 bg-white p-5 shadow-sm sm:p-6 lg:flex-row lg:items-center">
                             <div className="min-w-0">
                                 <h3 className="text-lg font-bold text-slate-900">{req.name}</h3>
@@ -576,10 +607,34 @@ export default function AdminApprovalsPage() {
                                         </span>
                                     )}
                                     <span>{req.email}</span>
+                                    {isTeamCard ? (
+                                        <span className="rounded bg-violet-100 px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-violet-800">
+                                            Team apply
+                                        </span>
+                                    ) : null}
                                     <span>
                                         • Applied: {formatDateTime(req.created_at || req.createdAt || req.submitted_at || req.submittedAt)}
                                     </span>
                                 </div>
+                                {teammates.length > 0 ? (
+                                    <div className="mt-3 max-w-xl rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                                        <p className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-600">
+                                            <Users className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                                            Teammates ({teammates.length})
+                                        </p>
+                                        <ul className="space-y-1 text-sm text-slate-700">
+                                            {teammates.map((m, idx) => (
+                                                <li key={`${m.email}-${idx}`} className="break-words">
+                                                    <strong className="text-slate-800">{m.name}</strong>
+                                                    <span className="break-all text-slate-600"> · {m.email}</span>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                        <p className="mt-2 text-xs text-slate-500">
+                                            Applicant above is the team lead; listed peers are from the student&apos;s application.
+                                        </p>
+                                    </div>
+                                ) : null}
                             </div>
                             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
                                 <button
@@ -603,7 +658,8 @@ export default function AdminApprovalsPage() {
                                 </button>
                             </div>
                         </div>
-                    ))
+                        );
+                    })
                 ) : (
                     paginatedItems.map((proj) => {
                         const projRow = proj as Record<string, unknown>;

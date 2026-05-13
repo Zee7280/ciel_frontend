@@ -62,7 +62,13 @@ export default function AdminTutorialsPage() {
             }
             const body = (await res.json()) as { success?: boolean; data?: unknown };
             const data = body.data;
-            setRows(Array.isArray(data) ? (data as TutorialRow[]) : []);
+            const list = Array.isArray(data) ? (data as TutorialRow[]) : [];
+            list.sort(
+                (a, b) =>
+                    (Number(a.sortOrder ?? 0) - Number(b.sortOrder ?? 0)) ||
+                    String(a.title ?? "").localeCompare(String(b.title ?? ""), undefined, { sensitivity: "base" }),
+            );
+            setRows(list);
         } catch {
             setRows([]);
         } finally {
@@ -295,7 +301,7 @@ export default function AdminTutorialsPage() {
                                 <Input id="t-dur" value={durationLabel} onChange={(e) => setDurationLabel(e.target.value)} placeholder=" e.g. 5:30" className="mt-1.5" />
                             </div>
                             <div>
-                                <Label htmlFor="t-sort">Sort order</Label>
+                                <Label htmlFor="t-sort">Display order (sort)</Label>
                                 <Input
                                     id="t-sort"
                                     type="number"
@@ -304,6 +310,7 @@ export default function AdminTutorialsPage() {
                                     onChange={(e) => setSortOrder(e.target.value)}
                                     className="mt-1.5"
                                 />
+                                <p className="mt-1 text-[11px] text-slate-500">Lower numbers appear first (e.g. 1, then 2, then 3). Same order is used on all Platform tutorial pages.</p>
                             </div>
                         </div>
                         <div>
@@ -377,7 +384,9 @@ export default function AdminTutorialsPage() {
                                     className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between"
                                 >
                                     <div className="min-w-0 flex-1">
-                                        <p className="text-xs font-bold uppercase tracking-wide text-slate-400">{r.category}</p>
+                                        <p className="text-xs font-bold uppercase tracking-wide text-slate-400">
+                                            Order {Number(r.sortOrder ?? 0)} · {r.category}
+                                        </p>
                                         <h3 className="mt-1 font-semibold text-slate-900">{r.title}</h3>
                                         {r.durationLabel ? (
                                             <p className="mt-1 text-xs text-slate-500">{r.durationLabel}</p>
