@@ -14,6 +14,13 @@ import {
 } from "@/utils/opportunityWorkflow";
 import { readDashboardNavRoleFromStorage, type DashboardNavRole } from "@/utils/dashboardNavRole";
 import { formatDisplayId } from "@/utils/displayIds";
+import { CollapsibleDetailText } from "@/components/opportunities/CollapsibleDetailText";
+import {
+    pickOpportunityDetailView,
+    readActivityPlan,
+    readObjectiveItems,
+    readSupervisionStakeholders,
+} from "@/utils/opportunityDetailView";
 import { Loader2, MapPin, Calendar, ArrowLeft, Share2, CheckCircle2, AlertCircle, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
@@ -63,6 +70,14 @@ type OpportunityDetail = Record<string, unknown> & {
         type?: string;
     };
     sdg?: DisplayValue;
+    sdg_info?: {
+        sdg_id?: string | number;
+        target_id?: string | number;
+        indicator_id?: string | number;
+    };
+    types?: string[];
+    secondary_sdgs?: Array<Record<string, unknown>>;
+    detail_view?: Record<string, unknown>;
     verification_method?: string[];
     volunteers_needed?: DisplayValue;
     hours?: DisplayValue;
@@ -81,6 +96,9 @@ type OpportunityDetail = Record<string, unknown> & {
         role?: string;
         safe_environment?: boolean;
         supervised?: boolean;
+        partner_org_name?: string;
+        partner_contact_person?: string;
+        partner_email?: string;
     };
 };
 
@@ -273,6 +291,11 @@ export default function OpportunityDetailsPage() {
     const opportunitiesBackLabel = viewerNavRole === "admin" ? "Back to all projects" : "Back to Opportunities";
     const hideStudentApplyActions = viewerNavRole === "admin" && !opportunity.isStudentOwner;
     const oppRecord = opportunity as Record<string, unknown>;
+    const detailView = pickOpportunityDetailView(oppRecord);
+    const activityPlan = readActivityPlan(oppRecord);
+    const objectiveContent = readObjectiveItems(oppRecord);
+    const stakeholders = readSupervisionStakeholders(oppRecord);
+    const secondarySdgs = detailView?.sdg?.secondary ?? (opportunity as { secondary_sdgs?: unknown[] }).secondary_sdgs ?? [];
     const detailStatusBadgeLabel = formatOpportunityDetailStatusBadge(oppRecord);
     const detailWorkflowStageRaw =
         typeof (oppRecord.workflow_stage ?? oppRecord.workflowStage) === "string"
@@ -414,7 +437,19 @@ export default function OpportunityDetailsPage() {
                     <div className="flex justify-between items-start mb-4">
                         <div>
                             <h1 className="text-3xl font-bold text-slate-900 mb-2">{opportunity.title}</h1>
-                            <div className="flex items-center gap-4 text-sm text-slate-500">
+                            {Array.isArray(opportunity.types) && opportunity.types.length > 0 ? (
+                                <div className="flex flex-wrap gap-2 mb-2">
+                                    {opportunity.types.map((t: string) => (
+                                        <span
+                                            key={t}
+                                            className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-100 text-slate-700 border border-slate-200"
+                                        >
+                                            {t}
+                                        </span>
+                                    ))}
+                                </div>
+                            ) : null}
+                            <div className="flex items-center gap-4 text-sm text-slate-500 flex-wrap">
                                 <span className="flex items-center gap-1.5"><MapPin className="w-4 h-4" /> {opportunity.location?.city || opportunity.city || "Remote"}</span>
                                 <span className="flex items-center gap-1.5"><Calendar className="w-4 h-4" /> Start: {opportunity.timeline?.start_date ? new Date(opportunity.timeline.start_date).toLocaleDateString() : (opportunity.start_date ? new Date(opportunity.start_date).toLocaleDateString() : "Flexible")}</span>
                                 <span className="bg-blue-50 text-blue-700 px-2.5 py-0.5 rounded-full text-xs font-bold uppercase">{opportunity.mode || "On Site"}</span>
@@ -509,9 +544,32 @@ export default function OpportunityDetailsPage() {
                             <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4">SDG Alignment</h3>
                             <div className="bg-white p-4 rounded-xl border border-slate-100 text-center space-y-3">
                                 <div>
-                                    <div className="text-4xl font-bold text-slate-900 mb-1">{opportunity.sdg ? opportunity.sdg : "?"}</div>
-                                    <div className="text-xs text-slate-500 uppercase font-bold">Goal {opportunity.sdg || "N/A"}</div>
+                                    <div className="text-4xl font-bold text-slate-900 mb-1">
+                                        {opportunity.sdg_info?.sdg_id ?? opportunity.sdg ?? "?"}
+                                    </div>
+                                    <div className="text-xs text-slate-500 uppercase font-bold">
+                                        Goal {opportunity.sdg_info?.sdg_id ?? opportunity.sdg ?? "N/A"}
+                                    </div>
+                                    {opportunity.sdg_info?.target_id ? (
+                                        <p className="text-[10px] text-slate-500 mt-2">
+                                            Target {String(opportunity.sdg_info.target_id)} · Indicator{" "}
+                                            {String(opportunity.sdg_info.indicator_id ?? "—")}
+                                        </p>
+                                    ) : null}
                                 </div>
+                                {Array.isArray(secondarySdgs) && secondarySdgs.length > 0 ? (
+                                    <div className="pt-2 border-t border-slate-100 text-left">
+                                        <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Also aligned</p>
+                                        <ul className="space-y-1">
+                                            {(secondarySdgs as Record<string, unknown>[]).map((s, i) => (
+                                                <li key={i} className="text-[10px] text-slate-600">
+                                                    SDG {String(s.sdg_id ?? "?")}
+                                                    {s.target_id ? ` · ${String(s.target_id)}` : ""}
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                ) : null}
                             </div>
                         </div>
                         {opportunity.verification_method && opportunity.verification_method.length > 0 && (
@@ -553,9 +611,19 @@ export default function OpportunityDetailsPage() {
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                             <section>
                                 <h3 className="text-lg font-bold text-slate-900 mb-3 border-b border-slate-100 pb-2">Objectives</h3>
-                                <p className="text-slate-600 leading-relaxed whitespace-pre-line text-sm border-l-4 border-slate-200 pl-4">
-                                    {opportunity.objectives?.description || opportunity.description || "No description provided."}
-                                </p>
+                                {objectiveContent.items.length > 1 ? (
+                                    <ol className="text-slate-600 text-sm space-y-2 list-decimal list-inside border-l-4 border-slate-200 pl-2">
+                                        {objectiveContent.items.map((item, idx) => (
+                                            <li key={idx} className="leading-relaxed">
+                                                {item}
+                                            </li>
+                                        ))}
+                                    </ol>
+                                ) : (
+                                    <p className="text-slate-600 leading-relaxed whitespace-pre-line text-sm border-l-4 border-slate-200 pl-4">
+                                        {objectiveContent.description || "No description provided."}
+                                    </p>
+                                )}
                                 {opportunity.objectives?.beneficiaries_type && (
                                     <div className="mt-4 flex flex-wrap gap-2">
                                         {Array.isArray(opportunity.objectives.beneficiaries_type)
@@ -569,19 +637,23 @@ export default function OpportunityDetailsPage() {
                             </section>
                             <section>
                                 <h3 className="text-lg font-bold text-slate-900 mb-3 border-b border-slate-100 pb-2">Student Activities</h3>
-                                <p className="text-slate-600 leading-relaxed whitespace-pre-line text-sm mb-4 border-l-4 border-slate-200 pl-4">
-                                    {opportunity.activity_details?.student_responsibilities || "No specific responsibilities listed."}
-                                </p>
-                                {Array.isArray(opportunity.activity_details?.skills_gained) && (
+                                <CollapsibleDetailText
+                                    fullText={activityPlan.full}
+                                    previewText={activityPlan.preview}
+                                    isLong={activityPlan.isLong}
+                                    emptyLabel="No specific responsibilities listed."
+                                    className="mb-4"
+                                />
+                                {activityPlan.skills.length > 0 ? (
                                     <div>
                                         <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-2">Skills to be Gained</span>
                                         <div className="flex flex-wrap gap-2">
-                                            {opportunity.activity_details.skills_gained.map((s: string) => (
+                                            {activityPlan.skills.map((s: string) => (
                                                 <span key={s} className="px-3 py-1 bg-indigo-50 text-indigo-700 border border-indigo-100 text-xs font-bold rounded-full">{s}</span>
                                             ))}
                                         </div>
                                     </div>
-                                )}
+                                ) : null}
                             </section>
                         </div>
 
@@ -608,22 +680,55 @@ export default function OpportunityDetailsPage() {
                             </div>
 
                             <div className="md:col-span-1">
-                                <h3 className="text-sm font-bold text-slate-900 mb-3">Supervision</h3>
+                                <h3 className="text-sm font-bold text-slate-900 mb-3">Supervision & Partner</h3>
                                 <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 h-full">
                                     {opportunity.supervision ? (
                                         <div className="space-y-4">
                                             <div>
-                                                <div className="text-slate-500 text-xs">Supervisor</div>
-                                                <div className="font-medium text-slate-900">{opportunity.supervision.supervisor_name || "N/A"}</div>
-                                                <div className="text-xs text-slate-500">{opportunity.supervision.role}</div>
+                                                <div className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">Faculty</div>
+                                                <div className="font-medium text-slate-900">
+                                                    {stakeholders.faculty?.name || opportunity.supervision?.supervisor_name || "N/A"}
+                                                </div>
+                                                {(stakeholders.faculty?.role || opportunity.supervision?.role) ? (
+                                                    <div className="text-xs text-slate-500">
+                                                        {stakeholders.faculty?.role || opportunity.supervision?.role}
+                                                    </div>
+                                                ) : null}
+                                                {stakeholders.faculty?.department ? (
+                                                    <div className="text-xs text-slate-500 mt-0.5">{stakeholders.faculty.department}</div>
+                                                ) : null}
+                                                {stakeholders.faculty?.university ? (
+                                                    <div className="text-xs text-slate-500">{stakeholders.faculty.university}</div>
+                                                ) : null}
+                                                {stakeholders.faculty?.email ? (
+                                                    <div className="text-xs text-indigo-700 mt-1">{stakeholders.faculty.email}</div>
+                                                ) : null}
                                             </div>
+                                            {(stakeholders.partner?.organization || opportunity.supervision?.partner_org_name) ? (
+                                                <div className="pt-3 border-t border-slate-200">
+                                                    <div className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">Partner</div>
+                                                    <div className="font-medium text-slate-900">
+                                                        {stakeholders.partner?.organization || opportunity.supervision?.partner_org_name}
+                                                    </div>
+                                                    {(stakeholders.partner?.contact_person || opportunity.supervision?.partner_contact_person) ? (
+                                                        <div className="text-xs text-slate-500 mt-0.5">
+                                                            {stakeholders.partner?.contact_person || opportunity.supervision?.partner_contact_person}
+                                                        </div>
+                                                    ) : null}
+                                                    {(stakeholders.partner?.email || opportunity.supervision?.partner_email) ? (
+                                                        <div className="text-xs text-indigo-700 mt-1">
+                                                            {stakeholders.partner?.email || opportunity.supervision?.partner_email}
+                                                        </div>
+                                                    ) : null}
+                                                </div>
+                                            ) : null}
                                             <div className="pt-2 border-t border-slate-200">
                                                 <div className="space-y-2">
                                                     <span className={`flex items-center gap-1.5 text-xs font-medium ${opportunity.supervision.safe_environment ? 'text-green-600' : 'text-red-500'}`}>
-                                                        {opportunity.supervision.safe_environment ? <CheckCircle2 className="w-3 h-3" /> : <div className="w-3 h-3 rounded-full bg-red-500" />} Safe Env.
+                                                        {opportunity.supervision.safe_environment ? <CheckCircle2 className="w-3 h-3" /> : <span className="w-3 h-3 rounded-full bg-red-500" />} Safe environment
                                                     </span>
                                                     <span className={`flex items-center gap-1.5 text-xs font-medium ${opportunity.supervision.supervised ? 'text-green-600' : 'text-amber-500'}`}>
-                                                        {opportunity.supervision.supervised ? <CheckCircle2 className="w-3 h-3" /> : <div className="w-3 h-3 rounded-full bg-amber-500" />} Supervised
+                                                        {opportunity.supervision.supervised ? <CheckCircle2 className="w-3 h-3" /> : <span className="w-3 h-3 rounded-full bg-amber-500" />} Supervised activity
                                                     </span>
                                                 </div>
                                             </div>

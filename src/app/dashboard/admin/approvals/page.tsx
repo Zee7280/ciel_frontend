@@ -23,6 +23,8 @@ import { authenticatedFetch } from "@/utils/api";
 import { formatDisplayId } from "@/utils/displayIds";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { CollapsibleDetailText } from "@/components/opportunities/CollapsibleDetailText";
+import { readActivityPlan, readObjectiveItems } from "@/utils/opportunityDetailView";
 
 function pickDetailStr(o: Record<string, unknown> | null | undefined, ...keys: string[]): string {
     if (!o) return "";
@@ -647,6 +649,15 @@ export default function AdminApprovalsPage() {
         }
         return selectedOpportunity as Record<string, unknown>;
     }, [selectedOpportunity, opportunityDetail]);
+
+    const adminObjectiveContent = useMemo(
+        () => (adminDetailView ? readObjectiveItems(adminDetailView) : { description: "", items: [] }),
+        [adminDetailView],
+    );
+    const adminActivityPlan = useMemo(
+        () => (adminDetailView ? readActivityPlan(adminDetailView) : { full: "", preview: "", isLong: false, skills: [] }),
+        [adminDetailView],
+    );
 
     return (
         <div className="p-0 lg:p-8">
@@ -1344,13 +1355,24 @@ export default function AdminApprovalsPage() {
                                     <div className="space-y-4">
                                         <div>
                                             <span className="text-xs text-slate-500 block mb-1">Project Objective</span>
-                                            <p className="text-sm text-slate-700 bg-teal-50/50 p-3 rounded-lg border border-teal-100 whitespace-pre-wrap">
-                                                {String(
-                                                    (adminDetailView.objectives as { description?: string } | undefined)?.description ||
-                                                        adminDetailView.description ||
-                                                        "No objective provided.",
-                                                )}
-                                            </p>
+                                            {adminObjectiveContent.items.length > 1 ? (
+                                                <ol className="text-sm text-slate-700 bg-teal-50/50 p-3 rounded-lg border border-teal-100 space-y-2 list-decimal list-inside">
+                                                    {adminObjectiveContent.items.map((item, idx) => (
+                                                        <li key={idx} className="leading-relaxed">
+                                                            {item}
+                                                        </li>
+                                                    ))}
+                                                </ol>
+                                            ) : (
+                                                <p className="text-sm text-slate-700 bg-teal-50/50 p-3 rounded-lg border border-teal-100 whitespace-pre-wrap">
+                                                    {adminObjectiveContent.description ||
+                                                        String(
+                                                            (adminDetailView.objectives as { description?: string } | undefined)?.description ||
+                                                                adminDetailView.description ||
+                                                                "No objective provided.",
+                                                        )}
+                                                </p>
+                                            )}
                                         </div>
                                         <div className="grid grid-cols-2 gap-6">
                                             <div>
@@ -1410,12 +1432,12 @@ export default function AdminApprovalsPage() {
                                     <div className="space-y-4">
                                         <div>
                                             <span className="text-xs text-slate-500 block mb-1">Student Responsibilities</span>
-                                            <p className="text-sm text-slate-700 whitespace-pre-wrap pl-4 border-l-2 border-indigo-200">
-                                                {String(
-                                                    (adminDetailView.activity_details as { student_responsibilities?: string } | undefined)
-                                                        ?.student_responsibilities || "No details provided.",
-                                                )}
-                                            </p>
+                                            <CollapsibleDetailText
+                                                fullText={adminActivityPlan.full}
+                                                previewText={adminActivityPlan.preview}
+                                                isLong={adminActivityPlan.isLong}
+                                                emptyLabel="No details provided."
+                                            />
                                         </div>
                                         <div>
                                             <span className="text-xs text-slate-500 block mb-2">Skills Gained</span>

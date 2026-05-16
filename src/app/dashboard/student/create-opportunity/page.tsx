@@ -356,6 +356,10 @@ export default function StudentOpportunityCreationPage() {
             toast.error("Please list Student Responsibilities (Section E)");
             return false;
         }
+        if (formData.activity.responsibilities.length > 12_000) {
+            toast.error("Detailed plan is too long (max 12,000 characters). Use a concise bullet summary.");
+            return false;
+        }
         const mergedSkills = formData.activity.isOtherSkillChecked
             ? [
                   ...formData.activity.skills,
@@ -1876,12 +1880,19 @@ export default function StudentOpportunityCreationPage() {
                 <div className={`p-8 space-y-6 ${!expandedSections.includes('E') ? 'hidden' : ''}`}>
                     <div>
                         <label className="block text-sm font-bold text-slate-900 mb-2">E1. Detailed Plan (Bullet List) <span className="text-red-500">*</span></label>
+                        <p className="text-xs text-slate-500 mb-2">
+                            Summarize what students will do in bullet points (max 12,000 characters). Do not paste a full multi-page roadmap here—link or upload that separately if needed.
+                        </p>
                         <textarea spellCheck={true}
                             className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 outline-none font-medium h-32"
                             placeholder="• Step 1: ..."
+                            maxLength={12000}
                             value={formData.activity.responsibilities}
                             onChange={(e) => setFormData({ ...formData, activity: { ...formData.activity, responsibilities: e.target.value } })}
                         ></textarea>
+                        <p className="text-xs text-slate-400 mt-1 text-right">
+                            {formData.activity.responsibilities.length.toLocaleString()} / 12,000
+                        </p>
                     </div>
                     <div>
                         <label className="block text-sm font-bold text-slate-900 mb-2">E2. Skills Students Will Gain (Select up to 10)</label>
