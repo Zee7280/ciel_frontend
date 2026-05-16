@@ -35,10 +35,20 @@ import {
     persistStudentDashboardCache,
     readStudentDashboardCache,
 } from "@/utils/student-dashboard-fetch";
+import { authenticatedFetch } from "@/utils/api";
 import StudentProgressTracker from "./components/StudentProgressTracker";
 import PendingActionCards from "@/components/dashboard/PendingActionCards";
 import { CepExperienceFeedbackPrompt } from "@/components/feedback/CepExperienceFeedbackPrompt";
 import { studentEligibleForCepExperienceFeedback } from "@/utils/cepFeedbackEligibility";
+import {
+    dismissLiveApplyPrompt,
+    findLiveApplyPromptProject,
+    isLiveApplyPromptDismissed,
+    OpportunityLiveApplyBanner,
+    OpportunityLiveApplyModal,
+    type OpportunityPromptProject,
+    readStoredStudentId,
+} from "@/app/dashboard/student/components/OpportunityLifecyclePrompts";
 
 /** Shown when login prefetch did not populate cache yet — same UI, zeros / empty lists. */
 const EMPTY_STUDENT_DASHBOARD: DashboardData = {
@@ -157,6 +167,8 @@ function DeadlineIcon({ type }: { type: string }) {
 export default function StudentDashboard() {
     const [data, setData] = useState<DashboardData>(EMPTY_STUDENT_DASHBOARD);
     const [isLoading, setIsLoading] = useState(true);
+    const [liveApplyProject, setLiveApplyProject] = useState<OpportunityPromptProject | null>(null);
+    const [showLiveApplyModal, setShowLiveApplyModal] = useState(false);
 
     useEffect(() => {
         let cancelled = false;
@@ -193,6 +205,34 @@ export default function StudentDashboard() {
         };
     }, []);
 
+    useEffect(() => {
+        let cancelled = false;
+
+        const loadLiveApplyReminder = async () => {
+            const studentId = readStoredStudentId();
+            try {
+                const res = await authenticatedFetch(`/api/v1/student/projects`, {
+                    method: "POST",
+                    body: JSON.stringify({ studentId }),
+                });
+                if (!res?.ok || cancelled) return;
+                const json = await res.json();
+                const rows = Array.isArray(json?.data) ? (json.data as Record<string, unknown>[]) : [];
+                const project = findLiveApplyPromptProject(rows, studentId);
+                if (!project || isLiveApplyPromptDismissed(project.id) || cancelled) return;
+                setLiveApplyProject(project);
+                setShowLiveApplyModal(true);
+            } catch (error) {
+                console.error("Failed to fetch live opportunity reminder:", error);
+            }
+        };
+
+        void loadLiveApplyReminder();
+        return () => {
+            cancelled = true;
+        };
+    }, []);
+
     const overview = useMemo(() => mergeStudentOverview(data), [data]);
     const cepFeedbackEligible = useMemo(
         () => studentEligibleForCepExperienceFeedback(data.activeProjects ?? []),
@@ -224,8 +264,18 @@ export default function StudentDashboard() {
     const pendingPay = overview.pendingPaymentsCount ?? 0;
     const payReview = overview.paymentsUnderReviewCount ?? 0;
 
+    const dismissLiveApplyReminder = () => {
+        if (liveApplyProject) dismissLiveApplyPrompt(liveApplyProject.id);
+        setShowLiveApplyModal(false);
+        setLiveApplyProject(null);
+    };
+
     return (
         <div className="space-y-8">
+            {liveApplyProject ? (
+                <OpportunityLiveApplyBanner project={liveApplyProject} onDismiss={dismissLiveApplyReminder} />
+            ) : null}
+
             <div>
                 <h2 className="text-lg font-bold tracking-tight text-slate-800">Overview</h2>
                 <p className="text-sm text-slate-500">Your projects, deadlines, and actions at a glance.</p>
@@ -689,6 +739,11 @@ export default function StudentDashboard() {
             </div>
 
             <CepExperienceFeedbackPrompt eligibilityReady={cepFeedbackEligible} />
+            <OpportunityLiveApplyModal
+                project={liveApplyProject}
+                open={showLiveApplyModal}
+                onClose={() => setShowLiveApplyModal(false)}
+            />
         </div>
     );
 }

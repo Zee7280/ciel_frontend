@@ -233,6 +233,48 @@ function facultyApprovalPipelineApplies(v: Record<string, unknown>): boolean {
     return false;
 }
 
+function normalizeWhatsAppPhone(value: unknown): string {
+    if (typeof value !== "string") return "";
+    const digits = value.trim().replace(/\D/g, "");
+    if (!digits) return "";
+    if (digits.startsWith("00")) return digits.slice(2);
+    if (digits.startsWith("0") && digits.length === 11) return `92${digits.slice(1)}`;
+    if (digits.startsWith("3") && digits.length === 10) return `92${digits}`;
+    return digits;
+}
+
+function readOpportunityCreatorPhone(row: Record<string, unknown>): string {
+    const creator = row.creator && typeof row.creator === "object" ? (row.creator as Record<string, unknown>) : null;
+    return (
+        pickDetailStr(creator, "phone", "contact", "mobile") ||
+        pickDetailStr(row, "creator_phone", "student_phone", "student_contact", "contact_phone", "phone")
+    );
+}
+
+function buildOpportunityReminderText(row: Record<string, unknown>, flowLabel: string): string {
+    const creator = row.creator && typeof row.creator === "object" ? (row.creator as Record<string, unknown>) : null;
+    const creatorName = pickDetailStr(creator, "name", "full_name", "fullName") || "there";
+    const title = pickDetailStr(row, "title") || "your opportunity";
+    const stage =
+        flowLabel ||
+        pickDetailStr(row, "workflow_stage", "workflowStage", "status").replace(/_/g, " ") ||
+        "pending approval";
+
+    return [
+        `Assalam o Alaikum ${creatorName},`,
+        `Reminder from CIEL: your opportunity "${title}" is currently at "${stage}" stage.`,
+        "Please check your CIEL dashboard and complete the pending step so it can move forward.",
+        "Thank you.",
+    ].join("\n");
+}
+
+function buildOpportunityReminderWhatsAppUrl(row: Record<string, unknown>, flowLabel: string): string {
+    const phone = normalizeWhatsAppPhone(readOpportunityCreatorPhone(row));
+    if (!phone) return "";
+    const message = buildOpportunityReminderText(row, flowLabel);
+    return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+}
+
 export default function AdminApprovalsPage() {
     const router = useRouter();
     const [activeTab, setActiveTab] = useState<"registrations" | "projects">("registrations");
@@ -665,6 +707,7 @@ export default function AdminApprovalsPage() {
                         const projRow = proj as Record<string, unknown>;
                         const flowLabel = readFlowStatus(projRow);
                         const canAdminApprove = readAdminCanApprove(projRow);
+                        const reminderWhatsAppUrl = buildOpportunityReminderWhatsAppUrl(projRow, flowLabel);
                         return (
                         <div key={proj.id} className="flex flex-col items-stretch justify-between gap-4 rounded-xl border border-slate-100 bg-white p-5 shadow-sm sm:p-6 lg:flex-row lg:items-center">
                             <div className="min-w-0">
@@ -711,6 +754,26 @@ export default function AdminApprovalsPage() {
                                 >
                                     Details <ArrowRight className="w-4 h-4" />
                                 </button>
+                                {reminderWhatsAppUrl ? (
+                                    <a
+                                        href={reminderWhatsAppUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="px-4 py-2 bg-emerald-50 text-emerald-700 rounded-lg text-sm font-bold hover:bg-emerald-100 hover:text-emerald-800 flex items-center gap-2 transition-colors border border-emerald-100"
+                                        title="Send WhatsApp reminder to opportunity creator"
+                                    >
+                                        <MessageSquare className="w-4 h-4" /> WhatsApp
+                                    </a>
+                                ) : (
+                                    <button
+                                        type="button"
+                                        disabled
+                                        className="px-4 py-2 bg-slate-100 text-slate-400 rounded-lg text-sm font-bold flex items-center gap-2 border border-slate-100 cursor-not-allowed"
+                                        title="Creator phone number is not available"
+                                    >
+                                        <MessageSquare className="w-4 h-4" /> WhatsApp
+                                    </button>
+                                )}
                                 <button
                                     onClick={() => handleRejectClick(proj.id, 'opportunity')}
                                     className="px-4 py-2 bg-slate-100 text-slate-600 rounded-lg text-sm font-bold hover:bg-red-50 hover:text-red-600 flex items-center gap-2 transition-colors"

@@ -33,6 +33,12 @@ import {
 import { getStoredCurrentUserId } from "@/utils/currentUser";
 import { formatDisplayId } from "@/utils/displayIds";
 import {
+    findLiveApplyPromptProject,
+    isLiveApplyPromptDismissed,
+    OpportunityLiveApplyModal,
+    type OpportunityPromptProject,
+} from "@/app/dashboard/student/components/OpportunityLifecyclePrompts";
+import {
     Loader2,
     Users,
     Eye,
@@ -449,6 +455,9 @@ export default function MyProjectsPage() {
     const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
     const [projectDetailLoading, setProjectDetailLoading] = useState(false);
     const [currentStudentId, setCurrentStudentId] = useState("");
+    const [liveApplyModalProject, setLiveApplyModalProject] = useState<OpportunityPromptProject | null>(null);
+    const [showLiveApplyModal, setShowLiveApplyModal] = useState(false);
+    const [seenLiveApplyModalIds, setSeenLiveApplyModalIds] = useState<string[]>([]);
 
     useEffect(() => {
         const fetchProjects = async () => {
@@ -631,30 +640,24 @@ export default function MyProjectsPage() {
                     pRecord.application_status ?? pRecord.applicationStatus ?? project.application_status;
                 const applicationStatus =
                     typeof applicationStatusRaw === "string" ? applicationStatusRaw.trim().toLowerCase() : "";
-                const hasApplied =
-                    !isStudentOwnedOpportunity &&
-                    mergeHasAppliedFields({
-                        ...pRecord,
-                        application_status: applicationStatus || pRecord.application_status,
-                        has_applied: project.has_applied,
-                        hasApplied: project.hasApplied,
-                        status: project.status,
-                    });
-                const applyLocked =
-                    !isStudentOwnedOpportunity &&
-                    joinApplicationLocksApplyButton({
-                        ...pRecord,
-                        application_status: applicationStatus || pRecord.application_status,
-                        has_applied: project.has_applied,
-                        hasApplied: project.hasApplied,
-                        status: project.status,
-                    });
+                const applyFields = {
+                    ...pRecord,
+                    application_status: applicationStatus || pRecord.application_status,
+                    has_applied: project.has_applied,
+                    hasApplied: project.hasApplied,
+                    status: project.status,
+                };
+                const hasApplied = mergeHasAppliedFields(applyFields);
+                const applyLocked = joinApplicationLocksApplyButton(applyFields);
                 const live = isStudentOpportunityLiveForReporting(pRecord);
                 const joinAppStatus = pickJoinApplicationStatus(pRecord);
                 const joinPending =
                     !isStudentOwnedOpportunity &&
                     Boolean(joinAppStatus && isJoinApplicationPendingStatus(joinAppStatus));
-                const reportUnlocked = canStudentAccessReportForProjectPayload(pRecord);
+                const reportUnlocked = canStudentAccessReportForProjectPayload(
+                    pRecord,
+                    isStudentOwnedOpportunity ? { isStudentOwner: true } : undefined,
+                );
                 const workflow = resolveStudentOpportunityWorkflow(pRecord);
                 const approvalLine = formatStudentProjectApprovalLine(project);
                 const remarkSections = extractOpportunityReturnRemarkSections(pRecord);
@@ -707,6 +710,19 @@ export default function MyProjectsPage() {
             }),
         [projects, currentStudentId],
     );
+
+    const liveApplyPromptProject = useMemo(
+        () => findLiveApplyPromptProject(projects as unknown as Array<Record<string, unknown>>, currentStudentId),
+        [projects, currentStudentId],
+    );
+
+    useEffect(() => {
+        if (isLoading || !liveApplyPromptProject) return;
+        if (seenLiveApplyModalIds.includes(liveApplyPromptProject.id)) return;
+        if (isLiveApplyPromptDismissed(liveApplyPromptProject.id)) return;
+        setLiveApplyModalProject(liveApplyPromptProject);
+        setShowLiveApplyModal(true);
+    }, [isLoading, liveApplyPromptProject, seenLiveApplyModalIds]);
 
     const filteredRows = useMemo(
         () => projectRows.filter((row) => matchesProjectTab(row, activeTab)),
@@ -1115,7 +1131,7 @@ export default function MyProjectsPage() {
                                         </div>
 
                                         <div className="flex w-full shrink-0 flex-col gap-2 border-t border-slate-100 pt-4 lg:w-56 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
-                                            {!isStudentOwnedOpportunity && applyLocked ? (
+                                            {applyLocked ? (
                                                 <>
                                                     {reportCta ? (
                                                         <Link href={reportCta.href} className="w-full">
@@ -1156,7 +1172,7 @@ export default function MyProjectsPage() {
                                                         <CheckCircle className="h-4 w-4" /> Applied
                                                     </Button>
                                                 </>
-                                            ) : !isStudentOwnedOpportunity && hasApplied ? (
+                                            ) : hasApplied ? (
                                                 <>
                                                     {applicationStatus &&
                                                     isJoinApplicationRejectedStatus(applicationStatus) ? (
@@ -1173,7 +1189,7 @@ export default function MyProjectsPage() {
                                                         </Button>
                                                     </Link>
                                                 </>
-                                            ) : !isStudentOwnedOpportunity ? (
+                                            ) : live || !isStudentOwnedOpportunity ? (
                                                 <Link
                                                     href={`/dashboard/student/browse/${encodeURIComponent(project.id)}`}
                                                     className="w-full"
@@ -1248,6 +1264,19 @@ export default function MyProjectsPage() {
                     )}
                 </div>
             )}
+
+            <OpportunityLiveApplyModal
+                project={liveApplyModalProject}
+                open={showLiveApplyModal}
+                onClose={() => {
+                    setShowLiveApplyModal(false);
+                    if (liveApplyModalProject) {
+                        setSeenLiveApplyModalIds((prev) =>
+                            prev.includes(liveApplyModalProject.id) ? prev : [...prev, liveApplyModalProject.id],
+                        );
+                    }
+                }}
+            />
 
             {/* Team Details Dialog */}
             <Dialog open={isTeamDialogOpen} onOpenChange={setIsTeamDialogOpen}>

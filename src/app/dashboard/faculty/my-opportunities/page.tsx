@@ -13,6 +13,7 @@ import {
     extractOpportunityReviewFeedback,
     resolvePartnerOpportunityListLabels,
 } from "@/utils/opportunityWorkflow";
+import { extractFacultyMineOpportunityRows } from "@/utils/facultyMineOpportunities";
 
 type Row = {
     id: string;
@@ -53,17 +54,19 @@ export default function FacultyMyOpportunitiesPage() {
     useEffect(() => {
         const load = async () => {
             try {
+                const params = new URLSearchParams({ scope: "authored" });
                 const facultyEmail = getStoredCurrentUserEmail();
-                const params = new URLSearchParams();
                 if (facultyEmail) params.set("faculty_email", facultyEmail);
 
                 const res = await authenticatedFetch(
-                    `/api/v1/opportunities/faculty/mine${params.toString() ? `?${params.toString()}` : ""}`,
+                    `/api/v1/opportunities/faculty/mine?${params.toString()}`,
                 );
                 if (res?.ok) {
                     const data = await res.json();
-                    if (data.success && Array.isArray(data.data)) {
-                        const baseRows = data.data as Row[];
+                    if (data.success === false) {
+                        setRows([]);
+                    } else {
+                        const baseRows = extractFacultyMineOpportunityRows(data) as Row[];
                         const rowsWithRemarks = await Promise.all(
                             baseRows.map(async (row) => {
                                 const feedbackFromList = extractOpportunityReviewFeedback(
@@ -95,8 +98,6 @@ export default function FacultyMyOpportunitiesPage() {
                             }),
                         );
                         setRows(rowsWithRemarks);
-                    } else {
-                        setRows([]);
                     }
                 } else {
                     toast.error("Could not load your opportunities");

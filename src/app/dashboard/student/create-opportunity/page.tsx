@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { MapPin, Clock, CheckCircle, AlertCircle, ChevronDown, ChevronUp, Users, Loader2, X, Plus, Lock } from "lucide-react";
+import Link from "next/link";
+import { MapPin, Clock, CheckCircle, AlertCircle, ChevronDown, ChevronUp, Users, Loader2, X, Plus, Lock, ExternalLink } from "lucide-react";
 import { authenticatedFetch } from "@/utils/api";
 import { toast } from "sonner";
 import dynamic from 'next/dynamic';
@@ -16,6 +17,7 @@ import {
     parsePhoneForDisplay,
 } from "@/utils/countryCallingCodes";
 import { PAKISTAN_REGION_OPTIONS } from "@/utils/pakistanRegions";
+import { OpportunitySubmittedReviewModal } from "@/app/dashboard/student/components/OpportunityLifecyclePrompts";
 
 // Dynamically import LocationPicker to avoid SSR issues with Google Maps.
 const LocationPicker = dynamic(() => import('@/components/ui/LocationPicker'), {
@@ -82,6 +84,23 @@ function readCachedStudentUser(): unknown | null {
 
 const STUDENT_OPPORTUNITY_DRAFT_KEY = "ciel_student_create_opportunity_draft_v1";
 
+type SimilarOpportunityMatch = {
+    id: string;
+    title: string;
+    status?: string | null;
+    workflow_stage?: string | null;
+    match_strength?: "exact" | "similar";
+};
+
+function formatSimilarOpportunityStatus(row: SimilarOpportunityMatch): string {
+    const st = (row.status || row.workflow_stage || "").trim().toLowerCase();
+    if (!st) return "In review";
+    if (st === "live") return "Live";
+    if (st.includes("pending")) return "Pending approval";
+    if (st === "revision") return "Needs revision";
+    return st.replace(/_/g, " ");
+}
+
 function isPlainObject(x: unknown): x is Record<string, unknown> {
     return typeof x === "object" && x !== null && !Array.isArray(x);
 }
@@ -123,6 +142,12 @@ export default function StudentOpportunityCreationPage() {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [editingOpportunityId, setEditingOpportunityId] = useState<string | null>(null);
     const [isLoadingEdit, setIsLoadingEdit] = useState(false);
+    const [showSubmittedReviewModal, setShowSubmittedReviewModal] = useState(false);
+    const [submittedOpportunityTitle, setSubmittedOpportunityTitle] = useState("");
+    /** One lead per project: show notice before the create form (skipped when ?edit= is present). */
+    const [showTeamLeadNotice, setShowTeamLeadNotice] = useState(false);
+    const [similarMatches, setSimilarMatches] = useState<SimilarOpportunityMatch[]>([]);
+    const [similarCheckLoading, setSimilarCheckLoading] = useState(false);
 
     // Student Details State
     const [studentDetails, setStudentDetails] = useState({
@@ -417,6 +442,14 @@ export default function StudentOpportunityCreationPage() {
         if (isLoadingEdit) return;
         if (!validateForm()) return;
 
+        if (!editingOpportunityId && similarMatches.length > 0) {
+            toast.error(
+                "Disclaimer: A similar project already exists at your university. Ask your team lead to add you via Apply Now. Do not create another listing.",
+                { duration: 6000 },
+            );
+            return;
+        }
+
         setIsSubmitting(true);
         try {
             const hasOther = formData.opportunityType.includes("Other");
@@ -613,29 +646,53 @@ export default function StudentOpportunityCreationPage() {
                 } catch {
                     /* ignore */
                 }
-                toast.success(isEdit ? "Opportunity updated successfully!" : "Opportunity created successfully!");
-                router.push("/dashboard/student/projects");
+                if (isEdit) {
+                    toast.success("Opportunity updated successfully!");
+                    router.push("/dashboard/student/projects");
+                } else {
+                    setSubmittedOpportunityTitle(formData.title.trim());
+                    setShowSubmittedReviewModal(true);
+                }
             } else {
                 const errObj = data as {
-                    message?: string;
+                    message?: string | { message?: string; similarOpportunities?: SimilarOpportunityMatch[] };
                     error?: string;
                     statusCode?: number;
+                    similarOpportunities?: SimilarOpportunityMatch[];
                 };
+                const nestedMsg =
+                    errObj.message && typeof errObj.message === "object" && !Array.isArray(errObj.message)
+                        ? errObj.message.message
+                        : undefined;
+                const similarFrom409 =
+                    errObj.similarOpportunities ||
+                    (errObj.message &&
+                    typeof errObj.message === "object" &&
+                    !Array.isArray(errObj.message)
+                        ? errObj.message.similarOpportunities
+                        : undefined);
+                if (res.status === 409 && Array.isArray(similarFrom409) && similarFrom409.length > 0) {
+                    setSimilarMatches(similarFrom409);
+                }
                 const fromNest = Array.isArray((data as { message?: unknown }).message)
                     ? String((data as { message: string[] }).message[0])
                     : undefined;
+                const flatMsg = typeof errObj.message === "string" ? errObj.message : undefined;
                 const msg =
-                    errObj.message ||
+                    nestedMsg ||
+                    flatMsg ||
                     fromNest ||
                     (typeof errObj.error === "string" ? errObj.error : undefined) ||
-                    (res.status === 401 || res.status === 403
-                        ? "Not authorized. Please log in again."
-                        : res.status >= 500
-                          ? "Server error. Try again later or contact support."
-                          : isEdit
-                            ? `Could not update opportunity (${res.status}).`
-                            : `Could not create opportunity (${res.status}).`);
-                toast.error(msg);
+                    (res.status === 409
+                        ? "Disclaimer: A similar project already exists. Join the existing team via Apply Now instead of creating a duplicate listing."
+                        : res.status === 401 || res.status === 403
+                          ? "Not authorized. Please log in again."
+                          : res.status >= 500
+                            ? "Server error. Try again later or contact support."
+                            : isEdit
+                              ? `Could not update opportunity (${res.status}).`
+                              : `Could not create opportunity (${res.status}).`);
+                toast.error(msg, { duration: res.status === 409 ? 7000 : 4000 });
             }
         } catch (error) {
             console.error("Error submitting form", error);
@@ -844,7 +901,12 @@ export default function StudentOpportunityCreationPage() {
     useEffect(() => {
         if (typeof window === "undefined") return;
         const e = new URLSearchParams(window.location.search).get("edit")?.trim();
-        if (e) setEditingOpportunityId(e);
+        if (e) {
+            setEditingOpportunityId(e);
+            setShowTeamLeadNotice(false);
+        } else {
+            setShowTeamLeadNotice(true);
+        }
     }, []);
 
     useEffect(() => {
@@ -922,6 +984,57 @@ export default function StudentOpportunityCreationPage() {
         };
     }, [editingOpportunityId, isLoadingProfile]);
 
+    useEffect(() => {
+        if (!showTeamLeadNotice) return;
+        const prev = document.body.style.overflow;
+        document.body.style.overflow = "hidden";
+        return () => {
+            document.body.style.overflow = prev;
+        };
+    }, [showTeamLeadNotice]);
+
+    const checkSimilarTitles = useCallback(async (title: string, university: string, excludeId?: string | null) => {
+        const trimmed = title.trim();
+        const uni = university.trim();
+        if (trimmed.length < 6 || !uni) {
+            setSimilarMatches([]);
+            return;
+        }
+        setSimilarCheckLoading(true);
+        try {
+            const params = new URLSearchParams({ title: trimmed, university: uni });
+            if (excludeId) params.set("excludeId", excludeId);
+            const res = await authenticatedFetch(`/api/v1/student/opportunities/similar?${params.toString()}`);
+            if (!res?.ok) {
+                setSimilarMatches([]);
+                return;
+            }
+            const json = (await res.json()) as { success?: boolean; data?: SimilarOpportunityMatch[] };
+            setSimilarMatches(Array.isArray(json.data) ? json.data : []);
+        } catch {
+            setSimilarMatches([]);
+        } finally {
+            setSimilarCheckLoading(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        if (editingOpportunityId) {
+            setSimilarMatches([]);
+            return;
+        }
+        const title = formData.title.trim();
+        const uni = studentDetails.institution.trim();
+        if (title.length < 6 || !uni) {
+            setSimilarMatches([]);
+            return;
+        }
+        const timer = window.setTimeout(() => {
+            void checkSimilarTitles(title, uni);
+        }, 500);
+        return () => window.clearTimeout(timer);
+    }, [formData.title, studentDetails.institution, editingOpportunityId, checkSimilarTitles]);
+
     const toggleSection = (section: string) => {
         setExpandedSections(prev =>
             prev.includes(section)
@@ -932,6 +1045,53 @@ export default function StudentOpportunityCreationPage() {
 
     return (
         <div className="max-w-8xl mx-auto p-4 space-y-4 pb-24">
+            {showTeamLeadNotice ? (
+                <div
+                    className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/55 backdrop-blur-[2px]"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="team-lead-notice-title"
+                >
+                    <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[min(90vh,640px)] overflow-y-auto border border-slate-200">
+                        <div className="p-6 sm:p-8 space-y-4">
+                            <div className="flex items-start gap-3">
+                                <div className="shrink-0 w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
+                                    <Users className="w-5 h-5 text-blue-700" aria-hidden />
+                                </div>
+                                <div className="min-w-0 space-y-3 text-slate-800 text-sm leading-relaxed">
+                                    <p className="text-xs font-bold uppercase tracking-widest text-blue-700">Disclaimer</p>
+                                    <h2
+                                        id="team-lead-notice-title"
+                                        className="text-lg font-bold text-slate-900 leading-snug"
+                                    >
+                                        One opportunity per team project
+                                    </h2>
+                                    <p>
+                                        <strong>Do not create separate opportunities</strong> for the same team project. Only one listing is needed per project.
+                                    </p>
+                                    <p>
+                                        <strong>One team lead</strong> should create the opportunity. After it is approved and live, the team lead must use{" "}
+                                        <strong>Apply Now</strong> on that listing and add all other team members there.
+                                    </p>
+                                    <p>
+                                        If duplicate listings already exist, agree on a single project lead and{" "}
+                                        <strong>remove the extra duplicate opportunities</strong> created by other members.
+                                    </p>
+                                    <p className="text-slate-600">By continuing, you confirm that you have read and understood this disclaimer.</p>
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                className="w-full rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 text-sm shadow-sm transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+                                onClick={() => setShowTeamLeadNotice(false)}
+                            >
+                                I understand — continue to the form
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            ) : null}
+
             <div className="mb-4">
                 <h1 className="text-3xl font-bold text-slate-900">
                     {editingOpportunityId ? "Edit student opportunity" : "Create Student Opportunity"}
@@ -1028,6 +1188,67 @@ export default function StudentOpportunityCreationPage() {
                             value={formData.title}
                             onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                         />
+                        {!editingOpportunityId && (similarCheckLoading || similarMatches.length > 0) ? (
+                            <div
+                                className={`mt-3 rounded-xl border p-4 ${
+                                    similarMatches.length > 0
+                                        ? "border-amber-200 bg-amber-50"
+                                        : "border-slate-200 bg-slate-50"
+                                }`}
+                                role="status"
+                            >
+                                {similarCheckLoading ? (
+                                    <p className="text-sm text-slate-600 flex items-center gap-2">
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                        Checking for existing projects at your university…
+                                    </p>
+                                ) : (
+                                    <div className="space-y-3">
+                                        <div className="flex gap-2 items-start">
+                                            <AlertCircle className="h-5 w-5 shrink-0 text-amber-700 mt-0.5" />
+                                            <div className="text-sm text-amber-950 leading-relaxed">
+                                                <p className="text-xs font-bold uppercase tracking-widest text-amber-800">Disclaimer</p>
+                                                <p className="font-bold mt-1">
+                                                    A similar project title already exists at your university.
+                                                </p>
+                                                <p className="mt-1">
+                                                    You should not create another copy. Only <strong>one team lead</strong> should submit the opportunity. All other members must open an existing listing below and join through{" "}
+                                                    <strong>Apply Now</strong> so team members can be added correctly.
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <ul className="space-y-2">
+                                            {similarMatches.map((row) => (
+                                                <li
+                                                    key={row.id}
+                                                    className="flex flex-col gap-2 rounded-lg border border-amber-100 bg-white px-3 py-2 sm:flex-row sm:items-center sm:justify-between"
+                                                >
+                                                    <div className="min-w-0">
+                                                        <p className="text-sm font-semibold text-slate-900 line-clamp-2">{row.title}</p>
+                                                        <p className="text-xs text-slate-500 mt-0.5">
+                                                            {formatSimilarOpportunityStatus(row)}
+                                                            {row.match_strength === "exact" ? " · Same title" : " · Similar title"}
+                                                        </p>
+                                                    </div>
+                                                    <Link
+                                                        href={`/dashboard/student/browse/${encodeURIComponent(row.id)}`}
+                                                        className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-800"
+                                                    >
+                                                        View &amp; apply <ExternalLink className="h-3.5 w-3.5" />
+                                                    </Link>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                        <Link
+                                            href="/dashboard/student/browse"
+                                            className="inline-block text-xs font-semibold text-amber-900 underline underline-offset-2"
+                                        >
+                                            Browse all opportunities
+                                        </Link>
+                                    </div>
+                                )}
+                            </div>
+                        ) : null}
                     </div>
                     {/* B2. Type */}
                     <div>
@@ -1492,47 +1713,61 @@ export default function StudentOpportunityCreationPage() {
                     </div>
                     <div className="bg-slate-50 p-6 rounded-xl border border-slate-100">
                         <label className="block text-sm font-bold text-slate-900 mb-4">D2. Expected Outreach</label>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-6">
                             <div>
-                                <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Number of Beneficiaries</label>
+                                <label className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5 block">
+                                    Number of Beneficiaries
+                                </label>
                                 <input
                                     type="number"
-                                    className="w-full px-4 py-2 rounded-lg border border-slate-200 focus:border-teal-500 outline-none"
+                                    min={1}
+                                    className="w-full max-w-[220px] px-4 py-2.5 rounded-lg border border-slate-200 bg-white focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 outline-none"
                                     placeholder="e.g. 50"
                                     value={formData.objectives.beneficiariesCount}
                                     onChange={(e) => setFormData({ ...formData, objectives: { ...formData.objectives, beneficiariesCount: e.target.value } })}
                                 />
                             </div>
                             <div>
-                                <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Type of Beneficiaries</label>
-                                <div className="h-40 overflow-y-auto border border-slate-200 rounded-lg bg-white p-2 space-y-2">
-                                    {BENEFICIARY_PREDEFINED.map((b) => (
-                                        <label key={b} className="flex items-center gap-2 text-sm text-slate-600">
-                                            <input
-                                                type="checkbox"
-                                                className="rounded text-teal-600 focus:ring-teal-500"
-                                                checked={formData.objectives.beneficiariesType.includes(b)}
-                                                onChange={() => {
-                                                    const types = formData.objectives.beneficiariesType.includes(b)
-                                                        ? formData.objectives.beneficiariesType.filter((t) => t !== b)
-                                                        : [...formData.objectives.beneficiariesType, b];
-                                                    setFormData({
-                                                        ...formData,
-                                                        objectives: { ...formData.objectives, beneficiariesType: types },
-                                                    });
-                                                }}
-                                            />{" "}
-                                            {b}
-                                        </label>
-                                    ))}
+                                <label className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5 block">
+                                    Type of Beneficiaries
+                                </label>
+                                <div className="rounded-xl border border-slate-200 bg-white p-4">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2.5">
+                                        {BENEFICIARY_PREDEFINED.map((b) => (
+                                            <label
+                                                key={b}
+                                                className="flex items-center gap-2.5 py-1 text-sm text-slate-700 cursor-pointer hover:text-slate-900"
+                                            >
+                                                <input
+                                                    type="checkbox"
+                                                    className="h-4 w-4 shrink-0 rounded border-slate-300 text-teal-600 focus:ring-teal-500"
+                                                    checked={formData.objectives.beneficiariesType.includes(b)}
+                                                    onChange={() => {
+                                                        const types = formData.objectives.beneficiariesType.includes(b)
+                                                            ? formData.objectives.beneficiariesType.filter((t) => t !== b)
+                                                            : [...formData.objectives.beneficiariesType, b];
+                                                        setFormData({
+                                                            ...formData,
+                                                            objectives: { ...formData.objectives, beneficiariesType: types },
+                                                        });
+                                                    }}
+                                                />
+                                                <span>{b}</span>
+                                            </label>
+                                        ))}
+                                    </div>
                                 </div>
-                                <div className="mt-3">
+                                <div className="mt-4 space-y-3">
                                     <label
-                                        className={`flex items-center gap-2 p-3 border rounded-xl hover:bg-slate-50 cursor-pointer transition-all ${formData.objectives.isOtherBeneficiaryChecked ? "bg-teal-50 border-teal-200" : "border-slate-100"}`}
+                                        className={`flex items-center gap-2.5 px-4 py-3 rounded-xl border bg-white cursor-pointer transition-colors hover:bg-slate-50 ${
+                                            formData.objectives.isOtherBeneficiaryChecked
+                                                ? "border-teal-300 ring-1 ring-teal-500/15"
+                                                : "border-slate-200"
+                                        }`}
                                     >
                                         <input
                                             type="checkbox"
-                                            className="rounded text-teal-600 focus:ring-teal-500"
+                                            className="h-4 w-4 shrink-0 rounded border-slate-300 text-teal-600 focus:ring-teal-500"
                                             checked={formData.objectives.isOtherBeneficiaryChecked}
                                             onChange={(e) =>
                                                 setFormData({
@@ -1545,59 +1780,53 @@ export default function StudentOpportunityCreationPage() {
                                                 })
                                             }
                                         />
-                                        <span
-                                            className={`text-sm font-medium ${formData.objectives.isOtherBeneficiaryChecked ? "text-teal-700" : "text-slate-600"}`}
-                                        >
-                                            Other (please specify)
-                                        </span>
+                                        <span className="text-sm font-medium text-slate-700">Other (please specify)</span>
                                     </label>
                                     {formData.objectives.isOtherBeneficiaryChecked && (
-                                        <div className="mt-3 space-y-3 pl-4 border-l-2 border-teal-100">
-                                            <p className="text-xs font-bold text-slate-500 uppercase">
+                                        <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
+                                            <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">
                                                 Add one or more other beneficiary types
                                             </p>
                                             {formData.objectives.otherBeneficiarySpecs.map((spec, idx) => (
-                                                <div key={idx} className="flex gap-2">
-                                                    <div className="relative flex-1">
-                                                        <input
-                                                            type="text"
-                                                            placeholder="Specify beneficiary type…"
-                                                            className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-teal-500 outline-none text-sm transition-all"
-                                                            value={spec}
-                                                            onChange={(e) => {
-                                                                const next = [...formData.objectives.otherBeneficiarySpecs];
-                                                                next[idx] = e.target.value;
+                                                <div key={idx} className="relative">
+                                                    <input
+                                                        type="text"
+                                                        placeholder="Specify beneficiary type…"
+                                                        className="w-full px-4 py-2.5 pr-10 rounded-lg border border-slate-200 focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 outline-none text-sm"
+                                                        value={spec}
+                                                        onChange={(e) => {
+                                                            const next = [...formData.objectives.otherBeneficiarySpecs];
+                                                            next[idx] = e.target.value;
+                                                            setFormData({
+                                                                ...formData,
+                                                                objectives: {
+                                                                    ...formData.objectives,
+                                                                    otherBeneficiarySpecs: next,
+                                                                },
+                                                            });
+                                                        }}
+                                                    />
+                                                    {formData.objectives.otherBeneficiarySpecs.length > 1 && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                const next = formData.objectives.otherBeneficiarySpecs.filter(
+                                                                    (_, i) => i !== idx,
+                                                                );
                                                                 setFormData({
                                                                     ...formData,
                                                                     objectives: {
                                                                         ...formData.objectives,
-                                                                        otherBeneficiarySpecs: next,
+                                                                        otherBeneficiarySpecs: next.length ? next : [""],
                                                                     },
                                                                 });
                                                             }}
-                                                        />
-                                                        {formData.objectives.otherBeneficiarySpecs.length > 1 && (
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => {
-                                                                    const next = formData.objectives.otherBeneficiarySpecs.filter(
-                                                                        (_, i) => i !== idx,
-                                                                    );
-                                                                    setFormData({
-                                                                        ...formData,
-                                                                        objectives: {
-                                                                            ...formData.objectives,
-                                                                            otherBeneficiarySpecs: next.length ? next : [""],
-                                                                        },
-                                                                    });
-                                                                }}
-                                                                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-red-500 transition-colors"
-                                                                aria-label="Remove row"
-                                                            >
-                                                                <X className="w-4 h-4" />
-                                                            </button>
-                                                        )}
-                                                    </div>
+                                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-red-500 transition-colors"
+                                                            aria-label="Remove row"
+                                                        >
+                                                            <X className="w-4 h-4" />
+                                                        </button>
+                                                    )}
                                                 </div>
                                             ))}
                                             <button
@@ -1614,7 +1843,7 @@ export default function StudentOpportunityCreationPage() {
                                                         },
                                                     })
                                                 }
-                                                className="text-xs font-bold text-teal-600 hover:text-teal-700 flex items-center gap-1.5 px-2 py-1"
+                                                className="text-xs font-semibold text-teal-600 hover:text-teal-700 flex items-center gap-1.5"
                                             >
                                                 <Plus className="w-3.5 h-3.5" />
                                                 Add another
@@ -2212,6 +2441,14 @@ export default function StudentOpportunityCreationPage() {
                           : "Submit Project"}
                 </button>
             </div>
+            <OpportunitySubmittedReviewModal
+                open={showSubmittedReviewModal}
+                opportunityTitle={submittedOpportunityTitle}
+                onClose={() => {
+                    setShowSubmittedReviewModal(false);
+                    router.push("/dashboard/student/projects");
+                }}
+            />
         </div>
     );
 }

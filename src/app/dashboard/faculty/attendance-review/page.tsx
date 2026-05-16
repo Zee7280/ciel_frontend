@@ -6,39 +6,7 @@ import { getStoredCurrentUserEmail } from "@/utils/currentUser";
 import { toast } from "sonner";
 import AttendanceReviewDashboard from "@/components/engagement/AttendanceReviewDashboard";
 import { fetchPendingAttendanceCountForProject } from "@/utils/engagementPendingAttendanceResponse";
-
-/** Normalize faculty /mine list payloads (flat `data[]`, nested wrappers, Mongo-style `_id`). */
-function extractFacultyMineOpportunityRows(payload: unknown): Record<string, unknown>[] {
-    if (Array.isArray(payload)) {
-        return payload.filter((x): x is Record<string, unknown> => x != null && typeof x === "object");
-    }
-    if (payload == null || typeof payload !== "object") return [];
-    const root = payload as Record<string, unknown>;
-    if (root.success === false) return [];
-
-    const asObjectRows = (v: unknown): Record<string, unknown>[] | null => {
-        if (!Array.isArray(v)) return null;
-        return v.filter((x): x is Record<string, unknown> => x != null && typeof x === "object");
-    };
-
-    const top = asObjectRows(root.data);
-    if (top) return top;
-
-    if (root.data != null && typeof root.data === "object" && !Array.isArray(root.data)) {
-        const inner = root.data as Record<string, unknown>;
-        for (const key of ["opportunities", "items", "rows", "records", "list"] as const) {
-            const nested = asObjectRows(inner[key]);
-            if (nested) return nested;
-        }
-    }
-
-    for (const key of ["opportunities", "items"] as const) {
-        const direct = asObjectRows(root[key]);
-        if (direct) return direct;
-    }
-
-    return [];
-}
+import { extractFacultyMineOpportunityRows } from "@/utils/facultyMineOpportunities";
 
 function pickOpportunityListId(o: Record<string, unknown>): string {
     const nested =

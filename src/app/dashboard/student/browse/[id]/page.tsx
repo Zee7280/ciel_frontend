@@ -27,9 +27,11 @@ import {
     isJoinApplicationRejectedStatus,
     joinApplicationLocksApplyButton,
     joinApplicationPendingLabel,
+    mergeHasAppliedFields,
     pickJoinApplicationId,
     pickJoinApplicationStage,
 } from "@/utils/studentJoinApplication";
+import { isStudentOpportunityLiveForReporting } from "@/utils/opportunityWorkflow";
 import {
     buildStudentReportsCheckMap,
     pickReportStatusFromCheckRow,
@@ -195,7 +197,8 @@ export default function OpportunityDetailsPage() {
                 hasApplied: opData.hasApplied,
                 status: opData.status,
             };
-            const applyLocked = !isStudentOwner && joinApplicationLocksApplyButton(rawForApplyLock);
+            const applyLocked = joinApplicationLocksApplyButton(rawForApplyLock);
+            const hasApplied = mergeHasAppliedFields(rawForApplyLock);
 
             let report_status: string | undefined;
             if (myId) {
@@ -220,12 +223,7 @@ export default function OpportunityDetailsPage() {
                 application_status: application_status || undefined,
                 application_id: application_id || undefined,
                 application_stage: application_stage ?? undefined,
-                hasApplied:
-                    isStudentOwner ||
-                    Boolean(application_status) ||
-                    String(opData.status || "").toLowerCase() === "applied" ||
-                    opData.has_applied === true ||
-                    opData.hasApplied === true,
+                hasApplied,
                 applyLocked,
                 isStudentOwner,
                 report_status,
@@ -288,6 +286,9 @@ export default function OpportunityDetailsPage() {
         opportunity.isStudentOwner &&
         canEditReturnedOpportunity(opportunity as Record<string, unknown>);
 
+    const ownerListingLive =
+        Boolean(opportunity.isStudentOwner) && isStudentOpportunityLiveForReporting(oppRecord);
+
     const startReportCta =
         opportunity &&
         canStudentShowStartReportCta(oppRecord, {
@@ -323,7 +324,7 @@ export default function OpportunityDetailsPage() {
                         <Share2 className="w-4 h-4" /> Print / Save PDF
                     </button>
 
-                    {!hideStudentApplyActions && opportunity.isStudentOwner ? (
+                    {!hideStudentApplyActions && opportunity.isStudentOwner && !ownerListingLive ? (
                         <div className="flex flex-col items-end gap-2">
                             <div className="flex flex-wrap gap-2 justify-end">
                                 <Link href="/dashboard/student/projects">

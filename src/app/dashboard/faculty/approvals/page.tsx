@@ -226,7 +226,17 @@ export default function FacultyApprovalsPage() {
                 setDetailActionKind("faculty_review");
                 void loadLists();
             } else {
-                toast.error("Failed to approve project");
+                let message = "Failed to approve project";
+                try {
+                    const errorBody = (await res?.json()) as { message?: unknown };
+                    if (typeof errorBody?.message === "string" && errorBody.message.trim()) {
+                        message = errorBody.message.trim();
+                    }
+                } catch {
+                    /* ignore */
+                }
+                toast.error(message);
+                void loadLists();
             }
         } catch (error) {
             console.error("Failed to approve", error);

@@ -81,11 +81,26 @@ export function shouldApplyJoinApplicationRules(raw: Record<string, unknown>, op
     return Boolean(pickJoinApplicationStatus(raw));
 }
 
+/** Live student-created listings: creator must complete join-application before report access. */
+function studentOwnerMustCompleteJoinBeforeReport(
+    raw: Record<string, unknown>,
+    opts?: { isStudentOwner?: boolean },
+): boolean {
+    if (!opts?.isStudentOwner) return false;
+    if (!isOpportunityPubliclyLive(raw)) return false;
+    const app = pickJoinApplicationStatus(raw);
+    if (!app) return true;
+    if (isJoinApplicationRejectedStatus(app)) return true;
+    if (isJoinApplicationPendingStatus(app)) return true;
+    return !isJoinApplicationApprovedStatus(app);
+}
+
 /** Browse / detail: show Start Report when join is cleared and status allows. */
 export function canStudentShowStartReportCta(
     raw: Record<string, unknown>,
     opts?: { isStudentOwner?: boolean },
 ): boolean {
+    if (studentOwnerMustCompleteJoinBeforeReport(raw, opts)) return false;
     if (opts?.isStudentOwner) {
         return opportunityStatusAllowsStudentReportFlow(raw);
     }
@@ -110,7 +125,12 @@ export function joinApplicationPendingLabel(raw: Record<string, unknown>): strin
 }
 
 /** Report page / project fetch: allow access only when project status allowlisted and join not blocking. */
-export function canStudentAccessReportForProjectPayload(raw: Record<string, unknown>): boolean {
+export function canStudentAccessReportForProjectPayload(
+    raw: Record<string, unknown>,
+    opts?: { isStudentOwner?: boolean },
+): boolean {
+    if (studentOwnerMustCompleteJoinBeforeReport(raw, opts)) return false;
+
     const status = lower(raw.status);
     const allowedLegacy = ["active", "approved", "verified"];
     const eligible =
