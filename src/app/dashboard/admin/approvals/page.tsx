@@ -251,27 +251,112 @@ function readOpportunityCreatorPhone(row: Record<string, unknown>): string {
     );
 }
 
-function buildOpportunityReminderText(row: Record<string, unknown>, flowLabel: string): string {
+function isApprovalStepComplete(status: string): boolean {
+    return ["approved", "verified", "skipped", "not_required", "not_applicable"].includes(status);
+}
+
+function opportunityRequiresPartnerApproval(row: Record<string, unknown>): boolean {
+    if (row.requiresPartnerApproval === true || row.requires_partner_approval === true) return true;
+    const sh = stakeholderRows(row);
+    return Boolean(sh.partnerEmail || sh.partnerOrg);
+}
+
+type OpportunityReminderKind = "faculty" | "partner" | "faculty_and_partner" | "admin_review";
+
+function pickOpportunityReminderKind(row: Record<string, unknown>): OpportunityReminderKind {
+    const facultyPipeline = facultyApprovalPipelineApplies(row);
+    const facultyStatus = normalizeApprovalState(row.faculty_approval_status ?? row.facultyApprovalStatus);
+    const partnerStatus = normalizeApprovalState(row.partner_approval_status ?? row.partnerApprovalStatus);
+    const requiresPartner = opportunityRequiresPartnerApproval(row);
+
+    const facultyPending = facultyPipeline && !isApprovalStepComplete(facultyStatus);
+    const partnerPending =
+        requiresPartner && partnerStatus !== "not_applicable" && !isApprovalStepComplete(partnerStatus);
+
+    if (facultyPending && partnerPending) return "faculty_and_partner";
+    if (facultyPending) return "faculty";
+    if (partnerPending) return "partner";
+
+    const workflow = normalizeApprovalState(row.workflow_stage ?? row.workflowStage);
+    if (workflow === "pending_admin" || workflow === "pending_approval") return "admin_review";
+    return "faculty";
+}
+
+function readOpportunityReminderStudentName(row: Record<string, unknown>): string {
     const creator = row.creator && typeof row.creator === "object" ? (row.creator as Record<string, unknown>) : null;
-    const creatorName = pickDetailStr(creator, "name", "full_name", "fullName") || "there";
-    const title = pickDetailStr(row, "title") || "your opportunity";
-    const stage =
-        flowLabel ||
-        pickDetailStr(row, "workflow_stage", "workflowStage", "status").replace(/_/g, " ") ||
-        "pending approval";
+    return pickDetailStr(creator, "name", "full_name", "fullName") || "Student";
+}
+
+function readOpportunityReminderTitle(row: Record<string, unknown>): string {
+    return pickDetailStr(row, "title") || "your opportunity";
+}
+
+function buildOpportunityReminderText(row: Record<string, unknown>): string {
+    const studentName = readOpportunityReminderStudentName(row);
+    const title = readOpportunityReminderTitle(row);
+    const kind = pickOpportunityReminderKind(row);
+
+    if (kind === "partner") {
+        return [
+            `Dear ${studentName},`,
+            "",
+            `Reminder from CIEL PK: your opportunity, "${title}," is currently awaiting partner approval.`,
+            "",
+            "Please request your partner organization representative to register or log in to the CIEL PK dashboard using the same email ID you mentioned in the system and approve your project.",
+            "",
+            "Once approved, you will be able to add team members, if you are working in a team, and start your report.",
+            "",
+            "Thank you,",
+            "Team CIEL PK",
+        ].join("\n");
+    }
+
+    if (kind === "faculty_and_partner") {
+        return [
+            `Dear ${studentName},`,
+            "",
+            `Reminder from CIEL PK: your opportunity, "${title}," is currently awaiting both faculty and partner approval.`,
+            "",
+            "Please request your faculty supervisor and partner organization representative to register or log in to the CIEL PK dashboard using the same email IDs you mentioned in the system and approve your project.",
+            "",
+            "Once both approvals are completed, you will be able to add team members, if you are working in a team, and start your report.",
+            "",
+            "Thank you,",
+            "Team CIEL PK",
+        ].join("\n");
+    }
+
+    if (kind === "admin_review") {
+        return [
+            `Dear ${studentName},`,
+            "",
+            `Reminder from CIEL PK: your opportunity, "${title}," is currently awaiting final CIEL PK admin review.`,
+            "",
+            "No further action is required from your faculty supervisor or partner at this stage. Your submission is in the CIEL PK review queue.",
+            "",
+            "Thank you,",
+            "Team CIEL PK",
+        ].join("\n");
+    }
 
     return [
-        `Assalam o Alaikum ${creatorName},`,
-        `Reminder from CIEL: your opportunity "${title}" is currently at "${stage}" stage.`,
-        "Please check your CIEL dashboard and complete the pending step so it can move forward.",
-        "Thank you.",
+        `Dear ${studentName},`,
+        "",
+        `Reminder from CIEL PK: your opportunity, "${title}," is currently awaiting faculty approval.`,
+        "",
+        "Please request your faculty supervisor to register or log in to the CIEL PK dashboard using the same email ID you mentioned in the system and approve your project.",
+        "",
+        "Once approved, you will be able to add team members, if you are working in a team, and start your report.",
+        "",
+        "Thank you,",
+        "Team CIEL PK",
     ].join("\n");
 }
 
-function buildOpportunityReminderWhatsAppUrl(row: Record<string, unknown>, flowLabel: string): string {
+function buildOpportunityReminderWhatsAppUrl(row: Record<string, unknown>): string {
     const phone = normalizeWhatsAppPhone(readOpportunityCreatorPhone(row));
     if (!phone) return "";
-    const message = buildOpportunityReminderText(row, flowLabel);
+    const message = buildOpportunityReminderText(row);
     return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
 }
 
@@ -707,7 +792,7 @@ export default function AdminApprovalsPage() {
                         const projRow = proj as Record<string, unknown>;
                         const flowLabel = readFlowStatus(projRow);
                         const canAdminApprove = readAdminCanApprove(projRow);
-                        const reminderWhatsAppUrl = buildOpportunityReminderWhatsAppUrl(projRow, flowLabel);
+                        const reminderWhatsAppUrl = buildOpportunityReminderWhatsAppUrl(projRow);
                         return (
                         <div key={proj.id} className="flex flex-col items-stretch justify-between gap-4 rounded-xl border border-slate-100 bg-white p-5 shadow-sm sm:p-6 lg:flex-row lg:items-center">
                             <div className="min-w-0">
