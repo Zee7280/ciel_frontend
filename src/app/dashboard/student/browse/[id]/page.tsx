@@ -21,7 +21,8 @@ import {
     readObjectiveItems,
     readSupervisionStakeholders,
 } from "@/utils/opportunityDetailView";
-import { Loader2, MapPin, Calendar, ArrowLeft, Share2, CheckCircle2, AlertCircle, Pencil } from "lucide-react";
+import { Loader2, MapPin, Calendar, ArrowLeft, Share2, Printer, CheckCircle2, AlertCircle, Pencil } from "lucide-react";
+import { copyOpportunityShareLink } from "@/utils/opportunityShareLink";
 import { toast } from "sonner";
 import Link from "next/link";
 import ApplicationDialog from "../components/ApplicationDialog";
@@ -343,8 +344,21 @@ export default function OpportunityDetailsPage() {
                     <ArrowLeft className="w-4 h-4" /> {opportunitiesBackLabel}
                 </Link>
                 <div className="flex gap-3 flex-wrap justify-end">
-                    <button onClick={() => window.print()} className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 font-medium">
-                        <Share2 className="w-4 h-4" /> Print / Save PDF
+                    <button
+                        type="button"
+                        onClick={() => void copyOpportunityShareLink(id)}
+                        className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 font-medium"
+                        aria-label="Copy share link"
+                        title="Copy share link"
+                    >
+                        <Share2 className="w-4 h-4" /> Copy share link
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => window.print()}
+                        className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 font-medium"
+                    >
+                        <Printer className="w-4 h-4" /> Print / Save PDF
                     </button>
 
                     {!hideStudentApplyActions && opportunity.isStudentOwner && !ownerListingLive ? (

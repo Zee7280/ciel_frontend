@@ -1,5 +1,13 @@
 export type AttendanceApproverType = "faculty" | "partner";
 
+/** Matches backend `addAttendanceLog` participation status gate. */
+export const PARTICIPATION_STATUSES_ALLOWING_ATTENDANCE_LOG = [
+    "approved",
+    "verified",
+    "accepted",
+    "finalized",
+] as const;
+
 function str(value: unknown): string {
     return typeof value === "string" ? value.trim() : "";
 }
@@ -10,13 +18,53 @@ function hasValue(value: unknown): boolean {
     return true;
 }
 
+function hasMeaningfulObjectValue(value: unknown): boolean {
+    if (!value || typeof value !== "object") return false;
+    return Object.values(value as Record<string, unknown>).some((v) => {
+        if (Array.isArray(v)) return v.length > 0;
+        if (v && typeof v === "object") return hasMeaningfulObjectValue(v);
+        return v !== null && v !== undefined && String(v).trim() !== "";
+    });
+}
+
 /**
- * Attendance approval ownership is fixed when a student applies.
- * Partner-created opportunities go to partner review; every other/legacy shape
- * stays on the existing faculty path.
+ * Mirrors backend `StudentsService.opportunityHasPartner` — source of truth on apply.
+ * Backend ignores client `attendance_approver_type` and recomputes from the opportunity.
  */
-export function resolveAttendanceApproverType(opportunity: Record<string, unknown> | null | undefined): AttendanceApproverType {
+export function opportunityHasPartner(opportunity: Record<string, unknown> | null | undefined): boolean {
+    if (!opportunity) return false;
+    if (
+        opportunity.requires_partner_approval === true ||
+        opportunity.requiresPartnerApproval === true
+    ) {
+        return true;
+    }
+    if (hasValue(opportunity.organization_id) || hasValue(opportunity.organizationId)) {
+        return true;
+    }
+    if (hasMeaningfulObjectValue(opportunity.partner_organization)) return true;
+    if (hasMeaningfulObjectValue(opportunity.executing_organization)) return true;
+    return false;
+}
+
+export function canLogAttendanceForParticipationStatus(status: string | null | undefined): boolean {
+    const normalized = str(status).toLowerCase();
+    if (!normalized) return false;
+    return (PARTICIPATION_STATUSES_ALLOWING_ATTENDANCE_LOG as readonly string[]).includes(normalized);
+}
+
+/**
+ * Attendance approval ownership is fixed when a student applies (backend recomputes on apply).
+ * Partner-linked student projects route to partner review; faculty/student-only projects stay on faculty.
+ */
+export function resolveAttendanceApproverType(
+    opportunity: Record<string, unknown> | null | undefined,
+): AttendanceApproverType {
     if (!opportunity) return "faculty";
+
+    if (opportunityHasPartner(opportunity)) {
+        return "partner";
+    }
 
     const creatorRole = str(
         opportunity.created_by_role ??
@@ -27,17 +75,9 @@ export function resolveAttendanceApproverType(opportunity: Record<string, unknow
             opportunity.creatorRole,
     ).toLowerCase();
     const source = str(opportunity.source ?? opportunity.opportunity_source ?? opportunity.opportunitySource).toLowerCase();
-    const ownerType = str(opportunity.owner_type ?? opportunity.ownerType ?? opportunity.created_by_type ?? opportunity.createdByType).toLowerCase();
-
-    const explicitFacultyOrStudent =
-        creatorRole.includes("faculty") ||
-        creatorRole.includes("student") ||
-        source.includes("faculty") ||
-        source.includes("student") ||
-        ownerType.includes("faculty") ||
-        ownerType.includes("student");
-
-    if (explicitFacultyOrStudent) return "faculty";
+    const ownerType = str(
+        opportunity.owner_type ?? opportunity.ownerType ?? opportunity.created_by_type ?? opportunity.createdByType,
+    ).toLowerCase();
 
     const explicitPartner =
         creatorRole.includes("partner") ||

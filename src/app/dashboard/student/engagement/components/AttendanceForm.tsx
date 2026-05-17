@@ -8,6 +8,7 @@ import { Input } from "../../report/components/ui/input";
 import { Label } from "../../report/components/ui/label";
 import { authenticatedFetch } from "@/utils/api";
 import { normalizeEngagementAttendanceLog } from "@/utils/engagementAttendanceMap";
+import { canLogAttendanceForParticipationStatus } from "@/utils/attendanceApproverRouting";
 import clsx from "clsx";
 import { useReportForm } from "../../report/context/ReportContext";
 import React from "react";
@@ -139,10 +140,13 @@ export default function AttendanceForm({
     const wordCount = formData.description.trim() === "" ? 0 : formData.description.trim().split(/\s+/).length;
 
     const selectedUser = verifiedUsers.find(u => u.id === formData.participantId);
-    const isUserApproved = !!selectedUser && [
-        'approved', 'verified', 'active', 'accepted', 'pending',
-        'pending_approval', 'pending_faculty_approval', 'pending_partner_approval', 'pending_ciel_approval', 'registered'
-    ].includes(selectedUser.status || '');
+    const isUserApproved =
+        !!selectedUser && canLogAttendanceForParticipationStatus(selectedUser.status);
+    const participationPendingApproval =
+        !!selectedUser &&
+        !isUserApproved &&
+        typeof selectedUser.status === "string" &&
+        selectedUser.status.trim().length > 0;
     
     // Restore proper locking logic: record is locked if report is submitted OR if user is not yet approved
     const effectiveLocked = !isUserApproved || (isLocked && !isParticipationUnlocked);

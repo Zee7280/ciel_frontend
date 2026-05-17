@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Loader2, MapPin, Calendar, Globe, ArrowLeft, Building2, Share2, CheckCircle2, User, Trophy, Clock, Target, ShieldCheck, Heart } from "lucide-react";
 import { toast } from "sonner";
+import { copyOpportunityShareLink } from "@/utils/opportunityShareLink";
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -240,8 +241,12 @@ export default function PublicOpportunityPage() {
                         </div>
 
                         {/* Share */}
-                        <button className="w-full flex items-center justify-center gap-3 py-4 rounded-2xl border-2 border-slate-200 text-slate-600 font-bold hover:bg-slate-50 transition-all active:scale-95">
-                            <Share2 className="w-5 h-5" /> Share this Project
+                        <button
+                            type="button"
+                            onClick={() => void copyOpportunityShareLink(id)}
+                            className="w-full flex items-center justify-center gap-3 py-4 rounded-2xl border-2 border-slate-200 text-slate-600 font-bold hover:bg-slate-50 transition-all active:scale-95"
+                        >
+                            <Share2 className="w-5 h-5" /> Copy share link
                         </button>
                     </div>
                 </div>

@@ -4,12 +4,19 @@ import Navbar from "@/components/Navbar";
 import PartnersFooter from "@/components/PartnersFooter";
 import FooterBanner from "@/components/FooterBanner";
 import Footer from "@/components/Footer";
-import { MapPin, Users, Target, ArrowLeft, CheckCircle2, Loader2, Globe2, Sparkles, Building2, Tag, Clock } from "lucide-react";
+import { MapPin, Users, Target, ArrowLeft, CheckCircle2, Loader2, Globe2, Sparkles, Building2, Tag, Clock, Share2 } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useState, useEffect } from "react";
 import { readStoredCurrentUser } from "@/utils/currentUser";
 import { authenticatedFetch, isTokenValid } from "@/utils/api";
+import { CollapsibleDetailText } from "@/components/opportunities/CollapsibleDetailText";
+import {
+    readActivityPlan,
+    readObjectiveItems,
+    readSupervisionStakeholders,
+} from "@/utils/opportunityDetailView";
+import { copyOpportunityShareLink } from "@/utils/opportunityShareLink";
 
 interface ProjectDetails {
     id: string | number;
@@ -56,8 +63,12 @@ interface ProjectDetails {
         role?: string;
         safe_environment?: boolean;
         supervised?: boolean;
+        partner_org_name?: string;
+        partner_contact_person?: string;
     };
     verification_method?: string[];
+    detail_view?: Record<string, unknown>;
+    secondary_sdgs?: Array<Record<string, unknown>>;
 }
 
 function normalizeTextList(value?: string[] | string): string[] {
@@ -215,12 +226,22 @@ export default function ProjectDetailsPage() {
         );
     }
 
+    const projectRecord = project as unknown as Record<string, unknown>;
+    const objectiveContent = readObjectiveItems(projectRecord);
+    const activityPlan = readActivityPlan(projectRecord);
+    const stakeholders = readSupervisionStakeholders(projectRecord);
+
     const category = (project.types && project.types.length > 0) ? project.types[0] : "Social Impact";
     const status = project.status || "Active";
     const displayLocation = getDisplayLocation(project.location);
-    const partnerName = project.organization?.name || project.organization_name || project.partner_name || project.org || "Verified Organization";
-    const primaryDescription = project.objectives?.description || project.description;
-    const skills = normalizeTextList(project.activity_details?.skills_gained);
+    const partnerName =
+        stakeholders.partner?.organization ||
+        project.organization?.name ||
+        project.organization_name ||
+        project.partner_name ||
+        project.org ||
+        "Verified Organization";
+    const skills = activityPlan.skills.length > 0 ? activityPlan.skills : normalizeTextList(project.activity_details?.skills_gained);
     const verificationMethods = normalizeTextList(project.verification_method);
     const beneficiaryTypes = normalizeTextList(project.objectives?.beneficiaries_type);
     const volunteersNeeded = project.timeline?.volunteers_required || project.volunteers_needed || project.participant_count || 0;
@@ -238,9 +259,13 @@ export default function ProjectDetailsPage() {
         (project.location && typeof project.location === "object"
             ? project.location.city || project.location.district || ""
             : "");
-    const sdgLabel = project.sdg_info?.sdg_id || (project.sdg ? `SDG ${project.sdg}` : "UN Global Goal");
+    const sdgInfo = project.sdg_info as { sdg_id?: string | number; target_id?: string; indicator_id?: string; description?: string } | undefined;
+    const sdgLabel = sdgInfo?.sdg_id || (project.sdg ? `SDG ${project.sdg}` : "UN Global Goal");
     const sdgDescription =
-        project.sdg_info?.description || "This opportunity supports measurable community impact goals.";
+        sdgInfo?.description || "This opportunity supports measurable community impact goals.";
+    const secondarySdgs = (project.detail_view as { sdg?: { secondary?: unknown[] } } | undefined)?.sdg?.secondary
+        ?? project.secondary_sdgs
+        ?? [];
 
     return (
         <main className="min-h-screen bg-slate-50 font-sans selection:bg-blue-100 pb-20">
@@ -253,9 +278,26 @@ export default function ProjectDetailsPage() {
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                     <div>
                         <h1 className="text-4xl md:text-5xl font-black text-slate-900 mb-3 tracking-tight leading-tight">{project.title}</h1>
+                        {project.types && project.types.length > 0 ? (
+                            <div className="flex flex-wrap gap-2 mb-2">
+                                {project.types.map((t) => (
+                                    <span key={t} className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                                        {t}
+                                    </span>
+                                ))}
+                            </div>
+                        ) : null}
                         <p className="text-lg font-bold text-[#4285F4]">{partnerName}</p>
                     </div>
-                    <div className="flex items-center gap-3">
+                    <div className="flex flex-wrap items-center gap-3">
+                        <button
+                            type="button"
+                            onClick={() => void copyOpportunityShareLink(String(project.id))}
+                            className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-slate-200 text-[10px] font-black uppercase tracking-widest text-slate-600 hover:bg-slate-50"
+                            aria-label="Copy share link"
+                        >
+                            <Share2 className="h-4 w-4" /> Copy link
+                        </button>
                         {project.mode ? (
                             <span className="px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest bg-blue-50 text-blue-700 border border-blue-100">
                                 {project.mode}
@@ -308,12 +350,29 @@ export default function ProjectDetailsPage() {
                         </div>
                     </div>
 
-                    {/* Description Section */}
+                    {/* Objectives */}
                     <div className="mb-10">
-                        <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-6">About the Project</h3>
-                        <p className="text-base text-slate-600 leading-7 whitespace-pre-line">
-                            {primaryDescription}
-                        </p>
+                        <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-6">Project Objectives</h3>
+                        {objectiveContent.items.length > 1 ? (
+                            <ol className="text-base text-slate-600 leading-7 space-y-3 list-decimal list-inside border-l-4 border-[#4285F4]/30 pl-4">
+                                {objectiveContent.items.map((item, idx) => (
+                                    <li key={idx}>{item}</li>
+                                ))}
+                            </ol>
+                        ) : (
+                            <p className="text-base text-slate-600 leading-7 whitespace-pre-line border-l-4 border-[#4285F4]/30 pl-4">
+                                {objectiveContent.description || project.description || "No objectives provided."}
+                            </p>
+                        )}
+                        {beneficiaryTypes.length > 0 ? (
+                            <div className="flex flex-wrap gap-2 mt-4">
+                                {beneficiaryTypes.map((b) => (
+                                    <span key={b} className="px-3 py-1 rounded-full bg-slate-100 text-xs font-bold text-slate-600">
+                                        {b}
+                                    </span>
+                                ))}
+                            </div>
+                        ) : null}
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
@@ -335,7 +394,22 @@ export default function ProjectDetailsPage() {
                             </div>
                             <div className="space-y-2 text-sm text-slate-600">
                                 <p><span className="font-bold text-slate-900">Goal:</span> {sdgLabel}</p>
+                                {sdgInfo?.target_id ? (
+                                    <p className="text-xs text-slate-500">
+                                        Target {String(sdgInfo.target_id)} · Indicator {String(sdgInfo.indicator_id ?? "—")}
+                                    </p>
+                                ) : null}
                                 <p className="leading-6">{sdgDescription}</p>
+                                {Array.isArray(secondarySdgs) && secondarySdgs.length > 0 ? (
+                                    <ul className="text-xs text-slate-500 space-y-1 pt-2 border-t border-slate-200">
+                                        {(secondarySdgs as Record<string, unknown>[]).map((s, i) => (
+                                            <li key={i}>
+                                                Also: SDG {String(s.sdg_id ?? "?")}
+                                                {s.target_id ? ` · ${String(s.target_id)}` : ""}
+                                            </li>
+                                        ))}
+                                    </ul>
+                                ) : null}
                             </div>
                         </div>
                         <div className="bg-slate-50 rounded-3xl border border-slate-100 p-6">
@@ -357,9 +431,13 @@ export default function ProjectDetailsPage() {
                                 <Target className="w-5 h-5 text-[#4285F4]" />
                                 <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Student Responsibilities</h3>
                             </div>
-                            <p className="text-sm text-slate-600 leading-7 whitespace-pre-line">
-                                {project.activity_details?.student_responsibilities || "Detailed student responsibilities will be shared after login through the student dashboard."}
-                            </p>
+                            <CollapsibleDetailText
+                                fullText={activityPlan.full}
+                                previewText={activityPlan.preview}
+                                isLong={activityPlan.isLong}
+                                emptyLabel="Detailed student responsibilities will be shared after login through the student dashboard."
+                                className="text-sm"
+                            />
                         </div>
                         <div className="bg-slate-50 rounded-3xl border border-slate-100 p-6">
                             <div className="flex items-center gap-3 mb-4">
@@ -410,9 +488,36 @@ export default function ProjectDetailsPage() {
                                     <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Supervision</h3>
                                 </div>
                                 <div className="space-y-3 text-sm text-slate-600">
-                                    <p><span className="font-bold text-slate-900">Organization:</span> {partnerName}</p>
-                                    <p><span className="font-bold text-slate-900">Supervisor:</span> {project.supervision?.supervisor_name || "Assigned Coordinator"}</p>
-                                    <p><span className="font-bold text-slate-900">Role:</span> {project.supervision?.role || "Project Lead"}</p>
+                                    {(stakeholders.faculty?.name || project.supervision?.supervisor_name) ? (
+                                        <div>
+                                            <p className="text-[10px] font-black uppercase text-slate-400 mb-1">Faculty</p>
+                                            <p className="font-bold text-slate-900">
+                                                {stakeholders.faculty?.name || project.supervision?.supervisor_name}
+                                            </p>
+                                            {(stakeholders.faculty?.role || project.supervision?.role) ? (
+                                                <p className="text-xs">{stakeholders.faculty?.role || project.supervision?.role}</p>
+                                            ) : null}
+                                            {stakeholders.faculty?.department ? (
+                                                <p className="text-xs">{stakeholders.faculty.department}</p>
+                                            ) : null}
+                                            {stakeholders.faculty?.university ? (
+                                                <p className="text-xs">{stakeholders.faculty.university}</p>
+                                            ) : null}
+                                        </div>
+                                    ) : null}
+                                    {(stakeholders.partner?.organization || project.supervision?.partner_org_name) ? (
+                                        <div className="pt-2 border-t border-slate-200">
+                                            <p className="text-[10px] font-black uppercase text-slate-400 mb-1">Partner</p>
+                                            <p className="font-bold text-slate-900">
+                                                {stakeholders.partner?.organization || project.supervision?.partner_org_name}
+                                            </p>
+                                            {(stakeholders.partner?.contact_person || project.supervision?.partner_contact_person) ? (
+                                                <p className="text-xs">
+                                                    {stakeholders.partner?.contact_person || project.supervision?.partner_contact_person}
+                                                </p>
+                                            ) : null}
+                                        </div>
+                                    ) : null}
                                     <p><span className="font-bold text-slate-900">Safe Environment:</span> {project.supervision?.safe_environment ? "Confirmed" : "Shared after onboarding"}</p>
                                 </div>
                             </div>

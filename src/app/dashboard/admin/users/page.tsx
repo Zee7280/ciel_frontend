@@ -22,7 +22,13 @@ import {
     CheckCircle2,
     AlertCircle,
     MinusCircle,
+    Eye,
+    EyeOff,
+    Copy,
+    Lock,
+    Info,
 } from "lucide-react";
+import { toast } from "sonner";
 import DataTable from "react-data-table-component";
 
 function formatJoinDate(createdAt: string | undefined | null): string {
@@ -54,6 +60,8 @@ interface User {
     status: string;
     joinDate: string;
     orgName?: string;
+    /** Super-admin only: decrypted password copy from backend */
+    stored_password?: string | null;
     /** From backend `findAllForAdmin`; absent on older APIs */
     profile_complete?: boolean;
     profile_missing_fields?: string[];
@@ -95,6 +103,8 @@ export default function AdminUsersPage() {
 
     // Form States
     const [formData, setFormData] = useState({ name: "", email: "", password: "", role: "student", status: "active" });
+    const [showPasswordColumn, setShowPasswordColumn] = useState(false);
+    const [revealedPasswordIds, setRevealedPasswordIds] = useState<Record<string, boolean>>({});
 
     // Filtered & Paginated Users
     const filteredUsers = users.filter(user => {
@@ -180,6 +190,10 @@ export default function AdminUsersPage() {
                 role: u.role,
                 status: u.status || "active",
                 joinDate: formatJoinDate(u.createdAt),
+                stored_password:
+                    typeof u.stored_password === "string" && u.stored_password.trim()
+                        ? u.stored_password
+                        : null,
                 profile_complete: typeof u.profile_complete === "boolean" ? u.profile_complete : undefined,
                 profile_missing_fields: Array.isArray(u.profile_missing_fields) ? u.profile_missing_fields : undefined,
             }));
@@ -265,36 +279,59 @@ export default function AdminUsersPage() {
         }
     };
 
+    const storedPasswordCount = users.filter((u) => u.stored_password).length;
+
+    const togglePasswordReveal = (userId: string | number) => {
+        const key = String(userId);
+        setRevealedPasswordIds((prev) => ({ ...prev, [key]: !prev[key] }));
+    };
+
+    const copyStoredPassword = async (password: string) => {
+        try {
+            await navigator.clipboard.writeText(password);
+            toast.success("Password copied");
+        } catch {
+            toast.error("Could not copy password");
+        }
+    };
+
+    const toolbarControlClass =
+        "h-10 rounded-lg border border-slate-200 bg-white text-sm text-slate-800 outline-none transition-shadow focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400";
+
     return (
         <div className="relative p-0 lg:p-8">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+            <div className="mb-5 space-y-4">
+                <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
                 <div>
-                    <h1 className="text-2xl font-bold text-slate-900 sm:text-3xl">User Management</h1>
-                    <p className="text-slate-500">Manage all registered users and their roles.</p>
+                    <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">User Management</h1>
+                    <p className="mt-1 text-sm text-slate-600">Manage registered users, roles, and account status.</p>
+                    <p className="mt-2 text-xs font-medium text-slate-500">
+                        {isLoading ? "Loading…" : `${filteredUsers.length} user${filteredUsers.length === 1 ? "" : "s"} shown`}
+                        {roleFilter !== "all" ? ` · ${formatRoleLabel(roleFilter)}` : ""}
+                    </p>
                 </div>
 
-                <div className="grid w-full grid-cols-1 gap-3 sm:grid-cols-[1fr_auto_auto] md:w-auto md:items-center">
+                <div className="flex w-full flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center xl:w-auto xl:justify-end">
                     {/* Search */}
-                    <div className="relative min-w-0 md:w-64">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    <div className="relative min-w-0 flex-1 sm:min-w-[220px] sm:max-w-xs">
+                        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                         <input
                             type="text"
-                            placeholder="Search users..."
-                            className="w-full pl-9 pr-4 py-2 rounded-lg border border-slate-200 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                            placeholder="Search name or email…"
+                            className={`${toolbarControlClass} w-full pl-9 pr-3`}
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                         />
                     </div>
 
-                    {/* Role Filter */}
-                    <div className="relative">
-                        <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    <div className="relative w-full sm:w-[160px]">
+                        <Filter className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                         <select
-                            className="w-full appearance-none rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-8 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                            className={`${toolbarControlClass} w-full appearance-none pl-9 pr-8`}
                             value={roleFilter}
                             onChange={(e) => setRoleFilter(e.target.value)}
                         >
-                            <option value="all">All Roles</option>
+                            <option value="all">All roles</option>
                             <option value="student">Student</option>
                             <option value="faculty">Faculty</option>
                             <option value="university">University</option>
@@ -306,19 +343,55 @@ export default function AdminUsersPage() {
                     </div>
 
                     <button
+                        type="button"
+                        onClick={() => {
+                            setShowPasswordColumn((v) => {
+                                if (v) setRevealedPasswordIds({});
+                                return !v;
+                            });
+                        }}
+                        className={`inline-flex h-10 items-center justify-center gap-2 whitespace-nowrap rounded-lg border px-3 text-sm font-semibold transition-colors sm:px-4 ${
+                            showPasswordColumn
+                                ? "border-violet-200 bg-violet-50 text-violet-800 hover:bg-violet-100"
+                                : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                        }`}
+                        title="Show stored password column (super admin)"
+                    >
+                        {showPasswordColumn ? <EyeOff className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
+                        Passwords
+                        {storedPasswordCount > 0 && (
+                            <span className="rounded-full bg-violet-200/80 px-1.5 py-0.5 text-[10px] font-bold tabular-nums text-violet-900">
+                                {storedPasswordCount}
+                            </span>
+                        )}
+                    </button>
+
+                    <button
                         onClick={() => {
                             setFormData({ name: "", email: "", password: "", role: "student", status: "active" });
                             setIsAddModalOpen(true);
                         }}
-                        className="flex items-center justify-center gap-2 whitespace-nowrap rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-blue-700"
+                        className="inline-flex h-10 items-center justify-center gap-2 whitespace-nowrap rounded-lg bg-blue-600 px-4 text-sm font-bold text-white shadow-sm transition-colors hover:bg-blue-700"
                     >
-                        <Plus className="w-4 h-4" /> Add User
+                        <Plus className="h-4 w-4" />
+                        Add user
                     </button>
                 </div>
+                </div>
+
+                {showPasswordColumn && (
+                    <div className="flex gap-3 rounded-xl border border-violet-200/80 bg-violet-50/80 px-4 py-3 text-sm text-violet-950">
+                        <Info className="mt-0.5 h-4 w-4 shrink-0 text-violet-600" aria-hidden />
+                        <p className="leading-relaxed">
+                            Passwords appear after signup, when you set a new password in <strong>Edit</strong>, or when the user logs in again.
+                            Empty rows need a login or an admin password reset.
+                        </p>
+                    </div>
+                )}
             </div>
 
             {/* Table */}
-            <div className="relative min-h-[400px] overflow-x-auto overflow-y-visible rounded-2xl border border-slate-100 bg-white shadow-sm">
+            <div className="relative min-h-[320px] overflow-x-auto overflow-y-visible rounded-2xl border border-slate-200/80 bg-white shadow-sm">
 
                 <DataTable
                     columns={[
@@ -337,6 +410,58 @@ export default function AdminUsersPage() {
                             ),
                             grow: 2
                         },
+                        ...(showPasswordColumn
+                            ? [
+                                  {
+                                      name: "Password",
+                                      cell: (user: User) => {
+                                          const key = String(user.id);
+                                          const stored = user.stored_password;
+                                          if (!stored) {
+                                              return (
+                                                  <span
+                                                      className="text-xs text-slate-400"
+                                                      title="Set via Edit, or captured on next login"
+                                                  >
+                                                      Not stored yet
+                                                  </span>
+                                              );
+                                          }
+                                          const revealed = revealedPasswordIds[key];
+                                          return (
+                                              <div className="flex items-center gap-1 py-1">
+                                                  <code className="max-w-[140px] truncate rounded-md bg-slate-100 px-2 py-1 font-mono text-xs text-slate-800">
+                                                      {revealed ? stored : "••••••••"}
+                                                  </code>
+                                                  <button
+                                                      type="button"
+                                                      onClick={() => togglePasswordReveal(user.id)}
+                                                      className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+                                                      title={revealed ? "Hide password" : "Show password"}
+                                                      aria-label={revealed ? "Hide password" : "Show password"}
+                                                  >
+                                                      {revealed ? (
+                                                          <EyeOff className="h-3.5 w-3.5" />
+                                                      ) : (
+                                                          <Eye className="h-3.5 w-3.5" />
+                                                      )}
+                                                  </button>
+                                                  <button
+                                                      type="button"
+                                                      onClick={() => copyStoredPassword(stored)}
+                                                      className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+                                                      title="Copy password"
+                                                      aria-label="Copy password"
+                                                  >
+                                                      <Copy className="h-3.5 w-3.5" />
+                                                  </button>
+                                              </div>
+                                          );
+                                      },
+                                      minWidth: "200px",
+                                  },
+                              ]
+                            : []),
                         {
                             name: "Role",
                             cell: (user: User) => (
@@ -352,11 +477,11 @@ export default function AdminUsersPage() {
                             name: "Status",
                             cell: (user: User) => (
                                 <span
-                                    className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide ${user.status === "active"
-                                        ? "bg-[#E8F5E9] text-green-700"
+                                    className={`inline-flex rounded-md border px-2.5 py-1 text-xs font-semibold capitalize ${user.status === "active"
+                                        ? "border-slate-200 bg-slate-50 text-slate-700"
                                         : user.status === "pending"
-                                            ? "bg-amber-50 text-amber-600"
-                                            : "bg-red-50 text-red-600"
+                                            ? "border-amber-200 bg-amber-50 text-amber-800"
+                                            : "border-red-200 bg-red-50 text-red-700"
                                         }`}
                                 >
                                     {user.status}
@@ -374,10 +499,10 @@ export default function AdminUsersPage() {
                                 if (user.profile_complete === true) {
                                     return (
                                         <span
-                                            className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-800"
+                                            className="inline-flex items-center gap-1.5 rounded-md border border-emerald-200 bg-white px-2.5 py-1 text-xs font-medium text-emerald-800"
                                             title="Required fields for submissions are filled"
                                         >
-                                            <CheckCircle2 className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                                            <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-emerald-600" aria-hidden />
                                             Complete
                                         </span>
                                     );
@@ -441,27 +566,47 @@ export default function AdminUsersPage() {
 
                     /* 🔥 IMPORTANT FIX */
                     customStyles={{
+                        headRow: {
+                            style: {
+                                minHeight: "44px",
+                                borderBottomWidth: "1px",
+                                borderBottomColor: "#e2e8f0",
+                            },
+                        },
+                        headCells: {
+                            style: {
+                                fontSize: "11px",
+                                fontWeight: 700,
+                                textTransform: "uppercase",
+                                letterSpacing: "0.06em",
+                                color: "#64748b",
+                            },
+                        },
                         table: {
                             style: {
-                                overflow: "visible"
-                            }
+                                overflow: "visible",
+                            },
                         },
                         tableWrapper: {
                             style: {
-                                overflow: "visible"
-                            }
+                                overflow: "visible",
+                            },
                         },
                         rows: {
                             style: {
                                 overflow: "visible",
-                                position: "relative"
-                            }
+                                position: "relative",
+                                minHeight: "56px",
+                                borderBottomColor: "#f1f5f9",
+                            },
                         },
                         cells: {
                             style: {
-                                overflow: "visible"
-                            }
-                        }
+                                overflow: "visible",
+                                paddingTop: "10px",
+                                paddingBottom: "10px",
+                            },
+                        },
                     }}
                 />
 
