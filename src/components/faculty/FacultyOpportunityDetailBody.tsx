@@ -1,4 +1,5 @@
 import { formatDisplayId } from "@/utils/displayIds";
+import { OpportunitySdgAlignmentSection } from "@/components/opportunities/OpportunitySdgAlignmentSection";
 
 function pickNestedStr(o: Record<string, unknown> | null, ...keys: string[]): string {
     if (!o) return "";
@@ -105,7 +106,6 @@ export function FacultyOpportunityDetailBody({ d }: { d: Record<string, unknown>
     const skillsRaw = activity?.skills_gained ?? activity?.skillsGained;
     const skills = Array.isArray(skillsRaw) ? (skillsRaw as string[]).filter((s) => typeof s === "string") : [];
 
-    const sdgInfo = d.sdg_info && typeof d.sdg_info === "object" ? (d.sdg_info as Record<string, unknown>) : null;
     const supervision = d.supervision && typeof d.supervision === "object" ? (d.supervision as Record<string, unknown>) : null;
     const executing =
         d.executing_context && typeof d.executing_context === "object"
@@ -275,15 +275,7 @@ export function FacultyOpportunityDetailBody({ d }: { d: Record<string, unknown>
                 </div>
             ) : null}
 
-            {sdgInfo ? (
-                <div>
-                    <p className="text-xs font-bold text-slate-500 uppercase mb-1">SDG</p>
-                    <p className="text-slate-800">
-                        Primary SDG ID: {String(sdgInfo.sdg_id ?? sdgInfo.sdgId ?? "—")} · Target:{" "}
-                        {String(sdgInfo.target_id ?? sdgInfo.targetId ?? "—")}
-                    </p>
-                </div>
-            ) : null}
+            <OpportunitySdgAlignmentSection raw={d} heading="SDG alignment" />
 
             {responsibilities ? (
                 <div>

@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import Link from "next/link";
 import DataTable from "react-data-table-component";
 import type { TableColumn } from "react-data-table-component";
-import { Search, Filter, MoreVertical, Briefcase, MapPin, Eye, FileDown, Trash2, Users, Loader2, X, UserMinus } from "lucide-react";
+import { Search, Filter, MoreVertical, Briefcase, MapPin, Eye, FileDown, Trash2, Users, Loader2, X, UserMinus, Pencil, Mail } from "lucide-react";
 import { authenticatedFetch } from "@/utils/api";
 import { toast } from "sonner";
 
@@ -25,6 +25,8 @@ type AdminProjectRow = {
     hours: number;
     remainingHours: number | null;
     raw: Record<string, unknown>;
+    /** Present when listing is scoped with `student_email` query — role on that opportunity. */
+    studentMatch: { role: string; matchSource: "enrollment" | "application_pipeline" } | null;
 };
 
 function lower(v: unknown): string {
@@ -114,6 +116,19 @@ function normalizeAdminProjectRow(raw: Record<string, unknown>): AdminProjectRow
     const remainingSeats = parseNonNegInt(raw.remaining_seats);
     const remainingMembers = parseNonNegInt(raw.remaining_members);
 
+    let studentMatch: AdminProjectRow["studentMatch"] = null;
+    const sm = raw.student_match;
+    if (sm && typeof sm === "object" && !Array.isArray(sm)) {
+        const o = sm as Record<string, unknown>;
+        const role = typeof o.role === "string" ? o.role.trim() : "";
+        const ms = typeof o.match_source === "string" ? o.match_source.trim().toLowerCase() : "";
+        const matchSource: "application_pipeline" | "enrollment" =
+            ms === "application_pipeline" ? "application_pipeline" : "enrollment";
+        if (role) {
+            studentMatch = { role, matchSource };
+        }
+    }
+
     return {
         id,
         title,
@@ -129,6 +144,7 @@ function normalizeAdminProjectRow(raw: Record<string, unknown>): AdminProjectRow
         hours,
         remainingHours,
         raw,
+        studentMatch,
     };
 }
 
@@ -163,6 +179,24 @@ function incompleteApplicantBadgeClass(reportStatusRaw: string): string {
     return "bg-amber-50 text-amber-800 border border-amber-100";
 }
 
+/** Matches backend Participation / patch DTO enums. */
+const YEAR_OF_STUDY_OPTIONS = [
+    "1st Year",
+    "2nd Year",
+    "3rd Year",
+    "4th Year",
+    "Graduate",
+    "Postgraduate",
+] as const;
+
+const ACADEMIC_INTEGRATION_OPTIONS = [
+    "Voluntary",
+    "Course-Linked",
+    "Credit-Bearing",
+    "Capstone / Thesis",
+    "Research-Integrated",
+] as const;
+
 type TeamMemberRow = {
     id: string;
     name: string;
@@ -170,6 +204,35 @@ type TeamMemberRow = {
     role: string;
     reportStatus: string;
     reportAvailable: boolean;
+    supportsAdminPatch: boolean;
+    phoneNumber: string;
+    cnicDisplay: string;
+    universityId: string;
+    universityName: string;
+    academicProgram: string;
+    department: string;
+    yearOfStudy: string;
+    academicIntegrationType: string;
+};
+
+type TeamMemberEditorDraft = {
+    full_name: string;
+    mobile: string;
+    cnic: string;
+    university_id: string;
+    university_name: string;
+    academic_program: string;
+    department: string;
+    year_of_study: string;
+    academic_integration_type: string;
+    sync_linked_user_profile: boolean;
+};
+
+type TeamMemberEditorState = {
+    teamId: string;
+    memberId: string;
+    headline: string;
+    draft: TeamMemberEditorDraft;
 };
 
 type ParticipationMode = "team" | "individual";
@@ -275,9 +338,27 @@ function pickBoolean(raw: Record<string, unknown>, keys: string[], fallback = fa
     return fallback;
 }
 
+function pickLooseString(raw: Record<string, unknown>, keys: string[]): string {
+    for (const key of keys) {
+        const value = raw[key];
+        if (value === null || value === undefined) continue;
+        if (typeof value === "string") return value.trim();
+        if (typeof value === "number" && Number.isFinite(value)) return String(value);
+    }
+    return "";
+}
+
 function mapTeamMember(raw: Record<string, unknown>): TeamMemberRow | null {
     const id = pickString(raw, ["id", "member_id", "memberId", "student_id", "studentId", "application_id", "applicationId"]);
     if (!id) return null;
+    let supportsAdminPatch: boolean;
+    if (typeof raw.supports_admin_patch === "boolean") {
+        supportsAdminPatch = raw.supports_admin_patch;
+    } else if (typeof raw.supportsAdminPatch === "boolean") {
+        supportsAdminPatch = raw.supportsAdminPatch;
+    } else {
+        supportsAdminPatch = !/^pending:/i.test(id);
+    }
     return {
         id,
         name: pickString(raw, ["name", "student_name", "studentName", "full_name", "fullName"], "—"),
@@ -285,6 +366,15 @@ function mapTeamMember(raw: Record<string, unknown>): TeamMemberRow | null {
         role: pickString(raw, ["role", "member_role", "memberRole"], "Member"),
         reportStatus: pickString(raw, ["report_status", "reportStatus", "status"], "not_started").replace(/_/g, " "),
         reportAvailable: pickBoolean(raw, ["report_available", "reportAvailable", "is_report_available", "isReportAvailable"]),
+        supportsAdminPatch,
+        phoneNumber: pickLooseString(raw, ["phone_number", "phoneNumber", "mobile", "phone"]),
+        cnicDisplay: pickLooseString(raw, ["cnic_display", "cnicDisplay", "cnic"]),
+        universityId: pickLooseString(raw, ["university_id", "universityId"]),
+        universityName: pickLooseString(raw, ["university_name", "universityName"]),
+        academicProgram: pickLooseString(raw, ["academic_program", "academicProgram", "major"]),
+        department: pickLooseString(raw, ["department"]),
+        yearOfStudy: pickLooseString(raw, ["year_of_study", "yearOfStudy"]),
+        academicIntegrationType: pickLooseString(raw, ["academic_integration_type", "academicIntegrationType"]),
     };
 }
 
@@ -354,6 +444,8 @@ export default function AdminProjectsPage() {
     const [isLoading, setIsLoading] = useState(true);
     const [deletingId, setDeletingId] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState("");
+    const [studentEmailInput, setStudentEmailInput] = useState("");
+    const [studentEmailApplied, setStudentEmailApplied] = useState("");
     const [statusFilter, setStatusFilter] = useState("all");
     const [locationFilter, setLocationFilter] = useState("all");
     const [activeMenu, setActiveMenu] = useState<{ id: string; top: number; right: number } | null>(null);
@@ -371,15 +463,29 @@ export default function AdminProjectsPage() {
     const [teamOverviewLoading, setTeamOverviewLoading] = useState(false);
     const [deletingTeamId, setDeletingTeamId] = useState<string | null>(null);
     const [deletingMemberId, setDeletingMemberId] = useState<string | null>(null);
+    const [teamMemberEditor, setTeamMemberEditor] = useState<TeamMemberEditorState | null>(null);
+    const [memberSaveLoading, setMemberSaveLoading] = useState(false);
     const [teamOverviewParticipationFilter, setTeamOverviewParticipationFilter] = useState<"all" | "team" | "individual">("all");
     const [incompleteApplicantStatusFilter, setIncompleteApplicantStatusFilter] = useState<IncompleteApplicantStatusFilter>("all");
     /** Bumps when the modal closes or reopens so in-flight fetches cannot apply stale rows. */
     const incompleteApplicantsLoadSeq = useRef(0);
 
+    useEffect(() => {
+        const id = setTimeout(() => {
+            setStudentEmailApplied(studentEmailInput.trim().toLowerCase());
+        }, 450);
+        return () => clearTimeout(id);
+    }, [studentEmailInput]);
+
     const loadProjects = useCallback(async () => {
         setIsLoading(true);
         try {
-            const res = await authenticatedFetch(`/api/v1/admin/projects`);
+            const qp = studentEmailApplied.trim();
+            const path =
+                qp.length > 0
+                    ? `/api/v1/admin/projects?student_email=${encodeURIComponent(qp)}`
+                    : `/api/v1/admin/projects`;
+            const res = await authenticatedFetch(path);
             if (!res || !res.ok) {
                 const err = res ? await res.json().catch(() => ({})) : {};
                 toast.error(typeof (err as { error?: string }).error === "string" ? (err as { error: string }).error : "Could not load projects");
@@ -397,7 +503,7 @@ export default function AdminProjectsPage() {
         } finally {
             setIsLoading(false);
         }
-    }, []);
+    }, [studentEmailApplied]);
 
     useEffect(() => {
         void loadProjects();
@@ -471,6 +577,8 @@ export default function AdminProjectsPage() {
         setTeamOverviewLoading(false);
         setDeletingTeamId(null);
         setDeletingMemberId(null);
+        setTeamMemberEditor(null);
+        setMemberSaveLoading(false);
         setTeamOverviewParticipationFilter("all");
     }, []);
 
@@ -558,6 +666,7 @@ export default function AdminProjectsPage() {
             );
             if (res && (res.ok || res.status === 204)) {
                 toast.success("Member removed successfully");
+                setTeamMemberEditor((cur) => (cur?.memberId === memberId ? null : cur));
                 await loadTeamOverview(teamOverviewModal.opportunityId);
                 await loadProjects();
             } else {
@@ -572,6 +681,78 @@ export default function AdminProjectsPage() {
             toast.error("Could not remove member");
         } finally {
             setDeletingMemberId(null);
+        }
+    };
+
+    const openTeamMemberEditor = (teamId: string, member: TeamMemberRow) => {
+        if (!member.supportsAdminPatch) return;
+        const draft: TeamMemberEditorDraft = {
+            full_name: member.name.trim() === "—" ? "" : member.name.trim(),
+            mobile: member.phoneNumber.trim(),
+            cnic: member.cnicDisplay.trim(),
+            university_id: member.universityId.trim(),
+            university_name: member.universityName.trim(),
+            academic_program: member.academicProgram.trim(),
+            department: member.department.trim(),
+            year_of_study: member.yearOfStudy.trim(),
+            academic_integration_type: member.academicIntegrationType.trim(),
+            sync_linked_user_profile: true,
+        };
+        const headline =
+            [member.name.trim() !== "—" ? member.name : "", member.email.trim()].filter(Boolean).join(" · ") || member.id;
+        setTeamMemberEditor({ teamId, memberId: member.id, headline, draft });
+    };
+
+    const submitTeamMemberEdit = async () => {
+        if (!teamOverviewModal || !teamMemberEditor) return;
+        const { draft, teamId, memberId } = teamMemberEditor;
+        const body: Record<string, unknown> = {
+            sync_linked_user_profile: draft.sync_linked_user_profile,
+        };
+        if (draft.full_name.trim()) body.full_name = draft.full_name.trim();
+        if (draft.mobile.trim().length >= 6) body.mobile = draft.mobile.trim();
+        if (draft.cnic.trim()) body.cnic = draft.cnic.trim();
+        if (draft.university_id.trim()) body.university_id = draft.university_id.trim();
+        if (draft.university_name.trim()) body.university_name = draft.university_name.trim();
+        if (draft.academic_program.trim()) body.academic_program = draft.academic_program.trim();
+        if (draft.department.trim()) body.department = draft.department.trim();
+        if (draft.year_of_study && (YEAR_OF_STUDY_OPTIONS as readonly string[]).includes(draft.year_of_study)) {
+            body.year_of_study = draft.year_of_study;
+        }
+        if (
+            draft.academic_integration_type &&
+            (ACADEMIC_INTEGRATION_OPTIONS as readonly string[]).includes(draft.academic_integration_type)
+        ) {
+            body.academic_integration_type = draft.academic_integration_type;
+        }
+
+        setMemberSaveLoading(true);
+        try {
+            const res = await authenticatedFetch(
+                `/api/v1/admin/opportunities/${encodeURIComponent(teamOverviewModal.opportunityId)}/teams/${encodeURIComponent(teamId)}/members/${encodeURIComponent(memberId)}`,
+                {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(body),
+                },
+            );
+            const data = res ? await res.json().catch(() => ({})) : {};
+            if (res?.ok) {
+                toast.success("Member details updated");
+                setTeamMemberEditor(null);
+                await loadTeamOverview(teamOverviewModal.opportunityId);
+                await loadProjects();
+            } else {
+                toast.error(
+                    typeof (data as { message?: string }).message === "string"
+                        ? (data as { message: string }).message
+                        : "Could not update member",
+                );
+            }
+        } catch {
+            toast.error("Could not update member");
+        } finally {
+            setMemberSaveLoading(false);
         }
     };
 
@@ -689,6 +870,7 @@ export default function AdminProjectsPage() {
             "Title",
             "Organization / creator",
             "Status",
+            ...(studentEmailApplied.trim() ? (["Their role", "Seat vs application"] as const) : []),
             "Volunteers enrolled",
             "Volunteers required",
             "Remaining seats",
@@ -699,12 +881,26 @@ export default function AdminProjectsPage() {
         ];
         const csvContent = [
             headers.join(","),
-            ...filteredRows.map((r) =>
-                [
+            ...filteredRows.map((r) => {
+                const seatVsApp =
+                    r.studentMatch?.matchSource === "application_pipeline"
+                        ? "Application pipeline"
+                        : r.studentMatch
+                          ? "Enrolled seat"
+                          : "";
+                const extra =
+                    studentEmailApplied.trim().length > 0 ?
+                        [
+                            `"${String(r.studentMatch?.role ?? "").replace(/"/g, '""')}"`,
+                            `"${seatVsApp.replace(/"/g, '""')}"`,
+                        ]
+                    :   [];
+                return [
                     r.id,
                     `"${r.title.replace(/"/g, '""')}"`,
                     `"${r.subtitle.replace(/"/g, '""')}"`,
                     `"${r.displayStatus.replace(/"/g, '""')}"`,
+                    ...extra,
                     r.volunteers,
                     r.volunteersRequired ?? "",
                     r.remainingSeats ?? "",
@@ -712,8 +908,8 @@ export default function AdminProjectsPage() {
                     r.hours,
                     r.remainingHours ?? "",
                     `"${r.locationLabel.replace(/"/g, '""')}"`,
-                ].join(","),
-            ),
+                ].join(",");
+            }),
         ].join("\n");
         const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
         const link = document.createElement("a");
@@ -786,115 +982,141 @@ export default function AdminProjectsPage() {
 
     const activeMenuRow = activeMenu ? rows.find((r) => r.id === activeMenu.id) : null;
 
-    const columns: TableColumn<AdminProjectRow>[] = [
-        {
-            name: "Project",
-            grow: 2,
+    const studentEmailFiltered = Boolean(studentEmailApplied.trim());
+
+    const columns: TableColumn<AdminProjectRow>[] = useMemo(() => {
+        const studentRoleColumn: TableColumn<AdminProjectRow> = {
+            name: "Their role",
+            grow: 1,
             sortable: true,
-            selector: (r) => r.title,
+            selector: (r) => r.studentMatch?.role ?? "",
             cell: (r) => (
-                <div className="py-2 pr-2">
-                    <Link
-                        href={`/dashboard/student/browse/${encodeURIComponent(r.id)}`}
-                        className="font-bold text-slate-900 hover:text-blue-600 transition-colors line-clamp-1"
-                    >
-                        {r.title}
-                    </Link>
-                    <div className="text-xs text-slate-500 font-medium flex items-center gap-1.5 mt-0.5">
-                        <Briefcase className="w-3 h-3 shrink-0" />
-                        <span className="line-clamp-1">{r.subtitle}</span>
-                    </div>
-                </div>
-            ),
-        },
-        {
-            name: "Status",
-            sortable: true,
-            selector: (r) => r.displayStatus,
-            cell: (r) => (
-                <span
-                    className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${statusBadgeClass(r.statusKey)}`}
-                >
-                    {r.displayStatus}
-                </span>
-            ),
-        },
-        {
-            name: "Location",
-            sortable: true,
-            selector: (r) => r.locationLabel,
-            cell: (r) => (
-                <div className="flex items-center gap-1.5 text-xs text-slate-600 font-medium">
-                    <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                    <span className="line-clamp-2">{r.locationLabel}</span>
-                </div>
-            ),
-        },
-        {
-            name: "Volunteers",
-            sortable: true,
-            width: "132px",
-            selector: (r) => r.volunteers,
-            cell: (r) => (
-                <div className="text-center w-full py-1">
-                    <span className="text-sm font-bold text-slate-900">
-                        {r.volunteersRequired != null ? `${r.volunteers} / ${r.volunteersRequired}` : r.volunteers}
-                    </span>
-                    {r.remainingSeats != null || r.remainingMembers != null ? (
-                        <div className="text-[10px] font-medium text-slate-500 mt-0.5 leading-snug">
-                            {r.remainingSeats != null ? `${r.remainingSeats} seat${r.remainingSeats === 1 ? "" : "s"} left` : null}
-                            {r.remainingSeats != null && r.remainingMembers != null && r.remainingMembers !== r.remainingSeats ? " · " : null}
-                            {r.remainingMembers != null && r.remainingMembers !== r.remainingSeats
-                                ? `${r.remainingMembers} member slot${r.remainingMembers === 1 ? "" : "s"}`
-                                : null}
-                            {r.remainingSeats == null && r.remainingMembers != null
-                                ? `${r.remainingMembers} member slot${r.remainingMembers === 1 ? "" : "s"} left`
-                                : null}
+                <div className="py-1">
+                    <div className="text-sm font-bold text-slate-900 capitalize">{r.studentMatch?.role ?? "—"}</div>
+                    {r.studentMatch ? (
+                        <div className="text-[10px] font-bold uppercase tracking-wide text-slate-500 mt-0.5">
+                            {r.studentMatch.matchSource === "application_pipeline" ? "application (pending seat)" : "enrolled"}
                         </div>
                     ) : null}
                 </div>
             ),
-        },
-        {
-            name: "Hours",
-            sortable: true,
-            width: "112px",
-            selector: (r) => r.hours,
-            cell: (r) => (
-                <div className="text-center w-full py-1">
-                    <span className="text-sm font-bold text-slate-900">{r.hours}</span>
-                    {r.remainingHours != null ? (
-                        <div className="text-[10px] font-medium text-slate-500 mt-0.5">{r.remainingHours} h remaining</div>
-                    ) : null}
-                </div>
-            ),
-        },
-        {
-            name: "Actions",
-            width: "88px",
-            cell: (r) => (
-                <div className="relative flex justify-end py-1 w-full">
-                    <button
-                        type="button"
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            const rect = e.currentTarget.getBoundingClientRect();
-                            setActiveMenu((prev) =>
-                                prev?.id === r.id
-                                    ? null
-                                    : { id: r.id, top: rect.bottom + 6, right: window.innerWidth - rect.right },
-                            );
-                        }}
-                        className="admin-project-menu-trigger text-slate-400 hover:text-slate-600 p-1.5 rounded-full hover:bg-slate-200 transition-colors"
-                        aria-label="Actions"
-                        aria-expanded={activeMenu?.id === r.id}
+        };
+
+        const baseColumns: TableColumn<AdminProjectRow>[] = [
+            {
+                name: "Project",
+                grow: 2,
+                sortable: true,
+                selector: (r) => r.title,
+                cell: (r) => (
+                    <div className="py-2 pr-2">
+                        <Link
+                            href={`/dashboard/student/browse/${encodeURIComponent(r.id)}`}
+                            className="font-bold text-slate-900 hover:text-blue-600 transition-colors line-clamp-1"
+                        >
+                            {r.title}
+                        </Link>
+                        <div className="text-xs text-slate-500 font-medium flex items-center gap-1.5 mt-0.5">
+                            <Briefcase className="w-3 h-3 shrink-0" />
+                            <span className="line-clamp-1">{r.subtitle}</span>
+                        </div>
+                    </div>
+                ),
+            },
+        ];
+
+        const restColumns: TableColumn<AdminProjectRow>[] = [
+            {
+                name: "Status",
+                sortable: true,
+                selector: (r) => r.displayStatus,
+                cell: (r) => (
+                    <span
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${statusBadgeClass(r.statusKey)}`}
                     >
-                        <MoreVertical className="w-4 h-4" />
-                    </button>
-                </div>
-            ),
-        },
-    ];
+                        {r.displayStatus}
+                    </span>
+                ),
+            },
+            {
+                name: "Location",
+                sortable: true,
+                selector: (r) => r.locationLabel,
+                cell: (r) => (
+                    <div className="flex items-center gap-1.5 text-xs text-slate-600 font-medium">
+                        <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                        <span className="line-clamp-2">{r.locationLabel}</span>
+                    </div>
+                ),
+            },
+            {
+                name: "Volunteers",
+                sortable: true,
+                width: "132px",
+                selector: (r) => r.volunteers,
+                cell: (r) => (
+                    <div className="text-center w-full py-1">
+                        <span className="text-sm font-bold text-slate-900">
+                            {r.volunteersRequired != null ? `${r.volunteers} / ${r.volunteersRequired}` : r.volunteers}
+                        </span>
+                        {r.remainingSeats != null || r.remainingMembers != null ? (
+                            <div className="text-[10px] font-medium text-slate-500 mt-0.5 leading-snug">
+                                {r.remainingSeats != null ? `${r.remainingSeats} seat${r.remainingSeats === 1 ? "" : "s"} left` : null}
+                                {r.remainingSeats != null && r.remainingMembers != null && r.remainingMembers !== r.remainingSeats ? " · " : null}
+                                {r.remainingMembers != null && r.remainingMembers !== r.remainingSeats
+                                    ? `${r.remainingMembers} member slot${r.remainingMembers === 1 ? "" : "s"}`
+                                    : null}
+                                {r.remainingSeats == null && r.remainingMembers != null
+                                    ? `${r.remainingMembers} member slot${r.remainingMembers === 1 ? "" : "s"} left`
+                                    : null}
+                            </div>
+                        ) : null}
+                    </div>
+                ),
+            },
+            {
+                name: "Hours",
+                sortable: true,
+                width: "112px",
+                selector: (r) => r.hours,
+                cell: (r) => (
+                    <div className="text-center w-full py-1">
+                        <span className="text-sm font-bold text-slate-900">{r.hours}</span>
+                        {r.remainingHours != null ? (
+                            <div className="text-[10px] font-medium text-slate-500 mt-0.5">{r.remainingHours} h remaining</div>
+                        ) : null}
+                    </div>
+                ),
+            },
+            {
+                name: "Actions",
+                width: "88px",
+                cell: (r) => (
+                    <div className="relative flex justify-end py-1 w-full">
+                        <button
+                            type="button"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                const rect = e.currentTarget.getBoundingClientRect();
+                                setActiveMenu((prev) =>
+                                    prev?.id === r.id
+                                        ? null
+                                        : { id: r.id, top: rect.bottom + 6, right: window.innerWidth - rect.right },
+                                );
+                            }}
+                            className="admin-project-menu-trigger text-slate-400 hover:text-slate-600 p-1.5 rounded-full hover:bg-slate-200 transition-colors"
+                            aria-label="Actions"
+                            aria-expanded={activeMenu?.id === r.id}
+                        >
+                            <MoreVertical className="w-4 h-4" />
+                        </button>
+                    </div>
+                ),
+            },
+        ];
+
+        return studentEmailFiltered ? [...baseColumns, studentRoleColumn, ...restColumns] : [...baseColumns, ...restColumns];
+    }, [studentEmailFiltered, activeMenu]);
 
     return (
         <div className="mx-auto max-w-7xl p-0 lg:p-8">
@@ -913,48 +1135,77 @@ export default function AdminProjectsPage() {
                 </button>
             </div>
 
-            <div className="bg-white p-2 rounded-2xl border border-slate-200 shadow-sm mb-6 flex flex-col lg:flex-row gap-3">
-                <div className="relative flex-1 min-w-0">
-                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                    <input
-                        type="search"
-                        placeholder="Search projects..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-50 border border-transparent focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-50/50 transition-all outline-none font-medium text-slate-700 text-sm"
-                    />
+            <div className="bg-white p-2 rounded-2xl border border-slate-200 shadow-sm mb-6 flex flex-col gap-3">
+                <div className="flex flex-col lg:flex-row gap-3">
+                    <div className="relative flex-1 min-w-0">
+                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                        <input
+                            type="search"
+                            placeholder="Search projects..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-50 border border-transparent focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-50/50 transition-all outline-none font-medium text-slate-700 text-sm"
+                        />
+                    </div>
+                    <div className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2 lg:w-auto lg:shrink-0">
+                        <div className="relative min-w-0 sm:min-w-[160px]">
+                            <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
+                            <select
+                                value={statusFilter}
+                                onChange={(e) => setStatusFilter(e.target.value)}
+                                className="w-full pl-9 pr-8 py-2.5 rounded-xl border border-slate-200 text-xs font-bold uppercase tracking-wide text-slate-700 bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none appearance-none cursor-pointer"
+                                aria-label="Filter by status"
+                            >
+                                {statusOptions.map((opt) => (
+                                    <option key={opt} value={opt}>
+                                        {opt === "all" ? "All statuses" : opt.replace(/_/g, " ")}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                        <div className="relative min-w-0 sm:min-w-[160px]">
+                            <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
+                            <select
+                                value={locationFilter}
+                                onChange={(e) => setLocationFilter(e.target.value)}
+                                className="w-full pl-9 pr-8 py-2.5 rounded-xl border border-slate-200 text-xs font-bold uppercase tracking-wide text-slate-700 bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none appearance-none cursor-pointer"
+                                aria-label="Filter by location"
+                            >
+                                {locationOptions.map((opt) => (
+                                    <option key={opt} value={opt}>
+                                        {opt === "all" ? "All locations" : opt}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                    </div>
                 </div>
-                <div className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2 lg:w-auto lg:shrink-0">
-                    <div className="relative min-w-0 sm:min-w-[160px]">
-                        <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
-                        <select
-                            value={statusFilter}
-                            onChange={(e) => setStatusFilter(e.target.value)}
-                            className="w-full pl-9 pr-8 py-2.5 rounded-xl border border-slate-200 text-xs font-bold uppercase tracking-wide text-slate-700 bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none appearance-none cursor-pointer"
-                            aria-label="Filter by status"
-                        >
-                            {statusOptions.map((opt) => (
-                                <option key={opt} value={opt}>
-                                    {opt === "all" ? "All statuses" : opt.replace(/_/g, " ")}
-                                </option>
-                            ))}
-                        </select>
+                <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center border-t border-slate-100 pt-3">
+                    <div className="relative flex-1 min-w-0">
+                        <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                        <input
+                            type="email"
+                            autoComplete="off"
+                            placeholder="Student email — show only projects where they applied or enrolled…"
+                            value={studentEmailInput}
+                            onChange={(e) => setStudentEmailInput(e.target.value)}
+                            className="w-full pl-10 pr-10 py-2.5 rounded-xl bg-slate-50 border border-transparent focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-50/50 transition-all outline-none font-medium text-slate-700 text-sm"
+                            aria-label="Filter projects by student email"
+                        />
+                        {studentEmailInput.trim() ? (
+                            <button
+                                type="button"
+                                className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200"
+                                aria-label="Clear student email filter"
+                                onClick={() => setStudentEmailInput("")}
+                            >
+                                <X className="w-4 h-4" />
+                            </button>
+                        ) : null}
                     </div>
-                    <div className="relative min-w-0 sm:min-w-[160px]">
-                        <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
-                        <select
-                            value={locationFilter}
-                            onChange={(e) => setLocationFilter(e.target.value)}
-                            className="w-full pl-9 pr-8 py-2.5 rounded-xl border border-slate-200 text-xs font-bold uppercase tracking-wide text-slate-700 bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none appearance-none cursor-pointer"
-                            aria-label="Filter by location"
-                        >
-                            {locationOptions.map((opt) => (
-                                <option key={opt} value={opt}>
-                                    {opt === "all" ? "All locations" : opt}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
+                    <p className="text-[11px] text-slate-500 sm:max-w-[14rem] shrink-0 leading-snug">
+                        Includes team lead, teammate on application, or enrolled seat. Reloads shortly after you pause typing.
+                    </p>
                 </div>
             </div>
 
@@ -963,7 +1214,11 @@ export default function AdminProjectsPage() {
                     <div className="text-center py-24 px-4">
                         <Briefcase className="w-12 h-12 text-slate-300 mx-auto mb-4" />
                         <h3 className="text-lg font-bold text-slate-900">No projects found</h3>
-                        <p className="text-slate-500 text-sm mt-1">Try adjusting search or filters, or check the API response.</p>
+                        <p className="text-slate-500 text-sm mt-1">
+                            {studentEmailApplied.trim() ?
+                                "No projects found for this student email (no application or enrolled seat with that address)."
+                            :   "Try adjusting search or filters, or check the API response."}
+                        </p>
                     </div>
                 ) : (
                     <DataTable<AdminProjectRow>
@@ -1336,68 +1591,135 @@ export default function AdminProjectsPage() {
                                                 </div>
                                             </div>
                                             <div className="overflow-x-auto">
-                                                <table className="min-w-[760px] w-full text-left text-sm">
+                                                <table className="min-w-[1100px] w-full text-left text-sm">
                                                     <thead className="bg-white border-b border-slate-100">
                                                         <tr>
-                                                            <th className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wide text-slate-500">Member</th>
-                                                            <th className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wide text-slate-500">Role</th>
-                                                            <th className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wide text-slate-500">Report</th>
-                                                            <th className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wide text-slate-500">Availability</th>
-                                                            <th className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wide text-slate-500 text-right">Action</th>
+                                                            <th className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wide text-slate-500">
+                                                                Member
+                                                            </th>
+                                                            <th className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wide text-slate-500">
+                                                                CNIC
+                                                            </th>
+                                                            <th className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wide text-slate-500">
+                                                                Phone
+                                                            </th>
+                                                            <th className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wide text-slate-500">
+                                                                Academic
+                                                            </th>
+                                                            <th className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wide text-slate-500">
+                                                                Role
+                                                            </th>
+                                                            <th className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wide text-slate-500">
+                                                                Report
+                                                            </th>
+                                                            <th className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wide text-slate-500">
+                                                                Availability
+                                                            </th>
+                                                            <th className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wide text-slate-500 text-right">
+                                                                Action
+                                                            </th>
                                                         </tr>
                                                     </thead>
                                                     <tbody className="divide-y divide-slate-100">
                                                         {team.members.length === 0 ? (
                                                             <tr>
-                                                                <td colSpan={5} className="px-4 py-4 text-xs text-slate-500">
+                                                                <td colSpan={8} className="px-4 py-4 text-xs text-slate-500">
                                                                     No members found.
                                                                 </td>
                                                             </tr>
                                                         ) : (
-                                                            team.members.map((member) => (
-                                                                <tr key={member.id}>
-                                                                    <td className="px-4 py-3">
-                                                                        <div className="font-semibold text-slate-900">{member.name}</div>
-                                                                        {member.email ? (
-                                                                            <div className="text-xs text-slate-500 mt-0.5">{member.email}</div>
-                                                                        ) : null}
-                                                                    </td>
-                                                                    <td className="px-4 py-3 text-slate-700">{member.role}</td>
-                                                                    <td className="px-4 py-3 text-slate-700">{member.reportStatus}</td>
-                                                                    <td className="px-4 py-3">
-                                                                        <span
-                                                                            className={`inline-flex px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wide border ${
-                                                                                member.reportAvailable
-                                                                                    ? "bg-blue-50 text-blue-800 border-blue-100"
-                                                                                    : "bg-slate-100 text-slate-600 border-slate-200"
-                                                                            }`}
-                                                                        >
-                                                                            {member.reportAvailable ? "available" : "unavailable"}
-                                                                        </span>
-                                                                    </td>
-                                                                    <td className="px-4 py-3 text-right">
-                                                                        <button
-                                                                            type="button"
-                                                                            onClick={() => void handleRemoveTeamMember(team.id, member.id)}
-                                                                            disabled={deletingMemberId === member.id}
-                                                                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-[11px] font-bold text-red-700 bg-red-50 border border-red-100 hover:bg-red-100 disabled:opacity-50 disabled:cursor-not-allowed"
-                                                                        >
-                                                                            {deletingMemberId === member.id ? (
-                                                                                <>
-                                                                                    <Loader2 className="w-3 h-3 animate-spin" /> Removing…
-                                                                                </>
-                                                                            ) : (
-                                                                                <>
-                                                                                    <UserMinus className="w-3 h-3" />{" "}
-                                                                                    {team.participationMode === "individual"
-                                                                                        ? "Remove from project"
-                                                                                        : "Remove"}
-                                                                                </>
-                                                                            )}
-                                                                        </button>
-                                                                    </td>
-                                                                </tr>
-                                                            ))
+                                                            team.members.map((member) => {
+                                                                const academicBits = [
+                                                                    member.yearOfStudy,
+                                                                    member.department,
+                                                                    member.academicIntegrationType,
+                                                                ].filter(Boolean);
+                                                                return (
+                                                                    <tr key={member.id}>
+                                                                        <td className="px-4 py-3">
+                                                                            <div className="font-semibold text-slate-900">{member.name}</div>
+                                                                            {member.email ? (
+                                                                                <div className="text-xs text-slate-500 mt-0.5">{member.email}</div>
+                                                                            ) : null}
+                                                                        </td>
+                                                                        <td className="px-4 py-3 text-xs text-slate-700 whitespace-nowrap">
+                                                                            {member.cnicDisplay.trim() || "—"}
+                                                                        </td>
+                                                                        <td className="px-4 py-3 text-xs text-slate-700 whitespace-nowrap">
+                                                                            {member.phoneNumber.trim() || "—"}
+                                                                        </td>
+                                                                        <td className="px-4 py-3 text-xs text-slate-700 max-w-[260px]">
+                                                                            {member.universityName.trim() ? (
+                                                                                <div className="font-medium text-slate-800">{member.universityName}</div>
+                                                                            ) : null}
+                                                                            {member.universityId.trim() ? (
+                                                                                <div className="text-slate-500 mt-0.5">ID: {member.universityId}</div>
+                                                                            ) : null}
+                                                                            {member.academicProgram.trim() ? (
+                                                                                <div className="mt-1 text-slate-600">{member.academicProgram}</div>
+                                                                            ) : null}
+                                                                            {academicBits.length ? (
+                                                                                <div className="text-slate-500 mt-1 leading-snug">{academicBits.join(" · ")}</div>
+                                                                            ) : null}
+                                                                            {!member.universityName.trim() &&
+                                                                            !member.universityId.trim() &&
+                                                                            !member.academicProgram.trim() &&
+                                                                            academicBits.length === 0 ?
+                                                                                <span className="text-slate-400">—</span>
+                                                                            : null}
+                                                                        </td>
+                                                                        <td className="px-4 py-3 text-slate-700 capitalize">{member.role}</td>
+                                                                        <td className="px-4 py-3 text-slate-700">{member.reportStatus}</td>
+                                                                        <td className="px-4 py-3">
+                                                                            <span
+                                                                                className={`inline-flex px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wide border ${
+                                                                                    member.reportAvailable
+                                                                                        ? "bg-blue-50 text-blue-800 border-blue-100"
+                                                                                        : "bg-slate-100 text-slate-600 border-slate-200"
+                                                                                }`}
+                                                                            >
+                                                                                {member.reportAvailable ? "available" : "unavailable"}
+                                                                            </span>
+                                                                        </td>
+                                                                        <td className="px-4 py-3 text-right">
+                                                                            <div className="inline-flex flex-wrap items-center justify-end gap-1">
+                                                                                <button
+                                                                                    type="button"
+                                                                                    onClick={() => openTeamMemberEditor(team.id, member)}
+                                                                                    disabled={!member.supportsAdminPatch || memberSaveLoading}
+                                                                                    title={
+                                                                                        member.supportsAdminPatch
+                                                                                            ? "Correct CNIC, phone, or academic fields"
+                                                                                            : "Available after the seat exists (approved enrollment)"
+                                                                                    }
+                                                                                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-[11px] font-bold text-blue-700 bg-blue-50 border border-blue-100 hover:bg-blue-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                                                >
+                                                                                    <Pencil className="w-3 h-3" /> Update
+                                                                                </button>
+                                                                                <button
+                                                                                    type="button"
+                                                                                    onClick={() => void handleRemoveTeamMember(team.id, member.id)}
+                                                                                    disabled={deletingMemberId === member.id}
+                                                                                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-[11px] font-bold text-red-700 bg-red-50 border border-red-100 hover:bg-red-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                                                >
+                                                                                    {deletingMemberId === member.id ? (
+                                                                                        <>
+                                                                                            <Loader2 className="w-3 h-3 animate-spin" /> Removing…
+                                                                                        </>
+                                                                                    ) : (
+                                                                                        <>
+                                                                                            <UserMinus className="w-3 h-3" />{" "}
+                                                                                            {team.participationMode === "individual"
+                                                                                                ? "Remove from project"
+                                                                                                : "Remove"}
+                                                                                        </>
+                                                                                    )}
+                                                                                </button>
+                                                                            </div>
+                                                                        </td>
+                                                                    </tr>
+                                                                );
+                                                            })
                                                         )}
                                                     </tbody>
                                                 </table>
@@ -1409,6 +1731,245 @@ export default function AdminProjectsPage() {
                             )}
                         </div>
                     </div>
+                    {teamMemberEditor ? (
+                        <>
+                            <div
+                                className="fixed inset-0 z-[94] bg-slate-900/30"
+                                aria-hidden
+                                onClick={() => {
+                                    if (!memberSaveLoading) setTeamMemberEditor(null);
+                                }}
+                            />
+                            <div
+                                role="dialog"
+                                aria-modal="true"
+                                aria-labelledby="team-member-edit-title"
+                                className="fixed left-1/2 top-1/2 z-[95] flex max-h-[min(88vh,44rem)] w-[calc(100vw-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl"
+                            >
+                                <div className="px-5 py-4 border-b border-slate-100 flex items-start justify-between gap-2 shrink-0">
+                                    <div className="min-w-0">
+                                        <h3 id="team-member-edit-title" className="text-base font-extrabold text-slate-900">
+                                            Update enrollment
+                                        </h3>
+                                        <p className="text-xs text-slate-500 mt-1 line-clamp-2">{teamMemberEditor.headline}</p>
+                                        <p className="text-[11px] text-slate-400 mt-1">
+                                            CNIC format <span className="font-mono">12345-1234567-1</span>. Phone: saved on the enrollment seat (+92 or
+                                            local both supported).
+                                        </p>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        disabled={memberSaveLoading}
+                                        onClick={() => setTeamMemberEditor(null)}
+                                        className="p-2 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 shrink-0"
+                                        aria-label="Close editor"
+                                    >
+                                        <X className="w-5 h-5" />
+                                    </button>
+                                </div>
+                                <div className="px-5 py-4 overflow-y-auto flex-1 min-h-0 space-y-3 text-sm">
+                                    <label className="block">
+                                        <span className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Full name</span>
+                                        <input
+                                            className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15"
+                                            value={teamMemberEditor.draft.full_name}
+                                            onChange={(e) =>
+                                                setTeamMemberEditor((prev) =>
+                                                    prev ?
+                                                        { ...prev, draft: { ...prev.draft, full_name: e.target.value } }
+                                                    :   null,
+                                                )
+                                            }
+                                        />
+                                    </label>
+                                    <label className="block">
+                                        <span className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Mobile / phone</span>
+                                        <input
+                                            className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15"
+                                            value={teamMemberEditor.draft.mobile}
+                                            onChange={(e) =>
+                                                setTeamMemberEditor((prev) =>
+                                                    prev ?
+                                                        { ...prev, draft: { ...prev.draft, mobile: e.target.value } }
+                                                    :   null,
+                                                )
+                                            }
+                                        />
+                                    </label>
+                                    <label className="block">
+                                        <span className="text-[11px] font-bold uppercase tracking-wide text-slate-500">CNIC</span>
+                                        <input
+                                            className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15 font-mono"
+                                            placeholder="12345-1234567-1"
+                                            value={teamMemberEditor.draft.cnic}
+                                            onChange={(e) =>
+                                                setTeamMemberEditor((prev) =>
+                                                    prev ? { ...prev, draft: { ...prev.draft, cnic: e.target.value } } : null,
+                                                )
+                                            }
+                                        />
+                                    </label>
+                                    <label className="block">
+                                        <span className="text-[11px] font-bold uppercase tracking-wide text-slate-500">University ID</span>
+                                        <input
+                                            className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15"
+                                            value={teamMemberEditor.draft.university_id}
+                                            onChange={(e) =>
+                                                setTeamMemberEditor((prev) =>
+                                                    prev ?
+                                                        { ...prev, draft: { ...prev.draft, university_id: e.target.value } }
+                                                    :   null,
+                                                )
+                                            }
+                                        />
+                                    </label>
+                                    <label className="block">
+                                        <span className="text-[11px] font-bold uppercase tracking-wide text-slate-500">University name</span>
+                                        <input
+                                            className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15"
+                                            value={teamMemberEditor.draft.university_name}
+                                            onChange={(e) =>
+                                                setTeamMemberEditor((prev) =>
+                                                    prev ?
+                                                        { ...prev, draft: { ...prev.draft, university_name: e.target.value } }
+                                                    :   null,
+                                                )
+                                            }
+                                        />
+                                    </label>
+                                    <label className="block">
+                                        <span className="text-[11px] font-bold uppercase tracking-wide text-slate-500">
+                                            Academic program / major
+                                        </span>
+                                        <input
+                                            className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15"
+                                            value={teamMemberEditor.draft.academic_program}
+                                            onChange={(e) =>
+                                                setTeamMemberEditor((prev) =>
+                                                    prev ?
+                                                        { ...prev, draft: { ...prev.draft, academic_program: e.target.value } }
+                                                    :   null,
+                                                )
+                                            }
+                                        />
+                                    </label>
+                                    <label className="block">
+                                        <span className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Department</span>
+                                        <input
+                                            className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15"
+                                            value={teamMemberEditor.draft.department}
+                                            onChange={(e) =>
+                                                setTeamMemberEditor((prev) =>
+                                                    prev ?
+                                                        { ...prev, draft: { ...prev.draft, department: e.target.value } }
+                                                    :   null,
+                                                )
+                                            }
+                                        />
+                                    </label>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                        <label className="block">
+                                            <span className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Year of study</span>
+                                            <select
+                                                className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15 bg-white"
+                                                value={teamMemberEditor.draft.year_of_study}
+                                                onChange={(e) =>
+                                                    setTeamMemberEditor((prev) =>
+                                                        prev ?
+                                                            { ...prev, draft: { ...prev.draft, year_of_study: e.target.value } }
+                                                        :   null,
+                                                    )
+                                                }
+                                            >
+                                                <option value="">— unchanged —</option>
+                                                {YEAR_OF_STUDY_OPTIONS.map((y) => (
+                                                    <option key={y} value={y}>
+                                                        {y}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </label>
+                                        <label className="block">
+                                            <span className="text-[11px] font-bold uppercase tracking-wide text-slate-500">
+                                                Academic integration type
+                                            </span>
+                                            <select
+                                                className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/15 bg-white"
+                                                value={teamMemberEditor.draft.academic_integration_type}
+                                                onChange={(e) =>
+                                                    setTeamMemberEditor((prev) =>
+                                                        prev ?
+                                                            {
+                                                                ...prev,
+                                                                draft: {
+                                                                    ...prev.draft,
+                                                                    academic_integration_type: e.target.value,
+                                                                },
+                                                            }
+                                                        :   null,
+                                                    )
+                                                }
+                                            >
+                                                <option value="">— unchanged —</option>
+                                                {ACADEMIC_INTEGRATION_OPTIONS.map((y) => (
+                                                    <option key={y} value={y}>
+                                                        {y}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </label>
+                                    </div>
+                                    <label className="flex items-start gap-2 cursor-pointer select-none pt-1">
+                                        <input
+                                            type="checkbox"
+                                            className="mt-0.5 rounded border-slate-300"
+                                            checked={teamMemberEditor.draft.sync_linked_user_profile}
+                                            onChange={(e) =>
+                                                setTeamMemberEditor((prev) =>
+                                                    prev ?
+                                                        {
+                                                            ...prev,
+                                                            draft: {
+                                                                ...prev.draft,
+                                                                sync_linked_user_profile: e.target.checked,
+                                                            },
+                                                        }
+                                                    :   null,
+                                                )
+                                            }
+                                        />
+                                        <span className="text-xs text-slate-600 leading-snug">
+                                            Also mirror these fields onto the linked student profile (when a platform account exists).
+                                        </span>
+                                    </label>
+                                </div>
+                                <div className="px-5 py-3 border-t border-slate-100 flex flex-wrap justify-end gap-2 shrink-0 bg-slate-50">
+                                    <button
+                                        type="button"
+                                        disabled={memberSaveLoading}
+                                        onClick={() => setTeamMemberEditor(null)}
+                                        className="px-4 py-2 rounded-xl text-sm font-bold text-slate-700 border border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-50"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        type="button"
+                                        disabled={memberSaveLoading}
+                                        onClick={() => void submitTeamMemberEdit()}
+                                        className="px-4 py-2 rounded-xl text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 inline-flex items-center gap-2"
+                                    >
+                                        {memberSaveLoading ? (
+                                            <>
+                                                <Loader2 className="w-4 h-4 animate-spin" /> Saving…
+                                            </>
+                                        ) : (
+                                            "Save changes"
+                                        )}
+                                    </button>
+                                </div>
+                            </div>
+                        </>
+                    ) : null}
                 </>
             )}
         </div>

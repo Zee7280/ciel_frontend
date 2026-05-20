@@ -24,6 +24,7 @@ import {
 } from "@/utils/facultyApprovals";
 import { formatDisplayId } from "@/utils/displayIds";
 import { getStoredCurrentUserId } from "@/utils/currentUser";
+import { OpportunitySdgAlignmentSection } from "@/components/opportunities/OpportunitySdgAlignmentSection";
 import { resolveStudentOpportunityWorkflow, type OpportunityWorkflowStage, isFacultyApprovalCompleteForPartnerGate } from "@/utils/opportunityWorkflow";
 
 type PartnerApprovalRow = FacultyApprovalRow & {
@@ -779,25 +780,15 @@ export default function VerifyWorkPage() {
                                 );
                             })()}
 
-                            {(() => {
-                                const sdgInfo = pickObj(detailRecord, "sdg_info");
-                                const verification = normalizeStrArray(detailRecord.verification_method);
-                                if (!sdgInfo && verification.length === 0) return null;
-                                return (
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <div className="rounded-xl border border-slate-200 p-4">
-                                            <p className="text-xs font-bold text-slate-500 uppercase mb-2">SDG linkage</p>
-                                            <p className="text-slate-800">
-                                                SDG: {String(sdgInfo?.sdg_id ?? detailRecord.sdg ?? "—")} | Target: {String(sdgInfo?.target_id ?? "—")}
-                                            </p>
-                                        </div>
-                                        <div className="rounded-xl border border-slate-200 p-4">
-                                            <p className="text-xs font-bold text-slate-500 uppercase mb-2">Verification method</p>
-                                            <p className="text-slate-800">{verification.join(", ") || "—"}</p>
-                                        </div>
-                                    </div>
-                                );
-                            })()}
+                            <OpportunitySdgAlignmentSection raw={detailRecord} heading="SDG alignment" />
+                            {normalizeStrArray(detailRecord.verification_method).length > 0 ? (
+                                <div className="rounded-xl border border-slate-200 p-4">
+                                    <p className="text-xs font-bold text-slate-500 uppercase mb-2">Verification method</p>
+                                    <p className="text-slate-800">
+                                        {normalizeStrArray(detailRecord.verification_method).join(", ")}
+                                    </p>
+                                </div>
+                            ) : null}
                             {needsExecDialog && detailOppId ? (
                                 <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-4">
                                     <p className="text-xs font-bold text-emerald-900 uppercase mb-2">Executing organization confirmation</p>

@@ -24,6 +24,7 @@ import { formatDisplayId } from "@/utils/displayIds";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { CollapsibleDetailText } from "@/components/opportunities/CollapsibleDetailText";
+import { OpportunitySdgAlignmentSection } from "@/components/opportunities/OpportunitySdgAlignmentSection";
 import { readActivityPlan, readObjectiveItems } from "@/utils/opportunityDetailView";
 
 function pickDetailStr(o: Record<string, unknown> | null | undefined, ...keys: string[]): string {
@@ -1402,26 +1403,7 @@ export default function AdminApprovalsPage() {
                                     <h3 className="text-xs font-bold text-purple-600 uppercase tracking-wider mb-4 border-b border-purple-100 pb-2 flex items-center gap-2">
                                         <TrendingUp className="w-4 h-4" /> SDG Alignment
                                     </h3>
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                        <div className="bg-purple-50 p-3 rounded-xl border border-purple-100">
-                                            <span className="text-xs text-purple-600 block mb-1 font-bold">Primary SDG</span>
-                                            <span className="font-bold text-slate-900 text-sm block">
-                                                SDG {(adminDetailView.sdg_info as { sdg_id?: string | number } | undefined)?.sdg_id ?? "N/A"}
-                                            </span>
-                                        </div>
-                                        <div className="bg-purple-50 p-3 rounded-xl border border-purple-100">
-                                            <span className="text-xs text-purple-600 block mb-1 font-bold">Target</span>
-                                            <span className="font-bold text-slate-900 text-sm block">
-                                                {(adminDetailView.sdg_info as { target_id?: string | number } | undefined)?.target_id ?? "N/A"}
-                                            </span>
-                                        </div>
-                                        <div className="bg-purple-50 p-3 rounded-xl border border-purple-100">
-                                            <span className="text-xs text-purple-600 block mb-1 font-bold">Indicator</span>
-                                            <span className="font-bold text-slate-900 text-sm block">
-                                                {(adminDetailView.sdg_info as { indicator_id?: string | number } | undefined)?.indicator_id ?? "N/A"}
-                                            </span>
-                                        </div>
-                                    </div>
+                                    <OpportunitySdgAlignmentSection raw={adminDetailView} />
                                 </div>
 
                                 {/* Section 4: Activities & Skills */}

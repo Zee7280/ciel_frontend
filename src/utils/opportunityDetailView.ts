@@ -99,6 +99,81 @@ export function readObjectiveItems(raw: Record<string, unknown>): { description:
     return { description, items: description ? [description] : [] };
 }
 
+export type OpportunitySdgAlignmentRow = {
+    role: "primary" | "secondary";
+    sdg_id: string;
+    target_id?: string;
+    indicator_id?: string;
+    justification?: string;
+};
+
+function pickSdgField(row: Record<string, unknown>, ...keys: string[]): string {
+    for (const k of keys) {
+        const v = row[k];
+        if (v != null && String(v).trim()) return String(v).trim();
+    }
+    return "";
+}
+
+/** Primary + secondary SDGs from `detail_view`, `sdg_info`, and `secondary_sdgs`. */
+export function readOpportunitySdgAlignments(raw: Record<string, unknown> | null | undefined): OpportunitySdgAlignmentRow[] {
+    if (!raw || typeof raw !== "object") return [];
+
+    const rows: OpportunitySdgAlignmentRow[] = [];
+    const seen = new Set<string>();
+
+    const pushRow = (row: OpportunitySdgAlignmentRow) => {
+        const key = `${row.role}:${row.sdg_id}:${row.target_id ?? ""}:${row.indicator_id ?? ""}`;
+        if (seen.has(key)) return;
+        seen.add(key);
+        rows.push(row);
+    };
+
+    const dv = pickOpportunityDetailView(raw);
+    const primaryFromDv =
+        dv?.sdg?.primary && typeof dv.sdg.primary === "object" ? (dv.sdg.primary as Record<string, unknown>) : null;
+    const primary = primaryFromDv ?? (raw.sdg_info && typeof raw.sdg_info === "object" ? (raw.sdg_info as Record<string, unknown>) : null);
+    if (primary) {
+        const sdgId = pickSdgField(primary, "sdg_id", "sdgId") || pickSdgField(raw, "sdg");
+        if (sdgId) {
+            pushRow({
+                role: "primary",
+                sdg_id: sdgId,
+                target_id: pickSdgField(primary, "target_id", "targetId") || undefined,
+                indicator_id: pickSdgField(primary, "indicator_id", "indicatorId") || undefined,
+            });
+        }
+    }
+
+    const secondarySources: unknown[] = [];
+    if (Array.isArray(dv?.sdg?.secondary)) secondarySources.push(...dv.sdg.secondary);
+    if (Array.isArray(raw.secondary_sdgs)) secondarySources.push(...raw.secondary_sdgs);
+    if (raw.secondary_sdg && typeof raw.secondary_sdg === "object") secondarySources.push(raw.secondary_sdg);
+
+    for (const item of secondarySources) {
+        if (!item || typeof item !== "object") continue;
+        const o = item as Record<string, unknown>;
+        const sdgId = pickSdgField(o, "sdg_id", "sdgId");
+        if (!sdgId) continue;
+        pushRow({
+            role: "secondary",
+            sdg_id: sdgId,
+            target_id: pickSdgField(o, "target_id", "targetId") || undefined,
+            indicator_id: pickSdgField(o, "indicator_id", "indicatorId") || undefined,
+            justification: pickSdgField(o, "justification") || undefined,
+        });
+    }
+
+    return rows;
+}
+
+export function formatOpportunitySdgAlignmentLine(row: OpportunitySdgAlignmentRow): string {
+    const parts = [`SDG ${row.sdg_id}`];
+    if (row.target_id) parts.push(`Target ${row.target_id}`);
+    if (row.indicator_id) parts.push(`Indicator ${row.indicator_id}`);
+    return parts.join(" · ");
+}
+
 export function readSupervisionStakeholders(raw: Record<string, unknown>) {
     const dv = pickOpportunityDetailView(raw);
     if (dv?.supervision) {

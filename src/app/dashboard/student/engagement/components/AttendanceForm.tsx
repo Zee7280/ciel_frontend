@@ -9,6 +9,7 @@ import { Label } from "../../report/components/ui/label";
 import { authenticatedFetch } from "@/utils/api";
 import { normalizeEngagementAttendanceLog } from "@/utils/engagementAttendanceMap";
 import { canLogAttendanceForParticipationStatus } from "@/utils/attendanceApproverRouting";
+import { extractJsonErrorMessage } from "@/utils/applyOpportunityUx";
 import clsx from "clsx";
 import { useReportForm } from "../../report/context/ReportContext";
 import React from "react";
@@ -212,6 +213,14 @@ export default function AttendanceForm({
                 const segments = activeParticipantId.split(':');
                 const realId = segments.length > 1 ? segments[segments.length - 1] : activeParticipantId;
 
+                if (!realId || realId === "anon") {
+                    const message =
+                        "This student is not linked to a participation record yet. Refresh the page or complete team registration first.";
+                    setSubmitError(message);
+                    toast.error(message);
+                    return;
+                }
+
                 if (evidenceFile) {
                     const fd = new FormData();
                     fd.append('participantId', realId || '');
@@ -258,13 +267,13 @@ export default function AttendanceForm({
 
                 if (!res || !res.ok) {
                     let message = "Could not save attendance. Please try again.";
-                    if (res) {
+                    if (!res) {
+                        message = "Your session may have expired. Please sign in again and retry.";
+                    } else {
                         console.error("[Attendance] Server Response Error:", res.status, res.statusText);
                         try {
-                            const errBody = await res.json();
-                            if (typeof errBody?.message === "string" && errBody.message.trim()) {
-                                message = errBody.message.trim();
-                            }
+                            const errBody = (await res.json()) as Record<string, unknown>;
+                            message = extractJsonErrorMessage(errBody) || message;
                         } catch {
                             /* non-JSON error body */
                         }

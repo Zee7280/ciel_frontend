@@ -28,9 +28,12 @@ export function mapProjectTeamRowsForReport(teamRows: unknown[], myParticipantId
         })
         .map((m: unknown) => {
             const row = m as ReportTeamRow;
+            const status = typeof row.status === "string" ? row.status : "";
+            const approvedLike = ["approved", "verified", "accepted", "finalized"].includes(status);
             return {
                 ...row,
-                verified: true,
+                verified: row.verified === true || approvedLike,
+                status: status || (row.verified === true ? "approved" : "pending_approval"),
                 name: row.fullName || row.name,
                 university: row.universityName || row.university,
             };
