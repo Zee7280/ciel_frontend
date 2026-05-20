@@ -2,25 +2,35 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { authenticatedFetch } from "@/utils/api";
-import { getStoredCurrentUserId } from "@/utils/currentUser";
 import { toast } from "sonner";
 import AttendanceReviewDashboard from "@/components/engagement/AttendanceReviewDashboard";
 import { fetchPendingAttendanceCountForProject } from "@/utils/engagementPendingAttendanceResponse";
 
-function isOwnedByCurrentPartner(opportunity: Record<string, unknown>, currentUserId: string) {
-    const createdByRole = String(opportunity.created_by_role ?? opportunity.creator_role ?? "").toLowerCase();
-    const source = String(opportunity.source ?? "").toLowerCase();
-
-    if (opportunity.is_student_created === true || createdByRole === "student" || source === "student_created") {
-        return false;
+/**
+ * Normalize list shapes from Nest + older BFF (some clients sent nested `data`).
+ * `partner_id=me` list is always server-scoped — do not re-filter client-side.
+ */
+function extractPartnerOpportunityRows(payload: unknown): Record<string, unknown>[] {
+    if (!payload || typeof payload !== "object") return [];
+    const root = payload as Record<string, unknown>;
+    if (root.success === false && (typeof root.message === "string" || typeof root.error === "string")) {
+        return [];
     }
 
-    const creatorId = opportunity.creatorId ?? opportunity.creator_id ?? opportunity.created_by ?? opportunity.owner_id;
-    if (!currentUserId || creatorId == null) {
-        return true;
+    const d = root.data;
+    if (Array.isArray(d)) return d.filter((x) => x && typeof x === "object") as Record<string, unknown>[];
+    if (d && typeof d === "object" && !Array.isArray(d)) {
+        const inner = d as Record<string, unknown>;
+        for (const k of ["items", "opportunities", "rows", "data"]) {
+            const v = inner[k];
+            if (Array.isArray(v)) return v.filter((x) => x && typeof x === "object") as Record<string, unknown>[];
+        }
     }
-
-    return String(creatorId).trim() === currentUserId;
+    for (const top of ["opportunities", "items", "rows"] as const) {
+        const v = root[top];
+        if (Array.isArray(v)) return v.filter((x) => x && typeof x === "object") as Record<string, unknown>[];
+    }
+    return [];
 }
 
 function opportunitySubtitle(o: Record<string, unknown>): string | undefined {
@@ -88,11 +98,15 @@ export default function PartnerAttendanceReviewPage() {
                     return;
                 }
                 const data = await res.json();
-                const rows = Array.isArray(data.data) ? data.data : [];
-                const currentUserId = getStoredCurrentUserId();
-                const mine = rows.filter((item: unknown) =>
-                    item && typeof item === "object" ? isOwnedByCurrentPartner(item as Record<string, unknown>, currentUserId) : false,
-                );
+                if (typeof (data as { success?: unknown }).success !== "undefined" && (data as { success?: boolean }).success === false) {
+                    const msg =
+                        typeof (data as { message?: unknown }).message === "string"
+                            ? (data as { message: string }).message
+                            : "Could not load your opportunities.";
+                    if (!cancelled) toast.error(msg);
+                    return;
+                }
+                const mine = extractPartnerOpportunityRows(data).filter((o) => String(o.id ?? "").trim());
                 const mapped = mine
                     .map((o: Record<string, unknown>) => ({
                         id: String(o.id ?? ""),

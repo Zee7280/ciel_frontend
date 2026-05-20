@@ -262,10 +262,41 @@ function teamOverviewRemoveGroupDisabled(team: TeamOverviewRow): boolean {
     return isSyntheticIndividualGroupId(team.id);
 }
 
+type OpportunityPipelineSummary = {
+    title: string | null;
+    status: string | null;
+    adminApproved: boolean;
+    facultyVerificationStatus: string | null;
+    facultyVerified: boolean;
+    executionVerificationStatus: string | null;
+    executionVerified: boolean;
+    awaitingPartnerOrFaculty: string | null;
+};
+
 type TeamOverviewSummary = {
     registeredTeams: number;
     completedReports: number;
     reportsAvailable: number;
+    pipeline: OpportunityPipelineSummary | null;
+    applicationsByInternalStatus: Record<string, number>;
+    applicationsPipelineTotalNonWithdrawn: number;
+};
+
+const EMPTY_TEAM_OVERVIEW_SUMMARY: TeamOverviewSummary = {
+    registeredTeams: 0,
+    completedReports: 0,
+    reportsAvailable: 0,
+    pipeline: null,
+    applicationsByInternalStatus: {
+        pending_faculty: 0,
+        pending_partner: 0,
+        pending_admin: 0,
+        approved: 0,
+        faculty_rejected: 0,
+        partner_rejected: 0,
+        admin_rejected: 0,
+    },
+    applicationsPipelineTotalNonWithdrawn: 0,
 };
 
 /** Backend returns { data: [...] }; keep fallbacks for older payloads only. */
@@ -348,6 +379,90 @@ function pickLooseString(raw: Record<string, unknown>, keys: string[]): string {
     return "";
 }
 
+function normalizeApplicationsByInternalStatus(summaryRaw: Record<string, unknown>): {
+    counts: Record<string, number>;
+    pipelineTotalNonWithdrawnFromApi: number | null;
+} {
+    const keys = [
+        "pending_faculty",
+        "pending_partner",
+        "pending_admin",
+        "approved",
+        "faculty_rejected",
+        "partner_rejected",
+        "admin_rejected",
+    ] as const;
+
+    const counts = {
+        pending_faculty: 0,
+        pending_partner: 0,
+        pending_admin: 0,
+        approved: 0,
+        faculty_rejected: 0,
+        partner_rejected: 0,
+        admin_rejected: 0,
+    } satisfies Record<(typeof keys)[number], number>;
+
+    const block =
+        (summaryRaw.applications_by_internal_status as unknown) ??
+        (summaryRaw.applicationsByInternalStatus as unknown);
+
+    if (block && typeof block === "object" && !Array.isArray(block)) {
+        for (const k of keys) {
+            const n = Number((block as Record<string, unknown>)[k]);
+            counts[k] = Number.isFinite(n) ? n : 0;
+        }
+    }
+
+    const totalRaw =
+        summaryRaw.applications_pipeline_total_non_withdrawn ?? summaryRaw.applicationsPipelineTotalNonWithdrawn;
+    const totalParsed = Number(totalRaw);
+    return {
+        counts,
+        pipelineTotalNonWithdrawnFromApi: Number.isFinite(totalParsed) ? totalParsed : null,
+    };
+}
+
+function extractOpportunityPipelineSummary(summaryRaw: Record<string, unknown>): OpportunityPipelineSummary | null {
+    const oRaw = summaryRaw.opportunity ?? summaryRaw.opportunitySnapshot;
+    if (!oRaw || typeof oRaw !== "object" || Array.isArray(oRaw)) return null;
+    const o = oRaw as Record<string, unknown>;
+
+    const statusPick =
+        typeof o.status === "string" && o.status.trim()
+            ? o.status.trim()
+            : typeof (o.workflowStage ?? o.workflow_stage) === "string" &&
+                String(o.workflowStage ?? o.workflow_stage).trim()
+              ? String(o.workflowStage ?? o.workflow_stage).trim()
+              : null;
+
+    return {
+        title: typeof o.title === "string" && o.title.trim() ? o.title.trim() : null,
+        status: statusPick,
+        adminApproved: typeof o.admin_approved === "boolean" ? o.admin_approved : Boolean(o.adminApproved),
+        facultyVerificationStatus: pickLooseString(o, ["faculty_verification_status", "facultyVerificationStatus"]),
+        facultyVerified: typeof o.faculty_verified === "boolean" ? o.faculty_verified : Boolean(o.facultyVerified),
+        executionVerificationStatus: pickLooseString(o, [
+            "execution_verification_status",
+            "executionVerificationStatus",
+        ]),
+        executionVerified:
+            typeof o.execution_verified === "boolean" ? o.execution_verified : Boolean(o.executionVerified),
+        awaitingPartnerOrFaculty: pickLooseString(o, [
+            "awaiting_partner_or_faculty",
+            "awaitingPartnerOrFaculty",
+        ]),
+    };
+}
+
+/** Two-step browser confirm so a single mis-click cannot delete a whole team/member seat. */
+function confirmDangerSequence(messages: readonly string[]): boolean {
+    for (const msg of messages) {
+        if (!globalThis.window.confirm(msg)) return false;
+    }
+    return true;
+}
+
 function mapTeamMember(raw: Record<string, unknown>): TeamMemberRow | null {
     const id = pickString(raw, ["id", "member_id", "memberId", "student_id", "studentId", "application_id", "applicationId"]);
     if (!id) return null;
@@ -357,7 +472,7 @@ function mapTeamMember(raw: Record<string, unknown>): TeamMemberRow | null {
     } else if (typeof raw.supportsAdminPatch === "boolean") {
         supportsAdminPatch = raw.supportsAdminPatch;
     } else {
-        supportsAdminPatch = !/^pending:/i.test(id);
+        supportsAdminPatch = true;
     }
     return {
         id,
@@ -407,23 +522,88 @@ function extractTeamRows(body: unknown): TeamOverviewRow[] {
 }
 
 function extractTeamSummary(body: unknown, rows: TeamOverviewRow[]): TeamOverviewSummary {
+    const baseApps: Record<string, number> = {
+        pending_faculty: 0,
+        pending_partner: 0,
+        pending_admin: 0,
+        approved: 0,
+        faculty_rejected: 0,
+        partner_rejected: 0,
+        admin_rejected: 0,
+    };
+
+    const deriveFromRows = () => ({
+        registeredTeams: rows.length,
+        completedReports: rows.filter((team) => lower(team.reportStatus) === "completed").length,
+        reportsAvailable: rows.filter((team) => team.reportAvailable).length,
+    });
+
     const payload = body && typeof body === "object" ? (body as Record<string, unknown>) : null;
     const summaryRaw = payload && typeof payload.summary === "object" ? (payload.summary as Record<string, unknown>) : null;
-    const summaryFromApi = {
-        registeredTeams: Number(summaryRaw?.registered_teams ?? summaryRaw?.registeredTeams ?? 0),
-        completedReports: Number(summaryRaw?.completed_reports ?? summaryRaw?.completedReports ?? 0),
-        reportsAvailable: Number(summaryRaw?.reports_available ?? summaryRaw?.reportsAvailable ?? 0),
-    };
-    if (summaryFromApi.registeredTeams > 0 || summaryFromApi.completedReports > 0 || summaryFromApi.reportsAvailable > 0) {
-        return summaryFromApi;
+
+    if (!summaryRaw) {
+        const derived = deriveFromRows();
+        return {
+            ...derived,
+            pipeline: null,
+            applicationsByInternalStatus: baseApps,
+            applicationsPipelineTotalNonWithdrawn: 0,
+        };
     }
-    const completedReports = rows.filter((team) => lower(team.reportStatus) === "completed").length;
-    const reportsAvailable = rows.filter((team) => team.reportAvailable).length;
+
+    const { counts, pipelineTotalNonWithdrawnFromApi } = normalizeApplicationsByInternalStatus(summaryRaw);
+
+    const reg = Number(summaryRaw.registered_teams ?? summaryRaw.registeredTeams);
+    const cmp = Number(summaryRaw.completed_reports ?? summaryRaw.completedReports);
+    const rpt = Number(summaryRaw.reports_available ?? summaryRaw.reportsAvailable);
+    const rowDerived = deriveFromRows();
+
+    const registeredTeams = Number.isFinite(reg) && reg >= 0 ? reg : rowDerived.registeredTeams;
+    const completedReports = Number.isFinite(cmp) && cmp >= 0 ? cmp : rowDerived.completedReports;
+    const reportsAvailable = Number.isFinite(rpt) && rpt >= 0 ? rpt : rowDerived.reportsAvailable;
+
+    const summed = Object.values(counts).reduce((a, b) => a + b, 0);
+
     return {
-        registeredTeams: rows.length,
+        registeredTeams,
         completedReports,
         reportsAvailable,
+        pipeline: extractOpportunityPipelineSummary(summaryRaw),
+        applicationsByInternalStatus: counts,
+        applicationsPipelineTotalNonWithdrawn: pipelineTotalNonWithdrawnFromApi ?? summed,
     };
+}
+
+const APPLICATION_INTERNAL_STATUS_KEYS = [
+    "pending_faculty",
+    "pending_partner",
+    "pending_admin",
+    "approved",
+    "faculty_rejected",
+    "partner_rejected",
+    "admin_rejected",
+] as const;
+
+function applicationInternalStatusLabel(key: string): string {
+    const map: Record<string, string> = {
+        pending_faculty: "Pending faculty",
+        pending_partner: "Pending partner",
+        pending_admin: "Pending admin",
+        approved: "Approved",
+        faculty_rejected: "Faculty rejected",
+        partner_rejected: "Partner rejected",
+        admin_rejected: "Admin rejected",
+    };
+    return map[key] ?? key.replace(/_/g, " ");
+}
+
+/** Backend coarse hint for listing (see `/teams` summary `awaiting_partner_or_faculty`). */
+function humanizeApprovalLane(code: string | null | undefined): string | null {
+    if (!code?.trim()) return null;
+    const c = code.trim().toLowerCase();
+    if (c === "faculty_gate") return "Opportunity awaits faculty verification";
+    if (c === "execution_partner_gate") return "Opportunity awaits partner / execution verification";
+    return null;
 }
 
 function statusBadgeClass(statusKey: string): string {
@@ -455,11 +635,7 @@ export default function AdminProjectsPage() {
     const [deletingApplicationId, setDeletingApplicationId] = useState<string | null>(null);
     const [teamOverviewModal, setTeamOverviewModal] = useState<{ opportunityId: string; title: string } | null>(null);
     const [teamOverviewRows, setTeamOverviewRows] = useState<TeamOverviewRow[]>([]);
-    const [teamOverviewSummary, setTeamOverviewSummary] = useState<TeamOverviewSummary>({
-        registeredTeams: 0,
-        completedReports: 0,
-        reportsAvailable: 0,
-    });
+    const [teamOverviewSummary, setTeamOverviewSummary] = useState<TeamOverviewSummary>(() => ({ ...EMPTY_TEAM_OVERVIEW_SUMMARY }));
     const [teamOverviewLoading, setTeamOverviewLoading] = useState(false);
     const [deletingTeamId, setDeletingTeamId] = useState<string | null>(null);
     const [deletingMemberId, setDeletingMemberId] = useState<string | null>(null);
@@ -569,11 +745,7 @@ export default function AdminProjectsPage() {
     const closeTeamOverviewModal = useCallback(() => {
         setTeamOverviewModal(null);
         setTeamOverviewRows([]);
-        setTeamOverviewSummary({
-            registeredTeams: 0,
-            completedReports: 0,
-            reportsAvailable: 0,
-        });
+        setTeamOverviewSummary({ ...EMPTY_TEAM_OVERVIEW_SUMMARY });
         setTeamOverviewLoading(false);
         setDeletingTeamId(null);
         setDeletingMemberId(null);
@@ -585,11 +757,7 @@ export default function AdminProjectsPage() {
     const loadTeamOverview = useCallback(async (opportunityId: string) => {
         setTeamOverviewLoading(true);
         setTeamOverviewRows([]);
-        setTeamOverviewSummary({
-            registeredTeams: 0,
-            completedReports: 0,
-            reportsAvailable: 0,
-        });
+        setTeamOverviewSummary({ ...EMPTY_TEAM_OVERVIEW_SUMMARY });
         try {
             const res = await authenticatedFetch(`/api/v1/admin/opportunities/${encodeURIComponent(opportunityId)}/teams`);
             if (!res) {
@@ -624,9 +792,10 @@ export default function AdminProjectsPage() {
     const handleRemoveTeam = async (teamId: string) => {
         if (!teamOverviewModal) return;
         if (
-            !confirm(
+            !confirmDangerSequence([
                 "Remove this full team?\n\nAll team members will be removed from this project and seats will be released.\n\nThis cannot be undone.",
-            )
+                "Second confirmation: delete the ENTIRE team and free all seats?\n\nType confirms with OK — Cancel stops.",
+            ])
         ) {
             return;
         }
@@ -657,7 +826,14 @@ export default function AdminProjectsPage() {
 
     const handleRemoveTeamMember = async (teamId: string, memberId: string) => {
         if (!teamOverviewModal) return;
-        if (!confirm("Remove this member from team?\n\nThis action cannot be undone.")) return;
+        if (
+            !confirmDangerSequence([
+                "Remove this member from the team?\n\nSeat and linked report/payment stubs for this person on this project will be cleared.\n\nThis cannot be undone.",
+                "Second confirmation: permanently remove ONLY this member from this team?",
+            ])
+        ) {
+            return;
+        }
         setDeletingMemberId(memberId);
         try {
             const res = await authenticatedFetch(
@@ -759,9 +935,10 @@ export default function AdminProjectsPage() {
     const handleRemoveIncompleteApplicant = async (applicationId: string) => {
         if (!applicantsModal) return;
         if (
-            !confirm(
+            !confirmDangerSequence([
                 "Withdraw this applicant from the project (admin)?\n\nParticipation and in-progress report data for this opportunity will be cleared, and the seat will show as available again — same occupancy rules as the rest of the app.\n\nThis cannot be undone.",
-            )
+                "Second confirmation: withdraw this applicant and free their seat?",
+            ])
         ) {
             return;
         }
@@ -859,6 +1036,107 @@ export default function AdminProjectsPage() {
     const teamRegisteredMetricLabel = teamOverviewRows.some((r) => r.participationMode === "individual")
         ? "Enrollments"
         : "Registered teams";
+
+    const teamOverviewPipelineRibbon = useMemo(() => {
+        if (teamOverviewLoading) return null;
+        const p = teamOverviewSummary.pipeline;
+        const counts = teamOverviewSummary.applicationsByInternalStatus;
+        const awaiting = humanizeApprovalLane(p?.awaitingPartnerOrFaculty ?? null);
+        const statusChips = APPLICATION_INTERNAL_STATUS_KEYS.map((k) => ({
+            key: k,
+            label: applicationInternalStatusLabel(k),
+            n: counts[k] ?? 0,
+        })).filter((x) => x.n > 0);
+        const totalPipeline = teamOverviewSummary.applicationsPipelineTotalNonWithdrawn;
+
+        const showOppStripe = Boolean(p && (awaiting || p.status || p.facultyVerificationStatus || p.executionVerificationStatus));
+
+        if (!showOppStripe && statusChips.length === 0 && totalPipeline <= 0) return null;
+
+        return (
+            <div className="px-5 py-3 border-b border-slate-100 bg-slate-50/80 shrink-0 space-y-2.5">
+                {showOppStripe ? (
+                    <div>
+                        <div className="text-[10px] font-black uppercase tracking-wider text-slate-500 mb-2">Approvals</div>
+                        <div className="flex flex-wrap gap-2 text-xs font-semibold text-slate-800">
+                            {awaiting ?
+                                <span className={`inline-flex px-2 py-1 rounded-lg border bg-rose-50 text-rose-800 border-rose-100`}>
+                                    {awaiting}
+                                </span>
+                            : null}
+                            {p?.status ?
+                                <span className={`inline-flex px-2 py-1 rounded-lg border capitalize ${statusBadgeClass(p.status)}`}>
+                                    Project: {humanizeIncompleteApplicantStatus(p.status)}
+                                </span>
+                            : null}
+                            <span
+                                className={`inline-flex px-2 py-1 rounded-lg border ${
+                                    p?.adminApproved
+                                        ? "bg-emerald-50 text-emerald-800 border-emerald-100"
+                                        : "bg-amber-50 text-amber-900 border-amber-100"
+                                }`}
+                            >
+                                Internal admin cleared: {p?.adminApproved ? "yes" : "no"}
+                            </span>
+                            {p?.facultyVerificationStatus ?
+                                <span
+                                    className={`inline-flex px-2 py-1 rounded-lg border ${statusBadgeClass(p.facultyVerificationStatus)}`}
+                                >
+                                    Faculty: {humanizeIncompleteApplicantStatus(p.facultyVerificationStatus)}
+                                    {typeof p.facultyVerified === "boolean"
+                                        ? p.facultyVerified
+                                            ? " · verified"
+                                            : " · not verified"
+                                        : ""}
+                                </span>
+                            : null}
+                            {p?.executionVerificationStatus ?
+                                <span
+                                    className={`inline-flex px-2 py-1 rounded-lg border ${statusBadgeClass(p.executionVerificationStatus)}`}
+                                >
+                                    Partner / exec:{" "}
+                                    {humanizeIncompleteApplicantStatus(p.executionVerificationStatus)}
+                                    {typeof p.executionVerified === "boolean"
+                                        ? p.executionVerified
+                                            ? " · verified"
+                                            : " · not verified"
+                                        : ""}
+                                </span>
+                            : null}
+                        </div>
+                    </div>
+                ) : null}
+                {totalPipeline > 0 || statusChips.length > 0 ?
+                    <div>
+                        <div className="flex flex-wrap items-baseline gap-2 mb-2">
+                            <div className="text-[10px] font-black uppercase tracking-wider text-slate-500">
+                                Pipeline applications / seats
+                            </div>
+                            <div className="text-[11px] font-semibold text-slate-700">
+                                {totalPipeline}{" "}
+                                <span className="text-slate-500 font-medium">total non-withdrawn</span>
+                            </div>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                            {statusChips.map((c) => (
+                                <span
+                                    key={c.key}
+                                    className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg border text-[11px] font-bold capitalize ${statusBadgeClass(c.key)}`}
+                                >
+                                    {c.label}: {c.n}
+                                </span>
+                            ))}
+                            {totalPipeline > 0 && !statusChips.length ?
+                                <span className="inline-flex px-2 py-1 rounded-lg border text-[11px] font-semibold text-slate-600 bg-white border-slate-200">
+                                    Detailed status breakdown unavailable
+                                </span>
+                            : null}
+                        </div>
+                    </div>
+                : null}
+            </div>
+        );
+    }, [teamOverviewLoading, teamOverviewSummary]);
 
     const handleExport = () => {
         if (!filteredRows.length) {
@@ -1492,6 +1770,7 @@ export default function AdminProjectsPage() {
                                 <div className="mt-1 text-2xl font-black text-blue-800">{teamOverviewSummary.reportsAvailable}</div>
                             </div>
                         </div>
+                        {teamOverviewPipelineRibbon}
                         <div className="px-5 py-4 overflow-y-auto flex-1 min-h-0">
                             {teamOverviewLoading ? (
                                 <div className="flex flex-col items-center justify-center py-16 gap-3 text-slate-500">
@@ -1689,8 +1968,8 @@ export default function AdminProjectsPage() {
                                                                                     disabled={!member.supportsAdminPatch || memberSaveLoading}
                                                                                     title={
                                                                                         member.supportsAdminPatch
-                                                                                            ? "Correct CNIC, phone, or academic fields"
-                                                                                            : "Available after the seat exists (approved enrollment)"
+                                                                                            ? "Correct CNIC, phone, or academic profile fields"
+                                                                                            : "Correction is blocked for this row"
                                                                                     }
                                                                                     className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-[11px] font-bold text-blue-700 bg-blue-50 border border-blue-100 hover:bg-blue-100 disabled:opacity-50 disabled:cursor-not-allowed"
                                                                                 >

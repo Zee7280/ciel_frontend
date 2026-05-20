@@ -4,13 +4,12 @@ import { NextResponse } from "next/server";
  * Next: GET /api/v1/admin/opportunities/:opportunityId/teams
  * Backend: GET /admin/opportunities/:opportunityId/teams
  *
- * Intended response shape:
- * {
- *   success: true,
- *   summary?: { registered_teams, completed_reports, reports_available },
- *   data: [{ id, team_id?, team_name, lead_name, participation_mode?: 'team' | 'individual', report_status, report_available, members: [...] }]
- *   Individual rows may use synthetic ids like individual:<studentId>; team_name may reflect the participant name.
- * }
+ * Backend returns (passthrough): { summary, data } — no wrapper required by the dashboard.
+ * summary: registered_teams, completed_reports, reports_available; plus opportunity_snapshot fields:
+ *   opportunity (snake_case: admin_approved, faculty_verification_status, awaiting_partner_or_faculty, …),
+ *   applications_by_internal_status { pending_faculty, … }, applications_pipeline_total_non_withdrawn.
+ * data: roster rows — members[].id includes enrollments (UUID) or pending synthetic pending:<applicationId>:m:<normalizedEmail>
+ *   / lead pending row uses application UUID. Synthetic team ids remain individual:<studentId>.
  */
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
     try {

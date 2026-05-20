@@ -38,3 +38,17 @@ export function getStoredCurrentUserId(): string {
     if (typeof rawId === "number") return String(rawId);
     return "";
 }
+
+/** For org-scoped dashboards (e.g. partner attendance on student-hosted but org-linked opportunities). */
+export function getStoredOrganizationId(): string {
+    const user = readStoredCurrentUser();
+    if (!user) return "";
+    const nested =
+        user.organization && typeof user.organization === "object"
+            ? (user.organization as { id?: unknown }).id
+            : null;
+    const raw = user.organizationId ?? user.organization_id ?? nested;
+    if (typeof raw === "string") return raw.trim();
+    if (typeof raw === "number") return String(raw);
+    return "";
+}

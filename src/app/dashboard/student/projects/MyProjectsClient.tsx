@@ -322,6 +322,8 @@ interface Project {
     faculty_approval_status?: string;
     partner_approval_status?: string;
     admin_approval_status?: string;
+    /** DB join row status (e.g. pending_admin). Prefer over `application_stage` for badges. */
+    application_internal_status?: string | null;
     application_status?: string;
     application_stage?: string | null;
     application_id?: string;

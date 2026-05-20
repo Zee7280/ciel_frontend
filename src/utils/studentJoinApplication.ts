@@ -31,11 +31,21 @@ export function pickJoinApplicationId(raw: Record<string, unknown>): string {
     return "";
 }
 
-export type JoinApplicationStage = "faculty" | "admin";
+export type JoinApplicationStage = "faculty" | "partner" | "admin";
 
+/**
+ * Join-pipeline queue for UI. Prefer {@link application_internal_status} from the API — it matches DB
+ * (`pending_faculty` | `pending_partner` | `pending_admin` | …) and stays correct when `application_stage` is stale.
+ */
 export function pickJoinApplicationStage(raw: Record<string, unknown>): JoinApplicationStage | null {
+    const internal = lower(raw.application_internal_status ?? raw.applicationInternalStatus);
+    if (internal === "pending_faculty") return "faculty";
+    if (internal === "pending_partner") return "partner";
+    if (internal === "pending_admin") return "admin";
+
     const s = lower(raw.application_stage ?? raw.applicationStage);
     if (s === "faculty") return "faculty";
+    if (s === "partner") return "partner";
     if (s === "admin") return "admin";
     return null;
 }
@@ -116,10 +126,11 @@ export function canStudentShowStartReportCta(
     return opportunityStatusAllowsStudentReportFlow(raw);
 }
 
-/** Short badge line for pending join (faculty vs admin queue). */
+/** Short badge line for pending join (faculty / partner / admin queue). */
 export function joinApplicationPendingLabel(raw: Record<string, unknown>): string {
     const stage = pickJoinApplicationStage(raw);
     if (stage === "faculty") return "Pending faculty review";
+    if (stage === "partner") return "Pending partner review";
     if (stage === "admin") return "Pending CIEL admin review";
     return "Pending approval";
 }
