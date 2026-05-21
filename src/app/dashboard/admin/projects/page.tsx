@@ -73,6 +73,17 @@ function subtitleFromRaw(raw: Record<string, unknown>): string {
     );
 }
 
+/** Faculty supervisor official email only — not partner names or partner emails. */
+function pickFacultySupervisorEmail(raw: Record<string, unknown>): string {
+    const sup =
+        raw.supervision && typeof raw.supervision === "object"
+            ? (raw.supervision as Record<string, unknown>)
+            : null;
+    const contact = String(sup?.contact ?? "").trim();
+    if (contact.includes("@")) return contact.toLowerCase();
+    return "";
+}
+
 function optionalPositiveNumber(raw: Record<string, unknown>, keys: string[]): number | null {
     for (const key of keys) {
         const n = Number(raw[key]);
@@ -628,6 +639,8 @@ export default function AdminProjectsPage() {
     const [studentEmailApplied, setStudentEmailApplied] = useState("");
     const [statusFilter, setStatusFilter] = useState("all");
     const [locationFilter, setLocationFilter] = useState("all");
+    const [degreeFilter, setDegreeFilter] = useState("all");
+    const [facultyEmailFilter, setFacultyEmailFilter] = useState("all");
     const [activeMenu, setActiveMenu] = useState<{ id: string; top: number; right: number } | null>(null);
     const [applicantsModal, setApplicantsModal] = useState<{ opportunityId: string; title: string } | null>(null);
     const [incompleteApplicants, setIncompleteApplicants] = useState<IncompleteReportApplicantRow[]>([]);
@@ -996,11 +1009,49 @@ export default function AdminProjectsPage() {
         return ["all", ...Array.from(set).sort()];
     }, [rows]);
 
+    const degreeOptions = useMemo(() => {
+        const set = new Set<string>();
+        rows.forEach((r) => {
+            const raw = r.raw;
+            const scope = raw.participation_scope && typeof raw.participation_scope === "object"
+                ? (raw.participation_scope as Record<string, unknown>)
+                : null;
+            const depts = Array.isArray(scope?.departments) ? (scope!.departments as unknown[]) : [];
+            depts.forEach((d) => {
+                const v = String(d ?? "").trim();
+                if (v) set.add(v);
+            });
+        });
+        return ["all", ...Array.from(set).sort()];
+    }, [rows]);
+
+    const facultyEmailOptions = useMemo(() => {
+        const set = new Set<string>();
+        rows.forEach((r) => {
+            const email = pickFacultySupervisorEmail(r.raw);
+            if (email) set.add(email);
+        });
+        return ["all", ...Array.from(set).sort()];
+    }, [rows]);
+
     const filteredRows = useMemo(() => {
         const q = searchQuery.trim().toLowerCase();
         return rows.filter((r) => {
             if (statusFilter !== "all" && r.statusKey !== statusFilter) return false;
             if (locationFilter !== "all" && r.locationLabel !== locationFilter) return false;
+            if (degreeFilter !== "all") {
+                const raw = r.raw;
+                const scope = raw.participation_scope && typeof raw.participation_scope === "object"
+                    ? (raw.participation_scope as Record<string, unknown>)
+                    : null;
+                const depts = Array.isArray(scope?.departments) ? (scope!.departments as unknown[]) : [];
+                const match = depts.some((d) => String(d ?? "").trim() === degreeFilter);
+                if (!match) return false;
+            }
+            if (facultyEmailFilter !== "all") {
+                const email = pickFacultySupervisorEmail(r.raw);
+                if (email !== facultyEmailFilter) return false;
+            }
             if (!q) return true;
             return (
                 r.title.toLowerCase().includes(q) ||
@@ -1009,7 +1060,7 @@ export default function AdminProjectsPage() {
                 r.displayStatus.toLowerCase().includes(q)
             );
         });
-    }, [rows, searchQuery, statusFilter, locationFilter]);
+    }, [rows, searchQuery, statusFilter, locationFilter, degreeFilter, facultyEmailFilter]);
 
     const filteredTeamOverviewRows = useMemo(() => {
         if (teamOverviewParticipationFilter === "all") return teamOverviewRows;
@@ -1456,6 +1507,36 @@ export default function AdminProjectsPage() {
                                 ))}
                             </select>
                         </div>
+                        <div className="relative min-w-0 sm:min-w-[160px]">
+                            <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
+                            <select
+                                value={degreeFilter}
+                                onChange={(e) => setDegreeFilter(e.target.value)}
+                                className="w-full pl-9 pr-8 py-2.5 rounded-xl border border-slate-200 text-xs font-bold uppercase tracking-wide text-slate-700 bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none appearance-none cursor-pointer"
+                                aria-label="Filter by degree"
+                            >
+                                {degreeOptions.map((opt) => (
+                                    <option key={opt} value={opt}>
+                                        {opt === "all" ? "All degrees" : opt.replace(/_/g, " ")}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                        <div className="relative min-w-0 sm:min-w-[160px]">
+                            <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
+                            <select
+                                value={facultyEmailFilter}
+                                onChange={(e) => setFacultyEmailFilter(e.target.value)}
+                                className="w-full pl-9 pr-8 py-2.5 rounded-xl border border-slate-200 text-xs font-bold uppercase tracking-wide text-slate-700 bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 outline-none appearance-none cursor-pointer"
+                                aria-label="Filter by faculty email"
+                            >
+                                {facultyEmailOptions.map((opt) => (
+                                    <option key={opt} value={opt}>
+                                        {opt === "all" ? "All faculty emails" : opt}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
                     </div>
                 </div>
                 <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center border-t border-slate-100 pt-3">
@@ -1544,6 +1625,46 @@ export default function AdminProjectsPage() {
                             >
                                 <Eye className="w-4 h-4" /> View details
                             </Link>
+                            {(() => {
+                                const c = activeMenuRow.raw.creator && typeof activeMenuRow.raw.creator === "object"
+                                    ? (activeMenuRow.raw.creator as Record<string, unknown>)
+                                    : null;
+                                const rawPhone = String(c?.phone ?? activeMenuRow.raw.contact_phone ?? activeMenuRow.raw.owner_phone ?? "").trim();
+                                const digits = rawPhone.replace(/\D/g, "");
+                                const waPhone = rawPhone.startsWith("+") ? digits : digits.length >= 10 ? `92${digits.slice(-10)}` : digits;
+                                if (!waPhone) return null;
+                                const waIcon = (
+                                    <svg viewBox="0 0 24 24" className="w-4 h-4 fill-current shrink-0" aria-hidden>
+                                        <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/>
+                                        <path d="M12 0C5.373 0 0 5.373 0 12c0 2.125.556 4.12 1.527 5.855L.057 23.25a.75.75 0 0 0 .916.919l5.556-1.458A11.945 11.945 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.75a9.712 9.712 0 0 1-4.953-1.355l-.355-.213-3.684.966.984-3.595-.232-.371A9.712 9.712 0 0 1 2.25 12C2.25 6.615 6.615 2.25 12 2.25S21.75 6.615 21.75 12 17.385 21.75 12 21.75z"/>
+                                    </svg>
+                                );
+                                const rejectionTemplate = `Dear Student,\n\nYour opportunity has been rejected because the partner organization has not been added. Since your activity requires a partner, please click the Edit button and revise your opportunity by adding the organization where you plan to conduct the activity.\n\nOnce the partner is added, please ensure that the partner logs in or registers on the dashboard using the same email address you entered, and then approves the opportunity.\n\nAfter partner approval, your opportunity will be cleared and made live.`;
+                                return (
+                                    <>
+                                        <a
+                                            href={`https://wa.me/${waPhone}`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="flex items-center gap-2 w-full px-3 py-2.5 text-sm font-medium text-emerald-700 hover:bg-emerald-50"
+                                            onClick={() => setActiveMenu(null)}
+                                        >
+                                            {waIcon}
+                                            WhatsApp creator
+                                        </a>
+                                        <a
+                                            href={`https://wa.me/${waPhone}?text=${encodeURIComponent(rejectionTemplate)}`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="flex items-center gap-2 w-full px-3 py-2.5 text-sm font-medium text-emerald-700 hover:bg-emerald-50"
+                                            onClick={() => setActiveMenu(null)}
+                                        >
+                                            {waIcon}
+                                            Send rejection template
+                                        </a>
+                                    </>
+                                );
+                            })()}
                             <button
                                 type="button"
                                 onClick={() => openApplicantsModal(activeMenuRow)}

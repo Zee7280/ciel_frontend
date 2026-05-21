@@ -289,28 +289,28 @@ export default function AttendancePendingQueuePanel({
         >
             <div
                 className={clsx(
-                    "flex flex-col gap-3 border-b px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5",
+                    "flex flex-col gap-2.5 border-b px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5",
                     isPartner
                         ? "border-slate-200/70 bg-gradient-to-r from-white via-slate-50/40 to-[#0056B3]/[0.03]"
                         : "border-slate-100",
                 )}
             >
-                <div className="flex min-w-0 items-start gap-3">
+                <div className="flex min-w-0 items-center gap-2.5">
                     <div
                         className={clsx(
-                            "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl",
+                            "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg",
                             isPartner
-                                ? "bg-gradient-to-br from-[#0056B3] to-[#003F85] text-white shadow-md shadow-[#0056B3]/20"
+                                ? "bg-gradient-to-br from-[#0056B3] to-[#003F85] text-white shadow-sm"
                                 : "bg-slate-100 text-slate-700",
                         )}
                         aria-hidden
                     >
-                        <ClipboardList className="h-5 w-5" />
+                        <ClipboardList className="h-4 w-4" />
                     </div>
                     <div className="min-w-0">
                         <h2
                             className={clsx(
-                                "text-base text-slate-900 sm:text-[17px]",
+                                "text-sm text-slate-900 sm:text-[15px]",
                                 isPartner ? "font-bold tracking-tight" : "font-semibold",
                             )}
                         >
@@ -366,21 +366,18 @@ export default function AttendancePendingQueuePanel({
             </div>
 
             {isPartner && rowsAfterTeamScope.length > 0 && partnerSelectedMemberKey && selectedMemberLabel ? (
-                <div className="flex items-center gap-3 border-b border-[#0056B3]/10 bg-gradient-to-r from-[#0056B3]/[0.07] via-[#0056B3]/[0.04] to-transparent px-4 py-3.5 sm:px-5">
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#0056B3] to-[#003F85] text-white shadow-md shadow-[#0056B3]/25">
-                        <UserCircle className="h-6 w-6" aria-hidden />
+                <div className="flex items-center gap-2.5 border-b border-[#0056B3]/10 bg-gradient-to-r from-[#0056B3]/[0.05] via-[#0056B3]/[0.02] to-transparent px-4 py-2.5 sm:px-5">
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#0056B3] to-[#003F85] text-white shadow-sm">
+                        <UserCircle className="h-4 w-4" aria-hidden />
                     </div>
                     <div className="min-w-0 flex-1">
-                        <p className="text-[10.5px] font-bold uppercase tracking-wider text-[#0056B3]/70">
-                            Selected member
-                        </p>
-                        <p className="truncate text-sm font-bold text-slate-900">{selectedMemberLabel.name}</p>
+                        <p className="truncate text-sm font-semibold text-slate-900">{selectedMemberLabel.name}</p>
                         {selectedMemberLabel.subtitle ? (
-                            <p className="truncate text-xs text-slate-600">{selectedMemberLabel.subtitle}</p>
+                            <p className="truncate text-[11px] text-slate-500">{selectedMemberLabel.subtitle}</p>
                         ) : null}
                     </div>
                     {tableRows.length > 0 ? (
-                        <span className="hidden rounded-lg bg-white/70 px-2.5 py-1 text-xs font-semibold text-[#0056B3] ring-1 ring-inset ring-[#0056B3]/15 backdrop-blur-sm sm:inline-flex">
+                        <span className="hidden rounded-md bg-white/70 px-2 py-0.5 text-[11px] font-semibold text-[#0056B3] ring-1 ring-inset ring-[#0056B3]/15 backdrop-blur-sm sm:inline-flex">
                             {tableRows.length} session{tableRows.length !== 1 ? "s" : ""}
                         </span>
                     ) : null}
@@ -472,31 +469,205 @@ export default function AttendancePendingQueuePanel({
             ) : null}
 
             {tableRows.length > 0 ? (
+                <>
                 <div
                     className={clsx(
-                        "overflow-x-auto px-2 pb-4 pt-2 sm:px-4",
+                        "space-y-3 px-3 pb-4 pt-3 sm:px-4 lg:hidden",
                         scrollTableInPanel && "min-h-0 flex-1 overflow-y-auto overscroll-contain",
                     )}
                 >
-                    <table
-                        className={clsx(
-                            "w-full border-collapse text-left text-sm",
-                            partnerHideParticipantColumn ? "min-w-[780px]" : "min-w-[920px]",
-                        )}
-                    >
+                    {tableRows.map((raw, idx) => {
+                        const rawObj = raw as Record<string, unknown>;
+                        const row = normalizeEngagementAttendanceLog(rawObj);
+                        const id = pickStr(row.id);
+                        const who = participantDisplay(rawObj);
+                        const rawUrl = pickStr(rawObj.evidenceUrl ?? rawObj.evidence_url ?? rawObj.evidenceURL);
+                        const fromRow =
+                            typeof row.evidence_file === "string" && /^https?:\/\//i.test(row.evidence_file.trim())
+                                ? row.evidence_file.trim()
+                                : "";
+                        const evidenceUrl = fromRow || (rawUrl.startsWith("http") ? rawUrl : "");
+                        const workType = pickStr(row.activity_type) || "—";
+                        const desc = pickStr(row.description) || "—";
+                        const st = pickStr(row.start_time);
+                        const et = pickStr(row.end_time);
+                        const t1 = formatDisplayTimeSegment(st) || st;
+                        const t2 = formatDisplayTimeSegment(et) || et;
+                        const timeRange = [t1, t2].filter(Boolean).join(" – ") || "—";
+                        const loc = pickStr(row.location);
+
+                        return (
+                            <div
+                                key={id || `card-${idx}`}
+                                className={clsx(
+                                    "rounded-xl border p-4 transition-colors",
+                                    isPartner
+                                        ? "border-slate-200/80 bg-white shadow-sm"
+                                        : "border-slate-200 bg-white",
+                                )}
+                            >
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <span className="text-sm font-semibold text-slate-900">
+                                        {formatDisplayDate(pickStr(row.date))}
+                                    </span>
+                                    <span
+                                        className={clsx(
+                                            "inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-semibold tabular-nums",
+                                            isPartner
+                                                ? "bg-[#0056B3]/[0.08] text-[#0056B3] ring-1 ring-inset ring-[#0056B3]/10"
+                                                : "bg-slate-100 text-slate-700 ring-1 ring-inset ring-slate-200",
+                                        )}
+                                    >
+                                        {timeRange}
+                                    </span>
+                                    <span className="inline-flex items-center rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-700 ring-1 ring-inset ring-slate-200">
+                                        {workType}
+                                    </span>
+                                </div>
+
+                                {loc ? (
+                                    <p className="mt-2 line-clamp-2 break-words text-xs leading-relaxed text-slate-600" title={loc}>
+                                        <span className="font-medium text-slate-500">Location: </span>{loc}
+                                    </p>
+                                ) : null}
+
+                                {desc !== "—" ? (
+                                    <p className="mt-1.5 line-clamp-2 break-words text-xs leading-relaxed text-slate-600" title={desc}>
+                                        <span className="font-medium text-slate-500">Description: </span>{desc}
+                                    </p>
+                                ) : null}
+
+                                {!partnerHideParticipantColumn && who.name ? (
+                                    <p className="mt-1.5 text-xs text-slate-600">
+                                        <span className="font-medium text-slate-500">Participant: </span>
+                                        <span className="font-semibold text-slate-800">{who.name}</span>
+                                        {who.detail ? <span className="text-slate-400"> · {who.detail}</span> : null}
+                                    </p>
+                                ) : null}
+
+                                <div className="mt-3 flex items-center gap-2">
+                                    {evidenceUrl ? (
+                                        <a
+                                            href={evidenceUrl}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className={clsx(
+                                                "inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-semibold transition",
+                                                isPartner
+                                                    ? "bg-[#0056B3]/10 text-[#0056B3] ring-1 ring-inset ring-[#0056B3]/15 hover:bg-[#0056B3]/15"
+                                                    : "bg-slate-100 text-slate-800 ring-1 ring-inset ring-slate-200 hover:bg-slate-200",
+                                            )}
+                                        >
+                                            <ExternalLink className="h-3 w-3" aria-hidden />
+                                            View
+                                        </a>
+                                    ) : (
+                                        <span className="inline-flex items-center gap-1 rounded-lg bg-amber-50 px-2 py-1 text-[11px] font-semibold text-amber-800 ring-1 ring-inset ring-amber-200">
+                                            <AlertTriangle className="h-3 w-3 shrink-0" aria-hidden />
+                                            Missing
+                                        </span>
+                                    )}
+                                </div>
+
+                                <div className="mt-3 border-t border-slate-100 pt-3">
+                                    <div className="flex flex-wrap gap-1.5">
+                                        <button
+                                            type="button"
+                                            disabled={acting !== null}
+                                            onClick={() => void act(id, "approve")}
+                                            className={clsx(
+                                                "inline-flex items-center justify-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-semibold shadow-sm transition disabled:opacity-50",
+                                                isPartner
+                                                    ? "rounded-[10px] border-emerald-600 bg-emerald-600 text-white hover:bg-emerald-700"
+                                                    : "border-emerald-500 bg-emerald-50 text-emerald-800 hover:bg-emerald-100",
+                                            )}
+                                        >
+                                            {acting === `${id}:approve` ? (
+                                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                            ) : (
+                                                <CheckCircle2 className="h-3.5 w-3.5" />
+                                            )}
+                                            Approve
+                                        </button>
+                                        <button
+                                            type="button"
+                                            disabled={acting !== null}
+                                            onClick={() => void act(id, "reject")}
+                                            className={clsx(
+                                                "inline-flex items-center justify-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-semibold shadow-sm transition disabled:opacity-50",
+                                                isPartner
+                                                    ? "rounded-[10px] border-red-200 bg-white text-red-700 hover:border-red-300 hover:bg-red-50"
+                                                    : "border-red-500 bg-white text-red-700 hover:bg-red-50",
+                                            )}
+                                        >
+                                            {acting === `${id}:reject` ? (
+                                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                            ) : (
+                                                <XCircle className="h-3.5 w-3.5" />
+                                            )}
+                                            Reject
+                                        </button>
+                                        <button
+                                            type="button"
+                                            disabled={acting !== null}
+                                            onClick={() => void act(id, "flag")}
+                                            className={clsx(
+                                                "inline-flex items-center justify-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-semibold shadow-sm transition disabled:opacity-50",
+                                                isPartner
+                                                    ? "rounded-[10px] border-amber-200 bg-white text-amber-800 hover:border-amber-300 hover:bg-amber-50"
+                                                    : "border-amber-500 bg-white text-amber-800 hover:bg-amber-50",
+                                            )}
+                                        >
+                                            {acting === `${id}:flag` ? (
+                                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                            ) : (
+                                                <AlertTriangle className="h-3.5 w-3.5" />
+                                            )}
+                                            Request revision
+                                        </button>
+                                    </div>
+                                    <label className="mt-2 block">
+                                        <span className="sr-only">Reason for rejection or revision</span>
+                                        <textarea
+                                            rows={1}
+                                            className={clsx(
+                                                "w-full resize-y rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-slate-400 focus:ring-2 focus:ring-slate-100",
+                                                isPartner &&
+                                                    "rounded-[10px] focus:border-[#0056B3]/40 focus:ring-[#0056B3]/12",
+                                            )}
+                                            placeholder="Reason (required for reject / revision)"
+                                            value={reasonByLogId[id] || ""}
+                                            onChange={(e) =>
+                                                setReasonByLogId((prev) => ({ ...prev, [id]: e.target.value }))
+                                            }
+                                        />
+                                    </label>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+
+                <div
+                    className={clsx(
+                        "hidden overflow-x-auto px-2 pb-4 pt-2 sm:px-4 lg:block",
+                        scrollTableInPanel && "min-h-0 flex-1 overflow-y-auto overscroll-contain",
+                    )}
+                >
+                    <table className="w-full min-w-[720px] border-collapse text-left text-sm">
                         <thead>
                             <tr>
                                 {[
-                                    { label: "Date", extra: "whitespace-nowrap" },
-                                    { label: "Location", extra: "whitespace-nowrap" },
-                                    { label: "Time", extra: "whitespace-nowrap" },
-                                    { label: "Work type", extra: "whitespace-nowrap" },
+                                    { label: "Date", extra: "whitespace-nowrap w-[88px]" },
+                                    { label: "Location", extra: "w-[110px]" },
+                                    { label: "Time", extra: "whitespace-nowrap w-[120px]" },
+                                    { label: "Work type", extra: "w-[90px]" },
                                     ...(!partnerHideParticipantColumn
-                                        ? [{ label: "Participant", extra: "min-w-[140px]" }]
+                                        ? [{ label: "Participant", extra: "w-[130px]" }]
                                         : []),
-                                    { label: "Description", extra: "min-w-[160px]" },
-                                    { label: "Evidence", extra: "whitespace-nowrap" },
-                                    { label: "Actions", extra: "min-w-[220px]" },
+                                    { label: "Description", extra: "" },
+                                    { label: "Evidence", extra: "whitespace-nowrap w-[72px]" },
+                                    { label: "Actions", extra: "w-[200px]" },
                                 ].map((col) => (
                                     <th
                                         key={col.label}
@@ -552,17 +723,19 @@ export default function AttendancePendingQueuePanel({
                                                 : "bg-white hover:bg-slate-50/80",
                                         )}
                                     >
-                                        <td className="whitespace-nowrap px-3 py-3.5 align-top sm:px-4">
+                                        <td className="whitespace-nowrap px-3 py-3 align-top sm:px-4">
                                             <span className="font-semibold text-slate-900">
                                                 {formatDisplayDate(pickStr(row.date))}
                                             </span>
                                         </td>
-                                        <td className="max-w-[200px] px-3 py-3.5 align-top text-slate-700 sm:px-4">
-                                            {pickStr(row.location) || (
+                                        <td className="max-w-[110px] px-3 py-3 align-top text-slate-700 sm:px-4">
+                                            {pickStr(row.location) ? (
+                                                <span className="line-clamp-2 block break-words text-xs leading-snug" title={pickStr(row.location)}>{pickStr(row.location)}</span>
+                                            ) : (
                                                 <span className="text-slate-400">—</span>
                                             )}
                                         </td>
-                                        <td className="whitespace-nowrap px-3 py-3.5 align-top sm:px-4">
+                                        <td className="whitespace-nowrap px-3 py-3 align-top sm:px-4">
                                             <span
                                                 className={clsx(
                                                     "inline-flex items-center rounded-md px-2 py-1 text-xs font-semibold tabular-nums",
@@ -574,13 +747,13 @@ export default function AttendancePendingQueuePanel({
                                                 {timeCell}
                                             </span>
                                         </td>
-                                        <td className="max-w-[140px] px-3 py-3.5 align-top sm:px-4">
+                                        <td className="px-3 py-3 align-top sm:px-4">
                                             <span className="inline-flex items-center rounded-md bg-slate-100 px-2 py-1 text-xs font-medium text-slate-700 ring-1 ring-inset ring-slate-200">
                                                 {workType}
                                             </span>
                                         </td>
                                         {!partnerHideParticipantColumn ? (
-                                            <td className="px-3 py-3.5 align-top text-slate-800 sm:px-4">
+                                            <td className="px-3 py-3 align-top text-slate-800 sm:px-4">
                                                 {who.name ? (
                                                     <>
                                                         <span className="font-semibold text-slate-900">{who.name}</span>
@@ -593,10 +766,10 @@ export default function AttendancePendingQueuePanel({
                                                 )}
                                             </td>
                                         ) : null}
-                                        <td className="max-w-[220px] px-3 py-3.5 align-top text-slate-600 sm:px-4">
-                                            <span className="line-clamp-3 leading-relaxed">{desc}</span>
+                                        <td className="px-3 py-3 align-top text-slate-600 sm:px-4">
+                                            <span className="line-clamp-2 block break-words text-xs leading-snug" title={desc}>{desc}</span>
                                         </td>
-                                        <td className="whitespace-nowrap px-3 py-3.5 align-top sm:px-4">
+                                        <td className="whitespace-nowrap px-3 py-3 align-top sm:px-4">
                                             {evidenceUrl ? (
                                                 <a
                                                     href={evidenceUrl}
@@ -619,9 +792,9 @@ export default function AttendancePendingQueuePanel({
                                                 </span>
                                             )}
                                         </td>
-                                        <td className="px-3 py-3.5 align-top sm:px-4">
-                                            <div className="flex flex-col gap-2">
-                                                <div className="flex flex-wrap gap-2">
+                                        <td className="px-3 py-3 align-top sm:px-4">
+                                            <div className="flex flex-col gap-1.5">
+                                                <div className="flex flex-wrap gap-1.5">
                                                     <button
                                                         type="button"
                                                         disabled={acting !== null}
@@ -701,6 +874,7 @@ export default function AttendancePendingQueuePanel({
                         </tbody>
                     </table>
                 </div>
+                </>
             ) : null}
         </div>
     );

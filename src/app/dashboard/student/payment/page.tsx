@@ -42,10 +42,10 @@ function PaymentContent() {
     const [submitting, setSubmitting] = useState(false);
     const [projectDetails, setProjectDetails] = useState<any>(null);
     const bankInfo = {
-        bankName: "Allied Bank Limited (ABL)",
-        accountTitle: "Fatima Khalid/Faizan Saadullah Khan",
-        accountNumber: "07800010140722710026",
-        iban: "PK65ABPA0010140722710026",
+        bankName: "United Bank Limited (UBL)",
+        accountTitle: "Community Impact Education Lab Pakistan",
+        accountNumber: "371162266",
+        iban: "PK54UNIL0109000371162266",
     };
 
 

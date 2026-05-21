@@ -324,7 +324,7 @@ export default function AttendanceReviewDashboard({
                 {isPartner ? (
                     <>
                         <nav aria-label="Breadcrumb">
-                            <p className="text-xs leading-relaxed text-slate-500 sm:text-[13px]">
+                            <p className="text-[11px] leading-relaxed text-slate-500 sm:text-xs">
                                 <span className={clsx(selected ? "text-slate-700" : "text-slate-400")}>
                                     {selected?.title ?? "Project title"}
                                 </span>
@@ -347,9 +347,9 @@ export default function AttendanceReviewDashboard({
                             </p>
                         </nav>
 
-                        <div aria-label="Verification steps" className="border-b border-slate-100 pb-6">
+                        <div aria-label="Verification steps" className="border-b border-slate-100 pb-3">
                             <div className="-mx-1 overflow-x-auto px-1 sm:overflow-visible">
-                                <div className="flex min-w-[36rem] items-center pb-px sm:min-w-0">
+                                <div className="flex min-w-[32rem] items-center pb-px sm:min-w-0">
                                 {(
                                     [
                                         { n: 1, label: "Project title", done: partnerStepProjectDone },
@@ -381,7 +381,7 @@ export default function AttendanceReviewDashboard({
                                     const circle = (
                                         <div
                                             className={clsx(
-                                                "flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-2 text-sm font-bold transition-colors",
+                                                "flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 text-xs font-bold transition-colors",
                                                 isDone &&
                                                     "border-[#0056B3] bg-[#0056B3] text-white shadow-[0_1px_2px_rgba(0,0,0,.06)]",
                                                 !isDone &&
@@ -394,7 +394,7 @@ export default function AttendanceReviewDashboard({
                                                     "border-slate-200 bg-white text-slate-400",
                                             )}
                                         >
-                                            {isDone ? <Check className="h-5 w-5" strokeWidth={2.5} /> : step.n}
+                                            {isDone ? <Check className="h-4 w-4" strokeWidth={2.5} /> : step.n}
                                         </div>
                                     );
 
@@ -409,9 +409,9 @@ export default function AttendanceReviewDashboard({
                                                     aria-hidden
                                                 />
                                             ) : null}
-                                            <div className="flex w-[min(7.75rem,calc((100%-3rem)/4))] shrink-0 flex-col items-center text-center">
+                                            <div className="flex w-[min(7rem,calc((100%-3rem)/4))] shrink-0 flex-col items-center text-center">
                                                 {circle}
-                                                <p className="mt-2 px-1 text-[11px] font-semibold leading-tight text-slate-700 sm:text-xs">
+                                                <p className="mt-1.5 px-0.5 text-[10px] font-semibold leading-tight text-slate-600 sm:text-[11px]">
                                                     {step.label}
                                                 </p>
                                             </div>
@@ -688,77 +688,75 @@ export default function AttendanceReviewDashboard({
 
                     <div
                         className={clsx(
-                            stretchViewport ? "flex min-h-0 flex-col lg:col-span-9" : "lg:col-span-8",
-                            isPartner ? "space-y-4" : "space-y-3",
-                            stretchViewport && "max-h-[calc(100dvh-11rem)]",
+                        stretchViewport ? "flex min-h-0 flex-col lg:col-span-9" : "lg:col-span-8",
+                        isPartner ? "space-y-4" : "space-y-3",
+                        stretchViewport && !isPartner && "max-h-[calc(100dvh-11rem)]",
                         )}
                     >
                         {selected ? (
                             <div className={clsx(stretchViewport && "flex min-h-0 flex-1 flex-col gap-3")}>
                                 {isPartner ? (
                                     <div className={clsx("flex shrink-0 flex-col gap-4", stretchViewport && "gap-3")}>
-                                        <div className="flex items-start gap-5 rounded-xl border border-slate-200/90 bg-white p-5 shadow-sm sm:gap-6">
+                                        <div className="flex items-center gap-4 rounded-xl border border-slate-200/90 bg-white px-4 py-3.5 shadow-sm">
                                             <div
                                                 className={clsx(
-                                                    "flex h-14 w-14 shrink-0 items-center justify-center rounded-xl sm:h-[4.25rem] sm:w-[4.25rem]",
+                                                    "flex h-10 w-10 shrink-0 items-center justify-center rounded-lg",
                                                     accentSoftBg,
                                                 )}
                                             >
-                                                <BookOpen className={clsx("h-7 w-7 sm:h-8 sm:w-8", accent)} aria-hidden />
+                                                <BookOpen className={clsx("h-5 w-5", accent)} aria-hidden />
                                             </div>
                                             <div className="min-w-0 flex-1">
-                                                <p className="text-lg font-bold leading-snug text-slate-900 md:text-xl">
+                                                <p className="text-sm font-bold leading-snug text-slate-900 sm:text-base">
                                                     {selected.title}
                                                 </p>
-                                                <p className="mt-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                                    Selected project
-                                                </p>
-                                                {selected.subtitle ? (
-                                                    <p className="mt-2 text-xs text-slate-600 sm:text-sm">{selected.subtitle}</p>
-                                                ) : null}
-                                                <p className="mt-2 text-[11px] font-medium uppercase tracking-wide text-slate-400">
-                                                    OPP-{oppIdTail}
-                                                </p>
+                                                <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5">
+                                                    {selected.subtitle ? (
+                                                        <span className="text-xs text-slate-500">{selected.subtitle}</span>
+                                                    ) : null}
+                                                    <span className="text-[10px] font-medium uppercase tracking-wide text-slate-400">
+                                                        OPP-{oppIdTail}
+                                                    </span>
+                                                </div>
                                             </div>
                                         </div>
 
-                                        <div className={clsx("grid gap-4 lg:grid-cols-2", stretchViewport && "gap-3 lg:gap-4")}>
-                                            <div className="flex gap-4 rounded-xl border border-slate-200/90 bg-white p-4 shadow-sm sm:p-5">
+                                        <div className={clsx("grid gap-3 lg:grid-cols-2", stretchViewport && "lg:gap-3")}>
+                                            <div className="flex gap-3 rounded-xl border border-slate-200/90 bg-white p-3.5 shadow-sm sm:p-4">
                                                 <div
                                                     className={clsx(
-                                                        "flex h-12 w-12 shrink-0 items-center justify-center rounded-xl sm:h-14 sm:w-14",
+                                                        "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg",
                                                         accentSoftBg,
                                                     )}
                                                 >
-                                                    <Users className={clsx("h-6 w-6 sm:h-7 sm:w-7", accent)} aria-hidden />
+                                                    <Users className={clsx("h-4.5 w-4.5 sm:h-5 sm:w-5", accent)} aria-hidden />
                                                 </div>
                                                 <div className="min-w-0 flex-1">
-                                                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                                    <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
                                                         Selected team
                                                     </p>
                                                     {partnerTeamsLoading ? (
-                                                        <div className="mt-3 flex items-center gap-2 text-sm text-slate-500">
+                                                        <div className="mt-2 flex items-center gap-2 text-sm text-slate-500">
                                                             <Loader2
-                                                                className={clsx("h-5 w-5 shrink-0 animate-spin", accent)}
+                                                                className={clsx("h-4 w-4 shrink-0 animate-spin", accent)}
                                                                 aria-hidden
                                                             />
                                                             Loading teams…
                                                         </div>
                                                     ) : partnerTeamBuckets.length === 0 ? (
                                                         <>
-                                                            <p className="mt-1 text-sm font-bold leading-snug text-slate-900 sm:text-base">
+                                                            <p className="mt-1 text-sm font-bold leading-snug text-slate-900">
                                                                 All cohorts
                                                             </p>
-                                                            <p className="mt-2 text-xs text-slate-600">
-                                                                No separate team registrations found — pending rows are shown
-                                                                together.
+                                                            <p className="mt-1 text-[11px] leading-relaxed text-slate-500">
+                                                                No separate teams — rows shown together.
                                                             </p>
                                                         </>
                                                     ) : (
                                                         <div
                                                             className={clsx(
-                                                                "mt-3 max-h-[10.5rem] space-y-2 overflow-y-auto pr-0.5",
-                                                                stretchViewport && "max-h-36 sm:max-h-44",
+                                                                "mt-2 max-h-[8rem] space-y-1.5 overflow-y-auto pr-0.5",
+                                                                stretchViewport && "max-h-28 sm:max-h-36",
                                                             )}
                                                         >
                                                             {partnerTeamBuckets.map((b) => {
@@ -769,7 +767,7 @@ export default function AttendanceReviewDashboard({
                                                                         type="button"
                                                                         onClick={() => setSelectedTeamKey(b.key)}
                                                                         className={clsx(
-                                                                            "flex w-full items-start justify-between gap-2 rounded-[10px] border px-3 py-2.5 text-left text-sm transition",
+                                                                            "flex w-full items-start justify-between gap-2 rounded-lg border px-2.5 py-2 text-left text-[13px] transition",
                                                                             sel
                                                                                 ? clsx(
                                                                                       "border-[#0056B3]/40 bg-[#0056B3]/[0.08] ring-2",
@@ -806,7 +804,7 @@ export default function AttendanceReviewDashboard({
                                                         </div>
                                                     )}
                                                     {selectedTeamBucket && partnerTeamIdLabel(selectedTeamBucket.key) ? (
-                                                        <p className="mt-3 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                                                        <p className="mt-2 text-[10px] font-medium uppercase tracking-wide text-slate-400">
                                                             Team ID: {partnerTeamIdLabel(selectedTeamBucket.key)}
                                                         </p>
                                                     ) : null}
@@ -815,14 +813,14 @@ export default function AttendanceReviewDashboard({
 
                                             <div
                                                 className={clsx(
-                                                    "flex flex-col rounded-xl border border-slate-200/90 bg-white p-4 shadow-sm sm:p-5",
-                                                    stretchViewport ? "min-h-[11rem]" : "min-h-[12rem]",
+                                                    "flex flex-col rounded-xl border border-slate-200/90 bg-white p-3.5 shadow-sm sm:p-4",
+                                                    stretchViewport ? "min-h-[9rem]" : "min-h-[10rem]",
                                                 )}
                                             >
-                                                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
                                                     Group members ({partnerRoster.length})
                                                 </p>
-                                                <div className="mt-3 min-h-[6rem] max-h-56 flex-1 space-y-2 overflow-y-auto pr-0.5">
+                                                <div className="mt-2 min-h-[5rem] max-h-48 flex-1 space-y-1.5 overflow-y-auto pr-0.5">
                                                     {partnerRoster.length === 0 ? (
                                                         <p className="text-sm text-slate-500">
                                                             {selectedTeamKey === PARTNER_ATTENDANCE_AWAIT_TEAM
@@ -844,7 +842,7 @@ export default function AttendanceReviewDashboard({
                                                                     type="button"
                                                                     onClick={() => setSelectedParticipantKey(m.key)}
                                                                     className={clsx(
-                                                                        "flex w-full items-center justify-between gap-2 rounded-[10px] border px-3 py-2.5 text-left text-sm transition",
+                                                                        "flex w-full items-center justify-between gap-2 rounded-lg border px-2.5 py-2 text-left text-[13px] transition",
                                                                         sel
                                                                             ? clsx(
                                                                                   "border-[#0056B3]/40 bg-[#0056B3]/[0.08] ring-2",
@@ -854,10 +852,10 @@ export default function AttendanceReviewDashboard({
                                                                             : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/80",
                                                                     )}
                                                                 >
-                                                                    <span className="flex min-w-0 items-center gap-3">
+                                                                    <span className="flex min-w-0 items-center gap-2.5">
                                                                         <span
                                                                             className={clsx(
-                                                                                "flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white shadow-inner",
+                                                                                "flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white shadow-inner",
                                                                                 avatarClass,
                                                                             )}
                                                                         >
@@ -901,7 +899,7 @@ export default function AttendanceReviewDashboard({
                                         ) : null}
                                     </p>
                                 )}
-                                <div className={clsx(isPartner && stretchViewport && "flex min-h-0 flex-1 flex-col")}>
+                                <div className={clsx(isPartner && stretchViewport && "flex min-h-0 flex-1 flex-col", isPartner && "min-h-[420px]")}>
                                     <AttendancePendingQueuePanel
                                         projectId={projectId}
                                         title={queueTitle}
