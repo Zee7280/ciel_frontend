@@ -18,6 +18,7 @@ import clsx from "clsx";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog";
 import { toast } from "sonner";
 import { MAX_REPORT_IMAGE_UPLOAD_LABEL, splitReportFilesByImageSize } from "../utils/fileUploadLimits";
+import { REPORT_ATTACHMENT_ACCEPT } from "@/utils/reportAttachmentAccept";
 
 function countWords(str: string): number {
     return (str || "").trim().split(/\s+/).filter(w => w.length > 0).length;
@@ -92,7 +93,7 @@ const emptyResource = () => ({
 
 // ─── File Preview ──────────────────────────────────────────────────────────────
 function FilePreview({ file }: { file: any }) {
-    const isImage = file?.type?.startsWith('image/') || file?.name?.match(/\.(jpg|jpeg|png|gif|webp)$/i);
+    const isImage = file?.type?.startsWith('image/') || file?.name?.match(/\.(jpg|jpeg|png|gif|webp|heic|heif)$/i);
     const [previewUrl, setPreviewUrl] = React.useState<string | null>(null);
 
     useEffect(() => {
@@ -125,7 +126,7 @@ function FilePreview({ file }: { file: any }) {
 }
 
 function FullFilePreview({ file }: { file: any }) {
-    const isImage = file?.type?.startsWith('image/') || file?.name?.match(/\.(jpg|jpeg|png|gif|webp)$/i);
+    const isImage = file?.type?.startsWith('image/') || file?.name?.match(/\.(jpg|jpeg|png|gif|webp|heic|heif)$/i);
     const [previewUrl, setPreviewUrl] = React.useState<string | null>(null);
 
     useEffect(() => {
@@ -830,7 +831,7 @@ export default function Section6Resources({ projectData }: { projectData?: unkno
                                 <input
                                     type="file"
                                     multiple
-                                    accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+                                    accept={REPORT_ATTACHMENT_ACCEPT}
                                     className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                                     onChange={e => {
                                         if (e.target.files) {

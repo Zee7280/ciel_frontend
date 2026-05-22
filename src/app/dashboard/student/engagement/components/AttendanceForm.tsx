@@ -11,6 +11,7 @@ import { normalizeEngagementAttendanceLog } from "@/utils/engagementAttendanceMa
 import { canLogAttendanceForParticipationStatus } from "@/utils/attendanceApproverRouting";
 import { extractJsonErrorMessage } from "@/utils/applyOpportunityUx";
 import clsx from "clsx";
+import { REPORT_ATTACHMENT_ACCEPT } from "@/utils/reportAttachmentAccept";
 import { useReportForm } from "../../report/context/ReportContext";
 import React from "react";
 import dynamic from "next/dynamic";
@@ -525,13 +526,15 @@ export default function AttendanceForm({
                         <div className="flex-1 relative">
                             <input
                                 type="file"
-                                accept=".jpg,.jpeg,.png,.pdf"
+                                accept={REPORT_ATTACHMENT_ACCEPT}
                                 onChange={(e) => setEvidenceFile(e.target.files?.[0] || null)}
                                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
                             />
                             <div className="w-full p-4 border-2 border-dashed border-slate-200 rounded-2xl flex flex-col items-center gap-1 text-slate-400 group-hover:border-blue-300 transition-colors">
                                 <Upload className="w-6 h-6" />
-                                <span className="text-xs font-bold">JPG, PNG, or PDF</span>
+                                <span className="text-xs font-bold text-center px-2">
+                                    Photos (JPG, PNG, HEIC, WebP), PDF, or Word
+                                </span>
                             </div>
                         </div>
                     )}

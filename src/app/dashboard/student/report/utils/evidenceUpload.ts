@@ -1,5 +1,32 @@
 import { authenticatedFetch } from "@/utils/api";
 
+async function extractEvidenceUploadFailureDetail(res: Response): Promise<string> {
+    if (res.status === 413) {
+        return "file too large for the server limit — use a smaller photo or compress the PDF, then try again.";
+    }
+    try {
+        const ct = res.headers.get("content-type") || "";
+        if (ct.includes("application/json")) {
+            const j = (await res.json()) as Record<string, unknown>;
+            const m = j.message;
+            if (typeof m === "string" && m.trim()) return m.trim();
+            if (Array.isArray(m)) {
+                const parts = m
+                    .filter((x): x is string => typeof x === "string")
+                    .map((s) => s.trim())
+                    .filter(Boolean);
+                if (parts.length) return parts.join(" ");
+            }
+        } else {
+            const text = (await res.text()).trim();
+            if (text) return text.slice(0, 280);
+        }
+    } catch {
+        /* ignore parse errors */
+    }
+    return `HTTP ${res.status}. Check the file type (JPG, PNG, HEIC, WebP, PDF, Word) and connection, then retry.`;
+}
+
 type EvidenceRecord = {
     file?: File;
     name?: string;
@@ -116,12 +143,19 @@ async function uploadEvidenceFile(
             body: formData,
         },
         {
-            timeoutMs: 60000,
+            timeoutMs: 120000,
         },
     );
 
-    if (!res || !res.ok) {
-        throw new Error(`Evidence upload failed for ${file.name}`);
+    if (!res) {
+        throw new Error(
+            `Evidence upload failed for ${file.name}: session may have expired or the network blocked the request — sign in again and retry.`,
+        );
+    }
+
+    if (!res.ok) {
+        const detail = await extractEvidenceUploadFailureDetail(res);
+        throw new Error(`Evidence upload failed for ${file.name}: ${detail}`);
     }
 
     const json = await res.json().catch(() => ({}));

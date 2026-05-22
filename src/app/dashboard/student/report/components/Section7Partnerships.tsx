@@ -11,6 +11,7 @@ import React, { useMemo, useEffect } from "react";
 import clsx from "clsx";
 import { toast } from "sonner";
 import { MAX_REPORT_IMAGE_UPLOAD_LABEL, splitReportFilesByImageSize } from "../utils/fileUploadLimits";
+import { REPORT_ATTACHMENT_ACCEPT } from "@/utils/reportAttachmentAccept";
 
 // ─── Static data ──────────────────────────────────────────────────────────────
 const partnerTypes = [
@@ -664,7 +665,7 @@ export default function Section7Partnerships() {
                                 <input
                                     type="file"
                                     multiple
-                                    accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+                                    accept={REPORT_ATTACHMENT_ACCEPT}
                                     className="text-xs text-slate-500"
                                     onChange={e => {
                                         if (e.target.files) {

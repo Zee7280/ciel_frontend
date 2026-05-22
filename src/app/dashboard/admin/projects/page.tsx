@@ -4,9 +4,10 @@ import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import Link from "next/link";
 import DataTable from "react-data-table-component";
 import type { TableColumn } from "react-data-table-component";
-import { Search, Filter, MoreVertical, Briefcase, MapPin, Eye, FileDown, Trash2, Users, Loader2, X, UserMinus, Pencil, Mail } from "lucide-react";
+import { Search, Filter, MoreVertical, Briefcase, MapPin, Eye, FileDown, Trash2, Users, Loader2, X, UserMinus, Pencil, Mail, ClipboardList } from "lucide-react";
 import { authenticatedFetch } from "@/utils/api";
 import { toast } from "sonner";
+import { ProjectTrackerModal } from "@/app/dashboard/admin/projects/ProjectTrackerModal";
 
 type AdminProjectRow = {
     id: string;
@@ -646,6 +647,7 @@ export default function AdminProjectsPage() {
     const [incompleteApplicants, setIncompleteApplicants] = useState<IncompleteReportApplicantRow[]>([]);
     const [applicantsLoading, setApplicantsLoading] = useState(false);
     const [deletingApplicationId, setDeletingApplicationId] = useState<string | null>(null);
+    const [trackerModalRow, setTrackerModalRow] = useState<AdminProjectRow | null>(null);
     const [teamOverviewModal, setTeamOverviewModal] = useState<{ opportunityId: string; title: string } | null>(null);
     const [teamOverviewRows, setTeamOverviewRows] = useState<TeamOverviewRow[]>([]);
     const [teamOverviewSummary, setTeamOverviewSummary] = useState<TeamOverviewSummary>(() => ({ ...EMPTY_TEAM_OVERVIEW_SUMMARY }));
@@ -796,10 +798,21 @@ export default function AdminProjectsPage() {
         }
     }, []);
 
+    const openProjectTrackerModal = (row: AdminProjectRow) => {
+        setActiveMenu(null);
+        setTrackerModalRow(row);
+    };
+
     const openTeamOverviewModal = (row: AdminProjectRow) => {
         setActiveMenu(null);
         setTeamOverviewModal({ opportunityId: row.id, title: row.title });
         void loadTeamOverview(row.id);
+    };
+
+    const openTeamOverviewFromTracker = () => {
+        if (!trackerModalRow) return;
+        openTeamOverviewModal(trackerModalRow);
+        setTrackerModalRow(null);
     };
 
     const handleRemoveTeam = async (teamId: string) => {
@@ -1419,9 +1432,21 @@ export default function AdminProjectsPage() {
             },
             {
                 name: "Actions",
-                width: "88px",
+                width: "120px",
                 cell: (r) => (
-                    <div className="relative flex justify-end py-1 w-full">
+                    <div className="relative flex justify-end items-center gap-0.5 py-1 w-full">
+                        <button
+                            type="button"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                openProjectTrackerModal(r);
+                            }}
+                            className="text-blue-600 hover:text-blue-800 p-1.5 rounded-full hover:bg-blue-50 transition-colors"
+                            aria-label="Track project pipeline"
+                            title="Track project — details, applicants, stages"
+                        >
+                            <ClipboardList className="w-4 h-4" />
+                        </button>
                         <button
                             type="button"
                             onClick={(e) => {
@@ -1434,7 +1459,7 @@ export default function AdminProjectsPage() {
                                 );
                             }}
                             className="admin-project-menu-trigger text-slate-400 hover:text-slate-600 p-1.5 rounded-full hover:bg-slate-200 transition-colors"
-                            aria-label="Actions"
+                            aria-label="More actions"
                             aria-expanded={activeMenu?.id === r.id}
                         >
                             <MoreVertical className="w-4 h-4" />
@@ -1665,6 +1690,13 @@ export default function AdminProjectsPage() {
                                     </>
                                 );
                             })()}
+                            <button
+                                type="button"
+                                onClick={() => openProjectTrackerModal(activeMenuRow)}
+                                className="w-full text-left px-3 py-2.5 text-sm font-medium text-blue-700 hover:bg-blue-50 flex items-center gap-2"
+                            >
+                                <ClipboardList className="w-4 h-4" /> Project tracker
+                            </button>
                             <button
                                 type="button"
                                 onClick={() => openApplicantsModal(activeMenuRow)}
@@ -2372,6 +2404,14 @@ export default function AdminProjectsPage() {
                     ) : null}
                 </>
             )}
+
+            {trackerModalRow ? (
+                <ProjectTrackerModal
+                    row={trackerModalRow}
+                    onClose={() => setTrackerModalRow(null)}
+                    onOpenTeamsEnrollments={openTeamOverviewFromTracker}
+                />
+            ) : null}
         </div>
     );
 }

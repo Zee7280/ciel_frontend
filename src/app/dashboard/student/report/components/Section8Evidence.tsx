@@ -1,5 +1,4 @@
 import React, { useEffect } from "react";
-import { generateAISummary } from "../utils/aiSummarizer";
 import { toast } from "sonner";
 import {
     ShieldCheck, Camera, FileUp, Globe, FileText, Lock, CheckCircle2,
@@ -14,6 +13,7 @@ import { useDebounce } from "@/hooks/useDebounce";
 import { FieldError } from "./ui/FieldError";
 import clsx from "clsx";
 import { MAX_REPORT_IMAGE_UPLOAD_LABEL, splitReportFilesByImageSize } from "../utils/fileUploadLimits";
+import { REPORT_ATTACHMENT_ACCEPT } from "@/utils/reportAttachmentAccept";
 
 // ─── Static configuration ───────────────────────────────────────────────────
 const evidenceOptions = [
@@ -127,7 +127,7 @@ const getFileType = (file: EvidenceFileItem) => {
 
 function EvidenceFilePreview({ file, name }: { file: EvidenceFileItem; name: string }) {
     const directUrl = typeof file === 'string' ? file : isEvidenceFileRecord(file) ? file?.url || file?.path : undefined;
-    const isImage = getFileType(file).startsWith('image/') || /\.(jpg|jpeg|png|gif|webp)$/i.test(name);
+    const isImage = getFileType(file).startsWith('image/') || /\.(jpg|jpeg|png|gif|webp|heic|heif)$/i.test(name);
     const previewUrl = isImage ? directUrl : null;
 
     if (isImage && previewUrl) {
@@ -347,11 +347,10 @@ export default function Section8Evidence() {
                                     </p>
 
                                     <ul className="text-sm text-slate-500 space-y-1 list-disc list-inside">
-                                        <li>JPG / PNG (Photos)</li>
-                                        <li>MP4 (Short videos)</li>
-                                        <li>PDF (Attendance sheets, reports, documents)</li>
-                                        <li>Official letters & email confirmations</li>
-                                        <li>Media coverage links</li>
+                                        <li>JPG, PNG, WebP, HEIC — phone photos supported</li>
+                                        <li>PDF — attendance sheets and scans</li>
+                                        <li>Word (.doc/.docx) — letters and confirmations</li>
+                                        <li>Official letters, email confirmations, media links (paste in narrative where asked)</li>
                                     </ul>
 
                                 </div>
@@ -383,9 +382,9 @@ export default function Section8Evidence() {
 
                             {/* FILE UPLOAD */}
                             <FileUpload
-                                label="Drag & drop files or click to browse (images max 5 MB)"
+                                label={`Drag & drop files or click to browse (images max ${MAX_REPORT_IMAGE_UPLOAD_LABEL})`}
                                 multiple
-                                accept=".jpg,.jpeg,.png,.mp4,.pdf,.doc,.docx"
+                                accept={REPORT_ATTACHMENT_ACCEPT}
                                 onChange={(e) => {
                                     if (e.target.files) {
                                         const acceptedFiles = filterOversizedImages(Array.from(e.target.files), e.currentTarget);
@@ -883,9 +882,9 @@ export default function Section8Evidence() {
 
 
                             <FileUpload
-                                label="Upload Partner Verification Letter / Document (images max 5 MB)"
+                                label={`Upload partner verification (images max ${MAX_REPORT_IMAGE_UPLOAD_LABEL})`}
                                 multiple
-                                accept=".jpg,.jpeg,.png,.pdf,.doc,.docx"
+                                accept={REPORT_ATTACHMENT_ACCEPT}
                                 onChange={(e) => {
                                     if (e.target.files) {
                                         const acceptedFiles = filterOversizedImages(Array.from(e.target.files), e.currentTarget);

@@ -1,5 +1,6 @@
-export const MAX_REPORT_IMAGE_UPLOAD_BYTES = 5 * 1024 * 1024;
-export const MAX_REPORT_IMAGE_UPLOAD_LABEL = "5 MB";
+/** Aligned with Nest student report uploads (`studentReportUploadMulterLimits` fileSize). */
+export const MAX_REPORT_IMAGE_UPLOAD_BYTES = 15 * 1024 * 1024;
+export const MAX_REPORT_IMAGE_UPLOAD_LABEL = "15 MB";
 
 const IMAGE_EXTENSION_PATTERN = /\.(avif|gif|heic|heif|jpe?g|png|svg|webp)$/i;
 

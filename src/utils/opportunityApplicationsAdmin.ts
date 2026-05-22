@@ -11,6 +11,8 @@ export type OpportunityApplicationListRow = {
     studentName: string;
     studentEmail: string;
     status: string;
+    /** DB pipeline status (`pending_faculty`, `pending_admin`, …). */
+    internalStatus?: string;
     createdAt?: string;
     /** Join pipeline stage from API (e.g. faculty → admin). */
     applicationStage?: string;
@@ -66,6 +68,7 @@ export function mapOpportunityApplicationListRow(raw: unknown): OpportunityAppli
     if (!id) return null;
     const opportunityId = pickStr(r, "opportunity_id", "opportunityId", "project_id", "projectId");
     const applicationStage = pickStr(r, "application_stage", "applicationStage", "stage") || undefined;
+    const internalStatus = pickStr(r, "internal_status", "internalStatus") || undefined;
     const facultyApprovalStatus = pickStr(
         r,
         "faculty_approval_status",
@@ -81,7 +84,8 @@ export function mapOpportunityApplicationListRow(raw: unknown): OpportunityAppli
         opportunityTitle: pickStr(r, "opportunity_title", "opportunityTitle", "title", "project_title", "projectTitle") || "Opportunity",
         studentName: pickStr(r, "student_name", "studentName", "applicant_name", "name") || "—",
         studentEmail: pickStr(r, "student_email", "studentEmail", "applicant_email", "email") || "",
-        status: pickStr(r, "status", "application_status", "applicationStatus") || "pending_approval",
+        status: pickStr(r, "status", "application_status", "applicationStatus") || internalStatus || "pending_approval",
+        internalStatus,
         createdAt: pickStr(r, "created_at", "createdAt", "submitted_at", "submittedAt") || undefined,
         applicationStage,
         facultyApprovedAt:
