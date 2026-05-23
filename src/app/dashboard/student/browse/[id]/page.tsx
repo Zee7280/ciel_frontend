@@ -7,7 +7,6 @@ import { Button } from "../../report/components/ui/button";
 import { authenticatedFetch } from "@/utils/api";
 import { resolveAttendanceApproverType } from "@/utils/attendanceApproverRouting";
 import {
-    canEditReturnedOpportunity,
     extractOpportunityReturnRemarkSections,
     extractOpportunityReviewFeedback,
     formatOpportunityDetailStatusBadge,
@@ -32,13 +31,11 @@ import {
 } from "@/utils/studentOpportunityApplyEligibility";
 import {
     canStudentShowStartReportCta,
-    isJoinApplicationRejectedStatus,
-    joinApplicationLocksApplyButton,
     joinApplicationPendingLabel,
-    mergeHasAppliedFields,
     pickJoinApplicationId,
     pickJoinApplicationStage,
 } from "@/utils/studentJoinApplication";
+import { buildJoinApplyFields, resolveStudentProjectActions } from "@/utils/studentProjectActions";
 import { isStudentOpportunityLiveForReporting } from "@/utils/opportunityWorkflow";
 import {
     buildStudentReportsCheckMap,
@@ -202,22 +199,12 @@ export default function OpportunityDetailsPage() {
             const creatorStr = pickOpportunityOwnerId(opData);
             const isStudentOwner = Boolean(myId && creatorStr && creatorStr === myId);
 
-            const appRaw = opData.application_status ?? opData.applicationStatus;
-            const application_status =
-                typeof appRaw === "string" && appRaw.trim() ? String(appRaw).trim().toLowerCase() : "";
+            const joinFields = buildJoinApplyFields(opData);
+            const application_status = joinFields.applicationStatus;
             const application_id = pickJoinApplicationId(opData);
             const application_stage = pickJoinApplicationStage(opData);
-
-            const rawForApplyLock: Record<string, unknown> = {
-                ...opData,
-                application_status: application_status || opData.application_status,
-                applicationStatus: opData.applicationStatus ?? application_status,
-                has_applied: opData.has_applied,
-                hasApplied: opData.hasApplied,
-                status: opData.status,
-            };
-            const applyLocked = joinApplicationLocksApplyButton(rawForApplyLock);
-            const hasApplied = mergeHasAppliedFields(rawForApplyLock);
+            const applyLocked = joinFields.applyLocked;
+            const hasApplied = joinFields.hasApplied;
 
             let report_status: string | undefined;
             if (myId) {
@@ -305,13 +292,17 @@ export default function OpportunityDetailsPage() {
     const remarkSections = extractOpportunityReturnRemarkSections(oppRecord);
     const reviewFeedback =
         remarkSections.length === 0 ? extractOpportunityReviewFeedback(oppRecord) : null;
-    const canEditReturned =
-        viewerNavRole !== "admin" &&
-        opportunity.isStudentOwner &&
-        canEditReturnedOpportunity(opportunity as Record<string, unknown>);
-
-    const ownerListingLive =
-        Boolean(opportunity.isStudentOwner) && isStudentOpportunityLiveForReporting(oppRecord);
+    const projectActions =
+        viewerNavRole === "admin"
+            ? null
+            : resolveStudentProjectActions({
+                  raw: oppRecord,
+                  isStudentOwner: Boolean(opportunity.isStudentOwner),
+                  hasApplied: Boolean(opportunity.hasApplied),
+                  applyLocked: Boolean(opportunity.applyLocked),
+                  applicationStatus: opportunity.application_status || "",
+                  live: isStudentOpportunityLiveForReporting(oppRecord),
+              });
 
     const startReportCta =
         opportunity &&
@@ -339,107 +330,108 @@ export default function OpportunityDetailsPage() {
                 </div>
             ) : null}
             {/* Header Actions */}
-            <div className="flex justify-between items-center print:hidden">
-                <Link href={opportunitiesListHref} className="text-slate-500 hover:text-slate-800 flex items-center gap-2 font-medium">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between print:hidden">
+                <Link
+                    href={opportunitiesListHref}
+                    className="text-slate-500 hover:text-slate-800 inline-flex items-center gap-2 text-sm font-medium shrink-0"
+                >
                     <ArrowLeft className="w-4 h-4" /> {opportunitiesBackLabel}
                 </Link>
-                <div className="flex gap-3 flex-wrap justify-end">
-                    <button
-                        type="button"
-                        onClick={() => void copyOpportunityShareLink(id)}
-                        className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 font-medium"
-                        aria-label="Copy share link"
-                        title="Copy share link"
-                    >
-                        <Share2 className="w-4 h-4" /> Copy share link
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => window.print()}
-                        className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 font-medium"
-                    >
-                        <Printer className="w-4 h-4" /> Print / Save PDF
-                    </button>
+                <div className="flex flex-col items-stretch sm:items-end gap-1.5 min-w-0">
+                    <div className="flex flex-wrap items-center justify-end gap-2">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            className="gap-2 rounded-lg shadow-none"
+                            onClick={() => void copyOpportunityShareLink(id)}
+                            aria-label="Copy share link"
+                            title="Copy share link"
+                        >
+                            <Share2 className="w-4 h-4 shrink-0" /> Copy share link
+                        </Button>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            className="gap-2 rounded-lg shadow-none"
+                            onClick={() => window.print()}
+                        >
+                            <Printer className="w-4 h-4 shrink-0" /> Print / Save PDF
+                        </Button>
 
-                    {!hideStudentApplyActions && opportunity.isStudentOwner && !ownerListingLive ? (
-                        <div className="flex flex-col items-end gap-2">
-                            <div className="flex flex-wrap gap-2 justify-end">
-                                <Link href="/dashboard/student/projects">
-                                    <Button
-                                        variant="outline"
-                                        className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg shadow-none font-medium"
-                                    >
-                                        My Projects
-                                    </Button>
-                                </Link>
-                                {canEditReturned ? (
-                                    <Link href={`/dashboard/student/create-opportunity?edit=${encodeURIComponent(id)}`}>
-                                        <Button className="flex items-center gap-2 px-6 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 font-medium shadow-sm">
-                                            <Pencil className="w-4 h-4" /> Edit & Resubmit
+                        {!hideStudentApplyActions && projectActions ? (
+                            <>
+                                {opportunity.isStudentOwner ? (
+                                    <Link href="/dashboard/student/projects" className="inline-flex">
+                                        <Button variant="outline" className="rounded-lg shadow-none">
+                                            My Projects
                                         </Button>
                                     </Link>
                                 ) : null}
-                            </div>
-                            <p className="text-[10px] text-slate-500 max-w-xs text-right">
-                                You created this listing. It becomes visible to others after approvals.
-                            </p>
-                        </div>
-                    ) : !hideStudentApplyActions && opportunity.applyLocked ? (
-                        <div className="flex flex-col items-end gap-2">
-                            <div className="flex items-center gap-2">
-                                {startReportCta ? (
+                                {projectActions.showEditResubmit ? (
+                                    <Link
+                                        href={`/dashboard/student/create-opportunity?edit=${encodeURIComponent(id)}`}
+                                        className="inline-flex"
+                                    >
+                                        <Button className="gap-2 rounded-lg px-5 shadow-sm">
+                                            <Pencil className="w-4 h-4 shrink-0" /> Edit & Resubmit
+                                        </Button>
+                                    </Link>
+                                ) : null}
+                                {startReportCta && !projectActions.showEditResubmit ? (
                                     <Button
                                         onClick={() => router.push(startReportCta.href)}
-                                        className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 font-medium"
+                                        className="gap-2 rounded-lg bg-blue-600 px-5 text-white shadow-sm hover:bg-blue-700"
                                     >
                                         {startReportCta.label}
                                     </Button>
                                 ) : null}
-                                <Button className="flex items-center gap-2 px-6 py-2 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg shadow-none cursor-default font-medium hover:bg-emerald-50">
-                                    <CheckCircle2 className="w-4 h-4" /> Applied
-                                </Button>
-                            </div>
-                            {opportunity.application_status &&
-                                ["pending", "pending_approval", "applied"].includes(opportunity.application_status) && (
-                                    <p className="text-[10px] text-amber-600 font-bold italic bg-amber-50 px-2 py-1 rounded border border-amber-100">
-                                        {joinApplicationPendingLabel(oppRecord)}
-                                    </p>
-                                )}
-                        </div>
-                    ) : !hideStudentApplyActions && opportunity.hasApplied && !opportunity.applyLocked ? (
-                        <div className="flex flex-col items-end gap-2">
-                            {opportunity.application_status &&
-                                isJoinApplicationRejectedStatus(opportunity.application_status) && (
-                                    <p className="text-[10px] text-rose-700 font-bold italic bg-rose-50 px-2 py-1 rounded border border-rose-100">
-                                        Application not approved. You can submit a new request.
-                                    </p>
-                                )}
-                            <Button
-                                onClick={handleApplyClick}
-                                disabled={!applyEligibility.canApply}
-                                title={applyEligibility.blockedReason || undefined}
-                                className={
-                                    applyEligibility.canApply
-                                        ? "flex items-center gap-2 px-6 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 font-medium shadow-sm"
-                                        : "flex items-center gap-2 px-6 py-2 bg-slate-300 text-slate-600 rounded-lg font-medium shadow-sm cursor-not-allowed"
-                                }
+                                {projectActions.showJoinAppliedLocked ? (
+                                    <span
+                                        className="inline-flex h-10 items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-4 text-sm font-medium text-emerald-700"
+                                        aria-label="Applied"
+                                    >
+                                        <CheckCircle2 className="w-4 h-4 shrink-0" /> Applied
+                                    </span>
+                                ) : null}
+                                {projectActions.showJoinApplyAgain || projectActions.showJoinApplyNow ? (
+                                    <Button
+                                        onClick={handleApplyClick}
+                                        disabled={!applyEligibility.canApply}
+                                        title={applyEligibility.blockedReason || undefined}
+                                        className={
+                                            applyEligibility.canApply
+                                                ? "gap-2 rounded-lg px-5 shadow-sm"
+                                                : "cursor-not-allowed gap-2 rounded-lg bg-slate-300 px-5 text-slate-600 shadow-sm hover:bg-slate-300"
+                                        }
+                                    >
+                                        {projectActions.showJoinApplyAgain ? "Apply again" : "Apply Now"}
+                                    </Button>
+                                ) : null}
+                            </>
+                        ) : null}
+                    </div>
+                    {!hideStudentApplyActions && projectActions ? (
+                        projectActions.helperMessage ? (
+                            <p
+                                className={`text-xs text-right sm:max-w-md ${
+                                    projectActions.showListingClosed
+                                        ? "font-medium text-rose-800"
+                                        : projectActions.showJoinApplyAgain
+                                          ? "font-medium text-rose-700"
+                                          : "font-medium text-amber-800"
+                                }`}
                             >
-                                {applyEligibility.canApply ? "Apply again" : "Not eligible"}
-                            </Button>
-                        </div>
-                    ) : !hideStudentApplyActions ? (
-                        <Button
-                            onClick={handleApplyClick}
-                            disabled={!applyEligibility.canApply}
-                            title={applyEligibility.blockedReason || undefined}
-                            className={
-                                applyEligibility.canApply
-                                    ? "flex items-center gap-2 px-6 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 font-medium shadow-sm"
-                                    : "flex items-center gap-2 px-6 py-2 bg-slate-300 text-slate-600 rounded-lg font-medium shadow-sm cursor-not-allowed"
-                            }
-                        >
-                            {applyEligibility.canApply ? "Apply Now" : "Not eligible"}
-                        </Button>
+                                {projectActions.helperMessage}
+                            </p>
+                        ) : opportunity.isStudentOwner && !projectActions.showEditResubmit && !projectActions.showListingClosed ? (
+                            <p className="text-xs text-slate-500 text-right">You created this listing.</p>
+                        ) : projectActions.showJoinAppliedLocked &&
+                          opportunity.application_status &&
+                          ["pending", "pending_approval", "applied"].includes(opportunity.application_status) ? (
+                            <p className="text-xs font-medium text-amber-700 text-right">
+                                {joinApplicationPendingLabel(oppRecord)}
+                            </p>
+                        ) : null
                     ) : null}
                 </div>
             </div>
@@ -522,7 +514,7 @@ export default function OpportunityDetailsPage() {
                                         <p className="mt-1 text-sm text-rose-900 whitespace-pre-wrap">{reviewFeedback}</p>
                                     ) : null}
                                 </div>
-                                {canEditReturned ? (
+                                {projectActions?.showEditResubmit ? (
                                     <Link href={`/dashboard/student/create-opportunity?edit=${encodeURIComponent(id)}`}>
                                         <Button variant="outline" className="gap-2 border-rose-200 text-rose-700 hover:bg-rose-100">
                                             <Pencil className="w-4 h-4" /> Edit now

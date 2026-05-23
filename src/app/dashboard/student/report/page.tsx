@@ -171,8 +171,12 @@ function ReportFormContent() {
                 projectPayload = pInfo as Record<string, unknown>;
                 setProjectDetails(pInfo);
 
+                const isStudentOwner = Boolean(
+                    pInfo.is_student_owner === true ||
+                        pInfo.isStudentOwner === true,
+                );
                 // 🚨 SECURITY CHECK: project status + join application (when API sends application_status)
-                if (!canStudentAccessReportForProjectPayload(pInfo as Record<string, unknown>)) {
+                if (!canStudentAccessReportForProjectPayload(pInfo as Record<string, unknown>, { isStudentOwner })) {
                     toast.error('Approval is required to start/edit a report for this project.');
                     router.push('/dashboard/student');
                     return;

@@ -71,6 +71,7 @@ export default function FacultyApprovalsPage() {
     const [rejectActionKind, setRejectActionKind] = useState<FacultyApprovalAction>("faculty_review");
     const [rejectComment, setRejectComment] = useState("");
     const [rejectSubmitting, setRejectSubmitting] = useState(false);
+    const [feedbackMode, setFeedbackMode] = useState<"revise" | "reject_permanent">("revise");
     const autoOpenedIdRef = useRef<string | null>(null);
 
     useEffect(() => {
@@ -246,9 +247,14 @@ export default function FacultyApprovalsPage() {
         }
     };
 
-    const openRejectDialog = (id: string, action: FacultyApprovalAction = "faculty_review") => {
+    const openRejectDialog = (
+        id: string,
+        action: FacultyApprovalAction = "faculty_review",
+        mode: "revise" | "reject_permanent" = "revise",
+    ) => {
         setRejectTargetId(id);
         setRejectActionKind(action);
+        setFeedbackMode(mode);
         setRejectComment("");
         setRejectOpen(true);
     };
@@ -269,16 +275,21 @@ export default function FacultyApprovalsPage() {
         }
         setRejectSubmitting(true);
         try {
-            const rejectEndpoint =
+            const actionPath = feedbackMode === "revise" ? "revise" : "reject";
+            const reviewEndpoint =
                 rejectActionKind === "partner_ack"
-                    ? `/api/v1/partner/approvals/${rejectTargetId}/reject`
-                    : `/api/v1/faculty/approvals/${rejectTargetId}/reject`;
-            const res = await authenticatedFetch(rejectEndpoint, {
+                    ? `/api/v1/partner/approvals/${rejectTargetId}/${actionPath}`
+                    : `/api/v1/faculty/approvals/${rejectTargetId}/${actionPath}`;
+            const res = await authenticatedFetch(reviewEndpoint, {
                 method: "POST",
                 body: JSON.stringify({ reason }),
             });
             if (res && res.ok) {
-                toast.success("Rejected. Your comments are sent to the student when the server sends notifications.");
+                toast.success(
+                    feedbackMode === "revise"
+                        ? "Revision requested. The student can edit and resubmit."
+                        : "Permanently rejected. The student cannot edit this opportunity.",
+                );
                 setPendingProjects((prev) => prev.filter((p) => p.id !== rejectTargetId));
                 setDetailOpen(false);
                 setDetailActionId(null);
@@ -305,7 +316,7 @@ export default function FacultyApprovalsPage() {
                     <strong className="text-slate-600 font-semibold">academic relevance</strong>,{" "}
                     <strong className="text-slate-600 font-semibold">feasibility</strong>, and{" "}
                     <strong className="text-slate-600 font-semibold">student readiness</strong>. Approve to move the
-                    request forward, or reject with comments so they can revise.
+                    request forward, request revision, or reject permanently when the proposal cannot proceed.
                 </p>
                 <p className="mt-2 text-sm text-slate-600">
                     <strong className="font-semibold text-slate-800">Why do I see a request?</strong>{" "}
@@ -451,13 +462,30 @@ export default function FacultyApprovalsPage() {
                                                 )}
                                             </Button>
                                             <Button
+                                                variant="outline"
+                                                className="w-full border-amber-300 text-amber-900 hover:bg-amber-50"
+                                                onClick={() =>
+                                                    openRejectDialog(
+                                                        project.id,
+                                                        project.approvalAction ?? "faculty_review",
+                                                        "revise",
+                                                    )
+                                                }
+                                            >
+                                                <XCircle className="w-4 h-4 mr-2" /> Request revision
+                                            </Button>
+                                            <Button
                                                 variant="destructive"
                                                 className="w-full"
                                                 onClick={() =>
-                                                    openRejectDialog(project.id, project.approvalAction ?? "faculty_review")
+                                                    openRejectDialog(
+                                                        project.id,
+                                                        project.approvalAction ?? "faculty_review",
+                                                        "reject_permanent",
+                                                    )
                                                 }
                                             >
-                                                <XCircle className="w-4 h-4 mr-2" /> Reject
+                                                <XCircle className="w-4 h-4 mr-2" /> Reject permanently
                                             </Button>
                                         </>
                                     ) : null}
@@ -509,12 +537,23 @@ export default function FacultyApprovalsPage() {
                             {detailActionId ? (
                                 <div className="flex flex-wrap justify-end gap-2 pt-4 border-t border-slate-200">
                                     <Button
-                                        variant="destructive"
+                                        variant="outline"
+                                        className="border-amber-300 text-amber-900 hover:bg-amber-50"
                                         onClick={() =>
-                                            detailActionId && openRejectDialog(detailActionId, detailActionKind)
+                                            detailActionId &&
+                                            openRejectDialog(detailActionId, detailActionKind, "revise")
                                         }
                                     >
-                                        <XCircle className="w-4 h-4 mr-2" /> Reject
+                                        <XCircle className="w-4 h-4 mr-2" /> Request revision
+                                    </Button>
+                                    <Button
+                                        variant="destructive"
+                                        onClick={() =>
+                                            detailActionId &&
+                                            openRejectDialog(detailActionId, detailActionKind, "reject_permanent")
+                                        }
+                                    >
+                                        <XCircle className="w-4 h-4 mr-2" /> Reject permanently
                                     </Button>
                                     <Button
                                         className="bg-green-600 hover:bg-green-700"
@@ -543,10 +582,13 @@ export default function FacultyApprovalsPage() {
             <Dialog open={rejectOpen} onOpenChange={(open) => !open && !rejectSubmitting && closeRejectDialog()}>
                 <DialogContent className="w-[calc(100vw-2rem)] max-w-md sm:max-w-md">
                     <DialogHeader>
-                        <DialogTitle>Reject with feedback</DialogTitle>
+                        <DialogTitle>
+                            {feedbackMode === "revise" ? "Request revision" : "Reject permanently"}
+                        </DialogTitle>
                         <DialogDescription>
-                            Comments are shared with the student (and stored on the server) so they can understand what to
-                            change.
+                            {feedbackMode === "revise"
+                                ? "The student can edit and resubmit. Your comments explain what to change."
+                                : "This closes the opportunity. The student cannot edit or resubmit."}
                         </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-2 py-2">
@@ -564,14 +606,21 @@ export default function FacultyApprovalsPage() {
                         <Button type="button" variant="outline" onClick={closeRejectDialog} disabled={rejectSubmitting}>
                             Cancel
                         </Button>
-                        <Button type="button" variant="destructive" onClick={() => void confirmReject()} disabled={rejectSubmitting}>
+                        <Button
+                            type="button"
+                            variant={feedbackMode === "revise" ? "default" : "destructive"}
+                            className={feedbackMode === "revise" ? "bg-amber-600 hover:bg-amber-700" : undefined}
+                            onClick={() => void confirmReject()}
+                            disabled={rejectSubmitting}
+                        >
                             {rejectSubmitting ? (
                                 <>
                                     <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Sending…
                                 </>
                             ) : (
                                 <>
-                                    <XCircle className="w-4 h-4 mr-2" /> Submit rejection
+                                    <XCircle className="w-4 h-4 mr-2" />{" "}
+                                    {feedbackMode === "revise" ? "Send revision request" : "Confirm permanent reject"}
                                 </>
                             )}
                         </Button>

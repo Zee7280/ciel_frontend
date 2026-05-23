@@ -1,4 +1,14 @@
-import { authenticatedFetch } from "@/utils/api";
+import { authenticatedFetch, isTokenValid } from "@/utils/api";
+import {
+    resolvePreferredApiV1Base,
+    resolveTutorialMultipartUploadApiV1Base,
+} from "@/utils/backendApiV1Base";
+import { MAX_REPORT_UPLOAD_BYTES, MAX_REPORT_UPLOAD_LABEL } from "./fileUploadLimits";
+
+/** Same-origin BFF / Vercel often rejects multipart bodies above ~1MB; presign + S3 PUT avoids that. */
+const MULTIPART_BODY_LIMIT_BYTES = 1024 * 1024;
+const PRESIGN_TIMEOUT_MS = 30_000;
+const S3_PUT_TIMEOUT_MS = 300_000;
 
 async function extractEvidenceUploadFailureDetail(res: Response): Promise<string> {
     if (res.status === 413) {
@@ -50,6 +60,13 @@ type EvidenceRecord = {
 };
 
 type EvidenceItem = File | EvidenceRecord | string;
+
+type PresignedUpload = {
+    uploadUrl?: string;
+    publicUrl?: string;
+    url?: string;
+    key?: string;
+};
 
 const isNativeFile = (item: EvidenceItem): item is File => (
     typeof File !== "undefined" && item instanceof File
@@ -107,6 +124,112 @@ const normalizeUploadedFile = (uploaded: unknown, source: File): EvidenceRecord 
     };
 };
 
+const getPresignedUpload = (json: unknown): PresignedUpload => {
+    if (!json || typeof json !== "object") return {};
+    const record = json as Record<string, unknown>;
+    const data = record.data && typeof record.data === "object"
+        ? record.data as Record<string, unknown>
+        : record;
+
+    return {
+        uploadUrl: typeof data.uploadUrl === "string" ? data.uploadUrl : undefined,
+        publicUrl: typeof data.publicUrl === "string" ? data.publicUrl : undefined,
+        url: typeof data.url === "string" ? data.url : undefined,
+        key: typeof data.key === "string" ? data.key : undefined,
+    };
+};
+
+function apiV1PathToNestUrl(apiV1Path: string, nestApiV1Base: string): string {
+    const base = nestApiV1Base.replace(/\/+$/, "");
+    const suffix = apiV1Path.startsWith("/api/v1") ? apiV1Path.slice("/api/v1".length) : apiV1Path;
+    return `${base}${suffix.startsWith("/") ? suffix : `/${suffix}`}`;
+}
+
+async function postJsonWithAuth(url: string, body: Record<string, unknown>): Promise<Response | null> {
+    const token = typeof localStorage !== "undefined" ? localStorage.getItem("ciel_token") : null;
+    if (!isTokenValid(token)) return null;
+    return fetch(url, {
+        method: "POST",
+        headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+    });
+}
+
+/** Presign via same-origin BFF (small JSON), then direct Nest if needed. */
+async function requestPresign(apiV1Path: string, body: Record<string, unknown>): Promise<Response | null> {
+    const viaBff = await authenticatedFetch(
+        apiV1Path,
+        { method: "POST", body: JSON.stringify(body) },
+        { timeoutMs: PRESIGN_TIMEOUT_MS },
+    );
+    if (viaBff?.ok) return viaBff;
+
+    const directBase = resolveTutorialMultipartUploadApiV1Base() ?? resolvePreferredApiV1Base();
+    if (!directBase) return viaBff;
+
+    try {
+        const directUrl = apiV1PathToNestUrl(apiV1Path, directBase);
+        const direct = await postJsonWithAuth(directUrl, body);
+        if (direct?.ok) return direct;
+    } catch {
+        /* try multipart fallback below */
+    }
+    return viaBff;
+}
+
+async function uploadViaMultipartDirect(
+    projectId: string,
+    section: string,
+    field: string,
+    file: File,
+): Promise<EvidenceRecord> {
+    const nestBase = resolveTutorialMultipartUploadApiV1Base() ?? resolvePreferredApiV1Base();
+    if (!nestBase) {
+        throw new Error(
+            `Evidence upload failed for ${file.name}: configure a direct API host for large files (multipart cannot use the web app origin).`,
+        );
+    }
+
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("project_id", projectId);
+    formData.append("section", section);
+    formData.append("field", field);
+
+    const token = localStorage.getItem("ciel_token");
+    if (!isTokenValid(token)) {
+        throw new Error(`Evidence upload failed for ${file.name}: session expired — sign in again.`);
+    }
+
+    const url = apiV1PathToNestUrl(
+        `/api/v1/student/reports/${encodeURIComponent(projectId)}/evidence`,
+        nestBase,
+    );
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), S3_PUT_TIMEOUT_MS);
+    let res: Response;
+    try {
+        res = await fetch(url, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${token}` },
+            body: formData,
+            signal: controller.signal,
+        });
+    } finally {
+        clearTimeout(timeoutId);
+    }
+
+    if (!res.ok) {
+        const detail = await extractEvidenceUploadFailureDetail(res);
+        throw new Error(`Evidence upload failed for ${file.name}: ${detail}`);
+    }
+    const json = await res.json().catch(() => ({}));
+    return normalizeUploadedFile(json, file);
+}
+
 const stripRuntimeFile = (item: EvidenceItem): EvidenceItem => {
     if (isNativeFile(item)) {
         return {
@@ -124,28 +247,34 @@ const stripRuntimeFile = (item: EvidenceItem): EvidenceItem => {
     return metadata;
 };
 
-async function uploadEvidenceFile(
+async function uploadViaPresignedPut(
     projectId: string,
     section: string,
     field: string,
     file: File,
 ): Promise<EvidenceRecord> {
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("project_id", projectId);
-    formData.append("section", section);
-    formData.append("field", field);
+    const isSection8Evidence = section === "section8";
+    const presignPath = isSection8Evidence
+        ? `/api/v1/student/reports/${encodeURIComponent(projectId)}/evidence/presign`
+        : "/api/v1/student/reports/upload/presign";
 
-    const res = await authenticatedFetch(
-        `/api/v1/student/reports/${encodeURIComponent(projectId)}/evidence`,
-        {
-            method: "POST",
-            body: formData,
-        },
-        {
-            timeoutMs: 120000,
-        },
-    );
+    const body: Record<string, unknown> = isSection8Evidence
+        ? {
+            project_id: projectId,
+            section,
+            field,
+            filename: file.name,
+            contentType: file.type || "application/octet-stream",
+            size: file.size,
+        }
+        : {
+            section: `${projectId}/${section}/${field}`,
+            filename: file.name,
+            contentType: file.type || "application/octet-stream",
+            size: file.size,
+        };
+
+    const res = await requestPresign(presignPath, body);
 
     if (!res) {
         throw new Error(
@@ -159,7 +288,76 @@ async function uploadEvidenceFile(
     }
 
     const json = await res.json().catch(() => ({}));
-    return normalizeUploadedFile(json, file);
+    const signed = getPresignedUpload(json);
+    if (!signed.uploadUrl || !(signed.publicUrl || signed.url)) {
+        throw new Error(`Evidence upload failed for ${file.name}: upload URL missing from server response.`);
+    }
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), S3_PUT_TIMEOUT_MS);
+    let putRes: Response;
+    try {
+        putRes = await fetch(signed.uploadUrl, {
+            method: "PUT",
+            headers: { "Content-Type": file.type || "application/octet-stream" },
+            body: file,
+            signal: controller.signal,
+        });
+    } finally {
+        clearTimeout(timeoutId);
+    }
+
+    if (!putRes.ok) {
+        const detail = (await putRes.text().catch(() => "")).trim();
+        throw new Error(
+            `Evidence upload failed for ${file.name}: S3 upload failed (${putRes.status})${detail ? ` ${detail.slice(0, 240)}` : ""}`,
+        );
+    }
+
+    return normalizeUploadedFile(
+        {
+            data: {
+                url: signed.publicUrl || signed.url,
+                key: signed.key,
+            },
+        },
+        file,
+    );
+}
+
+async function uploadEvidenceFile(
+    projectId: string,
+    section: string,
+    field: string,
+    file: File,
+): Promise<EvidenceRecord> {
+    if (file.size > MAX_REPORT_UPLOAD_BYTES) {
+        throw new Error(
+            `Evidence upload failed for ${file.name}: file exceeds ${MAX_REPORT_UPLOAD_LABEL} limit.`,
+        );
+    }
+
+    const usePresign = file.size > MULTIPART_BODY_LIMIT_BYTES;
+
+    if (usePresign) {
+        try {
+            return await uploadViaPresignedPut(projectId, section, field, file);
+        } catch (presignErr) {
+            const directBase = resolveTutorialMultipartUploadApiV1Base();
+            if (!directBase) throw presignErr;
+            return uploadViaMultipartDirect(projectId, section, field, file);
+        }
+    }
+
+    try {
+        return await uploadViaMultipartDirect(projectId, section, field, file);
+    } catch (multipartErr) {
+        try {
+            return await uploadViaPresignedPut(projectId, section, field, file);
+        } catch {
+            throw multipartErr;
+        }
+    }
 }
 
 async function uploadEvidenceList(

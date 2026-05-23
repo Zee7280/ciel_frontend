@@ -17,7 +17,7 @@ import React, { useMemo, useEffect, useState } from "react";
 import clsx from "clsx";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog";
 import { toast } from "sonner";
-import { MAX_REPORT_IMAGE_UPLOAD_LABEL, splitReportFilesByImageSize } from "../utils/fileUploadLimits";
+import { MAX_REPORT_UPLOAD_LABEL, splitReportFilesByImageSize } from "../utils/fileUploadLimits";
 import { REPORT_ATTACHMENT_ACCEPT } from "@/utils/reportAttachmentAccept";
 
 function countWords(str: string): number {
@@ -27,7 +27,7 @@ function countWords(str: string): number {
 function filterOversizedImages(files: File[], input: HTMLInputElement): File[] {
     const { accepted, rejected } = splitReportFilesByImageSize(files);
     if (rejected.length > 0) {
-        toast.error(`Images must be ${MAX_REPORT_IMAGE_UPLOAD_LABEL} or smaller: ${rejected.map((file) => file.name).join(", ")}`);
+        toast.error(`Each file must be ${MAX_REPORT_UPLOAD_LABEL} or smaller: ${rejected.map((file) => file.name).join(", ")}`);
         input.value = "";
     }
     return accepted;

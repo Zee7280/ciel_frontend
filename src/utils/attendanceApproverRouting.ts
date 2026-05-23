@@ -12,39 +12,60 @@ function str(value: unknown): string {
     return typeof value === "string" ? value.trim() : "";
 }
 
-function hasValue(value: unknown): boolean {
-    if (value == null) return false;
-    if (typeof value === "string") return value.trim().length > 0;
-    return true;
+function pickPartnerEmail(value: unknown): string | null {
+    return typeof value === "string" && value.trim().includes("@") ? value.trim() : null;
 }
 
-function hasMeaningfulObjectValue(value: unknown): boolean {
-    if (!value || typeof value !== "object") return false;
-    return Object.values(value as Record<string, unknown>).some((v) => {
-        if (Array.isArray(v)) return v.length > 0;
-        if (v && typeof v === "object") return hasMeaningfulObjectValue(v);
-        return v !== null && v !== undefined && String(v).trim() !== "";
-    });
+/** Partner contact emails — matches backend `extractPartnerContactEmailsForAttendance`. */
+export function extractPartnerContactEmailsForAttendance(
+    opportunity: Record<string, unknown> | null | undefined,
+): string[] {
+    if (!opportunity) return [];
+    const partnerOrg =
+        opportunity.partner_organization && typeof opportunity.partner_organization === "object"
+            ? (opportunity.partner_organization as Record<string, unknown>)
+            : {};
+    const externalCollab =
+        opportunity.external_partner_collaboration &&
+        typeof opportunity.external_partner_collaboration === "object"
+            ? (opportunity.external_partner_collaboration as Record<string, unknown>)
+            : {};
+    const executingContext =
+        opportunity.executing_context && typeof opportunity.executing_context === "object"
+            ? (opportunity.executing_context as Record<string, unknown>)
+            : {};
+    const contextPartner =
+        executingContext.partner && typeof executingContext.partner === "object"
+            ? (executingContext.partner as Record<string, unknown>)
+            : {};
+    const supervision =
+        opportunity.supervision && typeof opportunity.supervision === "object"
+            ? (opportunity.supervision as Record<string, unknown>)
+            : {};
+
+    const raw = [
+        pickPartnerEmail(partnerOrg.official_email),
+        pickPartnerEmail(partnerOrg.officialEmail),
+        pickPartnerEmail(partnerOrg.email),
+        pickPartnerEmail(partnerOrg.contact_email),
+        pickPartnerEmail(partnerOrg.contactEmail),
+        pickPartnerEmail(supervision.partner_email),
+        pickPartnerEmail(supervision.external_partner_email),
+        pickPartnerEmail(externalCollab.official_email),
+        pickPartnerEmail(externalCollab.officialEmail),
+        pickPartnerEmail(contextPartner.official_email),
+        pickPartnerEmail(contextPartner.officialEmail),
+    ].filter((v): v is string => Boolean(v));
+
+    return [...new Set(raw.map((e) => e.toLowerCase()))];
 }
 
 /**
- * Mirrors backend `StudentsService.opportunityHasPartner` — source of truth on apply.
+ * True when the project has a partner contact email for attendance review (not host org id alone).
  * Backend ignores client `attendance_approver_type` and recomputes from the opportunity.
  */
 export function opportunityHasPartner(opportunity: Record<string, unknown> | null | undefined): boolean {
-    if (!opportunity) return false;
-    if (
-        opportunity.requires_partner_approval === true ||
-        opportunity.requiresPartnerApproval === true
-    ) {
-        return true;
-    }
-    if (hasValue(opportunity.organization_id) || hasValue(opportunity.organizationId)) {
-        return true;
-    }
-    if (hasMeaningfulObjectValue(opportunity.partner_organization)) return true;
-    if (hasMeaningfulObjectValue(opportunity.executing_organization)) return true;
-    return false;
+    return extractPartnerContactEmailsForAttendance(opportunity).length > 0;
 }
 
 export function canLogAttendanceForParticipationStatus(status: string | null | undefined): boolean {
@@ -60,42 +81,5 @@ export function canLogAttendanceForParticipationStatus(status: string | null | u
 export function resolveAttendanceApproverType(
     opportunity: Record<string, unknown> | null | undefined,
 ): AttendanceApproverType {
-    if (!opportunity) return "faculty";
-
-    if (opportunityHasPartner(opportunity)) {
-        return "partner";
-    }
-
-    const creatorRole = str(
-        opportunity.created_by_role ??
-            opportunity.creator_role ??
-            opportunity.creator_type ??
-            opportunity.creatorBucket ??
-            opportunity.createdByRole ??
-            opportunity.creatorRole,
-    ).toLowerCase();
-    const source = str(opportunity.source ?? opportunity.opportunity_source ?? opportunity.opportunitySource).toLowerCase();
-    const ownerType = str(
-        opportunity.owner_type ?? opportunity.ownerType ?? opportunity.created_by_type ?? opportunity.createdByType,
-    ).toLowerCase();
-
-    const explicitPartner =
-        creatorRole.includes("partner") ||
-        creatorRole.includes("ngo") ||
-        creatorRole.includes("organization") ||
-        source.includes("partner") ||
-        source.includes("ngo") ||
-        ownerType.includes("partner") ||
-        ownerType.includes("ngo") ||
-        ownerType.includes("organization");
-
-    if (explicitPartner) return "partner";
-
-    const partnerLinked =
-        hasValue(opportunity.partner_id) ||
-        hasValue(opportunity.partnerId) ||
-        hasValue(opportunity.partner_user_id) ||
-        hasValue(opportunity.partnerUserId);
-
-    return partnerLinked ? "partner" : "faculty";
+    return opportunityHasPartner(opportunity) ? "partner" : "faculty";
 }

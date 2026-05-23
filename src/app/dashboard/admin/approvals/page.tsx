@@ -386,6 +386,7 @@ export default function AdminApprovalsPage() {
     const [rejectType, setRejectType] = useState<'opportunity' | 'user'>('opportunity');
     const [rejectReason, setRejectReason] = useState("");
     const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
+    const [opportunityReviewMode, setOpportunityReviewMode] = useState<"revise" | "reject_permanent">("revise");
     const [approveSubmittingKey, setApproveSubmittingKey] = useState<string | null>(null);
 
     useEffect(() => {
@@ -505,9 +506,14 @@ export default function AdminApprovalsPage() {
         }
     };
 
-    const handleRejectClick = (id: string, type: 'opportunity' | 'user' = 'opportunity') => {
+    const handleRejectClick = (
+        id: string,
+        type: "opportunity" | "user" = "opportunity",
+        mode: "revise" | "reject_permanent" = "revise",
+    ) => {
         setRejectId(id);
         setRejectType(type);
+        setOpportunityReviewMode(mode);
         setRejectReason("");
         setIsRejectModalOpen(true);
     };
@@ -548,26 +554,29 @@ export default function AdminApprovalsPage() {
         if (!rejectId) return;
 
         try {
-            const endpoint = rejectType === 'opportunity'
-                ? `/api/v1/admin/opportunities/${rejectId}/reject`
-                : `/api/v1/admin/users/${rejectId}/reject`;
+            const endpoint =
+                rejectType === "opportunity"
+                    ? opportunityReviewMode === "revise"
+                        ? `/api/v1/admin/opportunities/${rejectId}/revise`
+                        : `/api/v1/admin/opportunities/${rejectId}/reject`
+                    : `/api/v1/admin/users/${rejectId}/reject`;
 
             const res = await authenticatedFetch(endpoint, {
-                method: 'POST',
-                body: JSON.stringify({ reason: rejectReason })
+                method: "POST",
+                body: JSON.stringify({ reason: rejectReason }),
             });
 
             if (res && res.ok) {
-                if (rejectType === 'opportunity') {
-                    setOpportunities(prev => prev.filter(c => c.id !== rejectId));
+                if (rejectType === "opportunity") {
+                    setOpportunities((prev) => prev.filter((c) => c.id !== rejectId));
                 } else {
-                    setPendingUsers(prev => prev.filter(c => c.id !== rejectId));
+                    setPendingUsers((prev) => prev.filter((c) => c.id !== rejectId));
                 }
                 setIsRejectModalOpen(false);
                 setRejectId(null);
             }
         } catch (error) {
-            console.error("Failed to reject", error);
+            console.error("Failed to submit review action", error);
         }
     };
 
@@ -872,10 +881,16 @@ export default function AdminApprovalsPage() {
                                     </button>
                                 )}
                                 <button
-                                    onClick={() => handleRejectClick(proj.id, 'opportunity')}
+                                    onClick={() => handleRejectClick(proj.id, "opportunity", "revise")}
+                                    className="px-4 py-2 bg-amber-50 text-amber-800 rounded-lg text-sm font-bold hover:bg-amber-100 flex items-center gap-2 transition-colors border border-amber-200"
+                                >
+                                    <XCircle className="w-4 h-4" /> Request revision
+                                </button>
+                                <button
+                                    onClick={() => handleRejectClick(proj.id, "opportunity", "reject_permanent")}
                                     className="px-4 py-2 bg-slate-100 text-slate-600 rounded-lg text-sm font-bold hover:bg-red-50 hover:text-red-600 flex items-center gap-2 transition-colors"
                                 >
-                                    <XCircle className="w-4 h-4" /> Return
+                                    <XCircle className="w-4 h-4" /> Reject permanently
                                 </button>
                                 <button
                                     onClick={() => handleApprove(proj.id, 'opportunity')}
@@ -1511,11 +1526,21 @@ export default function AdminApprovalsPage() {
                                     onClick={() => {
                                         setIsDetailModalOpen(false);
                                         setOpportunityDetail(null);
-                                        handleRejectClick(selectedOpportunity.id, "opportunity");
+                                        handleRejectClick(selectedOpportunity.id, "opportunity", "revise");
+                                    }}
+                                    className="px-4 py-2 bg-amber-50 text-amber-800 rounded-lg font-bold hover:bg-amber-100 border border-amber-200"
+                                >
+                                    Request revision
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        setIsDetailModalOpen(false);
+                                        setOpportunityDetail(null);
+                                        handleRejectClick(selectedOpportunity.id, "opportunity", "reject_permanent");
                                     }}
                                     className="px-4 py-2 bg-red-50 text-red-600 rounded-lg font-bold hover:bg-red-100"
                                 >
-                                    Reject
+                                    Reject permanently
                                 </button>
                                 <button
                                     onClick={() => {
@@ -1559,17 +1584,31 @@ export default function AdminApprovalsPage() {
                     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
                         <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl animate-in zoom-in-95 duration-200">
                             <div className="flex justify-between items-center mb-6">
-                                <h2 className="text-xl font-bold text-slate-900">Return Opportunity</h2>
+                                <h2 className="text-xl font-bold text-slate-900">
+                                    {rejectType === "opportunity" && opportunityReviewMode === "reject_permanent"
+                                        ? "Reject opportunity permanently"
+                                        : rejectType === "opportunity"
+                                          ? "Request revision"
+                                          : "Reject registration"}
+                                </h2>
                                 <button onClick={() => setIsRejectModalOpen(false)} className="text-slate-400 hover:text-slate-600">
                                     <XCircle className="w-6 h-6" />
                                 </button>
                             </div>
 
                             <div className="mb-6">
-                                <label className="block text-sm font-bold text-slate-700 mb-2">Reason for Return</label>
+                                <label className="block text-sm font-bold text-slate-700 mb-2">
+                                    {rejectType === "opportunity" && opportunityReviewMode === "reject_permanent"
+                                        ? "Reason for permanent rejection"
+                                        : "Feedback for the student"}
+                                </label>
                                 <textarea spellCheck={true}
                                     className="w-full h-32 p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none resize-none"
-                                    placeholder="Please explain why this opportunity is being returned..."
+                                    placeholder={
+                                        rejectType === "opportunity" && opportunityReviewMode === "reject_permanent"
+                                            ? "Explain why this opportunity cannot proceed…"
+                                            : "e.g. Add partner organization email and resubmit…"
+                                    }
                                     value={rejectReason}
                                     onChange={(e) => setRejectReason(e.target.value)}
                                 ></textarea>
@@ -1587,7 +1626,11 @@ export default function AdminApprovalsPage() {
                                     disabled={!rejectReason.trim()}
                                     className="px-4 py-2 bg-red-600 text-white rounded-lg font-bold hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
-                                    Confirm Return
+                                    {rejectType === "opportunity" && opportunityReviewMode === "reject_permanent"
+                                        ? "Confirm permanent reject"
+                                        : rejectType === "opportunity"
+                                          ? "Send revision request"
+                                          : "Confirm reject"}
                                 </button>
                             </div>
                         </div>

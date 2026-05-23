@@ -18,13 +18,11 @@ import {
 import {
     canStudentAccessReportForProjectPayload,
     canStudentShowStartReportCta,
-    isJoinApplicationRejectedStatus,
     isJoinApplicationPendingStatus,
-    joinApplicationLocksApplyButton,
     joinApplicationPendingLabel,
-    mergeHasAppliedFields,
     pickJoinApplicationStatus,
 } from "@/utils/studentJoinApplication";
+import { buildJoinApplyFields, resolveStudentProjectActions } from "@/utils/studentProjectActions";
 import {
     buildStudentReportsCheckMap,
     pickReportStatusFromCheckRow,
@@ -359,7 +357,7 @@ interface ProjectRow {
     approvalLine: string | null;
     remarkSections: ReturnType<typeof extractOpportunityReturnRemarkSections>;
     reviewFeedback: string | null;
-    canReviseOpportunity: boolean;
+    projectActions: ReturnType<typeof resolveStudentProjectActions>;
     detailStatusLabel: string;
     statusBadgeClass: string;
 }
@@ -391,7 +389,7 @@ function matchesProjectTab(row: ProjectRow, tab: ProjectTab): boolean {
         !draftsTab &&
         (joinPending ||
             (!live &&
-                ["pending_faculty", "pending_partner", "pending_admin", "pending_unknown", "rejected"].includes(
+                ["pending_faculty", "pending_partner", "pending_admin", "pending_unknown"].includes(
                     workflow.stage,
                 )));
     const inProgressTab =
@@ -638,19 +636,15 @@ export default function MyProjectsPage() {
             projects.map((project) => {
                 const pRecord = project as unknown as Record<string, unknown>;
                 const isStudentOwnedOpportunity = isCurrentStudentOwnedOpportunity(pRecord, currentStudentId);
-                const applicationStatusRaw =
-                    pRecord.application_status ?? pRecord.applicationStatus ?? project.application_status;
-                const applicationStatus =
-                    typeof applicationStatusRaw === "string" ? applicationStatusRaw.trim().toLowerCase() : "";
-                const applyFields = {
+                const joinFields = buildJoinApplyFields({
                     ...pRecord,
-                    application_status: applicationStatus || pRecord.application_status,
                     has_applied: project.has_applied,
                     hasApplied: project.hasApplied,
                     status: project.status,
-                };
-                const hasApplied = mergeHasAppliedFields(applyFields);
-                const applyLocked = joinApplicationLocksApplyButton(applyFields);
+                });
+                const applicationStatus = joinFields.applicationStatus;
+                const hasApplied = joinFields.hasApplied;
+                const applyLocked = joinFields.applyLocked;
                 const live = isStudentOpportunityLiveForReporting(pRecord);
                 const joinAppStatus = pickJoinApplicationStatus(pRecord);
                 const joinPending =
@@ -665,8 +659,14 @@ export default function MyProjectsPage() {
                 const remarkSections = extractOpportunityReturnRemarkSections(pRecord);
                 const reviewFeedback =
                     remarkSections.length === 0 ? extractOpportunityReviewFeedback(pRecord) : null;
-                const canReviseOpportunity =
-                    isStudentOwnedOpportunity && !live && canEditReturnedOpportunity(pRecord);
+                const projectActions = resolveStudentProjectActions({
+                    raw: pRecord,
+                    isStudentOwner: isStudentOwnedOpportunity,
+                    hasApplied,
+                    applyLocked,
+                    applicationStatus,
+                    live,
+                });
                 const detailStatusLabel = formatOpportunityDetailStatusBadge(pRecord);
                 const statusBadgeClass = joinPending
                     ? "bg-amber-100 text-amber-800 border-amber-200/80"
@@ -705,7 +705,7 @@ export default function MyProjectsPage() {
                     approvalLine,
                     remarkSections,
                     reviewFeedback,
-                    canReviseOpportunity,
+                    projectActions,
                     detailStatusLabel,
                     statusBadgeClass,
                 };
@@ -905,7 +905,7 @@ export default function MyProjectsPage() {
                             approvalLine,
                             remarkSections,
                             reviewFeedback,
-                            canReviseOpportunity,
+                            projectActions,
                             detailStatusLabel,
                             statusBadgeClass,
                         }) => {
@@ -1133,7 +1133,17 @@ export default function MyProjectsPage() {
                                         </div>
 
                                         <div className="flex w-full shrink-0 flex-col gap-2 border-t border-slate-100 pt-4 lg:w-56 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
-                                            {applyLocked ? (
+                                            {projectActions.showEditResubmit ? (
+                                                <Link
+                                                    href={`/dashboard/student/create-opportunity?edit=${encodeURIComponent(project.id)}`}
+                                                    className="w-full"
+                                                >
+                                                    <Button className="h-10 w-full gap-2 rounded-xl bg-slate-900 font-medium text-white hover:bg-slate-800">
+                                                        <Pencil className="h-4 w-4" /> Edit & Resubmit
+                                                    </Button>
+                                                </Link>
+                                            ) : null}
+                                            {projectActions.showJoinAppliedLocked ? (
                                                 <>
                                                     {reportCta ? (
                                                         <Link href={reportCta.href} className="w-full">
@@ -1159,10 +1169,10 @@ export default function MyProjectsPage() {
                                                             </Button>
                                                         </Link>
                                                     ) : null}
-                                                    {(!applicationStatus ||
+                                                    {applicationStatus &&
                                                         ["pending", "pending_approval", "applied"].includes(
                                                             applicationStatus,
-                                                        )) && (
+                                                        ) && (
                                                         <p className="rounded-md border border-amber-100 bg-amber-50 px-2 py-1 text-[10px] font-bold italic text-amber-700">
                                                             {joinApplicationPendingLabel(pRecord)}
                                                         </p>
@@ -1174,14 +1184,11 @@ export default function MyProjectsPage() {
                                                         <CheckCircle className="h-4 w-4" /> Applied
                                                     </Button>
                                                 </>
-                                            ) : hasApplied ? (
+                                            ) : projectActions.showJoinApplyAgain ? (
                                                 <>
-                                                    {applicationStatus &&
-                                                    isJoinApplicationRejectedStatus(applicationStatus) ? (
-                                                        <p className="rounded-md border border-rose-100 bg-rose-50 px-2 py-1 text-[10px] font-bold italic text-rose-700">
-                                                            Application not approved
-                                                        </p>
-                                                    ) : null}
+                                                    <p className="rounded-md border border-rose-100 bg-rose-50 px-2 py-1 text-[10px] font-bold italic text-rose-700">
+                                                        {projectActions.helperMessage ?? "Application not approved"}
+                                                    </p>
                                                     <Link
                                                         href={`/dashboard/student/browse/${encodeURIComponent(project.id)}`}
                                                         className="w-full"
@@ -1191,7 +1198,7 @@ export default function MyProjectsPage() {
                                                         </Button>
                                                     </Link>
                                                 </>
-                                            ) : live || !isStudentOwnedOpportunity ? (
+                                            ) : projectActions.showJoinApplyNow ? (
                                                 <Link
                                                     href={`/dashboard/student/browse/${encodeURIComponent(project.id)}`}
                                                     className="w-full"
@@ -1232,19 +1239,6 @@ export default function MyProjectsPage() {
                                                 >
                                                     <Users className="h-4 w-4" /> View team
                                                 </Button>
-                                            ) : null}
-                                            {canReviseOpportunity ? (
-                                                <Link
-                                                    href={`/dashboard/student/create-opportunity?edit=${encodeURIComponent(project.id)}`}
-                                                    className="w-full"
-                                                >
-                                                    <Button
-                                                        variant="outline"
-                                                        className="h-10 w-full gap-2 rounded-xl border-slate-200"
-                                                    >
-                                                        <Pencil className="h-4 w-4" /> Edit & Resubmit
-                                                    </Button>
-                                                </Link>
                                             ) : null}
                                             <Button
                                                 variant="outline"

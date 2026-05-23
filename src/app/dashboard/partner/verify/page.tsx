@@ -220,6 +220,7 @@ export default function VerifyWorkPage() {
     const [rejectTargetId, setRejectTargetId] = useState<string | null>(null);
     const [rejectComment, setRejectComment] = useState("");
     const [rejectSubmitting, setRejectSubmitting] = useState(false);
+    const [feedbackMode, setFeedbackMode] = useState<"revise" | "reject_permanent">("revise");
     const [execVerifySubmitting, setExecVerifySubmitting] = useState(false);
     const autoOpenedIdRef = useRef<string | null>(null);
 
@@ -344,8 +345,9 @@ export default function VerifyWorkPage() {
         }
     };
 
-    const openRejectDialog = (id: string) => {
+    const openRejectDialog = (id: string, mode: "revise" | "reject_permanent" = "revise") => {
         setRejectTargetId(id);
+        setFeedbackMode(mode);
         setRejectComment("");
         setRejectOpen(true);
     };
@@ -412,12 +414,17 @@ export default function VerifyWorkPage() {
         }
         setRejectSubmitting(true);
         try {
-            const res = await authenticatedFetch(`/api/v1/partner/approvals/${rejectTargetId}/reject`, {
+            const actionPath = feedbackMode === "revise" ? "revise" : "reject";
+            const res = await authenticatedFetch(`/api/v1/partner/approvals/${rejectTargetId}/${actionPath}`, {
                 method: "POST",
                 body: JSON.stringify({ reason }),
             });
             if (res?.ok) {
-                toast.success("Partner rejection submitted");
+                toast.success(
+                    feedbackMode === "revise"
+                        ? "Revision requested. The student can edit and resubmit."
+                        : "Permanently rejected. The student cannot edit this opportunity.",
+                );
                 setDetailOpen(false);
                 setDetailActionId(null);
                 setDetailRecord(null);
@@ -625,12 +632,20 @@ export default function VerifyWorkPage() {
                                                 )}
                                             </Button>
                                             <Button
-                                                variant="destructive"
-                                                className="w-full"
-                                                onClick={() => openRejectDialog(row.id)}
+                                                variant="outline"
+                                                className="w-full border-amber-300 text-amber-900 hover:bg-amber-50"
+                                                onClick={() => openRejectDialog(row.id, "revise")}
                                                 disabled={!row.partnerDecisionActionsEnabled}
                                             >
-                                                <XCircle className="w-4 h-4 mr-2" /> Reject
+                                                <XCircle className="w-4 h-4 mr-2" /> Request revision
+                                            </Button>
+                                            <Button
+                                                variant="destructive"
+                                                className="w-full"
+                                                onClick={() => openRejectDialog(row.id, "reject_permanent")}
+                                                disabled={!row.partnerDecisionActionsEnabled}
+                                            >
+                                                <XCircle className="w-4 h-4 mr-2" /> Reject permanently
                                             </Button>
                                         </>
                                     ) : null}
@@ -825,11 +840,21 @@ export default function VerifyWorkPage() {
                             {detailActionId ? (
                                 <div className="flex flex-wrap justify-end gap-2 pt-4 border-t border-slate-200">
                                     <Button
-                                        variant="destructive"
-                                        onClick={() => detailActionId && openRejectDialog(detailActionId)}
+                                        variant="outline"
+                                        className="border-amber-300 text-amber-900 hover:bg-amber-50"
+                                        onClick={() => detailActionId && openRejectDialog(detailActionId, "revise")}
                                         disabled={!detailPartnerActionsEnabled}
                                     >
-                                        <XCircle className="w-4 h-4 mr-2" /> Reject
+                                        <XCircle className="w-4 h-4 mr-2" /> Request revision
+                                    </Button>
+                                    <Button
+                                        variant="destructive"
+                                        onClick={() =>
+                                            detailActionId && openRejectDialog(detailActionId, "reject_permanent")
+                                        }
+                                        disabled={!detailPartnerActionsEnabled}
+                                    >
+                                        <XCircle className="w-4 h-4 mr-2" /> Reject permanently
                                     </Button>
                                     <Button
                                         className="bg-green-600 hover:bg-green-700"
@@ -855,9 +880,13 @@ export default function VerifyWorkPage() {
             <Dialog open={rejectOpen} onOpenChange={(open) => !open && !rejectSubmitting && closeRejectDialog()}>
                 <DialogContent className="w-[calc(100vw-2rem)] max-w-md sm:max-w-md">
                     <DialogHeader>
-                        <DialogTitle>Reject with feedback</DialogTitle>
+                        <DialogTitle>
+                            {feedbackMode === "revise" ? "Request revision" : "Reject permanently"}
+                        </DialogTitle>
                         <DialogDescription>
-                            Explain what the student should fix before this opportunity can proceed.
+                            {feedbackMode === "revise"
+                                ? "The student can edit and resubmit. Explain what to fix."
+                                : "This closes the opportunity. The student cannot edit or resubmit."}
                         </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-2 py-2">
@@ -875,14 +904,21 @@ export default function VerifyWorkPage() {
                         <Button type="button" variant="outline" onClick={closeRejectDialog} disabled={rejectSubmitting}>
                             Cancel
                         </Button>
-                        <Button type="button" variant="destructive" onClick={() => void confirmReject()} disabled={rejectSubmitting}>
+                        <Button
+                            type="button"
+                            variant={feedbackMode === "revise" ? "default" : "destructive"}
+                            className={feedbackMode === "revise" ? "bg-amber-600 hover:bg-amber-700" : undefined}
+                            onClick={() => void confirmReject()}
+                            disabled={rejectSubmitting}
+                        >
                             {rejectSubmitting ? (
                                 <>
                                     <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Sending…
                                 </>
                             ) : (
                                 <>
-                                    <XCircle className="w-4 h-4 mr-2" /> Submit rejection
+                                    <XCircle className="w-4 h-4 mr-2" />{" "}
+                                    {feedbackMode === "revise" ? "Send revision request" : "Confirm permanent reject"}
                                 </>
                             )}
                         </Button>

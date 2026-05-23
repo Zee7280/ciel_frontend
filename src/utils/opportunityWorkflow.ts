@@ -339,6 +339,7 @@ export function extractOpportunityReviewFeedback(project: Record<string, unknown
     return extractGenericOpportunityReviewFeedback(project);
 }
 
+/** True when the student may edit and resubmit (revision requested — not a permanent reject). */
 export function canEditReturnedOpportunity(project: Record<string, unknown>): boolean {
     const states = [
         lower(project.status),
@@ -347,7 +348,16 @@ export function canEditReturnedOpportunity(project: Record<string, unknown>): bo
         lower(project.faculty_approval_status),
         lower(project.partner_approval_status),
     ];
-    return states.some((state) => ["returned", "revision", "needs_revision", "rejected"].includes(state));
+    return states.some((state) =>
+        ["returned", "revision", "needs_revision", "revision_requested"].includes(state),
+    );
+}
+
+export function isOpportunityPermanentlyRejected(project: Record<string, unknown>): boolean {
+    if (canEditReturnedOpportunity(project)) return false;
+    const stage = lower(project.workflow_stage ?? project.approval_stage);
+    const status = lower(project.status);
+    return stage === "rejected" || status === "rejected";
 }
 
 /** True when the listing is publicly live: API-aligned `status` plus final admin approval (do not infer from `workflow_stage`). */
@@ -471,7 +481,7 @@ export function resolveStudentOpportunityWorkflow(project: Record<string, unknow
 
     if (
         [stage, statusEarly, adminStatus, facultyStatus, partnerStatus].some((value) =>
-            ["returned", "revision", "needs_revision"].includes(value),
+            ["returned", "revision", "needs_revision", "revision_requested"].includes(value),
         )
     ) {
         return {
@@ -565,8 +575,9 @@ export function resolveStudentOpportunityWorkflow(project: Record<string, unknow
     if (stage === "rejected" || project.rejected === true || lower(project.status) === "rejected") {
         return {
             stage: "rejected",
-            badgeLabel: "Rejected",
-            queueMessage: "This opportunity was returned. Check the remarks from faculty, partner, or admin, then edit and resubmit.",
+            badgeLabel: "Permanently rejected",
+            queueMessage:
+                "This opportunity was permanently closed and cannot be edited. Submit a new opportunity if your programme allows it.",
         };
     }
 

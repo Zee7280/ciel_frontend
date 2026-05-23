@@ -3,7 +3,10 @@
  * Backend exposes application_status, application_stage, application_id; legacy pending/applied still supported.
  */
 
-import { isOpportunityPubliclyLive } from "@/utils/opportunityWorkflow";
+import {
+    isOpportunityPubliclyLive,
+    isStudentOpportunityLiveForReporting,
+} from "@/utils/opportunityWorkflow";
 
 /** Listing statuses where an approved student may still open / continue the impact report (incl. post‑live wrap‑up). */
 function opportunityStatusAllowsStudentReportFlow(raw: Record<string, unknown>): boolean {
@@ -91,18 +94,32 @@ export function shouldApplyJoinApplicationRules(raw: Record<string, unknown>, op
     return Boolean(pickJoinApplicationStatus(raw));
 }
 
-/** Live student-created listings: creator must complete join-application before report access. */
+/**
+ * Live student-created listing: admin approval unlocks report/attendance.
+ * Only an in-flight join application still blocks (not stale rejected participation rows).
+ */
 function studentOwnerMustCompleteJoinBeforeReport(
     raw: Record<string, unknown>,
     opts?: { isStudentOwner?: boolean },
 ): boolean {
     if (!opts?.isStudentOwner) return false;
-    if (!isOpportunityPubliclyLive(raw)) return false;
+    if (!isStudentOpportunityLiveForReporting(raw)) return false;
     const app = pickJoinApplicationStatus(raw);
-    if (!app) return true;
-    if (isJoinApplicationRejectedStatus(app)) return true;
-    if (isJoinApplicationPendingStatus(app)) return true;
-    return !isJoinApplicationApprovedStatus(app);
+    return isJoinApplicationPendingStatus(app);
+}
+
+/** Attendance + Section 1 evidence: treat creator on own live listing as approved when DB row is stale. */
+export function effectiveParticipationStatusForReportActions(
+    actualStatus: string | null | undefined,
+    projectData?: Record<string, unknown> | null,
+): string {
+    const st = lower(actualStatus) || "pending_approval";
+    if (!projectData) return st;
+    const isOwner = Boolean(projectData.is_student_owner ?? projectData.isStudentOwner);
+    if (!isOwner || !isStudentOpportunityLiveForReporting(projectData)) return st;
+    if (["approved", "verified", "accepted", "finalized"].includes(st)) return st;
+    if (isJoinApplicationPendingStatus(st)) return st;
+    return "approved";
 }
 
 /** Browse / detail: show Start Report when join is cleared and status allows. */

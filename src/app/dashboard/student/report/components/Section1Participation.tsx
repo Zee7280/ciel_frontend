@@ -22,6 +22,7 @@ import { normalizeEngagementAttendanceLog } from "@/utils/engagementAttendanceMa
 import { calculateSection1CII } from "@/utils/reportQuality";
 import { calculateCII } from "../utils/calculateCII";
 import { resolveScopedTeamMembers } from "@/utils/reportTeamScope";
+import { effectiveParticipationStatusForReportActions } from "@/utils/studentJoinApplication";
 
 /** Copy for verify-attendance UX: no reviewer emails shown; NGO/partner first, faculty fallback. */
 const ATTENDANCE_VERIFICATION_INFO = {
@@ -183,11 +184,17 @@ export default function Section1Participation({ projectData }: { projectData?: a
         }
     }, []);
 
+    const projectRecord =
+        projectData && typeof projectData === "object"
+            ? (projectData as Record<string, unknown>)
+            : null;
+    const effectiveLeadStatus = effectiveParticipationStatusForReportActions(leadStatus, projectRecord);
+
     const rawParticipants = React.useMemo(() => [
         ...(isVerified || data.section1.team_lead.verified || participantId ? [{
             id: `lead:${participantId || data.section1.team_lead.id}`,
             name: `${((data.section1.team_lead as any).fullName || (data.section1.team_lead as any).name || "Team Lead")}${((data.section1.team_lead as any).email === currentUserEmail) ? ' (Self)' : ''}`,
-            status: leadStatus,
+            status: effectiveLeadStatus,
             email: (data.section1.team_lead as any).email
         }] : []),
         ...data.section1.team_members
@@ -195,10 +202,13 @@ export default function Section1Participation({ projectData }: { projectData?: a
                 id: `member:${idx}:${m.id || m.participantId || m.cnic || m.email || 'anon'}`,
                 name: `${(m.fullName || m.name || m.email || `Student ${idx + 1}`)}${(m.email === currentUserEmail) ? ' (Self)' : ''}`,
                 verified: m.verified,
-                status: m.status || (m.verified ? 'approved' : 'pending_approval'),
+                status: effectiveParticipationStatusForReportActions(
+                    m.status || (m.verified ? 'approved' : 'pending_approval'),
+                    projectRecord,
+                ),
                 email: m.email
             }))
-    ], [isVerified, participantId, data.section1.team_lead, data.section1.team_members, currentUserEmail, leadStatus]);
+    ], [isVerified, participantId, data.section1.team_lead, data.section1.team_members, currentUserEmail, effectiveLeadStatus, projectRecord]);
 
     const [hasSelectedInitial, setHasSelectedInitial] = React.useState(false);
 
@@ -304,7 +314,12 @@ export default function Section1Participation({ projectData }: { projectData?: a
                     // Explicitly update selected ID if it was null or stale
                     setSelectedParticipantId(`lead:${myPart.id}`);
                     
-                    setLeadStatus(myPart.status || 'pending_approval');
+                    setLeadStatus(
+                        effectiveParticipationStatusForReportActions(
+                            myPart.status || 'pending_approval',
+                            projectRecord,
+                        ),
+                    );
                     setIsVerified(true);
                     
                     // Update wizard step based on progress

@@ -12,7 +12,7 @@ import { useReportForm } from "../context/ReportContext";
 import { useDebounce } from "@/hooks/useDebounce";
 import { FieldError } from "./ui/FieldError";
 import clsx from "clsx";
-import { MAX_REPORT_IMAGE_UPLOAD_LABEL, splitReportFilesByImageSize } from "../utils/fileUploadLimits";
+import { MAX_REPORT_UPLOAD_LABEL, splitReportFilesByImageSize } from "../utils/fileUploadLimits";
 import { REPORT_ATTACHMENT_ACCEPT } from "@/utils/reportAttachmentAccept";
 
 // ─── Static configuration ───────────────────────────────────────────────────
@@ -76,7 +76,7 @@ const toEvidenceFileItem = (file: File): EvidenceFileItem => ({
 function filterOversizedImages(files: File[], input: HTMLInputElement): File[] {
     const { accepted, rejected } = splitReportFilesByImageSize(files);
     if (rejected.length > 0) {
-        toast.error(`Images must be ${MAX_REPORT_IMAGE_UPLOAD_LABEL} or smaller: ${rejected.map((file) => file.name).join(", ")}`);
+        toast.error(`Each file must be ${MAX_REPORT_UPLOAD_LABEL} or smaller: ${rejected.map((file) => file.name).join(", ")}`);
         input.value = "";
     }
     return accepted;
@@ -382,7 +382,7 @@ export default function Section8Evidence() {
 
                             {/* FILE UPLOAD */}
                             <FileUpload
-                                label={`Drag & drop files or click to browse (images max ${MAX_REPORT_IMAGE_UPLOAD_LABEL})`}
+                                label={`Drag & drop files or click to browse (max ${MAX_REPORT_UPLOAD_LABEL} per file)`}
                                 multiple
                                 accept={REPORT_ATTACHMENT_ACCEPT}
                                 onChange={(e) => {
@@ -882,7 +882,7 @@ export default function Section8Evidence() {
 
 
                             <FileUpload
-                                label={`Upload partner verification (images max ${MAX_REPORT_IMAGE_UPLOAD_LABEL})`}
+                                label={`Upload partner verification (max ${MAX_REPORT_UPLOAD_LABEL} per file)`}
                                 multiple
                                 accept={REPORT_ATTACHMENT_ACCEPT}
                                 onChange={(e) => {
