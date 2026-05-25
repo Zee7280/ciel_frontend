@@ -283,14 +283,16 @@ export default function AttendancePendingQueuePanel({
                 "overflow-hidden border bg-white",
                 isPartner
                     ? "rounded-2xl border-slate-200/80 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_8px_24px_-12px_rgba(15,23,42,0.12)]"
-                    : "rounded-xl border-slate-200 shadow-sm",
+                    : scrollTableInPanel
+                      ? "rounded-2xl border-slate-200/80 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_8px_24px_-12px_rgba(15,23,42,0.12)]"
+                      : "rounded-xl border-slate-200 shadow-sm",
                 scrollTableInPanel && "flex min-h-0 flex-1 flex-col",
             )}
         >
             <div
                 className={clsx(
                     "flex flex-col gap-2.5 border-b px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5",
-                    isPartner
+                    isPartner || scrollTableInPanel
                         ? "border-slate-200/70 bg-gradient-to-r from-white via-slate-50/40 to-[#0056B3]/[0.03]"
                         : "border-slate-100",
                 )}
@@ -301,7 +303,9 @@ export default function AttendancePendingQueuePanel({
                             "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg",
                             isPartner
                                 ? "bg-gradient-to-br from-[#0056B3] to-[#003F85] text-white shadow-sm"
-                                : "bg-slate-100 text-slate-700",
+                                : scrollTableInPanel
+                                  ? "bg-[#0056B3]/10 text-[#0056B3] ring-1 ring-inset ring-[#0056B3]/15"
+                                  : "bg-slate-100 text-slate-700",
                         )}
                         aria-hidden
                     >
@@ -311,7 +315,7 @@ export default function AttendancePendingQueuePanel({
                         <h2
                             className={clsx(
                                 "text-sm text-slate-900 sm:text-[15px]",
-                                isPartner ? "font-bold tracking-tight" : "font-semibold",
+                                isPartner || scrollTableInPanel ? "font-bold tracking-tight" : "font-semibold",
                             )}
                         >
                             {title}
@@ -333,7 +337,7 @@ export default function AttendancePendingQueuePanel({
                         <span
                             className={clsx(
                                 "hidden items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold sm:inline-flex",
-                                isPartner
+                                isPartner || scrollTableInPanel
                                     ? "bg-[#0056B3]/[0.08] text-[#0056B3] ring-1 ring-inset ring-[#0056B3]/15"
                                     : "bg-slate-100 text-slate-700 ring-1 ring-inset ring-slate-200",
                             )}
@@ -342,7 +346,7 @@ export default function AttendancePendingQueuePanel({
                             <span
                                 className={clsx(
                                     "h-1.5 w-1.5 rounded-full",
-                                    isPartner ? "bg-[#0056B3]" : "bg-slate-500",
+                                    isPartner || scrollTableInPanel ? "bg-[#0056B3]" : "bg-slate-500",
                                 )}
                             />
                             {tableRows.length} pending
@@ -356,7 +360,9 @@ export default function AttendancePendingQueuePanel({
                             "inline-flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium shadow-sm transition disabled:cursor-not-allowed disabled:opacity-50",
                             isPartner
                                 ? "rounded-[10px] bg-gradient-to-r from-[#0056B3] to-[#004494] px-4 font-semibold text-white shadow-[#0056B3]/20 hover:shadow-md hover:shadow-[#0056B3]/30"
-                                : "rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50",
+                                : scrollTableInPanel
+                                  ? "rounded-[10px] border border-[#0056B3]/25 bg-white px-4 font-semibold text-[#0056B3] hover:border-[#0056B3]/40 hover:bg-[#0056B3]/[0.04]"
+                                  : "rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50",
                         )}
                     >
                         {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
@@ -654,20 +660,23 @@ export default function AttendancePendingQueuePanel({
                         scrollTableInPanel && "min-h-0 flex-1 overflow-y-auto overscroll-contain",
                     )}
                 >
-                    <table className="w-full min-w-[720px] border-collapse text-left text-sm">
+                    <table className="w-full min-w-[960px] border-collapse text-left text-sm">
                         <thead>
                             <tr>
                                 {[
-                                    { label: "Date", extra: "whitespace-nowrap w-[88px]" },
-                                    { label: "Location", extra: "w-[110px]" },
-                                    { label: "Time", extra: "whitespace-nowrap w-[120px]" },
-                                    { label: "Work type", extra: "w-[90px]" },
+                                    { label: "Date", extra: "whitespace-nowrap w-[92px]" },
+                                    { label: "Location", extra: "min-w-[150px] w-[min(200px,16vw)]" },
+                                    { label: "Time", extra: "whitespace-nowrap w-[128px]" },
+                                    { label: "Work type", extra: "min-w-[120px] w-[140px]" },
                                     ...(!partnerHideParticipantColumn
-                                        ? [{ label: "Participant", extra: "w-[130px]" }]
+                                        ? [{ label: "Participant", extra: "min-w-[160px] w-[180px]" }]
                                         : []),
-                                    { label: "Description", extra: "" },
-                                    { label: "Evidence", extra: "whitespace-nowrap w-[72px]" },
-                                    { label: "Actions", extra: "w-[200px]" },
+                                    { label: "Description", extra: "min-w-[180px]" },
+                                    { label: "Evidence", extra: "whitespace-nowrap w-[88px]" },
+                                    {
+                                        label: "Actions",
+                                        extra: scrollTableInPanel && !isPartner ? "min-w-[248px] w-[248px]" : "min-w-[220px] w-[220px]",
+                                    },
                                 ].map((col) => (
                                     <th
                                         key={col.label}
@@ -675,7 +684,7 @@ export default function AttendancePendingQueuePanel({
                                             "px-3 py-3 text-[11px] sm:px-4",
                                             col.extra,
                                             "sticky top-0 z-10 backdrop-blur",
-                                            isPartner
+                                            isPartner || scrollTableInPanel
                                                 ? "border-b border-slate-200/80 bg-slate-50/95 py-3.5 font-bold uppercase tracking-wider text-slate-600"
                                                 : "border-y border-slate-200 bg-slate-50 font-semibold uppercase tracking-wide text-slate-600",
                                         )}
@@ -701,21 +710,22 @@ export default function AttendancePendingQueuePanel({
                                 const desc = pickStr(row.description) || "—";
                                 const st = pickStr(row.start_time);
                                 const et = pickStr(row.end_time);
-                                const timeCell = isPartner
-                                    ? (() => {
-                                          const t1 = formatDisplayTimeSegment(st) || st;
-                                          const t2 = formatDisplayTimeSegment(et) || et;
-                                          const timeRange = [t1, t2].filter(Boolean).join(" - ");
-                                          return timeRange || "—";
-                                      })()
-                                    : [st, et].filter(Boolean).join(" – ") || "—";
+                                const timeCell = (() => {
+                                    const t1 = formatDisplayTimeSegment(st) || st;
+                                    const t2 = formatDisplayTimeSegment(et) || et;
+                                    const sep = isPartner ? " - " : " – ";
+                                    const timeRange = [t1, t2].filter(Boolean).join(sep);
+                                    return timeRange || "—";
+                                })();
+
+                                const useStackedActions = scrollTableInPanel && !isPartner;
 
                                 return (
                                     <tr
                                         key={id || `row-${idx}`}
                                         className={clsx(
                                             "border-b border-slate-100 transition-colors",
-                                            isPartner
+                                            isPartner || scrollTableInPanel
                                                 ? clsx(
                                                       "hover:bg-[#0056B3]/[0.035]",
                                                       idx % 2 === 0 ? "bg-white" : "bg-slate-50/40",
@@ -723,23 +733,28 @@ export default function AttendancePendingQueuePanel({
                                                 : "bg-white hover:bg-slate-50/80",
                                         )}
                                     >
-                                        <td className="whitespace-nowrap px-3 py-3 align-top sm:px-4">
+                                        <td className="whitespace-nowrap px-3 py-3.5 align-top sm:px-4">
                                             <span className="font-semibold text-slate-900">
                                                 {formatDisplayDate(pickStr(row.date))}
                                             </span>
                                         </td>
-                                        <td className="max-w-[110px] px-3 py-3 align-top text-slate-700 sm:px-4">
+                                        <td className="min-w-[150px] max-w-[220px] px-3 py-3.5 align-top text-slate-700 sm:px-4">
                                             {pickStr(row.location) ? (
-                                                <span className="line-clamp-2 block break-words text-xs leading-snug" title={pickStr(row.location)}>{pickStr(row.location)}</span>
+                                                <span
+                                                    className="line-clamp-3 block break-words text-xs leading-relaxed"
+                                                    title={pickStr(row.location)}
+                                                >
+                                                    {pickStr(row.location)}
+                                                </span>
                                             ) : (
                                                 <span className="text-slate-400">—</span>
                                             )}
                                         </td>
-                                        <td className="whitespace-nowrap px-3 py-3 align-top sm:px-4">
+                                        <td className="whitespace-nowrap px-3 py-3.5 align-top sm:px-4">
                                             <span
                                                 className={clsx(
                                                     "inline-flex items-center rounded-md px-2 py-1 text-xs font-semibold tabular-nums",
-                                                    isPartner
+                                                    isPartner || scrollTableInPanel
                                                         ? "bg-[#0056B3]/[0.08] text-[#0056B3] ring-1 ring-inset ring-[#0056B3]/10"
                                                         : "bg-slate-100 text-slate-700 ring-1 ring-inset ring-slate-200",
                                                 )}
@@ -747,18 +762,27 @@ export default function AttendancePendingQueuePanel({
                                                 {timeCell}
                                             </span>
                                         </td>
-                                        <td className="px-3 py-3 align-top sm:px-4">
-                                            <span className="inline-flex items-center rounded-md bg-slate-100 px-2 py-1 text-xs font-medium text-slate-700 ring-1 ring-inset ring-slate-200">
-                                                {workType}
+                                        <td className="px-3 py-3.5 align-top sm:px-4">
+                                            <span
+                                                className={clsx(
+                                                    "inline-flex max-w-full items-center rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset",
+                                                    isPartner || scrollTableInPanel
+                                                        ? "bg-[#0056B3]/[0.06] text-[#0056B3] ring-[#0056B3]/12"
+                                                        : "bg-slate-100 text-slate-700 ring-slate-200",
+                                                )}
+                                            >
+                                                <span className="line-clamp-2">{workType}</span>
                                             </span>
                                         </td>
                                         {!partnerHideParticipantColumn ? (
-                                            <td className="px-3 py-3 align-top text-slate-800 sm:px-4">
+                                            <td className="px-3 py-3.5 align-top text-slate-800 sm:px-4">
                                                 {who.name ? (
                                                     <>
                                                         <span className="font-semibold text-slate-900">{who.name}</span>
                                                         {who.detail ? (
-                                                            <span className="mt-0.5 block text-xs text-slate-500">{who.detail}</span>
+                                                            <span className="mt-0.5 block text-xs leading-relaxed text-slate-500">
+                                                                {who.detail}
+                                                            </span>
                                                         ) : null}
                                                     </>
                                                 ) : (
@@ -766,10 +790,15 @@ export default function AttendancePendingQueuePanel({
                                                 )}
                                             </td>
                                         ) : null}
-                                        <td className="px-3 py-3 align-top text-slate-600 sm:px-4">
-                                            <span className="line-clamp-2 block break-words text-xs leading-snug" title={desc}>{desc}</span>
+                                        <td className="px-3 py-3.5 align-top text-slate-600 sm:px-4">
+                                            <span
+                                                className="line-clamp-3 block break-words text-xs leading-relaxed"
+                                                title={desc}
+                                            >
+                                                {desc}
+                                            </span>
                                         </td>
-                                        <td className="whitespace-nowrap px-3 py-3 align-top sm:px-4">
+                                        <td className="whitespace-nowrap px-3 py-3.5 align-top sm:px-4">
                                             {evidenceUrl ? (
                                                 <a
                                                     href={evidenceUrl}
@@ -777,7 +806,7 @@ export default function AttendancePendingQueuePanel({
                                                     rel="noopener noreferrer"
                                                     className={clsx(
                                                         "inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition",
-                                                        isPartner
+                                                        isPartner || scrollTableInPanel
                                                             ? "bg-[#0056B3]/10 text-[#0056B3] ring-1 ring-inset ring-[#0056B3]/15 hover:bg-[#0056B3]/15"
                                                             : "bg-slate-100 text-slate-800 ring-1 ring-inset ring-slate-200 hover:bg-slate-200",
                                                     )}
@@ -792,74 +821,125 @@ export default function AttendancePendingQueuePanel({
                                                 </span>
                                             )}
                                         </td>
-                                        <td className="px-3 py-3 align-top sm:px-4">
-                                            <div className="flex flex-col gap-1.5">
-                                                <div className="flex flex-wrap gap-1.5">
-                                                    <button
-                                                        type="button"
-                                                        disabled={acting !== null}
-                                                        onClick={() => void act(id, "approve")}
-                                                        className={clsx(
-                                                            "inline-flex items-center justify-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-semibold shadow-sm transition disabled:opacity-50",
-                                                            isPartner
-                                                                ? "rounded-[10px] border-emerald-600 bg-emerald-600 text-white hover:bg-emerald-700"
-                                                                : "border-emerald-500 bg-emerald-50 text-emerald-800 hover:bg-emerald-100",
-                                                        )}
-                                                    >
-                                                        {acting === `${id}:approve` ? (
-                                                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                                        ) : (
-                                                            <CheckCircle2 className="h-3.5 w-3.5" />
-                                                        )}
-                                                        Approve
-                                                    </button>
-                                                    <button
-                                                        type="button"
-                                                        disabled={acting !== null}
-                                                        onClick={() => void act(id, "reject")}
-                                                        className={clsx(
-                                                            "inline-flex items-center justify-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-semibold shadow-sm transition disabled:opacity-50",
-                                                            isPartner
-                                                                ? "rounded-[10px] border-red-200 bg-white text-red-700 hover:border-red-300 hover:bg-red-50"
-                                                                : "border-red-500 bg-white text-red-700 hover:bg-red-50",
-                                                        )}
-                                                    >
-                                                        {acting === `${id}:reject` ? (
-                                                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                                        ) : (
-                                                            <XCircle className="h-3.5 w-3.5" />
-                                                        )}
-                                                        Reject
-                                                    </button>
-                                                    <button
-                                                        type="button"
-                                                        disabled={acting !== null}
-                                                        onClick={() => void act(id, "flag")}
-                                                        className={clsx(
-                                                            "inline-flex items-center justify-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-semibold shadow-sm transition disabled:opacity-50",
-                                                            isPartner
-                                                                ? "rounded-[10px] border-amber-200 bg-white text-amber-800 hover:border-amber-300 hover:bg-amber-50"
-                                                                : "border-amber-500 bg-white text-amber-800 hover:bg-amber-50",
-                                                        )}
-                                                    >
-                                                        {acting === `${id}:flag` ? (
-                                                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                                        ) : (
-                                                            <AlertTriangle className="h-3.5 w-3.5" />
-                                                        )}
-                                                        Request revision
-                                                    </button>
-                                                </div>
+                                        <td className="min-w-[248px] px-3 py-3.5 align-top sm:px-4">
+                                            <div
+                                                className={clsx(
+                                                    "flex flex-col gap-2",
+                                                    useStackedActions && "w-full max-w-[248px]",
+                                                )}
+                                            >
+                                                {useStackedActions ? (
+                                                    <>
+                                                        <button
+                                                            type="button"
+                                                            disabled={acting !== null}
+                                                            onClick={() => void act(id, "approve")}
+                                                            className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-emerald-600 bg-emerald-600 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-700 disabled:opacity-50"
+                                                        >
+                                                            {acting === `${id}:approve` ? (
+                                                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                                            ) : (
+                                                                <CheckCircle2 className="h-3.5 w-3.5" />
+                                                            )}
+                                                            Approve
+                                                        </button>
+                                                        <div className="grid grid-cols-2 gap-1.5">
+                                                            <button
+                                                                type="button"
+                                                                disabled={acting !== null}
+                                                                onClick={() => void act(id, "reject")}
+                                                                className="inline-flex items-center justify-center gap-1 rounded-lg border border-red-200 bg-white px-2 py-1.5 text-[11px] font-semibold text-red-700 transition hover:border-red-300 hover:bg-red-50 disabled:opacity-50"
+                                                            >
+                                                                {acting === `${id}:reject` ? (
+                                                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                                                ) : (
+                                                                    <XCircle className="h-3.5 w-3.5" />
+                                                                )}
+                                                                Reject
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                disabled={acting !== null}
+                                                                onClick={() => void act(id, "flag")}
+                                                                className="inline-flex items-center justify-center gap-1 rounded-lg border border-amber-200 bg-white px-2 py-1.5 text-[11px] font-semibold text-amber-800 transition hover:border-amber-300 hover:bg-amber-50 disabled:opacity-50"
+                                                            >
+                                                                {acting === `${id}:flag` ? (
+                                                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                                                ) : (
+                                                                    <AlertTriangle className="h-3.5 w-3.5" />
+                                                                )}
+                                                                Revise
+                                                            </button>
+                                                        </div>
+                                                    </>
+                                                ) : (
+                                                    <div className="flex flex-wrap gap-1.5">
+                                                        <button
+                                                            type="button"
+                                                            disabled={acting !== null}
+                                                            onClick={() => void act(id, "approve")}
+                                                            className={clsx(
+                                                                "inline-flex items-center justify-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-semibold shadow-sm transition disabled:opacity-50",
+                                                                isPartner
+                                                                    ? "rounded-[10px] border-emerald-600 bg-emerald-600 text-white hover:bg-emerald-700"
+                                                                    : "border-emerald-500 bg-emerald-50 text-emerald-800 hover:bg-emerald-100",
+                                                            )}
+                                                        >
+                                                            {acting === `${id}:approve` ? (
+                                                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                                            ) : (
+                                                                <CheckCircle2 className="h-3.5 w-3.5" />
+                                                            )}
+                                                            Approve
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            disabled={acting !== null}
+                                                            onClick={() => void act(id, "reject")}
+                                                            className={clsx(
+                                                                "inline-flex items-center justify-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-semibold shadow-sm transition disabled:opacity-50",
+                                                                isPartner
+                                                                    ? "rounded-[10px] border-red-200 bg-white text-red-700 hover:border-red-300 hover:bg-red-50"
+                                                                    : "border-red-500 bg-white text-red-700 hover:bg-red-50",
+                                                            )}
+                                                        >
+                                                            {acting === `${id}:reject` ? (
+                                                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                                            ) : (
+                                                                <XCircle className="h-3.5 w-3.5" />
+                                                            )}
+                                                            Reject
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            disabled={acting !== null}
+                                                            onClick={() => void act(id, "flag")}
+                                                            className={clsx(
+                                                                "inline-flex items-center justify-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-semibold shadow-sm transition disabled:opacity-50",
+                                                                isPartner
+                                                                    ? "rounded-[10px] border-amber-200 bg-white text-amber-800 hover:border-amber-300 hover:bg-amber-50"
+                                                                    : "border-amber-500 bg-white text-amber-800 hover:bg-amber-50",
+                                                            )}
+                                                        >
+                                                            {acting === `${id}:flag` ? (
+                                                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                                            ) : (
+                                                                <AlertTriangle className="h-3.5 w-3.5" />
+                                                            )}
+                                                            Request revision
+                                                        </button>
+                                                    </div>
+                                                )}
                                                 <label className="block">
                                                     <span className="sr-only">Reason for rejection or revision</span>
                                                     <textarea
                                                         rows={2}
                                                         className={clsx(
-                                                            "w-full resize-y rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-slate-400 focus:ring-2 focus:ring-slate-100",
-                                                            isPartner &&
+                                                            "w-full resize-y rounded-lg border border-slate-200 bg-slate-50/50 px-2.5 py-2 text-xs text-slate-900 outline-none transition placeholder:text-slate-400 focus:bg-white focus:ring-2 focus:ring-slate-100",
+                                                            (isPartner || scrollTableInPanel) &&
                                                                 "rounded-[10px] focus:border-[#0056B3]/40 focus:ring-[#0056B3]/12",
                                                         )}
-                                                        placeholder="Reason (required for reject / request revision)"
+                                                        placeholder="Reason (required for reject / revision)"
                                                         value={reasonByLogId[id] || ""}
                                                         onChange={(e) =>
                                                             setReasonByLogId((prev) => ({ ...prev, [id]: e.target.value }))

@@ -270,75 +270,49 @@ export default function CertificateView({ projectData }: { projectData?: unknown
     });
 
     return (
-        <div className="certificate-one-page bg-[#fffdfa] min-h-[690px] w-full max-w-6xl mx-auto p-12 relative border-[12px] border-[#071b3a] shadow-2xl flex flex-col items-center text-center overflow-x-hidden overflow-y-visible break-inside-avoid print:w-full print:h-auto print:min-h-0 print:max-h-none print:overflow-visible print:break-inside-avoid print:shadow-none print:m-0 print:max-w-none print:px-5 print:py-3 print:border-[6px]">
+        <div className="certificate-print-shell">
+        <div className="certificate-one-page bg-[#fffdfa] min-h-[690px] w-full max-w-6xl mx-auto p-12 relative border-[12px] border-[#071b3a] shadow-2xl flex flex-col items-center text-center overflow-x-hidden overflow-y-visible break-inside-avoid">
             <style dangerouslySetInnerHTML={{
                 __html: `
                 @media print {
-                    @page { size: A4 landscape; margin: 0; }
-                    body.cii-certificate-printing {
-                        -webkit-print-color-adjust: exact;
-                        print-color-adjust: exact;
-                        overflow: hidden !important;
+                    @page {
+                        size: A4 landscape;
+                        margin: 0;
                     }
-                    body.cii-certificate-printing .cii-certificate-print-root {
-                        align-items: center !important;
-                        justify-content: center !important;
-                    }
-                    body.cii-certificate-printing #print-area-certificate {
-                        display: flex !important;
-                        align-items: center !important;
-                        justify-content: center !important;
-                        width: 100% !important;
-                        min-height: 100vh !important;
-                        overflow: hidden !important;
-                    }
-                    body.cii-certificate-printing .certificate-one-page {
-                        width: 294mm !important;
-                        height: auto !important;
-                        min-height: 206mm !important;
-                        max-height: none !important;
-                        overflow: visible !important;
-                        transform: none !important;
-                        margin: 0 !important;
-                    }
-                    body.cii-certificate-printing .certificate-metrics-grid {
-                        display: grid !important;
-                        grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
-                    }
-                    body.cii-certificate-printing .certificate-team-roster {
-                        display: grid !important;
-                        grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+                    @page cii-certificate-page {
+                        size: A4 landscape;
+                        margin: 0;
                     }
                 }
                 `,
             }} />
-            <div className="pointer-events-none absolute inset-3 border border-[#b67835]/80 print:inset-1.5" />
-            <div className="pointer-events-none absolute inset-6 border border-[#071b3a]/10 print:inset-3" />
-            <div className="absolute top-0 left-0 w-64 h-64 bg-[#b67835]/5 -ml-32 -mt-32 rounded-full print:hidden" />
-            <div className="absolute bottom-0 right-0 w-96 h-96 bg-[#071b3a]/5 -mr-48 -mb-48 rounded-full print:hidden" />
-            <div className="pointer-events-none absolute inset-0 flex items-center justify-center opacity-[0.035] print:opacity-[0.025]">
-                <img src="/certificate-iel-pk-logo.png" alt="" className="h-[34rem] w-[34rem] object-contain print:h-[25rem] print:w-[25rem]" />
+            <div className="pointer-events-none absolute inset-3 border border-[#b67835]/80" />
+            <div className="pointer-events-none absolute inset-6 border border-[#071b3a]/10" />
+            <div className="absolute top-0 left-0 w-64 h-64 bg-[#b67835]/5 -ml-32 -mt-32 rounded-full" />
+            <div className="absolute bottom-0 right-0 w-96 h-96 bg-[#071b3a]/5 -mr-48 -mb-48 rounded-full" />
+            <div className="pointer-events-none absolute inset-0 flex items-center justify-center opacity-[0.035]">
+                <img src="/certificate-iel-pk-logo.png" alt="" className="h-[34rem] w-[34rem] object-contain" />
             </div>
 
-            <div className="relative z-10 w-full flex justify-between items-start gap-6 mb-10 pt-4 print:mb-3 print:gap-3 print:pt-0">
-                <div className="flex items-center gap-4 text-left print:gap-2.5">
-                    <img src="/certificate-iel-pk-logo.png" alt="CIEL PK" className="h-[5.5rem] w-[5.5rem] shrink-0 object-contain object-left print:h-14 print:w-14" width={1024} height={1024} />
-                    <div className="border-l border-[#b67835]/60 pl-4 print:pl-2.5">
-                        <p className="font-serif text-3xl font-black leading-none tracking-wide text-[#071b3a] print:text-lg">
+            <div className="relative z-10 w-full flex justify-between items-start gap-6 mb-10 pt-4">
+                <div className="flex items-center gap-4 text-left">
+                    <img src="/certificate-iel-pk-logo.png" alt="CIEL PK" className="h-[5.5rem] w-[5.5rem] shrink-0 object-contain object-left" width={1024} height={1024} />
+                    <div className="border-l border-[#b67835]/60 pl-4">
+                        <p className="font-serif text-3xl font-black leading-none tracking-wide text-[#071b3a]">
                             CIEL PK
                         </p>
-                        <p className="mt-1 text-xs font-semibold text-[#071b3a]/80 print:text-[8px]">
+                        <p className="mt-1 text-xs font-semibold text-[#071b3a]/80">
                             Community Impact Education Lab
                         </p>
                     </div>
                 </div>
-                <div className="flex items-start justify-end gap-4 text-right print:gap-2">
+                <div className="flex items-start justify-end gap-4 text-right">
                     <div>
                         <div className="flex items-center justify-end gap-2 mb-1">
-                            <ShieldCheck className="w-4 h-4 text-[#071b3a] print:h-3 print:w-3" />
-                            <span className="text-[10px] font-black uppercase tracking-[0.3em] text-[#071b3a] print:text-[7px] print:tracking-[0.2em]">Verified impact</span>
+                            <ShieldCheck className="w-4 h-4 text-[#071b3a]" />
+                            <span className="text-[10px] font-black uppercase tracking-[0.3em] text-[#071b3a]">Verified impact</span>
                         </div>
-                        <div className="text-[9px] font-bold text-[#071b3a]/55 print:text-[6px]">
+                        <div className="text-[9px] font-bold text-[#071b3a]/55">
                             ID: {data.project_id ? formatDisplayId(data.project_id, "OPP") : "CIEL-REF-PENDING"}
                         </div>
                     </div>
@@ -347,58 +321,58 @@ export default function CertificateView({ projectData }: { projectData?: unknown
                             impactVerifyUrl={resolvedVerifyUrl ?? undefined}
                             size={64}
                             caption="Authenticate certificate"
-                            className="shrink-0 items-end gap-1 print:gap-0.5"
+                            className="shrink-0 items-end gap-1"
                         />
                     ) : null}
                 </div>
             </div>
 
-            <div className={`relative z-10 space-y-3 print:space-y-1 ${showTeamRoster ? "mb-4 print:mb-1.5" : "mb-8 print:mb-2"}`}>
-                <div className="inline-flex items-center gap-3 px-6 py-2 text-[#9a4b25] print:gap-2 print:px-3 print:py-1">
-                    <span className="h-px w-9 bg-[#b67835]/70 print:w-5" />
-                    <span className="text-xs font-black uppercase tracking-[0.45em] print:text-[8px] print:tracking-[0.2em]">
+            <div className={`relative z-10 space-y-3 ${showTeamRoster ? "mb-4" : "mb-8"}`}>
+                <div className="inline-flex items-center gap-3 px-6 py-2 text-[#9a4b25]">
+                    <span className="h-px w-9 bg-[#b67835]/70" />
+                    <span className="text-xs font-black uppercase tracking-[0.45em]">
                         Honorary recognition
                     </span>
-                    <span className="h-px w-9 bg-[#b67835]/70 print:w-5" />
+                    <span className="h-px w-9 bg-[#b67835]/70" />
                 </div>
 
-                <h1 className="font-serif text-5xl font-black text-[#071b3a] uppercase tracking-tight leading-tight print:text-[2rem] print:leading-[1]">
+                <h1 className="font-serif text-5xl font-black text-[#071b3a] uppercase tracking-tight leading-tight">
                     Certificate of <br />
                     <span className="text-[#9a4b25]">Institutional impact</span>
                 </h1>
             </div>
 
-            <div className={`relative z-10 w-full space-y-5 print:space-y-2 ${showTeamRoster ? "max-w-4xl mb-5 print:mb-2" : "max-w-3xl mb-10 print:mb-3"}`}>
-                <p className="text-base font-medium text-[#071b3a]/65 italic print:text-xs print:leading-snug">
+            <div className={`relative z-10 w-full space-y-5 ${showTeamRoster ? "max-w-4xl mb-5" : "max-w-3xl mb-10"}`}>
+                <p className="text-base font-medium text-[#071b3a]/65 italic">
                     This official recognition is presented to{showTeamRoster ? " the Verified Project Team" : ""}
                 </p>
 
                 {showTeamRoster ? (
-                    <div className="rounded-2xl border border-[#b67835]/75 bg-white/75 p-3 shadow-sm print:p-2 print:shadow-none">
-                        <div className="relative -mt-6 mb-2 flex justify-center print:-mt-4 print:mb-1">
-                            <span className="bg-[#071b3a] px-6 py-1 font-serif text-sm font-black uppercase tracking-widest text-white print:px-4 print:py-0.5 print:text-[10px]">
+                    <div className="rounded-2xl border border-[#b67835]/75 bg-white/75 p-3 shadow-sm">
+                        <div className="relative -mt-6 mb-2 flex justify-center">
+                            <span className="bg-[#071b3a] px-6 py-1 font-serif text-sm font-black uppercase tracking-widest text-white">
                                 Verified Team Roster
                             </span>
                         </div>
-                        <p className="mb-2 text-[11px] font-semibold italic text-[#9a4b25] print:mb-1 print:text-[7px]">
+                        <p className="mb-2 text-[11px] font-semibold italic text-[#9a4b25]">
                             Capacity: Up to 20 Students | Multi-University Team Recognition
                             {hiddenRosterCount > 0 ? ` | +${hiddenRosterCount} listed in official report` : ""}
                         </p>
-                        <div className="certificate-team-roster grid grid-cols-1 sm:grid-cols-4 rounded-xl border border-[#b67835]/25 text-left print:grid-cols-4">
+                        <div className="certificate-team-roster grid grid-cols-1 sm:grid-cols-4 rounded-xl border border-[#b67835]/25 text-left">
                             {rosterBlocks.map((row, index) => (
                                 <div
                                     key={row.key}
-                                    className="min-h-[3.35rem] border-b border-r border-[#b67835]/20 px-3 py-2 last:border-b-0 print:min-h-[2.35rem] print:px-2 print:py-1"
+                                    className="min-h-[3.35rem] border-b border-r border-[#b67835]/20 px-3 py-2 last:border-b-0"
                                 >
                                     <div className="flex gap-2">
-                                        <span className="w-5 shrink-0 text-right text-[11px] font-black text-[#9a4b25] print:w-4 print:text-[8px]">
+                                        <span className="w-5 shrink-0 text-right text-[11px] font-black text-[#9a4b25]">
                                             {index + 1}.
                                         </span>
                                         <div className="min-w-0">
-                                            <p className="truncate text-sm font-black leading-none text-[#071b3a] print:text-[9px]">
+                                            <p className="truncate text-sm font-black leading-none text-[#071b3a]">
                                                 {row.name}
                                             </p>
-                                            <p className="mt-1 line-clamp-2 text-[9px] font-semibold leading-tight text-[#071b3a]/70 print:mt-0.5 print:text-[6px]">
+                                            <p className="mt-1 line-clamp-2 text-[9px] font-semibold leading-tight text-[#071b3a]/70">
                                                 {row.university || row.program || row.label}
                                             </p>
                                         </div>
@@ -408,31 +382,31 @@ export default function CertificateView({ projectData }: { projectData?: unknown
                         </div>
                     </div>
                 ) : showRecipientCards ? (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 print:grid-cols-2 print:gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                         {recipientBlocks.map((row) => (
                             <div
                                 key={row.key}
-                                className="relative rounded-2xl border border-[#b67835]/70 bg-white/75 px-5 pb-4 pt-5 shadow-sm print:px-3 print:pb-2 print:pt-3 print:shadow-none"
+                                className="relative rounded-2xl border border-[#b67835]/70 bg-white/75 px-5 pb-4 pt-5 shadow-sm"
                             >
-                                <div className="absolute -top-3 left-1/2 flex h-7 w-7 -translate-x-1/2 items-center justify-center rounded-full bg-[#071b3a] text-white ring-2 ring-[#fffdfa] print:-top-2 print:h-5 print:w-5">
-                                    <span className="text-[11px] font-black leading-none print:text-[8px]">●</span>
+                                <div className="absolute -top-3 left-1/2 flex h-7 w-7 -translate-x-1/2 items-center justify-center rounded-full bg-[#071b3a] text-white ring-2 ring-[#fffdfa]">
+                                    <span className="text-[11px] font-black leading-none">●</span>
                                 </div>
                                 <div className="flex flex-col sm:flex-row sm:items-baseline sm:justify-center sm:gap-3 gap-0.5">
-                                    <span className="text-2xl sm:text-3xl font-black text-[#071b3a] uppercase tracking-[0.12em] print:text-xl print:tracking-[0.08em] break-words">
+                                    <span className="text-2xl sm:text-3xl font-black text-[#071b3a] uppercase tracking-[0.12em] break-words">
                                         {row.name}
                                     </span>
-                                    <span className="text-[10px] font-bold uppercase tracking-widest text-[#9a4b25] print:text-[7px]">
+                                    <span className="text-[10px] font-bold uppercase tracking-widest text-[#9a4b25]">
                                         {row.label}
                                     </span>
                                 </div>
-                                <div className="my-3 h-px bg-[#b67835]/35 print:my-1.5" />
+                                <div className="my-3 h-px bg-[#b67835]/35" />
                                 {row.university ? (
-                                    <p className="text-sm font-black leading-tight text-[#071b3a] print:text-[10px]">
+                                    <p className="text-sm font-black leading-tight text-[#071b3a]">
                                         {row.university}
                                     </p>
                                 ) : null}
                                 {row.program ? (
-                                    <p className="mt-2 text-xs font-semibold leading-tight text-[#071b3a]/75 print:mt-1 print:text-[8px]">
+                                    <p className="mt-2 text-xs font-semibold leading-tight text-[#071b3a]/75">
                                         {row.program}
                                     </p>
                                 ) : null}
@@ -440,17 +414,17 @@ export default function CertificateView({ projectData }: { projectData?: unknown
                         ))}
                     </div>
                 ) : (
-                    <div className="pb-3 print:pb-2">
-                        <div className="flex flex-col gap-2.5 print:gap-1.5">
+                    <div className="pb-3">
+                        <div className="flex flex-col gap-2.5">
                             {recipientBlocks.map((row) => (
                                 <div
                                     key={row.key}
                                     className="flex flex-col sm:flex-row sm:items-baseline sm:justify-center sm:gap-3 gap-0.5"
                                 >
-                                    <span className="text-2xl sm:text-3xl font-black text-[#071b3a] uppercase tracking-[0.18em] print:text-xl print:tracking-[0.12em] break-words">
+                                    <span className="text-2xl sm:text-3xl font-black text-[#071b3a] uppercase tracking-[0.18em] break-words">
                                         {row.name}
                                     </span>
-                                    <span className="text-[10px] font-bold uppercase tracking-widest text-[#9a4b25] print:text-[8px]">
+                                    <span className="text-[10px] font-bold uppercase tracking-widest text-[#9a4b25]">
                                         {row.label}
                                     </span>
                                 </div>
@@ -460,32 +434,32 @@ export default function CertificateView({ projectData }: { projectData?: unknown
                 )}
 
                 {!showRecipientCards && (institutionLine.primary || institutionLine.secondary) && (
-                    <div className="rounded-2xl border border-[#b67835]/70 bg-white/70 px-5 py-4 shadow-sm print:px-3 print:py-1.5 print:shadow-none">
+                    <div className="rounded-2xl border border-[#b67835]/70 bg-white/70 px-5 py-4 shadow-sm">
                         {institutionLine.primary ? (
-                            <p className="text-xs font-black uppercase tracking-[0.35em] text-[#071b3a] print:text-[10px] print:tracking-[0.18em]">
+                            <p className="text-xs font-black uppercase tracking-[0.35em] text-[#071b3a]">
                                 {institutionLine.primary}
                             </p>
                         ) : null}
                         {institutionLine.secondary ? (
-                            <p className="text-[11px] font-semibold text-[#9a4b25] mt-1.5 leading-snug print:text-[9px] print:mt-1">
+                            <p className="text-[11px] font-semibold text-[#9a4b25] mt-1.5 leading-snug">
                                 {institutionLine.secondary}
                             </p>
                         ) : null}
                     </div>
                 )}
 
-                <p className="text-sm font-medium text-[#071b3a]/65 italic leading-relaxed max-w-2xl mx-auto print:text-[11px] print:leading-snug">
+                <p className="text-sm font-medium text-[#071b3a]/65 italic leading-relaxed max-w-2xl mx-auto">
                     for verified delivery of the institutional impact project
                 </p>
                 <div className="max-w-2xl mx-auto space-y-2">
                     <p
-                        className="text-lg sm:text-xl font-black text-[#071b3a] leading-snug tracking-tight print:text-sm print:leading-tight"
+                        className="text-lg sm:text-xl font-black text-[#071b3a] leading-snug tracking-tight"
                         title={certificateHeadline}
                     >
                         &ldquo;{certificateHeadline}&rdquo;
                     </p>
                     {!showTeamRoster && certificateContext ? (
-                        <p className="text-[11px] sm:text-xs text-[#071b3a]/60 font-medium leading-relaxed text-center print:text-[9px]">
+                        <p className="text-[11px] sm:text-xs text-[#071b3a]/60 font-medium leading-relaxed text-center">
                             {certificateContext}
                         </p>
                     ) : null}
@@ -493,29 +467,29 @@ export default function CertificateView({ projectData }: { projectData?: unknown
             </div>
 
             <div
-                className={`certificate-metrics-grid relative z-10 w-full max-w-4xl print:max-w-full ${showTeamRoster ? "gap-4" : "gap-8"}`}
+                className={`certificate-metrics-grid relative z-10 w-full max-w-4xl ${showTeamRoster ? "gap-4" : "gap-8"}`}
                 style={{
                     display: "grid",
                     gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
                     gap: showTeamRoster ? "1rem" : "2rem",
                 }}
             >
-                <div className="space-y-2 print:space-y-0.5 sm:border-r sm:border-[#b67835]/30 sm:pr-4">
-                    <div className="flex justify-center mb-2 print:mb-1">
-                        <div className="w-10 h-10 rounded-full bg-white/70 flex items-center justify-center text-[#9a4b25] ring-1 ring-[#b67835]/40 print:h-8 print:w-8">
-                            <Clock className="w-5 h-5 print:w-4 print:h-4" />
+                <div className="space-y-2 sm:border-r sm:border-[#b67835]/30 sm:pr-4">
+                    <div className="flex justify-center mb-2">
+                        <div className="w-10 h-10 rounded-full bg-white/70 flex items-center justify-center text-[#9a4b25] ring-1 ring-[#b67835]/40">
+                            <Clock className="w-5 h-5" />
                         </div>
                     </div>
-                    <p className="text-[10px] font-black uppercase tracking-widest text-[#071b3a]/65 print:text-[8px]">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-[#071b3a]/65">
                         Verified hours
                     </p>
-                    <p className="text-2xl sm:text-3xl font-black text-[#071b3a] print:text-lg">
+                    <p className="text-2xl sm:text-3xl font-black text-[#071b3a]">
                         <span className="whitespace-nowrap">{verifiedHours}</span>
                     </p>
-                    <p className="text-[10px] font-bold text-[#9a4b25] uppercase tracking-tight print:text-[8px]">
+                    <p className="text-[10px] font-bold text-[#9a4b25] uppercase tracking-tight">
                         Engagement span
                     </p>
-                    <p className="text-sm font-black text-[#071b3a] print:text-xs">
+                    <p className="text-sm font-black text-[#071b3a]">
                         {engagementSpanDays > 0 ? (
                             <span>{engagementSpanDays} calendar days</span>
                         ) : (
@@ -524,16 +498,16 @@ export default function CertificateView({ projectData }: { projectData?: unknown
                     </p>
                 </div>
 
-                <div className="space-y-2 border-y border-[#b67835]/30 py-8 sm:py-0 sm:border-y-0 sm:border-x sm:px-4 print:space-y-0.5 print:border-y-0 print:border-x print:py-0 print:px-2">
-                    <div className="flex justify-center mb-2 print:mb-1">
-                        <div className="w-10 h-10 rounded-full bg-white/70 flex items-center justify-center text-[#9a4b25] ring-1 ring-[#b67835]/40 print:h-8 print:w-8">
-                            <Globe className="w-5 h-5 print:w-4 print:h-4" />
+                <div className="space-y-2 border-y border-[#b67835]/30 py-8 sm:py-0 sm:border-y-0 sm:border-x sm:px-4">
+                    <div className="flex justify-center mb-2">
+                        <div className="w-10 h-10 rounded-full bg-white/70 flex items-center justify-center text-[#9a4b25] ring-1 ring-[#b67835]/40">
+                            <Globe className="w-5 h-5" />
                         </div>
                     </div>
-                    <p className="text-[10px] font-black uppercase tracking-widest text-[#071b3a]/65 print:text-[8px]">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-[#071b3a]/65">
                         SDG alignment
                     </p>
-                    <p className="text-xl sm:text-2xl font-black text-[#071b3a] print:text-base">
+                    <p className="text-xl sm:text-2xl font-black text-[#071b3a]">
                         {mergedSdgNums.length === 0 ? (
                             <span className="whitespace-nowrap">—</span>
                         ) : mergedSdgNums.length === 1 ? (
@@ -547,34 +521,34 @@ export default function CertificateView({ projectData }: { projectData?: unknown
                         )}
                     </p>
                     {sdgTitleLine ? (
-                        <p className="text-[11px] font-semibold text-[#071b3a]/70 leading-snug max-w-[14rem] mx-auto print:text-[9px] print:max-w-[11rem]">
+                        <p className="text-[11px] font-semibold text-[#071b3a]/70 leading-snug max-w-[14rem] mx-auto">
                             {sdgTitleLine}
                         </p>
                     ) : null}
                 </div>
 
-                <div className="space-y-2 print:space-y-0.5 sm:pl-4">
-                    <div className="flex justify-center mb-2 print:mb-1">
-                        <div className="w-10 h-10 rounded-full bg-white/70 flex items-center justify-center text-[#9a4b25] ring-1 ring-[#b67835]/40 print:h-8 print:w-8">
-                            <Award className="w-5 h-5 print:w-4 print:h-4" />
+                <div className="space-y-2 sm:pl-4">
+                    <div className="flex justify-center mb-2">
+                        <div className="w-10 h-10 rounded-full bg-white/70 flex items-center justify-center text-[#9a4b25] ring-1 ring-[#b67835]/40">
+                            <Award className="w-5 h-5" />
                         </div>
                     </div>
-                    <p className="text-[10px] font-black uppercase tracking-widest text-[#071b3a]/65 print:text-[8px]">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-[#071b3a]/65">
                         CII index score
                     </p>
-                    <p className="text-2xl sm:text-3xl font-black text-[#071b3a] print:text-lg">
+                    <p className="text-2xl sm:text-3xl font-black text-[#071b3a]">
                         <span className="whitespace-nowrap">{ciiScore}/100</span>
-                        <span className={`block text-[11px] font-black uppercase tracking-widest mt-1 print:text-[8px] ${ciiBadge.accentClass}`}>
+                        <span className={`block text-[11px] font-black uppercase tracking-widest mt-1 ${ciiBadge.accentClass}`}>
                             {ciiBadge.title}
                         </span>
-                        <span className="block font-serif text-[11px] font-semibold italic normal-case tracking-normal text-[#071b3a]/70 mt-0.5 print:text-[7px]">
+                        <span className="block font-serif text-[11px] font-semibold italic normal-case tracking-normal text-[#071b3a]/70 mt-0.5">
                             {ciiBadge.tagline}
                         </span>
                     </p>
                 </div>
             </div>
 
-            <div className="relative z-10 mt-auto w-full max-w-5xl pt-8 print:pt-3">
+            <div className="relative z-10 mt-auto w-full max-w-5xl pt-8">
                 <div
                     className="items-end"
                     style={{
@@ -583,23 +557,23 @@ export default function CertificateView({ projectData }: { projectData?: unknown
                         gap: "1.5rem",
                     }}
                 >
-                    <div className="text-left space-y-3 print:space-y-1">
+                    <div className="text-left space-y-3">
                         <div className="pl-1">
                             <img
                                 src="/ciel-e-signature.png"
                                 alt="E-signature"
-                                className="h-10 w-40 object-contain object-left print:h-7 print:w-28"
+                                className="h-10 w-40 object-contain object-left"
                                 width={640}
                                 height={160}
                             />
                         </div>
-                        <div className="w-48 h-[1px] bg-[#b67835] print:w-32" />
+                        <div className="w-48 h-[1px] bg-[#b67835]" />
                         <div>
-                            <p className="mb-1 text-[7px] font-black uppercase tracking-[0.35em] text-[#071b3a]/45 print:mb-0.5 print:text-[5px] print:tracking-[0.2em]">
+                            <p className="mb-1 text-[7px] font-black uppercase tracking-[0.35em] text-[#071b3a]/45">
                                 E-signature
                             </p>
-                            <p className="font-black text-[#071b3a] text-sm uppercase print:text-[9px]">Registrar of impact</p>
-                            <p className="text-[10px] font-bold text-[#071b3a]/55 uppercase tracking-widest print:text-[6px]">
+                            <p className="font-black text-[#071b3a] text-sm uppercase">Registrar of impact</p>
+                            <p className="text-[10px] font-bold text-[#071b3a]/55 uppercase tracking-widest">
                                 Community Impact Lab (CIEL)
                             </p>
                         </div>
@@ -609,27 +583,28 @@ export default function CertificateView({ projectData }: { projectData?: unknown
                         <img
                             src={ciiBadge.src}
                             alt={ciiBadge.alt}
-                            className="h-24 w-36 object-contain drop-shadow-sm print:h-16 print:w-28 print:drop-shadow-none"
+                            className="h-24 w-36 object-contain drop-shadow-sm"
                             width={1024}
                             height={1024}
                         />
                     </div>
 
-                    <div className="text-right space-y-3 print:space-y-1">
-                        <div className="w-48 h-[1px] bg-[#b67835] ml-auto print:w-32" />
+                    <div className="text-right space-y-3">
+                        <div className="w-48 h-[1px] bg-[#b67835] ml-auto" />
                         <div>
-                            <p className="font-black text-[#071b3a] text-sm uppercase print:text-[9px]">Dated</p>
-                            <p className="text-[10px] font-bold text-[#071b3a]/55 uppercase tracking-widest print:text-[6px]">{today}</p>
+                            <p className="font-black text-[#071b3a] text-sm uppercase">Dated</p>
+                            <p className="text-[10px] font-bold text-[#071b3a]/55 uppercase tracking-widest">{today}</p>
                         </div>
                     </div>
                 </div>
 
-                <div className="mt-5 text-center print:mt-2">
-                    <p className="text-[8px] font-black text-[#071b3a]/35 uppercase tracking-[0.45em] print:text-[5px] print:tracking-[0.2em]">
+                <div className="mt-5 text-center">
+                    <p className="text-[8px] font-black text-[#071b3a]/35 uppercase tracking-[0.45em]">
                         Verification follows HEC-aligned community engagement documentation standards
                     </p>
                 </div>
             </div>
+        </div>
         </div>
     );
 }

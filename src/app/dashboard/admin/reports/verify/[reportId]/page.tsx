@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useParams, useRouter } from 'next/navigation';
 import { authenticatedFetch } from '@/utils/api';
 import {
@@ -185,8 +185,13 @@ const DOSSIER_NAV_SECTIONS = [
     { id: "section8", label: "Evidence", icon: FileText },
     { id: "section9", label: "Reflection", icon: MessageSquare },
     { id: "section10", label: "Sustainability", icon: Activity },
-    { id: "section11", label: "Summary / Print View", icon: FileText },
+    { id: "section11", label: "Print dossier", icon: FileText },
 ] as const;
+
+/** Sections 1–10: structured admin review fields. Section 11: full print layout (collapsed by default). */
+const REPORT_REVIEW_NAV_SECTIONS = DOSSIER_NAV_SECTIONS.slice(0, 10);
+const PRINT_DOSSIER_NAV_SECTION = DOSSIER_NAV_SECTIONS[10];
+const ALL_SECTION_IDS = DOSSIER_NAV_SECTIONS.map((s) => s.id);
 
 /** Admin verify dossier: indigo accent + slate neutrals (matches `--color-report-*` in globals). */
 const adminDossier = {
@@ -198,8 +203,12 @@ const adminDossier = {
     microLabel: "text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500",
     inset: "rounded-xl border border-slate-100 bg-slate-50/90 px-3 py-2.5",
     tocBtn: "group flex w-full flex-row items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-slate-50",
+    tocBtnActive: "bg-indigo-50 ring-1 ring-indigo-200/90 shadow-sm",
     navIcon: "h-4 w-4 shrink-0 text-slate-400 transition-colors group-hover:text-indigo-600",
+    navIconActive: "text-indigo-700",
     navText: "min-w-0 flex-1 text-left text-sm font-medium leading-snug text-slate-700 transition-colors group-hover:text-slate-900",
+    navTextActive: "font-semibold text-indigo-900",
+    sectionCardActive: "ring-2 ring-indigo-500/70 border-indigo-300 shadow-md shadow-indigo-100/80",
     hub: "rounded-3xl bg-slate-900 p-6 text-white shadow-lg shadow-slate-300/40",
 } as const;
 
@@ -509,14 +518,43 @@ export default function AdminReportDetailPage() {
     const [qualityAlerts, setQualityAlerts] = useState<QualityAlert[]>([]);
     const [section11Audit, setSection11Audit] = useState<ReportCIIauditMeta | null>(null);
     const [sectionOpen, setSectionOpen] = useState<Record<string, boolean>>(() =>
-        Object.fromEntries(DOSSIER_NAV_SECTIONS.map((s) => [s.id, true])) as Record<string, boolean>,
+        Object.fromEntries(
+            DOSSIER_NAV_SECTIONS.map((s) => [s.id, s.id !== PRINT_DOSSIER_NAV_SECTION.id]),
+        ) as Record<string, boolean>,
     );
+    const [activeSectionId, setActiveSectionId] = useState<string>("section1");
 
     const toggleSection = (id: string) => setSectionOpen((prev) => ({ ...prev, [id]: !prev[id] }));
-    const expandAllSections = () =>
-        setSectionOpen(Object.fromEntries(DOSSIER_NAV_SECTIONS.map((s) => [s.id, true])) as Record<string, boolean>);
-    const collapseAllSections = () =>
-        setSectionOpen(Object.fromEntries(DOSSIER_NAV_SECTIONS.map((s) => [s.id, false])) as Record<string, boolean>);
+
+    const expandReportSections = () =>
+        setSectionOpen((prev) => {
+            const next = { ...prev };
+            for (const s of REPORT_REVIEW_NAV_SECTIONS) next[s.id] = true;
+            return next;
+        });
+    const collapseReportSections = () =>
+        setSectionOpen((prev) => {
+            const next = { ...prev };
+            for (const s of REPORT_REVIEW_NAV_SECTIONS) next[s.id] = false;
+            return next;
+        });
+    const openPrintDossier = () => setSectionOpen((prev) => ({ ...prev, [PRINT_DOSSIER_NAV_SECTION.id]: true }));
+
+    const scrollToSection = useCallback((id: string) => {
+        if (id === PRINT_DOSSIER_NAV_SECTION.id) {
+            setSectionOpen((prev) => ({ ...prev, [PRINT_DOSSIER_NAV_SECTION.id]: true }));
+        }
+        setActiveSectionId(id);
+        requestAnimationFrame(() => {
+            document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+        });
+    }, []);
+
+    const sectionCardClass = useCallback(
+        (sectionId: string) =>
+            clsx(adminDossier.cardLg, "scroll-mt-8 p-6 sm:p-8", activeSectionId === sectionId && adminDossier.sectionCardActive),
+        [activeSectionId],
+    );
 
     const ciiSnapshot = useMemo(() => {
         if (!report) return null;
@@ -601,13 +639,37 @@ export default function AdminReportDetailPage() {
 
     useEffect(() => {
         fetchReportDetail();
-        
+
         const handleScroll = () => {
             setShowStickyActions(window.scrollY > 600);
         };
-        window.addEventListener('scroll', handleScroll);
-        return () => window.removeEventListener('scroll', handleScroll);
+        window.addEventListener("scroll", handleScroll);
+        return () => window.removeEventListener("scroll", handleScroll);
     }, [params.reportId]);
+
+    useEffect(() => {
+        if (!report) return;
+
+        const observer = new IntersectionObserver(
+            (entries) => {
+                const visible = entries
+                    .filter((e) => e.isIntersecting)
+                    .sort((a, b) => (b.intersectionRatio ?? 0) - (a.intersectionRatio ?? 0));
+                const top = visible[0]?.target?.id;
+                if (top && (ALL_SECTION_IDS as readonly string[]).includes(top)) {
+                    setActiveSectionId(top);
+                }
+            },
+            { root: null, rootMargin: "-12% 0px -55% 0px", threshold: [0.08, 0.2, 0.45] },
+        );
+
+        for (const id of ALL_SECTION_IDS) {
+            const el = document.getElementById(id);
+            if (el) observer.observe(el);
+        }
+
+        return () => observer.disconnect();
+    }, [report]);
 
     const fetchReportDetail = async () => {
         console.log('📞 ADMIN: Fetching report detail for ID:', params.reportId);
@@ -740,7 +802,7 @@ export default function AdminReportDetailPage() {
                     </button>
                     <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                         <span className="rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-2 text-xs font-semibold uppercase tracking-widest text-indigo-800">
-                            Single-page dossier
+                            Admin report review
                         </span>
                         <span className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-widest text-slate-600">
                             Super admin
@@ -863,49 +925,84 @@ export default function AdminReportDetailPage() {
                     </div>
                 </div>
 
-                {/* Report Content - Unified Scrollable Dossier */}
+                {/* Report sections (1–10) + optional print dossier (11) */}
                 <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-12 lg:gap-8">
-                    {/* Sticky Table of Contents */}
+                    {/* Sticky table of contents */}
                     <div className="space-y-4 lg:sticky lg:top-8 lg:col-span-3">
                         <div className={clsx(adminDossier.card, "p-5 sm:p-6")}>
                             <div className="mb-4 flex items-center justify-between gap-2">
                                 <h3 className={clsx(adminDossier.microLabel, "flex items-center gap-2 tracking-widest text-slate-400")}>
                                     <List className="h-4 w-4 text-indigo-600" strokeWidth={2} />
-                                    Dossier contents
+                                    Report review
                                 </h3>
                                 <div className="flex gap-1">
                                     <button
                                         type="button"
-                                        onClick={expandAllSections}
+                                        onClick={expandReportSections}
                                         className="rounded-lg px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-indigo-700 hover:bg-indigo-50"
                                     >
                                         Expand
                                     </button>
                                     <button
                                         type="button"
-                                        onClick={collapseAllSections}
+                                        onClick={collapseReportSections}
                                         className="rounded-lg px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500 hover:bg-slate-100"
                                     >
                                         Collapse
                                     </button>
                                 </div>
                             </div>
+                            <p className={clsx(adminDossier.microLabel, "mb-2 text-slate-400")}>Sections 1–10</p>
                             <div className="space-y-0.5">
-                                {DOSSIER_NAV_SECTIONS.map((section) => (
-                                    <button
-                                        key={section.id}
-                                        type="button"
-                                        onClick={() => {
-                                            const el = document.getElementById(section.id);
-                                            el?.scrollIntoView({ behavior: "smooth", block: "start" });
-                                        }}
-                                        className={adminDossier.tocBtn}
-                                    >
-                                        <section.icon className={adminDossier.navIcon} strokeWidth={2} />
-                                        <span className={adminDossier.navText}>{section.label}</span>
-                                    </button>
-                                ))}
+                                {REPORT_REVIEW_NAV_SECTIONS.map((section, index) => {
+                                    const isActive = activeSectionId === section.id;
+                                    return (
+                                        <button
+                                            key={section.id}
+                                            type="button"
+                                            onClick={() => scrollToSection(section.id)}
+                                            className={clsx(adminDossier.tocBtn, isActive && adminDossier.tocBtnActive)}
+                                        >
+                                            <section.icon
+                                                className={clsx(adminDossier.navIcon, isActive && adminDossier.navIconActive)}
+                                                strokeWidth={2}
+                                            />
+                                            <span className={clsx(adminDossier.navText, isActive && adminDossier.navTextActive)}>
+                                                {index + 1}. {section.label}
+                                            </span>
+                                        </button>
+                                    );
+                                })}
                             </div>
+                            <div className="my-4 border-t border-slate-100" />
+                            <p className={clsx(adminDossier.microLabel, "mb-2 text-slate-400")}>Print dossier</p>
+                            <button
+                                type="button"
+                                onClick={() => scrollToSection(PRINT_DOSSIER_NAV_SECTION.id)}
+                                className={clsx(
+                                    adminDossier.tocBtn,
+                                    activeSectionId === PRINT_DOSSIER_NAV_SECTION.id && adminDossier.tocBtnActive,
+                                )}
+                            >
+                                <PRINT_DOSSIER_NAV_SECTION.icon
+                                    className={clsx(
+                                        adminDossier.navIcon,
+                                        activeSectionId === PRINT_DOSSIER_NAV_SECTION.id && adminDossier.navIconActive,
+                                    )}
+                                    strokeWidth={2}
+                                />
+                                <span
+                                    className={clsx(
+                                        adminDossier.navText,
+                                        activeSectionId === PRINT_DOSSIER_NAV_SECTION.id && adminDossier.navTextActive,
+                                    )}
+                                >
+                                    11. {PRINT_DOSSIER_NAV_SECTION.label}
+                                    {!sectionOpen.section11 ? (
+                                        <span className="ml-1 text-xs font-normal text-slate-400">(collapsed)</span>
+                                    ) : null}
+                                </span>
+                            </button>
                         </div>
 
                         {/* Quick Status Summary */}
@@ -962,7 +1059,7 @@ export default function AdminReportDetailPage() {
                     {/* All Sections rendered vertically */}
                     <div className="space-y-6 lg:col-span-9 sm:space-y-7">
                         {/* Section 1 */}
-                        <div id="section1" className={clsx(adminDossier.cardLg, "scroll-mt-8 p-6 sm:p-8")}>
+                        <div id="section1" className={sectionCardClass("section1")}>
                             <div className="mb-5 flex items-start justify-between gap-3 border-b border-slate-100 pb-4">
                                 <div className="flex min-w-0 flex-1 items-center gap-3">
                                     <div className={adminDossier.sectionIcon}>
@@ -1133,7 +1230,7 @@ export default function AdminReportDetailPage() {
                         </div>
 
                         {/* Section 2 */}
-                        <div id="section2" className={clsx(adminDossier.cardLg, "scroll-mt-8 p-6 sm:p-8")}>
+                        <div id="section2" className={sectionCardClass("section2")}>
                             <div className="mb-5 flex items-start justify-between gap-3 border-b border-slate-100 pb-4">
                                 <div className="flex min-w-0 flex-1 items-center gap-3">
                                     <div className={adminDossier.sectionIcon}>
@@ -1220,7 +1317,7 @@ export default function AdminReportDetailPage() {
                         </div>
 
                         {/* Section 3 */}
-                        <div id="section3" className={clsx(adminDossier.cardLg, "scroll-mt-8 p-6 sm:p-8")}>
+                        <div id="section3" className={sectionCardClass("section3")}>
                             <div className="mb-5 flex items-start justify-between gap-3 border-b border-slate-100 pb-4">
                                 <div className="flex min-w-0 flex-1 items-center gap-3">
                                     <div className={adminDossier.sectionIcon}>
@@ -1307,7 +1404,7 @@ export default function AdminReportDetailPage() {
                         </div>
 
                         {/* Section 4 */}
-                        <div id="section4" className={clsx(adminDossier.cardLg, "scroll-mt-8 p-6 sm:p-8")}>
+                        <div id="section4" className={sectionCardClass("section4")}>
                             <div className="mb-5 flex items-start justify-between gap-3 border-b border-slate-100 pb-4">
                                 <div className="flex min-w-0 flex-1 items-center gap-3">
                                     <div className={adminDossier.sectionIcon}>
@@ -1414,7 +1511,7 @@ export default function AdminReportDetailPage() {
                         </div>
 
                         {/* Section 5 */}
-                        <div id="section5" className={clsx(adminDossier.cardLg, "scroll-mt-8 p-6 sm:p-8")}>
+                        <div id="section5" className={sectionCardClass("section5")}>
                             <div className="mb-5 flex items-start justify-between gap-3 border-b border-slate-100 pb-4">
                                 <div className="flex min-w-0 flex-1 items-center gap-3">
                                     <div className={adminDossier.sectionIcon}>
@@ -1475,7 +1572,7 @@ export default function AdminReportDetailPage() {
                         </div>
 
                         {/* Section 6 */}
-                        <div id="section6" className={clsx(adminDossier.cardLg, "scroll-mt-8 p-6 sm:p-8")}>
+                        <div id="section6" className={sectionCardClass("section6")}>
                             <div className="mb-5 flex items-start justify-between gap-3 border-b border-slate-100 pb-4">
                                 <div className="flex min-w-0 flex-1 items-center gap-3">
                                     <div className={adminDossier.sectionIcon}>
@@ -1531,7 +1628,7 @@ export default function AdminReportDetailPage() {
                         </div>
 
                         {/* Section 7 */}
-                        <div id="section7" className={clsx(adminDossier.cardLg, "scroll-mt-8 p-6 sm:p-8")}>
+                        <div id="section7" className={sectionCardClass("section7")}>
                             <div className="mb-5 flex items-start justify-between gap-3 border-b border-slate-100 pb-4">
                                 <div className="flex min-w-0 flex-1 items-center gap-3">
                                     <div className={adminDossier.sectionIcon}>
@@ -1594,7 +1691,7 @@ export default function AdminReportDetailPage() {
                         </div>
 
                         {/* Section 8 */}
-                        <div id="section8" className={clsx(adminDossier.cardLg, "scroll-mt-8 p-6 sm:p-8")}>
+                        <div id="section8" className={sectionCardClass("section8")}>
                             <div className="mb-5 flex items-start justify-between gap-3 border-b border-slate-100 pb-4">
                                 <div className="flex min-w-0 flex-1 items-center gap-3">
                                     <div className={adminDossier.sectionIcon}>
@@ -1661,7 +1758,7 @@ export default function AdminReportDetailPage() {
                         </div>
 
                         {/* Section 9 */}
-                        <div id="section9" className={clsx(adminDossier.cardLg, "scroll-mt-8 p-6 sm:p-8")}>
+                        <div id="section9" className={sectionCardClass("section9")}>
                             <div className="mb-5 flex items-start justify-between gap-3 border-b border-slate-100 pb-4">
                                 <div className="flex min-w-0 flex-1 items-center gap-3">
                                     <div className={adminDossier.sectionIcon}>
@@ -1715,7 +1812,7 @@ export default function AdminReportDetailPage() {
                         </div>
 
                         {/* Section 10 */}
-                        <div id="section10" className={clsx(adminDossier.cardLg, "scroll-mt-8 p-6 sm:p-8")}>
+                        <div id="section10" className={sectionCardClass("section10")}>
                             <div className="mb-5 flex items-start justify-between gap-3 border-b border-slate-100 pb-4">
                                 <div className="flex min-w-0 flex-1 items-center gap-3">
                                     <div className={adminDossier.sectionIcon}>
@@ -1743,10 +1840,10 @@ export default function AdminReportDetailPage() {
                             ) : null}
                         </div>
 
-                        {/* Summary View */}
+                        {/* Print dossier — collapsed until admin opens it */}
                         <div
                             id="section11"
-                            className={clsx(adminDossier.cardLg, "relative scroll-mt-8 overflow-hidden p-8 shadow-md sm:p-10 md:p-12")}
+                            className={clsx(sectionCardClass("section11"), "relative overflow-hidden p-8 shadow-md sm:p-10 md:p-12")}
                         >
                             <div className="mb-5 flex items-start justify-between gap-3 border-b border-slate-100 pb-4">
                                 <div className="flex min-w-0 flex-1 items-center gap-3">
@@ -1754,8 +1851,11 @@ export default function AdminReportDetailPage() {
                                         <FileText className="h-6 w-6" strokeWidth={1.75} />
                                     </div>
                                     <div className="min-w-0">
-                                        <p className={clsx(adminDossier.microLabel, "mb-1 text-indigo-600")}>Print-ready dossier</p>
+                                        <p className={clsx(adminDossier.microLabel, "mb-1 text-indigo-600")}>Print dossier</p>
                                         <h2 className={adminDossier.sectionTitle}>11. Executive impact dossier</h2>
+                                        <p className="mt-1 text-sm text-slate-500">
+                                            Full print layout — separate from sections 1–10. Open only when you need the executive summary view.
+                                        </p>
                                     </div>
                                 </div>
                                 <SectionCollapseTrigger
@@ -1773,7 +1873,21 @@ export default function AdminReportDetailPage() {
                                     <ReportPrintView projectData={report.opportunity} reportData={{ ...report }} />
                                 </div>
                             </div>
-                            ) : null}
+                            ) : (
+                            <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/90 px-4 py-8 text-center">
+                                <p className="text-sm font-medium text-slate-600">
+                                    Print dossier is collapsed so you can focus on report sections above.
+                                </p>
+                                <button
+                                    type="button"
+                                    onClick={openPrintDossier}
+                                    className="mt-4 inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-indigo-700"
+                                >
+                                    <FileText className="h-4 w-4" strokeWidth={2} />
+                                    Open print dossier
+                                </button>
+                            </div>
+                            )}
                         </div>
                     </div>
                 </div>

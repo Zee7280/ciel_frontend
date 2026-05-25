@@ -193,41 +193,93 @@ body {
 @media print {
   @page cii-certificate-page {
     size: A4 landscape;
-    margin: 0.35cm;
+    margin: 0;
   }
 
-  /* CII certificate modal is portaled to body; hide the rest of the app so Save PDF is certificate-only */
-  body.cii-certificate-printing > *:not(.cii-certificate-print-root) {
-    display: none !important;
-  }
-
+  /* Certificate-only print: hide app chrome, one landscape sheet, WYSIWYG scale via --cert-print-scale */
+  html.cii-certificate-printing,
   body.cii-certificate-printing {
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
     background: white !important;
     margin: 0 !important;
     padding: 0 !important;
+    width: 297mm !important;
+    height: 210mm !important;
+    overflow: hidden !important;
   }
 
-  body.cii-certificate-printing .cii-certificate-print-root {
-    display: block !important;
+  body.cii-certificate-printing > *:not(.cii-certificate-print-root) {
+    display: none !important;
+  }
+
+  body.cii-certificate-printing .cii-certificate-print-root,
+  body.cii-certificate-printing .relative.w-full.max-w-7xl,
+  body.cii-certificate-printing #print-area-certificate,
+  body.cii-certificate-printing .certificate-print-shell {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
     position: static !important;
-    width: 287mm !important;
-    height: 190mm !important;
-    margin: 0 auto !important;
+    width: 297mm !important;
+    height: 210mm !important;
+    max-width: 297mm !important;
+    max-height: 210mm !important;
+    margin: 0 !important;
     padding: 0 !important;
     overflow: hidden !important;
+    background: white !important;
+    page-break-after: avoid !important;
+    page-break-before: avoid !important;
+    break-after: avoid !important;
+    break-before: avoid !important;
   }
 
+  /* Keep on-screen certificate styling; only scale to fit the landscape sheet */
   body.cii-certificate-printing .certificate-one-page {
     page: cii-certificate-page;
-    break-inside: avoid;
-    page-break-inside: avoid;
-    width: 287mm !important;
-    height: 190mm !important;
-    max-width: 287mm !important;
-    max-height: 190mm !important;
-    min-height: 190mm !important;
-    overflow: hidden !important;
+    flex-shrink: 0 !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+    box-shadow: none !important;
+    zoom: var(--cert-print-scale, 1);
+    transform-origin: center center;
+  }
+
+  @supports (-moz-appearance: none) {
+    body.cii-certificate-printing .certificate-one-page {
+      zoom: 1;
+      transform: scale(var(--cert-print-scale, 1));
+      transform-origin: center center;
+    }
+  }
+
+  body.cii-certificate-printing .certificate-metrics-grid {
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+
+  body.cii-certificate-printing .certificate-team-roster {
+    display: grid !important;
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  }
+
+  body.cii-certificate-printing .certificate-metrics-grid > div:first-child {
+    border-right: 1px solid rgba(182, 120, 53, 0.3);
+    padding-right: 1rem;
+  }
+
+  body.cii-certificate-printing .certificate-metrics-grid > div:nth-child(2) {
+    border-top: none !important;
+    border-bottom: none !important;
+    border-left: 1px solid rgba(182, 120, 53, 0.3);
+    border-right: 1px solid rgba(182, 120, 53, 0.3);
+    padding: 0 1rem !important;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+  }
+
+  body.cii-certificate-printing .certificate-metrics-grid > div:last-child {
+    padding-left: 1rem;
   }
 }

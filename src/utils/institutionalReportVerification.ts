@@ -1,22 +1,37 @@
 import type { ReportData } from "@/app/dashboard/student/report/context/ReportContext";
 
+function norm(value: unknown): string {
+    return String(value ?? "").trim().toLowerCase();
+}
+
+function isApprovedishStatus(value: unknown): boolean {
+    const s = norm(value);
+    return s === "verified" || s === "approved" || s === "finalized";
+}
+
 /**
  * Whether we show the institutional “verified” band + QR in UI (Section 11, certificate, dossier print).
- * Kept in sync with the Section 11 “Report Approved & Impact Verified” card so a visible success state
- * is not missing a QR when `impact_verify_url` is present.
+ * Kept in sync with student report gates (`ciiVerifiedSummaryLock`, admin verify actions).
  *
- * Public `GET …/public/impact-reports/:key/verification` may still return `verified: false` for some
- * edge statuses until payment/finalization — backend should only issue `impact_verify_url` when ready.
+ * Backend payloads vary: some set `admin_status`, others `admin_approval_status` or top-level `status: approved`.
  */
-export function isInstitutionallyVerifiedReport(
-    data: Pick<ReportData, "status" | "admin_status">,
-): boolean {
-    const reportSt = String(data.status || "").toLowerCase();
-    const adminSt = String(data.admin_status || "").toLowerCase();
+export function isInstitutionallyVerifiedReport(data: Partial<ReportData>): boolean {
+    const row = data as Partial<ReportData> & { reportStatus?: string; adminStatus?: string; adminApprovalStatus?: string };
+
+    const reportSt = norm(data.status ?? row.reportStatus);
+    const reportRs = norm(data.report_status);
+    const adminSt = norm(data.admin_status ?? row.adminStatus);
+    const adminApproval = norm(data.admin_approval_status ?? row.adminApprovalStatus);
+
     return (
-        adminSt === "verified" ||
-        adminSt === "approved" ||
-        reportSt === "verified" ||
-        reportSt === "finalized"
+        isApprovedishStatus(adminSt) ||
+        isApprovedishStatus(adminApproval) ||
+        isApprovedishStatus(reportSt) ||
+        isApprovedishStatus(reportRs)
     );
+}
+
+/** Dossier summary chip — same institutional gate as QR / verified band. */
+export function getReportReadinessLabel(data: Partial<ReportData>): "Ready" | "Pending" {
+    return isInstitutionallyVerifiedReport(data) ? "Ready" : "Pending";
 }

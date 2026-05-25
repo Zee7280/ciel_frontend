@@ -286,7 +286,7 @@ export default function AttendanceReviewDashboard({
                     href={backHref}
                     className={clsx(
                         "group inline-flex items-center gap-1.5 text-sm font-medium transition-colors",
-                        isPartner
+                        isPartner || stretchViewport
                             ? "text-slate-500 hover:text-[#0056B3]"
                             : "text-slate-600 hover:text-slate-900",
                     )}
@@ -574,18 +574,20 @@ export default function AttendanceReviewDashboard({
                         ) : (
                             <div
                                 className={clsx(
-                                    stretchViewport && "flex min-h-0 flex-1 flex-col gap-4",
+                                    "rounded-xl border border-slate-200/90 bg-white shadow-sm",
+                                    stretchViewport && "flex min-h-0 flex-1 flex-col p-4",
+                                    !stretchViewport && "p-4",
                                 )}
                             >
                                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                                    <div className="flex gap-1 rounded-lg bg-slate-100 p-1">
+                                    <div className="flex gap-1 rounded-[10px] bg-slate-100 p-1">
                                         <button
                                             type="button"
                                             onClick={() => setListTab("all")}
                                             className={clsx(
-                                                "rounded-md px-3 py-2 text-xs font-medium transition",
+                                                "rounded-lg px-3 py-2 text-xs font-semibold transition",
                                                 listTab === "all"
-                                                    ? "bg-white text-slate-900 shadow-sm"
+                                                    ? "bg-white text-slate-900 shadow-sm ring-1 ring-slate-200/80"
                                                     : "text-slate-600 hover:text-slate-900",
                                             )}
                                         >
@@ -595,9 +597,9 @@ export default function AttendanceReviewDashboard({
                                             type="button"
                                             onClick={() => setListTab("pending")}
                                             className={clsx(
-                                                "rounded-md px-3 py-2 text-xs font-medium transition",
+                                                "rounded-lg px-3 py-2 text-xs font-semibold transition",
                                                 listTab === "pending"
-                                                    ? "bg-white text-slate-900 shadow-sm"
+                                                    ? "bg-white text-slate-900 shadow-sm ring-1 ring-slate-200/80"
                                                     : "text-slate-600 hover:text-slate-900",
                                             )}
                                         >
@@ -609,7 +611,7 @@ export default function AttendanceReviewDashboard({
                                             type="button"
                                             onClick={() => void handleRefreshCounts()}
                                             disabled={refreshingCounts || countsLoading}
-                                            className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                                            className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-[#0056B3]/30 hover:bg-[#0056B3]/[0.04] hover:text-[#0056B3] disabled:cursor-not-allowed disabled:opacity-50"
                                         >
                                             {refreshingCounts || countsLoading ? (
                                                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -621,31 +623,31 @@ export default function AttendanceReviewDashboard({
                                     ) : null}
                                 </div>
 
-                                <label className="relative block">
+                                <label className={clsx("relative block", stretchViewport ? "mt-4" : "mt-4")}>
                                     <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                                     <input
                                         type="search"
                                         placeholder="Search opportunities…"
                                         value={query}
                                         onChange={(e) => setQuery(e.target.value)}
-                                        className="w-full rounded-lg border border-slate-200 bg-white py-2.5 pl-10 pr-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-slate-400 focus:ring-2 focus:ring-slate-100"
+                                        className="w-full rounded-[10px] border border-slate-200 bg-slate-50/50 py-2.5 pl-10 pr-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-[#0056B3]/40 focus:bg-white focus:ring-2 focus:ring-[#0056B3]/15"
                                     />
                                 </label>
 
                                 <div
                                     className={clsx(
-                                        "space-y-2 overflow-y-auto overscroll-contain pr-1",
+                                        "mt-4 space-y-2 overflow-y-auto overscroll-contain pr-1",
                                         stretchViewport
                                             ? "min-h-0 flex-1 max-h-none"
                                             : "max-h-[min(28rem,calc(100vh-14rem))]",
                                     )}
                                 >
                                     {filteredRows.length === 0 ? (
-                                        <div className="rounded-lg border border-dashed border-slate-200 bg-white px-4 py-10 text-center text-sm text-slate-600">
+                                        <div className="rounded-[10px] border border-dashed border-slate-200 bg-slate-50/50 px-4 py-10 text-center text-sm text-slate-600">
                                             No matches. Try{" "}
                                             <button
                                                 type="button"
-                                                className="font-medium text-slate-900 underline"
+                                                className="font-semibold text-[#0056B3] underline decoration-[#0056B3]/30 underline-offset-2"
                                                 onClick={() => setListTab("all")}
                                             >
                                                 All
@@ -662,20 +664,30 @@ export default function AttendanceReviewDashboard({
                                                     type="button"
                                                     onClick={() => handleRowSelect(p.id)}
                                                     className={clsx(
-                                                        "w-full rounded-lg border px-4 py-3 text-left text-sm transition",
+                                                        "relative w-full overflow-hidden rounded-[10px] border px-4 py-3.5 text-left text-sm transition shadow-sm",
                                                         sel
-                                                            ? "border-slate-900 bg-slate-50 ring-1 ring-slate-900"
-                                                            : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/80",
+                                                            ? clsx(
+                                                                  "border-[#0056B3]/35 bg-[#0056B3]/[0.07] shadow-md ring-2",
+                                                                  accentRing,
+                                                                  "ring-offset-2 ring-offset-white",
+                                                              )
+                                                            : "border-slate-200/90 bg-white hover:border-slate-300 hover:bg-slate-50/90",
                                                     )}
                                                 >
-                                                    <div className="flex items-start justify-between gap-3">
+                                                    {sel ? (
+                                                        <span
+                                                            className="absolute left-0 top-0 h-full w-1 rounded-l-[10px] bg-[#0056B3]"
+                                                            aria-hidden
+                                                        />
+                                                    ) : null}
+                                                    <div className="flex items-start justify-between gap-3 pl-0.5">
                                                         <div className="min-w-0">
-                                                            <p className="font-medium text-slate-900">{p.title}</p>
+                                                            <p className="font-semibold text-slate-900">{p.title}</p>
                                                             {p.subtitle ? (
                                                                 <p className="mt-0.5 text-xs text-slate-500">{p.subtitle}</p>
                                                             ) : null}
                                                         </div>
-                                                        <PendingCountBadge n={n} />
+                                                        <PendingCountBadge n={n} partner />
                                                     </div>
                                                 </button>
                                             );
@@ -908,7 +920,26 @@ export default function AttendanceReviewDashboard({
                                             </div>
                                         </div>
                                     </div>
-                                ) : stretchViewport ? null : (
+                                ) : stretchViewport ? (
+                                    <div className="flex shrink-0 items-center gap-3 rounded-xl border border-slate-200/90 bg-white px-4 py-3 shadow-sm">
+                                        <div
+                                            className={clsx(
+                                                "flex h-10 w-10 shrink-0 items-center justify-center rounded-lg",
+                                                accentSoftBg,
+                                            )}
+                                        >
+                                            <BookOpen className={clsx("h-5 w-5", accent)} aria-hidden />
+                                        </div>
+                                        <div className="min-w-0 flex-1">
+                                            <p className="text-sm font-semibold leading-snug text-slate-900 sm:text-base">
+                                                {selected.title}
+                                            </p>
+                                            {selected.subtitle ? (
+                                                <p className="mt-0.5 text-xs text-slate-500">{selected.subtitle}</p>
+                                            ) : null}
+                                        </div>
+                                    </div>
+                                ) : (
                                     <p className="text-sm text-slate-600">
                                         <span className="font-medium text-slate-900">{selected.title}</span>
                                         {selected.subtitle ? (

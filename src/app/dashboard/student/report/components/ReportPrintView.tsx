@@ -3,7 +3,11 @@ import { useReportForm } from "../context/ReportContext";
 import type { ReportData } from "../context/ReportContext";
 import { Landmark } from "lucide-react";
 import { calculateCII } from "../utils/calculateCII";
-import { buildIndividualRosterFromSection1, calculateEngagementMetrics } from "../utils/engagementMetrics";
+import {
+    buildIndividualRosterFromSection1,
+    calculateEngagementMetrics,
+    formatHecComplianceLabel,
+} from "../utils/engagementMetrics";
 import { formatSection7PakistanDialForDisplay } from "@/utils/reportSection7PakistanDial";
 import { buildSection1ParticipationDisplay, resolveReportAuthorParticipationSnapshot } from "@/utils/reportSection1ParticipationDisplay";
 import { deriveCertificateProjectDisplay } from "../utils/certificateDisplay";
@@ -17,7 +21,10 @@ import {
 import { AttendanceLogsDossierTable } from "@/components/verify/AttendanceLogsDossierTable";
 import { buildSection1AttendanceParticipantNameMap } from "@/utils/attendanceLogDisplay";
 import { formatDisplayId } from "@/utils/displayIds";
-import { isInstitutionallyVerifiedReport } from "@/utils/institutionalReportVerification";
+import {
+    getReportReadinessLabel,
+    isInstitutionallyVerifiedReport,
+} from "@/utils/institutionalReportVerification";
 import { pickImpactVerifyUrlFromPayload } from "@/utils/reportVerificationUrl";
 import { readPersistedCiiSnapshot } from "@/utils/reportCiiSnapshot";
 import { extractIssueFields, parseAuditSummaryIntoSections } from "@/lib/parseAuditSummarySections";
@@ -1186,8 +1193,12 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
                             {[
                                 { label: "Verified hours", value: metrics.total_verified_hours, suffix: "hrs" },
                                 { label: "CII score", value: totalScore, suffix: "/100" },
-                                { label: "Compliance", value: data.section1.metrics?.hec_compliance || "—", suffix: "" },
-                                { label: "Readiness", value: isInstitutionallyVerifiedReport(reportRow) ? "Ready" : "Pending", suffix: "" },
+                                {
+                                    label: "Compliance",
+                                    value: formatHecComplianceLabel(data.section1.metrics?.hec_compliance),
+                                    suffix: "",
+                                },
+                                { label: "Readiness", value: getReportReadinessLabel(reportRow), suffix: "" },
                             ].map((cell) => (
                                 <div key={cell.label} className="rounded-xl border border-slate-200/80 bg-white p-5 text-center shadow-sm transition-shadow duration-200 hover:shadow-md">
                                     <p className={`${dossierLabel} text-slate-500`}>{cell.label}</p>
@@ -1285,7 +1296,10 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
                             <QandA q="Weekly continuity (%)" a={engagementForPrintDossier.weekly_continuity} />
                             <QandA q="EIS score" a={engagementForPrintDossier.eis_score} />
                             <QandA q="Engagement category" a={engagementForPrintDossier.engagement_category} />
-                            <QandA q="HEC compliance" a={engagementForPrintDossier.hec_compliance} />
+                            <QandA
+                                q="HEC compliance"
+                                a={formatHecComplianceLabel(engagementForPrintDossier.hec_compliance)}
+                            />
                             <QandA q="Non-compliant (engagement)" a={engagementForPrintDossier.isNonCompliant} />
                         </div>
                         {redFlagsForPrint.length > 0 ? (

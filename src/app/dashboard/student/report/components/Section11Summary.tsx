@@ -104,10 +104,37 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
     const [showCertificate, setShowCertificate] = useState(false);
     const [showRedFlagsModal, setShowRedFlagsModal] = useState(false);
 
+    const clearCertificatePrintScale = () => {
+        document.documentElement.style.removeProperty("--cert-print-scale");
+    };
+
+    const applyCertificatePrintScale = () => {
+        const area = document.getElementById("print-area-certificate");
+        if (area) area.scrollTop = 0;
+        window.scrollTo(0, 0);
+
+        const cert = document.querySelector(".certificate-one-page") as HTMLElement | null;
+        if (!cert) return;
+
+        const pageHeightPx = (210 / 25.4) * 96;
+        const pageWidthPx = (297 / 25.4) * 96;
+        const contentH = cert.offsetHeight;
+        const contentW = cert.offsetWidth;
+        if (contentH <= 0 || contentW <= 0) return;
+
+        const scale = Math.min(pageWidthPx / contentW, pageHeightPx / contentH, 1) * 0.98;
+        document.documentElement.style.setProperty("--cert-print-scale", String(scale));
+    };
+
     useEffect(() => {
         if (!showCertificate) return;
+        document.documentElement.classList.add("cii-certificate-printing");
         document.body.classList.add("cii-certificate-printing");
-        return () => document.body.classList.remove("cii-certificate-printing");
+        return () => {
+            document.documentElement.classList.remove("cii-certificate-printing");
+            document.body.classList.remove("cii-certificate-printing");
+            clearCertificatePrintScale();
+        };
     }, [showCertificate]);
 
     const beneficiariesRaw = section4.project_summary?.distinct_total_beneficiaries;
@@ -187,6 +214,16 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
     };
 
     const handlePrint = () => {
+        if (showCertificate) {
+            applyCertificatePrintScale();
+            const onAfterPrint = () => {
+                clearCertificatePrintScale();
+                window.removeEventListener("afterprint", onAfterPrint);
+            };
+            window.addEventListener("afterprint", onAfterPrint);
+            requestAnimationFrame(() => window.print());
+            return;
+        }
         window.print();
     };
 
@@ -805,10 +842,24 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                         top: 0 !important;
                     }
 
-                    @page { margin: 1cm; size: auto; }
-
                     .print-no-ui { display: none !important; }
-                    
+
+                    /* Certificate: one landscape sheet — layout in globals.css */
+                    body:not(.cii-certificate-printing) .print-scroll-auto,
+                    body:not(.cii-certificate-printing) #print-area {
+                        overflow: visible !important;
+                        max-height: none !important;
+                        height: auto !important;
+                        display: block !important;
+                        padding: 0 !important;
+                    }
+
+                    body.cii-certificate-printing #print-area-certificate {
+                        overflow: hidden !important;
+                        max-height: 210mm !important;
+                        scroll-behavior: auto !important;
+                    }
+
                     .print-scroll-auto, #print-area, #print-area-certificate { 
                         overflow: visible !important; 
                         max-height: none !important; 

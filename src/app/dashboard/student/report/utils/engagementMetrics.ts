@@ -105,6 +105,17 @@ export interface CalculatedMetrics {
     isNonCompliant?: boolean;
 }
 
+/** UI label for `hec_compliance` (API/validation keep lowercase enum values). */
+export function formatHecComplianceLabel(value: string | undefined | null): string {
+    if (value == null) return "—";
+    const s = String(value).trim();
+    if (!s || s === "—") return "—";
+    return s
+        .split("-")
+        .map((part) => (part ? part.charAt(0).toUpperCase() + part.slice(1).toLowerCase() : ""))
+        .join("-");
+}
+
 export function calculateEngagementMetrics(
     logs: AttendanceLog[], 
     requiredHours: number = 16, 
