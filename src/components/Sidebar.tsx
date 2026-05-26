@@ -213,6 +213,7 @@ export default function Sidebar() {
             { label: "Funding", href: "/dashboard/partner/funding", icon: PieChart },
             { label: "Notifications", href: "/dashboard/partner/notifications", icon: Bell },
             { label: "Platform tutorial", href: "/dashboard/partner/tutorials", icon: PlayCircle },
+            { label: "Help & Support", href: "/dashboard/partner/help", icon: LifeBuoy },
         ] : []),
         // Faculty 
         ...(isFaculty ? [
@@ -229,6 +230,7 @@ export default function Sidebar() {
             { label: "Notifications", href: "/dashboard/faculty/notifications", icon: Bell },
             { label: "Platform tutorial", href: "/dashboard/faculty/tutorials", icon: PlayCircle },
             { label: "Impact Analytics", href: "/dashboard/faculty/analytics", icon: PieChart },
+            { label: "Help & Support", href: "/dashboard/faculty/help", icon: LifeBuoy },
         ] : []),
         // Admin
         ...(isAdmin ? [

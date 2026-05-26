@@ -1,11 +1,16 @@
 import React, { useMemo } from "react";
 import { useReportForm } from "../context/ReportContext";
 import type { ReportData } from "../context/ReportContext";
-import { formatDisplayId } from "@/utils/displayIds";
-import { Award, ShieldCheck, Globe } from "lucide-react";
+import { BarChart3, Calendar, Clock, Globe, Lock, Target, Users } from "lucide-react";
+import "./certificate-print.css";
 import { calculateCII } from "../utils/calculateCII";
 import { calculateEngagementMetrics, buildIndividualRosterFromSection1 } from "../utils/engagementMetrics";
-import { deriveCertificateProjectDisplay } from "../utils/certificateDisplay";
+import {
+    deriveCertificateProjectDisplay,
+    formatCertificateDate,
+    pickCertificateVerificationCode,
+} from "../utils/certificateDisplay";
+import { resolveImpactVerifyQrHref } from "@/utils/reportVerificationUrl";
 import { mergedSdgTitlesLine, uniqueMergedSdgGoalNumbers } from "../utils/reportSdgMerge";
 import ReportVerificationQr from "@/components/ReportVerificationQr";
 import { isInstitutionallyVerifiedReport } from "@/utils/institutionalReportVerification";
@@ -68,6 +73,20 @@ function isSameReportParticipant(a: LeadShape | TeamMember, b: LeadShape | TeamM
     return false;
 }
 
+function CertFlourish() {
+    return (
+        <svg className="cert-flourish" viewBox="0 0 88 18" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
+            <path
+                d="M44 2c-8 0-12 4-16 6-4 2-8 2-12 0M44 2c8 0 12 4 16 6 4 2 8 2 12 0M44 16c-3-2-6-3-10-3s-7 1-10 3M44 16c3-2 6-3 10-3s7 1 10 3"
+                stroke="currentColor"
+                strokeWidth="1.2"
+                strokeLinecap="round"
+            />
+            <circle cx="44" cy="9" r="2.5" fill="currentColor" />
+        </svg>
+    );
+}
+
 function getCiiCertificateBadge(score: number): CertificateBadge {
     if (score >= 85) {
         return {
@@ -118,7 +137,7 @@ export default function CertificateView({ projectData }: { projectData?: unknown
     const { data } = useReportForm();
     const { section1, section2, section3 } = data;
 
-    const { headline: certificateHeadline, contextLine: certificateContext } = useMemo(
+    const { headline: certificateHeadline } = useMemo(
         () => deriveCertificateProjectDisplay(data),
         [data],
     );
@@ -126,8 +145,7 @@ export default function CertificateView({ projectData }: { projectData?: unknown
     const recipientBlocks = useMemo(() => {
         const lead = section1.team_lead;
         const leadName = displayPersonName(lead) || "Distinguished Participant";
-        const leadLabel =
-            section1.participation_type === "team" ? "Team lead" : "Participant";
+        const leadLabel = section1.participation_type === "team" ? "Team Lead" : "Participant";
         const leadDegree = lead.degree?.trim() || "";
         const leadProgram = [leadDegree, section2.discipline?.trim() && leadDegree !== section2.discipline.trim() ? section2.discipline.trim() : ""]
             .filter(Boolean)
@@ -169,20 +187,8 @@ export default function CertificateView({ projectData }: { projectData?: unknown
         return rows;
     }, [section1.participation_type, section1.team_lead, section1.team_members, section2.discipline]);
 
-    const showRecipientCards = section1.participation_type === "team" && recipientBlocks.length > 1;
-    const showTeamRoster = showRecipientCards && recipientBlocks.length > 2;
     const rosterBlocks = useMemo(() => recipientBlocks.slice(0, 20), [recipientBlocks]);
     const hiddenRosterCount = Math.max(0, recipientBlocks.length - rosterBlocks.length);
-
-    const institutionLine = useMemo(() => {
-        const uni = section1.team_lead.university?.trim();
-        const degree = section1.team_lead.degree?.trim();
-        const discipline = section2.discipline?.trim();
-        const parts: string[] = [];
-        if (uni) parts.push(uni);
-        const program = [degree, discipline && degree !== discipline ? discipline : ""].filter(Boolean).join(" · ");
-        return { primary: parts.join(" "), secondary: program };
-    }, [section1.team_lead.university, section1.team_lead.degree, section2.discipline]);
 
     const mergedSdgNums = useMemo(
         () => uniqueMergedSdgGoalNumbers(projectData, section3),
@@ -263,366 +269,193 @@ export default function CertificateView({ projectData }: { projectData?: unknown
 
     const ciiBadge = useMemo(() => getCiiCertificateBadge(ciiScore), [ciiScore]);
 
-    const today = new Date().toLocaleDateString(undefined, {
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-    });
+    const certificateDate = useMemo(() => formatCertificateDate(), []);
+    const verificationCode = useMemo(() => pickCertificateVerificationCode(data), [data]);
+
+    const verifyHintHost = useMemo(() => {
+        const href = resolveImpactVerifyQrHref(resolvedVerifyUrl);
+        if (href) {
+            try {
+                return new URL(href).host;
+            } catch {
+                /* fall through */
+            }
+        }
+        return "www.cielpk.com";
+    }, [resolvedVerifyUrl]);
+
+    const engagementSpanLabel =
+        engagementSpanDays > 0
+            ? `${engagementSpanDays} Calendar ${engagementSpanDays === 1 ? "Day" : "Days"}`
+            : "—";
+
+    const sdgPrimaryLabel =
+        mergedSdgNums.length === 0
+            ? "—"
+            : mergedSdgNums.length === 1
+              ? `Goal ${sdgGoalDisplay}`
+              : `Goals ${sdgGoalDisplay}`;
 
     return (
-        <div className="certificate-print-shell">
-        <div className="certificate-one-page bg-[#fffdfa] min-h-[690px] w-full max-w-6xl mx-auto p-12 relative border-[12px] border-[#071b3a] shadow-2xl flex flex-col items-center text-center overflow-x-hidden overflow-y-visible break-inside-avoid">
-            <style dangerouslySetInnerHTML={{
-                __html: `
-                @media print {
-                    @page {
-                        size: A4 landscape;
-                        margin: 0;
-                    }
-                    @page cii-certificate-page {
-                        size: A4 landscape;
-                        margin: 0;
-                    }
-                }
-                `,
-            }} />
-            <div className="pointer-events-none absolute inset-3 border border-[#b67835]/80" />
-            <div className="pointer-events-none absolute inset-6 border border-[#071b3a]/10" />
-            <div className="absolute top-0 left-0 w-64 h-64 bg-[#b67835]/5 -ml-32 -mt-32 rounded-full" />
-            <div className="absolute bottom-0 right-0 w-96 h-96 bg-[#071b3a]/5 -mr-48 -mb-48 rounded-full" />
-            <div className="pointer-events-none absolute inset-0 flex items-center justify-center opacity-[0.035]">
-                <img src="/certificate-iel-pk-logo.png" alt="" className="h-[34rem] w-[34rem] object-contain" />
-            </div>
+        <div className="certificate-print-shell flex justify-center p-4 print:p-0">
+            <div className="certificate-one-page w-[210mm] min-h-[297mm] max-w-[210mm] mx-auto shadow-2xl print:shadow-none break-inside-avoid">
+                <div className="cert-frame">
+                    <div className="cert-corner cert-corner--tl" aria-hidden />
+                    <div className="cert-corner cert-corner--tl-gold" aria-hidden />
+                    <div className="cert-corner cert-corner--bl" aria-hidden />
+                    <div className="cert-corner cert-corner--bl-gold" aria-hidden />
 
-            <div className="relative z-10 w-full flex justify-between items-start gap-6 mb-10 pt-4">
-                <div className="flex items-center gap-4 text-left">
-                    <img src="/certificate-iel-pk-logo.png" alt="CIEL PK" className="h-[5.5rem] w-[5.5rem] shrink-0 object-contain object-left" width={1024} height={1024} />
-                    <div className="border-l border-[#b67835]/60 pl-4">
-                        <p className="font-serif text-3xl font-black leading-none tracking-wide text-[#071b3a]">
-                            CIEL PK
-                        </p>
-                        <p className="mt-1 text-xs font-semibold text-[#071b3a]/80">
-                            Community Impact Education Lab
-                        </p>
-                    </div>
-                </div>
-                <div className="flex items-start justify-end gap-4 text-right">
-                    <div>
-                        <div className="flex items-center justify-end gap-2 mb-1">
-                            <ShieldCheck className="w-4 h-4 text-[#071b3a]" />
-                            <span className="text-[10px] font-black uppercase tracking-[0.3em] text-[#071b3a]">Verified impact</span>
-                        </div>
-                        <div className="text-[9px] font-bold text-[#071b3a]/55">
-                            ID: {data.project_id ? formatDisplayId(data.project_id, "OPP") : "CIEL-REF-PENDING"}
-                        </div>
-                    </div>
-                    {showVerificationQr ? (
-                        <ReportVerificationQr
-                            impactVerifyUrl={resolvedVerifyUrl ?? undefined}
-                            size={64}
-                            caption="Authenticate certificate"
-                            className="shrink-0 items-end gap-1"
-                        />
-                    ) : null}
-                </div>
-            </div>
-
-            <div className={`relative z-10 space-y-3 ${showTeamRoster ? "mb-4" : "mb-8"}`}>
-                <div className="inline-flex items-center gap-3 px-6 py-2 text-[#9a4b25]">
-                    <span className="h-px w-9 bg-[#b67835]/70" />
-                    <span className="text-xs font-black uppercase tracking-[0.45em]">
-                        Honorary recognition
-                    </span>
-                    <span className="h-px w-9 bg-[#b67835]/70" />
-                </div>
-
-                <h1 className="font-serif text-5xl font-black text-[#071b3a] uppercase tracking-tight leading-tight">
-                    Certificate of <br />
-                    <span className="text-[#9a4b25]">Institutional impact</span>
-                </h1>
-            </div>
-
-            <div className={`relative z-10 w-full space-y-5 ${showTeamRoster ? "max-w-4xl mb-5" : "max-w-3xl mb-10"}`}>
-                <p className="text-base font-medium text-[#071b3a]/65 italic">
-                    This official recognition is presented to{showTeamRoster ? " the Verified Project Team" : ""}
-                </p>
-
-                {showTeamRoster ? (
-                    <div className="rounded-2xl border border-[#b67835]/75 bg-white/75 p-3 shadow-sm">
-                        <div className="relative -mt-6 mb-2 flex justify-center">
-                            <span className="bg-[#071b3a] px-6 py-1 font-serif text-sm font-black uppercase tracking-widest text-white">
-                                Verified Team Roster
-                            </span>
-                        </div>
-                        <p className="mb-2 text-[11px] font-semibold italic text-[#9a4b25]">
-                            Capacity: Up to 20 Students | Multi-University Team Recognition
-                            {hiddenRosterCount > 0 ? ` | +${hiddenRosterCount} listed in official report` : ""}
-                        </p>
-                        <div className="certificate-team-roster grid grid-cols-1 sm:grid-cols-4 rounded-xl border border-[#b67835]/25 text-left">
-                            {rosterBlocks.map((row, index) => (
-                                <div
-                                    key={row.key}
-                                    className="min-h-[3.35rem] border-b border-r border-[#b67835]/20 px-3 py-2 last:border-b-0"
-                                >
-                                    <div className="flex gap-2">
-                                        <span className="w-5 shrink-0 text-right text-[11px] font-black text-[#9a4b25]">
-                                            {index + 1}.
-                                        </span>
-                                        <div className="min-w-0">
-                                            <p className="truncate text-sm font-black leading-none text-[#071b3a]">
-                                                {row.name}
-                                            </p>
-                                            <p className="mt-1 line-clamp-2 text-[9px] font-semibold leading-tight text-[#071b3a]/70">
-                                                {row.university || row.program || row.label}
-                                            </p>
-                                        </div>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                ) : showRecipientCards ? (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                        {recipientBlocks.map((row) => (
-                            <div
-                                key={row.key}
-                                className="relative rounded-2xl border border-[#b67835]/70 bg-white/75 px-5 pb-4 pt-5 shadow-sm"
-                            >
-                                <div className="absolute -top-3 left-1/2 flex h-7 w-7 -translate-x-1/2 items-center justify-center rounded-full bg-[#071b3a] text-white ring-2 ring-[#fffdfa]">
-                                    <span className="text-[11px] font-black leading-none">●</span>
-                                </div>
-                                <div className="flex flex-col sm:flex-row sm:items-baseline sm:justify-center sm:gap-3 gap-0.5">
-                                    <span className="text-2xl sm:text-3xl font-black text-[#071b3a] uppercase tracking-[0.12em] break-words">
-                                        {row.name}
-                                    </span>
-                                    <span className="text-[10px] font-bold uppercase tracking-widest text-[#9a4b25]">
-                                        {row.label}
-                                    </span>
-                                </div>
-                                <div className="my-3 h-px bg-[#b67835]/35" />
-                                {row.university ? (
-                                    <p className="text-sm font-black leading-tight text-[#071b3a]">
-                                        {row.university}
-                                    </p>
-                                ) : null}
-                                {row.program ? (
-                                    <p className="mt-2 text-xs font-semibold leading-tight text-[#071b3a]/75">
-                                        {row.program}
-                                    </p>
-                                ) : null}
-                            </div>
-                        ))}
-                    </div>
-                ) : (
-                    <div className="pb-3">
-                        <div className="flex flex-col gap-2.5">
-                            {recipientBlocks.map((row) => (
-                                <div
-                                    key={row.key}
-                                    className="flex flex-col sm:flex-row sm:items-baseline sm:justify-center sm:gap-3 gap-0.5"
-                                >
-                                    <span className="text-2xl sm:text-3xl font-black text-[#071b3a] uppercase tracking-[0.18em] break-words">
-                                        {row.name}
-                                    </span>
-                                    <span className="text-[10px] font-bold uppercase tracking-widest text-[#9a4b25]">
-                                        {row.label}
-                                    </span>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                )}
-
-                {!showRecipientCards && (institutionLine.primary || institutionLine.secondary) && (
-                    <div className="rounded-2xl border border-[#b67835]/70 bg-white/70 px-5 py-4 shadow-sm">
-                        {institutionLine.primary ? (
-                            <p className="text-xs font-black uppercase tracking-[0.35em] text-[#071b3a]">
-                                {institutionLine.primary}
-                            </p>
-                        ) : null}
-                        {institutionLine.secondary ? (
-                            <p className="text-[11px] font-semibold text-[#9a4b25] mt-1.5 leading-snug">
-                                {institutionLine.secondary}
-                            </p>
-                        ) : null}
-                    </div>
-                )}
-
-                <p className="text-sm font-medium text-[#071b3a]/65 italic leading-relaxed max-w-2xl mx-auto">
-                    for verified delivery of the institutional impact project
-                </p>
-                <div className="max-w-2xl mx-auto space-y-2">
-                    <p
-                        className="text-lg sm:text-xl font-black text-[#071b3a] leading-snug tracking-tight"
-                        title={certificateHeadline}
-                    >
-                        &ldquo;{certificateHeadline}&rdquo;
-                    </p>
-                    {!showTeamRoster && certificateContext ? (
-                        <p className="text-[11px] sm:text-xs text-[#071b3a]/60 font-medium leading-relaxed text-center">
-                            {certificateContext}
-                        </p>
-                    ) : null}
-                </div>
-            </div>
-
-            <div
-                className={`certificate-metrics-grid relative z-10 w-full max-w-4xl ${showTeamRoster ? "gap-4" : "gap-8"}`}
-                style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-                    gap: showTeamRoster ? "1rem" : "2rem",
-                }}
-            >
-                <div className="space-y-2 sm:border-r sm:border-[#b67835]/30 sm:pr-4">
-                    <div className="flex justify-center mb-2">
-                        <div className="w-10 h-10 rounded-full bg-white/70 flex items-center justify-center text-[#9a4b25] ring-1 ring-[#b67835]/40">
-                            <Clock className="w-5 h-5" />
-                        </div>
-                    </div>
-                    <p className="text-[10px] font-black uppercase tracking-widest text-[#071b3a]/65">
-                        Verified hours
-                    </p>
-                    <p className="text-2xl sm:text-3xl font-black text-[#071b3a]">
-                        <span className="whitespace-nowrap">{verifiedHours}</span>
-                    </p>
-                    <p className="text-[10px] font-bold text-[#9a4b25] uppercase tracking-tight">
-                        Engagement span
-                    </p>
-                    <p className="text-sm font-black text-[#071b3a]">
-                        {engagementSpanDays > 0 ? (
-                            <span>{engagementSpanDays} calendar days</span>
-                        ) : (
-                            <span className="text-slate-400 font-semibold">Log dates to show span</span>
-                        )}
-                    </p>
-                </div>
-
-                <div className="space-y-2 border-y border-[#b67835]/30 py-8 sm:py-0 sm:border-y-0 sm:border-x sm:px-4">
-                    <div className="flex justify-center mb-2">
-                        <div className="w-10 h-10 rounded-full bg-white/70 flex items-center justify-center text-[#9a4b25] ring-1 ring-[#b67835]/40">
-                            <Globe className="w-5 h-5" />
-                        </div>
-                    </div>
-                    <p className="text-[10px] font-black uppercase tracking-widest text-[#071b3a]/65">
-                        SDG alignment
-                    </p>
-                    <p className="text-xl sm:text-2xl font-black text-[#071b3a]">
-                        {mergedSdgNums.length === 0 ? (
-                            <span className="whitespace-nowrap">—</span>
-                        ) : mergedSdgNums.length === 1 ? (
-                            <>
-                                Goal <span className="whitespace-nowrap">{sdgGoalDisplay}</span>
-                            </>
-                        ) : (
-                            <>
-                                Goals <span className="whitespace-nowrap">{sdgGoalDisplay}</span>
-                            </>
-                        )}
-                    </p>
-                    {sdgTitleLine ? (
-                        <p className="text-[11px] font-semibold text-[#071b3a]/70 leading-snug max-w-[14rem] mx-auto">
-                            {sdgTitleLine}
-                        </p>
-                    ) : null}
-                </div>
-
-                <div className="space-y-2 sm:pl-4">
-                    <div className="flex justify-center mb-2">
-                        <div className="w-10 h-10 rounded-full bg-white/70 flex items-center justify-center text-[#9a4b25] ring-1 ring-[#b67835]/40">
-                            <Award className="w-5 h-5" />
-                        </div>
-                    </div>
-                    <p className="text-[10px] font-black uppercase tracking-widest text-[#071b3a]/65">
-                        CII index score
-                    </p>
-                    <p className="text-2xl sm:text-3xl font-black text-[#071b3a]">
-                        <span className="whitespace-nowrap">{ciiScore}/100</span>
-                        <span className={`block text-[11px] font-black uppercase tracking-widest mt-1 ${ciiBadge.accentClass}`}>
-                            {ciiBadge.title}
-                        </span>
-                        <span className="block font-serif text-[11px] font-semibold italic normal-case tracking-normal text-[#071b3a]/70 mt-0.5">
-                            {ciiBadge.tagline}
-                        </span>
-                    </p>
-                </div>
-            </div>
-
-            <div className="relative z-10 mt-auto w-full max-w-5xl pt-8">
-                <div
-                    className="items-end"
-                    style={{
-                        display: "grid",
-                        gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-                        gap: "1.5rem",
-                    }}
-                >
-                    <div className="text-left space-y-3">
-                        <div className="pl-1">
+                    <div className="cert-inner">
+                        <div className="cert-logo-row">
                             <img
-                                src="/ciel-e-signature.png"
-                                alt="E-signature"
-                                className="h-10 w-40 object-contain object-left"
-                                width={640}
-                                height={160}
+                                src="/certificate-iel-pk-logo.png"
+                                alt="IEL"
+                                className="cert-logo-mark"
+                                width={1024}
+                                height={1024}
                             />
+                            <span className="cert-logo-pk">PK</span>
                         </div>
-                        <div className="w-48 h-[1px] bg-[#b67835]" />
-                        <div>
-                            <p className="mb-1 text-[7px] font-black uppercase tracking-[0.35em] text-[#071b3a]/45">
-                                E-signature
-                            </p>
-                            <p className="font-black text-[#071b3a] text-sm uppercase">Registrar of impact</p>
-                            <p className="text-[10px] font-bold text-[#071b3a]/55 uppercase tracking-widest">
-                                Community Impact Lab (CIEL)
-                            </p>
+
+                        <h1 className="cert-title-main">Certificate</h1>
+                        <p className="cert-title-sub">Of Verified Community Impact</p>
+                        <CertFlourish />
+
+                        <p className="cert-intro">
+                            This is to certify that the following participant(s) have successfully contributed to
+                            the institutional impact project
+                        </p>
+                        <p className="cert-project-title" title={certificateHeadline}>
+                            &ldquo;{certificateHeadline}&rdquo;
+                        </p>
+                        <CertFlourish />
+
+                        <div className="cert-table-wrap">
+                            <div className="cert-table-tab">Certified Participants</div>
+                            <table className="cert-participant-table certificate-participant-table">
+                                <thead>
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Participant Name</th>
+                                        <th>Role</th>
+                                        <th>Degree / Program</th>
+                                        <th>Institution</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {rosterBlocks.map((row, index) => (
+                                        <tr key={row.key}>
+                                            <td>{index + 1}</td>
+                                            <td>{row.name}</td>
+                                            <td>{row.label}</td>
+                                            <td>{row.program || "—"}</td>
+                                            <td>{row.university || "—"}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                            {hiddenRosterCount > 0 ? (
+                                <p className="cert-roster-note">
+                                    +{hiddenRosterCount} additional participant(s) listed in the official impact report
+                                </p>
+                            ) : null}
                         </div>
-                    </div>
 
-                    <div className="flex flex-col items-center justify-end">
-                        <img
-                            src={ciiBadge.src}
-                            alt={ciiBadge.alt}
-                            className="h-24 w-36 object-contain drop-shadow-sm"
-                            width={1024}
-                            height={1024}
-                        />
-                    </div>
-
-                    <div className="text-right space-y-3">
-                        <div className="w-48 h-[1px] bg-[#b67835] ml-auto" />
-                        <div>
-                            <p className="font-black text-[#071b3a] text-sm uppercase">Dated</p>
-                            <p className="text-[10px] font-bold text-[#071b3a]/55 uppercase tracking-widest">{today}</p>
+                        <div className="cert-metrics certificate-metrics-grid">
+                            <div className="cert-metric certificate-metric-cell">
+                                <Clock className="cert-metric-icon" aria-hidden />
+                                <p className="cert-metric-label">Verified Hours</p>
+                                <p className="cert-metric-value">{verifiedHours || "—"}</p>
+                            </div>
+                            <div className="cert-metric certificate-metric-cell">
+                                <Users className="cert-metric-icon" aria-hidden />
+                                <p className="cert-metric-label">Engagement Span</p>
+                                <p className="cert-metric-value cert-metric-value--sm">{engagementSpanLabel}</p>
+                            </div>
+                            <div className="cert-metric certificate-metric-cell">
+                                <Target className="cert-metric-icon" aria-hidden />
+                                <p className="cert-metric-label">SDG Alignment</p>
+                                <p className="cert-metric-value">{sdgPrimaryLabel}</p>
+                                {sdgTitleLine ? <p className="cert-metric-sdg-sub">{sdgTitleLine}</p> : null}
+                            </div>
+                            <div className="cert-metric certificate-metric-cell">
+                                <BarChart3 className="cert-metric-icon" aria-hidden />
+                                <p className="cert-metric-label">CII Index Score</p>
+                                <p className="cert-metric-value">
+                                    {ciiScore}/100
+                                </p>
+                            </div>
+                            <div className="cert-metric cert-metric-badge certificate-metric-cell">
+                                <img
+                                    src={ciiBadge.src}
+                                    alt={ciiBadge.alt}
+                                    className="cert-metric-badge-img"
+                                    width={1024}
+                                    height={1024}
+                                />
+                            </div>
                         </div>
-                    </div>
-                </div>
 
-                <div className="mt-5 text-center">
-                    <p className="text-[8px] font-black text-[#071b3a]/35 uppercase tracking-[0.45em]">
-                        Verification follows HEC-aligned community engagement documentation standards
-                    </p>
+                        <div className="cert-footer-row">
+                            <div className="cert-signature-block">
+                                <img
+                                    src="/ciel-e-signature.png"
+                                    alt="Registrar signature"
+                                    className="cert-signature-img"
+                                    width={640}
+                                    height={160}
+                                />
+                                <div className="cert-signature-line" />
+                                <p className="cert-registrar-label">Registrar of Impact</p>
+                                <p className="cert-registrar-sub">Community Impact Lab (CIL)</p>
+                            </div>
+                            <div className="cert-date-block">
+                                <Calendar className="cert-date-icon" aria-hidden />
+                                <div className="cert-date-line" />
+                                <p className="cert-dated-label">Dated</p>
+                                <p className="cert-dated-value">{certificateDate}</p>
+                            </div>
+                        </div>
+
+                        <div className="cert-verify-box">
+                            <div className="cert-verify-shield" aria-hidden>
+                                <Lock className="cert-verify-shield-lock" strokeWidth={2.25} />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                                <p className="cert-verify-code-label">Certificate Verification Code</p>
+                                <p className="cert-verify-code-value">
+                                    {verificationCode ?? "—"}
+                                </p>
+                                <p className="cert-verify-hint">
+                                    Scan the QR code or visit {verifyHintHost} to verify authenticity.
+                                </p>
+                            </div>
+                            {showVerificationQr ? (
+                                <ReportVerificationQr
+                                    impactVerifyUrl={resolvedVerifyUrl ?? undefined}
+                                    size={76}
+                                    caption=""
+                                    className="shrink-0 [&_div]:rounded-none [&_div]:border-0 [&_div]:p-0"
+                                />
+                            ) : (
+                                <div
+                                    className="h-[76px] w-[76px] shrink-0 border border-dashed border-[#b67835]/50 bg-white/80"
+                                    aria-hidden
+                                />
+                            )}
+                        </div>
+
+                        <p className="cert-disclaimer">
+                            This certificate is issued by Community Impact Lab (CIL) and follows CIL-aligned
+                            community engagement documentation standards.
+                        </p>
+                        <p className="cert-website">
+                            <Globe className="cert-website-icon" aria-hidden />
+                            www.cielpk.com
+                        </p>
+                    </div>
                 </div>
             </div>
-        </div>
         </div>
     );
 }
-
-const Clock = ({ className }: { className?: string }) => (
-    <svg
-        className={className}
-        xmlns="http://www.w3.org/2000/svg"
-        width="24"
-        height="24"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-    >
-        <circle cx="12" cy="12" r="10" />
-        <polyline points="12 6 12 12 16 14" />
-    </svg>
-);

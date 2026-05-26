@@ -116,8 +116,8 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
         const cert = document.querySelector(".certificate-one-page") as HTMLElement | null;
         if (!cert) return;
 
-        const pageHeightPx = (210 / 25.4) * 96;
-        const pageWidthPx = (297 / 25.4) * 96;
+        const pageWidthPx = (210 / 25.4) * 96;
+        const pageHeightPx = (297 / 25.4) * 96;
         const contentH = cert.offsetHeight;
         const contentW = cert.offsetWidth;
         if (contentH <= 0 || contentW <= 0) return;
@@ -844,7 +844,7 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
 
                     .print-no-ui { display: none !important; }
 
-                    /* Certificate: one landscape sheet — layout in globals.css */
+                    /* Certificate: one portrait A4 sheet — layout in globals.css */
                     body:not(.cii-certificate-printing) .print-scroll-auto,
                     body:not(.cii-certificate-printing) #print-area {
                         overflow: visible !important;
@@ -856,7 +856,7 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
 
                     body.cii-certificate-printing #print-area-certificate {
                         overflow: hidden !important;
-                        max-height: 210mm !important;
+                        max-height: 297mm !important;
                         scroll-behavior: auto !important;
                     }
 

@@ -192,11 +192,11 @@ body {
 
 @media print {
   @page cii-certificate-page {
-    size: A4 landscape;
+    size: A4 portrait;
     margin: 0;
   }
 
-  /* Certificate-only print: hide app chrome, one landscape sheet, WYSIWYG scale via --cert-print-scale */
+  /* Certificate-only print: hide app chrome, one portrait sheet, WYSIWYG scale via --cert-print-scale */
   html.cii-certificate-printing,
   body.cii-certificate-printing {
     -webkit-print-color-adjust: exact;
@@ -204,8 +204,8 @@ body {
     background: white !important;
     margin: 0 !important;
     padding: 0 !important;
-    width: 297mm !important;
-    height: 210mm !important;
+    width: 210mm !important;
+    height: 297mm !important;
     overflow: hidden !important;
   }
 
@@ -221,10 +221,10 @@ body {
     align-items: center !important;
     justify-content: center !important;
     position: static !important;
-    width: 297mm !important;
-    height: 210mm !important;
-    max-width: 297mm !important;
-    max-height: 210mm !important;
+    width: 210mm !important;
+    height: 297mm !important;
+    max-width: 210mm !important;
+    max-height: 297mm !important;
     margin: 0 !important;
     padding: 0 !important;
     overflow: hidden !important;
@@ -254,32 +254,23 @@ body {
     }
   }
 
-  body.cii-certificate-printing .certificate-metrics-grid {
+  body.cii-certificate-printing .certificate-metrics-grid,
+  body.cii-certificate-printing .cert-metrics {
     display: grid !important;
-    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
   }
 
-  body.cii-certificate-printing .certificate-team-roster {
-    display: grid !important;
-    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  body.cii-certificate-printing .cert-frame {
+    min-height: calc(297mm - 18mm) !important;
   }
 
-  body.cii-certificate-printing .certificate-metrics-grid > div:first-child {
-    border-right: 1px solid rgba(182, 120, 53, 0.3);
-    padding-right: 1rem;
+  body.cii-certificate-printing .certificate-metric-cell,
+  body.cii-certificate-printing .cert-metric {
+    break-inside: avoid !important;
   }
 
-  body.cii-certificate-printing .certificate-metrics-grid > div:nth-child(2) {
-    border-top: none !important;
-    border-bottom: none !important;
-    border-left: 1px solid rgba(182, 120, 53, 0.3);
-    border-right: 1px solid rgba(182, 120, 53, 0.3);
-    padding: 0 1rem !important;
-    padding-top: 0 !important;
-    padding-bottom: 0 !important;
-  }
-
-  body.cii-certificate-printing .certificate-metrics-grid > div:last-child {
-    padding-left: 1rem;
+  body.cii-certificate-printing .cert-verify-box,
+  body.cii-certificate-printing .cert-participant-table {
+    break-inside: avoid !important;
   }
 }

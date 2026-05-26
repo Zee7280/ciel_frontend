@@ -14,6 +14,12 @@ export interface ReportData {
     impact_verify_url?: string | null;
     /** Some API responses use camelCase; merged into `impact_verify_url` in `setFullData`. */
     impactVerifyUrl?: string | null;
+    /** DB `verification_public_slug` — used with backend to build certificate verification code. */
+    verification_public_slug?: string | null;
+    verificationPublicSlug?: string | null;
+    /** Display code on printed certificate (from backend). */
+    certificate_verification_code?: string | null;
+    certificateVerificationCode?: string | null;
     /** Backend impact report row id when distinct from `project_id`. */
     report_id?: string;
     /** Report document id from API when present. */
