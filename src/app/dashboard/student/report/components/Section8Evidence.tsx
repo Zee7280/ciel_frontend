@@ -349,6 +349,7 @@ export default function Section8Evidence() {
                                     <ul className="text-sm text-slate-500 space-y-1 list-disc list-inside">
                                         <li>JPG, PNG, WebP, HEIC — phone photos supported</li>
                                         <li>PDF — attendance sheets and scans</li>
+                                        <li>Video — MP4, MOV, WebM, and other common formats (up to 500 MB)</li>
                                         <li>Word (.doc/.docx) — letters and confirmations</li>
                                         <li>Official letters, email confirmations, media links (paste in narrative where asked)</li>
                                     </ul>

@@ -24,6 +24,10 @@ import {
     fetchStudentDashboardData,
     persistStudentDashboardCache,
 } from "@/utils/student-dashboard-fetch";
+import {
+    fetchAndPersistUnreadNotificationsCount,
+    roleHasNotificationInbox,
+} from "@/utils/cielNotificationsUnread";
 
 function toRecord(value: unknown): Record<string, unknown> | null {
     if (!value || typeof value !== "object" || Array.isArray(value)) return null;
@@ -384,6 +388,14 @@ function LoginContent() {
                 }
             } else {
                 clearStudentDashboardCache();
+            }
+
+            if (authToken && roleHasNotificationInbox(role)) {
+                try {
+                    await fetchAndPersistUnreadNotificationsCount();
+                } catch {
+                    /* optional */
+                }
             }
 
             let targetPath = getDashboardHomePathForRole(role);

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState, useEffect, useLayoutEffect, useCallback } from "react";
-import { LayoutDashboard, Users, Settings, PieChart, LogOut, FileText, Building2, CheckCircle, Briefcase, FileBarChart, ShieldAlert, History, Bell, User, MessageSquare, Plus, CreditCard, ClipboardList, CalendarClock, LifeBuoy, Link2, GraduationCap, Globe2, PlayCircle, Mail, type LucideProps } from "lucide-react";
+import { LayoutDashboard, Users, Settings, PieChart, LogOut, FileText, Building2, CheckCircle, Briefcase, FileBarChart, ShieldAlert, History, Bell, User, MessageSquare, Plus, CreditCard, ClipboardList, CalendarClock, LifeBuoy, Link2, GraduationCap, Globe2, PlayCircle, Mail, Archive, type LucideProps } from "lucide-react";
 import clsx from "clsx";
 import { authenticatedFetch, isTokenValid } from "@/utils/api";
 import {
@@ -122,8 +122,7 @@ export default function Sidebar() {
     const hasInboxNotificationsNav = isStudent || isPartner || isFaculty || isAdmin;
 
     /**
-     * Notification unread count: single network source — `DashboardHeader` polls `/notifications/unread-count`
-     * and broadcasts `CIEL_NOTIFICATIONS_UNREAD_EVENT`. Sidebar only mirrors localStorage + that event to avoid duplicate requests.
+     * Notification unread count: fetched once on login; sidebar mirrors localStorage + `CIEL_NOTIFICATIONS_UNREAD_EVENT`.
      */
     useEffect(() => {
         if (!hasInboxNotificationsNav) {
@@ -242,6 +241,7 @@ export default function Sidebar() {
             { label: "Applications & Reports Approvals", href: "/dashboard/admin/join-applications", icon: ClipboardList },
             { label: "Payments", href: "/dashboard/admin/payments", icon: CreditCard },
             { label: "All projects", href: "/dashboard/admin/projects", icon: Briefcase },
+            { label: "Project evidence export", href: "/dashboard/admin/project-evidence", icon: Archive },
             { label: "Student Reports", href: "/dashboard/admin/reports/verify", icon: FileText },
             { label: "CIEL Master", href: "/dashboard/admin/master-analytics", icon: Globe2 },
             { label: "Impact", href: "/dashboard/admin/impact", icon: FileBarChart },

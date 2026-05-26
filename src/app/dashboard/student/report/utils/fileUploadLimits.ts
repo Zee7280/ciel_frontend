@@ -1,6 +1,6 @@
 /** Aligned with Nest `STUDENT_REPORT_MAX_FILE_BYTES` in `student-report-file-upload.ts`. */
-export const MAX_REPORT_UPLOAD_BYTES = 50 * 1024 * 1024;
-export const MAX_REPORT_UPLOAD_LABEL = "50 MB";
+export const MAX_REPORT_UPLOAD_BYTES = 500 * 1024 * 1024;
+export const MAX_REPORT_UPLOAD_LABEL = "500 MB";
 
 /** @deprecated Use {@link MAX_REPORT_UPLOAD_BYTES} */
 export const MAX_REPORT_IMAGE_UPLOAD_BYTES = MAX_REPORT_UPLOAD_BYTES;

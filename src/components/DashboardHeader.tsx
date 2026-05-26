@@ -9,8 +9,8 @@ import {
     readDashboardNavRoleFromStorage,
     type DashboardNavRole,
 } from "@/utils/dashboardNavRole";
-import { authenticatedFetch, isTokenValid } from "@/utils/api";
-import { CIEL_NOTIFICATIONS_UNREAD_EVENT, type CielNotificationsUnreadEventDetail, broadcastUnreadNotificationsCount } from "@/utils/cielNotificationsUnread";
+import { authenticatedFetch } from "@/utils/api";
+import { CIEL_NOTIFICATIONS_UNREAD_EVENT, type CielNotificationsUnreadEventDetail } from "@/utils/cielNotificationsUnread";
 import { clearStudentDashboardCache } from "@/utils/student-dashboard-cache";
 import {
     CIEL_FACULTY_SCOPE_EVENT,
@@ -119,50 +119,38 @@ export default function DashboardHeader() {
     const [notifPreview, setNotifPreview] = useState<HeaderNotification[]>([]);
     const notifWrapRef = useRef<HTMLDivElement>(null);
 
-    /** After first successful poll, overrides `user.notifications_count` from localStorage for the bell badge. */
-    const [liveUnreadInboxCount, setLiveUnreadInboxCount] = useState<number | null>(null);
-
-    const refreshUnreadInboxCount = useCallback(async () => {
-        if (!notificationHref) return;
-        if (!isTokenValid(localStorage.getItem("ciel_token"))) return;
-        try {
-            const res = await authenticatedFetch("/api/v1/notifications/unread-count", {}, { redirectToLogin: false });
-            if (!res?.ok) return;
-            const data = (await res.json()) as { success?: boolean; data?: { count?: number } };
-            if (data.success && typeof data.data?.count === "number") {
-                const count = data.data.count;
-                setLiveUnreadInboxCount(count);
-                broadcastUnreadNotificationsCount(count);
-            }
-        } catch {
-            /* non-fatal */
-        }
-    }, [notificationHref]);
+    const [headerUnreadBellCount, setHeaderUnreadBellCount] = useState(0);
 
     useEffect(() => {
         if (!notificationHref) {
-            setLiveUnreadInboxCount(null);
+            setHeaderUnreadBellCount(0);
             return;
         }
-        void refreshUnreadInboxCount();
-        const interval = setInterval(() => void refreshUnreadInboxCount(), 30000);
-        return () => clearInterval(interval);
-    }, [notificationHref, refreshUnreadInboxCount]);
-
-    useEffect(() => {
-        if (!notificationHref) return;
-        const handler = (e: Event) => {
-            const ce = e as CustomEvent<CielNotificationsUnreadEventDetail>;
-            if (typeof ce.detail?.count === "number") {
-                setLiveUnreadInboxCount(ce.detail.count);
+        const syncFromStorage = () => {
+            try {
+                const raw = localStorage.getItem("ciel_user") || localStorage.getItem("user");
+                const u = raw ? JSON.parse(raw) : null;
+                if (typeof u?.notifications_count === "number") {
+                    setHeaderUnreadBellCount(u.notifications_count);
+                }
+            } catch {
+                /* ignore */
             }
         };
-        window.addEventListener(CIEL_NOTIFICATIONS_UNREAD_EVENT, handler);
-        return () => window.removeEventListener(CIEL_NOTIFICATIONS_UNREAD_EVENT, handler);
+        syncFromStorage();
+        const onUnreadEvent = (e: Event) => {
+            const ce = e as CustomEvent<CielNotificationsUnreadEventDetail>;
+            if (typeof ce.detail?.count === "number") {
+                setHeaderUnreadBellCount(ce.detail.count);
+            }
+        };
+        window.addEventListener(CIEL_NOTIFICATIONS_UNREAD_EVENT, onUnreadEvent);
+        window.addEventListener("ciel_user_updated", syncFromStorage);
+        return () => {
+            window.removeEventListener(CIEL_NOTIFICATIONS_UNREAD_EVENT, onUnreadEvent);
+            window.removeEventListener("ciel_user_updated", syncFromStorage);
+        };
     }, [notificationHref]);
-
-    const headerUnreadBellCount =
-        liveUnreadInboxCount !== null ? liveUnreadInboxCount : (user?.notifications_count ?? 0);
 
     const loadHeaderNotifications = useCallback(async () => {
         if (!notificationHref) return;
@@ -187,8 +175,7 @@ export default function DashboardHeader() {
         } finally {
             setNotifLoading(false);
         }
-        void refreshUnreadInboxCount();
-    }, [notificationHref, refreshUnreadInboxCount]);
+    }, [notificationHref]);
 
     useEffect(() => {
         if (notifOpen && notificationHref) {

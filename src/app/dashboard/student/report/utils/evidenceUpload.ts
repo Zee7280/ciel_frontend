@@ -8,7 +8,8 @@ import { MAX_REPORT_UPLOAD_BYTES, MAX_REPORT_UPLOAD_LABEL } from "./fileUploadLi
 /** Same-origin BFF / Vercel often rejects multipart bodies above ~1MB; presign + S3 PUT avoids that. */
 const MULTIPART_BODY_LIMIT_BYTES = 1024 * 1024;
 const PRESIGN_TIMEOUT_MS = 30_000;
-const S3_PUT_TIMEOUT_MS = 300_000;
+/** Large evidence (up to 500MB) may need long uploads on slow connections. */
+const S3_PUT_TIMEOUT_MS = 60 * 60 * 1000;
 
 async function extractEvidenceUploadFailureDetail(res: Response): Promise<string> {
     if (res.status === 413) {
@@ -34,7 +35,7 @@ async function extractEvidenceUploadFailureDetail(res: Response): Promise<string
     } catch {
         /* ignore parse errors */
     }
-    return `HTTP ${res.status}. Check the file type (JPG, PNG, HEIC, WebP, PDF, Word) and connection, then retry.`;
+    return `HTTP ${res.status}. Check the file type (photos, PDF, Word, or video) and connection, then retry.`;
 }
 
 type EvidenceRecord = {
@@ -337,26 +338,22 @@ async function uploadEvidenceFile(
         );
     }
 
-    const usePresign = file.size > MULTIPART_BODY_LIMIT_BYTES;
-
-    if (usePresign) {
-        try {
-            return await uploadViaPresignedPut(projectId, section, field, file);
-        } catch (presignErr) {
-            const directBase = resolveTutorialMultipartUploadApiV1Base();
-            if (!directBase) throw presignErr;
-            return uploadViaMultipartDirect(projectId, section, field, file);
-        }
-    }
-
+    // Always presign → direct S3 PUT so large files never hit API/Vercel body limits.
+    void MULTIPART_BODY_LIMIT_BYTES;
     try {
-        return await uploadViaMultipartDirect(projectId, section, field, file);
-    } catch (multipartErr) {
-        try {
-            return await uploadViaPresignedPut(projectId, section, field, file);
-        } catch {
-            throw multipartErr;
+        return await uploadViaPresignedPut(projectId, section, field, file);
+    } catch (presignErr) {
+        if (file.size <= MULTIPART_BODY_LIMIT_BYTES) {
+            const directBase = resolveTutorialMultipartUploadApiV1Base();
+            if (directBase) {
+                try {
+                    return await uploadViaMultipartDirect(projectId, section, field, file);
+                } catch {
+                    /* fall through */
+                }
+            }
         }
+        throw presignErr;
     }
 }
 
