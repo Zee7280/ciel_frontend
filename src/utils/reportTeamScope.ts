@@ -155,6 +155,168 @@ export function scopeTeamMembersByEmbeddedTeamId(section1: Record<string, unknow
     return filtered.length > 0 ? filtered : null;
 }
 
+function dossierFirstNonBlank(...values: unknown[]): string {
+    for (const value of values) {
+        if (value === null || value === undefined) continue;
+        const text = String(value).trim();
+        if (text && text.toLowerCase() !== "undefined" && text.toLowerCase() !== "null") return text;
+    }
+    return "";
+}
+
+function linkedStudentRecord(row: Record<string, unknown>): Record<string, unknown> | null {
+    const s = row.student;
+    return s && typeof s === "object" ? (s as Record<string, unknown>) : null;
+}
+
+/** Degree / program line for verify dossiers (matches backend `resolveParticipationProgramLine`). */
+export function buildParticipationProgramLine(row: Record<string, unknown>): string {
+    const student = linkedStudentRecord(row);
+    const deptRaw = dossierFirstNonBlank(row.department, student?.department);
+    const dept =
+        deptRaw && !["other", "n/a", "na", "general", "unspecified"].includes(deptRaw.trim().toLowerCase())
+            ? deptRaw
+            : "";
+    const progRaw = dossierFirstNonBlank(row.academicProgram, row.academic_program, row.degree, student?.major);
+    const prog =
+        progRaw && !["other", "n/a", "na", "general", "unspecified"].includes(progRaw.trim().toLowerCase())
+            ? progRaw
+            : "";
+    const base = dossierFirstNonBlank(row.program, prog, dept);
+    const year = dossierFirstNonBlank(row.year, row.yearOfStudy, row.year_of_study);
+    if (base && year) return `${base} · ${year}`;
+    if (base) return base;
+    return year;
+}
+
+/** Map engagement `Participation` rows (or stored section1 rows) to verify-dossier field names. */
+export function normalizeParticipationRowForDossier(row: unknown): ReportTeamRow {
+    if (!row || typeof row !== "object") return {};
+    const r = row as Record<string, unknown>;
+    const isTeamLead = r.isTeamLead === true;
+    const status = typeof r.status === "string" ? r.status : "";
+    const approvedLike = ["approved", "verified", "accepted", "finalized"].includes(status.toLowerCase());
+    const programLine = buildParticipationProgramLine(r);
+    const student = linkedStudentRecord(r);
+    return {
+        ...r,
+        id: r.id ?? r.participantId,
+        participantId: r.participantId ?? r.id,
+        fullName: dossierFirstNonBlank(r.fullName, r.name, r.full_name),
+        name: dossierFirstNonBlank(r.fullName, r.name, r.full_name),
+        mobile: dossierFirstNonBlank(r.mobile, r.phone),
+        university: dossierFirstNonBlank(r.university, r.universityName),
+        program: programLine,
+        degree: dossierFirstNonBlank(r.degree, r.academicProgram, r.academic_program, student?.major, r.department),
+        year: dossierFirstNonBlank(r.year, r.yearOfStudy, r.year_of_study),
+        email: r.email,
+        cnic: r.cnic,
+        role: dossierFirstNonBlank(r.role, isTeamLead ? "Team lead" : ""),
+        isTeamLead,
+        verified: r.verified === true || approvedLike,
+        status: status || (r.verified === true ? "approved" : "pending_approval"),
+        hours: r.hours,
+        teamId: r.teamId ?? r.team_id,
+        team_id: r.teamId ?? r.team_id,
+    };
+}
+
+function mergeTeamLeadForDossier(
+    existing: Record<string, unknown> | undefined,
+    leadFromRoster: ReportTeamRow | undefined,
+): ReportTeamRow {
+    const from = leadFromRoster ? normalizeParticipationRowForDossier(leadFromRoster) : {};
+    const base =
+        existing && typeof existing === "object" ? normalizeParticipationRowForDossier(existing) : {};
+    const merged: ReportTeamRow = { ...from, ...base };
+    const keys = [
+        "fullName",
+        "name",
+        "cnic",
+        "mobile",
+        "email",
+        "university",
+        "degree",
+        "year",
+        "program",
+        "role",
+        "hours",
+        "consent",
+        "verified",
+        "id",
+    ] as const;
+    for (const key of keys) {
+        if (!dossierFirstNonBlank(merged[key]) && dossierFirstNonBlank(from[key])) {
+            merged[key] = from[key];
+        }
+    }
+    if (!dossierFirstNonBlank(merged.fullName) && dossierFirstNonBlank(merged.name)) {
+        merged.fullName = merged.name;
+    }
+    return merged;
+}
+
+/**
+ * Admin / partner / faculty verify dossiers: keep the full project roster from the API.
+ * Do not scope to the filing student's team (that is for student report editing only).
+ */
+export function prepareReportForVerifyDossier(report: Record<string, unknown>): Record<string, unknown> {
+    const section1 = { ...((report.section1 as Record<string, unknown> | undefined) || {}) };
+    const rawMembers = Array.isArray(section1.team_members) ? section1.team_members : [];
+    const normalized = rawMembers.map((row) => normalizeParticipationRowForDossier(row));
+
+    const leadRow = normalized.find((r) => r.isTeamLead === true);
+    const memberRows = normalized.filter((r) => r.isTeamLead !== true);
+    const existingLead =
+        section1.team_lead && typeof section1.team_lead === "object"
+            ? (section1.team_lead as Record<string, unknown>)
+            : undefined;
+    const team_lead = mergeTeamLeadForDossier(existingLead, leadRow);
+
+    const team_members = memberRows.length > 0 ? memberRows : leadRow ? [] : normalized;
+
+    const participation_type =
+        section1.participation_type === "team" || team_members.length > 0 || dossierFirstNonBlank(team_lead.fullName)
+            ? team_members.length > 0 || leadRow
+                ? "team"
+                : section1.participation_type
+            : section1.participation_type;
+
+    const leadRoll = resolveStudentRollNumberForDossier(team_lead);
+    if (leadRoll) {
+        team_lead.studentRollNumber = leadRoll;
+    }
+
+    const membersWithRoll = team_members.map((m) => {
+        const roll = resolveStudentRollNumberForDossier(m);
+        if (!roll) return m;
+        return { ...m, studentRollNumber: roll };
+    });
+
+    return {
+        ...report,
+        section1: {
+            ...section1,
+            team_lead,
+            team_members: membersWithRoll,
+            ...(participation_type ? { participation_type } : {}),
+        },
+    };
+}
+
+/** Student roll from identity form (`universityId` column), excluding university name / UUID noise. */
+function resolveStudentRollNumberForDossier(row: Record<string, unknown>): string {
+    const universityName = dossierFirstNonBlank(row.university, row.universityName);
+    const stored = dossierFirstNonBlank(row.universityId, row.university_id);
+    const reg = dossierFirstNonBlank(row.registrationNumber, row.registration_number);
+    if (!stored) return reg;
+    const lower = stored.toLowerCase();
+    if (universityName && lower === universityName.trim().toLowerCase()) return reg;
+    if (/^[0-9a-f-]{36}$/i.test(stored)) return reg;
+    if (lower.includes("university") || lower.includes("institute") || stored.length > 36) return reg;
+    return stored;
+}
+
 /** Same merge as student report load: scope roster to the author’s engagement team for dossier / verify UIs. */
 export async function applyEngagementTeamScopeToReport(report: Record<string, unknown>): Promise<Record<string, unknown>> {
     const section1 = (report.section1 as Record<string, unknown> | undefined) || {};

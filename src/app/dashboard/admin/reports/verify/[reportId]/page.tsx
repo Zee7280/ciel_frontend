@@ -38,7 +38,7 @@ import type { ReportData } from "../../../../student/report/context/ReportContex
 import { calculateCII } from "../../../../student/report/utils/calculateCII";
 import { formatSdgGoalPadded, mergeReportSdgSnapshotRows } from "../../../../student/report/utils/reportSdgMerge";
 import { readPersistedCiiSnapshot } from "@/utils/reportCiiSnapshot";
-import { applyEngagementTeamScopeToReport } from "@/utils/reportTeamScope";
+import { prepareReportForVerifyDossier } from "@/utils/reportTeamScope";
 import { getReportProjectContextDisplay } from "@/utils/reportProjectContext";
 import { VERIFY_DOSSIER_FIELD_GRID } from "@/utils/verifyDossierFieldGrid";
 import {
@@ -48,6 +48,17 @@ import {
 import { CompetencyScoresTable } from "@/components/verify/CompetencyScoresTable";
 import { formatSection7PakistanDialForDisplay } from "@/utils/reportSection7PakistanDial";
 import { buildSection1ParticipationDisplay, resolveReportAuthorParticipationSnapshot } from "@/utils/reportSection1ParticipationDisplay";
+import { Section1ParticipantProfileGrid } from "@/components/verify/Section1ParticipantProfileGrid";
+import {
+    normalizeSection1ParticipantRow,
+    readSection1TeamFacultyEmails,
+    type Section1DossierField,
+} from "@/utils/section1ParticipantDossierFields";
+import {
+    formatReportPartnerStatusLabel,
+    reportPartnerGateDisabled,
+    reportPartnerStatusTone,
+} from "@/utils/reportPartnerApprovalDisplay";
 
 function normalizeAuditMeta(raw: unknown, summaryText: string): ReportCIIauditMeta | null {
     const fallback = summaryText ? parseSection11AuditSummary(summaryText) : null;
@@ -146,6 +157,8 @@ interface ReportDetail {
     submission_date: string;
     status: string;
     partner_status: string;
+    requires_partner_approval?: boolean;
+    partner_required?: boolean;
     admin_status: string;
     section1: ReportData["section1"];
     section2: ReportData["section2"];
@@ -650,26 +663,27 @@ export default function AdminReportDetailPage() {
     useEffect(() => {
         if (!report) return;
 
-        const observer = new IntersectionObserver(
-            (entries) => {
-                const visible = entries
-                    .filter((e) => e.isIntersecting)
-                    .sort((a, b) => (b.intersectionRatio ?? 0) - (a.intersectionRatio ?? 0));
-                const top = visible[0]?.target?.id;
-                if (top && (ALL_SECTION_IDS as readonly string[]).includes(top)) {
-                    setActiveSectionId(top);
+        const syncActiveSectionFromScroll = () => {
+            const scrollAnchor = window.scrollY + 140;
+            let current: string = ALL_SECTION_IDS[0];
+            for (const id of ALL_SECTION_IDS) {
+                const el = document.getElementById(id);
+                if (!el) continue;
+                if (el.offsetTop <= scrollAnchor) {
+                    current = id;
                 }
-            },
-            { root: null, rootMargin: "-12% 0px -55% 0px", threshold: [0.08, 0.2, 0.45] },
-        );
+            }
+            setActiveSectionId(current);
+        };
 
-        for (const id of ALL_SECTION_IDS) {
-            const el = document.getElementById(id);
-            if (el) observer.observe(el);
-        }
-
-        return () => observer.disconnect();
-    }, [report]);
+        syncActiveSectionFromScroll();
+        window.addEventListener("scroll", syncActiveSectionFromScroll, { passive: true });
+        window.addEventListener("resize", syncActiveSectionFromScroll);
+        return () => {
+            window.removeEventListener("scroll", syncActiveSectionFromScroll);
+            window.removeEventListener("resize", syncActiveSectionFromScroll);
+        };
+    }, [report, sectionOpen]);
 
     const fetchReportDetail = async () => {
         console.log('📞 ADMIN: Fetching report detail for ID:', params.reportId);
@@ -690,8 +704,7 @@ export default function AdminReportDetailPage() {
 
                 // Backend might return { success, data } or { report }
                 const raw = data.data || data.report || data;
-                const scoped = await applyEngagementTeamScopeToReport(raw as Record<string, unknown>);
-                const reportData = scoped as unknown as ReportDetail;
+                const reportData = prepareReportForVerifyDossier(raw as Record<string, unknown>) as unknown as ReportDetail;
                 const section11Text = String(reportData?.section11?.summary_text || "").trim();
                 const parsedAudit = normalizeAuditMeta(reportData?.section11?.audit_meta, section11Text);
                 setReport(reportData);
@@ -761,6 +774,15 @@ export default function AdminReportDetailPage() {
                 <AdminFieldBody value={value} />
             </div>
         </div>
+    );
+
+    const renderSection1DossierField = (field: Section1DossierField) => (
+        <LabelValue key={field.label} label={field.label} value={field.value} fullWidth={field.fullWidth} />
+    );
+
+    const section1FacultyEmails = useMemo(
+        () => readSection1TeamFacultyEmails(report?.section1 as Record<string, unknown> | undefined),
+        [report?.section1],
     );
 
     if (loading) {
@@ -904,15 +926,20 @@ export default function AdminReportDetailPage() {
                             </span>
                             <div className="flex items-center justify-end gap-2">
                                 <span className="mt-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-                                    NGO decision
+                                    {reportPartnerGateDisabled(report) ? "NGO review" : "NGO decision"}
                                 </span>
                                 <span
                                     className={clsx(
                                         "mt-1 text-[10px] font-semibold uppercase",
-                                        report.partner_status === "approved" ? "text-green-600" : "text-slate-400",
+                                        reportPartnerStatusTone(report.partner_status) === "approved" && "text-green-600",
+                                        reportPartnerStatusTone(report.partner_status) === "rejected" && "text-red-600",
+                                        reportPartnerStatusTone(report.partner_status) === "muted" && "text-slate-500",
+                                        reportPartnerStatusTone(report.partner_status) === "pending" && "text-slate-400",
                                     )}
                                 >
-                                    {report.partner_status || "Pending"}
+                                    {reportPartnerGateDisabled(report)
+                                        ? "Not required"
+                                        : formatReportPartnerStatusLabel(report.partner_status)}
                                 </span>
                             </div>
                         </div>
@@ -1086,85 +1113,61 @@ export default function AdminReportDetailPage() {
                                     <LabelValue label="Email notified" value={report.section1?.attendance_verification_email_notified} />
                                     <LabelValue label="Review checklist" value={report.section1?.review_checked} fullWidth />
                                     <LabelValue label="Verified summary" value={report.section1?.verified_summary} fullWidth />
+                                    <LabelValue label="Primary faculty email" value={section1FacultyEmails.primary} />
+                                    <LabelValue label="Secondary faculty email" value={section1FacultyEmails.secondary} />
                                 </div>
                                 {reportAuthorParticipation && !reportAuthorParticipation.isTeamLeadAuthor ? (
                                     <div className="mt-4">
-                                        <h3 className="font-bold text-slate-800 text-sm mb-2 border-b pb-1">
+                                        <h3 className="mb-3 border-b border-slate-100 pb-1 text-sm font-bold text-slate-800">
                                             Report author (filing student)
                                         </h3>
-                                        <div className={VERIFY_DOSSIER_FIELD_GRID}>
-                                            <LabelValue label="Name" value={reportAuthorParticipation.displayName} />
-                                            <LabelValue label="CNIC" value={reportAuthorParticipation.cnic} />
-                                            <LabelValue label="Mobile" value={reportAuthorParticipation.mobile} />
-                                            <LabelValue label="University" value={reportAuthorParticipation.university} />
-                                            <LabelValue label="Program" value={reportAuthorParticipation.degreeProgramYearLine} />
-                                            <LabelValue label="Email" value={reportAuthorParticipation.email} />
-                                            <LabelValue
-                                                label="Role"
-                                                value={
-                                                    reportAuthorParticipation.memberIndex >= 0
-                                                        ? String(
-                                                              report.section1?.team_members?.[reportAuthorParticipation.memberIndex]
-                                                                  ?.role ?? "",
-                                                          )
-                                                        : ""
-                                                }
-                                            />
-                                            <LabelValue
-                                                label="Hours"
-                                                value={
-                                                    section1ParticipationDisplay && reportAuthorParticipation.memberIndex >= 0
-                                                        ? section1ParticipationDisplay.memberHoursLine(
-                                                              reportAuthorParticipation.memberIndex,
-                                                              report.section1?.team_members?.[reportAuthorParticipation.memberIndex]
-                                                                  ?.hours,
-                                                          )
-                                                        : ""
-                                                }
-                                            />
-                                        </div>
+                                        <Section1ParticipantProfileGrid
+                                            participant={normalizeSection1ParticipantRow(
+                                                reportAuthorParticipation.memberIndex >= 0
+                                                    ? report.section1?.team_members?.[reportAuthorParticipation.memberIndex]
+                                                    : report.section1?.team_lead,
+                                            )}
+                                            hoursDisplay={
+                                                section1ParticipationDisplay && reportAuthorParticipation.memberIndex >= 0
+                                                    ? section1ParticipationDisplay.memberHoursLine(
+                                                          reportAuthorParticipation.memberIndex,
+                                                          report.section1?.team_members?.[reportAuthorParticipation.memberIndex]
+                                                              ?.hours,
+                                                      )
+                                                    : section1ParticipationDisplay?.teamLeadHours
+                                            }
+                                            renderField={renderSection1DossierField}
+                                        />
                                     </div>
                                 ) : null}
                                 <div className="mt-4">
-                                    <h3 className="font-bold text-slate-800 text-sm mb-2 border-b pb-1">Team Lead</h3>
-                                    <div className={VERIFY_DOSSIER_FIELD_GRID}>
-                                        <LabelValue label="Name" value={report.section1?.team_lead?.fullName || report.section1?.team_lead?.name} />
-                                        <LabelValue label="CNIC" value={report.section1?.team_lead?.cnic} />
-                                        <LabelValue label="Mobile" value={report.section1?.team_lead?.mobile} />
-                                        <LabelValue label="University" value={report.section1?.team_lead?.university} />
-                                        <LabelValue label="Degree" value={report.section1?.team_lead?.degree} />
-                                        <LabelValue label="Year" value={report.section1?.team_lead?.year} />
-                                        <LabelValue label="Email" value={report.section1?.team_lead?.email} />
-                                        <LabelValue label="Role" value={section1ParticipationDisplay?.teamLeadRole || report.section1?.team_lead?.role} />
-                                        <LabelValue label="Hours" value={section1ParticipationDisplay?.teamLeadHours || report.section1?.team_lead?.hours} />
-                                        <LabelValue label="Consent" value={report.section1?.team_lead?.consent} />
-                                        <LabelValue label="Verified" value={report.section1?.team_lead?.verified} />
-                                    </div>
+                                    <h3 className="mb-3 border-b border-slate-100 pb-1 text-sm font-bold text-slate-800">Team lead</h3>
+                                    <Section1ParticipantProfileGrid
+                                        participant={report.section1?.team_lead}
+                                        hoursDisplay={section1ParticipationDisplay?.teamLeadHours || report.section1?.team_lead?.hours}
+                                        renderField={renderSection1DossierField}
+                                    />
                                 </div>
                                 {report.section1?.team_members && report.section1.team_members.length > 0 && (
-                                    <div className="mt-4">
-                                        <h3 className="font-bold text-slate-800 text-sm mb-2 border-b pb-1">Team Members ({report.section1.team_members.length})</h3>
-                                        <div className="space-y-3">
-                                            {adminRecordArray(report.section1.team_members).map((member, index) => (
-                                                <div key={index} className="rounded-2xl border border-slate-100 bg-slate-50/90 p-4">
-                                                    <div className="mb-3 flex items-center justify-between gap-3 border-b border-slate-100 pb-2">
-                                                        <span className="font-bold text-slate-900">{String(member.fullName || member.name || "")}</span>
-                                                        <span className="text-sm font-semibold text-slate-600">{String(member.role || "")}</span>
-                                                    </div>
-                                                    <div className={VERIFY_DOSSIER_FIELD_GRID}>
-                                                        <LabelValue label="CNIC" value={member.cnic} />
-                                                        <LabelValue label="Mobile" value={member.mobile} />
-                                                        <LabelValue label="University" value={member.university} />
-                                                        <LabelValue label="Program" value={member.program} />
-                                                        <LabelValue
-                                                            label="Hours"
-                                                            value={section1ParticipationDisplay?.memberHoursLine(index, member.hours) || member.hours}
-                                                        />
-                                                        <LabelValue label="Verified" value={member.verified} />
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
+                                    <div className="mt-4 space-y-4">
+                                        <h3 className="border-b border-slate-100 pb-1 text-sm font-bold text-slate-800">
+                                            Team members ({report.section1.team_members.length})
+                                        </h3>
+                                        {adminRecordArray(report.section1.team_members).map((member, index) => (
+                                            <div key={index} className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
+                                                <p className="mb-3 text-sm font-bold text-slate-900">
+                                                    {String(member.fullName || member.name || `Member ${index + 1}`)}
+                                                </p>
+                                                <Section1ParticipantProfileGrid
+                                                    participant={member}
+                                                    hoursDisplay={
+                                                        section1ParticipationDisplay?.memberHoursLine(index, member.hours) ||
+                                                        (member.hours != null ? String(member.hours) : undefined)
+                                                    }
+                                                    renderField={renderSection1DossierField}
+                                                />
+                                            </div>
+                                        ))}
                                     </div>
                                 )}
 

@@ -1,18 +1,19 @@
 "use client"
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { authenticatedFetch } from '@/utils/api';
-import { CheckCircle2, XCircle, Clock, FileText, Search, Building2, Eye, ChevronDown } from 'lucide-react';
+import { CheckCircle2, XCircle, Clock, FileText, Search, Building2, Eye, ChevronDown, ArrowUpDown } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import clsx from 'clsx';
+import { normalizeReportPartnerStatus } from '@/utils/reportPartnerApprovalDisplay';
 
 function formatDisplayName(name: string) {
     return name
         .trim()
         .split(/\s+/)
         .map((part) =>
-            part.length ? part.charAt(0).toLocaleUpperCase() + part.slice(1).toLocaleLowerCase() : part
+            part.length ? part.charAt(0).toLocaleUpperCase() + part.slice(1).toLowerCase() : part
         )
         .join(' ');
 }
@@ -22,19 +23,34 @@ interface Report {
     student_name: string;
     student_email: string;
     project_title: string;
+    organization_id?: string | null;
     organization_name?: string;
     submission_date: string;
+    submitted_at?: string;
+    report_submitted_at?: string;
+    created_at: string;
     status: string;
     partner_status: string;
     admin_status: string;
-    created_at: string;
 }
 
 type ReportStatusFilter = 'all' | 'submitted' | 'pending' | 'verified' | 'rejected';
+type PartnerStatusFilter = 'all' | 'pending' | 'approved' | 'rejected';
+type SortOption = 'submitted_newest' | 'submitted_oldest' | 'student_az' | 'project_az';
 
 function normalizeStatus(value: string | null | undefined): string {
     if (!value) return '';
     return value.trim().toLowerCase().replace(/[\s-]+/g, '_');
+}
+
+function reportSubmittedMs(report: Report): number {
+    const raw =
+        report.report_submitted_at ||
+        report.submitted_at ||
+        report.submission_date ||
+        report.created_at;
+    const ms = raw ? new Date(raw).getTime() : 0;
+    return Number.isFinite(ms) ? ms : 0;
 }
 
 function reportMatchesTab(report: Report, tab: ReportStatusFilter): boolean {
@@ -50,7 +66,8 @@ function reportMatchesTab(report: Report, tab: ReportStatusFilter): boolean {
             status.includes('pending') ||
             status.includes('submitted') ||
             status.includes('under_review') ||
-            status.includes('awaiting'),
+            status.includes('awaiting') ||
+            status === 'draft',
         );
     }
     if (tab === 'submitted') {
@@ -67,35 +84,69 @@ function reportMatchesTab(report: Report, tab: ReportStatusFilter): boolean {
     return true;
 }
 
+function reportMatchesPartnerFilter(report: Report, filter: PartnerStatusFilter): boolean {
+    if (filter === 'all') return true;
+    const ps = normalizeReportPartnerStatus(report.partner_status);
+    if (ps === 'not_applicable' || ps === 'not_required' || ps === 'n_a') {
+        return filter === 'approved';
+    }
+    if (filter === 'pending') {
+        return ps.includes('pending') || ps === 'submitted' || ps === 'draft' || !ps;
+    }
+    if (filter === 'approved') {
+        return ps === 'approved' || ps.includes('verified');
+    }
+    if (filter === 'rejected') return ps === 'rejected';
+    return true;
+}
+
+function extractOrganizationsList(payload: unknown): { id: string; name: string }[] {
+    if (!payload || typeof payload !== 'object') return [];
+    const o = payload as Record<string, unknown>;
+    const raw =
+        (Array.isArray(o.data) && o.data) ||
+        (Array.isArray(o.organizations) && o.organizations) ||
+        (Array.isArray(payload) && payload) ||
+        [];
+    return (raw as unknown[])
+        .map((row) => {
+            if (!row || typeof row !== 'object') return null;
+            const r = row as Record<string, unknown>;
+            const id = String(r.id ?? '').trim();
+            const name = String(r.name ?? r.organization_name ?? '').trim();
+            if (!id || !name) return null;
+            return { id, name };
+        })
+        .filter((x): x is { id: string; name: string } => x !== null);
+}
+
 export default function AdminReportsVerificationPage() {
     const router = useRouter();
     const [reports, setReports] = useState<Report[]>([]);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<ReportStatusFilter>('pending');
+    const [partnerFilter, setPartnerFilter] = useState<PartnerStatusFilter>('all');
+    const [sortBy, setSortBy] = useState<SortOption>('submitted_newest');
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedOrg, setSelectedOrg] = useState<string>('all');
-    const [organizations, setOrganizations] = useState<any[]>([]);
+    const [dateFrom, setDateFrom] = useState('');
+    const [dateTo, setDateTo] = useState('');
+    const [organizations, setOrganizations] = useState<{ id: string; name: string }[]>([]);
 
     useEffect(() => {
-        fetchOrganizations();
+        void fetchOrganizations();
     }, []);
 
     useEffect(() => {
-        // Keep UX deterministic: default view opens on pending queue.
-        setActiveTab('pending');
-    }, []);
-
-    useEffect(() => {
-        fetchReports();
-    }, [activeTab, selectedOrg]);
+        void fetchReports();
+    }, [selectedOrg]);
 
     const fetchOrganizations = async () => {
         try {
-            const response = await authenticatedFetch(`/api/v1/admin/organizations`
-            );
+            const response = await authenticatedFetch(`/api/v1/admin/organizations`, {}, { redirectToLogin: false });
             if (response?.ok) {
                 const data = await response.json();
-                setOrganizations(data.organizations || []);
+                setOrganizations(extractOrganizationsList(data));
             }
         } catch (error) {
             console.error('Error fetching organizations:', error);
@@ -103,38 +154,36 @@ export default function AdminReportsVerificationPage() {
     };
 
     const fetchReports = async () => {
-        console.log('📞 ADMIN: Fetching all student reports');
         try {
             setLoading(true);
 
-            // Admin gets ALL reports via the segregated admin endpoint
-            let apiUrl = `/api/v1/admin/reports?`;
-
-            // Add organization filter if selected
+            const params = new URLSearchParams();
+            params.set('page', '1');
+            params.set('limit', '500');
             if (selectedOrg && selectedOrg !== 'all') {
-                apiUrl += `organizationId=${selectedOrg}&`;
+                params.set('organizationId', selectedOrg);
             }
 
-            console.log('🌐 ADMIN API URL:', apiUrl);
-
-            const response = await authenticatedFetch(apiUrl);
-            console.log('📡 Response:', response?.ok);
+            const apiUrl = `/api/v1/admin/reports?${params.toString()}`;
+            const response = await authenticatedFetch(apiUrl, {}, { redirectToLogin: false });
 
             if (response?.ok) {
                 const data = await response.json();
-                console.log('📊 Reports data:', data);
-
-                if (data.success && data.data) {
-                    setReports(data.data);
+                if (data.success && Array.isArray(data.data)) {
+                    setReports(data.data as Report[]);
+                } else if (Array.isArray(data)) {
+                    setReports(data as Report[]);
                 } else {
                     setReports([]);
                 }
             } else {
                 toast.error('Failed to load reports');
+                setReports([]);
             }
         } catch (error) {
-            console.error('💥 Error fetching reports:', error);
+            console.error('Error fetching reports:', error);
             toast.error('Failed to load reports');
+            setReports([]);
         } finally {
             setLoading(false);
         }
@@ -149,9 +198,13 @@ export default function AdminReportsVerificationPage() {
             draft: { color: 'bg-slate-100 text-slate-600', icon: FileText, label: 'Draft' },
             pending: { color: 'bg-amber-50 text-amber-700', icon: Clock, label: 'Pending' },
             approved: { color: 'bg-green-50 text-green-600', icon: CheckCircle2, label: 'Approved' },
+            not_applicable: { color: 'bg-slate-50 text-slate-500', icon: CheckCircle2, label: 'Not required' },
+            not_required: { color: 'bg-slate-50 text-slate-500', icon: CheckCircle2, label: 'Not required' },
         };
 
-        const { color, icon: Icon, label } = config[status as keyof typeof config] || config.draft;
+        const key = normalizeStatus(status) || normalizeReportPartnerStatus(status);
+        const { color, icon: Icon, label } =
+            config[key as keyof typeof config] || config.draft;
 
         return (
             <span className={clsx('inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold', color)}>
@@ -161,15 +214,71 @@ export default function AdminReportsVerificationPage() {
         );
     };
 
-    const filteredReports = reports.filter((report) => {
-        const q = searchQuery.toLowerCase();
-        const matchesSearch =
-            report.student_name.toLowerCase().includes(q) ||
-            report.student_email.toLowerCase().includes(q) ||
-            report.project_title.toLowerCase().includes(q) ||
-            (report.organization_name && report.organization_name.toLowerCase().includes(q));
-        return matchesSearch && reportMatchesTab(report, activeTab);
-    });
+    const filteredReports = useMemo(() => {
+        const q = searchQuery.trim().toLowerCase();
+        const fromMs = dateFrom ? new Date(`${dateFrom}T00:00:00`).getTime() : null;
+        const toMs = dateTo ? new Date(`${dateTo}T23:59:59.999`).getTime() : null;
+
+        const selectedOrgName =
+            selectedOrg !== 'all'
+                ? organizations.find((o) => o.id === selectedOrg)?.name?.trim().toLowerCase()
+                : null;
+
+        let list = reports.filter((report) => {
+            const matchesSearch =
+                !q ||
+                report.student_name.toLowerCase().includes(q) ||
+                report.student_email.toLowerCase().includes(q) ||
+                report.project_title.toLowerCase().includes(q) ||
+                (report.organization_name && report.organization_name.toLowerCase().includes(q));
+
+            const matchesTab = reportMatchesTab(report, activeTab);
+            const matchesPartner = reportMatchesPartnerFilter(report, partnerFilter);
+
+            const submittedMs = reportSubmittedMs(report);
+            const matchesFrom = fromMs == null || submittedMs >= fromMs;
+            const matchesTo = toMs == null || submittedMs <= toMs;
+
+            let matchesOrg = true;
+            if (selectedOrg !== 'all') {
+                const byId = report.organization_id && report.organization_id === selectedOrg;
+                const byName =
+                    selectedOrgName &&
+                    report.organization_name?.trim().toLowerCase() === selectedOrgName;
+                matchesOrg = Boolean(byId || byName);
+            }
+
+            return matchesSearch && matchesTab && matchesPartner && matchesFrom && matchesTo && matchesOrg;
+        });
+
+        list = [...list].sort((a, b) => {
+            if (sortBy === 'submitted_newest') {
+                return reportSubmittedMs(b) - reportSubmittedMs(a);
+            }
+            if (sortBy === 'submitted_oldest') {
+                return reportSubmittedMs(a) - reportSubmittedMs(b);
+            }
+            if (sortBy === 'student_az') {
+                return a.student_name.localeCompare(b.student_name);
+            }
+            if (sortBy === 'project_az') {
+                return a.project_title.localeCompare(b.project_title);
+            }
+            return 0;
+        });
+
+        return list;
+    }, [
+        reports,
+        searchQuery,
+        activeTab,
+        partnerFilter,
+        sortBy,
+        dateFrom,
+        dateTo,
+        selectedOrg,
+        organizations,
+    ]);
 
     const statusOptions = [
         { id: 'pending', label: 'Pending' },
@@ -183,35 +292,37 @@ export default function AdminReportsVerificationPage() {
         setSearchQuery('');
         setSelectedOrg('all');
         setActiveTab('pending');
+        setPartnerFilter('all');
+        setSortBy('submitted_newest');
+        setDateFrom('');
+        setDateTo('');
     };
 
     return (
         <div className="min-h-screen bg-[#f7f9fc] px-4 py-6 sm:px-6 lg:px-8">
             <div className="mx-auto max-w-7xl space-y-6">
                 <div>
-                    <div>
-                        <h1 className="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">
-                            Student Reports Verification
-                        </h1>
-                        <p className="mt-2 text-sm text-slate-500 sm:text-base">
-                            Review and verify student activity reports
-                        </p>
-                    </div>
+                    <h1 className="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">
+                        Student Reports Verification
+                    </h1>
+                    <p className="mt-2 text-sm text-slate-500 sm:text-base">
+                        Review and verify student activity reports — newest submissions appear first
+                    </p>
                 </div>
 
-                <div className="rounded-[28px] border border-slate-200 bg-white p-4 shadow-sm">
+                <div className="rounded-[28px] border border-slate-200 bg-white p-4 shadow-sm space-y-3">
                     <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
                         <div className="relative min-w-0 flex-1">
                             <Search className="pointer-events-none absolute left-4 top-1/2 z-10 h-5 w-5 -translate-y-1/2 text-slate-400" />
                             <input
                                 type="text"
-                                placeholder="Search by name, email, project..."
+                                placeholder="Search by name, email, project, organization..."
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
                                 className="h-14 w-full rounded-2xl border border-slate-200 bg-white pl-12 pr-4 text-sm text-slate-700 outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-50"
                             />
                         </div>
-                        <div className="relative w-full xl:w-48 shrink-0">
+                        <div className="relative w-full xl:w-44 shrink-0">
                             <select
                                 value={activeTab}
                                 onChange={(e) => setActiveTab(e.target.value as ReportStatusFilter)}
@@ -222,6 +333,19 @@ export default function AdminReportsVerificationPage() {
                                         {option.label}
                                     </option>
                                 ))}
+                            </select>
+                            <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                        </div>
+                        <div className="relative w-full xl:w-44 shrink-0">
+                            <select
+                                value={partnerFilter}
+                                onChange={(e) => setPartnerFilter(e.target.value as PartnerStatusFilter)}
+                                className="h-14 w-full appearance-none rounded-2xl border border-slate-200 bg-white px-4 pr-10 text-sm font-medium text-slate-700 outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-50"
+                            >
+                                <option value="all">NGO: All</option>
+                                <option value="pending">NGO: Pending</option>
+                                <option value="approved">NGO: Approved</option>
+                                <option value="rejected">NGO: Rejected</option>
                             </select>
                             <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                         </div>
@@ -241,15 +365,50 @@ export default function AdminReportsVerificationPage() {
                             </select>
                             <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                         </div>
-                        <div className="w-full xl:w-auto">
-                            <button
-                                type="button"
-                                onClick={resetFilters}
-                                className="h-14 w-full rounded-2xl bg-blue-600 px-6 text-sm font-semibold text-white transition hover:bg-blue-700 xl:w-auto"
+                    </div>
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:flex-wrap">
+                        <div className="relative w-full sm:w-auto">
+                            <ArrowUpDown className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                            <select
+                                value={sortBy}
+                                onChange={(e) => setSortBy(e.target.value as SortOption)}
+                                className="h-11 w-full sm:w-56 appearance-none rounded-xl border border-slate-200 bg-white pl-9 pr-8 text-sm font-medium text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50"
                             >
-                                Reset Filters
-                            </button>
+                                <option value="submitted_newest">Newest submitted first</option>
+                                <option value="submitted_oldest">Oldest submitted first</option>
+                                <option value="student_az">Student A → Z</option>
+                                <option value="project_az">Project A → Z</option>
+                            </select>
                         </div>
+                        <label className="flex items-center gap-2 text-sm text-slate-600">
+                            <span className="font-medium whitespace-nowrap">Submitted from</span>
+                            <input
+                                type="date"
+                                value={dateFrom}
+                                onChange={(e) => setDateFrom(e.target.value)}
+                                className="h-11 rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-blue-400"
+                            />
+                        </label>
+                        <label className="flex items-center gap-2 text-sm text-slate-600">
+                            <span className="font-medium whitespace-nowrap">to</span>
+                            <input
+                                type="date"
+                                value={dateTo}
+                                onChange={(e) => setDateTo(e.target.value)}
+                                className="h-11 rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-blue-400"
+                            />
+                        </label>
+                        <button
+                            type="button"
+                            onClick={resetFilters}
+                            className="h-11 rounded-xl bg-blue-600 px-6 text-sm font-semibold text-white transition hover:bg-blue-700"
+                        >
+                            Reset Filters
+                        </button>
+                        <p className="text-sm text-slate-500 lg:ml-auto">
+                            Showing <span className="font-semibold text-slate-800">{filteredReports.length}</span>
+                            {reports.length !== filteredReports.length ? ` of ${reports.length}` : ''} reports
+                        </p>
                     </div>
                 </div>
 
@@ -299,11 +458,13 @@ export default function AdminReportsVerificationPage() {
                                         </td>
                                         <td className="px-6 py-5 whitespace-nowrap">
                                             <span className="text-sm text-slate-700">
-                                                {new Date(report.submission_date).toLocaleDateString('en-US', {
-                                                    month: 'short',
-                                                    day: 'numeric',
-                                                    year: 'numeric'
-                                                })}
+                                                {reportSubmittedMs(report) > 0
+                                                    ? new Date(reportSubmittedMs(report)).toLocaleDateString('en-US', {
+                                                        month: 'short',
+                                                        day: 'numeric',
+                                                        year: 'numeric',
+                                                    })
+                                                    : '—'}
                                             </span>
                                         </td>
                                         <td className="px-6 py-5">

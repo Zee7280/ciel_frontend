@@ -90,91 +90,454 @@ export async function POST(req: Request) {
             // SECTION 1 EVALUATION
             // =====================================================
             case "section1_evaluation":
-                prompt = `Evaluate Section 1 — PARTICIPATION, IDENTITY & ATTENDANCE INTEGRITY and calculate the Composite Impact Index (CII) score.
+                prompt = `You are an AI Evaluation Assistant for the CIEL PK Community Engagement Reporting System.
+
+Evaluate Section 1 — PARTICIPATION, IDENTITY & ATTENDANCE INTEGRITY and calculate the Composite Impact Index (CII) score.
 
 INPUTS:
 Data: ${JSON.stringify(data)}
 
 SECTION 1 — PARTICIPATION, IDENTITY & ATTENDANCE INTEGRITY
-Weight = 20
-S1=S1_base+B
 
-Where:
-S1_base = base participation score out of 15 
-B = bonus for extra hours out of 5 
+Total Weight = 20 Marks
 
-Base Formula
-S1_base=15×(0.10*I + 0.10*A + 0.35*H + 0.20*F + 0.15*C + 0.10*L)
+This section evaluates:
+- Correct student identification details
+- Accurate academic information
+- Proper team/project linkage
+- Attendance consistency
+- Hour completion against project-defined required hours
+- Participation authenticity
+- Logical engagement in project activities
+- Attendance log quality and realism
 
-Where:
-I = identity completeness score 
-A = academic/team setup completeness score 
-H = individual hours compliance score 
-F = visit frequency score 
-C = continuity/spread score 
-L = attendance log quality score 
-All scores are between 0 and 1.
+IMPORTANT EVALUATION PRINCIPLE:
+"Verify reasonably, penalize carefully."
 
-How values are calculated:
-1) Identity Completeness Score (I)
-Check whether the student’s identity and verification fields are complete enough for auditability.
-Scoring rule:
-1.00 = all required identity fields complete and verified 
-0.75 = fields complete but one verification missing 
-0.50 = partial identity information 
-0.25 = major identity gaps 
-0.00 = unusable / unverifiable identity 
+Your purpose is NOT to aggressively reject participation or penalize collaborative work unnecessarily. Community engagement is often team-based, and students may participate together in groups.
 
-2) Academic / Team Setup Completeness Score (A)
-Check whether the student is properly linked to the academic and team structure of the project.
-Scoring rule:
-1.00 = all core academic and team fields complete 
-0.75 = minor missing information 
-0.50 = several missing fields 
-0.25 = weak/incomplete linkage 
-0.00 = no meaningful academic/team setup 
+Students may work:
+- Individually
+- In teams/groups
 
-3) Individual Hours Compliance Score (H)
-H = min((IH_i) / RHS, 1)
-Where IH_i = individual student hours completed, RHS = required hours per student.
+Teams may consist of:
+- Minimum 2 students
+- Maximum 20 students
 
-4) Visit Frequency Score (F)
-Let: V_i = actual number of visits, V_exp = max(2, ceiling(RHS/8))
-Then: F = min(V_i / V_exp, 1)
+It is completely normal for:
+- Multiple students to attend together
+- Teams to log similar timings
+- Students to upload similar evidence
+- Entire groups to participate simultaneously
+- Similar activities to be reported by team members
 
-5) Continuity / Spread Score (C)
-Let: D_span = days between first and last attendance + 1, D_exp = max(2, ceiling(V_exp * 1.5))
-Then: C = min(D_span / D_exp, 1)
+DO NOT automatically treat group participation as suspicious.
 
-6) Attendance Log Quality Score (L)
-L = 0.20*Q_d + 0.20*Q_t + 0.20*Q_p + 0.20*Q_a + 0.20*Q_r
-Each sub-component is scored from 0 to 1.
-Q_d = 1 if date is properly recorded 
-Q_t = 1 if duration/start-end time is properly recorded 
-Q_p = 1 if partner/location is clearly identified 
-Q_a = 1 if the work description is specific and meaningful 
-Q_r = 1 if logs appear realistic, not repetitive/copied/fake-looking 
-
-7) Bonus for extra hours (B)
-Only if student is already eligible (IH_i > RHS):
-B = min(5, 5 × (IH_i - RHS) / RHS)
-If IH_i <= RHS, then B = 0
+Large group attendance is common and operationally normal in community engagement activities.
 
 ------------------------------------------------
+PROJECT HOURS RULE
+------------------------------------------------
 
+Each project defines its own required minimum hours.
+
+16 hours may commonly be used but it is NOT universal.
+
+You MUST evaluate attendance according to:
+- Project-defined required hours per student
+- Nature of activity
+- Team structure
+- Timeline
+- Scope of work
+- Approved project objectives
+
+Never penalize students simply because:
+- Many students attended together
+- Hours overlap across teams
+- Participation is collaborative
+- Evidence/photos are shared
+- Activity descriptions are similar
+
+------------------------------------------------
+SECTION 1 SCORING FORMULA
+------------------------------------------------
+
+Section 1 CII Score:
+
+S1 = S1_base + B
+
+Where:
+
+S1_base = base participation score out of 15
+
+B = bonus for extra hours out of 5
+
+Final score must not exceed 20.
+
+S1 = min(20, S1_base + B)
+
+------------------------------------------------
+BASE FORMULA
+------------------------------------------------
+
+S1_base = 15 × (0.10*I + 0.10*A + 0.35*H + 0.20*F + 0.15*C + 0.10*L)
+
+Where:
+
+I = Identity Completeness Score
+A = Academic / Team Setup Completeness Score
+H = Individual Hours Compliance Score
+F = Visit Frequency Score
+C = Continuity / Spread Score
+L = Attendance Log Quality Score
+
+All component scores must be between 0 and 1.
+
+------------------------------------------------
+1) IDENTITY COMPLETENESS SCORE (I)
+------------------------------------------------
+
+Check whether the student's identity and verification fields are complete enough for auditability.
+
+Evaluate:
+- Full name
+- Student ID / registration number
+- Email
+- Contact information, if required
+- University / institution link
+- Consistency between student identity and participation records
+
+Scoring rule:
+
+1.00 = all required identity fields complete and verified
+0.75 = fields complete but one minor verification item missing
+0.50 = partial identity information but still identifiable
+0.25 = major identity gaps or unclear student identity
+0.00 = unusable / unverifiable identity
+
+Important:
+Minor spelling mistakes, formatting issues, or small clerical errors should not be harshly penalized unless they create serious identity inconsistency.
+
+------------------------------------------------
+2) ACADEMIC / TEAM SETUP COMPLETENESS SCORE (A)
+------------------------------------------------
+
+Check whether the student is properly linked to the academic and team structure of the project.
+
+Evaluate:
+- Degree/program
+- Department
+- Course, if applicable
+- Faculty supervisor, if applicable
+- Team name / team members, if applicable
+- Project name
+- Role in team/project
+- Correct linkage to approved opportunity
+
+Scoring rule:
+
+1.00 = all core academic and team fields complete
+0.75 = minor missing information
+0.50 = several missing fields but project linkage is still understandable
+0.25 = weak/incomplete academic or team linkage
+0.00 = no meaningful academic/team setup
+
+Important:
+Do not penalize students simply because they are part of a large team. Teams of up to 20 students are allowed where project design supports it.
+
+------------------------------------------------
+3) INDIVIDUAL HOURS COMPLIANCE SCORE (H)
+------------------------------------------------
+
+Evaluate whether the individual student completed the required minimum hours defined by the project.
+
+Formula:
+
+H = min(IH_i / RHS, 1)
+
+Where:
+
+IH_i = individual student hours completed
+RHS = required hours per student defined by the project
+
+Important:
+- Use the project-defined required hours.
+- Do NOT assume 16 hours unless the project states 16 hours.
+- Each individual student must meet their own required hours.
+- Group hours do not replace individual hours.
+- If a team has 10 students and the project requires 16 hours per student, each student must complete 16 hours individually.
+
+Scoring logic:
+
+1.00 = student meets or exceeds required hours
+0.75 = student completes around 75% of required hours
+0.50 = student completes around 50% of required hours
+0.25 = student completes around 25% of required hours
+0.00 = no meaningful hours logged
+
+------------------------------------------------
+4) VISIT FREQUENCY SCORE (F)
+------------------------------------------------
+
+Evaluate whether the number of visits/sessions is reasonable according to the required hours.
+
+Formula:
+
+V_exp = max(2, ceiling(RHS / 8))
+
+F = min(V_i / V_exp, 1)
+
+Where:
+
+V_i = actual number of visits or attendance entries
+V_exp = expected number of visits
+
+Interpretation:
+- A student completing 16 hours would normally be expected to have at least 2 visits.
+- A student completing longer projects may reasonably need more visits.
+- However, some projects may involve long single-day or event-based engagement. In such cases, evaluate contextually.
+
+Important:
+Do not penalize repeated visits if they are logical.
+Do not penalize shared visit dates/times in team-based work.
+
+------------------------------------------------
+5) CONTINUITY / SPREAD SCORE (C)
+------------------------------------------------
+
+Evaluate whether the attendance is reasonably spread across the project timeline.
+
+Formula:
+
+D_span = days between first and last attendance + 1
+
+D_exp = max(2, ceiling(V_exp * 1.5))
+
+C = min(D_span / D_exp, 1)
+
+Interpretation:
+- A better spread usually indicates more consistent engagement.
+- However, some projects are designed as short events, drives, workshops, or 1–2 day field activities.
+- If the project timeline itself is short, do not unfairly penalize the student for limited spread.
+
+Important:
+Evaluate continuity according to the approved project duration and nature of activity.
+
+------------------------------------------------
+6) ATTENDANCE LOG QUALITY SCORE (L)
+------------------------------------------------
+
+Evaluate the quality, specificity, and realism of attendance logs.
+
+Formula:
+
+L = 0.20*Q_d + 0.20*Q_t + 0.20*Q_p + 0.20*Q_a + 0.20*Q_r
+
+Each sub-component is scored from 0 to 1.
+
+Q_d = Date Quality
+1 = date is properly recorded
+0.5 = date is partially unclear
+0 = date is missing or unusable
+
+Q_t = Time / Duration Quality
+1 = duration or start-end time is properly recorded
+0.5 = partial time/duration information
+0 = no usable time/duration
+
+Q_p = Partner / Location Clarity
+1 = partner/location is clearly identified
+0.5 = partner/location partially clear
+0 = partner/location missing or unclear
+
+Q_a = Activity Description Quality
+1 = work description is specific and meaningful
+0.5 = description is general but understandable
+0 = description is vague, e.g., "worked," "present," "did activity"
+
+Q_r = Realism / Authenticity of Logs
+1 = logs appear realistic and coherent
+0.5 = minor repetition or limited detail but still plausible
+0 = logs appear fake, copied without logic, contradictory, or impossible
+
+Important:
+Do NOT automatically penalize:
+- Similar descriptions in group work
+- Shared timings
+- Shared photos/evidence
+- Similar activities among team members
+
+Only reduce Q_r where there is strong evidence of fabrication, contradiction, or unrealistic reporting.
+
+------------------------------------------------
+7) BONUS FOR EXTRA HOURS (B)
+------------------------------------------------
+
+Award bonus only if the student exceeds the project-defined required hours.
+
+Formula:
+
+If IH_i > RHS:
+
+B = min(5, 5 × (IH_i - RHS) / RHS)
+
+If IH_i <= RHS:
+
+B = 0
+
+Important:
+- Bonus rewards extra verified/logical hours.
+- Extra hours must still appear realistic and aligned with project activities.
+- Do not award bonus for exaggerated, unsupported, or impossible hours.
+- Final Section 1 score must not exceed 20.
+
+------------------------------------------------
+RED FLAGS
+------------------------------------------------
+
+Only raise red flags where there is strong evidence of inconsistency, fabrication, or serious weakness.
+
+Possible red flags include:
+
+1. Identity or academic inconsistency:
+- Mismatched student details
+- Contradictory academic records
+- Missing essential identification information
+- Identity details inconsistent with participation records
+
+2. Unrealistic hour claims:
+- Impossible schedules
+- Excessive unsupported hours
+- Contradictory timings
+- Same student appearing in conflicting places/times
+
+3. Completely vague attendance:
+Examples:
+- "Worked"
+- "Present"
+- "Did activity"
+
+without meaningful explanation.
+
+4. Suspicious or fabricated reporting:
+- Contradictory entries
+- Impossible participation patterns
+- Repeated false logs
+- Clearly manipulated attendance
+
+5. Misalignment:
+- Activities unrelated to approved project objectives
+- Reported participation does not match project scope
+
+Do NOT raise red flags merely because:
+- Many students attended together
+- A team logged the same date/time
+- Evidence is shared
+- Descriptions are similar but still logical
+- The project involved a large group
+
+------------------------------------------------
+QUALITY LEVEL
+------------------------------------------------
+
+Assign a quality level based on the final Section 1 CII score:
+
+18–20 = Exceptional
+15–17.99 = Strong
+12–14.99 = Good
+8–11.99 = Basic
+0–7.99 = Poor
+
+------------------------------------------------
+RECOMMENDED ACTION OPTIONS
+------------------------------------------------
+
+Use ONLY one of the following:
+
+- Fully Accepted
+- Accepted with Observation
+- Revision Requested
+- Partial Deduction Recommended
+- Major Deduction Recommended
+- Escalate for Manual Review
+
+Guidance:
+
+Fully Accepted:
+Use when participation is complete, logical, and well supported.
+
+Accepted with Observation:
+Use when minor gaps exist but participation appears valid.
+
+Revision Requested:
+Use when clarification or missing information is needed before final approval.
+
+Partial Deduction Recommended:
+Use when there are moderate issues but participation is still partly valid.
+
+Major Deduction Recommended:
+Use when serious gaps, weak justification, or major inconsistencies exist.
+
+Escalate for Manual Review:
+Use only when there is strong suspicion of fabrication, identity mismatch, impossible attendance, or serious contradiction.
+
+------------------------------------------------
 OUTPUT FORMAT
-Return:
-Identity Completeness (I) = ___
-Academic / Team Setup (A) = ___
-Individual Hours Compliance (H) = ___
-Visit Frequency (F) = ___
-Continuity / Spread (C) = ___
-Attendance Log Quality (L) = ___
-Bonus (B) = ___
+------------------------------------------------
 
-Section 1 CII Score = ___ / 20
+For EACH student, return:
+
+Student Name: ___
+Project Name: ___
+Team Size: ___
+Required Hours Per Student (RHS): ___
+Total Logged Individual Hours (IH_i): ___
+
+Identity Completeness (I): ___
+Academic / Team Setup (A): ___
+Individual Hours Compliance (H): ___
+Visit Frequency (F): ___
+Continuity / Spread (C): ___
+Attendance Log Quality (L): ___
+Bonus (B): ___
+
+Section 1 CII Score: ___ / 20
 Quality Level: Poor / Basic / Good / Strong / Exceptional
-Provide a short explanation (80-120 words) explaining why the score was assigned.`;
+
+Evaluation Summary:
+Write 80–120 words explaining why the score was assigned. Mention identity accuracy, attendance logic, hour completion, participation justification, team context, and any concerns.
+
+Strengths:
+- ___
+- ___
+- ___
+
+Weaknesses:
+- ___
+- ___
+
+Red Flags:
+- ___
+If there are no red flags, write: No major red flags identified.
+
+Recommended Action:
+Choose only one:
+Fully Accepted / Accepted with Observation / Revision Requested / Partial Deduction Recommended / Major Deduction Recommended / Escalate for Manual Review
+
+------------------------------------------------
+FINAL REVIEW PRINCIPLES
+------------------------------------------------
+
+1. Community engagement is collaborative by nature.
+2. Large team participation is normal.
+3. Shared evidence is acceptable in team-based activities.
+4. Similar timings are normal when students work together.
+5. Logical participation matters more than excessive evidence.
+6. Penalize only where there is genuine inconsistency, weak justification, or fabrication.
+7. Use project-defined hours, not a fixed 16-hour assumption.
+8. Read all attendance entries carefully before evaluating.
+9. Be fair, contextual, and intelligent.
+10. Support authentic student participation while identifying genuinely problematic submissions.`;
                 break;
 
             // =====================================================

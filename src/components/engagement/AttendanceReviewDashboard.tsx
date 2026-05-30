@@ -440,14 +440,20 @@ export default function AttendanceReviewDashboard({
             ) : (
                 <div
                     className={clsx(
-                        "grid gap-6 lg:grid-cols-12 lg:gap-8",
-                        stretchViewport && "min-h-[calc(100dvh-11rem)] lg:items-stretch",
+                        stretchViewport && !isPartner
+                            ? "flex min-h-[calc(100dvh-11rem)] flex-col gap-4"
+                            : "grid gap-6 lg:grid-cols-12 lg:gap-8",
+                        stretchViewport && isPartner && "min-h-[calc(100dvh-11rem)] lg:items-stretch",
                     )}
                 >
                     <div
                         className={clsx(
-                            "space-y-4 lg:col-span-4",
-                            stretchViewport && "flex min-h-0 max-h-[calc(100dvh-11rem)] flex-col gap-4 lg:col-span-3",
+                            stretchViewport && !isPartner
+                                ? "flex w-full max-h-[min(16rem,calc(100dvh-22rem))] shrink-0 flex-col gap-4"
+                                : "space-y-4 lg:col-span-4",
+                            stretchViewport &&
+                                isPartner &&
+                                "flex min-h-0 max-h-[calc(100dvh-11rem)] flex-col gap-4 lg:col-span-3",
                         )}
                     >
                         {isPartner ? (
@@ -700,9 +706,13 @@ export default function AttendanceReviewDashboard({
 
                     <div
                         className={clsx(
-                        stretchViewport ? "flex min-h-0 flex-col lg:col-span-9" : "lg:col-span-8",
-                        isPartner ? "space-y-4" : "space-y-3",
-                        stretchViewport && !isPartner && "max-h-[calc(100dvh-11rem)]",
+                            stretchViewport && !isPartner
+                                ? "flex min-h-0 w-full flex-1 flex-col"
+                                : stretchViewport
+                                  ? "flex min-h-0 flex-col lg:col-span-9"
+                                  : "lg:col-span-8",
+                            isPartner ? "space-y-4" : "space-y-3",
+                            stretchViewport && isPartner && "max-h-[calc(100dvh-11rem)]",
                         )}
                     >
                         {selected ? (
@@ -947,7 +957,13 @@ export default function AttendanceReviewDashboard({
                                         ) : null}
                                     </p>
                                 )}
-                                <div className={clsx(isPartner && stretchViewport && "flex min-h-0 flex-1 flex-col", isPartner && "min-h-[420px]")}>
+                                <div
+                                    className={clsx(
+                                        isPartner && stretchViewport && "flex min-h-0 flex-1 flex-col",
+                                        isPartner && "min-h-[420px]",
+                                        stretchViewport && !isPartner && "flex min-h-0 w-full flex-1 flex-col",
+                                    )}
+                                >
                                     <AttendancePendingQueuePanel
                                         projectId={projectId}
                                         title={queueTitle}

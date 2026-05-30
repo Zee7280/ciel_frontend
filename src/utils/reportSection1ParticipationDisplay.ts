@@ -4,6 +4,7 @@ import {
     calculateEngagementMetrics,
     type IndividualMetric,
 } from "@/app/dashboard/student/report/utils/engagementMetrics";
+import { buildParticipationProgramLine } from "@/utils/reportTeamScope";
 
 function printObject(value: unknown): Record<string, unknown> | null {
     return value && typeof value === "object" && !Array.isArray(value)
@@ -139,7 +140,9 @@ export function resolveReportAuthorParticipationSnapshot(
         mobile: firstNonBlank(lead?.mobile),
         email: firstNonBlank(lead?.email, student?.email),
         university: firstNonBlank(lead?.university),
-        degreeProgramYearLine: [firstNonBlank(lead?.degree), firstNonBlank(lead?.year)].filter(Boolean).join(" · "),
+        degreeProgramYearLine:
+            buildParticipationProgramLine((lead || {}) as Record<string, unknown>) ||
+            [firstNonBlank(lead?.degree), firstNonBlank(lead?.year)].filter(Boolean).join(" · "),
     });
 
     if (!student || (!student.email && !student.id)) {
@@ -159,7 +162,7 @@ export function resolveReportAuthorParticipationSnapshot(
             mobile: firstNonBlank(m.mobile),
             email: firstNonBlank(ext.email, student.email),
             university: firstNonBlank(m.university),
-            degreeProgramYearLine: firstNonBlank(m.program),
+            degreeProgramYearLine: buildParticipationProgramLine(m as Record<string, unknown>) || firstNonBlank(m.program),
         };
     };
 
@@ -277,8 +280,20 @@ export function buildSection1ParticipationDisplay(args: {
             return `${fromField} hours`;
         }
         const rosterId = rosterIdsStable[memberIndex + 1];
-        if (!rosterId || !individualRowsForPrint.length) return "";
-        const hit = individualRowsForPrint.find((r) => r.student_id === rosterId);
+        const memberRow = section1.team_members?.[memberIndex] as
+            | (ReportData["section1"]["team_members"][number] & { id?: string; participantId?: string })
+            | undefined;
+        const memberBareId = firstNonBlank(memberRow?.id, memberRow?.participantId);
+        if (!individualRowsForPrint.length) return "";
+        const hit = individualRowsForPrint.find((r) => {
+            if (rosterId && r.student_id === rosterId) return true;
+            if (!memberBareId) return false;
+            return (
+                r.student_id === memberBareId ||
+                r.student_id.endsWith(`:${memberBareId}`) ||
+                r.student_id.includes(memberBareId)
+            );
+        });
         if (!hit || !(hit.individual_hours > 0)) return "";
         return `${hit.individual_hours} hours`;
     };

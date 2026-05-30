@@ -6,7 +6,7 @@ import { authenticatedFetch } from "@/utils/api";
 import { ArrowLeft, Building2, Calendar, FileText, TrendingUp, User } from "lucide-react";
 import { toast } from "sonner";
 import ReportPrintView from "@/app/dashboard/student/report/components/ReportPrintView";
-import { applyEngagementTeamScopeToReport } from "@/utils/reportTeamScope";
+import { prepareReportForVerifyDossier } from "@/utils/reportTeamScope";
 import { readPersistedCiiSnapshot } from "@/utils/reportCiiSnapshot";
 import type { ReportData } from "@/app/dashboard/student/report/context/ReportContext";
 
@@ -59,8 +59,7 @@ export default function FacultyReportDossierPage() {
             if (response?.ok) {
                 const data = await response.json();
                 const raw = data.data || data.report || data;
-                const scoped = await applyEngagementTeamScopeToReport(raw as Record<string, unknown>);
-                setReport(scoped as unknown as ReportDetail);
+                setReport(prepareReportForVerifyDossier(raw as Record<string, unknown>) as unknown as ReportDetail);
             } else {
                 toast.error("Report not available yet (admin approval may be pending)");
             }

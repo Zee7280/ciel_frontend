@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import {
     CheckCircle,
     XCircle,
@@ -17,6 +17,8 @@ import {
     User,
     Mail,
     Phone,
+    ChevronDown,
+    ArrowUpDown,
 } from "lucide-react";
 import { PaginationControls } from "@/components/ui/PaginationControls";
 import { authenticatedFetch } from "@/utils/api";
@@ -76,6 +78,36 @@ function readFlowStatus(row: Record<string, unknown> | null | undefined): string
     const t = raw.trim();
     if (!t) return "";
     return t.replace(/_/g, " ");
+}
+
+type OpportunityQueueFilter = "pending" | "approved" | "rejected" | "revision" | "all";
+type OpportunitySortOption = "submitted_newest" | "submitted_oldest" | "title_az";
+type OpportunityCreatorFilter = "all" | "student" | "faculty";
+
+function readAdminApproved(row: Record<string, unknown> | null | undefined): boolean {
+    if (!row) return false;
+    return row.admin_approved === true || row.adminApproved === true;
+}
+
+function readWorkflowStage(row: Record<string, unknown> | null | undefined): string {
+    if (!row) return "";
+    const raw = row.workflow_stage ?? row.workflowStage ?? row.status;
+    return typeof raw === "string" ? raw.trim().toLowerCase() : "";
+}
+
+function opportunitySubmittedMs(row: Record<string, unknown>): number {
+    const raw =
+        row.submitted_at ??
+        row.submittedAt ??
+        row.created_at ??
+        row.createdAt;
+    const ms = typeof raw === "string" || typeof raw === "number" ? new Date(raw).getTime() : 0;
+    return Number.isFinite(ms) ? ms : 0;
+}
+
+function readIsStudentCreated(row: Record<string, unknown> | null | undefined): boolean {
+    if (!row) return false;
+    return row.is_student_created === true || row.isStudentCreated === true;
 }
 
 function approvalPillClass(status: string): string {
@@ -375,6 +407,11 @@ export default function AdminApprovalsPage() {
     const [searchQuery, setSearchQuery] = useState("");
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage] = useState(10);
+    const [opportunityQueue, setOpportunityQueue] = useState<OpportunityQueueFilter>("pending");
+    const [opportunitySort, setOpportunitySort] = useState<OpportunitySortOption>("submitted_newest");
+    const [opportunityCreatorFilter, setOpportunityCreatorFilter] = useState<OpportunityCreatorFilter>("all");
+    const [opportunityDateFrom, setOpportunityDateFrom] = useState("");
+    const [opportunityDateTo, setOpportunityDateTo] = useState("");
 
     // Modal States
     const [selectedOpportunity, setSelectedOpportunity] = useState<any | null>(null);
@@ -389,37 +426,13 @@ export default function AdminApprovalsPage() {
     const [opportunityReviewMode, setOpportunityReviewMode] = useState<"revise" | "reject_permanent">("revise");
     const [approveSubmittingKey, setApproveSubmittingKey] = useState<string | null>(null);
 
-    useEffect(() => {
-        let cancelled = false;
-        (async () => {
-            setIsLoading(true);
-            await Promise.all([
-                fetchPendingUsers({ withLoading: false }),
-                fetchPendingOpportunities({ withLoading: false }),
-            ]);
-            if (!cancelled) {
-                setDidBootstrapCounts(true);
-                setIsLoading(false);
-            }
-        })();
-        return () => {
-            cancelled = true;
-        };
-    }, []);
-
-    useEffect(() => {
-        if (!didBootstrapCounts) return;
-        if (activeTab === 'projects') {
-            fetchPendingOpportunities();
-        } else if (activeTab === 'registrations') {
-            fetchPendingUsers();
-        }
-    }, [activeTab, didBootstrapCounts]);
-
-    const fetchPendingOpportunities = async (options?: { withLoading?: boolean }) => {
+    const fetchPendingOpportunities = useCallback(async (options?: { withLoading?: boolean }) => {
         if (options?.withLoading !== false) setIsLoading(true);
         try {
-            const res = await authenticatedFetch(`/api/v1/admin/opportunities/pending`);
+            const params = new URLSearchParams();
+            params.set("queue", opportunityQueue);
+            params.set("limit", "500");
+            const res = await authenticatedFetch(`/api/v1/admin/opportunities/approval-queue?${params.toString()}`);
             if (res && res.ok) {
                 const data = await res.json();
                 const raw =
@@ -435,17 +448,19 @@ export default function AdminApprovalsPage() {
             } else if (res && !res.ok) {
                 try {
                     const err = await res.json();
-                    console.error("Pending opportunities:", err?.message || res.status);
+                    console.error("Opportunity approval queue:", err?.message || res.status);
+                    toast.error(err?.message || "Failed to load opportunity requests");
                 } catch {
-                    /* ignore */
+                    toast.error("Failed to load opportunity requests");
                 }
             }
         } catch (error) {
             console.error("Failed to fetch opportunities", error);
+            toast.error("Failed to load opportunity requests");
         } finally {
             if (options?.withLoading !== false) setIsLoading(false);
         }
-    };
+    }, [opportunityQueue]);
 
     const fetchPendingUsers = async (options?: { withLoading?: boolean }) => {
         if (options?.withLoading !== false) setIsLoading(true);
@@ -464,6 +479,34 @@ export default function AdminApprovalsPage() {
         }
     };
 
+    useEffect(() => {
+        let cancelled = false;
+        (async () => {
+            setIsLoading(true);
+            await Promise.all([
+                fetchPendingUsers({ withLoading: false }),
+                fetchPendingOpportunities({ withLoading: false }),
+            ]);
+            if (!cancelled) {
+                setDidBootstrapCounts(true);
+                setIsLoading(false);
+            }
+        })();
+        return () => {
+            cancelled = true;
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- bootstrap once on mount
+    }, []);
+
+    useEffect(() => {
+        if (!didBootstrapCounts) return;
+        if (activeTab === 'projects') {
+            void fetchPendingOpportunities();
+        } else if (activeTab === 'registrations') {
+            void fetchPendingUsers();
+        }
+    }, [activeTab, didBootstrapCounts, opportunityQueue, fetchPendingOpportunities]);
+
     const handleApprove = async (id: string, type: 'opportunity' | 'user' = 'opportunity') => {
         const submittingKey = `${type}:${id}`;
         if (approveSubmittingKey === submittingKey) return;
@@ -481,8 +524,9 @@ export default function AdminApprovalsPage() {
                 method: 'POST'
             });
             if (res && res.ok) {
+                toast.success(type === "opportunity" ? "Project approved." : "User approved.");
                 if (type === 'opportunity') {
-                    setOpportunities(prev => prev.filter(c => c.id !== id));
+                    await fetchPendingOpportunities({ withLoading: false });
                 } else {
                     setPendingUsers(prev => prev.filter(c => c.id !== id));
                 }
@@ -567,13 +611,27 @@ export default function AdminApprovalsPage() {
             });
 
             if (res && res.ok) {
+                toast.success(
+                    rejectType === "opportunity" && opportunityReviewMode === "revise"
+                        ? "Revision request sent."
+                        : "Request rejected.",
+                );
                 if (rejectType === "opportunity") {
-                    setOpportunities((prev) => prev.filter((c) => c.id !== rejectId));
+                    await fetchPendingOpportunities({ withLoading: false });
                 } else {
                     setPendingUsers((prev) => prev.filter((c) => c.id !== rejectId));
                 }
                 setIsRejectModalOpen(false);
                 setRejectId(null);
+            } else if (res) {
+                let msg = "Review action failed.";
+                try {
+                    const err = (await res.json()) as { message?: unknown };
+                    if (typeof err?.message === "string" && err.message.trim()) msg = err.message.trim();
+                } catch {
+                    /* ignore */
+                }
+                toast.error(msg);
             }
         } catch (error) {
             console.error("Failed to submit review action", error);
@@ -581,19 +639,12 @@ export default function AdminApprovalsPage() {
     };
 
     // Filter & Pagination Logic
-    const getFilteredItems = () => {
-        const items = activeTab === 'projects' ? opportunities : pendingUsers;
-        if (!searchQuery) return items;
-
-        const lowerQuery = searchQuery.toLowerCase();
-        return items.filter(item => {
-            if (activeTab === 'projects') {
-                return (
-                    item.title?.toLowerCase().includes(lowerQuery) ||
-                    item.partner_name?.toLowerCase().includes(lowerQuery) ||
-                    readFlowStatus(item as Record<string, unknown>).toLowerCase().includes(lowerQuery)
-                );
-            } else {
+    const filteredItems = useMemo(() => {
+        const items = activeTab === "projects" ? opportunities : pendingUsers;
+        if (activeTab !== "projects") {
+            if (!searchQuery) return items;
+            const lowerQuery = searchQuery.toLowerCase();
+            return items.filter((item) => {
                 const row = item as Record<string, unknown>;
                 const teammates = pendingBrowseTeammatesForDisplay(row);
                 const teamHay = teammates.map((m) => `${m.name} ${m.email}`).join(" ");
@@ -603,11 +654,72 @@ export default function AdminApprovalsPage() {
                     (typeof item.opportunity === "string" && item.opportunity.toLowerCase().includes(lowerQuery)) ||
                     teamHay.toLowerCase().includes(lowerQuery)
                 );
-            }
-        });
-    };
+            });
+        }
 
-    const filteredItems = getFilteredItems();
+        const q = searchQuery.trim().toLowerCase();
+        const fromMs = opportunityDateFrom ? new Date(`${opportunityDateFrom}T00:00:00`).getTime() : null;
+        const toMs = opportunityDateTo ? new Date(`${opportunityDateTo}T23:59:59.999`).getTime() : null;
+
+        let list = items.filter((item) => {
+            const row = item as Record<string, unknown>;
+            const creator =
+                row.creator && typeof row.creator === "object" ? (row.creator as Record<string, unknown>) : null;
+            const creatorHay = creator
+                ? `${creator.name ?? ""} ${creator.email ?? ""} ${creator.university ?? ""}`
+                : "";
+            const haystack = [
+                item.title,
+                item.partner_name,
+                readFlowStatus(row),
+                readWorkflowStage(row),
+                creatorHay,
+            ]
+                .filter((v) => typeof v === "string" && v.trim())
+                .join(" ")
+                .toLowerCase();
+
+            const matchesSearch = !q || haystack.includes(q);
+            const submittedMs = opportunitySubmittedMs(row);
+            const matchesFrom = fromMs == null || submittedMs >= fromMs;
+            const matchesTo = toMs == null || submittedMs <= toMs;
+
+            let matchesCreator = true;
+            if (opportunityCreatorFilter === "student") {
+                matchesCreator = readIsStudentCreated(row);
+            } else if (opportunityCreatorFilter === "faculty") {
+                matchesCreator = !readIsStudentCreated(row);
+            }
+
+            return matchesSearch && matchesFrom && matchesTo && matchesCreator;
+        });
+
+        list = [...list].sort((a, b) => {
+            const rowA = a as Record<string, unknown>;
+            const rowB = b as Record<string, unknown>;
+            if (opportunitySort === "submitted_newest") {
+                return opportunitySubmittedMs(rowB) - opportunitySubmittedMs(rowA);
+            }
+            if (opportunitySort === "submitted_oldest") {
+                return opportunitySubmittedMs(rowA) - opportunitySubmittedMs(rowB);
+            }
+            if (opportunitySort === "title_az") {
+                return String(a.title ?? "").localeCompare(String(b.title ?? ""));
+            }
+            return 0;
+        });
+
+        return list;
+    }, [
+        activeTab,
+        opportunities,
+        pendingUsers,
+        searchQuery,
+        opportunityDateFrom,
+        opportunityDateTo,
+        opportunityCreatorFilter,
+        opportunitySort,
+    ]);
     const totalPages = Math.ceil(filteredItems.length / itemsPerPage);
     const paginatedItems = filteredItems.slice(
         (currentPage - 1) * itemsPerPage,
@@ -617,7 +729,16 @@ export default function AdminApprovalsPage() {
     // Reset page when tab or search changes
     useEffect(() => {
         setCurrentPage(1);
-    }, [activeTab, searchQuery]);
+    }, [activeTab, searchQuery, opportunityQueue, opportunitySort, opportunityCreatorFilter, opportunityDateFrom, opportunityDateTo]);
+
+    const resetOpportunityFilters = () => {
+        setSearchQuery("");
+        setOpportunityQueue("pending");
+        setOpportunitySort("submitted_newest");
+        setOpportunityCreatorFilter("all");
+        setOpportunityDateFrom("");
+        setOpportunityDateTo("");
+    };
 
     useEffect(() => {
         if (!isDetailModalOpen || !selectedOpportunity?.id) {
@@ -719,12 +840,87 @@ export default function AdminApprovalsPage() {
             </div>
 
             {activeTab === "projects" && (
-                <div className="mb-4 rounded-lg border border-blue-100 bg-blue-50/90 px-4 py-3 text-sm text-slate-700">
-                    <span className="font-semibold text-slate-900">CIEL final approval only.</span> This list is for
-                    opportunities in the admin queue (typically status{" "}
-                    <code className="text-xs bg-white/90 px-1.5 py-0.5 rounded border border-blue-100">pending_approval</code>
-                    ), after faculty and partner steps where they apply. Faculty and partner work happens in their own
-                    dashboards or email links — not missing from here by accident.
+                <div className="mb-4 space-y-3">
+                    <div className="rounded-lg border border-blue-100 bg-blue-50/90 px-4 py-3 text-sm text-slate-700">
+                        <span className="font-semibold text-slate-900">CIEL final approval only.</span> Use{" "}
+                        <strong>Pending queue</strong> for new reviews. Switch to <strong>Approved by CIEL</strong> to
+                        find projects already published — you can still <strong>Request revision</strong> or{" "}
+                        <strong>Reject permanently</strong> if approval was a mistake.
+                    </div>
+                    <div className="rounded-[20px] border border-slate-200 bg-white p-4 shadow-sm space-y-3">
+                        <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
+                            <div className="relative w-full xl:w-52 shrink-0">
+                                <select
+                                    value={opportunityQueue}
+                                    onChange={(e) => setOpportunityQueue(e.target.value as OpportunityQueueFilter)}
+                                    className="h-12 w-full appearance-none rounded-xl border border-slate-200 bg-white px-4 pr-10 text-sm font-medium text-slate-700 outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-50"
+                                >
+                                    <option value="pending">Pending queue</option>
+                                    <option value="approved">Approved by CIEL</option>
+                                    <option value="revision">Revision requested</option>
+                                    <option value="rejected">Rejected</option>
+                                    <option value="all">All in workflow</option>
+                                </select>
+                                <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                            </div>
+                            <div className="relative w-full xl:w-44 shrink-0">
+                                <select
+                                    value={opportunityCreatorFilter}
+                                    onChange={(e) =>
+                                        setOpportunityCreatorFilter(e.target.value as OpportunityCreatorFilter)
+                                    }
+                                    className="h-12 w-full appearance-none rounded-xl border border-slate-200 bg-white px-4 pr-10 text-sm font-medium text-slate-700 outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-50"
+                                >
+                                    <option value="all">Creator: All</option>
+                                    <option value="student">Student-created</option>
+                                    <option value="faculty">Faculty / partner</option>
+                                </select>
+                                <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                            </div>
+                            <div className="relative w-full xl:w-52 shrink-0">
+                                <ArrowUpDown className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                                <select
+                                    value={opportunitySort}
+                                    onChange={(e) => setOpportunitySort(e.target.value as OpportunitySortOption)}
+                                    className="h-12 w-full appearance-none rounded-xl border border-slate-200 bg-white pl-9 pr-8 text-sm font-medium text-slate-700 outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-50"
+                                >
+                                    <option value="submitted_newest">Newest submitted first</option>
+                                    <option value="submitted_oldest">Oldest submitted first</option>
+                                    <option value="title_az">Project title A → Z</option>
+                                </select>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={resetOpportunityFilters}
+                                className="h-12 rounded-xl border border-slate-200 px-4 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
+                            >
+                                Reset filters
+                            </button>
+                        </div>
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:flex-wrap">
+                            <label className="flex items-center gap-2 text-sm text-slate-600">
+                                <span className="font-medium whitespace-nowrap">Submitted from</span>
+                                <input
+                                    type="date"
+                                    value={opportunityDateFrom}
+                                    onChange={(e) => setOpportunityDateFrom(e.target.value)}
+                                    className="h-11 rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-blue-400"
+                                />
+                            </label>
+                            <label className="flex items-center gap-2 text-sm text-slate-600">
+                                <span className="font-medium whitespace-nowrap">Submitted to</span>
+                                <input
+                                    type="date"
+                                    value={opportunityDateTo}
+                                    onChange={(e) => setOpportunityDateTo(e.target.value)}
+                                    className="h-11 rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-blue-400"
+                                />
+                            </label>
+                            <span className="text-sm text-slate-500">
+                                Showing {filteredItems.length} of {opportunities.length} loaded
+                            </span>
+                        </div>
+                    </div>
                 </div>
             )}
 
@@ -813,6 +1009,13 @@ export default function AdminApprovalsPage() {
                         const projRow = proj as Record<string, unknown>;
                         const flowLabel = readFlowStatus(projRow);
                         const canAdminApprove = readAdminCanApprove(projRow);
+                        const isLiveApproved =
+                            readAdminApproved(projRow) || readWorkflowStage(projRow) === "live";
+                        const showApproveButton = opportunityQueue === "pending" && !isLiveApproved;
+                        const showPostApprovalActions =
+                            isLiveApproved ||
+                            opportunityQueue === "approved" ||
+                            opportunityQueue === "all";
                         const reminderWhatsAppUrl = buildOpportunityReminderWhatsAppUrl(projRow);
                         return (
                         <div key={proj.id} className="flex flex-col items-stretch justify-between gap-4 rounded-xl border border-slate-100 bg-white p-5 shadow-sm sm:p-6 lg:flex-row lg:items-center">
@@ -827,6 +1030,11 @@ export default function AdminApprovalsPage() {
                                             title="Workflow position in the approval chain"
                                         >
                                             {flowLabel}
+                                        </span>
+                                    ) : null}
+                                    {isLiveApproved ? (
+                                        <span className="bg-emerald-50 text-emerald-800 px-2 py-0.5 rounded font-bold text-[10px] uppercase tracking-wider border border-emerald-100">
+                                            CIEL approved
                                         </span>
                                     ) : null}
                                     <span>
@@ -883,15 +1091,26 @@ export default function AdminApprovalsPage() {
                                 <button
                                     onClick={() => handleRejectClick(proj.id, "opportunity", "revise")}
                                     className="px-4 py-2 bg-amber-50 text-amber-800 rounded-lg text-sm font-bold hover:bg-amber-100 flex items-center gap-2 transition-colors border border-amber-200"
+                                    title={
+                                        showPostApprovalActions
+                                            ? "Send back for revision after mistaken approval"
+                                            : "Ask student to revise before final approval"
+                                    }
                                 >
                                     <XCircle className="w-4 h-4" /> Request revision
                                 </button>
                                 <button
                                     onClick={() => handleRejectClick(proj.id, "opportunity", "reject_permanent")}
                                     className="px-4 py-2 bg-slate-100 text-slate-600 rounded-lg text-sm font-bold hover:bg-red-50 hover:text-red-600 flex items-center gap-2 transition-colors"
+                                    title={
+                                        showPostApprovalActions
+                                            ? "Permanently reject even after approval"
+                                            : "Permanently reject this opportunity"
+                                    }
                                 >
                                     <XCircle className="w-4 h-4" /> Reject permanently
                                 </button>
+                                {showApproveButton ? (
                                 <button
                                     onClick={() => handleApprove(proj.id, 'opportunity')}
                                     disabled={
@@ -899,7 +1118,7 @@ export default function AdminApprovalsPage() {
                                     }
                                     title={
                                         !canAdminApprove
-                                            ? "Executing organization verification pending"
+                                            ? "Awaiting faculty or partner steps before CIEL final approval"
                                             : undefined
                                     }
                                     className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors shadow-lg disabled:cursor-not-allowed ${
@@ -918,6 +1137,7 @@ export default function AdminApprovalsPage() {
                                         </>
                                     )}
                                 </button>
+                                ) : null}
                                 {/* <button
                                     onClick={() => handleChatWithPartner(proj)}
                                     className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors border border-blue-100"
@@ -933,7 +1153,13 @@ export default function AdminApprovalsPage() {
 
                 {filteredItems.length === 0 && !isLoading && (
                     <div className="text-center py-10 text-slate-500">
-                        {searchQuery ? "No results found matching your search." : "No pending items found."}
+                        {searchQuery ||
+                        opportunityDateFrom ||
+                        opportunityDateTo ||
+                        opportunityCreatorFilter !== "all" ||
+                        (activeTab === "projects" && opportunityQueue !== "pending")
+                            ? "No results found matching your filters."
+                            : "No pending items found."}
                     </div>
                 )}
             </div>

@@ -1,28 +1,22 @@
 "use client";
 
 import Image from "next/image";
-
-const HOME_PARTNER_LOGOS = [
-    { src: "/partners/partner-aabroo.png", alt: "Aabroo" },
-    { src: "/partners/partner-lahore-ka-ravi.png", alt: "Lahore ka Ravi" },
-    { src: "/partners/partner-alkhidmat.png", alt: "Alkhidmat Foundation" },
-    { src: "/partners/partner-sos-childrens-villages-pakistan.png", alt: "SOS Children's Villages Pakistan" },
-    { src: "/partners/partner-door-of-awareness.png", alt: "Door of Awareness Educational Welfare Organization" },
-    { src: "/partners/partner-ciel.png", alt: "CIEL" },
-    { src: "/partners/partner-rukh-foundation.png", alt: "Rukh Foundation" },
-    { src: "/partners/partner-noor-al-amal.png", alt: "Noor-al-Amal Light of Hope" },
-    { src: "/partners/partner-arooba-naeem-welfare.png", alt: "Arooba Naeem Welfare" },
-    { src: "/partners/partner-nawab-cats.png", alt: "Nawab Cats" },
-] as const;
+import {
+    HOME_PARTNER_LOGOS,
+    partnerLogoPublicUrl,
+} from "@/config/homePartnerLogos";
 
 const STATS = [
-    { value: "10+", label: "Partner Organisations" },
+    { value: "11+", label: "Partner Organisations" },
     { value: "5+", label: "Cities Across Pakistan" },
     { value: "100%", label: "Education & Social Impact" },
 ];
 
 export default function PartnersFooter() {
-    const marqueeLogos = [...HOME_PARTNER_LOGOS, ...HOME_PARTNER_LOGOS];
+    const marqueeLogos = [
+        ...HOME_PARTNER_LOGOS.map((p) => ({ src: partnerLogoPublicUrl(p.file), alt: p.alt, key: p.file })),
+        ...HOME_PARTNER_LOGOS.map((p) => ({ src: partnerLogoPublicUrl(p.file), alt: p.alt, key: `${p.file}-dup` })),
+    ];
 
     return (
         <section
@@ -90,9 +84,9 @@ export default function PartnersFooter() {
                 <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-32 bg-gradient-to-l from-[#04112a] to-transparent" />
 
                 <div className="marquee-track flex w-max items-center gap-5 px-5">
-                    {marqueeLogos.map(({ src, alt }, i) => (
+                    {marqueeLogos.map(({ src, alt, key }) => (
                         <div
-                            key={`${src}-${i}`}
+                            key={key}
                             className="group relative h-[6.5rem] w-[11rem] flex-shrink-0 cursor-pointer overflow-hidden rounded-2xl border border-white/10 bg-white shadow-[0_4px_24px_rgba(0,0,0,0.25)] transition-all duration-300 ease-out hover:-translate-y-1 hover:border-blue-200 hover:shadow-[0_12px_40px_rgba(0,86,179,0.25)]"
                         >
                             {/* Hover inner glow */}
@@ -106,7 +100,7 @@ export default function PartnersFooter() {
                                 alt={alt}
                                 fill
                                 sizes="176px"
-                                className="object-contain p-2 grayscale opacity-70 transition-all duration-300 ease-out group-hover:grayscale-0 group-hover:opacity-100 group-hover:scale-105"
+                                className="object-contain p-2 opacity-90 transition-all duration-300 ease-out group-hover:opacity-100 group-hover:scale-[1.06] group-hover:brightness-[1.03]"
                             />
                         </div>
                     ))}
