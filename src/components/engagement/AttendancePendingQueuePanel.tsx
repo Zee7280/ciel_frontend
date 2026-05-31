@@ -293,7 +293,9 @@ export default function AttendancePendingQueuePanel({
                 className={clsx(
                     "flex flex-col gap-2.5 border-b px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5",
                     isPartner || scrollTableInPanel
-                        ? "border-slate-200/70 bg-gradient-to-r from-white via-slate-50/40 to-[#0056B3]/[0.03]"
+                        ? scrollTableInPanel && !isPartner
+                            ? "border-amber-200/50 bg-gradient-to-r from-white via-amber-50/20 to-slate-50/40"
+                            : "border-slate-200/70 bg-gradient-to-r from-white via-slate-50/40 to-[#0056B3]/[0.03]"
                         : "border-slate-100",
                 )}
             >
@@ -304,7 +306,7 @@ export default function AttendancePendingQueuePanel({
                             isPartner
                                 ? "bg-gradient-to-br from-[#0056B3] to-[#003F85] text-white shadow-sm"
                                 : scrollTableInPanel
-                                  ? "bg-[#0056B3]/10 text-[#0056B3] ring-1 ring-inset ring-[#0056B3]/15"
+                                  ? "bg-amber-100 text-amber-800 ring-1 ring-inset ring-amber-200/80"
                                   : "bg-slate-100 text-slate-700",
                         )}
                         aria-hidden
@@ -333,7 +335,25 @@ export default function AttendancePendingQueuePanel({
                     </div>
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
-                    {tableRows.length > 0 ? (
+                    {scrollTableInPanel && !isPartner ? (
+                        <span
+                            className={clsx(
+                                "hidden items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold sm:inline-flex",
+                                tableRows.length > 0
+                                    ? "bg-amber-50 text-amber-900 ring-1 ring-inset ring-amber-200/90"
+                                    : "bg-slate-100 text-slate-600 ring-1 ring-inset ring-slate-200",
+                            )}
+                            aria-label={`${tableRows.length} pending`}
+                        >
+                            <span
+                                className={clsx(
+                                    "h-1.5 w-1.5 rounded-full",
+                                    tableRows.length > 0 ? "animate-pulse bg-amber-500" : "bg-slate-400",
+                                )}
+                            />
+                            {tableRows.length} pending
+                        </span>
+                    ) : tableRows.length > 0 ? (
                         <span
                             className={clsx(
                                 "hidden items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold sm:inline-flex",
@@ -419,13 +439,19 @@ export default function AttendancePendingQueuePanel({
                         "mx-4 mb-4 mt-4 flex flex-col items-center gap-3 border border-dashed px-4 py-10 text-center sm:mx-5",
                         isPartner
                             ? "rounded-[14px] border-[#0056B3]/20 bg-gradient-to-br from-white via-slate-50/40 to-[#0056B3]/[0.03]"
-                            : "rounded-lg border-slate-200 bg-slate-50",
+                            : scrollTableInPanel
+                              ? "rounded-2xl border-slate-200/80 bg-gradient-to-br from-white via-slate-50/50 to-amber-50/30"
+                              : "rounded-lg border-slate-200 bg-slate-50",
                     )}
                 >
                     <div
                         className={clsx(
                             "flex h-12 w-12 items-center justify-center rounded-2xl",
-                            isPartner ? "bg-[#0056B3]/10 text-[#0056B3]" : "bg-slate-200 text-slate-600",
+                            isPartner
+                                ? "bg-[#0056B3]/10 text-[#0056B3]"
+                                : scrollTableInPanel
+                                  ? "bg-amber-100 text-amber-700 ring-1 ring-inset ring-amber-200/80"
+                                  : "bg-slate-200 text-slate-600",
                         )}
                     >
                         <Inbox className="h-6 w-6" aria-hidden />

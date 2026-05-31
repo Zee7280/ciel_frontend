@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AlertTriangle, ChevronDown, ChevronUp, Loader2, RefreshCw, Search, ShieldAlert } from "lucide-react";
-import { authenticatedFetch } from "@/utils/api";
+import { authenticatedFetch, resolveSameOriginApiPath } from "@/utils/api";
 import { Badge } from "@/app/dashboard/student/report/components/ui/badge";
 import { Button } from "@/app/dashboard/student/report/components/ui/button";
 import { Card } from "@/app/dashboard/student/report/components/ui/card";
@@ -43,8 +43,21 @@ type IssueLogsResponse = {
     };
 };
 
-const MODULE_OPTIONS = ["all", "student", "students", "reports", "payments", "support", "admin"];
-const SEVERITY_OPTIONS = ["all", "error", "warning"];
+const MODULE_OPTIONS = [
+    "all",
+    "auth",
+    "engagement",
+    "student",
+    "students",
+    "reports",
+    "payments",
+    "support",
+    "admin",
+    "opportunities",
+] as const;
+const SEVERITY_OPTIONS = ["all", "error", "warning", "info"] as const;
+
+const SEARCH_DEBOUNCE_MS = 350;
 
 function formatWhen(value?: string) {
     if (!value) return "N/A";
@@ -57,6 +70,7 @@ function formatWhen(value?: string) {
 
 function severityClass(severity?: string | null) {
     if (severity === "error") return "border-red-200 bg-red-50 text-red-700";
+    if (severity === "info") return "border-blue-200 bg-blue-50 text-blue-700";
     return "border-amber-200 bg-amber-50 text-amber-700";
 }
 
@@ -82,7 +96,8 @@ export default function AdminIssueLogsPage() {
     const [error, setError] = useState("");
     const [expandedId, setExpandedId] = useState<string | null>(null);
 
-    const [search, setSearch] = useState("");
+    const [searchInput, setSearchInput] = useState("");
+    const [debouncedSearch, setDebouncedSearch] = useState("");
     const [moduleFilter, setModuleFilter] = useState("all");
     const [severityFilter, setSeverityFilter] = useState("all");
     const [currentPage, setCurrentPage] = useState(1);
@@ -90,23 +105,33 @@ export default function AdminIssueLogsPage() {
 
     const itemsPerPage = 20;
 
+    useEffect(() => {
+        const timer = window.setTimeout(() => {
+            setDebouncedSearch(searchInput.trim());
+        }, SEARCH_DEBOUNCE_MS);
+        return () => window.clearTimeout(timer);
+    }, [searchInput]);
+
     const queryString = useMemo(() => {
         const params = new URLSearchParams({
             page: String(currentPage),
             limit: String(itemsPerPage),
         });
-        const q = search.trim();
-        if (q) params.set("search", q);
+        if (debouncedSearch) params.set("search", debouncedSearch);
         if (moduleFilter !== "all") params.set("module", moduleFilter);
         if (severityFilter !== "all") params.set("severity", severityFilter);
         return params.toString();
-    }, [currentPage, moduleFilter, search, severityFilter]);
+    }, [currentPage, moduleFilter, debouncedSearch, severityFilter]);
 
     const loadLogs = useCallback(async () => {
         setIsLoading(true);
         setError("");
         try {
-            const res = await authenticatedFetch(`/api/v1/admin/issue-logs?${queryString}`, {}, { redirectToLogin: false });
+            const res = await authenticatedFetch(
+                resolveSameOriginApiPath(`/api/v1/admin/issue-logs?${queryString}`),
+                {},
+                { redirectToLogin: false },
+            );
             if (!res?.ok) {
                 setLogs([]);
                 setTotalItems(0);
@@ -131,7 +156,7 @@ export default function AdminIssueLogsPage() {
 
     useEffect(() => {
         setCurrentPage(1);
-    }, [moduleFilter, search, severityFilter]);
+    }, [moduleFilter, debouncedSearch, severityFilter]);
 
     const totalPages = Math.max(1, Math.ceil(totalItems / itemsPerPage));
 
@@ -161,9 +186,9 @@ export default function AdminIssueLogsPage() {
                     <div className="relative">
                         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                         <Input
-                            value={search}
-                            onChange={(event) => setSearch(event.target.value)}
-                            placeholder="Search message, email, request ID, path, target..."
+                            value={searchInput}
+                            onChange={(event) => setSearchInput(event.target.value)}
+                            placeholder="Search message, email, module, path, request ID..."
                             className="pl-9"
                         />
                     </div>
@@ -175,6 +200,7 @@ export default function AdminIssueLogsPage() {
                         {MODULE_OPTIONS.map((option) => (
                             <option key={option} value={option}>
                                 {option === "all" ? "All modules" : option}
+                                {option === "student" ? " (incl. students)" : ""}
                             </option>
                         ))}
                     </select>

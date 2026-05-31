@@ -9,7 +9,13 @@ import { Label } from "../../report/components/ui/label";
 import { authenticatedFetch } from "@/utils/api";
 import { normalizeEngagementAttendanceLog } from "@/utils/engagementAttendanceMap";
 import { canLogAttendanceForParticipationStatus } from "@/utils/attendanceApproverRouting";
-import { extractJsonErrorMessage } from "@/utils/applyOpportunityUx";
+import { resolveAttendanceSubmitError } from "@/utils/attendanceSubmitError";
+import {
+    ATTENDANCE_DESCRIPTION_MAX_CHARS,
+    ATTENDANCE_DESCRIPTION_MAX_WORDS,
+    attendanceDescriptionLimitMessage,
+    attendanceDescriptionOverLimit,
+} from "@/utils/attendanceDescriptionLimits";
 import clsx from "clsx";
 import { REPORT_ATTACHMENT_ACCEPT } from "@/utils/reportAttachmentAccept";
 import { useReportForm } from "../../report/context/ReportContext";
@@ -139,7 +145,11 @@ export default function AttendanceForm({
             : { ...prev, participantId: selectedParticipantId });
     }, [selectedParticipantId]);
 
-    const wordCount = formData.description.trim() === "" ? 0 : formData.description.trim().split(/\s+/).length;
+    const { wordCount, charCount, overWords, overChars } = attendanceDescriptionOverLimit(
+        formData.description,
+    );
+    const descriptionLimitMessage = attendanceDescriptionLimitMessage(wordCount, charCount);
+    const descriptionOverLimit = overWords || overChars;
 
     const selectedUser = verifiedUsers.find(u => u.id === formData.participantId);
     const isUserApproved =
@@ -170,6 +180,17 @@ export default function AttendanceForm({
 
         if (diffMinutes > 12 * 60) {
             alert("Daily attendance cannot exceed 12 hours");
+            return;
+        }
+
+        const submitDescLimits = attendanceDescriptionOverLimit(formData.description);
+        const limitMsg = attendanceDescriptionLimitMessage(
+            submitDescLimits.wordCount,
+            submitDescLimits.charCount,
+        );
+        if (limitMsg) {
+            setSubmitError(limitMsg);
+            toast.error(limitMsg);
             return;
         }
 
@@ -267,20 +288,10 @@ export default function AttendanceForm({
                 const res = await authenticatedFetch(`/api/v1/engagement/${realId}/attendance`, fetchOptions);
 
                 if (!res || !res.ok) {
-                    let message = "Could not save attendance. Please try again.";
-                    if (!res) {
-                        message = "Your session may have expired. Please sign in again and retry.";
-                    } else {
-                        console.error("[Attendance] Server Response Error:", res.status, res.statusText);
-                        try {
-                            const errBody = (await res.json()) as Record<string, unknown>;
-                            message = extractJsonErrorMessage(errBody) || message;
-                        } catch {
-                            /* non-JSON error body */
-                        }
-                    }
+                    const message = await resolveAttendanceSubmitError(res);
+                    console.error("[Attendance] Save failed:", res?.status, res?.statusText, message);
                     setSubmitError(message);
-                    toast.error(message);
+                    toast.error(message, { duration: 8000 });
                     return;
                 }
                 try {
@@ -316,10 +327,13 @@ export default function AttendanceForm({
             });
             setEvidenceFile(null);
         } catch (error) {
-            console.error(error);
-            const message = error instanceof Error ? error.message : "Could not save attendance. Please try again.";
+            console.error("[Attendance] Submit error:", error);
+            const message =
+                error instanceof Error && error.message.trim()
+                    ? error.message.trim()
+                    : "Network error while saving attendance. Check your connection and try again.";
             setSubmitError(message);
-            toast.error(message);
+            toast.error(message, { duration: 8000 });
         } finally {
             setIsSubmitting(false);
         }
@@ -490,22 +504,45 @@ export default function AttendanceForm({
 
             {/* Description */}
             <div className="space-y-2">
-                <div className="flex justify-between items-center">
+                <div className="flex justify-between items-center gap-2 flex-wrap">
                     <Label className="text-xs font-bold uppercase tracking-wider text-slate-500">Brief Description</Label>
-                    <span className={clsx("text-[10px] font-bold px-1.5 py-0.5 rounded", wordCount > 40 ? 'bg-red-100 text-red-600' : 'bg-slate-100 text-slate-500')}>
-                        {wordCount} / 40 words
-                    </span>
+                    <div className="flex flex-wrap gap-1.5">
+                        <span
+                            className={clsx(
+                                "text-[10px] font-bold px-1.5 py-0.5 rounded",
+                                overWords ? "bg-red-100 text-red-600" : "bg-slate-100 text-slate-500",
+                            )}
+                        >
+                            {wordCount} / {ATTENDANCE_DESCRIPTION_MAX_WORDS} words
+                        </span>
+                        <span
+                            className={clsx(
+                                "text-[10px] font-bold px-1.5 py-0.5 rounded",
+                                overChars ? "bg-red-100 text-red-600" : "bg-slate-100 text-slate-500",
+                            )}
+                        >
+                            {charCount} / {ATTENDANCE_DESCRIPTION_MAX_CHARS} characters
+                        </span>
+                    </div>
                 </div>
                 <div className="relative">
                     <FileText className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
                     <textarea spellCheck={true}
-                        placeholder="What did you accomplish during this session?"
+                        placeholder="What did you accomplish during this session? (max 40 words and 2000 characters)"
                         value={formData.description}
+                        maxLength={ATTENDANCE_DESCRIPTION_MAX_CHARS}
                         onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                         className="w-full pl-10 p-4 h-32 bg-slate-50 border-none rounded-2xl font-bold text-base focus:ring-2 focus:ring-report-primary/20 resize-none shadow-sm transition-all"
                         required
+                        aria-invalid={descriptionOverLimit}
+                        aria-describedby={descriptionOverLimit ? "attendance-description-limit" : undefined}
                     />
                 </div>
+                {descriptionLimitMessage && (
+                    <p id="attendance-description-limit" className="text-xs font-medium text-red-600">
+                        {descriptionLimitMessage}
+                    </p>
+                )}
             </div>
 
             {/* Evidence Upload */}
@@ -553,7 +590,7 @@ export default function AttendanceForm({
                 )}
                 <Button
                     type="submit"
-                    disabled={isSubmitting || wordCount > 40 || effectiveLocked}
+                    disabled={isSubmitting || descriptionOverLimit || effectiveLocked}
                     className={clsx(
                         "w-full h-14 rounded-2xl font-black text-sm transition-all shadow-xl",
                         effectiveLocked

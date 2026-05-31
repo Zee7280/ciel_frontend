@@ -114,7 +114,8 @@ export default function AttendanceReviewDashboard({
 }) {
     const isPartner = variant === "partner";
     const stretchViewport = wideQueueLayout;
-    const [listTab, setListTab] = useState<ListTab>("all");
+    const facultyWide = stretchViewport && !isPartner;
+    const [listTab, setListTab] = useState<ListTab>(isPartner ? "all" : "pending");
     const [query, setQuery] = useState("");
     const [refreshingCounts, setRefreshingCounts] = useState(false);
     const [partnerRoster, setPartnerRoster] = useState<PartnerParticipantChip[]>([]);
@@ -146,7 +147,13 @@ export default function AttendanceReviewDashboard({
         return list;
     }, [projects, pendingById, listTab, query]);
 
+    const totalPendingAcrossProjects = useMemo(
+        () => Object.values(pendingById).reduce((sum, n) => sum + (n ?? 0), 0),
+        [pendingById],
+    );
+
     const selected = projects.find((p) => p.id === projectId) ?? null;
+    const selectedPendingCount = selected ? (pendingById[selected.id] ?? 0) : 0;
     useEffect(() => {
         if (!isPartner) return;
         setPartnerRoster([]);
@@ -273,8 +280,11 @@ export default function AttendanceReviewDashboard({
     return (
         <div
             className={clsx(
-                "px-4 py-6 sm:px-6 lg:px-8",
-                stretchViewport ? "mx-auto w-full max-w-none space-y-4 py-4" : "mx-auto max-w-[1400px] space-y-6",
+                facultyWide
+                    ? "mx-auto w-full max-w-none space-y-3 px-3 py-4 sm:px-4 lg:px-5"
+                    : stretchViewport
+                      ? "mx-auto w-full max-w-none space-y-4 px-4 py-4 sm:px-6 lg:px-8"
+                      : "mx-auto max-w-[1400px] space-y-6 px-4 py-6 sm:px-6 lg:px-8",
             )}
         >
             <header
@@ -449,7 +459,7 @@ export default function AttendanceReviewDashboard({
                     <div
                         className={clsx(
                             stretchViewport && !isPartner
-                                ? "flex w-full max-h-[min(16rem,calc(100dvh-22rem))] shrink-0 flex-col gap-4"
+                                ? "flex w-full min-h-[min(24rem,calc(100dvh-20rem))] max-h-[min(36rem,calc(100dvh-14rem))] shrink-0 flex-col gap-4"
                                 : "space-y-4 lg:col-span-4",
                             stretchViewport &&
                                 isPartner &&
@@ -580,21 +590,47 @@ export default function AttendanceReviewDashboard({
                         ) : (
                             <div
                                 className={clsx(
-                                    "rounded-xl border border-slate-200/90 bg-white shadow-sm",
-                                    stretchViewport && "flex min-h-0 flex-1 flex-col p-4",
+                                    "border bg-white",
+                                    facultyWide
+                                        ? "rounded-2xl border-slate-200/80 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_8px_24px_-12px_rgba(15,23,42,0.1)]"
+                                        : "rounded-xl border-slate-200/90 shadow-sm",
+                                    stretchViewport && "flex min-h-0 flex-1 flex-col",
+                                    facultyWide && stretchViewport && "min-h-[20rem] p-4 sm:p-5",
                                     !stretchViewport && "p-4",
                                 )}
                             >
+                                {facultyWide ? (
+                                    <div className="mb-3 flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                                        <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                                            Opportunities
+                                        </p>
+                                        {totalPendingAcrossProjects > 0 ? (
+                                            <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-bold text-amber-900 ring-1 ring-inset ring-amber-200/90">
+                                                <span className="h-1.5 w-1.5 rounded-full bg-amber-500" aria-hidden />
+                                                {totalPendingAcrossProjects} pending total
+                                            </span>
+                                        ) : (
+                                            <span className="text-[11px] font-medium text-slate-400">All caught up</span>
+                                        )}
+                                    </div>
+                                ) : null}
                                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                                    <div className="flex gap-1 rounded-[10px] bg-slate-100 p-1">
+                                    <div
+                                        className={clsx(
+                                            "flex gap-1 p-1",
+                                            facultyWide ? "rounded-xl bg-slate-100/80 ring-1 ring-inset ring-slate-200/60" : "rounded-[10px] bg-slate-100",
+                                        )}
+                                    >
                                         <button
                                             type="button"
                                             onClick={() => setListTab("all")}
                                             className={clsx(
                                                 "rounded-lg px-3 py-2 text-xs font-semibold transition",
                                                 listTab === "all"
-                                                    ? "bg-white text-slate-900 shadow-sm ring-1 ring-slate-200/80"
-                                                    : "text-slate-600 hover:text-slate-900",
+                                                    ? facultyWide
+                                                        ? "bg-white text-slate-900 shadow-sm ring-1 ring-slate-200/80"
+                                                        : "bg-white text-slate-900 shadow-sm ring-1 ring-slate-200/80"
+                                                    : "text-slate-600 hover:bg-white/60 hover:text-slate-900",
                                             )}
                                         >
                                             All
@@ -603,13 +639,31 @@ export default function AttendanceReviewDashboard({
                                             type="button"
                                             onClick={() => setListTab("pending")}
                                             className={clsx(
-                                                "rounded-lg px-3 py-2 text-xs font-semibold transition",
+                                                "inline-flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-xs font-bold transition",
                                                 listTab === "pending"
-                                                    ? "bg-white text-slate-900 shadow-sm ring-1 ring-slate-200/80"
-                                                    : "text-slate-600 hover:text-slate-900",
+                                                    ? facultyWide
+                                                        ? "bg-amber-500 text-white shadow-md shadow-amber-500/30 ring-2 ring-amber-400/40"
+                                                        : "bg-white text-slate-900 shadow-sm ring-1 ring-slate-200/80"
+                                                    : facultyWide && totalPendingAcrossProjects > 0
+                                                      ? "bg-amber-50/80 text-amber-900 ring-1 ring-inset ring-amber-200/70 hover:bg-amber-100"
+                                                      : "text-slate-600 hover:bg-white/60 hover:text-slate-900",
                                             )}
                                         >
                                             Pending
+                                            {facultyWide ? (
+                                                <span
+                                                    className={clsx(
+                                                        "min-w-[1.25rem] rounded-full px-1.5 py-0.5 text-center text-[10px] font-bold tabular-nums",
+                                                        listTab === "pending"
+                                                            ? "bg-white/20 text-white"
+                                                            : totalPendingAcrossProjects > 0
+                                                              ? "bg-amber-500 text-white"
+                                                              : "bg-slate-200 text-slate-600",
+                                                    )}
+                                                >
+                                                    {totalPendingAcrossProjects}
+                                                </span>
+                                            ) : null}
                                         </button>
                                     </div>
                                     {onRefreshCounts ? (
@@ -642,10 +696,10 @@ export default function AttendanceReviewDashboard({
 
                                 <div
                                     className={clsx(
-                                        "mt-4 space-y-2 overflow-y-auto overscroll-contain pr-1",
-                                        stretchViewport
-                                            ? "min-h-0 flex-1 max-h-none"
-                                            : "max-h-[min(28rem,calc(100vh-14rem))]",
+                                        "mt-4 overflow-y-auto overscroll-contain pr-1",
+                                        facultyWide ? "min-h-[14rem] flex-1 space-y-2.5" : "space-y-2",
+                                        stretchViewport && !facultyWide && "min-h-0 flex-1 max-h-none",
+                                        !stretchViewport && "max-h-[min(28rem,calc(100vh-14rem))]",
                                     )}
                                 >
                                     {filteredRows.length === 0 ? (
@@ -670,7 +724,10 @@ export default function AttendanceReviewDashboard({
                                                     type="button"
                                                     onClick={() => handleRowSelect(p.id)}
                                                     className={clsx(
-                                                        "relative w-full overflow-hidden rounded-[10px] border px-4 py-3.5 text-left text-sm transition shadow-sm",
+                                                        "relative w-full overflow-hidden border text-left transition shadow-sm",
+                                                        facultyWide
+                                                            ? "min-h-[4.75rem] rounded-xl px-5 py-4 text-sm"
+                                                            : "rounded-[10px] px-4 py-3.5 text-sm",
                                                         sel
                                                             ? clsx(
                                                                   "border-[#0056B3]/35 bg-[#0056B3]/[0.07] shadow-md ring-2",
@@ -682,15 +739,25 @@ export default function AttendanceReviewDashboard({
                                                 >
                                                     {sel ? (
                                                         <span
-                                                            className="absolute left-0 top-0 h-full w-1 rounded-l-[10px] bg-[#0056B3]"
+                                                            className={clsx(
+                                                                "absolute left-0 top-0 h-full w-1 bg-[#0056B3]",
+                                                                facultyWide ? "rounded-l-xl" : "rounded-l-[10px]",
+                                                            )}
                                                             aria-hidden
                                                         />
                                                     ) : null}
                                                     <div className="flex items-start justify-between gap-3 pl-0.5">
                                                         <div className="min-w-0">
-                                                            <p className="font-semibold text-slate-900">{p.title}</p>
+                                                            <p
+                                                                className={clsx(
+                                                                    "font-semibold text-slate-900",
+                                                                    facultyWide && "line-clamp-2 leading-snug",
+                                                                )}
+                                                            >
+                                                                {p.title}
+                                                            </p>
                                                             {p.subtitle ? (
-                                                                <p className="mt-0.5 text-xs text-slate-500">{p.subtitle}</p>
+                                                                <p className="mt-1 text-xs text-slate-500">{p.subtitle}</p>
                                                             ) : null}
                                                         </div>
                                                         <PendingCountBadge n={n} partner />
@@ -931,22 +998,29 @@ export default function AttendanceReviewDashboard({
                                         </div>
                                     </div>
                                 ) : stretchViewport ? (
-                                    <div className="flex shrink-0 items-center gap-3 rounded-xl border border-slate-200/90 bg-white px-4 py-3 shadow-sm">
+                                    <div className="flex shrink-0 items-center gap-3 rounded-2xl border border-slate-200/80 bg-gradient-to-r from-white via-slate-50/40 to-white px-4 py-3.5 shadow-sm">
                                         <div
                                             className={clsx(
-                                                "flex h-10 w-10 shrink-0 items-center justify-center rounded-lg",
+                                                "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl",
                                                 accentSoftBg,
+                                                "ring-1 ring-inset ring-[#0056B3]/10",
                                             )}
                                         >
                                             <BookOpen className={clsx("h-5 w-5", accent)} aria-hidden />
                                         </div>
                                         <div className="min-w-0 flex-1">
-                                            <p className="text-sm font-semibold leading-snug text-slate-900 sm:text-base">
+                                            <p className="text-sm font-bold leading-snug text-slate-900 sm:text-base">
                                                 {selected.title}
                                             </p>
                                             {selected.subtitle ? (
                                                 <p className="mt-0.5 text-xs text-slate-500">{selected.subtitle}</p>
                                             ) : null}
+                                        </div>
+                                        <div className="flex shrink-0 flex-col items-end gap-1">
+                                            <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                                                Pending
+                                            </span>
+                                            <PendingCountBadge n={selectedPendingCount} partner />
                                         </div>
                                     </div>
                                 ) : (
