@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/app/dashboard/student/report/components/ui/card";
 import { authenticatedFetch } from "@/utils/api";
+import Section1AnalyticsPanel from "@/components/analytics/Section1AnalyticsPanel";
 
 type DegreeRow = { degree: string; count: number };
 type YearRow = { year_of_study: string; count: number };
@@ -273,6 +274,12 @@ export default function PartnerUniversityAnalyticsPage() {
                     </CardContent>
                 </Card>
             </div>
+
+            <Section1AnalyticsPanel
+                apiPath="/api/v1/partners/university/analytics/section1"
+                title="Participation & attendance"
+                description="Aggregated participation, verification, and compliance indicators for your university organization."
+            />
         </div>
     );
 }

@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import clsx from 'clsx';
 import { normalizeReportPartnerStatus } from '@/utils/reportPartnerApprovalDisplay';
+import { isReportReturnedForRevision } from '@/utils/reportRevisionState';
 
 function formatDisplayName(name: string) {
     return name
@@ -79,7 +80,10 @@ function reportMatchesTab(report: Report, tab: ReportStatusFilter): boolean {
         );
     }
     if (tab === 'rejected') {
-        return statuses.some((status) => status === 'rejected');
+        return (
+            isReportReturnedForRevision(report) ||
+            statuses.some((status) => status === 'rejected' || status === 'revision')
+        );
     }
     return true;
 }

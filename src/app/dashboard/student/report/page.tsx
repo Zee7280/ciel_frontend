@@ -23,6 +23,7 @@ import { prepareReportEvidenceForSave } from './utils/evidenceUpload';
 import { normalizeEngagementAttendanceLog } from '@/utils/engagementAttendanceMap';
 import { readPersistedCiiSnapshot } from '@/utils/reportCiiSnapshot';
 import { pickReportStatusFromCheckRow } from '@/utils/studentBrowseReportCta';
+import { isReportReturnedForRevision } from '@/utils/reportRevisionState';
 
 // Import New Sections
 import Section1Participation from './components/Section1Participation';
@@ -112,7 +113,7 @@ async function httpFailureUserMessage(res: Response, actionLabel: string): Promi
 /** Same lifecycle tokens as browse / My Projects (`pickReportStatusFromCheckRow`) — never infer from payload size. */
 function shouldSkipPreReportGuide(reportForState: Record<string, unknown>): boolean {
     const w = pickReportStatusFromCheckRow(reportForState);
-    return w === "continue" || w === "rejected" || w === "draft";
+    return w === "continue" || w === "rejected" || w === "revision" || w === "draft";
 }
 
 function ReportFormContent() {
@@ -260,8 +261,21 @@ function ReportFormContent() {
 
                     setFullData(reportForState as typeof mergedReport);
                     const st = String((reportForState.status as string | undefined) || "").toLowerCase();
+                    const adminSt = String(
+                        (reportForState.admin_status as string | undefined) ||
+                            (reportForState.admin_approval_status as string | undefined) ||
+                            "",
+                    ).toLowerCase();
+                    const partnerSt = String((reportForState.partner_status as string | undefined) || "").toLowerCase();
+                    const needsRevision =
+                        adminSt === "rejected" ||
+                        partnerSt === "rejected" ||
+                        st === "rejected" ||
+                        st === "revision" ||
+                        reportForState.is_editable === true;
                     const isSubmitted =
-                        [
+                        !needsRevision &&
+                        ([
                             "submitted",
                             "approved",
                             "under_review",
@@ -272,10 +286,11 @@ function ReportFormContent() {
                             "finalized",
                             "partner_verified",
                         ].includes(st) ||
-                        ["verified", "approved"].includes(
-                            String((reportForState.admin_status as string | undefined) || "").toLowerCase(),
-                        );
-                    if (isSubmitted) {
+                            ["verified", "approved"].includes(adminSt));
+                    if (needsRevision) {
+                        setShowGuide(false);
+                        setReadOnly(false);
+                    } else if (isSubmitted) {
                         // Report already submitted — skip guide, go straight to summary
                         setShowGuide(false);
                         setStep(11);
@@ -527,6 +542,34 @@ function ReportFormContent() {
 
     const reportStatusLower = String(data?.status || "").toLowerCase();
     const adminStatusLower = String(data?.admin_status || "").toLowerCase();
+    const needsRevision = React.useMemo(
+        () =>
+            isReportReturnedForRevision({
+                status: data?.status,
+                report_status: data?.report_status,
+                admin_status: data?.admin_status,
+                admin_approval_status: data?.admin_approval_status,
+                partner_status: data?.partner_status,
+            }),
+        [data?.status, data?.report_status, data?.admin_status, data?.admin_approval_status, data?.partner_status],
+    );
+    const postSubmitAwaitingReview = React.useMemo(() => {
+        if (needsRevision) return false;
+        return (
+            [
+                "submitted",
+                "approved",
+                "under_review",
+                "pending_payment",
+                "payment_under_review",
+                "paid",
+                "verified",
+                "finalized",
+                "partner_verified",
+            ].includes(reportStatusLower) ||
+            ["verified", "approved"].includes(adminStatusLower)
+        );
+    }, [needsRevision, reportStatusLower, adminStatusLower]);
     /** Same gate as Section 11 “Report Approved & Impact Verified” — CII index must stay on summary only. */
     const ciiVerifiedSummaryLock = React.useMemo(
         () =>
@@ -537,8 +580,13 @@ function ReportFormContent() {
         [reportStatusLower, adminStatusLower],
     );
     const summaryOnlyWorkspace = React.useMemo(
-        () => canSubmitReport && !isReadOnly && reportStatusLower !== "rejected",
-        [canSubmitReport, isReadOnly, reportStatusLower],
+        () =>
+            canSubmitReport &&
+            !isReadOnly &&
+            !needsRevision &&
+            reportStatusLower !== "rejected" &&
+            reportStatusLower !== "revision",
+        [canSubmitReport, isReadOnly, needsRevision, reportStatusLower],
     );
     const stepperLockedToSummaryOnly = summaryOnlyWorkspace || ciiVerifiedSummaryLock;
 
@@ -710,7 +758,9 @@ function ReportFormContent() {
                     {activeStep === 10 && <Section10Sustainability />}
                     {activeStep === 11 && (
                         <Section11Summary
-                            onRequestFinalSubmit={summaryOnlyWorkspace ? handleSubmit : undefined}
+                            onRequestFinalSubmit={
+                                summaryOnlyWorkspace || (needsRevision && !isReadOnly) ? handleSubmit : undefined
+                            }
                             projectData={projectDetails}
                         />
                     )}
@@ -754,13 +804,7 @@ function ReportFormContent() {
                     )}
 
                     <div className="flex justify-end sm:flex-1 order-3">
-                        {!(
-                            activeStep === 11 &&
-                            (["submitted", "approved", "under_review", "pending_payment", "payment_under_review", "paid", "verified", "finalized", "partner_verified"].includes(
-                                String(data?.status || "").toLowerCase(),
-                            ) ||
-                                ["verified", "approved"].includes(String(data?.admin_status || "").toLowerCase()))
-                        ) && (
+                        {!(activeStep === 11 && postSubmitAwaitingReview) && (
                             <Button
                                 type="button"
                                 onClick={handleNext}
@@ -770,8 +814,12 @@ function ReportFormContent() {
                                 {isSaving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
                                 {activeStep === 11
                                     ? isSaving
-                                        ? 'Submitting...'
-                                        : 'Submit Report'
+                                        ? needsRevision
+                                            ? 'Resubmitting...'
+                                            : 'Submitting...'
+                                        : needsRevision
+                                          ? 'Resubmit Report'
+                                          : 'Submit Report'
                                     : (aiStatus || 'Next Step')}
                                 {activeStep !== 11 && !isSaving && <ChevronRight className="w-4 h-4 ml-2" />}
                             </Button>
@@ -787,7 +835,9 @@ function ReportFormContent() {
                     <DialogHeader>
                         <DialogTitle>Submit Report?</DialogTitle>
                         <DialogDescription>
-                            Are you sure you want to submit this report? You will not be able to edit it after submission.
+                            {needsRevision
+                                ? "Resubmit your revised report for admin review? You can edit again if more changes are requested."
+                                : "Are you sure you want to submit this report? You will not be able to edit it after submission."}
                         </DialogDescription>
                     </DialogHeader>
                     <DialogFooter>

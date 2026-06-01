@@ -57,7 +57,7 @@ export function resolveStudentBrowseReportCta(projectId: string, reportStatus: s
     if (st === "submitted") {
         return { label: "Submitted", href: reportHref };
     }
-    if (st === "rejected") {
+    if (st === "rejected" || st === "revision") {
         return { label: "Revise report", href: reportHref };
     }
     if (st === "continue" || st === "draft") {

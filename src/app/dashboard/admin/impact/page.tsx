@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { Clock, Globe, Loader2, Building2, Landmark, Flag } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from "recharts";
 import { authenticatedFetch, resolveSameOriginApiPath } from "@/utils/api";
+import Section1AnalyticsPanel from "@/components/analytics/Section1AnalyticsPanel";
 
 type ImpactStats = {
     activeVolunteers: number;
@@ -524,6 +525,14 @@ export default function AdminImpactPage() {
                     </div>
                 )}
             </div>
+
+            <Section1AnalyticsPanel
+                apiPath="/api/v1/admin/analytics/section1/stakeholders"
+                query={{ slice: "un" }}
+                title="Stakeholder view (UN / Government)"
+                description="Non-personal compliance aggregates for external stakeholder reporting."
+                className="mt-8"
+            />
         </div>
     );
 }

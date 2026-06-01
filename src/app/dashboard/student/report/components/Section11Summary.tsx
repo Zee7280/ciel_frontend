@@ -1,4 +1,4 @@
-import { BarChart3, ShieldAlert, Quote, Award, Clock, Users, Target, ShieldCheck, Download, TrendingUp, X, Printer, CheckCircle, Eye, AlertTriangle, Lock, CreditCard, Flag } from "lucide-react";
+import { BarChart3, ShieldAlert, Quote, Award, Clock, Users, Target, ShieldCheck, Download, TrendingUp, X, Printer, CheckCircle, Eye, AlertTriangle, Lock, CreditCard, Flag, MessageSquareQuote } from "lucide-react";
 import { Button } from "./ui/button";
 import { useReportForm } from "../context/ReportContext";
 import React, { useState, useMemo, useEffect } from "react";
@@ -71,20 +71,39 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
     const reportSt = String(data.status || "").toLowerCase();
     const reportRs = String(data.report_status || "").toLowerCase();
     const paymentSt = String(data.payment_status || "").toLowerCase();
+    const adminSt = String(data.admin_status || data.admin_approval_status || "").toLowerCase();
+    const partnerSt = String(data.partner_status || "").toLowerCase();
+    const section11AuditMetaEarly = useMemo(() => {
+        const text = String(data.section11?.summary_text || "").trim();
+        return normalizeAuditMeta(data.section11?.audit_meta, text);
+    }, [data.section11?.audit_meta, data.section11?.summary_text]);
+    const needsAdminRevision =
+        adminSt === "rejected" ||
+        partnerSt === "rejected" ||
+        reportSt === "rejected" ||
+        reportSt === "revision" ||
+        Boolean(section11AuditMetaEarly?.needs_revision);
+    const revisionFeedback = useMemo(() => {
+        const direct = String(data.admin_feedback || data.feedback || "").trim();
+        if (direct) return direct;
+        const fromAudit = section11AuditMetaEarly?.student_feedback;
+        return typeof fromAudit === "string" && fromAudit.trim() ? fromAudit.trim() : "";
+    }, [data.admin_feedback, data.feedback, section11AuditMetaEarly?.student_feedback]);
     const inPostSubmitLifecycle =
-        reportSt === "submitted" ||
-        reportSt === "under_review" ||
-        reportSt === "pending_payment" ||
-        reportSt === "payment_under_review" ||
-        reportSt === "paid" ||
-        reportSt === "approved" ||
-        reportSt === "partner_verified" ||
-        reportRs === "pending_payment" ||
-        reportRs === "payment_under_review" ||
-        reportRs === "paid" ||
-        paymentSt === "payment_under_review" ||
-        paymentSt === "paid" ||
-        paymentSt === "approved";
+        !needsAdminRevision &&
+        (reportSt === "submitted" ||
+            reportSt === "under_review" ||
+            reportSt === "pending_payment" ||
+            reportSt === "payment_under_review" ||
+            reportSt === "paid" ||
+            reportSt === "approved" ||
+            reportSt === "partner_verified" ||
+            reportRs === "pending_payment" ||
+            reportRs === "payment_under_review" ||
+            reportRs === "paid" ||
+            paymentSt === "payment_under_review" ||
+            paymentSt === "paid" ||
+            paymentSt === "approved");
     const feeOrSlipRecorded =
         reportSt === "paid" ||
         reportSt === "payment_under_review" ||
@@ -197,10 +216,7 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
             : calculated;
     }, [data]);
 
-    const section11AuditMeta = useMemo(() => {
-        const text = String(data.section11?.summary_text || "").trim();
-        return normalizeAuditMeta(data.section11?.audit_meta, text);
-    }, [data.section11?.audit_meta, data.section11?.summary_text]);
+    const section11AuditMeta = section11AuditMetaEarly;
 
     const resolvedImpactVerifyUrl = useMemo(() => pickImpactVerifyUrlFromPayload(data), [data]);
 
@@ -388,7 +404,54 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                 </div>
             )}
 
-            {showVerifiedImpactScores ? (
+            {needsAdminRevision ? (
+                <>
+                    <div
+                        id="report-section11-revision-feedback"
+                        className={clsx("scroll-mt-24 md:scroll-mt-28 overflow-hidden", surfaceCard)}
+                    >
+                        <div
+                            className={clsx(
+                                "flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 px-6 py-4 md:px-8 md:py-5",
+                                surfaceHeaderRow,
+                            )}
+                        >
+                            <div className="flex items-start gap-3 min-w-0">
+                                <div className="w-9 h-9 shrink-0 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center">
+                                    <AlertTriangle className="w-4 h-4" />
+                                </div>
+                                <div className="min-w-0 space-y-1">
+                                    <p className="text-[10px] font-black text-rose-700 uppercase tracking-widest">
+                                        Revision required
+                                    </p>
+                                    <h3 className="text-sm font-black text-slate-900 tracking-tight">
+                                        Admin returned your report for updates
+                                    </h3>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="px-6 py-6 md:px-8 md:py-7 border-t border-slate-100/80 space-y-4 text-left">
+                            <p className="text-sm font-medium text-slate-600 leading-relaxed">
+                                Update the sections flagged below, then save and resubmit. Steps 1–10 are editable again;
+                                CII scores and certificates unlock only after admin approval.
+                            </p>
+                            {revisionFeedback ? (
+                                <div className="rounded-xl border border-indigo-200 bg-indigo-50/70 p-4">
+                                    <p className="text-[10px] font-black uppercase tracking-widest text-indigo-900 mb-2 flex items-center gap-2">
+                                        <MessageSquareQuote className="w-3.5 h-3.5" /> Reviewer feedback
+                                    </p>
+                                    <p className="text-xs font-medium text-indigo-950/90 leading-relaxed whitespace-pre-wrap">
+                                        {revisionFeedback}
+                                    </p>
+                                </div>
+                            ) : null}
+                        </div>
+                    </div>
+                    {section11AuditMeta ? (
+                        <CIIauditInsightsPanel audit={section11AuditMeta} ciiTotalScore={ciiResult.totalScore} />
+                    ) : null}
+                </>
+            ) : showVerifiedImpactScores ? (
                 <>
                     <div
                         id="report-section11-audit-review"
@@ -552,7 +615,53 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
             >
                 <div className="absolute right-0 top-0 w-40 h-40 bg-report-primary/5 rounded-full -mr-20 -mt-20 blur-3xl pointer-events-none" />
                 
-                {showVerifiedImpactScores ? (
+                {needsAdminRevision ? (
+                    <>
+                        <div className="w-16 h-16 bg-rose-50 rounded-2xl flex items-center justify-center border border-rose-100">
+                            <AlertTriangle className="w-7 h-7 text-rose-600" />
+                        </div>
+                        <div className="max-w-lg space-y-4">
+                            <h3 className="text-lg font-black text-slate-900">Resubmit after revision</h3>
+                            <p className="text-sm font-medium text-slate-500 leading-relaxed">
+                                Update the required sections (use the steps above), save your changes, then resubmit for
+                                admin review. You do not need to pay the reporting fee again unless the payment team asks
+                                you to.
+                            </p>
+                            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() => {
+                                        const el = document.getElementById("report-section11-revision-feedback");
+                                        el?.scrollIntoView({ behavior: "smooth", block: "start" });
+                                    }}
+                                    className="border-2 border-slate-200 rounded-xl text-xs font-black uppercase tracking-widest h-12 px-6"
+                                >
+                                    View feedback
+                                </Button>
+                                <Button
+                                    type="button"
+                                    onClick={() => {
+                                        if (onRequestFinalSubmit) {
+                                            onRequestFinalSubmit();
+                                            return;
+                                        }
+                                        const footerSubmitBtn = Array.from(document.querySelectorAll("button")).find(
+                                            (btn) =>
+                                                btn.textContent?.includes("Resubmit") ||
+                                                btn.textContent?.includes("Submit Report"),
+                                        );
+                                        footerSubmitBtn?.click();
+                                    }}
+                                    disabled={!areAllSectionsComplete}
+                                    className="bg-report-primary hover:bg-[#0049A3] text-white rounded-xl text-xs font-black uppercase tracking-widest h-12 px-8 shadow-md shadow-report-primary-shadow disabled:opacity-50"
+                                >
+                                    {areAllSectionsComplete ? "Resubmit report" : "Complete all sections first"}
+                                </Button>
+                            </div>
+                        </div>
+                    </>
+                ) : showVerifiedImpactScores ? (
                     <>
                         <div className="w-16 h-16 bg-green-100 rounded-2xl flex items-center justify-center shadow-sm">
                             <CheckCircle className="w-7 h-7 text-green-600" />

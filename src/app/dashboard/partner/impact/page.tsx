@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { TrendingUp, Users, Clock, Target, BarChart3, PieChart, Loader2 } from "lucide-react";
 import { authenticatedFetch } from "@/utils/api";
 import { toast } from "sonner";
+import Section1AnalyticsPanel from "@/components/analytics/Section1AnalyticsPanel";
 
 interface ImpactMetrics {
     totalBeneficiaries: number;
@@ -199,6 +200,14 @@ export default function PartnerImpactPage() {
                     Export Impact Report
                 </button>
             </div>
+
+            <Section1AnalyticsPanel
+                apiPath="/api/v1/partners/analytics/section1"
+                query={{ scope: "aggregate" }}
+                title="Participation & attendance"
+                description="Organization-wide participation and verification indicators."
+                className="mt-8"
+            />
         </div>
     );
 }

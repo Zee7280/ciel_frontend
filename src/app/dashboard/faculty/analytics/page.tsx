@@ -19,6 +19,7 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/app/dashboard/student/report/components/ui/card";
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, PieChart, Pie, Cell, Legend } from "recharts";
 import { authenticatedFetch, resolveSameOriginApiPath } from "@/utils/api";
+import AnalyticsHub from "@/components/analytics/AnalyticsHub";
 import {
     CIEL_FACULTY_DASHBOARD_VIEW_EVENT,
     readFacultyDashboardViewPreference,
@@ -298,7 +299,7 @@ export default function FacultyAnalyticsPage() {
                         <ArrowLeft className="h-4 w-4" />
                         Faculty dashboard
                     </Link>
-                    <h1 className="text-2xl font-bold text-slate-900 sm:text-3xl">Department Impact Analytics</h1>
+                    <h1 className="text-2xl font-bold text-slate-900 sm:text-3xl">Analytics</h1>
                     <p className="text-slate-500">Track student engagement, verification, and SDG contribution.</p>
                     {data?.university_scope?.organization_name ? (
                         <p className="mt-2 text-xs font-semibold text-indigo-700">
@@ -651,6 +652,30 @@ export default function FacultyAnalyticsPage() {
                             )}
                         </CardContent>
                     </Card>
+                </div>
+
+                <div className="mt-10 border-t border-slate-200 pt-10">
+                    <AnalyticsHub
+                        views={[
+                            {
+                                id: "faculty",
+                                label: "University",
+                                apiPath: "/api/v1/faculty/analytics/section1",
+                                query: {
+                                    project_id: appliedFilters.project_id,
+                                    degree_program: appliedFilters.degree_program,
+                                    year_of_study: appliedFilters.year_of_study,
+                                    academic_integration_type: appliedFilters.academic_integration_type,
+                                    participation_type: appliedFilters.participation_type,
+                                    verification_status: appliedFilters.verification_status,
+                                    period_start: appliedFilters.period_start,
+                                    period_end: appliedFilters.period_end,
+                                    scope: appliedFilters.project_id ? "project" : "aggregate",
+                                },
+                            },
+                        ]}
+                        hideOnError
+                    />
                 </div>
             </>
         </div>

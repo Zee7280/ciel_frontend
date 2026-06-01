@@ -311,7 +311,7 @@ interface Project {
     submitted_at: string;
     description: string;
     teamMembers?: TeamMember[];
-    report_status?: 'none' | 'draft' | 'continue' | 'submitted' | 'verified' | 'rejected' | 'pending_payment' | 'payment_under_review' | 'paid';
+    report_status?: 'none' | 'draft' | 'continue' | 'submitted' | 'verified' | 'rejected' | 'revision' | 'pending_payment' | 'payment_under_review' | 'paid';
     report_id?: string;
     report_feedback?: string;
     /** When API sends these, the UI shows the correct approval stage. */
@@ -380,6 +380,7 @@ function matchesProjectTab(row: ProjectRow, tab: ProjectTab): boolean {
         (rs === "draft" ||
             rs === "continue" ||
             rs === "rejected" ||
+            rs === "revision" ||
             (rs === "none" && reportUnlocked && live) ||
             workflow.stage === "revision");
     const pendingApprovalsTab =
@@ -1063,7 +1064,8 @@ export default function MyProjectsPage() {
                                                     ) : null}
                                                 </div>
                                             )}
-                                            {project.report_status === "rejected" && (
+                                            {(project.report_status === "rejected" ||
+                                                project.report_status === "revision") && (
                                                 <div className="rounded-xl border border-rose-200 bg-rose-50 p-3">
                                                     <p className="text-sm font-semibold text-rose-900">
                                                         Report needs revision

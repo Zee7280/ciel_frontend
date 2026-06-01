@@ -33,6 +33,7 @@ import ReportPrintView from '../../../../student/report/components/ReportPrintVi
 import { AttendanceLogsDossierTable } from "@/components/verify/AttendanceLogsDossierTable";
 import { buildSection1AttendanceParticipantNameMap } from "@/utils/attendanceLogDisplay";
 import { checkReportQuality, QualityAlert } from '@/utils/reportQuality';
+import { isReportReturnedForRevision, reportRevisionStatusLabel } from '@/utils/reportRevisionState';
 import { parseSection11AuditSummary, type ReportCIIauditMeta } from "@/lib/parseCIIauditSummary";
 import type { ReportData } from "../../../../student/report/context/ReportContext";
 import { calculateCII } from "../../../../student/report/utils/calculateCII";
@@ -919,10 +920,10 @@ export default function AdminReportDetailPage() {
                                     report.status === "verified" && "border-green-200 bg-green-50 text-green-700",
                                     report.status === "submitted" && "border-yellow-200 bg-yellow-50 text-yellow-700",
                                     report.status === "partner_verified" && "border-indigo-200 bg-indigo-50 text-indigo-700",
-                                    report.status === "rejected" && "border-red-200 bg-red-50 text-red-700",
+                                    isReportReturnedForRevision(report) && "border-red-200 bg-red-50 text-red-700",
                                 )}
                             >
-                                {report.status === "partner_verified" ? "NGO Verified" : report.status}
+                                {reportRevisionStatusLabel(report)}
                             </span>
                             <div className="flex items-center justify-end gap-2">
                                 <span className="mt-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
@@ -1947,12 +1948,12 @@ export default function AdminReportDetailPage() {
                                 <button
                                     type="button"
                                     onClick={() => handleVerify("reject", "editable")}
-                                    disabled={isVerifying || report.status === "rejected"}
+                                    disabled={isVerifying || isReportReturnedForRevision(report)}
                                     className="inline-flex min-h-[2.75rem] w-full items-center justify-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-5 py-2.5 text-sm font-semibold text-amber-800 shadow-sm transition-colors hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300 focus-visible:ring-offset-2 sm:w-auto"
                                     title="Return this report so the student can revise and resubmit it."
                                 >
                                     <PencilLine className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
-                                    {report.status === "rejected" ? "Editable" : "Make editable"}
+                                    {isReportReturnedForRevision(report) ? "Returned for revision" : "Make editable"}
                                 </button>
                                 <button
                                     type="button"
@@ -1966,11 +1967,11 @@ export default function AdminReportDetailPage() {
                                 <button
                                     type="button"
                                     onClick={() => handleVerify("reject")}
-                                    disabled={isVerifying || report.status === "rejected"}
+                                    disabled={isVerifying || isReportReturnedForRevision(report)}
                                     className="inline-flex min-h-[2.75rem] w-full items-center justify-center gap-2 rounded-xl border border-red-200 bg-white px-5 py-2.5 text-sm font-semibold text-red-700 shadow-sm transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300 focus-visible:ring-offset-2 sm:w-auto"
                                 >
                                     <XCircle className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
-                                    {report.status === "rejected" ? "Rejected" : "Reject"}
+                                    {isReportReturnedForRevision(report) ? "Revision requested" : "Reject"}
                                 </button>
                             </div>
                         </div>
@@ -2010,7 +2011,7 @@ export default function AdminReportDetailPage() {
                             <button
                                 type="button"
                                 onClick={() => handleVerify("reject", "editable")}
-                                disabled={report.status === "rejected"}
+                                disabled={isReportReturnedForRevision(report)}
                                 className="flex items-center justify-center gap-2 rounded-full bg-amber-500 px-5 py-2.5 text-xs font-semibold uppercase tracking-widest text-slate-950 shadow-lg shadow-amber-950/20 transition-transform hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-50 active:scale-95 sm:px-6"
                                 title="Return this report so the student can revise and resubmit it."
                             >

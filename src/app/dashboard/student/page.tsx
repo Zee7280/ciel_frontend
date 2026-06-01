@@ -36,6 +36,7 @@ import {
     readStudentDashboardCache,
 } from "@/utils/student-dashboard-fetch";
 import { authenticatedFetch } from "@/utils/api";
+import Section1AnalyticsPanel from "@/components/analytics/Section1AnalyticsPanel";
 import StudentProgressTracker from "./components/StudentProgressTracker";
 import PendingActionCards from "@/components/dashboard/PendingActionCards";
 import { CepExperienceFeedbackPrompt } from "@/components/feedback/CepExperienceFeedbackPrompt";
@@ -737,6 +738,15 @@ export default function StudentDashboard() {
                     )}
                 </div>
             </div>
+
+            {firstProjectForTracker ? (
+                <Section1AnalyticsPanel
+                    apiPath={`/api/v1/student/projects/${encodeURIComponent(firstProjectForTracker)}/section1-analytics`}
+                    title="Participation & attendance"
+                    description="Read-only metrics from CIEL for your active project. Full detail also appears in your report."
+                    className="mt-8"
+                />
+            ) : null}
 
             <CepExperienceFeedbackPrompt eligibilityReady={cepFeedbackEligible} />
             <OpportunityLiveApplyModal

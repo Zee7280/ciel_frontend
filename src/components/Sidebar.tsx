@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState, useEffect, useLayoutEffect, useCallback } from "react";
-import { LayoutDashboard, Users, Settings, PieChart, LogOut, FileText, Building2, CheckCircle, Briefcase, FileBarChart, ShieldAlert, History, Bell, User, MessageSquare, Plus, CreditCard, ClipboardList, CalendarClock, LifeBuoy, Link2, GraduationCap, Globe2, PlayCircle, Mail, Archive, type LucideProps } from "lucide-react";
+import { LayoutDashboard, Users, Settings, PieChart, LogOut, FileText, Building2, CheckCircle, Briefcase, FileBarChart, ShieldAlert, BarChart3, History, Bell, User, MessageSquare, Plus, CreditCard, ClipboardList, CalendarClock, LifeBuoy, Link2, GraduationCap, Globe2, PlayCircle, Mail, Archive, type LucideProps } from "lucide-react";
 import clsx from "clsx";
 import { authenticatedFetch, isTokenValid } from "@/utils/api";
 import {
@@ -186,6 +186,7 @@ export default function Sidebar() {
             { label: "Browse Opportunities", href: "/dashboard/student/browse", icon: Globe },
             { label: "Create Opportunity", href: "/dashboard/student/create-opportunity", icon: Plus },
             { label: "Impact History", href: "/dashboard/student/impact", icon: PieChart },
+            { label: "Analytics", href: "/dashboard/student/analytics", icon: BarChart3 },
             { label: "Payments", href: "/dashboard/student/payments", icon: CreditCard },
             { label: "Messages", href: "/dashboard/student/messages", icon: MessageSquare },
             { label: "Notifications", href: "/dashboard/student/notifications", icon: Bell },
@@ -205,6 +206,7 @@ export default function Sidebar() {
             { label: "Verify Work", href: "/dashboard/partner/verification", icon: CheckCircle },
             { label: "Reports", href: "/dashboard/partner/reports", icon: FileText },
             { label: "Impact", href: "/dashboard/partner/impact", icon: FileBarChart },
+            { label: "Analytics", href: "/dashboard/partner/analytics", icon: BarChart3 },
             ...(isUniversityPartnerOrg
                 ? [{ label: "Institution analytics", href: "/dashboard/partner/university-analytics", icon: GraduationCap }]
                 : []),
@@ -228,7 +230,7 @@ export default function Sidebar() {
             { label: "Messages", href: "/dashboard/faculty/messages", icon: MessageSquare },
             { label: "Notifications", href: "/dashboard/faculty/notifications", icon: Bell },
             { label: "Platform tutorial", href: "/dashboard/faculty/tutorials", icon: PlayCircle },
-            { label: "Impact Analytics", href: "/dashboard/faculty/analytics", icon: PieChart },
+            { label: "Analytics", href: "/dashboard/faculty/analytics", icon: BarChart3 },
             { label: "Help & Support", href: "/dashboard/faculty/help", icon: LifeBuoy },
         ] : []),
         // Admin
@@ -244,6 +246,7 @@ export default function Sidebar() {
             { label: "Project evidence export", href: "/dashboard/admin/project-evidence", icon: Archive },
             { label: "Student Reports", href: "/dashboard/admin/reports/verify", icon: FileText },
             { label: "CIEL Master", href: "/dashboard/admin/master-analytics", icon: Globe2 },
+            { label: "Analytics", href: "/dashboard/admin/analytics", icon: BarChart3 },
             { label: "Impact", href: "/dashboard/admin/impact", icon: FileBarChart },
             { label: "Messages", href: "/dashboard/admin/messages", icon: MessageSquare },
             { label: "Notifications", href: "/dashboard/admin/notifications", icon: Bell },
@@ -269,6 +272,13 @@ export default function Sidebar() {
 
     const links = [dashboardLink, ...roleLinks, settingsLink];
 
+    const isLinkActive = (href: string) => {
+        if (pathname === href) return true;
+        if (href === "/dashboard/student/payments" && pathname === "/dashboard/student/payment") return true;
+        if (href.endsWith("/analytics") && pathname.startsWith(`${href}/`)) return true;
+        return false;
+    };
+
     return (
         <>
         <aside className="fixed left-0 top-0 z-40 hidden h-screen max-h-[100dvh] w-64 flex-col bg-slate-900 text-white lg:flex">
@@ -290,9 +300,7 @@ export default function Sidebar() {
 
             <div className="min-h-0 flex-1 space-y-2 overflow-y-auto px-4 py-6 custom-scrollbar overscroll-contain">
                 {links.map((link) => {
-                    const isActive =
-                        pathname === link.href ||
-                        (link.href === "/dashboard/student/payments" && pathname === "/dashboard/student/payment");
+                    const isActive = isLinkActive(link.href);
                     return (
                         <Link
                             key={link.href}
@@ -343,9 +351,7 @@ export default function Sidebar() {
         >
             <div className="flex gap-2 overflow-x-auto pb-1">
                 {links.map((link) => {
-                    const isActive =
-                        pathname === link.href ||
-                        (link.href === "/dashboard/student/payments" && pathname === "/dashboard/student/payment");
+                    const isActive = isLinkActive(link.href);
                     return (
                         <Link
                             key={link.href}

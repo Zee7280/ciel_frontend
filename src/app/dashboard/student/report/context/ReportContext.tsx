@@ -30,6 +30,10 @@ export interface ReportData {
     admin_status?: string;
     admin_approval_status?: string;
     partner_status?: string;
+    /** Admin/partner notes when the report was returned for revision. */
+    admin_feedback?: string | null;
+    feedback?: string | null;
+    is_editable?: boolean;
     evidence_urls?: string[];
     /** When backend sends project/report payment state separately from `status`. */
     report_status?: string;

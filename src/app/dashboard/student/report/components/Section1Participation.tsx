@@ -23,6 +23,7 @@ import { calculateSection1CII } from "@/utils/reportQuality";
 import { calculateCII } from "../utils/calculateCII";
 import { resolveScopedTeamMembers } from "@/utils/reportTeamScope";
 import { effectiveParticipationStatusForReportActions } from "@/utils/studentJoinApplication";
+import Section1AnalyticsPanel from "@/components/analytics/Section1AnalyticsPanel";
 
 /** Copy for verify-attendance UX: no reviewer emails shown; NGO/partner first, faculty fallback. */
 const ATTENDANCE_VERIFICATION_INFO = {
@@ -1363,6 +1364,15 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                         hideIntensityHero
                                         report={data}
                                     />
+
+                                    {projectIdFromUrl ? (
+                                        <Section1AnalyticsPanel
+                                            apiPath={`/api/v1/student/projects/${encodeURIComponent(projectIdFromUrl)}/section1-analytics`}
+                                            title="Participation & attendance"
+                                            description="Read-only analytics from CIEL (your engagement metrics above are unchanged)."
+                                            className="mt-8"
+                                        />
+                                    ) : null}
 
 
                                 </div>

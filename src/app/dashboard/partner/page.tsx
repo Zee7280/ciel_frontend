@@ -5,6 +5,7 @@ import { Users, FileCheck, Clock, FileText, AlertCircle, Loader2 } from "lucide-
 import Link from "next/link";
 import { authenticatedFetch } from "@/utils/api";
 import PendingActionCards, { type PendingSummary } from "@/components/dashboard/PendingActionCards";
+import Section1AnalyticsPanel from "@/components/analytics/Section1AnalyticsPanel";
 
 type PartnerProject = {
     id: string;
@@ -205,6 +206,17 @@ export default function PartnerDashboard() {
                     <p className="text-sm text-slate-500 max-w-xs mt-2">You are on track to meet your beneficiary targets for Q1 2026.</p>
                 </div>
             </div>
+
+            <Section1AnalyticsPanel
+                apiPath="/api/v1/partners/analytics/section1"
+                query={{
+                    project_id: recentProjects[0]?.id,
+                    scope: recentProjects[0]?.id ? "project" : "aggregate",
+                }}
+                title="Participation & attendance"
+                description="Participation and verification metrics for your organization."
+                className="mt-8"
+            />
         </div>
     );
 }

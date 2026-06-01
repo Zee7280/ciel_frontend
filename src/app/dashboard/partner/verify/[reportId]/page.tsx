@@ -34,6 +34,7 @@ import {
     readSection1TeamFacultyEmails,
     type Section1DossierField,
 } from '@/utils/section1ParticipantDossierFields';
+import { isReportReturnedForRevision, reportRevisionStatusLabel } from '@/utils/reportRevisionState';
 
 function normalizeKey(value: unknown): string {
     return String(value ?? "")
@@ -49,7 +50,7 @@ function isPartnerDecisionFinal(value: unknown): boolean {
 
 function isReportDecisionFinal(value: unknown): boolean {
     const key = normalizeKey(value);
-    return ["verified", "finalized", "rejected", "partner_verified"].includes(key);
+    return ["verified", "finalized", "rejected", "revision", "partner_verified"].includes(key);
 }
 
 /** When to show NGO verify / reject controls. Backend status names vary, so only final decisions should hide the CTA. */
@@ -526,9 +527,11 @@ export default function ReportDetailPage() {
                                 report.status === 'verified' && 'bg-green-50 text-green-700 border-green-200',
                                 report.status === 'partner_verified' && 'bg-indigo-50 text-indigo-700 border-indigo-200',
                                 report.status === 'submitted' && 'bg-yellow-50 text-yellow-700 border-yellow-200',
-                                report.status === 'rejected' && 'bg-red-50 text-red-700 border-red-200'
+                                isReportReturnedForRevision(report) && 'bg-red-50 text-red-700 border-red-200'
                             )}>
-                                {report.status === 'partner_verified' ? 'Verified (Pending Admin)' : report.status}
+                                {report.status === 'partner_verified'
+                                    ? 'Verified (Pending Admin)'
+                                    : reportRevisionStatusLabel(report)}
                             </span>
                             <div className="flex items-center gap-2">
                                 <span className="text-[10px] font-black text-slate-400 mt-1">ADMIN DECISION:</span>

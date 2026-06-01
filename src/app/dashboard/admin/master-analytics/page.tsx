@@ -22,6 +22,7 @@ import {
     CardTitle,
 } from "@/app/dashboard/student/report/components/ui/card";
 import { authenticatedFetch, resolveSameOriginApiPath } from "@/utils/api";
+import Section1AnalyticsPanel from "@/components/analytics/Section1AnalyticsPanel";
 
 type TypeMixRow = { participation_type: string; count: number };
 
@@ -612,6 +613,17 @@ export default function AdminMasterAnalyticsPage() {
                     )}
                 </CardContent>
             </Card>
+
+            <Section1AnalyticsPanel
+                apiPath="/api/v1/admin/analytics/section1"
+                query={{
+                    ...(appliedSummary ?? {}),
+                    scope: appliedSummary?.project_id ? "project" : "aggregate",
+                }}
+                title="Participation & attendance (CIEL)"
+                description="Full admin field set. Respects the same filters as Master Analytics above."
+                className="mt-8"
+            />
         </div>
     );
 }

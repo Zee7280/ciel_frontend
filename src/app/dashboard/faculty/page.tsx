@@ -28,6 +28,7 @@ import {
     Cell,
 } from "recharts";
 import { authenticatedFetch } from "@/utils/api";
+import Section1AnalyticsPanel from "@/components/analytics/Section1AnalyticsPanel";
 import PendingActionCards, { type PendingSummary } from "@/components/dashboard/PendingActionCards";
 import { writeFacultyScopeSession, readFacultyDashboardViewPreference, writeFacultyDashboardViewPreference, type FacultyDashboardViewClient } from "@/utils/facultyScopeSession";
 
@@ -624,6 +625,14 @@ export default function FacultyDashboard() {
                     );
                 })}
             </div>
+
+            <Section1AnalyticsPanel
+                apiPath="/api/v1/faculty/analytics/section1"
+                query={{ scope: "aggregate" }}
+                title="Participation & attendance"
+                description="University-scoped metrics. Use Impact Analytics for filtered drill-down."
+                className="mt-8"
+            />
         </div>
     );
 }
