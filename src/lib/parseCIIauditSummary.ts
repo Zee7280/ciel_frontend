@@ -31,6 +31,14 @@ function findFinalAuditParagraph(full: string): string | null {
         }
     }
 
+    // v2 format: the "Final Decision" block is the best summary anchor.
+    for (let i = chunks.length - 1; i >= 0; i--) {
+        const c = chunks[i];
+        if (/Component\s*9\s*[—-]\s*Final\s+Decision/i.test(c) || /\bRecommended\s+Action\s*:/i.test(c)) {
+            return c;
+        }
+    }
+
     const idx = normalized.search(/SECTION\s*11[\s—-]*FINAL\s+AUDIT/i);
     if (idx >= 0 && /CRITICAL\s+RED\s+FLAGS/i.test(normalized)) {
         return normalized.slice(idx).trim();
@@ -78,6 +86,57 @@ function parseTopFixes(raw: string | null): string[] {
 export function parseSection11AuditSummary(fullText: string): ReportCIIauditMeta | null {
     const para = findFinalAuditParagraph(fullText);
     if (!para) return null;
+
+    // v2 format: read Top 5 lift criteria (Component 8) and recommended action (Component 9).
+    if (/Component\s*9\s*[—-]\s*Final\s+Decision/i.test(para) || /\bRecommended\s+Action\s*:/i.test(para)) {
+        const normalized = fullText.replace(/\r\n/g, "\n").trim();
+
+        const topBlock = sliceBetween(normalized, /Component\s*8\s*[—-]\s*Top\s*5\s+Lift\s+Criteria\s*/i, [
+            /Component\s*9\s*[—-]\s*Final\s+Decision/i,
+        ]);
+
+        const recommended = sliceBetween(para, /\bRecommended\s+Action\s*:\s*/i, [
+            /\bCurrent\s+Band\s*:/i,
+            /\bPath\s+Forward\s*:/i,
+        ]);
+
+        const currentBand = sliceBetween(para, /\bCurrent\s+Band\s*:\s*/i, [
+            /\bPath\s+Forward\s*:/i,
+        ]);
+
+        const top_fixes = topBlock
+            ? topBlock
+                  .split("\n")
+                  .map((l) => l.trim())
+                  .filter((l) => /^\d+\./.test(l))
+                  .map((l) => l.replace(/^\d+\.\s*/, "").trim())
+                  .filter(Boolean)
+            : [];
+
+        const risk_level = recommended ? recommended.trim() : null;
+        const final_remark = currentBand ? `Current Band: ${currentBand.trim()}` : null;
+
+        const needs_revision =
+            /\bRevision\s+Requested\b/i.test(risk_level || "") ||
+            /\bPartial\s+Deduction\b/i.test(risk_level || "") ||
+            /\bMajor\s+Deduction\b/i.test(risk_level || "") ||
+            /\bEscalate\b/i.test(risk_level || "");
+
+        const hasAny = Boolean(risk_level || top_fixes.length || final_remark);
+        if (!hasAny) return null;
+
+        return {
+            critical_red_flags: null,
+            moderate_issues: null,
+            minor_issues: null,
+            credibility: null,
+            risk_level,
+            top_fixes,
+            final_remark,
+            student_feedback: null,
+            needs_revision,
+        };
+    }
 
     const critical = sliceBetween(para, /CRITICAL\s+RED\s+FLAGS\s*:\s*/i, [
         /\bMODERATE\s+ISSUES\s*:/i,

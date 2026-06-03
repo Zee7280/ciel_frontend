@@ -23,6 +23,7 @@ import { calculateSection1CII } from "@/utils/reportQuality";
 import { calculateCII } from "../utils/calculateCII";
 import { resolveScopedTeamMembers } from "@/utils/reportTeamScope";
 import { effectiveParticipationStatusForReportActions } from "@/utils/studentJoinApplication";
+import { resolveAttendanceSubmitError } from "@/utils/attendanceSubmitError";
 import Section1AnalyticsPanel from "@/components/analytics/Section1AnalyticsPanel";
 
 /** Copy for verify-attendance UX: no reviewer emails shown; NGO/partner first, faculty fallback. */
@@ -52,6 +53,45 @@ function engagementParticipantIdsMatch(a: string | undefined | null, b: string |
     if (!a || !b) return false;
     if (a === b) return true;
     return engagementParticipantCompareKey(a) === engagementParticipantCompareKey(b);
+}
+
+/** Participation row ids for the signed-in student (team lead or member). */
+function selfParticipantRealIds(
+    currentUserEmail: string | null,
+    teamLead: Record<string, unknown>,
+    teamMembers: unknown[],
+    leadParticipantId: string | null,
+): string[] {
+    if (!currentUserEmail) return [];
+    const email = currentUserEmail.trim().toLowerCase();
+    const ids: string[] = [];
+    const leadEmail = typeof teamLead.email === "string" ? teamLead.email.trim().toLowerCase() : "";
+    if (leadEmail && leadEmail === email) {
+        const leadId = leadParticipantId || teamLead.id || teamLead.participantId;
+        if (leadId != null && String(leadId)) ids.push(String(leadId));
+    }
+    if (Array.isArray(teamMembers)) {
+        teamMembers.forEach((m) => {
+            if (!m || typeof m !== "object") return;
+            const row = m as Record<string, unknown>;
+            const rowEmail = typeof row.email === "string" ? row.email.trim().toLowerCase() : "";
+            if (rowEmail && rowEmail === email) {
+                const mid = row.participantId ?? row.id;
+                if (mid != null && String(mid)) ids.push(String(mid));
+            }
+        });
+    }
+    return ids;
+}
+
+function canDeleteAttendanceEntry(
+    entry: { participantId?: string | null },
+    selfIds: string[],
+    currentUserEmail: string | null,
+): boolean {
+    if (currentUserEmail && selfIds.length === 0) return false;
+    if (!entry?.participantId || selfIds.length === 0) return true;
+    return selfIds.some((sid) => engagementParticipantIdsMatch(entry.participantId, sid));
 }
 
 function memberRowPrefixedId(m: any, idx: number): string {
@@ -498,10 +538,28 @@ export default function Section1Participation({ projectData }: { projectData?: a
         }
     };
 
+    const selfParticipantIds = React.useMemo(
+        () =>
+            selfParticipantRealIds(
+                currentUserEmail,
+                data.section1.team_lead as Record<string, unknown>,
+                data.section1.team_members,
+                participantId,
+            ),
+        [currentUserEmail, data.section1.team_lead, data.section1.team_members, participantId],
+    );
+
     const handleDeleteEntry = async (entryId: string) => {
+        const entry = data.section1.attendance_logs.find((l: any) => l.id === entryId);
+        if (!entry) return;
+
+        if (!canDeleteAttendanceEntry(entry as { participantId?: string }, selfParticipantIds, currentUserEmail)) {
+            toast.error("You can only delete attendance entries that you logged for yourself.");
+            return;
+        }
+
         if (!confirm("Are you sure you want to remove this session?")) return;
 
-        const entry = data.section1.attendance_logs.find((l: any) => l.id === entryId);
         const entryParticipantId = (entry as any)?.participantId || participantId;
         if (!entryParticipantId) return;
 
@@ -519,11 +577,14 @@ export default function Section1Participation({ projectData }: { projectData?: a
             if (res && res.ok) {
                 const newLogs = data.section1.attendance_logs.filter((l: any) => l.id !== entryId);
                 updateSection('section1', { attendance_logs: newLogs });
+                toast.success("Attendance entry removed.");
             } else {
-                alert("Failed to delete entry. Please try again.");
+                const message = await resolveAttendanceSubmitError(res, "delete");
+                toast.error(message, { duration: 8000 });
             }
         } catch (err) {
             console.error(err);
+            toast.error("Could not delete this entry. Check your connection and try again.");
         } finally {
             setIsDeleting(null);
         }
@@ -1216,6 +1277,13 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                                     })}
                                                     participantNames={participantNamesMap}
                                                     onDelete={handleDeleteEntry}
+                                                    canDeleteEntry={(entry) =>
+                                                        canDeleteAttendanceEntry(
+                                                            entry,
+                                                            selfParticipantIds,
+                                                            currentUserEmail,
+                                                        )
+                                                    }
                                                     isLocked={isRecordLocked}
                                                 />
                                             </div>

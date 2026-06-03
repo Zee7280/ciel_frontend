@@ -10,6 +10,7 @@ import { authenticatedFetch } from "@/utils/api";
 import { normalizeEngagementAttendanceLog } from "@/utils/engagementAttendanceMap";
 import { canLogAttendanceForParticipationStatus } from "@/utils/attendanceApproverRouting";
 import { resolveAttendanceSubmitError } from "@/utils/attendanceSubmitError";
+import { uploadAttendanceEvidenceViaPresign } from "@/utils/attendanceEvidenceUpload";
 import {
     ATTENDANCE_DESCRIPTION_MAX_CHARS,
     ATTENDANCE_DESCRIPTION_MAX_WORDS,
@@ -243,46 +244,40 @@ export default function AttendanceForm({
                     return;
                 }
 
+                let presignedEvidenceUrl: string | undefined;
                 if (evidenceFile) {
-                    const fd = new FormData();
-                    fd.append('participantId', realId || '');
-                    fd.append('dateOfEngagement', formData.dateOfEngagement);
-                    fd.append('startTime', formData.startTime);
-                    fd.append('endTime', formData.endTime);
-                    fd.append('organizationName', formData.organizationName);
-                    fd.append('activityType', formData.activityType === 'Other' ? formData.otherActivity : formData.activityType);
-                    fd.append('description', formData.description);
-                    fd.append('sessionHours', numericHours.toString());
-                    fd.append('evidenceUploaded', 'true');
-                    fd.append('evidence', evidenceFile); // Actual file
-                    if (formData.locationPin) fd.append('locationPin', formData.locationPin);
-
-                    fetchOptions = {
-                        method: 'POST',
-                        body: fd,
-                    };
-                } else {
-                    const payload = {
-                        participantId: realId,
-                        dateOfEngagement: formData.dateOfEngagement,
-                        startTime: formData.startTime,
-                        endTime: formData.endTime,
-                        organizationName: formData.organizationName,
-                        activityType: formData.activityType === 'Other' ? formData.otherActivity : formData.activityType,
-                        description: formData.description,
-                        sessionHours: numericHours,
-                        evidenceUploaded: false,
-                        locationPin: formData.locationPin || undefined
-                    };
-
-                    console.log(`[Attendance] Body:`, payload);
-
-                    fetchOptions = {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
-                    };
+                    try {
+                        presignedEvidenceUrl = await uploadAttendanceEvidenceViaPresign(evidenceFile);
+                    } catch (uploadErr) {
+                        const message =
+                            uploadErr instanceof Error
+                                ? uploadErr.message
+                                : "Could not upload photo. Try a smaller image or save without evidence.";
+                        setSubmitError(message);
+                        toast.error(message, { duration: 8000 });
+                        return;
+                    }
                 }
+
+                const payload = {
+                    participantId: realId,
+                    dateOfEngagement: formData.dateOfEngagement,
+                    startTime: formData.startTime,
+                    endTime: formData.endTime,
+                    organizationName: formData.organizationName,
+                    activityType: formData.activityType === 'Other' ? formData.otherActivity : formData.activityType,
+                    description: formData.description,
+                    sessionHours: numericHours,
+                    evidenceUploaded: Boolean(presignedEvidenceUrl),
+                    evidenceUrl: presignedEvidenceUrl,
+                    locationPin: formData.locationPin || undefined,
+                };
+
+                fetchOptions = {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                };
 
                 console.log(`[Attendance] Submitting session for Participant ID: ${realId}`);
                 const res = await authenticatedFetch(`/api/v1/engagement/${realId}/attendance`, fetchOptions);

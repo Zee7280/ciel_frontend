@@ -92,6 +92,13 @@ export function resolveReportPaymentHeadcountFromReport(report: unknown): number
 /** Use the larger of project API vs report draft so team size is not missed after submit. */
 export function resolveReportPaymentHeadcountMerged(project: unknown, report: unknown | null | undefined): number {
     const fromProject = resolveReportPaymentHeadcountFromProject(project);
+    if (project && typeof project === "object") {
+        const p = project as Record<string, unknown>;
+        const part = String(p.participation_type ?? p.participationType ?? "").toLowerCase();
+        const explicitSize = readPositiveHeadcount(p.team_size ?? p.teamSize);
+        if (part === "individual") return 1;
+        if (part === "team" && explicitSize != null) return explicitSize;
+    }
     const fromReport = report ? resolveReportPaymentHeadcountFromReport(report) : 1;
     return Math.max(fromProject, fromReport);
 }

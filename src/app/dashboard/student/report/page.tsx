@@ -205,6 +205,14 @@ function ReportFormContent() {
                     const impactVerifyNormalized = pickImpactVerifyUrlFromPayload(actualReportData);
                     const mergedReport = {
                         ...actualReportData,
+                        project_id:
+                            String(
+                                (actualReportData as { project_id?: string }).project_id ||
+                                    (actualReportData as { projectId?: string }).projectId ||
+                                    (actualReportData as { opportunityId?: string }).opportunityId ||
+                                    projectId ||
+                                    "",
+                            ).trim() || projectId,
                         ...(!existingTitle && titleFromProject ? { project_title: titleFromProject } : {}),
                         ...(impactVerifyNormalized ? { impact_verify_url: impactVerifyNormalized } : {}),
                     };
@@ -279,6 +287,7 @@ function ReportFormContent() {
                             "submitted",
                             "approved",
                             "under_review",
+                            "payment_pending",
                             "pending_payment",
                             "payment_under_review",
                             "paid",

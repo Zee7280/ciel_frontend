@@ -36,7 +36,7 @@ export async function generateAISummary(section: string, data: unknown): Promise
         }));
 
         const controller = new AbortController();
-        const timeoutMs = section === "section11" ? 90000 : 45000;
+        const timeoutMs = section === "section11" ? 180000 : 45000;
         const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
         const response = await fetch("/api/ai/summarize", {
             method: "POST",

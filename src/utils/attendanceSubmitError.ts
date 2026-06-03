@@ -14,7 +14,7 @@ const STATUS_HINTS: Record<number, string> = {
 };
 
 /** User-friendly hints when the API message is generic or missing. */
-function hintForBackendMessage(en: string): string | undefined {
+function hintForBackendMessage(en: string, action: "submit" | "delete" = "submit"): string | undefined {
     const m = en.toLowerCase();
     if (m.includes("supervising faculty") || m.includes("faculty email")) {
         return "Add your faculty supervisor email on team registration, or ask your faculty to link their account to this project.";
@@ -25,8 +25,10 @@ function hintForBackendMessage(en: string): string | undefined {
     if (m.includes("approved/verified") || m.includes("only allowed for approved")) {
         return "Your participation must be approved before you can log attendance. Check Applications or refresh after approval.";
     }
-    if (m.includes("not authorized")) {
-        return "You can only log attendance for yourself or, as team lead, for verified team members on this project.";
+    if (m.includes("not authorized") || m.includes("only delete your own")) {
+        return action === "delete"
+            ? "You can only delete attendance entries that you logged for yourself."
+            : "You can only log attendance for yourself or, as team lead, for verified team members on this project.";
     }
     if (m.includes("failed to upload file to s3") || m.includes("s3")) {
         return "Evidence upload failed on the server. Try again without a photo, or use a smaller JPG/PNG.";
@@ -50,6 +52,13 @@ function hintForBackendMessage(en: string): string | undefined {
     }
     if (m.includes("upstream request failed") || m.includes("backend url is not configured")) {
         return "The app could not forward your request to the API. Try again later or contact support.";
+    }
+    if (
+        m.includes("payload_too_large") ||
+        m.includes("entity too large") ||
+        m.includes("function_payload")
+    ) {
+        return "The photo was too large for the app server. Update the app to the latest version, or try a smaller image.";
     }
     return undefined;
 }
@@ -86,7 +95,10 @@ async function readResponsePayload(res: Response): Promise<{
 /**
  * Resolve a student-facing message from an attendance POST response (or null when session missing).
  */
-export async function resolveAttendanceSubmitError(res: Response | null): Promise<string> {
+export async function resolveAttendanceSubmitError(
+    res: Response | null,
+    action: "submit" | "delete" = "submit",
+): Promise<string> {
     if (!res) {
         return STATUS_HINTS[401];
     }
@@ -102,11 +114,27 @@ export async function resolveAttendanceSubmitError(res: Response | null): Promis
     if (!message && textSnippet && !textSnippet.startsWith("<")) {
         message = textSnippet;
     }
+    if (
+        message.includes("PAYLOAD_TOO_LARGE") ||
+        message.includes("Request Entity Too Large") ||
+        message.includes("FUNCTION_PAYLOAD")
+    ) {
+        message =
+            "Photo upload failed: file is too large for the app gateway. Please update the app, use a smaller photo, or save without evidence for now.";
+    }
     if (!message) {
-        message = STATUS_HINTS[res.status] || `Could not save attendance (HTTP ${res.status}). Please try again.`;
+        if (res.status === 403 && action === "delete") {
+            message = "You can only delete your own attendance entries.";
+        } else {
+            message =
+                STATUS_HINTS[res.status] ||
+                (action === "delete"
+                    ? `Could not delete attendance (HTTP ${res.status}). Please try again.`
+                    : `Could not save attendance (HTTP ${res.status}). Please try again.`);
+        }
     }
 
-    const hint = hintForBackendMessage(message);
+    const hint = hintForBackendMessage(message, action);
     if (hint && !message.toLowerCase().includes(hint.slice(0, 24).toLowerCase())) {
         return `${message} ${hint}`;
     }

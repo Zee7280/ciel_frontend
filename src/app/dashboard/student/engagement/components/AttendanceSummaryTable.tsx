@@ -143,16 +143,20 @@ function evidenceLinkLabel(href: string): string {
     }
 }
 
-export default function AttendanceSummaryTable({ entries, onDelete, isLocked = false, participantNames = {}, embedded = false }: {
+export default function AttendanceSummaryTable({ entries, onDelete, canDeleteEntry, isLocked = false, participantNames = {}, embedded = false }: {
     entries: AttendanceEntry[],
     onDelete?: (id: string) => void,
+    /** When set, delete is only offered for entries that pass this check (e.g. own attendance only). */
+    canDeleteEntry?: (entry: AttendanceEntry) => boolean,
     isLocked?: boolean,
     participantNames?: Record<string, string>,
     /** When true, omit outer card chrome (parent already provides a panel). */
     embedded?: boolean,
 }) {
     const [remarkOpenId, setRemarkOpenId] = React.useState<string | null>(null);
-    const actionCol = !isLocked && !!onDelete;
+    const rowCanDelete = (entry: AttendanceEntry) =>
+        !isLocked && !!onDelete && (canDeleteEntry ? canDeleteEntry(entry) : true);
+    const actionCol = !isLocked && !!onDelete && entries.some(rowCanDelete);
     const colSpan = actionCol ? 9 : 8;
 
     const toggleRemarkRow = (id: string) => {
@@ -205,7 +209,7 @@ export default function AttendanceSummaryTable({ entries, onDelete, isLocked = f
                             <th className="px-5 py-5 text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">Duration</th>
                             <th className="px-5 py-5 text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">Approval</th>
                             <th className="min-w-[10rem] px-5 py-5 text-left text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">Evidence link</th>
-                            {!isLocked && onDelete && (
+                            {actionCol && (
                                 <th className="px-5 py-5 text-right text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">Actions</th>
                             )}
                         </tr>
@@ -326,17 +330,20 @@ export default function AttendanceSummaryTable({ entries, onDelete, isLocked = f
                                         <span className="text-[11px] font-semibold text-slate-400">No evidence</span>
                                     )}
                                 </td>
-                                {!isLocked && onDelete && (
-
+                                {rowCanDelete(entry) ? (
                                     <td className="px-8 py-7 text-right">
                                         <button
-                                            onClick={() => onDelete(entry.id)}
+                                            type="button"
+                                            onClick={() => onDelete!(entry.id)}
                                             className="w-10 h-10 flex items-center justify-center text-slate-300 hover:text-red-500 transition-all bg-white rounded-xl border-2 border-slate-100 hover:border-red-100 hover:shadow-lg hover:shadow-red-50 hover:bg-red-50/30"
+                                            aria-label="Delete attendance entry"
                                         >
                                             <Trash2 className="w-4.5 h-4.5" />
                                         </button>
                                     </td>
-                                )}
+                                ) : actionCol ? (
+                                    <td className="px-8 py-7 text-right" aria-hidden />
+                                ) : null}
                             </tr>
                             {remarkOpenId === entry.id && isRejectedEntry(entry) ? (
                                 <tr className="bg-rose-50/50 border-b border-rose-100/80">

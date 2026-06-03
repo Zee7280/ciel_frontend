@@ -93,6 +93,7 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
         !needsAdminRevision &&
         (reportSt === "submitted" ||
             reportSt === "under_review" ||
+            reportSt === "payment_pending" ||
             reportSt === "pending_payment" ||
             reportSt === "payment_under_review" ||
             reportSt === "paid" ||
@@ -116,8 +117,24 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
         data.payment_verified === true;
     const paymentSlipInReview =
         reportSt === "payment_under_review" || reportRs === "payment_under_review" || paymentSt === "payment_under_review";
-    const paymentHref =
-        data.project_id ? `/dashboard/student/payment?projectId=${encodeURIComponent(data.project_id)}` : "";
+    const projectPaymentId = String(
+        data.project_id ||
+            (data as { projectId?: string }).projectId ||
+            (data as { opportunityId?: string }).opportunityId ||
+            "",
+    ).trim();
+    const paymentHref = projectPaymentId
+        ? `/dashboard/student/payment?projectId=${encodeURIComponent(projectPaymentId)}`
+        : "";
+    const requiresPartnerApproval =
+        (data as { requires_partner_approval?: boolean }).requires_partner_approval === true ||
+        (data as { partner_required?: boolean }).partner_required === true;
+    const partnerStepSatisfied = ["approved", "not_applicable", "not_required"].includes(partnerSt);
+    const awaitingPartnerAfterPayment =
+        feeOrSlipRecorded &&
+        requiresPartnerApproval &&
+        !partnerStepSatisfied &&
+        !["verified", "partner_verified"].includes(reportSt);
 
     const [showPreview, setShowPreview] = useState(false);
     const [showCertificate, setShowCertificate] = useState(false);
@@ -759,6 +776,19 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                                 </Button>
                             </div>
                         </>
+                    ) : awaitingPartnerAfterPayment ? (
+                        <>
+                            <div className="w-16 h-16 bg-indigo-50 rounded-2xl flex items-center justify-center border border-indigo-100">
+                                <Clock className="w-7 h-7 text-indigo-600" />
+                            </div>
+                            <div className="max-w-md space-y-3">
+                                <h3 className="text-lg font-black text-slate-900">Partner review in progress</h3>
+                                <p className="text-sm font-medium text-slate-500 leading-relaxed">
+                                    Your reporting fee is recorded. Your NGO or partner organisation is reviewing the
+                                    report before CIEL admin final approval.
+                                </p>
+                            </div>
+                        </>
                     ) : (
                         <>
                             <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center">
@@ -767,7 +797,8 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                             <div className="max-w-md space-y-3">
                                 <h3 className="text-lg font-black text-slate-900">Report Locked Pending Admin Approval</h3>
                                 <p className="text-sm font-medium text-slate-400 leading-relaxed">
-                                    Your report is submitted, but the CII index, report preview, and certificate will unlock only after CIEL Admin gives final approval.
+                                    Your report and fee are on file. The CII index, report preview, and certificate unlock
+                                    after partner review (if required) and CIEL Admin final approval.
                                 </p>
                             </div>
                         </>

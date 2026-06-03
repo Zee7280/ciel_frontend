@@ -31,13 +31,24 @@ export function parseAuditSummaryIntoSections(full: string): AuditSummarySection
 
     const out: AuditSummarySection[] = [];
     for (const part of parts) {
-        const m = part.match(
+        // Legacy format:
+        // "SECTION 1 — TITLE: body..."
+        const legacy = part.match(
             /^(?:SECTION|Section)\s+(\d+)\s*(?:[—–\-]+|[.:]|\s-\s)?\s*([^:]+?)\s*:\s*([\s\S]*)$/i,
         );
+
+        // New v2 format:
+        // "SECTION 1 — TITLE\nScore: ...\n..."
+        const v2 = !legacy
+            ? part.match(/^(?:SECTION|Section)\s+(\d+)\s*[—–\-]+\s*([^\n]+)\n([\s\S]*)$/i)
+            : null;
+
+        const m = legacy || v2;
         if (!m) continue;
+
         const sectionNum = parseInt(m[1], 10);
         if (!Number.isFinite(sectionNum)) continue;
-        const title = m[2]
+        const title = (m[2] || "")
             .trim()
             .replace(/\s+/g, " ")
             .replace(/^[—–\-:.]+\s*/, "");

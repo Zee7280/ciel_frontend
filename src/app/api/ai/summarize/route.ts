@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { parseSection11AuditSummary } from "@/lib/parseCIIauditSummary";
+import { SECTION11_PROMPT_V2 } from "./prompts/section11Prompt.v2";
 
 // Gemini (paused): restore import + init + `model.generateContent(prompt)` below when using GEMINI_API_KEY again.
 // import { GoogleGenerativeAI } from "@google/generative-ai";
@@ -1362,7 +1363,13 @@ Keep the full response under 180 words.`;
             // SECTION 11 EXECUTIVE SUMMARY
             // =====================================================
             case "section11":
-                prompt = `GLOBAL MASTER INSTRUCTION (MANDATORY HEADER)
+                prompt = SECTION11_PROMPT_V2;
+                break;
+            /*
+             * Legacy prompt retained in:
+             * src/app/api/ai/summarize/prompts/section11Prompt.v1.ts
+             */
+            /*prompt = `GLOBAL MASTER INSTRUCTION (MANDATORY HEADER)
 You are an AI Auditor for CIEL (Community Impact Evaluation Lab).
 
 Your role is NOT just to evaluate but to critically REVIEW, VALIDATE, and IDENTIFY inconsistencies across the report.
@@ -1715,7 +1722,7 @@ SECTION 11 — FINAL AUDIT SUMMARY: CRITICAL RED FLAGS: ... MODERATE ISSUES: ...
 
 Submitted Report Data:
 ${JSON.stringify(data)}`;
-                break;
+                break;*/
 
             default:
                 prompt = `Summarize project data professionally: ${JSON.stringify(data)}`;
