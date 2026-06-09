@@ -434,8 +434,5 @@ Component 9 — Final Decision (three lines)
 
 [PRODUCE THE PER-SECTION JSON OBJECT EXACTLY IN THE SCHEMA PROVIDED IN THE SYSTEM PROMPT.]
 
-Now evaluate the submission below.
-
-SUBMISSION DATA:
-\${JSON.stringify(data)}`;
+Now evaluate the submission provided after this prompt under SUBMISSION DATA.`;
 

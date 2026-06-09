@@ -136,6 +136,8 @@ function ReportFormContent() {
         isEligibleForSubmission,
         areAllSectionsComplete,
         canSubmitReport,
+        canFinalizeSubmit,
+        isTeamLeadForSubmit,
         incompleteSectionsSummary
     } = useReportForm();
 
@@ -380,8 +382,10 @@ function ReportFormContent() {
             nextStep();
             window.scrollTo(0, 0);
         } else {
-            if (!canSubmitReport) {
-                if (!isEligibleForSubmission) {
+            if (!canFinalizeSubmit) {
+                if (canSubmitReport && !isTeamLeadForSubmit) {
+                    toast.error('Only your team lead can submit this team report.');
+                } else if (!isEligibleForSubmission) {
                     toast.error(
                         `Minimum verified hours not met (${data.section1.metrics?.total_verified_hours || 0}/${data.required_hours || 16}). Complete Section 1 first.`,
                     );
@@ -663,31 +667,35 @@ function ReportFormContent() {
                     {!isReadOnly && (
                         <div className={clsx(
                             "hidden md:flex items-center gap-2.5 px-3 py-1.5 rounded-xl border transition-all animate-in fade-in zoom-in duration-500",
-                            canSubmitReport
+                            canFinalizeSubmit
                                 ? "bg-emerald-50 border-emerald-100 text-emerald-700 shadow-sm"
                                 : "bg-amber-50 border-amber-100 text-amber-700"
                         )}>
                             <div className={clsx(
                                 "w-2.5 h-2.5 rounded-full animate-pulse",
-                                canSubmitReport ? "bg-emerald-500" : "bg-amber-500"
+                                canFinalizeSubmit ? "bg-emerald-500" : "bg-amber-500"
                             )} />
                             <div className="flex flex-col">
                                 <span className="text-[10px] font-black uppercase tracking-widest leading-none mb-0.5">
-                                    {canSubmitReport
+                                    {canFinalizeSubmit
                                         ? "Submission Mode Ready"
-                                        : isEligibleForSubmission
-                                          ? "Almost there"
-                                          : "Progress Mode"}
+                                        : canSubmitReport && !isTeamLeadForSubmit
+                                          ? "Team lead submit required"
+                                          : isEligibleForSubmission
+                                            ? "Almost there"
+                                            : "Progress Mode"}
                                 </span>
                                 <span className="text-[9px] font-bold opacity-70 leading-none">
-                                    {canSubmitReport
-                                        ? "All sections complete. You can submit from the summary step."
-                                        : isEligibleForSubmission
-                                          ? "Finish steps 1–10; then you can submit on the summary."
-                                          : `Verification in progress: ${data.section1.metrics?.total_verified_hours || 0}/${data.required_hours || 16} hours met.`}
+                                    {canSubmitReport && !isTeamLeadForSubmit
+                                        ? "Team report is ready, but only your team lead can submit."
+                                        : canSubmitReport
+                                          ? "All sections complete. You can submit from the summary step."
+                                          : isEligibleForSubmission
+                                            ? "Finish steps 1–10; then you can submit on the summary."
+                                            : `Verification in progress: ${data.section1.metrics?.total_verified_hours || 0}/${data.required_hours || 16} hours met.`}
                                 </span>
                             </div>
-                            {canSubmitReport && <CheckCircle2 className="w-4 h-4 text-emerald-500 ml-1" />}
+                            {canFinalizeSubmit && <CheckCircle2 className="w-4 h-4 text-emerald-500 ml-1" />}
                         </div>
                     )}
                     <div className="flex items-center gap-3 sm:justify-end">
@@ -817,7 +825,7 @@ function ReportFormContent() {
                             <Button
                                 type="button"
                                 onClick={handleNext}
-                                disabled={isSaving}
+                                disabled={isSaving || (activeStep === 11 && !canFinalizeSubmit && !needsRevision)}
                                 className="h-9 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm px-5 md:px-6 font-semibold shadow-sm shadow-blue-600/20 transition-all w-full sm:w-auto disabled:opacity-50"
                             >
                                 {isSaving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}

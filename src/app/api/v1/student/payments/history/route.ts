@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { resolveBackendApiV1Base } from "@/utils/backendApiV1Base";
 
 /** RFC-style 8-4-4-4-12 hex UUID (case-insensitive). */
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -30,7 +31,7 @@ function jwtUserIdFromPayload(payload: Record<string, unknown>): string | null {
 /** GET /api/v1/student/payments/history?studentId=<uuid> — proxy; studentId must match JWT subject id. */
 export async function GET(request: Request) {
     try {
-        const backendBase = process.env.NEXT_PUBLIC_BACKEND_BASE_URL?.replace(/\/+$/, "");
+        const backendBase = resolveBackendApiV1Base();
         if (!backendBase) {
             return NextResponse.json({ success: false, message: "Backend URL is not configured" }, { status: 500 });
         }

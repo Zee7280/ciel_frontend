@@ -1,7 +1,9 @@
 /**
- * Partner membership fee / bank-transfer screen — edit copy & bank lines here only.
+ * Partner membership fee / bank-transfer screen — edit copy here; bank lines come from `cielBankDetails`.
  * Fee amount: backend `membership-fee.defaults.ts` + optional DB settings; UI uses REPORTING_FEE_DISPLAY when feePkrOverride is set.
  */
+
+import { CIEL_OFFICIAL_BANK_ROWS } from "@/config/cielBankDetails";
 
 /** PKR amount shown on screen and sent as `paid_amount` when using override below. */
 export const REPORTING_FEE_DISPLAY = 1000;
@@ -22,12 +24,7 @@ export const partnerMembershipPaymentConfig = {
 
     /** Bank “report” section (label + value rows) */
     bankSectionTitle: "Bank details — use for your transfer",
-    bankRows: [
-        { label: "Bank name", value: "UNITED Bank Limited (UBL)" },
-        { label: "Account title", value: "CIEL International" },
-        { label: "Account number", value: "0374251663933" },
-        { label: "IBAN", value: "PK14UNIL0109000251663933" },
-    ] satisfies PartnerMembershipBankRow[],
+    bankRows: [...CIEL_OFFICIAL_BANK_ROWS] satisfies PartnerMembershipBankRow[],
 
     referenceHint:
         "In the transfer reference / remarks, put your organization name and signup email so we can match payment.",

@@ -173,6 +173,13 @@ export default function IdentityVerification({
         });
     }, [initialData?.cnic, initialData?.id]);
 
+    const [effectiveTeamId, setEffectiveTeamId] = useState(() => {
+        const fromProps = (teamId || "").trim();
+        if (fromProps) return fromProps;
+        const fromInitial = initialData?.teamId ?? initialData?.team_id;
+        return typeof fromInitial === "string" ? fromInitial.trim() : "";
+    });
+
     // Team leads: report/draft payloads can briefly carry truncated CNIC. Engagement row is authoritative once saved.
     useEffect(() => {
         if (!isTeamLead || !projectId.trim()) return;
@@ -198,6 +205,13 @@ export default function IdentityVerification({
                     return String((r as Record<string, unknown>).projectId ?? "") === pid;
                 }) ?? null;
 
+                const rowTeamId = candidate
+                    ? String(candidate.teamId ?? candidate.team_id ?? "").trim()
+                    : "";
+                if (rowTeamId && !cancelled) {
+                    setEffectiveTeamId(rowTeamId);
+                }
+
                 const d = normalizePakistaniCnicDigits(candidate?.cnic);
                 if (d.length !== 13 || cancelled) return;
 
@@ -212,6 +226,11 @@ export default function IdentityVerification({
             cancelled = true;
         };
     }, [isTeamLead, projectId]);
+
+    useEffect(() => {
+        const fromProps = (teamId || "").trim();
+        if (fromProps) setEffectiveTeamId(fromProps);
+    }, [teamId]);
 
     const handleChangeEmail = () => {
         setOtpSent(prev => ({ ...prev, email: false }));
@@ -255,7 +274,12 @@ export default function IdentityVerification({
             };
             // facultySupervisorEmail is now collected at the application/apply stage — not here
             delete body.facultySupervisorEmail;
-            const resolvedTeamId = teamId || initialData.teamId || initialData.team_id || "";
+            const resolvedTeamId =
+                effectiveTeamId ||
+                teamId ||
+                initialData.teamId ||
+                initialData.team_id ||
+                "";
             if (resolvedTeamId) {
                 body.teamId = resolvedTeamId;
                 body.team_id = resolvedTeamId;

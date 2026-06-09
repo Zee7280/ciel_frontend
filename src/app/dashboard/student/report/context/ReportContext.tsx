@@ -6,6 +6,7 @@ import { calculateEngagementMetrics, buildIndividualRosterFromSection1 } from '.
 import type { ReportCIIauditMeta } from '@/lib/parseCIIauditSummary';
 import { pickImpactVerifyUrlFromPayload } from '@/utils/reportVerificationUrl';
 import { prepareReportEvidenceForSave } from '../utils/evidenceUpload';
+import { isTeamLeadForReportSubmit } from '@/utils/teamReportSubmitAccess';
 
 // Define the shape of the report data matches the 11 sections (plus summary)
 export interface ReportData {
@@ -499,6 +500,10 @@ interface ReportContextType {
     areAllSectionsComplete: boolean;
     /** Hours + all sections valid — final submit allowed. */
     canSubmitReport: boolean;
+    /** Team projects: signed-in student matches roster team lead email. */
+    isTeamLeadForSubmit: boolean;
+    /** Final submit: sections + hours + team lead (when team mode). */
+    canFinalizeSubmit: boolean;
     /** Sections 1–10 that fail validation, with messages (for summary / submit UX). */
     incompleteSectionsSummary: SectionIncompleteInfo[];
     /**
@@ -543,6 +548,26 @@ export function ReportProvider({ children }: { children: React.ReactNode }) {
     const canSubmitReport = useMemo(
         () => isEligibleForSubmission && areAllSectionsComplete,
         [isEligibleForSubmission, areAllSectionsComplete],
+    );
+
+    const [signedInEmail, setSignedInEmail] = useState('');
+    useEffect(() => {
+        try {
+            const user = JSON.parse(localStorage.getItem('ciel_user') || '{}') as { email?: string };
+            setSignedInEmail(String(user.email || '').trim());
+        } catch {
+            setSignedInEmail('');
+        }
+    }, []);
+
+    const isTeamLeadForSubmit = useMemo(
+        () => isTeamLeadForReportSubmit(data, signedInEmail),
+        [data.section1, signedInEmail],
+    );
+
+    const canFinalizeSubmit = useMemo(
+        () => canSubmitReport && isTeamLeadForSubmit,
+        [canSubmitReport, isTeamLeadForSubmit],
     );
 
     const incompleteSectionsSummary = useMemo(
@@ -799,6 +824,8 @@ export function ReportProvider({ children }: { children: React.ReactNode }) {
         isEligibleForSubmission,
         areAllSectionsComplete,
         canSubmitReport,
+        isTeamLeadForSubmit,
+        canFinalizeSubmit,
         incompleteSectionsSummary,
         showVerifiedImpactScores
     }), [
@@ -822,6 +849,8 @@ export function ReportProvider({ children }: { children: React.ReactNode }) {
         isEligibleForSubmission,
         areAllSectionsComplete,
         canSubmitReport,
+        isTeamLeadForSubmit,
+        canFinalizeSubmit,
         incompleteSectionsSummary,
         showVerifiedImpactScores
     ]);

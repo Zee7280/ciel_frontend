@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { authenticatedFetch } from '@/utils/api';
-import { CheckCircle2, XCircle, Clock, FileText, Search, Building2, Eye, ChevronDown, ArrowUpDown } from 'lucide-react';
+import { CheckCircle2, XCircle, Clock, FileText, Search, Building2, Eye, ChevronDown, ArrowUpDown, RefreshCw, Loader2, Download } from 'lucide-react';
+import { downloadAdminReportAiPayload, regenerateAdminReportAiScore } from '@/utils/adminRegenerateReportAiScore';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import clsx from 'clsx';
@@ -33,6 +34,7 @@ interface Report {
     status: string;
     partner_status: string;
     admin_status: string;
+    cii_score?: number | null;
 }
 
 type ReportStatusFilter = 'all' | 'submitted' | 'pending' | 'verified' | 'rejected';
@@ -136,6 +138,9 @@ export default function AdminReportsVerificationPage() {
     const [dateFrom, setDateFrom] = useState('');
     const [dateTo, setDateTo] = useState('');
     const [organizations, setOrganizations] = useState<{ id: string; name: string }[]>([]);
+    const [refreshingReportIds, setRefreshingReportIds] = useState<Record<string, boolean>>({});
+    const [downloadingAiPayloadIds, setDownloadingAiPayloadIds] = useState<Record<string, boolean>>({});
+    const [ciiScores, setCiiScores] = useState<Record<string, number>>({});
 
     useEffect(() => {
         void fetchOrganizations();
@@ -174,7 +179,17 @@ export default function AdminReportsVerificationPage() {
             if (response?.ok) {
                 const data = await response.json();
                 if (data.success && Array.isArray(data.data)) {
-                    setReports(data.data as Report[]);
+                    const rows = data.data as Report[];
+                    setReports(rows);
+                    setCiiScores((prev) => {
+                        const next = { ...prev };
+                        for (const row of rows) {
+                            if (typeof row.cii_score === 'number' && Number.isFinite(row.cii_score)) {
+                                next[row.id] = Math.round(row.cii_score);
+                            }
+                        }
+                        return next;
+                    });
                 } else if (Array.isArray(data)) {
                     setReports(data as Report[]);
                 } else {
@@ -291,6 +306,65 @@ export default function AdminReportsVerificationPage() {
         { id: 'verified', label: 'Verified' },
         { id: 'rejected', label: 'Rejected' },
     ] as const;
+
+    const handleDownloadAiPayload = async (reportId: string) => {
+        if (downloadingAiPayloadIds[reportId]) return;
+
+        setDownloadingAiPayloadIds((prev) => ({ ...prev, [reportId]: true }));
+        try {
+            const result = await downloadAdminReportAiPayload(reportId);
+            if (!result.success) {
+                toast.error(result.error || 'Failed to download AI payload');
+                return;
+            }
+            toast.success('AI payload JSON downloaded');
+        } catch (error) {
+            console.error('AI payload download failed:', error);
+            toast.error('Failed to download AI payload');
+        } finally {
+            setDownloadingAiPayloadIds((prev) => {
+                const next = { ...prev };
+                delete next[reportId];
+                return next;
+            });
+        }
+    };
+
+    const handleRefreshAiScore = async (reportId: string) => {
+        if (refreshingReportIds[reportId]) return;
+
+        setRefreshingReportIds((prev) => ({ ...prev, [reportId]: true }));
+        try {
+            toast.info('Running AI audit — may take up to 3 minutes.');
+            const result = await regenerateAdminReportAiScore(reportId);
+            if (!result.success) {
+                toast.error(result.error || 'Failed to refresh AI score');
+                return;
+            }
+            if (typeof result.score === 'number') {
+                setCiiScores((prev) => ({ ...prev, [reportId]: result.score as number }));
+                setReports((prev) =>
+                    prev.map((row) =>
+                        row.id === reportId ? { ...row, cii_score: result.score ?? row.cii_score } : row,
+                    ),
+                );
+            }
+            toast.success(
+                typeof result.score === 'number'
+                    ? `CII score updated (${result.score}/100)`
+                    : 'CII score updated',
+            );
+        } catch (error) {
+            console.error('List AI score refresh failed:', error);
+            toast.error('AI scoring failed');
+        } finally {
+            setRefreshingReportIds((prev) => {
+                const next = { ...prev };
+                delete next[reportId];
+                return next;
+            });
+        }
+    };
 
     const resetFilters = () => {
         setSearchQuery('');
@@ -439,6 +513,7 @@ export default function AdminReportsVerificationPage() {
                                     <th className="px-6 py-4 text-sm font-semibold text-slate-600">Organization</th>
                                     <th className="px-6 py-4 text-sm font-semibold text-slate-600">Submitted</th>
                                     <th className="px-6 py-4 text-sm font-semibold text-slate-600">NGO Status</th>
+                                    <th className="px-6 py-4 text-sm font-semibold text-slate-600">CII Score</th>
                                     <th className="px-6 py-4 text-sm font-semibold text-slate-600">Overall</th>
                                     <th className="px-6 py-4 text-sm font-semibold text-slate-600">Actions</th>
                                 </tr>
@@ -474,11 +549,48 @@ export default function AdminReportsVerificationPage() {
                                         <td className="px-6 py-5">
                                             <div className="flex flex-wrap gap-1">{getStatusBadge(report.partner_status)}</div>
                                         </td>
+                                        <td className="px-6 py-5 whitespace-nowrap">
+                                            <div className="flex items-center gap-2">
+                                                <span className="min-w-[2.5rem] text-sm font-bold tabular-nums text-indigo-700">
+                                                    {typeof ciiScores[report.id] === 'number'
+                                                        ? `${ciiScores[report.id]}/100`
+                                                        : typeof report.cii_score === 'number'
+                                                          ? `${Math.round(report.cii_score)}/100`
+                                                          : '—'}
+                                                </span>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => void handleRefreshAiScore(report.id)}
+                                                    disabled={Boolean(refreshingReportIds[report.id])}
+                                                    title="Refresh AI CII score"
+                                                    className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-violet-200 bg-violet-50 text-violet-700 transition hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-50"
+                                                >
+                                                    {refreshingReportIds[report.id] ? (
+                                                        <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                                                    ) : (
+                                                        <RefreshCw className="h-4 w-4" aria-hidden />
+                                                    )}
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => void handleDownloadAiPayload(report.id)}
+                                                    disabled={Boolean(downloadingAiPayloadIds[report.id])}
+                                                    title="Download JSON sent to AI (section11)"
+                                                    className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                                                >
+                                                    {downloadingAiPayloadIds[report.id] ? (
+                                                        <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                                                    ) : (
+                                                        <Download className="h-4 w-4" aria-hidden />
+                                                    )}
+                                                </button>
+                                            </div>
+                                        </td>
                                         <td className="px-6 py-5">
                                             <div className="flex flex-wrap gap-1">{getStatusBadge(report.status)}</div>
                                         </td>
                                         <td className="px-6 py-5">
-                                            <div className="flex items-center">
+                                            <div className="flex items-center gap-2">
                                                 <button
                                                     onClick={() => router.push(`/dashboard/admin/reports/verify/${report.id}`)}
                                                     className="inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700"

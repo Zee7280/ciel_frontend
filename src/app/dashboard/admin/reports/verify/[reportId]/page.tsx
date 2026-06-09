@@ -26,6 +26,9 @@ import {
     AlertTriangle,
     List,
     PencilLine,
+    Sparkles,
+    Loader2,
+    Download,
 } from "lucide-react";
 import { toast } from 'sonner';
 import clsx from 'clsx';
@@ -39,6 +42,11 @@ import type { ReportData } from "../../../../student/report/context/ReportContex
 import { calculateCII } from "../../../../student/report/utils/calculateCII";
 import { formatSdgGoalPadded, mergeReportSdgSnapshotRows } from "../../../../student/report/utils/reportSdgMerge";
 import { readPersistedCiiSnapshot } from "@/utils/reportCiiSnapshot";
+import {
+    buildReportPayloadForAi,
+    downloadAdminReportAiPayload,
+    regenerateAdminReportAiScore,
+} from "@/utils/adminRegenerateReportAiScore";
 import { prepareReportForVerifyDossier } from "@/utils/reportTeamScope";
 import { getReportProjectContextDisplay } from "@/utils/reportProjectContext";
 import { VERIFY_DOSSIER_FIELD_GRID } from "@/utils/verifyDossierFieldGrid";
@@ -528,6 +536,8 @@ export default function AdminReportDetailPage() {
     const [loading, setLoading] = useState(true);
     const [feedback, setFeedback] = useState('');
     const [isVerifying, setIsVerifying] = useState(false);
+    const [isRegeneratingAiScore, setIsRegeneratingAiScore] = useState(false);
+    const [isDownloadingAiPayload, setIsDownloadingAiPayload] = useState(false);
     const [showStickyActions, setShowStickyActions] = useState(false);
     const [qualityAlerts, setQualityAlerts] = useState<QualityAlert[]>([]);
     const [section11Audit, setSection11Audit] = useState<ReportCIIauditMeta | null>(null);
@@ -724,6 +734,53 @@ export default function AdminReportDetailPage() {
         }
     };
 
+    const handleDownloadAiPayload = async () => {
+        if (!report || isDownloadingAiPayload) return;
+
+        setIsDownloadingAiPayload(true);
+        try {
+            const result = await downloadAdminReportAiPayload(String(params.reportId));
+            if (!result.success) {
+                toast.error(result.error || "Failed to download AI payload");
+                return;
+            }
+            toast.success("AI payload JSON downloaded");
+        } catch (error) {
+            console.error("AI payload download failed:", error);
+            toast.error("Failed to download AI payload");
+        } finally {
+            setIsDownloadingAiPayload(false);
+        }
+    };
+
+    const handleRegenerateAiScore = async () => {
+        if (!report || isRegeneratingAiScore) return;
+
+        setIsRegeneratingAiScore(true);
+        try {
+            toast.info("Running ChatGPT CII audit — this may take up to 3 minutes.");
+            const result = await regenerateAdminReportAiScore(
+                String(params.reportId),
+                buildReportPayloadForAi(report as ReportData),
+            );
+            if (!result.success) {
+                toast.error(result.error || "AI scoring failed");
+                return;
+            }
+            toast.success(
+                typeof result.score === "number"
+                    ? `CII score updated (${result.score}/100)`
+                    : "CII score updated",
+            );
+            await fetchReportDetail();
+        } catch (error) {
+            console.error("Admin AI score regeneration failed:", error);
+            toast.error("AI scoring failed. Please try again.");
+        } finally {
+            setIsRegeneratingAiScore(false);
+        }
+    };
+
     const handleVerify = async (action: 'approve' | 'reject', intent: 'decision' | 'editable' = 'decision') => {
         if (action === 'reject' && !feedback.trim()) {
             toast.error(
@@ -914,6 +971,36 @@ export default function AdminReportDetailPage() {
                                     </div>
                                 </div>
                             ) : null}
+                            <div className="flex w-full flex-col gap-2 sm:w-auto sm:items-end">
+                            <button
+                                type="button"
+                                onClick={handleRegenerateAiScore}
+                                disabled={isRegeneratingAiScore || isVerifying}
+                                className="inline-flex min-h-[2.75rem] w-full items-center justify-center gap-2 rounded-xl border border-violet-200 bg-violet-50 px-4 py-2.5 text-sm font-semibold text-violet-800 shadow-sm transition-colors hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+                                title="Run ChatGPT CII audit and save updated score to this report"
+                            >
+                                {isRegeneratingAiScore ? (
+                                    <Loader2 className="h-4 w-4 shrink-0 animate-spin" aria-hidden />
+                                ) : (
+                                    <Sparkles className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
+                                )}
+                                {isRegeneratingAiScore ? "Updating score…" : "Regenerate AI score"}
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleDownloadAiPayload}
+                                disabled={isDownloadingAiPayload || isVerifying}
+                                className="inline-flex min-h-[2.75rem] w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+                                title="Download JSON payload sent to AI (section11)"
+                            >
+                                {isDownloadingAiPayload ? (
+                                    <Loader2 className="h-4 w-4 shrink-0 animate-spin" aria-hidden />
+                                ) : (
+                                    <Download className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
+                                )}
+                                Download AI JSON
+                            </button>
+                            </div>
                             <span
                                 className={clsx(
                                     "rounded-xl border px-4 py-2 text-sm font-bold uppercase tracking-wide",
@@ -1927,6 +2014,37 @@ export default function AdminReportDetailPage() {
                                 </span>
                             </div>
                         ) : null}
+
+                        <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+                        <button
+                            type="button"
+                            onClick={handleRegenerateAiScore}
+                            disabled={isRegeneratingAiScore || isVerifying}
+                            className="inline-flex min-h-[2.75rem] items-center justify-center gap-2 rounded-xl border border-violet-200 bg-violet-50 px-5 py-2.5 text-sm font-semibold text-violet-800 shadow-sm transition-colors hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-60"
+                            title="Run ChatGPT CII audit and save updated score to this report"
+                        >
+                            {isRegeneratingAiScore ? (
+                                <Loader2 className="h-4 w-4 shrink-0 animate-spin" aria-hidden />
+                            ) : (
+                                <Sparkles className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
+                            )}
+                            {isRegeneratingAiScore ? "Running AI audit…" : "Regenerate AI score & audit"}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={handleDownloadAiPayload}
+                            disabled={isDownloadingAiPayload || isVerifying}
+                            className="inline-flex min-h-[2.75rem] items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                            title="Download JSON payload sent to AI (section11)"
+                        >
+                            {isDownloadingAiPayload ? (
+                                <Loader2 className="h-4 w-4 shrink-0 animate-spin" aria-hidden />
+                            ) : (
+                                <Download className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
+                            )}
+                            Download AI JSON
+                        </button>
+                        </div>
 
                         <div className="space-y-6">
                             <div>

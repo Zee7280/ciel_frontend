@@ -32,6 +32,7 @@ import {
 } from '@/config/reportingFee';
 import { ManualPaymentHistorySection } from '../components/ManualPaymentHistorySection';
 import { CepExperienceFeedbackPrompt } from '@/components/feedback/CepExperienceFeedbackPrompt';
+import { CIEL_OFFICIAL_BANK } from '@/config/cielBankDetails';
 
 function PaymentContent() {
     const searchParams = useSearchParams();
@@ -41,12 +42,7 @@ function PaymentContent() {
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
     const [projectDetails, setProjectDetails] = useState<any>(null);
-    const bankInfo = {
-        bankName: "United Bank Limited (UBL)",
-        accountTitle: "Community Impact Education Lab Pakistan",
-        accountNumber: "371162266",
-        iban: "PK54UNIL0109000371162266",
-    };
+    const bankInfo = CIEL_OFFICIAL_BANK;
 
 
     const [proofFile, setProofFile] = useState<File | null>(null);

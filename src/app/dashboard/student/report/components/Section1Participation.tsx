@@ -955,8 +955,14 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                         <IdentityVerification
                                             projectId={data.project_id || projectIdFromUrl || ""}
                                             participationMode={participation_type as any}
-                                            initialData={team_lead}
+                                            initialData={{
+                                                ...team_lead,
+                                                ...(teamId ? { teamId, team_id: teamId } : {}),
+                                            }}
                                             isTeamLead={true}
+                                            teamId={teamId}
+                                            primaryFacultyEmail={primaryFacultyEmail}
+                                            secondaryFacultyEmail={secondaryFacultyEmail}
                                             onSuccess={(p) => {
                                                 setIsVerified(true);
                                                 setIsEditingLead(false);

@@ -22,7 +22,7 @@ async function generateSummaryWithOpenAI(
         throw new Error("OPENAI_API_KEY missing");
     }
 
-    const model = process.env.OPENAI_SUMMARY_MODEL?.trim() || "gpt-4o-mini";
+    const model = process.env.OPENAI_SUMMARY_MODEL?.trim() || "gpt-5.4";
 
     const temperature = opts?.temperature ?? 0.4;
     const requestBody: Record<string, unknown> = {
@@ -1363,7 +1363,7 @@ Keep the full response under 180 words.`;
             // SECTION 11 EXECUTIVE SUMMARY
             // =====================================================
             case "section11":
-                prompt = SECTION11_PROMPT_V2;
+                prompt = `${SECTION11_PROMPT_V2}\n\nSUBMISSION DATA:\n${JSON.stringify(data)}`;
                 break;
             /*
              * Legacy prompt retained in:

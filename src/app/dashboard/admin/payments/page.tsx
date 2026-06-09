@@ -174,33 +174,9 @@ export default function AdminPaymentsPage() {
                         setPendingCount(list.length);
                     }
                 } else {
-                    // Mock data for demonstration if API fails (pending only — unchanged behavior)
-                    const mock: Payment[] = [
-                        {
-                            id: "pay_1",
-                            studentName: "Zain Ali",
-                            studentEmail: "zain@example.com",
-                            projectTitle: "Clean Water Initiative",
-                            projectId: "proj_123",
-                            amount: REPORTING_FEE_DISPLAY,
-                            date: new Date().toISOString(),
-                            proofUrl: "https://via.placeholder.com/600x800?text=Payment+Receipt+Proof",
-                            status: 'pending'
-                        },
-                        {
-                            id: "pay_2",
-                            studentName: "Ahmed Khan",
-                            studentEmail: "ahmed@example.com",
-                            projectTitle: "Education for All",
-                            projectId: "proj_456",
-                            amount: REPORTING_FEE_DISPLAY,
-                            date: new Date(Date.now() - 86400000).toISOString(),
-                            proofUrl: "https://via.placeholder.com/600x800?text=Bank+Transfer+Slip",
-                            status: 'pending'
-                        }
-                    ];
-                    setPayments(mock);
-                    setPendingCount(mock.length);
+                    setPayments([]);
+                    setPendingCount(0);
+                    toast.error("Could not load pending payments. Please try again or contact support.");
                 }
             } else {
                 const status = activeTab;
