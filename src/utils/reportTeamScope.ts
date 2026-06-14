@@ -100,12 +100,34 @@ export function mergeReportSection1TeamScope(
 ): Record<string, unknown> {
     const section1 = { ...((report.section1 as Record<string, unknown> | undefined) || {}) };
     const { team_members, participation_type } = resolveScopedTeamMembers(participant, teamRows);
+
+    const myTeamId = pickTeamIdFromRecord(participant);
+    const roster = Array.isArray(teamRows) ? teamRows : [];
+    const scopedRoster =
+        myTeamId && participation_type === "team"
+            ? roster.filter((row) => pickTeamIdFromRecord(row) === myTeamId)
+            : roster;
+    const leadFromRoster = scopedRoster.find((row) => {
+        if (!row || typeof row !== "object") return false;
+        const o = row as Record<string, unknown>;
+        return o.isTeamLead === true || o.is_team_lead === true;
+    });
+    const existingLead =
+        section1.team_lead && typeof section1.team_lead === "object"
+            ? (section1.team_lead as Record<string, unknown>)
+            : undefined;
+    const team_lead = mergeTeamLeadForDossier(
+        existingLead,
+        leadFromRoster ? normalizeParticipationRowForDossier(leadFromRoster) : undefined,
+    );
+
     return {
         ...report,
         section1: {
             ...section1,
             team_members,
             participation_type,
+            team_lead,
         },
     };
 }

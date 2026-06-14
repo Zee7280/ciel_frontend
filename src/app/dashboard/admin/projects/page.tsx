@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import Link from "next/link";
 import DataTable from "react-data-table-component";
 import type { TableColumn } from "react-data-table-component";
-import { Search, Filter, MoreVertical, Briefcase, MapPin, Eye, FileDown, Trash2, Users, Loader2, X, UserMinus, Pencil, Mail, ClipboardList } from "lucide-react";
+import { Search, Filter, MoreVertical, Briefcase, MapPin, Eye, FileDown, Trash2, Users, Loader2, X, UserMinus, Pencil, Mail, ClipboardList, GitMerge } from "lucide-react";
 import { authenticatedFetch } from "@/utils/api";
 import { toast } from "sonner";
 import { ProjectTrackerModal } from "@/app/dashboard/admin/projects/ProjectTrackerModal";
@@ -268,6 +268,41 @@ function normalizeParticipationMode(raw: Record<string, unknown>): Participation
 /** Listing-only synthetic group key; DELETE .../teams/:teamId expects a persisted Participation.teamId. */
 function isSyntheticIndividualGroupId(teamId: string): boolean {
     return /^individual:/i.test(String(teamId).trim());
+}
+
+const PARTICIPATION_UUID_RE =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+/** Enrolled participation seats only — excludes pending pipeline synthetic roster ids. */
+function isMergeableTeamMember(member: TeamMemberRow): boolean {
+    if (!member.supportsAdminPatch) return false;
+    if (/^pending:/i.test(member.id.trim())) return false;
+    return PARTICIPATION_UUID_RE.test(member.id.trim());
+}
+
+type MergeableEnrollmentOption = {
+    participationId: string;
+    name: string;
+    email: string;
+    groupLabel: string;
+    participationMode: ParticipationMode;
+};
+
+function flattenMergeableEnrollments(rows: TeamOverviewRow[]): MergeableEnrollmentOption[] {
+    const out: MergeableEnrollmentOption[] = [];
+    for (const team of rows) {
+        for (const member of team.members) {
+            if (!isMergeableTeamMember(member)) continue;
+            out.push({
+                participationId: member.id,
+                name: member.name,
+                email: member.email,
+                groupLabel: team.teamName,
+                participationMode: team.participationMode,
+            });
+        }
+    }
+    return out;
 }
 
 function teamOverviewRemoveGroupDisabled(team: TeamOverviewRow): boolean {
@@ -657,6 +692,11 @@ export default function AdminProjectsPage() {
     const [teamMemberEditor, setTeamMemberEditor] = useState<TeamMemberEditorState | null>(null);
     const [memberSaveLoading, setMemberSaveLoading] = useState(false);
     const [teamOverviewParticipationFilter, setTeamOverviewParticipationFilter] = useState<"all" | "team" | "individual">("all");
+    const [teamMergePanelOpen, setTeamMergePanelOpen] = useState(false);
+    const [teamMergeSelectedIds, setTeamMergeSelectedIds] = useState<string[]>([]);
+    const [teamMergeLeadId, setTeamMergeLeadId] = useState("");
+    const [teamMergeTargetTeamId, setTeamMergeTargetTeamId] = useState("");
+    const [teamMergeSubmitting, setTeamMergeSubmitting] = useState(false);
     const [incompleteApplicantStatusFilter, setIncompleteApplicantStatusFilter] = useState<IncompleteApplicantStatusFilter>("all");
     /** Bumps when the modal closes or reopens so in-flight fetches cannot apply stale rows. */
     const incompleteApplicantsLoadSeq = useRef(0);
@@ -767,6 +807,11 @@ export default function AdminProjectsPage() {
         setTeamMemberEditor(null);
         setMemberSaveLoading(false);
         setTeamOverviewParticipationFilter("all");
+        setTeamMergePanelOpen(false);
+        setTeamMergeSelectedIds([]);
+        setTeamMergeLeadId("");
+        setTeamMergeTargetTeamId("");
+        setTeamMergeSubmitting(false);
     }, []);
 
     const loadTeamOverview = useCallback(async (opportunityId: string) => {
@@ -884,6 +929,84 @@ export default function AdminProjectsPage() {
         } finally {
             setDeletingMemberId(null);
         }
+    };
+
+    const handleMergeTeamMembers = async () => {
+        if (!teamOverviewModal) return;
+        if (teamMergeSelectedIds.length < 2) {
+            toast.error("Select at least two enrolled members to merge.");
+            return;
+        }
+        if (!teamMergeLeadId || !teamMergeSelectedIds.includes(teamMergeLeadId)) {
+            toast.error("Choose which selected member should be the team lead.");
+            return;
+        }
+        const leadLabel =
+            mergeableEnrollments.find((m) => m.participationId === teamMergeLeadId)?.name ?? "selected lead";
+        if (
+            !confirmDangerSequence([
+                `Merge ${teamMergeSelectedIds.length} enrollments into one team?\n\nTeam lead: ${leadLabel}.\n\nDraft reports on other members may be removed or moved to the lead.`,
+                "Second confirmation: apply team merge on this project?",
+            ])
+        ) {
+            return;
+        }
+        setTeamMergeSubmitting(true);
+        try {
+            const res = await authenticatedFetch(
+                `/api/v1/admin/opportunities/${encodeURIComponent(teamOverviewModal.opportunityId)}/teams/merge`,
+                {
+                    method: "POST",
+                    body: JSON.stringify({
+                        member_participation_ids: teamMergeSelectedIds,
+                        lead_participation_id: teamMergeLeadId,
+                        ...(teamMergeTargetTeamId.trim()
+                            ? { target_team_id: teamMergeTargetTeamId.trim() }
+                            : {}),
+                    }),
+                },
+            );
+            const data = res ? await res.json().catch(() => ({})) : {};
+            if (res && res.ok) {
+                const msg =
+                    typeof (data as { message?: string }).message === "string"
+                        ? (data as { message: string }).message
+                        : "Team merged successfully";
+                toast.success(msg);
+                const mappedRows = extractTeamRows(data);
+                if (mappedRows.length > 0) {
+                    setTeamOverviewRows(mappedRows);
+                    setTeamOverviewSummary(extractTeamSummary(data, mappedRows));
+                } else {
+                    await loadTeamOverview(teamOverviewModal.opportunityId);
+                }
+                setTeamMergeSelectedIds([]);
+                setTeamMergeLeadId("");
+                setTeamMergeTargetTeamId("");
+                setTeamMergePanelOpen(false);
+                await loadProjects();
+            } else {
+                toast.error(
+                    typeof (data as { message?: string }).message === "string"
+                        ? (data as { message: string }).message
+                        : "Could not merge team members",
+                );
+            }
+        } catch {
+            toast.error("Could not merge team members");
+        } finally {
+            setTeamMergeSubmitting(false);
+        }
+    };
+
+    const toggleTeamMergeMember = (participationId: string, checked: boolean) => {
+        setTeamMergeSelectedIds((prev) => {
+            const next = checked
+                ? [...new Set([...prev, participationId])]
+                : prev.filter((id) => id !== participationId);
+            setTeamMergeLeadId((lead) => (lead && next.includes(lead) ? lead : ""));
+            return next;
+        });
     };
 
     const openTeamMemberEditor = (teamId: string, member: TeamMemberRow) => {
@@ -1081,6 +1204,19 @@ export default function AdminProjectsPage() {
             teamOverviewParticipationFilter === "individual" ? t.participationMode === "individual" : t.participationMode === "team",
         );
     }, [teamOverviewRows, teamOverviewParticipationFilter]);
+
+    const mergeableEnrollments = useMemo(
+        () => flattenMergeableEnrollments(teamOverviewRows),
+        [teamOverviewRows],
+    );
+
+    const persistedTeamIdOptions = useMemo(
+        () =>
+            teamOverviewRows
+                .filter((t) => t.participationMode === "team" && !isSyntheticIndividualGroupId(t.id))
+                .map((t) => ({ id: t.id, label: t.teamName })),
+        [teamOverviewRows],
+    );
 
     const incompleteApplicantsFiltered = useMemo(
         () => incompleteApplicants.filter((r) => incompleteApplicantMatchesFilter(r, incompleteApplicantStatusFilter)),
@@ -1924,6 +2060,113 @@ export default function AdminProjectsPage() {
                             </div>
                         </div>
                         {teamOverviewPipelineRibbon}
+                        {!teamOverviewLoading && mergeableEnrollments.length >= 2 ? (
+                            <div className="px-5 py-3 border-b border-slate-100 shrink-0 bg-indigo-50/40">
+                                <button
+                                    type="button"
+                                    onClick={() => setTeamMergePanelOpen((v) => !v)}
+                                    className="flex w-full items-center justify-between gap-2 rounded-xl border border-indigo-200/80 bg-white px-4 py-2.5 text-left shadow-sm hover:bg-indigo-50/50"
+                                >
+                                    <span className="inline-flex items-center gap-2 text-sm font-bold text-indigo-900">
+                                        <GitMerge className="h-4 w-4 shrink-0" />
+                                        Merge enrollments into one team
+                                    </span>
+                                    <span className="text-xs font-semibold text-indigo-600">
+                                        {teamMergePanelOpen ? "Hide" : "Show"}
+                                    </span>
+                                </button>
+                                {teamMergePanelOpen ? (
+                                    <div className="mt-3 space-y-3 rounded-xl border border-indigo-100 bg-white p-4">
+                                        <p className="text-xs leading-relaxed text-slate-600">
+                                            Select enrolled members from different individual/team rows, pick the team lead,
+                                            then merge. Pending pipeline applicants (not yet enrolled) cannot be merged here.
+                                        </p>
+                                        <div className="max-h-48 space-y-2 overflow-y-auto rounded-lg border border-slate-100 p-2">
+                                            {mergeableEnrollments.map((member) => {
+                                                const checked = teamMergeSelectedIds.includes(member.participationId);
+                                                const isLead = teamMergeLeadId === member.participationId;
+                                                return (
+                                                    <div
+                                                        key={member.participationId}
+                                                        className="flex flex-wrap items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-slate-50"
+                                                    >
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={checked}
+                                                            onChange={(e) =>
+                                                                toggleTeamMergeMember(member.participationId, e.target.checked)
+                                                            }
+                                                            className="h-4 w-4 rounded border-slate-300"
+                                                            aria-label={`Select ${member.name}`}
+                                                        />
+                                                        <label className="min-w-0 flex-1 cursor-pointer text-sm">
+                                                            <span className="font-semibold text-slate-900">{member.name}</span>
+                                                            {member.email ? (
+                                                                <span className="text-slate-500"> · {member.email}</span>
+                                                            ) : null}
+                                                            <span className="mt-0.5 block text-[10px] font-bold uppercase tracking-wide text-slate-400">
+                                                                {member.groupLabel} · {member.participationMode}
+                                                            </span>
+                                                        </label>
+                                                        {checked ? (
+                                                            <label className="inline-flex items-center gap-1.5 text-xs font-bold text-violet-800">
+                                                                <input
+                                                                    type="radio"
+                                                                    name="team-merge-lead"
+                                                                    checked={isLead}
+                                                                    onChange={() => setTeamMergeLeadId(member.participationId)}
+                                                                    className="h-3.5 w-3.5"
+                                                                />
+                                                                Team lead
+                                                            </label>
+                                                        ) : null}
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                                            <label className="text-[10px] font-bold uppercase tracking-wide text-slate-500 shrink-0">
+                                                Target team id
+                                            </label>
+                                            <select
+                                                value={teamMergeTargetTeamId}
+                                                onChange={(e) => setTeamMergeTargetTeamId(e.target.value)}
+                                                className="w-full max-w-md rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800"
+                                            >
+                                                <option value="">Auto (keep existing or generate)</option>
+                                                {persistedTeamIdOptions.map((t) => (
+                                                    <option key={t.id} value={t.id}>
+                                                        {t.label} ({t.id.slice(0, 12)}…)
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            disabled={
+                                                teamMergeSubmitting ||
+                                                teamMergeSelectedIds.length < 2 ||
+                                                !teamMergeLeadId
+                                            }
+                                            onClick={() => void handleMergeTeamMembers()}
+                                            className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+                                        >
+                                            {teamMergeSubmitting ? (
+                                                <>
+                                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                                    Merging…
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <GitMerge className="h-4 w-4" />
+                                                    Merge {teamMergeSelectedIds.length || 0} members
+                                                </>
+                                            )}
+                                        </button>
+                                    </div>
+                                ) : null}
+                            </div>
+                        ) : null}
                         <div className="px-5 py-4 overflow-y-auto flex-1 min-h-0">
                             {teamOverviewLoading ? (
                                 <div className="flex flex-col items-center justify-center py-16 gap-3 text-slate-500">

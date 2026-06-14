@@ -1,4 +1,5 @@
 import { filterAttendanceLogsForVerifiedMetrics } from "@/utils/attendanceApprovalEligibility";
+import { summarizeEngagementRedFlags } from "@/lib/summarizeRedFlagDetails";
 
 export interface QualityAlert {
     sectionId: string;
@@ -88,9 +89,7 @@ export const checkReportQuality = (report: any): QualityAlert[] => {
     // Section 1: engagement / attendance integrity flags (from stored metrics)
     const s1Metrics = report.section1?.metrics;
     const redFlags: unknown[] = Array.isArray(s1Metrics?.redFlags) ? s1Metrics.redFlags : [];
-    for (const rf of redFlags) {
-        const msg = typeof rf === "string" ? rf.trim() : "";
-        if (!msg) continue;
+    for (const msg of summarizeEngagementRedFlags(redFlags)) {
         const lower = msg.toLowerCase();
         const severity: QualityAlert["severity"] =
             lower.includes("inflation") ||

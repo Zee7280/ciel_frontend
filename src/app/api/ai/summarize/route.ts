@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { parseSection11AuditSummary } from "@/lib/parseCIIauditSummary";
-import { SECTION11_PROMPT_V2 } from "./prompts/section11Prompt.v2";
+import { SECTION11_PROMPT_V4 } from "./prompts/section11Prompt.v4";
 
 // Gemini (paused): restore import + init + `model.generateContent(prompt)` below when using GEMINI_API_KEY again.
 // import { GoogleGenerativeAI } from "@google/generative-ai";
@@ -1363,7 +1363,7 @@ Keep the full response under 180 words.`;
             // SECTION 11 EXECUTIVE SUMMARY
             // =====================================================
             case "section11":
-                prompt = `${SECTION11_PROMPT_V2}\n\nSUBMISSION DATA:\n${JSON.stringify(data)}`;
+                prompt = `${SECTION11_PROMPT_V4}\n\nSUBMISSION DATA:\n${JSON.stringify(data)}`;
                 break;
             /*
              * Legacy prompt retained in:

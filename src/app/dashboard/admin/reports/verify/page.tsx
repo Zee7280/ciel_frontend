@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { authenticatedFetch } from '@/utils/api';
-import { CheckCircle2, XCircle, Clock, FileText, Search, Building2, Eye, ChevronDown, ArrowUpDown, RefreshCw, Loader2, Download } from 'lucide-react';
+import { CheckCircle2, XCircle, Clock, FileText, Search, Building2, Eye, ChevronDown, ArrowUpDown, RefreshCw, Loader2, Download, GitMerge } from 'lucide-react';
 import { downloadAdminReportAiPayload, regenerateAdminReportAiScore } from '@/utils/adminRegenerateReportAiScore';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
@@ -22,6 +22,9 @@ function formatDisplayName(name: string) {
 
 interface Report {
     id: string;
+    student_id?: string;
+    opportunity_id?: string | null;
+    project_id?: string | null;
     student_name: string;
     student_email: string;
     project_title: string;
@@ -35,6 +38,15 @@ interface Report {
     partner_status: string;
     admin_status: string;
     cii_score?: number | null;
+    participation_mode?: 'individual' | 'team';
+    team_member_count?: number;
+    team_lead?: { name: string; email: string; student_id?: string | null } | null;
+    team_members?: Array<{ name: string; email: string; is_team_lead?: boolean }>;
+}
+
+function reportProjectKey(report: Report): string {
+    const key = String(report.opportunity_id ?? report.project_id ?? "").trim().toLowerCase();
+    return key;
 }
 
 type ReportStatusFilter = 'all' | 'submitted' | 'pending' | 'verified' | 'rejected';
@@ -141,6 +153,10 @@ export default function AdminReportsVerificationPage() {
     const [refreshingReportIds, setRefreshingReportIds] = useState<Record<string, boolean>>({});
     const [downloadingAiPayloadIds, setDownloadingAiPayloadIds] = useState<Record<string, boolean>>({});
     const [ciiScores, setCiiScores] = useState<Record<string, number>>({});
+    const [mergePanelOpen, setMergePanelOpen] = useState(false);
+    const [mergeSelectedIds, setMergeSelectedIds] = useState<string[]>([]);
+    const [mergeKeepId, setMergeKeepId] = useState("");
+    const [mergeSubmitting, setMergeSubmitting] = useState(false);
 
     useEffect(() => {
         void fetchOrganizations();
@@ -376,6 +392,81 @@ export default function AdminReportsVerificationPage() {
         setDateTo('');
     };
 
+    const toggleMergeReport = (reportId: string, checked: boolean) => {
+        setMergeSelectedIds((prev) => {
+            const next = checked ? [...new Set([...prev, reportId])] : prev.filter((id) => id !== reportId);
+            setMergeKeepId((keep) => (keep && next.includes(keep) ? keep : ""));
+            return next;
+        });
+    };
+
+    const mergeProjectKey =
+        mergeSelectedIds.length > 0
+            ? reportProjectKey(reports.find((r) => r.id === mergeSelectedIds[0]) ?? { id: "", student_name: "", student_email: "", project_title: "", submission_date: "", created_at: "", status: "", partner_status: "", admin_status: "" })
+            : "";
+
+    const mergeSelectionSameProject =
+        mergeSelectedIds.length >= 2 &&
+        mergeSelectedIds.every((id) => {
+            const row = reports.find((r) => r.id === id);
+            return row && reportProjectKey(row) === mergeProjectKey && mergeProjectKey !== "";
+        });
+
+    const handleMergeReports = async () => {
+        if (mergeSelectedIds.length < 2) {
+            toast.error("Select at least two reports to merge.");
+            return;
+        }
+        if (!mergeKeepId || !mergeSelectedIds.includes(mergeKeepId)) {
+            toast.error("Choose which report to keep.");
+            return;
+        }
+        if (!mergeSelectionSameProject) {
+            toast.error("Selected reports must belong to the same project.");
+            return;
+        }
+        const keeper = reports.find((r) => r.id === mergeKeepId);
+        if (
+            !window.confirm(
+                `Merge ${mergeSelectedIds.length - 1} duplicate report(s) into the keeper for ${keeper?.student_name ?? "student"} / ${keeper?.project_title ?? "project"}?\n\nOther rows will be deleted. Verified or admin-approved duplicates are blocked.`,
+            )
+        ) {
+            return;
+        }
+        setMergeSubmitting(true);
+        try {
+            const res = await authenticatedFetch(`/api/v1/admin/reports/merge`, {
+                method: "POST",
+                body: JSON.stringify({
+                    report_ids: mergeSelectedIds,
+                    keep_report_id: mergeKeepId,
+                }),
+            });
+            const data = res ? await res.json().catch(() => ({})) : {};
+            if (res && res.ok) {
+                toast.success(
+                    typeof (data as { message?: string }).message === "string"
+                        ? (data as { message: string }).message
+                        : "Reports merged",
+                );
+                setMergeSelectedIds([]);
+                setMergeKeepId("");
+                setMergePanelOpen(false);
+                await fetchReports();
+            } else {
+                toast.error(
+                    typeof (data as { message?: string }).message === "string"
+                        ? (data as { message: string }).message
+                        : "Could not merge reports",
+                );
+            }
+        } catch {
+            toast.error("Could not merge reports");
+        } finally {
+            setMergeSubmitting(false);
+        }
+    };
+
     return (
         <div className="min-h-screen bg-[#f7f9fc] px-4 py-6 sm:px-6 lg:px-8">
             <div className="mx-auto max-w-7xl space-y-6">
@@ -488,6 +579,50 @@ export default function AdminReportsVerificationPage() {
                             {reports.length !== filteredReports.length ? ` of ${reports.length}` : ''} reports
                         </p>
                     </div>
+                    <div className="rounded-2xl border border-violet-200/80 bg-violet-50/40 p-4">
+                        <button
+                            type="button"
+                            onClick={() => setMergePanelOpen((v) => !v)}
+                            className="flex w-full items-center justify-between gap-2 text-left"
+                        >
+                            <span className="inline-flex items-center gap-2 text-sm font-bold text-violet-900">
+                                <GitMerge className="h-4 w-4" />
+                                Merge duplicate reports
+                            </span>
+                            <span className="text-xs font-semibold text-violet-700">{mergePanelOpen ? "Hide" : "Show"}</span>
+                        </button>
+                        {mergePanelOpen ? (
+                            <div className="mt-3 space-y-3">
+                                <p className="text-xs leading-relaxed text-slate-600">
+                                    Select rows for the <strong>same project</strong>, mark which report to keep, then merge.
+                                    Duplicate drafts are removed; empty sections on the keeper are filled from removed rows when possible.
+                                </p>
+                                {mergeSelectedIds.length >= 2 && !mergeSelectionSameProject ? (
+                                    <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-900">
+                                        Selected reports must share the same project id — uncheck rows from a different opportunity.
+                                    </p>
+                                ) : null}
+                                <button
+                                    type="button"
+                                    disabled={mergeSubmitting || !mergeSelectionSameProject || !mergeKeepId}
+                                    onClick={() => void handleMergeReports()}
+                                    className="inline-flex items-center gap-2 rounded-xl bg-violet-600 px-4 py-2 text-sm font-bold text-white hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-50"
+                                >
+                                    {mergeSubmitting ? (
+                                        <>
+                                            <Loader2 className="h-4 w-4 animate-spin" />
+                                            Merging…
+                                        </>
+                                    ) : (
+                                        <>
+                                            <GitMerge className="h-4 w-4" />
+                                            Merge {mergeSelectedIds.length || 0} reports
+                                        </>
+                                    )}
+                                </button>
+                            </div>
+                        ) : null}
+                    </div>
                 </div>
 
                 {loading ? (
@@ -508,7 +643,11 @@ export default function AdminReportsVerificationPage() {
                             <table className="min-w-[980px] w-full">
                             <thead className="border-b border-slate-200 bg-slate-100/80">
                                 <tr className="text-left">
+                                    {mergePanelOpen ? (
+                                        <th className="w-12 px-3 py-4 text-sm font-semibold text-slate-600">Merge</th>
+                                    ) : null}
                                     <th className="px-6 py-4 text-sm font-semibold text-slate-600">Student</th>
+                                    <th className="px-6 py-4 text-sm font-semibold text-slate-600">Team</th>
                                     <th className="px-6 py-4 text-sm font-semibold text-slate-600">Project</th>
                                     <th className="px-6 py-4 text-sm font-semibold text-slate-600">Organization</th>
                                     <th className="px-6 py-4 text-sm font-semibold text-slate-600">Submitted</th>
@@ -519,11 +658,58 @@ export default function AdminReportsVerificationPage() {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
-                                {filteredReports.map((report) => (
+                                {filteredReports.map((report) => {
+                                    const mergeChecked = mergeSelectedIds.includes(report.id);
+                                    const mergeKeep = mergeKeepId === report.id;
+                                    return (
                                     <tr key={report.id} className="align-top transition-colors hover:bg-slate-50/60">
+                                        {mergePanelOpen ? (
+                                            <td className="px-3 py-5 align-middle">
+                                                <div className="flex flex-col items-center gap-2">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={mergeChecked}
+                                                        onChange={(e) => toggleMergeReport(report.id, e.target.checked)}
+                                                        aria-label={`Select report ${report.id}`}
+                                                        className="h-4 w-4 rounded border-slate-300"
+                                                    />
+                                                    {mergeChecked ? (
+                                                        <label className="inline-flex flex-col items-center gap-1 text-[10px] font-bold text-violet-800">
+                                                            <input
+                                                                type="radio"
+                                                                name="merge-keep-report"
+                                                                checked={mergeKeep}
+                                                                onChange={() => setMergeKeepId(report.id)}
+                                                                className="h-3.5 w-3.5"
+                                                            />
+                                                            Keep
+                                                        </label>
+                                                    ) : null}
+                                                </div>
+                                            </td>
+                                        ) : null}
                                         <td className="px-6 py-5">
                                             <div className="font-semibold text-slate-900">{formatDisplayName(report.student_name)}</div>
                                             <div className="mt-1 text-sm text-slate-500 break-all">{report.student_email}</div>
+                                        </td>
+                                        <td className="px-6 py-5">
+                                            {report.participation_mode === 'team' ? (
+                                                <div className="space-y-1 text-sm">
+                                                    <span className="inline-flex rounded-full bg-violet-100 px-2.5 py-0.5 text-xs font-bold text-violet-800">
+                                                        Team · {report.team_member_count ?? report.team_members?.length ?? '—'} members
+                                                    </span>
+                                                    {report.team_lead?.name ? (
+                                                        <div className="text-xs text-slate-600">
+                                                            Lead:{' '}
+                                                            <span className="font-semibold text-slate-800">
+                                                                {formatDisplayName(report.team_lead.name)}
+                                                            </span>
+                                                        </div>
+                                                    ) : null}
+                                                </div>
+                                            ) : (
+                                                <span className="text-xs font-medium text-slate-400">Individual</span>
+                                            )}
                                         </td>
                                         <td className="px-6 py-5">
                                             <div className="max-w-[240px] break-words text-base font-medium text-slate-700">
@@ -601,7 +787,8 @@ export default function AdminReportsVerificationPage() {
                                             </div>
                                         </td>
                                     </tr>
-                                ))}
+                                );
+                                })}
                             </tbody>
                             </table>
                         </div>

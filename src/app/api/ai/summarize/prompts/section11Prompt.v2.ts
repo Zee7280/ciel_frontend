@@ -1,8 +1,7 @@
 /**
- * Section 11 evaluator prompt (CII Evaluator v2).
+ * Section 11 evaluator prompt (CII Evaluator v2 — legacy stub).
  *
- * This is the new comprehensive 9-component report + per-section JSON companion.
- * Kept as a separate module so we can evolve it without breaking route logic.
+ * Superseded by section11Prompt.v4.ts. Retained for reference/rollback only.
  */
 export const SECTION11_PROMPT_V2 = `CIEL PK Composite Impact Index (CII) Evaluator — Master System Prompt
 

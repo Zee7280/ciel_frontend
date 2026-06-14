@@ -24,7 +24,7 @@ import { Card, CardContent, CardHeader } from '../../student/report/components/u
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '../../student/report/components/ui/dialog';
 import { Badge } from '../../student/report/components/ui/badge';
 import { Input } from '../../student/report/components/ui/input';
-import { REPORTING_FEE_DISPLAY } from '@/config/reportingFee';
+import { formatPkrAmount, REPORTING_FEE_DISPLAY } from '@/config/reportingFee';
 
 type PaymentStatusTab = 'pending' | 'approved' | 'rejected';
 
@@ -62,6 +62,12 @@ function resolvePaidAmountDisplay(raw: Record<string, unknown>): string {
     return `${Math.round(num).toLocaleString('en-PK')} PKR`;
 }
 
+type PaymentTeamMember = {
+    name: string;
+    email: string;
+    isTeamLead: boolean;
+};
+
 interface Payment {
     id: string;
     studentName: string;
@@ -72,11 +78,48 @@ interface Payment {
     date: string;
     proofUrl: string;
     status: 'pending' | 'approved' | 'rejected';
+    participationMode: 'individual' | 'team';
+    teamMemberCount: number;
+    teamMembers: PaymentTeamMember[];
+    reportingFeePerMemberPkr: number | null;
+    expectedPaidAmountPkr: number | null;
+    submittedByIsTeamLead: boolean;
     /** When the admin last verified (approve/reject). */
     reviewedAt?: string;
     /** Display name or email of the admin who verified. */
     reviewedBy?: string;
     feedback?: string;
+}
+
+function readTeamMembers(raw: Record<string, unknown>): PaymentTeamMember[] {
+    const list = raw.team_members ?? raw.teamMembers;
+    if (!Array.isArray(list)) return [];
+    return list
+        .map((row) => {
+            if (!row || typeof row !== 'object') return null;
+            const m = row as Record<string, unknown>;
+            const name = String(m.name ?? '').trim();
+            const email = String(m.email ?? '').trim();
+            if (!name && !email) return null;
+            return {
+                name: name || '—',
+                email: email || '—',
+                isTeamLead: m.is_team_lead === true || m.isTeamLead === true,
+            };
+        })
+        .filter((m): m is PaymentTeamMember => m != null);
+}
+
+function readPositiveInt(raw: unknown): number | null {
+    if (typeof raw === 'number' && Number.isFinite(raw)) {
+        const n = Math.floor(raw);
+        return n > 0 ? n : null;
+    }
+    if (typeof raw === 'string' && raw.trim()) {
+        const n = parseInt(raw.replace(/[^\d]/g, ''), 10);
+        return Number.isFinite(n) && n > 0 ? n : null;
+    }
+    return null;
 }
 
 function normalizePayment(raw: Record<string, unknown>, fallbackStatus: PaymentStatusTab): Payment {
@@ -108,20 +151,59 @@ function normalizePayment(raw: Record<string, unknown>, fallbackStatus: PaymentS
         : raw.admin_feedback != null
           ? String(raw.admin_feedback)
           : undefined;
+    const submittedBy =
+        raw.submitted_by && typeof raw.submitted_by === 'object'
+            ? (raw.submitted_by as Record<string, unknown>)
+            : raw.submittedBy && typeof raw.submittedBy === 'object'
+              ? (raw.submittedBy as Record<string, unknown>)
+              : null;
+    const participationRaw = String(
+        raw.participation_mode ?? raw.participationMode ?? '',
+    ).toLowerCase();
+    const teamMembers = readTeamMembers(raw);
+    const teamMemberCount =
+        readPositiveInt(raw.team_member_count ?? raw.teamMemberCount) ??
+        (teamMembers.length > 0 ? teamMembers.length : 1);
+    const participationMode: Payment['participationMode'] =
+        participationRaw === 'team' || teamMemberCount > 1 ? 'team' : 'individual';
+    const reportingFeePerMemberPkr = readPositiveInt(
+        raw.reporting_fee_per_member_pkr ?? raw.reportingFeePerMemberPkr,
+    );
+    const expectedPaidAmountPkr = readPositiveInt(
+        raw.expected_paid_amount_pkr ?? raw.expectedPaidAmountPkr,
+    );
+    const submittedByIsTeamLead =
+        submittedBy?.is_team_lead === true || submittedBy?.isTeamLead === true;
     return {
         id,
-        studentName,
-        studentEmail,
+        studentName: submittedBy?.name != null ? String(submittedBy.name) : studentName,
+        studentEmail: submittedBy?.email != null ? String(submittedBy.email) : studentEmail,
         projectTitle,
         projectId,
         amount,
         date,
         proofUrl,
         status,
+        participationMode,
+        teamMemberCount: participationMode === 'team' ? teamMemberCount : 1,
+        teamMembers,
+        reportingFeePerMemberPkr,
+        expectedPaidAmountPkr,
+        submittedByIsTeamLead,
         reviewedAt,
         reviewedBy,
         feedback,
     };
+}
+
+function formatTeamMembersSummary(members: PaymentTeamMember[], max = 3): string {
+    if (!members.length) return '';
+    const shown = members.slice(0, max).map((m) => {
+        const label = m.name !== '—' ? m.name : m.email;
+        return m.isTeamLead ? `${label} (lead)` : label;
+    });
+    const rest = members.length - shown.length;
+    return rest > 0 ? `${shown.join(', ')} +${rest} more` : shown.join(', ');
 }
 
 export default function AdminPaymentsPage() {
@@ -282,11 +364,18 @@ export default function AdminPaymentsPage() {
     };
 
     const q = searchQuery.toLowerCase();
-    const filteredPayments = payments.filter(p => 
-        p.studentName.toLowerCase().includes(q) ||
-        p.studentEmail.toLowerCase().includes(q) ||
-        p.projectTitle.toLowerCase().includes(q)
-    );
+    const filteredPayments = payments.filter((p) => {
+        if (
+            p.studentName.toLowerCase().includes(q) ||
+            p.studentEmail.toLowerCase().includes(q) ||
+            p.projectTitle.toLowerCase().includes(q)
+        ) {
+            return true;
+        }
+        return p.teamMembers.some(
+            (m) => m.name.toLowerCase().includes(q) || m.email.toLowerCase().includes(q),
+        );
+    });
 
     const tabs: { id: PaymentStatusTab; label: string }[] = [
         { id: 'pending', label: 'Pending' },
@@ -394,7 +483,7 @@ export default function AdminPaymentsPage() {
                             <table className="min-w-[980px] w-full border-collapse text-left">
                                 <thead>
                                     <tr className="bg-slate-50 border-b border-slate-100">
-                                        <th className="px-6 py-4 text-xs font-black text-slate-400 uppercase tracking-widest">Student</th>
+                                        <th className="px-6 py-4 text-xs font-black text-slate-400 uppercase tracking-widest">Submitted by</th>
                                         <th className="px-6 py-4 text-xs font-black text-slate-400 uppercase tracking-widest">Project / Report</th>
                                         <th className="px-6 py-4 text-xs font-black text-slate-400 uppercase tracking-widest">Amount</th>
                                         <th className="px-6 py-4 text-xs font-black text-slate-400 uppercase tracking-widest">Submitted</th>
@@ -418,17 +507,64 @@ export default function AdminPaymentsPage() {
                                                     <div>
                                                         <p className="font-bold text-slate-900 leading-tight">{payment.studentName}</p>
                                                         <p className="text-xs text-slate-500">{payment.studentEmail}</p>
+                                                        {payment.submittedByIsTeamLead ? (
+                                                            <Badge className="mt-1 h-5 border-0 bg-violet-100 px-1.5 text-[10px] font-black uppercase text-violet-800 hover:bg-violet-100">
+                                                                Team lead
+                                                            </Badge>
+                                                        ) : null}
                                                     </div>
                                                 </div>
                                             </td>
                                             <td className="px-6 py-4">
                                                 <p className="font-bold text-slate-800 leading-tight">{payment.projectTitle}</p>
-                                                <div className="flex items-center gap-1 mt-1">
-                                                    <Badge variant="outline" className="text-[10px] font-black uppercase text-slate-400 border-slate-200 h-5">Report Fee</Badge>
+                                                <div className="mt-1 flex flex-wrap items-center gap-1">
+                                                    <Badge variant="outline" className="h-5 border-slate-200 text-[10px] font-black uppercase text-slate-400">
+                                                        Report Fee
+                                                    </Badge>
+                                                    <Badge
+                                                        variant="outline"
+                                                        className={`h-5 text-[10px] font-black uppercase ${
+                                                            payment.participationMode === 'team'
+                                                                ? 'border-indigo-200 text-indigo-800'
+                                                                : 'border-slate-200 text-slate-500'
+                                                        }`}
+                                                    >
+                                                        {payment.participationMode === 'team'
+                                                            ? `Team · ${payment.teamMemberCount} members`
+                                                            : 'Individual'}
+                                                    </Badge>
                                                 </div>
+                                                {payment.teamMembers.length > 0 ? (
+                                                    <p
+                                                        className="mt-1.5 max-w-md text-xs leading-relaxed text-slate-500"
+                                                        title={payment.teamMembers
+                                                            .map((m) => {
+                                                                const who = m.name !== '—' ? m.name : m.email;
+                                                                return m.isTeamLead ? `${who} (lead)` : who;
+                                                            })
+                                                            .join(', ')}
+                                                    >
+                                                        {formatTeamMembersSummary(payment.teamMembers)}
+                                                    </p>
+                                                ) : null}
                                             </td>
                                             <td className="px-6 py-4">
                                                 <span className="font-black text-slate-900">{payment.amount}</span>
+                                                {payment.participationMode === 'team' &&
+                                                payment.reportingFeePerMemberPkr != null ? (
+                                                    <p className="mt-0.5 text-xs text-slate-500">
+                                                        {payment.teamMemberCount} ×{' '}
+                                                        {formatPkrAmount(payment.reportingFeePerMemberPkr)}
+                                                    </p>
+                                                ) : null}
+                                                {payment.expectedPaidAmountPkr != null &&
+                                                payment.amount !== '—' &&
+                                                payment.amount.replace(/[^\d]/g, '') !==
+                                                    String(payment.expectedPaidAmountPkr) ? (
+                                                    <p className="mt-0.5 text-xs font-medium text-amber-700">
+                                                        Expected {formatPkrAmount(payment.expectedPaidAmountPkr)}
+                                                    </p>
+                                                ) : null}
                                             </td>
                                             <td className="px-6 py-4">
                                                 <div className="flex items-center gap-2 text-slate-500 text-sm">
@@ -527,8 +663,23 @@ export default function AdminPaymentsPage() {
                             <FileText className="w-6 h-6 text-blue-600" />
                             Payment Receipt Preview
                         </DialogTitle>
-                        <DialogDescription className="font-medium text-slate-500">
-                            Review the transfer slip uploaded by <span className="text-slate-900 font-bold">{selectedPayment?.studentName}</span>.
+                        <DialogDescription className="space-y-2 font-medium text-slate-500">
+                            <span>
+                                Review the transfer slip uploaded by{' '}
+                                <span className="font-bold text-slate-900">{selectedPayment?.studentName}</span>
+                                {selectedPayment?.submittedByIsTeamLead ? ' (team lead)' : ''}.
+                            </span>
+                            {selectedPayment?.participationMode === 'team' ? (
+                                <span className="block text-sm">
+                                    Team size:{' '}
+                                    <span className="font-bold text-slate-800">
+                                        {selectedPayment.teamMemberCount} members
+                                    </span>
+                                    {selectedPayment.teamMembers.length > 0
+                                        ? ` — ${formatTeamMembersSummary(selectedPayment.teamMembers, 8)}`
+                                        : ''}
+                                </span>
+                            ) : null}
                         </DialogDescription>
                     </DialogHeader>
                     <div className="flex flex-1 items-center justify-center overflow-auto bg-slate-900 p-4 sm:p-8">
@@ -581,8 +732,12 @@ export default function AdminPaymentsPage() {
                             {actionType === 'approve' ? 'Approve Payment' : 'Reject Payment'}
                         </DialogTitle>
                         <DialogDescription className="font-medium">
-                            {actionType === 'approve' 
-                                ? `Confirm that you've verified the transfer of ${selectedPayment?.amount} from ${selectedPayment?.studentName}.` 
+                            {actionType === 'approve'
+                                ? `Confirm that you've verified the transfer of ${selectedPayment?.amount} from ${selectedPayment?.studentName}${
+                                      selectedPayment?.participationMode === 'team'
+                                          ? ` (team of ${selectedPayment.teamMemberCount})`
+                                          : ''
+                                  }.`
                                 : `Select the reason for rejecting this payment proof.`}
                         </DialogDescription>
                     </DialogHeader>

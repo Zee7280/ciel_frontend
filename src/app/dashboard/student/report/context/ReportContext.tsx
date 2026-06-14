@@ -6,7 +6,10 @@ import { calculateEngagementMetrics, buildIndividualRosterFromSection1 } from '.
 import type { ReportCIIauditMeta } from '@/lib/parseCIIauditSummary';
 import { pickImpactVerifyUrlFromPayload } from '@/utils/reportVerificationUrl';
 import { prepareReportEvidenceForSave } from '../utils/evidenceUpload';
-import { isTeamLeadForReportSubmit } from '@/utils/teamReportSubmitAccess';
+import {
+    isTeamLeadForReportSubmit,
+    isTeamMemberAttendanceOnlyMode,
+} from '@/utils/teamReportSubmitAccess';
 
 // Define the shape of the report data matches the 11 sections (plus summary)
 export interface ReportData {
@@ -502,6 +505,13 @@ interface ReportContextType {
     canSubmitReport: boolean;
     /** Team projects: signed-in student matches roster team lead email. */
     isTeamLeadForSubmit: boolean;
+    /** Team member (not lead): Section 1 attendance only; no draft save / submit. */
+    isTeamMemberAttendanceOnly: boolean;
+    /** Sections 2–10 locked (submitted report or team member). */
+    isReportSectionsReadOnly: boolean;
+    /** From engagement row: `isTeamLead` for this project (set on report load). */
+    myParticipationIsTeamLead: boolean | null;
+    setMyParticipationIsTeamLead: (value: boolean | null) => void;
     /** Final submit: sections + hours + team lead (when team mode). */
     canFinalizeSubmit: boolean;
     /** Sections 1–10 that fail validation, with messages (for summary / submit UX). */
@@ -521,6 +531,7 @@ export function ReportProvider({ children }: { children: React.ReactNode }) {
     const [activeStep, setActiveStep] = useState(1);
     const [validationErrors, setValidationErrors] = useState<Record<string, ValidationError[]>>({});
     const [isReadOnly, setReadOnly] = useState(false);
+    const [myParticipationIsTeamLead, setMyParticipationIsTeamLead] = useState<boolean | null>(null);
     const [isParticipationUnlocked, setParticipationUnlocked] = useState(false);
     
     // Eligibility for Submission (Progress vs Submission Mode)
@@ -561,8 +572,18 @@ export function ReportProvider({ children }: { children: React.ReactNode }) {
     }, []);
 
     const isTeamLeadForSubmit = useMemo(
-        () => isTeamLeadForReportSubmit(data, signedInEmail),
-        [data.section1, signedInEmail],
+        () => isTeamLeadForReportSubmit(data, signedInEmail, myParticipationIsTeamLead),
+        [data.section1, signedInEmail, myParticipationIsTeamLead],
+    );
+
+    const isTeamMemberAttendanceOnly = useMemo(
+        () => isTeamMemberAttendanceOnlyMode(data, signedInEmail, myParticipationIsTeamLead, isReadOnly),
+        [data, signedInEmail, myParticipationIsTeamLead, isReadOnly],
+    );
+
+    const isReportSectionsReadOnly = useMemo(
+        () => isReadOnly || isTeamMemberAttendanceOnly,
+        [isReadOnly, isTeamMemberAttendanceOnly],
     );
 
     const canFinalizeSubmit = useMemo(
@@ -638,6 +659,8 @@ export function ReportProvider({ children }: { children: React.ReactNode }) {
         // Intelligence layer (Section 11) is allowed to be updated even in read-only mode
         // to show/persist AI summaries generated after submission.
         if (isReadOnly && section !== 'section11') return;
+        // Team members may only touch Section 1 (attendance via engagement APIs + local state).
+        if (isTeamMemberAttendanceOnly && section !== 'section1' && section !== 'section11') return;
 
         setData(prev => ({
             ...prev,
@@ -646,7 +669,7 @@ export function ReportProvider({ children }: { children: React.ReactNode }) {
 
         // Clear validation errors for this section when data changes
         clearValidationErrors(section);
-    }, [isReadOnly, clearValidationErrors]);
+    }, [isReadOnly, isTeamMemberAttendanceOnly, clearValidationErrors]);
 
     const setFullData = useCallback((newData: Partial<ReportData>) => {
         if (!newData || Object.keys(newData).length === 0) return;
@@ -713,6 +736,7 @@ export function ReportProvider({ children }: { children: React.ReactNode }) {
     const validateCurrentSection = useCallback((): boolean => {
         // Validation implicitly passes in read-only mode to allow navigation without errors
         if (isReadOnly) return true;
+        if (isTeamMemberAttendanceOnly && activeStep >= 2 && activeStep <= 10) return true;
 
         let validationResult: { isValid: boolean; errors: ValidationError[] } = { isValid: true, errors: [] };
         const sectionKey = `section${activeStep}`;
@@ -742,7 +766,7 @@ export function ReportProvider({ children }: { children: React.ReactNode }) {
 
         clearValidationErrors(sectionKey);
         return true;
-    }, [isReadOnly, activeStep, data, clearValidationErrors]);
+    }, [isReadOnly, isTeamMemberAttendanceOnly, activeStep, data, clearValidationErrors]);
 
     const getFieldError = useCallback((fieldPath: string): string | undefined => {
         const sectionKey = `section${activeStep}`;
@@ -757,6 +781,13 @@ export function ReportProvider({ children }: { children: React.ReactNode }) {
 
     const saveReport = useCallback(async (silent: boolean = false): Promise<boolean> => {
         if (isReadOnly) return false;
+        if (isTeamMemberAttendanceOnly) {
+            if (!silent) {
+                const { toast } = await import('sonner');
+                toast.info('Only your team lead can save report sections. Update your attendance in Section 1.');
+            }
+            return false;
+        }
 
         try {
             const { authenticatedFetch } = await import('@/utils/api');
@@ -800,7 +831,7 @@ export function ReportProvider({ children }: { children: React.ReactNode }) {
             if (!silent) toast.error('Failed to save progress. Please try again.');
             return false;
         }
-    }, [isReadOnly, data]);
+    }, [isReadOnly, isTeamMemberAttendanceOnly, data]);
 
     const contextValue = useMemo(() => ({
         data,
@@ -825,6 +856,10 @@ export function ReportProvider({ children }: { children: React.ReactNode }) {
         areAllSectionsComplete,
         canSubmitReport,
         isTeamLeadForSubmit,
+        isTeamMemberAttendanceOnly,
+        isReportSectionsReadOnly,
+        myParticipationIsTeamLead,
+        setMyParticipationIsTeamLead,
         canFinalizeSubmit,
         incompleteSectionsSummary,
         showVerifiedImpactScores
@@ -850,6 +885,9 @@ export function ReportProvider({ children }: { children: React.ReactNode }) {
         areAllSectionsComplete,
         canSubmitReport,
         isTeamLeadForSubmit,
+        isTeamMemberAttendanceOnly,
+        isReportSectionsReadOnly,
+        myParticipationIsTeamLead,
         canFinalizeSubmit,
         incompleteSectionsSummary,
         showVerifiedImpactScores

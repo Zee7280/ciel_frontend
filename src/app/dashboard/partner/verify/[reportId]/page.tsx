@@ -35,6 +35,7 @@ import {
     type Section1DossierField,
 } from '@/utils/section1ParticipantDossierFields';
 import { isReportReturnedForRevision, reportRevisionStatusLabel } from '@/utils/reportRevisionState';
+import RedFlagsSummaryList from "@/components/RedFlagsSummaryList";
 
 function normalizeKey(value: unknown): string {
     return String(value ?? "")
@@ -715,7 +716,12 @@ export default function ReportDetailPage() {
                                             <LabelValue label="EIS Score" value={report.section1.metrics.eis_score} />
                                             <LabelValue label="Engagement Category" value={report.section1.metrics.engagement_category} />
                                             <LabelValue label="HEC Compliance" value={report.section1.metrics.hec_compliance} />
-                                            <LabelValue label="Red Flags" value={report.section1.metrics.redFlags} fullWidth />
+                                            <div className="mb-4 flex min-w-0 flex-col md:col-span-2">
+                                                <span className="font-bold text-slate-700 text-xs uppercase tracking-wider mb-1">
+                                                    Red flags
+                                                </span>
+                                                <RedFlagsSummaryList flags={report.section1.metrics.redFlags} />
+                                            </div>
                                             {engagementIndividualMetricsHaveTableRows(report.section1.metrics.individual_metrics) ? (
                                                 <div className="mb-4 flex min-w-0 flex-col md:col-span-2">
                                                     <span className="font-bold text-slate-700 text-xs uppercase tracking-wider mb-1">

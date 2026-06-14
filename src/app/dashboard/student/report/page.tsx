@@ -138,6 +138,8 @@ function ReportFormContent() {
         canSubmitReport,
         canFinalizeSubmit,
         isTeamLeadForSubmit,
+        isTeamMemberAttendanceOnly,
+        setMyParticipationIsTeamLead,
         incompleteSectionsSummary
     } = useReportForm();
 
@@ -230,6 +232,11 @@ function ReportFormContent() {
                                     p && (p.projectId === projectId || p.project_id === projectId),
                             );
                             if (myPart) {
+                                const isLeadFlag =
+                                    myPart.isTeamLead === true ||
+                                    myPart.is_team_lead === true ||
+                                    String(myPart.is_team_lead ?? "").toLowerCase() === "true";
+                                setMyParticipationIsTeamLead(isLeadFlag);
                                 const teamRes = await authenticatedFetch(
                                     `/api/v1/engagement/project/${encodeURIComponent(projectId)}/team`,
                                 );
@@ -239,6 +246,8 @@ function ReportFormContent() {
                                         teamJson.success && Array.isArray(teamJson.data) ? teamJson.data : [];
                                     reportForState = mergeReportSection1TeamScope(reportForState, myPart, teamRows);
                                 }
+                            } else {
+                                setMyParticipationIsTeamLead(null);
                             }
                         }
                     } catch (scopeErr) {
@@ -267,6 +276,13 @@ function ReportFormContent() {
                         }
                     } catch (attendanceErr) {
                         console.warn("[Report] Attendance log refresh skipped:", attendanceErr);
+                    }
+
+                    const reportAccess = reportForState.report_access as
+                        | { is_team_lead?: boolean }
+                        | undefined;
+                    if (reportAccess && typeof reportAccess.is_team_lead === "boolean") {
+                        setMyParticipationIsTeamLead(reportAccess.is_team_lead);
                     }
 
                     setFullData(reportForState as typeof mergedReport);
@@ -362,11 +378,13 @@ function ReportFormContent() {
                 }
             }
 
-            setAiStatus('Saving Progress...');
-            const saveResult = await handleSave(true, updatedData);
-            if (!saveResult.ok) {
-                toast.error(saveResult.message);
-                return;
+            if (!isTeamMemberAttendanceOnly) {
+                setAiStatus('Saving Progress...');
+                const saveResult = await handleSave(true, updatedData);
+                if (!saveResult.ok) {
+                    toast.error(saveResult.message);
+                    return;
+                }
             }
 
             if (aiSummaryIssue) {
@@ -406,6 +424,12 @@ function ReportFormContent() {
                 const message = 'This report is locked and cannot be edited.';
                 if (!silent) toast.error(message);
                 return { ok: false, message };
+            }
+            if (isTeamMemberAttendanceOnly) {
+                if (!silent) {
+                    toast.info('Only your team lead can save report sections. Update your attendance in Section 1.');
+                }
+                return { ok: true };
             }
 
             setAiStatus('Uploading Evidence...');
@@ -460,6 +484,10 @@ function ReportFormContent() {
             e.stopPropagation();
         }
         if (isReadOnly) return;
+        if (isTeamMemberAttendanceOnly) {
+            toast.error('Only your team lead can submit this team report.');
+            return;
+        }
 
         setIsConfirmOpen(true);
     };
@@ -664,7 +692,20 @@ function ReportFormContent() {
                     </div>
 
                     {/* Eligibility Banner */}
-                    {!isReadOnly && (
+                    {isTeamMemberAttendanceOnly && !isReadOnly ? (
+                        <div className="hidden md:flex items-center gap-2.5 px-3 py-1.5 rounded-xl border bg-sky-50 border-sky-100 text-sky-800 shadow-sm max-w-md">
+                            <div className="w-2.5 h-2.5 rounded-full bg-sky-500 animate-pulse" />
+                            <div className="flex flex-col">
+                                <span className="text-[10px] font-black uppercase tracking-widest leading-none mb-0.5">
+                                    Team member — attendance only
+                                </span>
+                                <span className="text-[9px] font-bold opacity-80 leading-snug">
+                                    Your team lead files this report. You may update your attendance in Section 1 only.
+                                </span>
+                            </div>
+                        </div>
+                    ) : null}
+                    {!isReadOnly && !isTeamMemberAttendanceOnly && (
                         <div className={clsx(
                             "hidden md:flex items-center gap-2.5 px-3 py-1.5 rounded-xl border transition-all animate-in fade-in zoom-in duration-500",
                             canFinalizeSubmit
@@ -699,7 +740,7 @@ function ReportFormContent() {
                         </div>
                     )}
                     <div className="flex items-center gap-3 sm:justify-end">
-                        {!isReadOnly && (
+                        {!isReadOnly && !isTeamMemberAttendanceOnly && (
                             <Button
                                 variant="outline"
                                 onClick={() => handleSave(false)}

@@ -28,6 +28,7 @@ import {
 import { pickImpactVerifyUrlFromPayload } from "@/utils/reportVerificationUrl";
 import { readPersistedCiiSnapshot } from "@/utils/reportCiiSnapshot";
 import { extractIssueFields, parseAuditSummaryIntoSections } from "@/lib/parseAuditSummarySections";
+import { summarizeAuditIssueText, summarizeEngagementRedFlags } from "@/lib/summarizeRedFlagDetails";
 import {
     formatSdgGoalPadded,
     listOpportunityReportSdgs,
@@ -681,10 +682,10 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
     const redFlagsForPrint = (() => {
         const stored = metricsMerged?.redFlags;
         if (Array.isArray(stored) && stored.length) {
-            return stored.filter((x): x is string => typeof x === "string");
+            return summarizeEngagementRedFlags(stored);
         }
         const calc = engagementRecalc.redFlags;
-        return Array.isArray(calc) ? calc : [];
+        return summarizeEngagementRedFlags(calc);
     })();
 
     const showEngagementDossierSection =
@@ -1953,21 +1954,24 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
                                 </p>
                             ) : null}
                             {dossierAuditMeta.critical_red_flags ? (
-                                <p>
+                                <p className="whitespace-pre-wrap">
                                     <span className="font-black text-rose-800">Critical red flags: </span>
-                                    {dossierAuditMeta.critical_red_flags}
+                                    {summarizeAuditIssueText(dossierAuditMeta.critical_red_flags) ??
+                                        dossierAuditMeta.critical_red_flags}
                                 </p>
                             ) : null}
                             {dossierAuditMeta.moderate_issues ? (
-                                <p>
+                                <p className="whitespace-pre-wrap">
                                     <span className="font-black text-amber-900">Moderate issues: </span>
-                                    {dossierAuditMeta.moderate_issues}
+                                    {summarizeAuditIssueText(dossierAuditMeta.moderate_issues) ??
+                                        dossierAuditMeta.moderate_issues}
                                 </p>
                             ) : null}
                             {dossierAuditMeta.minor_issues ? (
-                                <p>
+                                <p className="whitespace-pre-wrap">
                                     <span className="font-black text-slate-700">Minor issues: </span>
-                                    {dossierAuditMeta.minor_issues}
+                                    {summarizeAuditIssueText(dossierAuditMeta.minor_issues) ??
+                                        dossierAuditMeta.minor_issues}
                                 </p>
                             ) : null}
                             {dossierAuditMeta.top_fixes.length > 0 ? (

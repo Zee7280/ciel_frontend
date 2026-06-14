@@ -119,7 +119,9 @@ function joinLocationParts(parts: string[]): string {
 }
 
 export default function Section2ProjectContext({ projectData }: Section2Props) {
-    const { data, updateSection, getFieldError, validationErrors, saveReport, isReadOnly } = useReportForm();
+    const { data, updateSection, getFieldError, validationErrors, saveReport, isReportSectionsReadOnly } =
+        useReportForm();
+    const isReadOnly = isReportSectionsReadOnly;
 
     const sectionErrors = validationErrors['section2'] || [];
     const hasErrors = sectionErrors.length > 0;

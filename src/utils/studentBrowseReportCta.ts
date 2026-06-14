@@ -36,6 +36,12 @@ export type StudentBrowseReportCta = {
     href: string;
 };
 
+/** Admin/partner returned the report — student must reopen the report flow regardless of join CTA gates. */
+export function isStudentReportRevisionStatus(reportStatus: string | undefined): boolean {
+    const st = (reportStatus || "").trim().toLowerCase();
+    return st === "revision" || st === "rejected";
+}
+
 /** Resolve label + route for the report/payment/CII button on student browse and opportunity detail. */
 export function resolveStudentBrowseReportCta(projectId: string, reportStatus: string | undefined): StudentBrowseReportCta {
     const st = (reportStatus || "none").trim().toLowerCase();

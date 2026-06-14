@@ -2,6 +2,7 @@
 
 import React from "react";
 import type { ReportCIIauditMeta } from "@/lib/parseCIIauditSummary";
+import { summarizeAuditIssueText } from "@/lib/summarizeRedFlagDetails";
 import { AlertOctagon, AlertTriangle, Info, ListChecks, MessageSquareQuote, ShieldAlert } from "lucide-react";
 import clsx from "clsx";
 
@@ -111,7 +112,7 @@ export default function CIIauditInsightsPanel({ audit, ciiTotalScore, className 
                             <AlertOctagon className="w-3.5 h-3.5" /> Critical red flags
                         </p>
                         <p className="text-xs font-medium text-rose-950/90 leading-relaxed whitespace-pre-wrap">
-                            {audit.critical_red_flags}
+                            {summarizeAuditIssueText(audit.critical_red_flags) ?? audit.critical_red_flags}
                         </p>
                     </div>
                 ) : null}
@@ -122,7 +123,7 @@ export default function CIIauditInsightsPanel({ audit, ciiTotalScore, className 
                             <AlertTriangle className="w-3.5 h-3.5" /> Moderate issues
                         </p>
                         <p className="text-xs font-medium text-amber-950/90 leading-relaxed whitespace-pre-wrap">
-                            {audit.moderate_issues}
+                            {summarizeAuditIssueText(audit.moderate_issues) ?? audit.moderate_issues}
                         </p>
                     </div>
                 ) : null}
@@ -133,7 +134,7 @@ export default function CIIauditInsightsPanel({ audit, ciiTotalScore, className 
                             <Info className="w-3.5 h-3.5" /> Minor issues
                         </p>
                         <p className="text-xs font-medium text-slate-700 leading-relaxed whitespace-pre-wrap">
-                            {audit.minor_issues}
+                            {summarizeAuditIssueText(audit.minor_issues) ?? audit.minor_issues}
                         </p>
                     </div>
                 ) : null}

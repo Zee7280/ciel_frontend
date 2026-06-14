@@ -68,6 +68,8 @@ import {
     reportPartnerGateDisabled,
     reportPartnerStatusTone,
 } from "@/utils/reportPartnerApprovalDisplay";
+import RedFlagsSummaryList from "@/components/RedFlagsSummaryList";
+import { summarizeAuditIssueText } from "@/lib/summarizeRedFlagDetails";
 
 function normalizeAuditMeta(raw: unknown, summaryText: string): ReportCIIauditMeta | null {
     const fallback = summaryText ? parseSection11AuditSummary(summaryText) : null;
@@ -116,21 +118,27 @@ function buildQualityAlerts(reportData: unknown, section11Audit: ReportCIIauditM
         aiAlerts.push({
             sectionId: "section11",
             severity: "error",
-            message: `Critical red flags: ${compactAlertText(section11Audit.critical_red_flags)}`,
+            message: `Critical red flags: ${compactAlertText(
+                summarizeAuditIssueText(section11Audit.critical_red_flags) ?? section11Audit.critical_red_flags,
+            )}`,
         });
     }
     if (section11Audit.moderate_issues) {
         aiAlerts.push({
             sectionId: "section11",
             severity: "warning",
-            message: `Moderate issues: ${compactAlertText(section11Audit.moderate_issues)}`,
+            message: `Moderate issues: ${compactAlertText(
+                summarizeAuditIssueText(section11Audit.moderate_issues) ?? section11Audit.moderate_issues,
+            )}`,
         });
     }
     if (section11Audit.minor_issues) {
         aiAlerts.push({
             sectionId: "section11",
             severity: "warning",
-            message: `Minor issues: ${compactAlertText(section11Audit.minor_issues)}`,
+            message: `Minor issues: ${compactAlertText(
+                summarizeAuditIssueText(section11Audit.minor_issues) ?? section11Audit.minor_issues,
+            )}`,
         });
     }
     if (section11Audit.top_fixes.length > 0) {
@@ -1274,7 +1282,14 @@ export default function AdminReportDetailPage() {
                                             <LabelValue label="EIS score" value={report.section1.metrics.eis_score} />
                                             <LabelValue label="Engagement category" value={report.section1.metrics.engagement_category} />
                                             <LabelValue label="HEC compliance" value={report.section1.metrics.hec_compliance} />
-                                            <LabelValue label="Red flags" value={report.section1.metrics.redFlags} fullWidth />
+                                            <div className="mb-4 flex min-w-0 flex-col md:col-span-2">
+                                                <span className={clsx(adminDossier.microLabel, "mb-1.5 block tracking-wide")}>
+                                                    Red flags
+                                                </span>
+                                                <div className={clsx(adminDossier.inset, "text-justify")}>
+                                                    <RedFlagsSummaryList flags={report.section1.metrics.redFlags} />
+                                                </div>
+                                            </div>
                                             {engagementIndividualMetricsHaveTableRows(report.section1.metrics.individual_metrics) ? (
                                                 <div className="mb-4 flex min-w-0 flex-col md:col-span-2">
                                                     <span className={clsx(adminDossier.microLabel, "mb-1.5 block tracking-wide")}>

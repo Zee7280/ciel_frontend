@@ -25,6 +25,7 @@ import {
 import { buildJoinApplyFields, resolveStudentProjectActions } from "@/utils/studentProjectActions";
 import {
     buildStudentReportsCheckMap,
+    isStudentReportRevisionStatus,
     pickReportStatusFromCheckRow,
     resolveStudentBrowseReportCta,
 } from "@/utils/studentBrowseReportCta";
@@ -683,11 +684,14 @@ export default function MyProjectsPage() {
                     !isStudentOwnedOpportunity &&
                     applicationStatus !== "" &&
                     ["approved", "verified"].includes(applicationStatus);
-                const reportCta =
-                    reportUnlocked &&
+                const reportNeedsRevision = isStudentReportRevisionStatus(project.report_status);
+                const reportCtaEligible =
+                    reportNeedsRevision ||
                     (isStudentOwnedOpportunity
                         ? canStudentShowStartReportCta(pRecord, { isStudentOwner: true })
-                        : joinBrowseReportCtaEligible)
+                        : joinBrowseReportCtaEligible);
+                const reportCta =
+                    reportCtaEligible && (reportUnlocked || reportNeedsRevision)
                         ? resolveStudentBrowseReportCta(project.id, project.report_status)
                         : null;
 
@@ -734,14 +738,14 @@ export default function MyProjectsPage() {
 
     const firstContinueRow = useMemo(
         () =>
-            projectRows.find(
-                (r) =>
+            projectRows.find((r) => {
+                const rs = (r.project.report_status || "none").trim().toLowerCase();
+                if (isStudentReportRevisionStatus(rs)) return true;
+                return (
                     r.reportUnlocked &&
-                    (r.project.report_status === undefined ||
-                        r.project.report_status === "none" ||
-                        r.project.report_status === "draft" ||
-                        r.project.report_status === "continue"),
-            ),
+                    (rs === "none" || rs === "draft" || rs === "continue")
+                );
+            }),
         [projectRows],
     );
 

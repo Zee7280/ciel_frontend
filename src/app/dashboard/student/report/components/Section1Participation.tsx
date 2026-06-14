@@ -168,7 +168,19 @@ function resolveAttendanceLogParticipantPrefixedId(
 }
 
 export default function Section1Participation({ projectData }: { projectData?: any } = {}) {
-    const { data, updateSection, getFieldError, validationErrors, nextStep, saveReport, isReadOnly, isParticipationUnlocked, setParticipationUnlocked, setRequiredHours } = useReportForm();
+    const {
+        data,
+        updateSection,
+        getFieldError,
+        validationErrors,
+        nextStep,
+        saveReport,
+        isReadOnly,
+        isTeamMemberAttendanceOnly,
+        isParticipationUnlocked,
+        setParticipationUnlocked,
+        setRequiredHours,
+    } = useReportForm();
 
     const searchParams = useSearchParams();
     // Use search params primarily for initialization to prevent context-update loops
@@ -212,6 +224,12 @@ export default function Section1Participation({ projectData }: { projectData?: a
     const [isVerified, setIsVerified] = React.useState(!!data.section1.team_lead.verified);
     const [participantId, setParticipantId] = React.useState<string | null>(data.section1.team_lead.id || null);
     const [currentUserEmail, setCurrentUserEmail] = React.useState<string | null>(null);
+
+    React.useEffect(() => {
+        if (isTeamMemberAttendanceOnly && internalStep < 4) {
+            setInternalStep(4);
+        }
+    }, [isTeamMemberAttendanceOnly, internalStep]);
 
     // Identify current user for labeling
     React.useEffect(() => {
@@ -785,6 +803,14 @@ export default function Section1Participation({ projectData }: { projectData?: a
 
     return (
         <div className="flex min-h-0 w-full min-w-0 flex-col bg-slate-50/30">
+            {isTeamMemberAttendanceOnly ? (
+                <div className="mx-3 mt-3 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900 sm:mx-5 lg:mx-6">
+                    <p className="font-semibold">Team member — attendance only</p>
+                    <p className="mt-1 text-xs text-sky-800/90">
+                        Your team lead completes and submits this report. You may log and update your own attendance below.
+                    </p>
+                </div>
+            ) : null}
 
             {/* Sticky Nav Progress */}
             <div className="shrink-0 border-b border-slate-100 bg-white px-3 py-2.5 sm:px-5 lg:px-6">
@@ -792,11 +818,21 @@ export default function Section1Participation({ projectData }: { projectData?: a
                     {steps.map((s, idx) => (
                         <React.Fragment key={s.id}>
                             <button
-                                onClick={() => internalStep > s.id && setInternalStep(s.id)}
+                                type="button"
+                                disabled={isTeamMemberAttendanceOnly && s.id < 4}
+                                onClick={() => {
+                                    if (isTeamMemberAttendanceOnly && s.id < 4) return;
+                                    if (internalStep > s.id) setInternalStep(s.id);
+                                }}
                                 className={clsx(
                                     "flex items-center gap-2 px-4 py-2 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all whitespace-nowrap",
-                                    internalStep === s.id ? "bg-indigo-600 text-white shadow-lg shadow-indigo-100" :
-                                        internalStep > s.id ? "bg-emerald-50 text-emerald-600 border border-emerald-100" : "text-slate-400 hover:text-slate-600"
+                                    isTeamMemberAttendanceOnly && s.id < 4
+                                        ? "cursor-not-allowed opacity-40 text-slate-400"
+                                        : internalStep === s.id
+                                          ? "bg-indigo-600 text-white shadow-lg shadow-indigo-100"
+                                          : internalStep > s.id
+                                            ? "bg-emerald-50 text-emerald-600 border border-emerald-100"
+                                            : "text-slate-400 hover:text-slate-600",
                                 )}
                             >
                                 <span className={clsx(

@@ -6,6 +6,7 @@ import {
     EngagementIndividualMetricsTable,
     engagementIndividualMetricsHaveTableRows,
 } from "@/components/verify/EngagementIndividualMetricsTable";
+import { summarizeEngagementRedFlags } from "@/lib/summarizeRedFlagDetails";
 
 interface EngagementMetrics {
     totalHours: number;
@@ -166,7 +167,7 @@ export default function EngagementOverview({ metrics, isTeam = false, hideIntens
                             <h4 className="text-[11px] font-black uppercase tracking-[0.2em] text-rose-300">Audit & Integrity Alerts</h4>
                         </div>
                         <ul className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-2">
-                            {metrics.redFlags.map((flag, idx) => (
+                            {summarizeEngagementRedFlags(metrics.redFlags).map((flag, idx) => (
                                 <li key={idx} className="flex items-center gap-3 text-[10px] font-bold text-rose-200/70">
                                     <div className="w-1 h-1 rounded-full bg-rose-500" />
                                     {flag}
