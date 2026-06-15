@@ -69,6 +69,20 @@
   border-right: 46px solid transparent;
 }
 
+.cert-corner--br {
+  bottom: 0;
+  right: 0;
+  border-bottom: 78px solid var(--cert-navy);
+  border-left: 78px solid transparent;
+}
+
+.cert-corner--br-gold {
+  bottom: 0;
+  right: 0;
+  border-bottom: 46px solid var(--cert-gold);
+  border-left: 46px solid transparent;
+}
+
 .cert-inner {
   position: relative;
   z-index: 3;
@@ -224,12 +238,19 @@
 
 .cert-metrics {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
   width: 100%;
-  margin-bottom: 22px;
+  margin-bottom: 14px;
   border-top: 1px solid rgba(182, 120, 53, 0.35);
   border-bottom: 1px solid rgba(182, 120, 53, 0.35);
   padding: 14px 0;
+}
+
+.cert-metrics--with-badge {
+  grid-template-columns: repeat(4, minmax(0, 1fr)) minmax(0, 1.15fr);
+}
+
+.cert-metrics--no-badge {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .cert-metric {
@@ -299,10 +320,39 @@
 .cert-metric-badge-img {
   display: block;
   margin: 0 auto;
-  height: 4.5rem;
+  height: 5.25rem;
   width: auto;
   max-width: 100%;
   object-fit: contain;
+}
+
+.cert-recognition-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  margin-bottom: 20px;
+  padding: 11px 14px;
+  background: var(--cert-navy);
+  border: 1px solid rgba(212, 162, 78, 0.45);
+}
+
+.cert-banner-flourish {
+  flex-shrink: 0;
+  width: 22px;
+  height: 14px;
+  color: var(--cert-gold-light);
+}
+
+.cert-recognition-text {
+  margin: 0;
+  flex: 1;
+  font-size: 0.72rem;
+  font-style: italic;
+  font-weight: 600;
+  line-height: 1.45;
+  color: #f8fafc;
 }
 
 .cert-footer-row {
@@ -497,9 +547,14 @@
     box-shadow: none !important;
   }
 
-  .cert-metrics {
+  .cert-metrics--with-badge {
     display: grid !important;
-    grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+    grid-template-columns: repeat(4, minmax(0, 1fr)) minmax(0, 1.15fr) !important;
+  }
+
+  .cert-metrics--no-badge {
+    display: grid !important;
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
   }
 
   .cert-participant-table thead th,

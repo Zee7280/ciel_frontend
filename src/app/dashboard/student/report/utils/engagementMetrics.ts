@@ -216,7 +216,7 @@ export function calculateEngagementMetrics(
     });
 
     Object.entries(hoursPerDay).forEach(([date, hrs]) => {
-        if (hrs > 8) redFlags.push(`Inflation: Unrealistic daily output on ${date} (${hrs} hrs)`);
+        if (hrs > 9) redFlags.push(`Inflation: Unrealistic daily output on ${date} (${hrs} hrs)`);
     });
 
     if (Object.values(patterns).some(v => v > 10)) {

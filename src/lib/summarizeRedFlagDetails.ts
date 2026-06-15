@@ -15,7 +15,7 @@ function summarizeInflationFlags(entries: { date: string; hrs: number }[]): stri
     const dateLabels = sortedDates.map((e) => formatShortDate(e.date));
 
     if (entries.length === 1) {
-        return `Unrealistic daily output on ${dateLabels[0]} (${entries[0].hrs} hrs logged; exceeds 8 hr/day threshold).`;
+        return `Unrealistic daily output on ${dateLabels[0]} (${entries[0].hrs} hrs logged; exceeds 9 hr/day threshold).`;
     }
 
     const datePart =

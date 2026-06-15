@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { parseSection11AuditSummary } from "@/lib/parseCIIauditSummary";
-import { SECTION11_PROMPT_V4 } from "./prompts/section11Prompt.v4";
+import { parseSection11V61Response } from "@/lib/parseSection11V61";
+import { SECTION11_PROMPT_V6_4 } from "./prompts/section11Prompt.v6.4";
+
+/** Vercel/Next — Section 11 audit can take several minutes with large reports. */
+export const maxDuration = 300;
 
 // Gemini (paused): restore import + init + `model.generateContent(prompt)` below when using GEMINI_API_KEY again.
 // import { GoogleGenerativeAI } from "@google/generative-ai";
@@ -11,7 +15,28 @@ type OpenAiCompletionOpts = {
     temperature?: number;
     /** When set, requests reproducible sampling (same inputs → same text for supported models). */
     seed?: number;
+    maxTokens?: number;
+    responseFormat?: { type: "json_object" };
+    systemMessage?: string;
 };
+
+function isOpenAiReasoningModel(model: string): boolean {
+    const m = model.toLowerCase();
+    return (
+        m.startsWith("gpt-5") ||
+        m.startsWith("o1") ||
+        m.startsWith("o3") ||
+        m.startsWith("o4") ||
+        m.includes("gpt-5.")
+    );
+}
+
+function resolveOpenAiErrorMessage(error: unknown): string {
+    if (error instanceof Error && error.message.trim()) {
+        return error.message.trim();
+    }
+    return "Failed to generate AI response";
+}
 
 async function generateSummaryWithOpenAI(
     userPrompt: string,
@@ -23,6 +48,7 @@ async function generateSummaryWithOpenAI(
     }
 
     const model = process.env.OPENAI_SUMMARY_MODEL?.trim() || "gpt-5.4";
+    const reasoningModel = isOpenAiReasoningModel(model);
 
     const temperature = opts?.temperature ?? 0.4;
     const requestBody: Record<string, unknown> = {
@@ -31,14 +57,29 @@ async function generateSummaryWithOpenAI(
             {
                 role: "system",
                 content:
+                    opts?.systemMessage ||
                     "You are ChatGPT, acting as a precise institutional impact analyst. Follow instructions exactly. Output plain text only unless a specific format is requested.",
             },
             { role: "user", content: userPrompt },
         ],
-        temperature,
     };
-    if (opts?.seed !== undefined) {
-        requestBody.seed = opts.seed;
+
+    if (!reasoningModel) {
+        requestBody.temperature = temperature;
+        if (opts?.seed !== undefined) {
+            requestBody.seed = opts.seed;
+        }
+    }
+
+    if (opts?.maxTokens !== undefined) {
+        if (reasoningModel) {
+            requestBody.max_completion_tokens = opts.maxTokens;
+        } else {
+            requestBody.max_tokens = opts.maxTokens;
+        }
+    }
+    if (opts?.responseFormat) {
+        requestBody.response_format = opts.responseFormat;
     }
 
     const res = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -1363,11 +1404,16 @@ Keep the full response under 180 words.`;
             // SECTION 11 EXECUTIVE SUMMARY
             // =====================================================
             case "section11":
-                prompt = `${SECTION11_PROMPT_V4}\n\nSUBMISSION DATA:\n${JSON.stringify(data)}`;
+                prompt = `Evaluate this student submission and return exactly one JSON object per the system schema.\n\nSUBMISSION DATA:\n${JSON.stringify(data)}`;
                 break;
             /*
-             * Legacy prompt retained in:
+             * Legacy prompts retained in:
              * src/app/api/ai/summarize/prompts/section11Prompt.v1.ts
+             * src/app/api/ai/summarize/prompts/section11Prompt.v2.ts
+             * src/app/api/ai/summarize/prompts/section11Prompt.v4.ts
+             * src/app/api/ai/summarize/prompts/section11Prompt.v6.1.ts
+             * src/app/api/ai/summarize/prompts/section11Prompt.v6.3.ts
+             * src/app/api/ai/summarize/prompts/section11Prompt.v6.4.ts (active: imported above)
              */
             /*prompt = `GLOBAL MASTER INSTRUCTION (MANDATORY HEADER)
 You are an AI Auditor for CIEL (Community Impact Evaluation Lab).
@@ -1733,7 +1779,10 @@ ${JSON.stringify(data)}`;
             section === "section11"
                 ? {
                       temperature: 0,
-                      seed: 277011,
+                      seed: 42,
+                      maxTokens: 8192,
+                      responseFormat: { type: "json_object" },
+                      systemMessage: `${SECTION11_PROMPT_V6_4}\n\nYou must emit one valid JSON object only — no markdown fences and no text outside the JSON.`,
                   }
                 : undefined;
 
@@ -1741,6 +1790,15 @@ ${JSON.stringify(data)}`;
         const summary = text.trim();
 
         if (section === "section11") {
+            const v61 = parseSection11V61Response(summary);
+            if (v61) {
+                return NextResponse.json({
+                    summary: v61.summaryText,
+                    auditMeta: v61.auditMeta,
+                    evaluationVersion: v61.evaluation.evaluation_version || "v6.4",
+                });
+            }
+
             const auditMeta = parseSection11AuditSummary(summary);
             return NextResponse.json({
                 summary,
@@ -1777,8 +1835,8 @@ ${JSON.stringify(data)}`;
         }
 
         return NextResponse.json(
-            { error: "Failed to generate AI response" },
-            { status: 500 }
+            { error: resolveOpenAiErrorMessage(error) },
+            { status: 500 },
         );
 
     }

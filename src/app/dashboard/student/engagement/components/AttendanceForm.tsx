@@ -14,8 +14,10 @@ import { uploadAttendanceEvidenceViaPresign } from "@/utils/attendanceEvidenceUp
 import {
     ATTENDANCE_DESCRIPTION_MAX_CHARS,
     ATTENDANCE_DESCRIPTION_MAX_WORDS,
+    MAX_DAILY_ATTENDANCE_HOURS,
     attendanceDescriptionLimitMessage,
     attendanceDescriptionOverLimit,
+    dailyAttendanceCapMessage,
 } from "@/utils/attendanceDescriptionLimits";
 import clsx from "clsx";
 import { REPORT_ATTACHMENT_ACCEPT } from "@/utils/reportAttachmentAccept";
@@ -179,8 +181,25 @@ export default function AttendanceForm({
             return;
         }
 
-        if (diffMinutes > 12 * 60) {
-            alert("Daily attendance cannot exceed 12 hours");
+        const numericHours = diffMinutes / 60;
+        const dailyCapMessage = dailyAttendanceCapMessage();
+        if (numericHours > MAX_DAILY_ATTENDANCE_HOURS) {
+            alert(dailyCapMessage);
+            return;
+        }
+
+        const activeParticipantId = formData.participantId;
+        const currentLogs = reportData.section1.attendance_logs || [];
+        const engagementDateKey = formData.dateOfEngagement.split("T")[0];
+        const existingDailyHours = currentLogs
+            .filter((log) => {
+                if (!attendanceParticipantsMatch(log.participantId, activeParticipantId)) return false;
+                const logDate = normalizeAttendanceDate(log.date);
+                return logDate === engagementDateKey;
+            })
+            .reduce((sum, log) => sum + (Number(log.hours) || 0), 0);
+        if (existingDailyHours + numericHours > MAX_DAILY_ATTENDANCE_HOURS) {
+            alert(dailyCapMessage);
             return;
         }
 
@@ -194,10 +213,6 @@ export default function AttendanceForm({
             toast.error(limitMsg);
             return;
         }
-
-        const numericHours = diffMinutes / 60;
-        const activeParticipantId = formData.participantId;
-        const currentLogs = reportData.section1.attendance_logs || [];
 
         if (hasOverlappingAttendanceLog(currentLogs, {
             participantId: activeParticipantId,

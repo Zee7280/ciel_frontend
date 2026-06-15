@@ -1,8 +1,8 @@
 /**
  * Section 11 evaluator prompt (CII Evaluator v4).
  *
+ * Superseded by section11Prompt.v6.1.ts. Retained for reference/rollback only.
  * v4 fixes false team attendance inflation flags and adds Donor Tier appreciation.
- * Kept as a separate module so route logic stays unchanged.
  */
 export const SECTION11_PROMPT_V4 = `CIEL PK Composite Impact Index (CII) Evaluator — Master System Prompt (v4)
 

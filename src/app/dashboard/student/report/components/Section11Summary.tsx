@@ -1,4 +1,4 @@
-import { BarChart3, ShieldAlert, Quote, Award, Clock, Users, Target, ShieldCheck, Download, TrendingUp, X, Printer, CheckCircle, Eye, AlertTriangle, Lock, CreditCard, Flag, MessageSquareQuote } from "lucide-react";
+import { BarChart3, ShieldAlert, Quote, Award, Clock, Users, Target, ShieldCheck, Download, TrendingUp, X, Printer, CheckCircle, Eye, AlertTriangle, Lock, CreditCard, Flag, MessageSquareQuote, ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "./ui/button";
 import { useReportForm } from "../context/ReportContext";
 import React, { useState, useMemo, useEffect } from "react";
@@ -17,6 +17,7 @@ import ReportVerificationQr from "@/components/ReportVerificationQr";
 import { pickImpactVerifyUrlFromPayload } from "@/utils/reportVerificationUrl";
 import { readPersistedCiiSnapshot } from "@/utils/reportCiiSnapshot";
 import { mergedSdgTitlesLine, uniqueMergedSdgGoalNumbers } from "../utils/reportSdgMerge";
+import { buildSection11DashboardView } from "@/lib/section11DashboardNarrative";
 
 type Section11SummaryProps = {
     /** When the footer submit control is hidden (summary-only workspace), opens the same confirm flow. */
@@ -139,6 +140,7 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
     const [showPreview, setShowPreview] = useState(false);
     const [showCertificate, setShowCertificate] = useState(false);
     const [showRedFlagsModal, setShowRedFlagsModal] = useState(false);
+    const [showFullAuditNarrative, setShowFullAuditNarrative] = useState(false);
 
     const clearCertificatePrintScale = () => {
         document.documentElement.style.removeProperty("--cert-print-scale");
@@ -191,9 +193,18 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
         [projectData, section3],
     );
 
+    const storedAuditText = String(data.section11?.summary_text || "").trim();
+
+    const section11DashboardView = useMemo(() => {
+        if (storedAuditText && !storedAuditText.toLowerCase().includes("project successfully synthesized")) {
+            return buildSection11DashboardView(storedAuditText);
+        }
+        return null;
+    }, [storedAuditText]);
+
     const executiveSummary = useMemo(() => {
-        if (data.section11?.summary_text && !data.section11.summary_text.includes("Project successfully synthesized")) {
-            return data.section11.summary_text;
+        if (section11DashboardView?.narrative) {
+            return section11DashboardView.narrative;
         }
 
         const sdgPhrase =
@@ -201,13 +212,17 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
             (mergedSdgNums.length ? mergedSdgNums.map((n) => `SDG ${n}`).join(", ") : "Sustainable Development");
         return `Audit summary pending detailed review. Based on the submitted inputs, the project references ${verifiedHours} verified hours, ${beneficiaries} reported beneficiaries, alignment with ${sdgPhrase}, and ${section10.mechanisms?.length || 0} sustainability mechanisms. Final credibility still depends on consistency across attendance, activities, outcomes, resources, evidence, and continuity claims.`;
     }, [
+        section11DashboardView,
         section10.mechanisms?.length,
         beneficiaries,
         verifiedHours,
-        data.section11,
         mergedSdgNarrative,
         mergedSdgNums,
     ]);
+
+    const showExpandFullAudit =
+        Boolean(storedAuditText) &&
+        storedAuditText.length > executiveSummary.length + 240;
 
     /** Always pass the same narrative shown in “Comprehensive audit review” (do not require SECTION 1). */
     const auditTextForModal = useMemo(() => {
@@ -493,8 +508,11 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                                             {data.section11?.is_ai_generated ? "AI-Generated" : "System-Generated"}
                                         </p>
                                         <h3 className="text-sm font-black text-slate-900 tracking-tight">
-                                            Comprehensive audit review
+                                            Executive audit summary
                                         </h3>
+                                        <p className="text-[10px] font-semibold text-slate-500 leading-snug mt-0.5">
+                                            Short overview only — section scores, red flags, and fixes are below.
+                                        </p>
                                     </div>
                                 </div>
                                 <button
@@ -508,6 +526,28 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                             </div>
                         </div>
                         <div className="px-6 py-8 md:px-8 md:py-10 space-y-6 relative z-10">
+                            {section11DashboardView?.highlights &&
+                            (section11DashboardView.highlights.finalScore ||
+                                section11DashboardView.highlights.band ||
+                                section11DashboardView.highlights.recommendedAction) ? (
+                                <div className="flex flex-wrap gap-2 relative z-10">
+                                    {section11DashboardView.highlights.finalScore ? (
+                                        <span className="inline-flex items-center rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-slate-700">
+                                            Score: {section11DashboardView.highlights.finalScore}
+                                        </span>
+                                    ) : null}
+                                    {section11DashboardView.highlights.band ? (
+                                        <span className="inline-flex items-center rounded-lg border border-report-primary-border bg-report-primary-soft px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-report-primary">
+                                            {section11DashboardView.highlights.band}
+                                        </span>
+                                    ) : null}
+                                    {section11DashboardView.highlights.recommendedAction ? (
+                                        <span className="inline-flex items-center rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-amber-950">
+                                            {section11DashboardView.highlights.recommendedAction}
+                                        </span>
+                                    ) : null}
+                                </div>
+                            ) : null}
                             <span className="absolute top-4 left-3 md:left-5 text-6xl md:text-7xl font-serif text-slate-100 select-none leading-none pointer-events-none">
                                 “
                             </span>
@@ -518,6 +558,38 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                                     </p>
                                 ))}
                             </div>
+                            {showExpandFullAudit ? (
+                                <div className="relative z-10 rounded-xl border border-slate-200 bg-slate-50/80 overflow-hidden">
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowFullAuditNarrative((open) => !open)}
+                                        className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left text-[10px] font-black uppercase tracking-widest text-slate-600 hover:bg-slate-100/80 transition-colors"
+                                    >
+                                        <span>
+                                            {showFullAuditNarrative
+                                                ? "Hide full technical audit"
+                                                : "View full technical audit report"}
+                                        </span>
+                                        {showFullAuditNarrative ? (
+                                            <ChevronUp className="w-4 h-4 shrink-0" />
+                                        ) : (
+                                            <ChevronDown className="w-4 h-4 shrink-0" />
+                                        )}
+                                    </button>
+                                    {showFullAuditNarrative ? (
+                                        <div className="max-h-80 overflow-y-auto border-t border-slate-200 px-4 py-4 space-y-3 bg-white">
+                                            {storedAuditText.split("\n\n").map((paragraph: string, idx: number) => (
+                                                <p
+                                                    key={idx}
+                                                    className="text-xs font-medium text-slate-700 leading-relaxed whitespace-pre-wrap"
+                                                >
+                                                    {paragraph.trim()}
+                                                </p>
+                                            ))}
+                                        </div>
+                                    ) : null}
+                                </div>
+                            ) : null}
                             <span className="absolute bottom-2 right-3 md:right-6 text-6xl md:text-7xl font-serif text-slate-100 select-none rotate-180 leading-none pointer-events-none">
                                 “
                             </span>

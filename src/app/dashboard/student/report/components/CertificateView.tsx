@@ -16,18 +16,11 @@ import ReportVerificationQr from "@/components/ReportVerificationQr";
 import { isInstitutionallyVerifiedReport } from "@/utils/institutionalReportVerification";
 import { pickImpactVerifyUrlFromPayload } from "@/utils/reportVerificationUrl";
 import { readPersistedCiiSnapshot } from "@/utils/reportCiiSnapshot";
+import { resolveCiiLevelRecognition } from "@/utils/ciiLevelBadge";
 
 type TeamMember = ReportData["section1"]["team_members"][number];
 
 type LeadShape = ReportData["section1"]["team_lead"];
-
-type CertificateBadge = {
-    src: string;
-    alt: string;
-    title: string;
-    tagline: string;
-    accentClass: string;
-};
 
 type RecipientBlock = {
     key: string;
@@ -87,50 +80,18 @@ function CertFlourish() {
     );
 }
 
-function getCiiCertificateBadge(score: number): CertificateBadge {
-    if (score >= 85) {
-        return {
-            src: "/certificate-badges/transformative-impact.png",
-            alt: "Transformative Impact badge",
-            title: "Transformative Impact",
-            tagline: "Verified Excellence in Community Impact.",
-            accentClass: "text-amber-700",
-        };
-    }
-    if (score >= 70) {
-        return {
-            src: "/certificate-badges/strong-impact-contributor.png",
-            alt: "Strong Impact Contributor badge",
-            title: "Strong Impact Contributor",
-            tagline: "Driving Progress Through Purposeful Service",
-            accentClass: "text-orange-700",
-        };
-    }
-    if (score >= 55) {
-        return {
-            src: "/certificate-badges/developing-impact-contributor.png",
-            alt: "Developing Impact Contributor badge",
-            title: "Developing Impact Contributor",
-            tagline: "Growing Through Service and Impact",
-            accentClass: "text-emerald-700",
-        };
-    }
-    if (score >= 40) {
-        return {
-            src: "/certificate-badges/emerging-community-contributor.png",
-            alt: "Emerging Community Contributor badge",
-            title: "Emerging Community Contributor",
-            tagline: "Starting the Journey of Community Change",
-            accentClass: "text-sky-700",
-        };
-    }
-    return {
-        src: "/certificate-badges/foundation-stage-contributor.png",
-        alt: "Foundation Stage Contributor badge",
-        title: "Foundation Stage Contributor",
-        tagline: "Planting the Seeds of Responsible Service",
-        accentClass: "text-[#9a4b25]",
-    };
+function CertBannerFlourish() {
+    return (
+        <svg className="cert-banner-flourish" viewBox="0 0 24 14" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
+            <path
+                d="M2 7c2-3 4-4 6-4 2 0 3 1 4 2M22 7c-2-3-4-4-6-4-2 0-3 1-4 2"
+                stroke="currentColor"
+                strokeWidth="1.1"
+                strokeLinecap="round"
+            />
+            <path d="M10 7h4" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" />
+        </svg>
+    );
 }
 
 export default function CertificateView({ projectData }: { projectData?: unknown } = {}) {
@@ -267,7 +228,8 @@ export default function CertificateView({ projectData }: { projectData?: unknown
         return Math.min(100, Math.max(0, Math.round(totalScore)));
     }, [data, reportForCii]);
 
-    const ciiBadge = useMemo(() => getCiiCertificateBadge(ciiScore), [ciiScore]);
+    const ciiRecognition = useMemo(() => resolveCiiLevelRecognition(ciiScore), [ciiScore]);
+    const ciiBadge = ciiRecognition.badge;
 
     const certificateDate = useMemo(() => formatCertificateDate(), []);
     const verificationCode = useMemo(() => pickCertificateVerificationCode(data), [data]);
@@ -304,6 +266,9 @@ export default function CertificateView({ projectData }: { projectData?: unknown
                     <div className="cert-corner cert-corner--tl-gold" aria-hidden />
                     <div className="cert-corner cert-corner--bl" aria-hidden />
                     <div className="cert-corner cert-corner--bl-gold" aria-hidden />
+
+                    <div className="cert-corner cert-corner--br" aria-hidden />
+                    <div className="cert-corner cert-corner--br-gold" aria-hidden />
 
                     <div className="cert-inner">
                         <div className="cert-logo-row">
@@ -361,7 +326,9 @@ export default function CertificateView({ projectData }: { projectData?: unknown
                             ) : null}
                         </div>
 
-                        <div className="cert-metrics certificate-metrics-grid">
+                        <div
+                            className={`cert-metrics certificate-metrics-grid ${ciiBadge ? "cert-metrics--with-badge" : "cert-metrics--no-badge"}`}
+                        >
                             <div className="cert-metric certificate-metric-cell">
                                 <Clock className="cert-metric-icon" aria-hidden />
                                 <p className="cert-metric-label">Verified Hours</p>
@@ -385,15 +352,23 @@ export default function CertificateView({ projectData }: { projectData?: unknown
                                     {ciiScore}/100
                                 </p>
                             </div>
-                            <div className="cert-metric cert-metric-badge certificate-metric-cell">
-                                <img
-                                    src={ciiBadge.src}
-                                    alt={ciiBadge.alt}
-                                    className="cert-metric-badge-img"
-                                    width={1024}
-                                    height={1024}
-                                />
-                            </div>
+                            {ciiBadge ? (
+                                <div className="cert-metric cert-metric-badge certificate-metric-cell">
+                                    <img
+                                        src={ciiBadge.src}
+                                        alt={ciiBadge.alt}
+                                        className="cert-metric-badge-img"
+                                        width={1024}
+                                        height={1024}
+                                    />
+                                </div>
+                            ) : null}
+                        </div>
+
+                        <div className="cert-recognition-banner" role="note">
+                            <CertBannerFlourish />
+                            <p className="cert-recognition-text">{ciiRecognition.tagline}</p>
+                            <CertBannerFlourish />
                         </div>
 
                         <div className="cert-footer-row">

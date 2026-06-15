@@ -37,6 +37,7 @@ import {
     mergedSdgTitlesLine,
     uniqueMergedSdgGoalNumbers,
 } from "../utils/reportSdgMerge";
+import { resolveCiiLevelBadge, resolveCiiLevelTitle } from "@/utils/ciiLevelBadge";
 
 interface Props {
     projectData?: unknown;
@@ -52,34 +53,7 @@ const dossierBodyText = "text-[13px] leading-relaxed";
 const dossierLabel = "text-[9px] font-black uppercase leading-snug tracking-[0.18em]";
 
 function getCiiCertificateBadge(score: number) {
-    if (score >= 85) {
-        return {
-            src: "/certificate-badges/transformative-impact.png",
-            alt: "Transformative Impact badge",
-        };
-    }
-    if (score >= 70) {
-        return {
-            src: "/certificate-badges/strong-impact-contributor.png",
-            alt: "Strong Impact Contributor badge",
-        };
-    }
-    if (score >= 55) {
-        return {
-            src: "/certificate-badges/developing-impact-contributor.png",
-            alt: "Developing Impact Contributor badge",
-        };
-    }
-    if (score >= 40) {
-        return {
-            src: "/certificate-badges/emerging-community-contributor.png",
-            alt: "Emerging Community Contributor badge",
-        };
-    }
-    return {
-        src: "/certificate-badges/foundation-stage-contributor.png",
-        alt: "Foundation Stage Contributor badge",
-    };
+    return resolveCiiLevelBadge(score);
 }
 
 /** Section 6 stores `sources: string[]` (+ optional legacy `source`); print view must not render "undefined". */
@@ -777,16 +751,7 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
     const sectionInk = "#071A33";
     const tealInk = "#0F8F83";
     const scorePercent = (score: number, max: number) => Math.round((score / max) * 100);
-    const finalScoreLevel =
-        totalScore >= 85
-            ? "Impact Contributor"
-            : totalScore >= 70
-              ? "Strong Impact Contributor"
-              : totalScore >= 55
-                ? "Developing Impact Contributor"
-                : totalScore >= 40
-                  ? "Emerging Community Contributor"
-                  : "Foundation Stage Contributor";
+    const finalScoreLevel = resolveCiiLevelTitle(totalScore);
     const finalScoreNarrative =
         totalScore >= 85
             ? "The student has demonstrated strong commitment, consistent engagement, quality reporting, and meaningful community contribution through verified experiential learning."
@@ -2105,13 +2070,15 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
                         </div>
 
                         <div className="flex justify-start sm:justify-center">
-                            <img
-                                src={ciiBadge.src}
-                                alt={ciiBadge.alt}
-                                className="h-24 w-36 object-contain drop-shadow-sm print:h-[4.5rem] print:w-28 print:drop-shadow-none"
-                                width={1024}
-                                height={1024}
-                            />
+                            {ciiBadge ? (
+                                <img
+                                    src={ciiBadge.src}
+                                    alt={ciiBadge.alt}
+                                    className="h-24 w-36 object-contain drop-shadow-sm print:h-[4.5rem] print:w-28 print:drop-shadow-none"
+                                    width={1024}
+                                    height={1024}
+                                />
+                            ) : null}
                         </div>
 
                         <div className="text-left sm:text-right">

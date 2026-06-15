@@ -288,7 +288,7 @@ export const calculateSection1CII = (input: Section1CIIInput): Section1CIIResult
     });
 
     Object.entries(hoursPerDay).forEach(([date, hrs]) => {
-        if (hrs > 8) redFlags.push(`Unrealistic daily output detected on ${date} (>8 hrs)`);
+        if (hrs > 9) redFlags.push(`Unrealistic daily output detected on ${date} (>9 hrs)`);
     });
 
     // Patterns (e.g., exact same time range repeated too many times)
