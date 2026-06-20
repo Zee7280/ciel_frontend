@@ -80,20 +80,6 @@ function CertFlourish() {
     );
 }
 
-function CertBannerFlourish() {
-    return (
-        <svg className="cert-banner-flourish" viewBox="0 0 24 14" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
-            <path
-                d="M2 7c2-3 4-4 6-4 2 0 3 1 4 2M22 7c-2-3-4-4-6-4-2 0-3 1-4 2"
-                stroke="currentColor"
-                strokeWidth="1.1"
-                strokeLinecap="round"
-            />
-            <path d="M10 7h4" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" />
-        </svg>
-    );
-}
-
 export default function CertificateView({ projectData }: { projectData?: unknown } = {}) {
     const { data } = useReportForm();
     const { section1, section2, section3 } = data;
@@ -229,7 +215,8 @@ export default function CertificateView({ projectData }: { projectData?: unknown
     }, [data, reportForCii]);
 
     const ciiRecognition = useMemo(() => resolveCiiLevelRecognition(ciiScore), [ciiScore]);
-    const ciiBadge = ciiRecognition.badge;
+    const { badge: ciiBadge } = ciiRecognition;
+    const ciiLevelRangeDisplay = ciiRecognition.rangeLabel.replace(/–/g, "-");
 
     const certificateDate = useMemo(() => formatCertificateDate(), []);
     const verificationCode = useMemo(() => pickCertificateVerificationCode(data), [data]);
@@ -326,9 +313,7 @@ export default function CertificateView({ projectData }: { projectData?: unknown
                             ) : null}
                         </div>
 
-                        <div
-                            className={`cert-metrics certificate-metrics-grid ${ciiBadge ? "cert-metrics--with-badge" : "cert-metrics--no-badge"}`}
-                        >
+                        <div className="cert-metrics certificate-metrics-grid">
                             <div className="cert-metric certificate-metric-cell">
                                 <Clock className="cert-metric-icon" aria-hidden />
                                 <p className="cert-metric-label">Verified Hours</p>
@@ -352,23 +337,26 @@ export default function CertificateView({ projectData }: { projectData?: unknown
                                     {ciiScore}/100
                                 </p>
                             </div>
-                            {ciiBadge ? (
-                                <div className="cert-metric cert-metric-badge certificate-metric-cell">
-                                    <img
-                                        src={ciiBadge.src}
-                                        alt={ciiBadge.alt}
-                                        className="cert-metric-badge-img"
-                                        width={1024}
-                                        height={1024}
-                                    />
-                                </div>
-                            ) : null}
                         </div>
 
-                        <div className="cert-recognition-banner" role="note">
-                            <CertBannerFlourish />
-                            <p className="cert-recognition-text">{ciiRecognition.tagline}</p>
-                            <CertBannerFlourish />
+                        <div className="cert-impact-recognition" role="note">
+                            <p className="cert-impact-recognition-heading">Community Impact Recognition</p>
+                            <div className="cert-impact-recognition-body">
+                                <img
+                                    src={ciiBadge.src}
+                                    alt={ciiBadge.alt}
+                                    className="cert-impact-recognition-badge"
+                                    width={1024}
+                                    height={1024}
+                                />
+                                <div className="cert-impact-recognition-copy">
+                                    <p className="cert-impact-recognition-title">{ciiRecognition.title}</p>
+                                    <p className="cert-impact-recognition-level">
+                                        LEVEL {ciiRecognition.level} ({ciiLevelRangeDisplay})
+                                    </p>
+                                    <p className="cert-impact-recognition-tagline">{ciiRecognition.tagline}</p>
+                                </div>
+                            </div>
                         </div>
 
                         <div className="cert-footer-row">

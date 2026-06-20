@@ -5,16 +5,16 @@ export interface CIIResult {
     totalScore: number;
     level: string;
     breakdown: {
-        participation: number; // Max 10
-        context: number;       // Max 10
-        sdg: number;           // Max 10
-        outputs: number;       // Max 15
-        outcomes: number;      // Max 20
-        resources: number;     // Max 7
-        partnerships: number;  // Max 7
-        evidence: number;      // Max 12
-        learning: number;      // Max 4
-        sustainability: number;// Max 5
+        participation: number;
+        context: number;
+        sdg: number;
+        outputs: number;
+        outcomes: number;
+        resources: number;
+        partnerships: number;
+        evidence: number;
+        learning: number;
+        sustainability: number;
     };
     suggestions: string[];
 }
@@ -91,57 +91,57 @@ export function calculateCII(data: ReportData): CIIResult {
     else if (sessions >= 3) outputs = 8;
     else if (sessions > 0) outputs = 4;
 
-    // --- 5. Outcomes & Measurable Change (Max 20) ---
+    // --- 5. Outcomes & Measurable Change (Max 10) ---
     const hasBaseline = data.section5?.measurable_outcomes?.some(o => o.baseline && o.endline);
     const hasConfidence = data.section5?.measurable_outcomes?.some(o => 
         o.confidence_level?.includes('Directly Measured') || 
         o.confidence_level?.includes('Partner Confirmed')
     );
 
-    if (hasBaseline && hasConfidence) outcomes = 20; 
-    else if (hasBaseline) outcomes = 15;
-    else if (data.section5?.observed_change?.length > 100) outcomes = 10;
-    else outcomes = 5;
+    if (hasBaseline && hasConfidence) outcomes = 10;
+    else if (hasBaseline) outcomes = 8;
+    else if (data.section5?.observed_change?.length > 100) outcomes = 5;
+    else outcomes = 3;
 
-    // --- 6. Resources Mobilized (Max 7) ---
+    // --- 6. Resources Mobilized (Max 15) ---
     const resourceCount = data.section6?.resources?.length || 0;
     const useResources = data.section6?.use_resources;
 
     if (useResources === 'yes') {
-        if (resourceCount >= 3) resources = 7;
-        else if (resourceCount === 2) resources = 5;
-        else if (resourceCount === 1) resources = 3;
+        if (resourceCount >= 3) resources = 15;
+        else if (resourceCount === 2) resources = 11;
+        else if (resourceCount === 1) resources = 7;
     } else {
-        resources = 3; // Volunteer effort only
+        resources = 7; // Volunteer effort only
     }
 
-    // --- 7. Partnerships & Collaboration (Max 7) ---
+    // --- 7. Partnerships & Collaboration (Max 10) ---
     const partnerCount = data.section7?.partners?.length || 0;
     const hasPartners = data.section7?.has_partners;
 
     if (hasPartners === 'yes') {
-        if (partnerCount >= 3) partnerships = 7;
-        else if (partnerCount === 2) partnerships = 5;
-        else if (partnerCount === 1) partnerships = 3;
+        if (partnerCount >= 3) partnerships = 10;
+        else if (partnerCount === 2) partnerships = 7;
+        else if (partnerCount === 1) partnerships = 4;
     } else {
-        partnerships = 2; // No partner
+        partnerships = 3; // No partner
     }
 
-    // --- 8. Evidence & Verification (Max 12) ---
+    // --- 8. Evidence & Verification (Max 10) ---
     const evidenceFiles = data.section8?.evidence_files?.length || 0;
     const partnerVerified = data.section8?.partner_verification;
 
-    if (partnerVerified) evidence = 12;
-    else if (evidenceFiles >= 5) evidence = 10;
-    else if (evidenceFiles >= 3) evidence = 7;
+    if (partnerVerified) evidence = 10;
+    else if (evidenceFiles >= 5) evidence = 8;
+    else if (evidenceFiles >= 3) evidence = 6;
     else evidence = 3;
 
-    // --- 9. Learning & Competency (Max 4) ---
+    // --- 9. Learning & Competency (Max 5) ---
     const academicRef = data.section9?.academic_integration?.length || 0;
     const personalRef = data.section9?.personal_learning?.length || 0;
 
-    if (academicRef > 150 && personalRef > 150) learning = 4;
-    else if (academicRef > 50 || personalRef > 50) learning = 2;
+    if (academicRef > 150 && personalRef > 150) learning = 5;
+    else if (academicRef > 50 || personalRef > 50) learning = 3;
     else learning = 1;
 
     // --- 10. Sustainability (Max 5) ---

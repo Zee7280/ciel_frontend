@@ -334,7 +334,9 @@ export function calculateEngagementMetrics(
     });
 
     // 4. Compliance & Status
-    const isNonCompliant = ratio < 1.0 || redFlags.length > 0;
+    // C = (Σ verified hours / (team members × RHS)) × 100 — non-compliant only when C < 100
+    const complianceScore = projectGoal > 0 ? (totalHours / projectGoal) * 100 : 0;
+    const isNonCompliant = complianceScore < 100;
     
     let category = 'Band A – Emerging Service Participant';
     if (teamEIS >= 80) category = 'Band E – Transformative Community Impact Leader';

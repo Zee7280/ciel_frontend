@@ -2,31 +2,21 @@ import type { AuditSummarySection } from "@/lib/parseAuditSummarySections";
 import { parseAuditSummaryIntoSections } from "@/lib/parseAuditSummarySections";
 import type { SectionIncompleteInfo } from "@/app/dashboard/student/report/utils/validation";
 import type { CIIResult } from "@/app/dashboard/student/report/utils/calculateCII";
+import { CII_SECTION_LABELS, CII_SECTION_MAX } from "@/app/dashboard/student/report/utils/ciiSectionWeights";
 
-const BREAKDOWN_MAX: Record<keyof CIIResult["breakdown"], number> = {
-    participation: 15,
-    context: 5,
-    sdg: 5,
-    outputs: 15,
-    outcomes: 25,
-    resources: 5,
-    partnerships: 10,
-    evidence: 10,
-    learning: 4,
-    sustainability: 5,
-};
+const BREAKDOWN_MAX: Record<keyof CIIResult["breakdown"], number> = { ...CII_SECTION_MAX };
 
 const DIM_LABEL: Record<keyof CIIResult["breakdown"], string> = {
-    participation: "Participation",
-    context: "Context",
-    sdg: "SDG alignment",
-    outputs: "Activities / outputs",
-    outcomes: "Outcomes",
-    resources: "Resources",
-    partnerships: "Partnerships",
-    evidence: "Evidence",
-    learning: "Reflection",
-    sustainability: "Sustainability",
+    participation: CII_SECTION_LABELS.participation,
+    context: CII_SECTION_LABELS.context,
+    sdg: CII_SECTION_LABELS.sdg,
+    outputs: CII_SECTION_LABELS.outputs,
+    outcomes: CII_SECTION_LABELS.outcomes,
+    resources: CII_SECTION_LABELS.resources,
+    partnerships: CII_SECTION_LABELS.partnerships,
+    evidence: CII_SECTION_LABELS.evidence,
+    learning: CII_SECTION_LABELS.learning,
+    sustainability: CII_SECTION_LABELS.sustainability,
 };
 
 /**

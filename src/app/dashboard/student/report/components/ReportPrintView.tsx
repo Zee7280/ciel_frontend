@@ -3,6 +3,7 @@ import { useReportForm } from "../context/ReportContext";
 import type { ReportData } from "../context/ReportContext";
 import { Landmark } from "lucide-react";
 import { calculateCII } from "../utils/calculateCII";
+import { CII_BREAKDOWN_ORDER, CII_SECTION_LABELS, CII_SECTION_MAX, ciiSectionWeightLabel } from "../utils/ciiSectionWeights";
 import {
     buildIndividualRosterFromSection1,
     calculateEngagementMetrics,
@@ -771,12 +772,12 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
         },
         {
             label: "Impact & Outcomes",
-            score: scorePercent(breakdown.outcomes, 20),
+            score: scorePercent(breakdown.outcomes, CII_SECTION_MAX.outcomes),
             note: "Observed change and measurable community benefit.",
         },
         {
             label: "Compliance & Professionalism",
-            score: scorePercent(breakdown.evidence, 12),
+            score: scorePercent(breakdown.evidence, CII_SECTION_MAX.evidence),
             note: "Verification, ethics, and professional reporting standards.",
         },
     ];
@@ -895,18 +896,12 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
         </div>
     );
 
-    const scoreTableItems = [
-        { label: "Identity & Participation", score: breakdown.participation, max: 10, weight: "10%" },
-        { label: "Project Context & Discipline", score: breakdown.context, max: 10, weight: "10%" },
-        { label: "SDG Strategy & Intent", score: breakdown.sdg, max: 10, weight: "10%" },
-        { label: "Activities & Output Scale", score: breakdown.outputs, max: 15, weight: "15%" },
-        { label: "Outcomes & Measurable Change", score: breakdown.outcomes, max: 20, weight: "20%" },
-        { label: "Resource Mobilization", score: breakdown.resources, max: 7, weight: "7%" },
-        { label: "Partnerships & Collaboration", score: breakdown.partnerships, max: 7, weight: "7%" },
-        { label: "Evidence & Verification", score: breakdown.evidence, max: 12, weight: "12%" },
-        { label: "Personal & Academic Reflection", score: breakdown.learning, max: 4, weight: "4%" },
-        { label: "Sustainability & Continuation", score: breakdown.sustainability, max: 5, weight: "5%" }
-    ];
+    const scoreTableItems = CII_BREAKDOWN_ORDER.map((key) => ({
+        label: CII_SECTION_LABELS[key],
+        score: breakdown[key],
+        max: CII_SECTION_MAX[key],
+        weight: ciiSectionWeightLabel(CII_SECTION_MAX[key]),
+    }));
     const formatCiiScore = (score: number) => Number.isInteger(score) ? String(score) : score.toFixed(1);
 
     return (

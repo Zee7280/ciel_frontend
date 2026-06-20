@@ -238,19 +238,12 @@
 
 .cert-metrics {
   display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   width: 100%;
   margin-bottom: 14px;
   border-top: 1px solid rgba(182, 120, 53, 0.35);
   border-bottom: 1px solid rgba(182, 120, 53, 0.35);
   padding: 14px 0;
-}
-
-.cert-metrics--with-badge {
-  grid-template-columns: repeat(4, minmax(0, 1fr)) minmax(0, 1.15fr);
-}
-
-.cert-metrics--no-badge {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .cert-metric {
@@ -311,48 +304,72 @@
   color: var(--cert-navy);
 }
 
-.cert-metric-badge {
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.cert-impact-recognition {
+  width: 100%;
+  margin-bottom: 20px;
+  border: 1px solid rgba(182, 120, 53, 0.45);
+  background: #f8f6f1;
+  text-align: left;
 }
 
-.cert-metric-badge-img {
+.cert-impact-recognition-heading {
+  margin: 0;
+  padding: 7px 14px;
+  background: var(--cert-navy);
+  color: #fff;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 0.52rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  text-align: center;
+}
+
+.cert-impact-recognition-body {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 16px;
+}
+
+.cert-impact-recognition-badge {
+  flex-shrink: 0;
   display: block;
-  margin: 0 auto;
-  height: 5.25rem;
+  height: 6.5rem;
   width: auto;
-  max-width: 100%;
   object-fit: contain;
 }
 
-.cert-recognition-banner {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  width: 100%;
-  margin-bottom: 20px;
-  padding: 11px 14px;
-  background: var(--cert-navy);
-  border: 1px solid rgba(212, 162, 78, 0.45);
-}
-
-.cert-banner-flourish {
-  flex-shrink: 0;
-  width: 22px;
-  height: 14px;
-  color: var(--cert-gold-light);
-}
-
-.cert-recognition-text {
-  margin: 0;
+.cert-impact-recognition-copy {
+  min-width: 0;
   flex: 1;
-  font-size: 0.72rem;
+}
+
+.cert-impact-recognition-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 900;
+  line-height: 1.25;
+  color: var(--cert-navy);
+}
+
+.cert-impact-recognition-level {
+  margin: 5px 0 0;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 0.58rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--cert-gold);
+}
+
+.cert-impact-recognition-tagline {
+  margin: 8px 0 0;
+  font-size: 0.68rem;
   font-style: italic;
   font-weight: 600;
   line-height: 1.45;
-  color: #f8fafc;
+  color: var(--cert-muted);
 }
 
 .cert-footer-row {
@@ -547,14 +564,27 @@
     box-shadow: none !important;
   }
 
-  .cert-metrics--with-badge {
-    display: grid !important;
-    grid-template-columns: repeat(4, minmax(0, 1fr)) minmax(0, 1.15fr) !important;
-  }
-
-  .cert-metrics--no-badge {
+  .cert-metrics {
     display: grid !important;
     grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  }
+
+  .cert-impact-recognition-body {
+    display: flex !important;
+    align-items: center !important;
+    gap: 12px !important;
+  }
+
+  .cert-impact-recognition-badge {
+    height: 5rem !important;
+  }
+
+  .cert-impact-recognition-title {
+    font-size: 11px !important;
+  }
+
+  .cert-impact-recognition-tagline {
+    font-size: 8px !important;
   }
 
   .cert-participant-table thead th,

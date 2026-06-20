@@ -85,13 +85,13 @@ const SECTION_TITLES: Record<number, string> = {
 };
 
 const LEVEL_RANGES: Record<number, string> = {
-    7: "90–100",
-    6: "80–89",
-    5: "70–79",
-    4: "60–69",
-    3: "50–59",
-    2: "40–49",
-    1: "0–39",
+    7: "92–100",
+    6: "84–91",
+    5: "75–83",
+    4: "67–74",
+    3: "58–66",
+    2: "48–57",
+    1: "0–47",
 };
 
 export function extractSection11JsonObject(raw: string): unknown | null {
@@ -400,7 +400,7 @@ function formatConcerns(concerns: unknown[] | undefined): {
 export function formatSection11V61AsSummaryText(evalData: Section11V61Evaluation): string {
     const cii = typeof evalData.cii === "number" ? Math.round(evalData.cii) : 0;
     const level = evalData.level ?? 0;
-    const levelLabel = evalData.level_label || "Participation Not Completed";
+    const levelLabel = evalData.level_label || "Participation Acknowledgement";
     const range = levelRange(level);
     const donorTier = evalData.section_scores?.section_6?.donor_tier;
     const version = evaluationVersionLabel(evalData);

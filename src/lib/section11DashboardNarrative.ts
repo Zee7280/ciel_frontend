@@ -1,5 +1,6 @@
 import { parseSection11AuditSummary } from "@/lib/parseCIIauditSummary";
 import { parseSection11V61Response } from "@/lib/parseSection11V61";
+import { parseSection11V81Response } from "@/lib/parseSection11V81";
 
 export type Section11DashboardHighlights = {
     finalScore?: string;
@@ -71,7 +72,7 @@ export function isComprehensiveSection11Report(fullText: string): boolean {
     if (!normalized) return false;
 
     if (/Component\s*[12]\s*[—–\-]/i.test(normalized)) return true;
-    if (/CII\s+EVALUATION\s*\(v6[\d.]+\)/i.test(normalized)) return true;
+    if (/CII\s+EVALUATION\s*\(v(?:6|8)[\d.]+\)/i.test(normalized)) return true;
 
     const sectionHits = (normalized.match(/\b(?:SECTION|Section)\s+\d+\b/gi) || []).length;
     return sectionHits >= 3 && normalized.length > 2000;
@@ -171,6 +172,28 @@ function extractCoverHighlights(normalized: string): Section11DashboardHighlight
  */
 export function buildSection11DashboardView(fullText: string): Section11DashboardView {
     const normalized = normalizeText(fullText);
+
+    const v81 = parseSection11V81Response(normalized);
+    if (v81) {
+        const feedback = v81.evaluation.student_feedback ?? v81.evaluation.student_facing_feedback;
+        const summaryLine =
+            v81.evaluation.student_feedback?.why_score_is_high_or_low ??
+            v81.evaluation.student_facing_feedback?.summary;
+        const narrative = [feedback?.opening_praise, summaryLine, feedback?.encouragement]
+            .map((part) => (typeof part === "string" ? part.trim() : ""))
+            .filter(Boolean)
+            .join("\n\n");
+        const cii = v81.evaluation.final_result?.cii_score;
+        return {
+            narrative: narrative || v81.summaryText.split("\n\n").slice(0, 2).join("\n\n"),
+            highlights: {
+                finalScore: typeof cii === "number" ? `${Math.round(cii)} / 100` : undefined,
+                band: v81.evaluation.final_result?.badge_title,
+                recommendedAction: v81.auditMeta.risk_level || undefined,
+            },
+            isComprehensiveReport: true,
+        };
+    }
 
     const v61 = parseSection11V61Response(normalized);
     if (v61) {

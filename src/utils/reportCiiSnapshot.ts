@@ -136,6 +136,7 @@ function parseCiiFromSummaryText(text: unknown): ReportCiiSnapshot | null {
     if (typeof text !== "string" || !text.trim()) return null;
 
     const patterns = [
+        /\bFinal\s+CII\s+Score\s*[:=-]?\s*(\d+(?:\.\d+)?)\s*(?:\/\s*100)?/i,
         /\bCII\s+Index\s+Score\s*[:=-]?\s*(\d+(?:\.\d+)?)\s*(?:\/\s*100)?/i,
         /\bCII\s+Score\s*[:=-]?\s*(\d+(?:\.\d+)?)\s*(?:\/\s*100)?/i,
         /\bcalculated\s+CII\s+index\s+(?:score\s+)?(?:is|of)?\s*[:=-]?\s*(\d+(?:\.\d+)?)\s*(?:\/\s*100)?/i,
