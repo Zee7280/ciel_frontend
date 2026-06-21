@@ -1,41 +1,26 @@
 import { NextResponse } from "next/server";
+import { fetchBackendPublicJson } from "@/utils/publicBffProxyFetch";
 
-export const revalidate = 120;
+export const dynamic = "force-dynamic";
 
-function resolveBackendUrl(): string | null {
-    const raw = process.env.NEXT_PUBLIC_BACKEND_BASE_URL?.trim();
-    if (!raw) return null;
-    const base = raw.replace(/\/+$/, "");
-    const withV1 = base.endsWith("/api/v1") ? base : `${base}/api/v1`;
-    return `${withV1}/public/tutorials`;
-}
+const EMPTY = { success: true as const, data: [] };
 
-/**
- * Public tutorial list for the marketing site (no JWT). Proxies Nest when configured.
- */
+type TutorialsPayload = { success?: boolean; data?: unknown };
+
+/** Public tutorial list for the marketing site (no JWT). Proxies Nest when configured. */
 export async function GET() {
-    const targetUrl = resolveBackendUrl();
-    const empty = { success: true as const, data: [] };
+    const result = await fetchBackendPublicJson<TutorialsPayload>("tutorials", {
+        logLabel: "public/tutorials",
+    });
 
-    if (!targetUrl) {
-        return NextResponse.json(empty);
+    if (!result.ok) {
+        return NextResponse.json(EMPTY);
     }
 
-    try {
-        const response = await fetch(targetUrl, {
-            method: "GET",
-            headers: { Accept: "application/json" },
-            next: { revalidate: 120 },
-        });
-        const payload = (await response.json().catch(() => null)) as { success?: boolean; data?: unknown } | null;
-
-        if (!response.ok || !payload?.success || !Array.isArray(payload.data)) {
-            return NextResponse.json(empty);
-        }
-
-        return NextResponse.json({ success: true, data: payload.data });
-    } catch (error) {
-        console.error("public/tutorials proxy:", error);
-        return NextResponse.json(empty);
+    const payload = result.data;
+    if (!payload?.success || !Array.isArray(payload.data)) {
+        return NextResponse.json(EMPTY);
     }
+
+    return NextResponse.json({ success: true, data: payload.data });
 }

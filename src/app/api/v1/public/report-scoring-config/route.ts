@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
+import { fetchBackendPublicJson } from "@/utils/publicBffProxyFetch";
 
-export const revalidate = 300;
+export const dynamic = "force-dynamic";
 
 type ReportScoringConfigPayload = {
     success: true;
@@ -49,37 +50,15 @@ const FALLBACK: ReportScoringConfigPayload = {
     },
 };
 
-function resolveBackendScoringUrl(): string | null {
-    const raw = process.env.NEXT_PUBLIC_BACKEND_BASE_URL?.trim();
-    if (!raw) return null;
-    const base = raw.replace(/\/+$/, "");
-    const withV1 = base.endsWith("/api/v1") ? base : `${base}/api/v1`;
-    return `${withV1}/public/report-scoring-config`;
-}
-
 /** Public CII weights + attendance cap. Proxies backend when configured. */
 export async function GET() {
-    const targetUrl = resolveBackendScoringUrl();
-    if (!targetUrl) {
+    const result = await fetchBackendPublicJson<ReportScoringConfigPayload>("report-scoring-config", {
+        logLabel: "public/report-scoring-config",
+    });
+
+    if (!result.ok || !result.data?.success || !result.data.data) {
         return NextResponse.json(FALLBACK);
     }
 
-    try {
-        const response = await fetch(targetUrl, {
-            method: "GET",
-            headers: { Accept: "application/json" },
-            next: { revalidate: 300 },
-        });
-
-        const payload = (await response.json().catch(() => null)) as ReportScoringConfigPayload | null;
-
-        if (!response.ok || !payload?.success || !payload.data) {
-            return NextResponse.json(FALLBACK);
-        }
-
-        return NextResponse.json(payload);
-    } catch (error) {
-        console.error("public/report-scoring-config proxy:", error);
-        return NextResponse.json(FALLBACK);
-    }
+    return NextResponse.json(result.data);
 }

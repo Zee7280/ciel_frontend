@@ -4,10 +4,16 @@ import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import Link from "next/link";
 import DataTable from "react-data-table-component";
 import type { TableColumn } from "react-data-table-component";
-import { Search, Filter, MoreVertical, Briefcase, MapPin, Eye, FileDown, Trash2, Users, Loader2, X, UserMinus, Pencil, Mail, ClipboardList, GitMerge } from "lucide-react";
+import { Search, Filter, MoreVertical, Briefcase, MapPin, Eye, FileDown, Trash2, Users, Loader2, X, UserMinus, Pencil, Mail, ClipboardList, GitMerge, Unlock, Lock } from "lucide-react";
 import { authenticatedFetch } from "@/utils/api";
 import { toast } from "sonner";
 import { ProjectTrackerModal } from "@/app/dashboard/admin/projects/ProjectTrackerModal";
+import {
+    attendanceUnlockLabel,
+    attendanceUnlockTone,
+    parseAdminEnrollmentAttendanceRows,
+    type AdminEnrollmentAttendanceMeta,
+} from "@/utils/adminEnrollmentAttendance";
 
 type AdminProjectRow = {
     id: string;
@@ -225,6 +231,7 @@ type TeamMemberRow = {
     department: string;
     yearOfStudy: string;
     academicIntegrationType: string;
+    attendanceMeta?: AdminEnrollmentAttendanceMeta;
 };
 
 type TeamMemberEditorDraft = {
@@ -303,6 +310,19 @@ function flattenMergeableEnrollments(rows: TeamOverviewRow[]): MergeableEnrollme
         }
     }
     return out;
+}
+
+function mergeTeamRowsWithEnrollmentAttendance(
+    rows: TeamOverviewRow[],
+    attendanceByParticipation: Map<string, AdminEnrollmentAttendanceMeta>,
+): TeamOverviewRow[] {
+    return rows.map((team) => ({
+        ...team,
+        members: team.members.map((member) => {
+            const attendanceMeta = attendanceByParticipation.get(member.id.trim());
+            return attendanceMeta ? { ...member, attendanceMeta } : member;
+        }),
+    }));
 }
 
 function teamOverviewRemoveGroupDisabled(team: TeamOverviewRow): boolean {
@@ -697,6 +717,7 @@ export default function AdminProjectsPage() {
     const [teamMergeLeadId, setTeamMergeLeadId] = useState("");
     const [teamMergeTargetTeamId, setTeamMergeTargetTeamId] = useState("");
     const [teamMergeSubmitting, setTeamMergeSubmitting] = useState(false);
+    const [attendanceToggleParticipationId, setAttendanceToggleParticipationId] = useState<string | null>(null);
     const [incompleteApplicantStatusFilter, setIncompleteApplicantStatusFilter] = useState<IncompleteApplicantStatusFilter>("all");
     /** Bumps when the modal closes or reopens so in-flight fetches cannot apply stale rows. */
     const incompleteApplicantsLoadSeq = useRef(0);
@@ -812,6 +833,7 @@ export default function AdminProjectsPage() {
         setTeamMergeLeadId("");
         setTeamMergeTargetTeamId("");
         setTeamMergeSubmitting(false);
+        setAttendanceToggleParticipationId(null);
     }, []);
 
     const loadTeamOverview = useCallback(async (opportunityId: string) => {
@@ -819,13 +841,16 @@ export default function AdminProjectsPage() {
         setTeamOverviewRows([]);
         setTeamOverviewSummary({ ...EMPTY_TEAM_OVERVIEW_SUMMARY });
         try {
-            const res = await authenticatedFetch(`/api/v1/admin/opportunities/${encodeURIComponent(opportunityId)}/teams`);
-            if (!res) {
+            const [teamsRes, enrollmentsRes] = await Promise.all([
+                authenticatedFetch(`/api/v1/admin/opportunities/${encodeURIComponent(opportunityId)}/teams`),
+                authenticatedFetch(`/api/v1/admin/projects/${encodeURIComponent(opportunityId)}/enrollments`),
+            ]);
+            if (!teamsRes) {
                 toast.error("Could not load team overview");
                 return;
             }
-            const data = await res.json().catch(() => ({}));
-            if (!res.ok) {
+            const data = await teamsRes.json().catch(() => ({}));
+            if (!teamsRes.ok) {
                 toast.error(
                     typeof (data as { message?: string }).message === "string"
                         ? (data as { message: string }).message
@@ -833,7 +858,17 @@ export default function AdminProjectsPage() {
                 );
                 return;
             }
-            const mappedRows = extractTeamRows(data);
+
+            let attendanceByParticipation = new Map<string, AdminEnrollmentAttendanceMeta>();
+            if (enrollmentsRes?.ok) {
+                const enrollmentBody = await enrollmentsRes.json().catch(() => ({}));
+                attendanceByParticipation = parseAdminEnrollmentAttendanceRows(enrollmentBody);
+            }
+
+            const mappedRows = mergeTeamRowsWithEnrollmentAttendance(
+                extractTeamRows(data),
+                attendanceByParticipation,
+            );
             setTeamOverviewRows(mappedRows);
             setTeamOverviewSummary(extractTeamSummary(data, mappedRows));
         } catch {
@@ -928,6 +963,48 @@ export default function AdminProjectsPage() {
             toast.error("Could not remove member");
         } finally {
             setDeletingMemberId(null);
+        }
+    };
+
+    const handleToggleMemberAttendance = async (member: TeamMemberRow, enable: boolean) => {
+        if (!teamOverviewModal) return;
+        if (!isMergeableTeamMember(member)) {
+            toast.error("Attendance override applies only to enrolled participation seats.");
+            return;
+        }
+
+        const participationId = member.id.trim();
+        setAttendanceToggleParticipationId(participationId);
+        try {
+            const res = await authenticatedFetch(
+                `/api/v1/admin/participations/${encodeURIComponent(participationId)}/attendance-editable`,
+                {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ editable: enable }),
+                },
+            );
+            const data = res ? await res.json().catch(() => ({})) : {};
+            if (res?.ok) {
+                toast.success(
+                    typeof (data as { message?: string }).message === "string"
+                        ? (data as { message: string }).message
+                        : enable
+                          ? "Attendance editing enabled for this member"
+                          : "Admin attendance override removed",
+                );
+                await loadTeamOverview(teamOverviewModal.opportunityId);
+            } else {
+                toast.error(
+                    typeof (data as { message?: string }).message === "string"
+                        ? (data as { message: string }).message
+                        : "Could not update attendance access",
+                );
+            }
+        } catch {
+            toast.error("Could not update attendance access");
+        } finally {
+            setAttendanceToggleParticipationId(null);
         }
     };
 
@@ -2031,9 +2108,11 @@ export default function AdminProjectsPage() {
                                 <h2 id="team-overview-title" className="text-lg font-extrabold text-slate-900 tracking-tight">
                                     Teams &amp; enrollments
                                 </h2>
-                                <p className="text-sm text-slate-500 mt-0.5 line-clamp-2">
+                                <p className="text-sm text-slate-500 mt-0.5 line-clamp-3">
                                     Team and individual participation plus report progress for{" "}
-                                    <span className="font-semibold text-slate-700">{teamOverviewModal.title}</span>
+                                    <span className="font-semibold text-slate-700">{teamOverviewModal.title}</span>.
+                                    Use <span className="font-semibold text-emerald-700">Enable attendance</span> when gates
+                                    block a member from logging hours.
                                 </p>
                             </div>
                             <button
@@ -2266,7 +2345,7 @@ export default function AdminProjectsPage() {
                                                 </div>
                                             </div>
                                             <div className="overflow-x-auto">
-                                                <table className="min-w-[1100px] w-full text-left text-sm">
+                                                <table className="min-w-[1280px] w-full text-left text-sm">
                                                     <thead className="bg-white border-b border-slate-100">
                                                         <tr>
                                                             <th className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wide text-slate-500">
@@ -2290,6 +2369,9 @@ export default function AdminProjectsPage() {
                                                             <th className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wide text-slate-500">
                                                                 Availability
                                                             </th>
+                                                            <th className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wide text-slate-500">
+                                                                Attendance
+                                                            </th>
                                                             <th className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wide text-slate-500 text-right">
                                                                 Action
                                                             </th>
@@ -2298,7 +2380,7 @@ export default function AdminProjectsPage() {
                                                     <tbody className="divide-y divide-slate-100">
                                                         {team.members.length === 0 ? (
                                                             <tr>
-                                                                <td colSpan={8} className="px-4 py-4 text-xs text-slate-500">
+                                                                <td colSpan={9} className="px-4 py-4 text-xs text-slate-500">
                                                                     No members found.
                                                                 </td>
                                                             </tr>
@@ -2309,6 +2391,14 @@ export default function AdminProjectsPage() {
                                                                     member.department,
                                                                     member.academicIntegrationType,
                                                                 ].filter(Boolean);
+                                                                const attendanceMeta = member.attendanceMeta;
+                                                                const attendanceTone = attendanceUnlockTone(attendanceMeta);
+                                                                const attendanceLabel = attendanceUnlockLabel(attendanceMeta);
+                                                                const canToggleAttendance = isMergeableTeamMember(member);
+                                                                const attendanceBusy = attendanceToggleParticipationId === member.id;
+                                                                const adminOverrideOn =
+                                                                    attendanceMeta?.adminAttendanceEditable === true ||
+                                                                    attendanceMeta?.attendanceUnlock?.admin_override === true;
                                                                 return (
                                                                     <tr key={member.id}>
                                                                         <td className="px-4 py-3">
@@ -2355,6 +2445,59 @@ export default function AdminProjectsPage() {
                                                                             >
                                                                                 {member.reportAvailable ? "available" : "unavailable"}
                                                                             </span>
+                                                                        </td>
+                                                                        <td className="px-4 py-3 align-top">
+                                                                            <div className="space-y-2">
+                                                                                <span
+                                                                                    className={`inline-flex px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wide border ${
+                                                                                        attendanceTone === "enabled"
+                                                                                            ? "bg-emerald-50 text-emerald-800 border-emerald-100"
+                                                                                            : attendanceTone === "unlocked"
+                                                                                              ? "bg-blue-50 text-blue-800 border-blue-100"
+                                                                                              : attendanceTone === "locked"
+                                                                                                ? "bg-amber-50 text-amber-800 border-amber-100"
+                                                                                                : "bg-slate-100 text-slate-600 border-slate-200"
+                                                                                    }`}
+                                                                                >
+                                                                                    {attendanceLabel}
+                                                                                </span>
+                                                                                {canToggleAttendance ? (
+                                                                                    <button
+                                                                                        type="button"
+                                                                                        onClick={() =>
+                                                                                            void handleToggleMemberAttendance(
+                                                                                                member,
+                                                                                                !adminOverrideOn,
+                                                                                            )
+                                                                                        }
+                                                                                        disabled={attendanceBusy || memberSaveLoading}
+                                                                                        title={
+                                                                                            adminOverrideOn
+                                                                                                ? "Remove admin attendance override"
+                                                                                                : "Allow this member to log attendance even when identity or verification gates are incomplete"
+                                                                                        }
+                                                                                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-100 hover:bg-emerald-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                                                    >
+                                                                                        {attendanceBusy ? (
+                                                                                            <>
+                                                                                                <Loader2 className="w-3 h-3 animate-spin" /> Saving…
+                                                                                            </>
+                                                                                        ) : adminOverrideOn ? (
+                                                                                            <>
+                                                                                                <Lock className="w-3 h-3" /> Revoke access
+                                                                                            </>
+                                                                                        ) : (
+                                                                                            <>
+                                                                                                <Unlock className="w-3 h-3" /> Enable attendance
+                                                                                            </>
+                                                                                        )}
+                                                                                    </button>
+                                                                                ) : (
+                                                                                    <span className="block text-[10px] text-slate-400">
+                                                                                        Pending pipeline only
+                                                                                    </span>
+                                                                                )}
+                                                                            </div>
                                                                         </td>
                                                                         <td className="px-4 py-3 text-right">
                                                                             <div className="inline-flex flex-wrap items-center justify-end gap-1">

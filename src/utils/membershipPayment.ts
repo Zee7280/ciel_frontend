@@ -6,7 +6,7 @@ export function notifyCielUserUpdated(): void {
     window.dispatchEvent(new Event("ciel_user_updated"));
 }
 
-/** True when university/corporate account must pay membership before partner tools unlock. */
+/** True when account must pay membership before partner tools unlock (university, corporate, or NGO when admin requires). */
 export function partnerNeedsMembershipPayment(user: Record<string, unknown> | null | undefined): boolean {
     if (!user) return false;
     if (user.requires_membership_payment === true) return true;

@@ -231,6 +231,40 @@ export default function Section1Participation({ projectData }: { projectData?: a
         }
     }, [isTeamMemberAttendanceOnly, internalStep]);
 
+    /** When CIEL admin enabled attendance override, unlock Section 1 logging for this project. */
+    React.useEffect(() => {
+        if (!projectIdFromUrl || isReadOnly) return;
+        let cancelled = false;
+        void (async () => {
+            try {
+                const res = await authenticatedFetch(
+                    `/api/v1/student/projects/${encodeURIComponent(projectIdFromUrl)}/section1-analytics`,
+                    {},
+                    { redirectToLogin: false },
+                );
+                if (!res?.ok || cancelled) return;
+                const json = (await res.json().catch(() => null)) as Record<string, unknown> | null;
+                const fields =
+                    json?.data && typeof json.data === "object"
+                        ? (json.data as Record<string, unknown>)
+                        : json;
+                const unlock =
+                    fields?.attendance_logging_unlock_status &&
+                    typeof fields.attendance_logging_unlock_status === "object"
+                        ? (fields.attendance_logging_unlock_status as Record<string, unknown>)
+                        : null;
+                if (unlock?.admin_override === true && unlock?.unlocked === true) {
+                    setParticipationUnlocked(true);
+                }
+            } catch {
+                /* non-fatal */
+            }
+        })();
+        return () => {
+            cancelled = true;
+        };
+    }, [projectIdFromUrl, isReadOnly, setParticipationUnlocked]);
+
     // Identify current user for labeling
     React.useEffect(() => {
         const storedUser = localStorage.getItem("user") || localStorage.getItem("ciel_user");

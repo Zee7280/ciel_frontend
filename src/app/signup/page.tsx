@@ -77,11 +77,11 @@ function SignUpContent() {
 
 
     const roles = [
-        { id: "student", label: "Student", icon: GraduationCap, desc: "Join verified projects, document your community impact, and earn SDG‑aligned records.", color: "blue" },
-        { id: "faculty", label: "Faculty / Academic Staff", icon: User, desc: "Oversee student engagement, validate learning and impact, and support SDG‑ready reporting.", color: "amber" },
-        { id: "university", label: "University / Institution", icon: School, desc: "Monitor engagement, aggregate verified impact data, and generate institutional SDG reports.", color: "indigo" },
-        { id: "ngo", label: "NGO / Non-Profit", icon: Heart, desc: "Post SDG‑aligned opportunities, engage students, and receive verified impact reports.", color: "green" },
-        { id: "corporate", label: "Corporate / Private", icon: Building2, desc: "Support impactful projects and track CSR goals aligned with SDGs.", color: "slate" },
+        { id: "student", label: "I'm a student", icon: GraduationCap, desc: "Join verified projects, document your community impact, and earn SDG‑aligned records.", color: "blue" },
+        { id: "faculty", label: "faculty", icon: User, desc: "Oversee student engagement, validate learning and impact, and support SDG‑ready reporting.", color: "amber" },
+        { id: "university", label: "uni/Institution admin", icon: School, desc: "Monitor engagement, aggregate verified impact data, and generate institutional SDG reports.", color: "indigo" },
+        { id: "ngo", label: "ngo admin", icon: Heart, desc: "Post SDG‑aligned opportunities, engage students, and receive verified impact reports.", color: "green" },
+        { id: "corporate", label: "corporate admin", icon: Building2, desc: "Support impactful projects and track CSR goals aligned with SDGs.", color: "slate" },
     ];
 
     const handleRoleSelect = (selectedRole: any) => {
@@ -353,7 +353,7 @@ function SignUpContent() {
                                 )}
                             </h2>
                             <div className="space-y-3">
-                                <h3 className="text-sm font-black text-white/90 uppercase tracking-widest">{displayTitle}</h3>
+                                <h3 className="text-sm font-bold text-white/90">{displayTitle}</h3>
                                 <p className="text-slate-300/70 text-sm font-medium leading-relaxed max-w-sm">
                                     {step === 'role'
                                         ? "Join Pakistan's leading platform for university-led community impact and SDG-aligned growth."
@@ -412,7 +412,7 @@ function SignUpContent() {
                                                 <r.icon className="w-7 h-7" />
                                             </div>
                                             <div className="flex-1">
-                                                <h4 className="text-sm font-black uppercase tracking-widest text-[#1E293B] mb-0.5">{r.label}</h4>
+                                                <h4 className="text-base font-bold text-[#1E293B] mb-0.5">{r.label}</h4>
                                                 <p className="text-[10px] font-black text-slate-400 group-hover:text-emerald-600/70 transition-colors uppercase tracking-widest">Start impacting today</p>
                                             </div>
                                             <div className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center opacity-0 group-hover:opacity-100 -translate-x-4 group-hover:translate-x-0 transition-all duration-300 border border-slate-100 group-hover:bg-white group-hover:border-emerald-200">
@@ -435,7 +435,7 @@ function SignUpContent() {
                             <form onSubmit={handleSubmit} className="space-y-6 animate-in fade-in slide-in-from-right-8 duration-500">
                                 <div className="mb-8 text-center lg:text-left">
                                     <h3 className="text-4xl font-black text-[#1E293B] tracking-tight mb-2">Credentials</h3>
-                                    <p className="text-slate-500 font-medium text-sm italic">Verify your details as <span className="text-emerald-600 font-black uppercase tracking-tight">{roles.find(r => r.id === role)?.label}</span></p>
+                                    <p className="text-slate-500 font-medium text-sm italic">Verify your details as <span className="text-emerald-600 font-bold">{roles.find(r => r.id === role)?.label}</span></p>
                                 </div>
 
                                 <div className="space-y-6">

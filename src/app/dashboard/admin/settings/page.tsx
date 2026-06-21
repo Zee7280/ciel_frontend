@@ -1,13 +1,19 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Save, Loader2, Shield, Globe, Mail, FileCheck } from "lucide-react";
+import { Save, Loader2, Shield, Globe, Mail, FileCheck, CreditCard } from "lucide-react";
 import { authenticatedFetch } from "@/utils/api";
 import { toast } from "sonner";
 import {
     parseReportPartnerApprovalSettingValue,
     REPORT_PARTNER_APPROVAL_SETTING_KEY,
 } from "@/utils/reportPartnerApprovalDisplay";
+import {
+    MEMBERSHIP_FEE_PARTNER_PKR_KEY,
+    parseMembershipFeePkrSettingValue,
+    parsePartnerMembershipRequiredSettingValue,
+    PARTNER_MEMBERSHIP_REQUIRED_KEY,
+} from "@/utils/partnerMembershipDisplay";
 
 type SettingRow = { key?: string; value?: string };
 
@@ -23,7 +29,11 @@ export default function AdminSettingsPage() {
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
     const [isSavingReportPartnerGate, setIsSavingReportPartnerGate] = useState(false);
+    const [isSavingPartnerMembershipGate, setIsSavingPartnerMembershipGate] = useState(false);
+    const [isSavingPartnerMembershipFee, setIsSavingPartnerMembershipFee] = useState(false);
     const [reportPartnerApprovalEnabled, setReportPartnerApprovalEnabled] = useState(true);
+    const [partnerMembershipRequired, setPartnerMembershipRequired] = useState(false);
+    const [partnerMembershipFeePkr, setPartnerMembershipFeePkr] = useState("1000");
     const [settings, setSettings] = useState({
         site_name: "",
         contact_email: "",
@@ -42,6 +52,12 @@ export default function AdminSettingsPage() {
                     const map = settingsRowsToMap(data.data as SettingRow[]);
                     setReportPartnerApprovalEnabled(
                         parseReportPartnerApprovalSettingValue(map[REPORT_PARTNER_APPROVAL_SETTING_KEY], true),
+                    );
+                    setPartnerMembershipRequired(
+                        parsePartnerMembershipRequiredSettingValue(map[PARTNER_MEMBERSHIP_REQUIRED_KEY], false),
+                    );
+                    setPartnerMembershipFeePkr(
+                        String(parseMembershipFeePkrSettingValue(map[MEMBERSHIP_FEE_PARTNER_PKR_KEY], 1000)),
                     );
                 } else if (data.success && data.data && typeof data.data === "object" && !Array.isArray(data.data)) {
                     setSettings((prev) => ({ ...prev, ...data.data }));
@@ -94,6 +110,76 @@ export default function AdminSettingsPage() {
     const handleReportPartnerToggle = (enabled: boolean) => {
         if (isSavingReportPartnerGate || enabled === reportPartnerApprovalEnabled) return;
         void persistReportPartnerApproval(enabled);
+    };
+
+    const persistPartnerMembershipRequired = async (enabled: boolean) => {
+        setIsSavingPartnerMembershipGate(true);
+        try {
+            const res = await authenticatedFetch(`/api/v1/admin/settings`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    key: PARTNER_MEMBERSHIP_REQUIRED_KEY,
+                    value: enabled ? "true" : "false",
+                }),
+            });
+            if (res?.ok) {
+                setPartnerMembershipRequired(enabled);
+                toast.success(
+                    enabled
+                        ? "Partner membership fee is ON — new NGO/partner signups must pay before full portal access."
+                        : "Partner membership fee is OFF — new partners register without a membership step.",
+                );
+            } else {
+                const err = await res?.json().catch(() => ({}));
+                toast.error((err as { message?: string }).message || "Failed to update partner membership setting");
+                await fetchSettings();
+            }
+        } catch (error) {
+            console.error("Failed to update partner membership setting", error);
+            toast.error("Failed to update partner membership setting");
+            await fetchSettings();
+        } finally {
+            setIsSavingPartnerMembershipGate(false);
+        }
+    };
+
+    const handlePartnerMembershipToggle = (enabled: boolean) => {
+        if (isSavingPartnerMembershipGate || enabled === partnerMembershipRequired) return;
+        void persistPartnerMembershipRequired(enabled);
+    };
+
+    const persistPartnerMembershipFee = async () => {
+        const amount = parseMembershipFeePkrSettingValue(partnerMembershipFeePkr, 0);
+        if (!Number.isFinite(amount) || amount <= 0) {
+            toast.error("Enter a valid membership fee amount in PKR");
+            return;
+        }
+        setIsSavingPartnerMembershipFee(true);
+        try {
+            const res = await authenticatedFetch(`/api/v1/admin/settings`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    key: MEMBERSHIP_FEE_PARTNER_PKR_KEY,
+                    value: String(amount),
+                }),
+            });
+            if (res?.ok) {
+                setPartnerMembershipFeePkr(String(amount));
+                toast.success(`Partner membership fee updated to PKR ${amount.toLocaleString()}`);
+            } else {
+                const err = await res?.json().catch(() => ({}));
+                toast.error((err as { message?: string }).message || "Failed to update partner membership fee");
+                await fetchSettings();
+            }
+        } catch (error) {
+            console.error("Failed to update partner membership fee", error);
+            toast.error("Failed to update partner membership fee");
+            await fetchSettings();
+        } finally {
+            setIsSavingPartnerMembershipFee(false);
+        }
     };
 
     const handleSave = async () => {
@@ -183,6 +269,82 @@ export default function AdminSettingsPage() {
                             Current: {reportPartnerApprovalEnabled ? "Enabled" : "Disabled"}
                         </p>
                     )}
+                </div>
+
+                <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm sm:p-6">
+                    <h3 className="mb-6 flex items-center gap-2 text-lg font-bold text-slate-900">
+                        <CreditCard className="h-5 w-5 text-emerald-600" /> Partner registration membership
+                    </h3>
+                    <div className="flex items-start justify-between gap-4 rounded-xl border border-emerald-100 bg-emerald-50/40 p-4">
+                        <div className="min-w-0">
+                            <div className="font-bold text-slate-900">Require membership fee for new NGO / partners</div>
+                            <p className="mt-1 text-sm leading-relaxed text-slate-600">
+                                When <strong>on</strong>, new partner signups start as pending membership payment and must
+                                submit bank proof (or wait for admin activation) before using the partner portal. When{" "}
+                                <strong>off</strong>, partners register without this step — same as current production default.
+                            </p>
+                            <p className="mt-2 text-xs font-medium text-slate-500">
+                                University and corporate accounts always require membership fee regardless of this toggle.
+                            </p>
+                        </div>
+                        <label
+                            className={`relative inline-flex shrink-0 cursor-pointer items-center ${
+                                isSavingPartnerMembershipGate ? "pointer-events-none opacity-60" : ""
+                            }`}
+                        >
+                            <input
+                                type="checkbox"
+                                checked={partnerMembershipRequired}
+                                disabled={isSavingPartnerMembershipGate}
+                                onChange={(e) => handlePartnerMembershipToggle(e.target.checked)}
+                                className="peer sr-only"
+                            />
+                            <div className="peer h-6 w-11 rounded-full bg-slate-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all peer-checked:bg-emerald-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-emerald-100"></div>
+                        </label>
+                    </div>
+                    {isSavingPartnerMembershipGate ? (
+                        <p className="mt-3 flex items-center gap-2 text-xs font-medium text-emerald-700">
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            Saving…
+                        </p>
+                    ) : (
+                        <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                            Current: {partnerMembershipRequired ? "Required on signup" : "Not required on signup"}
+                        </p>
+                    )}
+
+                    <div className="mt-5 flex flex-col gap-3 rounded-xl border border-slate-100 bg-slate-50/80 p-4 sm:flex-row sm:items-end">
+                        <div className="min-w-0 flex-1">
+                            <label className="mb-2 block text-sm font-bold text-slate-700">
+                                Partner membership fee (PKR)
+                            </label>
+                            <input
+                                type="number"
+                                min={1}
+                                step={1}
+                                value={partnerMembershipFeePkr}
+                                onChange={(e) => setPartnerMembershipFeePkr(e.target.value)}
+                                disabled={isSavingPartnerMembershipFee}
+                                className="w-full max-w-xs rounded-lg border border-slate-200 px-4 py-2 outline-none transition-colors focus:border-emerald-500"
+                            />
+                            <p className="mt-1 text-xs text-slate-500">
+                                Used when partner membership is required. Shown on the partner bank-transfer screen via API.
+                            </p>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() => void persistPartnerMembershipFee()}
+                            disabled={isSavingPartnerMembershipFee}
+                            className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-bold text-white transition-all hover:bg-emerald-700 disabled:opacity-70"
+                        >
+                            {isSavingPartnerMembershipFee ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                                <Save className="h-4 w-4" />
+                            )}
+                            Save fee
+                        </button>
+                    </div>
                 </div>
 
                 <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm sm:p-6">
