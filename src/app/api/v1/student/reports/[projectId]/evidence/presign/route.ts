@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { resolveBackendApiV1Base } from "@/utils/backendApiV1Base";
 
 type RouteCtx = { params: Promise<{ projectId: string }> };
 
@@ -6,8 +7,8 @@ type RouteCtx = { params: Promise<{ projectId: string }> };
 export async function POST(request: Request, ctx: RouteCtx) {
     try {
         const { projectId } = await ctx.params;
-        const backendBase = process.env.NEXT_PUBLIC_BACKEND_BASE_URL?.replace(/\/+$/, "");
-        if (!backendBase) {
+        const base = resolveBackendApiV1Base();
+        if (!base) {
             return NextResponse.json(
                 { success: false, message: "Backend URL is not configured" },
                 { status: 500 },
@@ -16,7 +17,7 @@ export async function POST(request: Request, ctx: RouteCtx) {
         const authHeader = request.headers.get("Authorization");
         const bodyText = await request.text();
         const response = await fetch(
-            `${backendBase}/api/v1/student/reports/${encodeURIComponent(projectId)}/evidence/presign`,
+            `${base}/student/reports/${encodeURIComponent(projectId)}/evidence/presign`,
             {
                 method: "POST",
                 headers: {

@@ -223,8 +223,7 @@ function LoginContent() {
         setFpError(null);
         setForgotSuccess(null);
         try {
-            const backendUrl = process.env.NEXT_PUBLIC_BACKEND_BASE_URL;
-            const res = await fetch(`${backendUrl}/auth/forgot-password`, {
+            const res = await fetch("/api/v1/auth/forgot-password", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ email: forgotEmail.trim().toLowerCase() }),
@@ -256,8 +255,7 @@ function LoginContent() {
         setIsLoading(true);
         setFpError(null);
         try {
-            const backendUrl = process.env.NEXT_PUBLIC_BACKEND_BASE_URL;
-            const res = await fetch(`${backendUrl}/auth/reset-password`, {
+            const res = await fetch("/api/v1/auth/reset-password", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ token: resetToken, newPassword }),
@@ -282,10 +280,7 @@ function LoginContent() {
         setError(null);
 
         try {
-            // API call to authenticate
-            // In a real app, this would be your backend endpoint
-            const backendUrl = process.env.NEXT_PUBLIC_BACKEND_BASE_URL;
-            const loginUrl = `${backendUrl}/auth/login`;
+            const loginUrl = "/api/v1/auth/login";
             console.log("Login URL:", loginUrl);
             const response = await fetch(loginUrl, {
                 method: "POST",
@@ -337,7 +332,7 @@ function LoginContent() {
 
                 // Fetch full user profile immediately to cache it
                 try {
-                    const profileRes = await fetch(`${backendUrl}/user/me`, {
+                    const profileRes = await fetch("/api/v1/users/me", {
                         method: "GET",
                         headers: {
                             "Content-Type": "application/json",

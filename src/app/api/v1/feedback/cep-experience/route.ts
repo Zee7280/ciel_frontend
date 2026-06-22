@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
+import { resolveBackendApiV1Base } from "@/utils/backendApiV1Base";
 
 export async function POST(request: Request) {
     try {
-        const backendBase = process.env.NEXT_PUBLIC_BACKEND_BASE_URL?.replace(/\/+$/, "");
-        if (!backendBase) {
+        const base = resolveBackendApiV1Base();
+        if (!base) {
             return NextResponse.json(
                 { success: false, message: "Backend URL is not configured" },
                 { status: 500 },
@@ -11,7 +12,7 @@ export async function POST(request: Request) {
         }
         const authHeader = request.headers.get("Authorization");
         const bodyText = await request.text();
-        const response = await fetch(`${backendBase}/api/v1/feedback/cep-experience`, {
+        const response = await fetch(`${base}/feedback/cep-experience`, {
             method: "POST",
             headers: {
                 Authorization: authHeader || "",

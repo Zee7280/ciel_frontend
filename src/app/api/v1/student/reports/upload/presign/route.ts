@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
+import { resolveBackendApiV1Base } from "@/utils/backendApiV1Base";
 
 /** JSON-only proxy — avoids ~1MB gateway limit on multipart; browser uploads to S3 via presigned PUT. */
 export async function POST(request: Request) {
     try {
-        const backendBase = process.env.NEXT_PUBLIC_BACKEND_BASE_URL?.replace(/\/+$/, "");
-        if (!backendBase) {
+        const base = resolveBackendApiV1Base();
+        if (!base) {
             return NextResponse.json(
                 { success: false, message: "Backend URL is not configured" },
                 { status: 500 },
@@ -12,7 +13,7 @@ export async function POST(request: Request) {
         }
         const authHeader = request.headers.get("Authorization");
         const bodyText = await request.text();
-        const response = await fetch(`${backendBase}/api/v1/student/reports/upload/presign`, {
+        const response = await fetch(`${base}/student/reports/upload/presign`, {
             method: "POST",
             headers: {
                 Authorization: authHeader || "",

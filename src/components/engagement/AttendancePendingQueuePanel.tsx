@@ -21,7 +21,7 @@ import clsx from "clsx";
 import {
     PARTNER_ATTENDANCE_ALL_TEAMS,
     PARTNER_ATTENDANCE_AWAIT_TEAM,
-    partnerTeamBucketKey,
+    filterPendingRowsByTeamScope,
 } from "@/utils/engagementPartnerTeamScope";
 
 type PendingRow = Record<string, unknown>;
@@ -116,6 +116,8 @@ export default function AttendancePendingQueuePanel({
     partnerSelectedMemberKey,
     /** Partner: scope queue to a team bucket from project roster; `*` = all; await = no rows until pick. */
     partnerScopedTeamFilter,
+    /** Raw rows from `GET /engagement/project/:id/team` — used to match pending logs when participant.teamId is missing. */
+    partnerTeamRosterRows,
     /** Faculty wide layout: table body scrolls inside the card (viewport-height column). */
     scrollTableInPanel = false,
 }: {
@@ -133,6 +135,7 @@ export default function AttendancePendingQueuePanel({
     /** Partner only: when set, table shows only this participant's sessions (key from `PartnerParticipantChip`). */
     partnerSelectedMemberKey?: string;
     partnerScopedTeamFilter?: string;
+    partnerTeamRosterRows?: unknown[];
     scrollTableInPanel?: boolean;
 }) {
     const isPartner = presentation === "partner";
@@ -189,15 +192,12 @@ export default function AttendancePendingQueuePanel({
     const rowsAfterTeamScope = useMemo(() => {
         if (!isPartner) return rows;
         const scope = partnerScopedTeamFilter ?? PARTNER_ATTENDANCE_ALL_TEAMS;
-        if (scope === PARTNER_ATTENDANCE_AWAIT_TEAM) return [];
-        if (scope === "" || scope === PARTNER_ATTENDANCE_ALL_TEAMS) return rows;
-        return rows.filter((raw) => {
-            const ro = raw as Record<string, unknown>;
-            const p = ro.participant;
-            if (!p || typeof p !== "object") return false;
-            return partnerTeamBucketKey(p as Record<string, unknown>) === scope;
-        });
-    }, [rows, isPartner, partnerScopedTeamFilter]);
+        return filterPendingRowsByTeamScope(
+            rows as Record<string, unknown>[],
+            scope,
+            partnerTeamRosterRows ?? [],
+        );
+    }, [rows, isPartner, partnerScopedTeamFilter, partnerTeamRosterRows]);
 
     useEffect(() => {
         if (!isPartner || !partnerSnapRef.current) return;

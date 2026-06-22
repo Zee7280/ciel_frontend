@@ -1,6 +1,25 @@
 import { clearStudentDashboardCache } from "@/utils/student-dashboard-cache";
 
-const BASE_URL = process.env.NEXT_PUBLIC_APP_API_BASE_URL || process.env.NEXT_PUBLIC_BACKEND_BASE_URL || "http://localhost:3000";
+/**
+ * Base URL for `authenticatedFetch` when the path starts with `/`.
+ * - In the browser, use same-origin (empty base) so requests hit Next.js `app/api/v1/*`
+ *   proxies — they forward `Authorization` to Nest. Avoids CORS when NEXT_PUBLIC_BACKEND_BASE_URL
+ *   points at cielbackend-ecru.vercel.app while the UI is on cielpk.com.
+ * - Override with `NEXT_PUBLIC_APP_API_BASE_URL` only when the UI is served from a different origin.
+ * - SSR fallback uses backend URL (this helper is almost always used from client-only code).
+ */
+function resolveAuthenticatedFetchBaseUrl(): string {
+    const appApi = process.env.NEXT_PUBLIC_APP_API_BASE_URL?.trim().replace(/\/+$/, "");
+    if (appApi) return appApi;
+
+    if (typeof window !== "undefined") {
+        return "";
+    }
+
+    const backend =
+        process.env.NEXT_PUBLIC_BACKEND_BASE_URL?.trim().replace(/\/+$/, "") || "http://localhost:3000";
+    return backend.endsWith("/api/v1") ? backend : `${backend}/api/v1`;
+}
 
 /** Decode JWT payload segment (base64url per RFC 7519). Plain `atob` fails on `-` / `_` and unpadded segments. */
 function decodeJwtPayloadJson(token: string): { exp?: number } | null {
@@ -67,10 +86,12 @@ export async function authenticatedFetch(
 
     let fullUrl = url;
     if (url.startsWith("/")) {
-        const cleanBase = BASE_URL.replace(/\/$/, "");
+        const cleanBase = resolveAuthenticatedFetchBaseUrl().replace(/\/$/, "");
         const cleanPath = url.startsWith("/") ? url : `/${url}`;
 
-        if (cleanBase.endsWith("/api/v1") && cleanPath.startsWith("/api/v1")) {
+        if (!cleanBase) {
+            fullUrl = cleanPath;
+        } else if (cleanBase.endsWith("/api/v1") && cleanPath.startsWith("/api/v1")) {
             fullUrl = `${cleanBase}${cleanPath.substring(7)}`;
         } else {
             fullUrl = `${cleanBase}${cleanPath}`;

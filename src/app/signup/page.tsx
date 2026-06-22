@@ -203,9 +203,8 @@ function SignUpContent() {
             if (!verifyRes.ok) throw new Error(verifyData.error || "Invalid or expired OTP");
 
             // OTP verified — now create account
-            const backendUrl = process.env.NEXT_PUBLIC_BACKEND_BASE_URL;
             const { phoneCountryKey, ...signupFields } = formData;
-            const signupRes = await fetch(`${backendUrl}/auth/signup`, {
+            const signupRes = await fetch("/api/v1/auth/signup", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({

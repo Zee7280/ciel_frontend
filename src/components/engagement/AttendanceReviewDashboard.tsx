@@ -122,6 +122,7 @@ export default function AttendanceReviewDashboard({
     const [partnerQueueRows, setPartnerQueueRows] = useState(0);
     const [selectedParticipantKey, setSelectedParticipantKey] = useState("");
     const [partnerTeamBuckets, setPartnerTeamBuckets] = useState<PartnerTeamBucket[]>([]);
+    const [partnerTeamRows, setPartnerTeamRows] = useState<Record<string, unknown>[]>([]);
     const [partnerTeamsLoading, setPartnerTeamsLoading] = useState(false);
     const [selectedTeamKey, setSelectedTeamKey] = useState(PARTNER_ATTENDANCE_AWAIT_TEAM);
 
@@ -160,6 +161,7 @@ export default function AttendanceReviewDashboard({
         setPartnerQueueRows(0);
         setSelectedParticipantKey("");
         setPartnerTeamBuckets([]);
+        setPartnerTeamRows([]);
         setSelectedTeamKey(PARTNER_ATTENDANCE_AWAIT_TEAM);
     }, [projectId, isPartner]);
 
@@ -177,15 +179,19 @@ export default function AttendanceReviewDashboard({
                 if (!res?.ok) {
                     if (!cancelled) {
                         setPartnerTeamBuckets([]);
+                        setPartnerTeamRows([]);
                         setSelectedTeamKey(PARTNER_ATTENDANCE_ALL_TEAMS);
                     }
                     return;
                 }
                 const json = await res.json();
-                const teamRows = Array.isArray(json?.data) ? json.data : Array.isArray(json) ? json : [];
+                const teamRows = (Array.isArray(json?.data) ? json.data : Array.isArray(json) ? json : []).filter(
+                    (x: unknown) => x && typeof x === "object",
+                ) as Record<string, unknown>[];
                 const buckets = buildPartnerTeamBuckets(teamRows);
                 if (cancelled) return;
                 setPartnerTeamBuckets(buckets);
+                setPartnerTeamRows(teamRows);
                 if (buckets.length === 0) {
                     setSelectedTeamKey(PARTNER_ATTENDANCE_ALL_TEAMS);
                 } else if (buckets.length === 1) {
@@ -196,6 +202,7 @@ export default function AttendanceReviewDashboard({
             } catch {
                 if (!cancelled) {
                     setPartnerTeamBuckets([]);
+                    setPartnerTeamRows([]);
                     setSelectedTeamKey(PARTNER_ATTENDANCE_ALL_TEAMS);
                 }
             } finally {
@@ -1048,6 +1055,7 @@ export default function AttendanceReviewDashboard({
                                         onPartnerQueueSnapshot={isPartner ? handlePartnerQueueSnapshot : undefined}
                                         partnerSelectedMemberKey={isPartner ? selectedParticipantKey : undefined}
                                         partnerScopedTeamFilter={isPartner ? selectedTeamKey : undefined}
+                                        partnerTeamRosterRows={isPartner ? partnerTeamRows : undefined}
                                         scrollTableInPanel={stretchViewport}
                                     />
                                 </div>

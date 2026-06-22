@@ -61,3 +61,45 @@ export function buildPartnerTeamBuckets(teamRows: unknown[]): PartnerTeamBucket[
     out.sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: "base" }));
     return out;
 }
+
+function pendingParticipantRecord(raw: Record<string, unknown>): Record<string, unknown> | null {
+    const p = raw.participant;
+    return p && typeof p === "object" ? (p as Record<string, unknown>) : null;
+}
+
+/**
+ * Partner queue: scope pending rows to a team bucket from `/engagement/project/:id/team`.
+ * Matches by bucket key on the participant, or by roster member id/email when `teamId` was
+ * never persisted on the attendance participant (common on older enrollments).
+ */
+export function filterPendingRowsByTeamScope(
+    rows: Record<string, unknown>[],
+    scope: string,
+    teamRosterRows: unknown[],
+): Record<string, unknown>[] {
+    if (scope === PARTNER_ATTENDANCE_AWAIT_TEAM) return [];
+    if (scope === "" || scope === PARTNER_ATTENDANCE_ALL_TEAMS) return rows;
+
+    const memberIds = new Set<string>();
+    const memberEmails = new Set<string>();
+    for (const raw of teamRosterRows) {
+        if (!raw || typeof raw !== "object") continue;
+        const o = raw as Record<string, unknown>;
+        if (partnerTeamBucketKey(o) !== scope) continue;
+        const id = pickStr(o.id ?? o.participantId ?? o.participant_id);
+        if (id) memberIds.add(id);
+        const email = pickStr(o.email).toLowerCase();
+        if (email) memberEmails.add(email);
+    }
+
+    return rows.filter((raw) => {
+        const po = pendingParticipantRecord(raw);
+        if (!po) return false;
+        if (partnerTeamBucketKey(po) === scope) return true;
+        const pid = pickStr(po.id ?? po.participantId ?? po.participant_id ?? po.userId ?? po.user_id);
+        if (pid && memberIds.has(pid)) return true;
+        const email = pickStr(po.email).toLowerCase();
+        if (email && memberEmails.has(email)) return true;
+        return false;
+    });
+}
