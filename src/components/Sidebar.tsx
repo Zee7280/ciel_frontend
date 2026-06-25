@@ -253,6 +253,7 @@ export default function Sidebar() {
             { label: "Platform tutorial", href: "/dashboard/admin/tutorials", icon: PlayCircle },
             { label: "Send email", href: "/dashboard/admin/email", icon: Mail },
             { label: "Help & Support", href: "/dashboard/admin/support", icon: LifeBuoy },
+            { label: "CEP feedback", href: "/dashboard/admin/cep-feedback", icon: MessageSquare },
             { label: "Audit Logs", href: "/dashboard/admin/audit-logs", icon: History },
             { label: "Issue Logs", href: "/dashboard/admin/issue-logs", icon: ShieldAlert },
         ] : []),

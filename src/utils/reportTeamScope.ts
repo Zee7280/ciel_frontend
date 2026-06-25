@@ -93,6 +93,64 @@ export function resolveScopedTeamMembers(participant: unknown, teamRows: unknown
     };
 }
 
+/** Full team roster for certificates — includes the viewer and uses live lead from enrollment. */
+export function resolveScopedTeamRosterForCertificate(
+    participant: unknown,
+    teamRows: unknown[],
+): ScopedTeamResult & { team_lead?: ReportTeamRow } {
+    const p = participant as Record<string, unknown> | null;
+    const myTeamId = pickTeamIdFromRecord(participant);
+    const roster = Array.isArray(teamRows) ? teamRows : [];
+    const scoped =
+        myTeamId && roster.length > 0
+            ? roster.filter((row) => pickTeamIdFromRecord(row) === myTeamId)
+            : roster;
+    const normalized = scoped.map((row) => normalizeParticipationRowForDossier(row));
+    const leadRow =
+        normalized.find((row) => row.isTeamLead === true) ??
+        (p
+            ? normalized.find((row) => {
+                  const rowIds = [row.id, row.participantId].map((v) => (v == null ? "" : String(v)));
+                  const myId = p.id == null ? "" : String(p.id);
+                  const rowEmail = typeof row.email === "string" ? row.email.trim().toLowerCase() : "";
+                  const myEmail = typeof p.email === "string" ? p.email.trim().toLowerCase() : "";
+                  return (myId && rowIds.includes(myId)) || (rowEmail && myEmail && rowEmail === myEmail);
+              })
+            : undefined) ??
+        normalized[0];
+    const members = normalized.filter((row) => row !== leadRow);
+    return {
+        team_lead: leadRow,
+        team_members: members,
+        participation_type: normalized.length > 0 ? "team" : "individual",
+    };
+}
+
+export function mergeReportSection1TeamScopeForCertificate(
+    report: Record<string, unknown>,
+    participant: unknown,
+    teamRows: unknown[],
+): Record<string, unknown> {
+    const section1 = { ...((report.section1 as Record<string, unknown> | undefined) || {}) };
+    const { team_members, participation_type, team_lead } = resolveScopedTeamRosterForCertificate(
+        participant,
+        teamRows,
+    );
+    const existingLead =
+        section1.team_lead && typeof section1.team_lead === "object"
+            ? (section1.team_lead as Record<string, unknown>)
+            : undefined;
+    return {
+        ...report,
+        section1: {
+            ...section1,
+            team_members,
+            participation_type,
+            team_lead: mergeTeamLeadForDossier(existingLead, team_lead),
+        },
+    };
+}
+
 export function mergeReportSection1TeamScope(
     report: Record<string, unknown>,
     participant: unknown,
@@ -250,7 +308,15 @@ function mergeTeamLeadForDossier(
     const from = leadFromRoster ? normalizeParticipationRowForDossier(leadFromRoster) : {};
     const base =
         existing && typeof existing === "object" ? normalizeParticipationRowForDossier(existing) : {};
-    const merged: ReportTeamRow = { ...from, ...base };
+    const rosterLeadEmail = dossierFirstNonBlank(from.email).toLowerCase();
+    const storedLeadEmail = dossierFirstNonBlank(base.email).toLowerCase();
+    const rosterIsCanonicalLead = from.isTeamLead === true;
+    const storedLeadIsStale =
+        rosterLeadEmail.length > 0 &&
+        storedLeadEmail.length > 0 &&
+        rosterLeadEmail !== storedLeadEmail &&
+        rosterIsCanonicalLead;
+    const merged: ReportTeamRow = storedLeadIsStale ? { ...base, ...from } : { ...from, ...base };
     const keys = [
         "fullName",
         "name",
@@ -284,7 +350,8 @@ function mergeTeamLeadForDossier(
  */
 export function prepareReportForVerifyDossier(report: Record<string, unknown>): Record<string, unknown> {
     const section1 = { ...((report.section1 as Record<string, unknown> | undefined) || {}) };
-    const rawMembers = Array.isArray(section1.team_members) ? section1.team_members : [];
+    const embeddedScope = scopeTeamMembersByEmbeddedTeamId(section1);
+    const rawMembers = embeddedScope ?? (Array.isArray(section1.team_members) ? section1.team_members : []);
     const normalized = rawMembers.map((row) => normalizeParticipationRowForDossier(row));
 
     const leadRow = normalized.find((r) => r.isTeamLead === true);

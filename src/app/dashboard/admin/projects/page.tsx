@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import Link from "next/link";
 import DataTable from "react-data-table-component";
 import type { TableColumn } from "react-data-table-component";
-import { Search, Filter, MoreVertical, Briefcase, MapPin, Eye, FileDown, Trash2, Users, Loader2, X, UserMinus, Pencil, Mail, ClipboardList, GitMerge, Unlock, Lock } from "lucide-react";
+import { Search, Filter, MoreVertical, Briefcase, MapPin, Eye, FileDown, Trash2, Users, Loader2, X, UserMinus, Pencil, Mail, ClipboardList, GitMerge, Unlock, Lock, Layers2, Sparkles, Wrench } from "lucide-react";
 import { authenticatedFetch } from "@/utils/api";
 import { toast } from "sonner";
 import { ProjectTrackerModal } from "@/app/dashboard/admin/projects/ProjectTrackerModal";
@@ -232,6 +232,9 @@ type TeamMemberRow = {
     yearOfStudy: string;
     academicIntegrationType: string;
     attendanceMeta?: AdminEnrollmentAttendanceMeta;
+    studentUserId?: string;
+    duplicateSeatCount?: number;
+    studentIdMislinked?: boolean;
 };
 
 type TeamMemberEditorDraft = {
@@ -274,7 +277,8 @@ function normalizeParticipationMode(raw: Record<string, unknown>): Participation
 
 /** Listing-only synthetic group key; DELETE .../teams/:teamId expects a persisted Participation.teamId. */
 function isSyntheticIndividualGroupId(teamId: string): boolean {
-    return /^individual:/i.test(String(teamId).trim());
+    const id = String(teamId).trim();
+    return /^individual:/i.test(id) || /^pending-individual:/i.test(id);
 }
 
 const PARTICIPATION_UUID_RE =
@@ -557,6 +561,13 @@ function mapTeamMember(raw: Record<string, unknown>): TeamMemberRow | null {
         department: pickLooseString(raw, ["department"]),
         yearOfStudy: pickLooseString(raw, ["year_of_study", "yearOfStudy"]),
         academicIntegrationType: pickLooseString(raw, ["academic_integration_type", "academicIntegrationType"]),
+        studentUserId: pickLooseString(raw, ["student_user_id", "studentUserId", "student_id", "studentId"]),
+        duplicateSeatCount: Math.max(
+            0,
+            Number(raw.duplicate_seat_count ?? raw.duplicateSeatCount) || 0,
+        ) || undefined,
+        studentIdMislinked:
+            raw.student_id_mislinked === true || raw.studentIdMislinked === true,
     };
 }
 
@@ -718,6 +729,9 @@ export default function AdminProjectsPage() {
     const [teamMergeTargetTeamId, setTeamMergeTargetTeamId] = useState("");
     const [teamMergeSubmitting, setTeamMergeSubmitting] = useState(false);
     const [attendanceToggleParticipationId, setAttendanceToggleParticipationId] = useState<string | null>(null);
+    const [dedupeSeatsStudentUserId, setDedupeSeatsStudentUserId] = useState<string | null>(null);
+    const [reconcileEnrollmentsLoading, setReconcileEnrollmentsLoading] = useState(false);
+    const [healEnrollmentsLoading, setHealEnrollmentsLoading] = useState(false);
     const [incompleteApplicantStatusFilter, setIncompleteApplicantStatusFilter] = useState<IncompleteApplicantStatusFilter>("all");
     /** Bumps when the modal closes or reopens so in-flight fetches cannot apply stale rows. */
     const incompleteApplicantsLoadSeq = useRef(0);
@@ -1005,6 +1019,148 @@ export default function AdminProjectsPage() {
             toast.error("Could not update attendance access");
         } finally {
             setAttendanceToggleParticipationId(null);
+        }
+    };
+
+    const handleDedupeStudentSeats = async (member: TeamMemberRow) => {
+        if (!teamOverviewModal) return;
+        const studentUserId = member.studentUserId?.trim();
+        const duplicateCount = member.duplicateSeatCount ?? 0;
+        if (!studentUserId || duplicateCount < 2) return;
+        if (
+            !confirmDangerSequence([
+                `Remove ${duplicateCount - 1} duplicate ghost seat(s) for ${member.name || "this student"}?\n\nThis ONLY removes extra rows for the SAME account.\n\nOther team members are NOT affected.\n\nTeammate emails on those rows should already be restored via Auto-fix (safe) first.`,
+                "Final confirmation: delete ONLY duplicate ghost seats for this one account?",
+            ])
+        ) {
+            return;
+        }
+
+        setDedupeSeatsStudentUserId(studentUserId);
+        try {
+            const res = await authenticatedFetch(
+                `/api/v1/admin/projects/${encodeURIComponent(teamOverviewModal.opportunityId)}/dedupe-student-seats`,
+                {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ student_user_id: studentUserId }),
+                },
+            );
+            const data = res ? await res.json().catch(() => ({})) : {};
+            if (res?.ok) {
+                const removed = Number((data as { data?: { removed_count?: number } }).data?.removed_count) || 0;
+                toast.success(
+                    typeof (data as { message?: string }).message === "string"
+                        ? (data as { message: string }).message
+                        : removed > 0
+                          ? `Removed ${removed} duplicate seat(s)`
+                          : "No duplicate seats found",
+                );
+                await loadTeamOverview(teamOverviewModal.opportunityId);
+                await loadProjects();
+            } else {
+                toast.error(
+                    typeof (data as { message?: string }).message === "string"
+                        ? (data as { message: string }).message
+                        : "Could not remove duplicate seats",
+                );
+            }
+        } catch {
+            toast.error("Could not remove duplicate seats");
+        } finally {
+            setDedupeSeatsStudentUserId(null);
+        }
+    };
+
+    const handleReconcileEnrollments = async () => {
+        if (!teamOverviewModal) return;
+        if (
+            !confirm(
+                "Restore missing team seats from approved applications?\n\n• Safe: does NOT delete any enrollments\n• Use Clean dupes (N) on a specific row only when that account has duplicate seats\n\nStudents do not need to re-add team members.",
+            )
+        ) {
+            return;
+        }
+
+        setReconcileEnrollmentsLoading(true);
+        try {
+            const res = await authenticatedFetch(
+                `/api/v1/admin/projects/${encodeURIComponent(teamOverviewModal.opportunityId)}/reconcile-enrollments`,
+                { method: "POST" },
+            );
+            const data = res ? await res.json().catch(() => ({})) : {};
+            if (res?.ok) {
+                const removed = Number((data as { data?: { seats_removed?: number } }).data?.seats_removed) || 0;
+                toast.success(
+                    typeof (data as { message?: string }).message === "string"
+                        ? (data as { message: string }).message
+                        : removed > 0
+                          ? `Fixed enrollments (removed ${removed} duplicate seat(s))`
+                          : "Enrollments reconciled",
+                );
+                await loadTeamOverview(teamOverviewModal.opportunityId);
+                await loadProjects();
+            } else {
+                toast.error(
+                    typeof (data as { message?: string }).message === "string"
+                        ? (data as { message: string }).message
+                        : "Could not auto-fix enrollments",
+                );
+            }
+        } catch {
+            toast.error("Could not auto-fix enrollments");
+        } finally {
+            setReconcileEnrollmentsLoading(false);
+        }
+    };
+
+    const handleHealTeamEnrollments = async () => {
+        if (!teamOverviewModal) return;
+        if (
+            !confirm(
+                "Repair enrollments on this project?\n\nThis will automatically:\n• Restore missing teammates (applications + reports)\n• Remove duplicate ghost seats\n• Fix wrong account links (e.g. teammate showing under another student's account)\n• Normalize team lead flags\n\nIt does NOT delete whole teams. Safe to run after duplicate-seat issues.",
+            )
+        ) {
+            return;
+        }
+
+        setHealEnrollmentsLoading(true);
+        try {
+            const res = await authenticatedFetch(
+                `/api/v1/admin/projects/${encodeURIComponent(teamOverviewModal.opportunityId)}/heal-team-enrollments`,
+                { method: "POST" },
+            );
+            const data = res ? await res.json().catch(() => ({})) : {};
+            if (res?.ok) {
+                const summary = (data as { data?: Record<string, unknown> }).data;
+                const parts: string[] = [];
+                const n = (k: string) => Number(summary?.[k]) || 0;
+                if (n("report_members_restored") > 0) parts.push(`${n("report_members_restored")} restored from reports`);
+                if (n("duplicate_student_seats_removed") + n("duplicate_email_rows_removed") > 0) {
+                    parts.push(`${n("duplicate_student_seats_removed") + n("duplicate_email_rows_removed")} duplicate row(s) removed`);
+                }
+                if (n("student_id_links_repaired") > 0) parts.push(`${n("student_id_links_repaired")} account link(s) fixed`);
+                if (n("teammates_salvaged") > 0) parts.push(`${n("teammates_salvaged")} teammate(s) salvaged`);
+                toast.success(
+                    typeof (data as { message?: string }).message === "string"
+                        ? (data as { message: string }).message
+                        : parts.length
+                          ? `Repaired: ${parts.join(", ")}`
+                          : "Roster checked — no repairs needed",
+                );
+                await loadTeamOverview(teamOverviewModal.opportunityId);
+                await loadProjects();
+            } else {
+                toast.error(
+                    typeof (data as { message?: string }).message === "string"
+                        ? (data as { message: string }).message
+                        : "Could not repair enrollments",
+                );
+            }
+        } catch {
+            toast.error("Could not repair enrollments");
+        } finally {
+            setHealEnrollmentsLoading(false);
         }
     };
 
@@ -1313,6 +1469,25 @@ export default function AdminProjectsPage() {
     const teamRegisteredMetricLabel = teamOverviewRows.some((r) => r.participationMode === "individual")
         ? "Enrollments"
         : "Registered teams";
+
+    const duplicateAccountCount = useMemo(() => {
+        const seen = new Set<string>();
+        let count = 0;
+        for (const team of teamOverviewRows) {
+            for (const member of team.members) {
+                const sid = member.studentUserId?.trim();
+                const em = member.email.trim().toLowerCase();
+                const key = sid || em;
+                if (!key || seen.has(key)) continue;
+                const hasDupes = (member.duplicateSeatCount ?? 0) >= 2;
+                const mislinked = member.studentIdMislinked === true;
+                if (!hasDupes && !mislinked) continue;
+                seen.add(key);
+                count += 1;
+            }
+        }
+        return count;
+    }, [teamOverviewRows]);
 
     const teamOverviewPipelineRibbon = useMemo(() => {
         if (teamOverviewLoading) return null;
@@ -2138,9 +2313,64 @@ export default function AdminProjectsPage() {
                                 <div className="mt-1 text-2xl font-black text-blue-800">{teamOverviewSummary.reportsAvailable}</div>
                             </div>
                         </div>
+                        {!teamOverviewLoading ? (
+                            <div className="px-5 py-3 border-b border-slate-100 shrink-0 bg-amber-50/30">
+                                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                    <p className="text-xs leading-relaxed text-slate-600 max-w-2xl">
+                                        {duplicateAccountCount > 0 ? (
+                                            <>
+                                                <span className="font-semibold text-amber-800">
+                                                    {duplicateAccountCount} account(s) need enrollment repair
+                                                    (duplicate seats or wrong account link).
+                                                </span>{" "}
+                                                Use <span className="font-semibold">Repair enrollments</span> to auto-fix
+                                                ghost rows, wrong account links, and missing teammates. Per-row{" "}
+                                                <span className="font-semibold">Clean dupes</span> only when the same
+                                                account has 2+ seats.
+                                            </>
+                                        ) : (
+                                            <>
+                                                <span className="font-semibold">Repair enrollments</span> checks the roster,
+                                                restores missing members, removes duplicate ghost seats, and fixes wrong
+                                                account links. Does not delete whole teams.
+                                            </>
+                                        )}
+                                    </p>
+                                    <div className="flex flex-col gap-2 sm:flex-row sm:shrink-0">
+                                    <button
+                                        type="button"
+                                        onClick={() => void handleHealTeamEnrollments()}
+                                        disabled={healEnrollmentsLoading || reconcileEnrollmentsLoading}
+                                        className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-violet-300 bg-violet-600 px-4 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-violet-700 disabled:opacity-60"
+                                    >
+                                        {healEnrollmentsLoading ? (
+                                            <Loader2 className="h-4 w-4 animate-spin" />
+                                        ) : (
+                                            <Wrench className="h-4 w-4" />
+                                        )}
+                                        Repair enrollments
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => void handleReconcileEnrollments()}
+                                        disabled={reconcileEnrollmentsLoading || healEnrollmentsLoading}
+                                        className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-amber-300 bg-white px-4 py-2.5 text-sm font-bold text-amber-900 shadow-sm hover:bg-amber-50 disabled:opacity-60"
+                                    >
+                                        {reconcileEnrollmentsLoading ? (
+                                            <Loader2 className="h-4 w-4 animate-spin" />
+                                        ) : (
+                                            <Sparkles className="h-4 w-4" />
+                                        )}
+                                        Auto-fix (safe)
+                                    </button>
+                                    </div>
+                                </div>
+                            </div>
+                        ) : null}
+                        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
                         {teamOverviewPipelineRibbon}
                         {!teamOverviewLoading && mergeableEnrollments.length >= 2 ? (
-                            <div className="px-5 py-3 border-b border-slate-100 shrink-0 bg-indigo-50/40">
+                            <div className="px-5 py-3 border-b border-slate-100 bg-indigo-50/40">
                                 <button
                                     type="button"
                                     onClick={() => setTeamMergePanelOpen((v) => !v)}
@@ -2160,7 +2390,7 @@ export default function AdminProjectsPage() {
                                             Select enrolled members from different individual/team rows, pick the team lead,
                                             then merge. Pending pipeline applicants (not yet enrolled) cannot be merged here.
                                         </p>
-                                        <div className="max-h-48 space-y-2 overflow-y-auto rounded-lg border border-slate-100 p-2">
+                                        <div className="max-h-56 space-y-2 overflow-y-auto rounded-lg border border-slate-100 p-2">
                                             {mergeableEnrollments.map((member) => {
                                                 const checked = teamMergeSelectedIds.includes(member.participationId);
                                                 const isLead = teamMergeLeadId === member.participationId;
@@ -2215,7 +2445,7 @@ export default function AdminProjectsPage() {
                                                 <option value="">Auto (keep existing or generate)</option>
                                                 {persistedTeamIdOptions.map((t) => (
                                                     <option key={t.id} value={t.id}>
-                                                        {t.label} ({t.id.slice(0, 12)}…)
+                                                        {t.label} — {t.id}
                                                     </option>
                                                 ))}
                                             </select>
@@ -2246,7 +2476,7 @@ export default function AdminProjectsPage() {
                                 ) : null}
                             </div>
                         ) : null}
-                        <div className="px-5 py-4 overflow-y-auto flex-1 min-h-0">
+                        <div className="px-5 py-4">
                             {teamOverviewLoading ? (
                                 <div className="flex flex-col items-center justify-center py-16 gap-3 text-slate-500">
                                     <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
@@ -2289,9 +2519,14 @@ export default function AdminProjectsPage() {
                                         return (
                                         <div key={team.id} className="rounded-xl border border-slate-200 overflow-hidden">
                                             <div className="px-4 py-3 bg-slate-50 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3">
-                                                <div className="min-w-0">
+                                                <div className="min-w-0 flex-1">
                                                     <div className="flex flex-wrap items-center gap-2">
-                                                        <span className="font-bold text-slate-900 truncate">{team.teamName}</span>
+                                                        <span
+                                                            className="font-bold text-slate-900 break-words"
+                                                            title={team.teamName}
+                                                        >
+                                                            {team.teamName}
+                                                        </span>
                                                         <span
                                                             className={`inline-flex shrink-0 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide border ${
                                                                 team.participationMode === "individual"
@@ -2307,6 +2542,14 @@ export default function AdminProjectsPage() {
                                                             ? `Participant: ${team.leadName}`
                                                             : `Lead: ${team.leadName}`}
                                                     </div>
+                                                    {team.participationMode === "team" && !isSyntheticIndividualGroupId(team.id) ? (
+                                                        <div
+                                                            className="mt-1 text-[11px] font-mono text-slate-600 break-all"
+                                                            title={team.id}
+                                                        >
+                                                            Team ID: {team.id}
+                                                        </div>
+                                                    ) : null}
                                                 </div>
                                                 <div className="flex flex-wrap items-center gap-2">
                                                     <span className="inline-flex px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wide bg-amber-50 text-amber-800 border border-amber-100">
@@ -2399,12 +2642,32 @@ export default function AdminProjectsPage() {
                                                                 const adminOverrideOn =
                                                                     attendanceMeta?.adminAttendanceEditable === true ||
                                                                     attendanceMeta?.attendanceUnlock?.admin_override === true;
+                                                                const duplicateSeatCount = member.duplicateSeatCount ?? 0;
+                                                                const showDedupeSeats =
+                                                                    duplicateSeatCount >= 2 &&
+                                                                    Boolean(member.studentUserId?.trim()) &&
+                                                                    isMergeableTeamMember(member);
+                                                                const dedupeBusy =
+                                                                    dedupeSeatsStudentUserId === member.studentUserId?.trim();
                                                                 return (
                                                                     <tr key={member.id}>
                                                                         <td className="px-4 py-3">
                                                                             <div className="font-semibold text-slate-900">{member.name}</div>
                                                                             {member.email ? (
                                                                                 <div className="text-xs text-slate-500 mt-0.5">{member.email}</div>
+                                                                            ) : null}
+                                                                            {showDedupeSeats ? (
+                                                                                <div className="mt-1.5">
+                                                                                    <span className="inline-flex px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide bg-amber-50 text-amber-900 border border-amber-100">
+                                                                                        {duplicateSeatCount} seats · same account
+                                                                                    </span>
+                                                                                </div>
+                                                                            ) : member.studentIdMislinked ? (
+                                                                                <div className="mt-1.5">
+                                                                                    <span className="inline-flex px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide bg-rose-50 text-rose-900 border border-rose-100">
+                                                                                        Wrong account link
+                                                                                    </span>
+                                                                                </div>
                                                                             ) : null}
                                                                         </td>
                                                                         <td className="px-4 py-3 text-xs text-slate-700 whitespace-nowrap">
@@ -2501,6 +2764,26 @@ export default function AdminProjectsPage() {
                                                                         </td>
                                                                         <td className="px-4 py-3 text-right">
                                                                             <div className="inline-flex flex-wrap items-center justify-end gap-1">
+                                                                                {showDedupeSeats ? (
+                                                                                    <button
+                                                                                        type="button"
+                                                                                        onClick={() => void handleDedupeStudentSeats(member)}
+                                                                                        disabled={dedupeBusy}
+                                                                                        title="Remove extra enrollment rows for this student account (keeps team lead / attendance seat)"
+                                                                                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-[11px] font-bold text-amber-900 bg-amber-50 border border-amber-200 hover:bg-amber-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                                                    >
+                                                                                        {dedupeBusy ? (
+                                                                                            <>
+                                                                                                <Loader2 className="w-3 h-3 animate-spin" /> Cleaning…
+                                                                                            </>
+                                                                                        ) : (
+                                                                                            <>
+                                                                                                <Layers2 className="w-3 h-3" /> Clean dupes (
+                                                                                                {duplicateSeatCount - 1})
+                                                                                            </>
+                                                                                        )}
+                                                                                    </button>
+                                                                                ) : null}
                                                                                 <button
                                                                                     type="button"
                                                                                     onClick={() => openTeamMemberEditor(team.id, member)}
@@ -2547,6 +2830,7 @@ export default function AdminProjectsPage() {
                                     })}
                                 </div>
                             )}
+                        </div>
                         </div>
                     </div>
                     {teamMemberEditor ? (

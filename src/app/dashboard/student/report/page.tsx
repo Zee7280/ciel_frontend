@@ -16,7 +16,7 @@ import {
 } from "./components/ui/dialog";
 import clsx from 'clsx';
 import { canStudentAccessReportForProjectPayload } from '@/utils/studentJoinApplication';
-import { mergeReportSection1TeamScope } from '@/utils/reportTeamScope';
+import { mergeReportSection1TeamScope, mergeReportSection1TeamScopeForCertificate } from '@/utils/reportTeamScope';
 import { getIncompleteSectionsSummary } from './utils/validation';
 import { pickImpactVerifyUrlFromPayload } from '@/utils/reportVerificationUrl';
 import { prepareReportEvidenceForSave } from './utils/evidenceUpload';
@@ -222,6 +222,7 @@ function ReportFormContent() {
                     };
 
                     let reportForState: Record<string, unknown> = mergedReport as Record<string, unknown>;
+                    let reportIsSubmitted = false;
                     try {
                         const myRes = await authenticatedFetch(`/api/v1/engagement/my`);
                         if (myRes && myRes.ok) {
@@ -244,7 +245,43 @@ function ReportFormContent() {
                                     const teamJson = await teamRes.json();
                                     const teamRows =
                                         teamJson.success && Array.isArray(teamJson.data) ? teamJson.data : [];
-                                    reportForState = mergeReportSection1TeamScope(reportForState, myPart, teamRows);
+                                    const stPreview = String(
+                                        (reportForState.status as string | undefined) || "",
+                                    ).toLowerCase();
+                                    const adminStPreview = String(
+                                        (reportForState.admin_status as string | undefined) ||
+                                            (reportForState.admin_approval_status as string | undefined) ||
+                                            "",
+                                    ).toLowerCase();
+                                    const needsRevisionPreview =
+                                        adminStPreview === "rejected" ||
+                                        String((reportForState.partner_status as string | undefined) || "").toLowerCase() ===
+                                            "rejected" ||
+                                        stPreview === "rejected" ||
+                                        stPreview === "revision" ||
+                                        reportForState.is_editable === true;
+                                    reportIsSubmitted =
+                                        !needsRevisionPreview &&
+                                        ([
+                                            "submitted",
+                                            "approved",
+                                            "under_review",
+                                            "payment_pending",
+                                            "pending_payment",
+                                            "payment_under_review",
+                                            "paid",
+                                            "verified",
+                                            "finalized",
+                                            "partner_verified",
+                                        ].includes(stPreview) ||
+                                            ["verified", "approved"].includes(adminStPreview));
+                                    reportForState = reportIsSubmitted
+                                        ? mergeReportSection1TeamScopeForCertificate(
+                                              reportForState,
+                                              myPart,
+                                              teamRows,
+                                          )
+                                        : mergeReportSection1TeamScope(reportForState, myPart, teamRows);
                                 }
                             } else {
                                 setMyParticipationIsTeamLead(null);
@@ -300,20 +337,21 @@ function ReportFormContent() {
                         st === "revision" ||
                         reportForState.is_editable === true;
                     const isSubmitted =
-                        !needsRevision &&
-                        ([
-                            "submitted",
-                            "approved",
-                            "under_review",
-                            "payment_pending",
-                            "pending_payment",
-                            "payment_under_review",
-                            "paid",
-                            "verified",
-                            "finalized",
-                            "partner_verified",
-                        ].includes(st) ||
-                            ["verified", "approved"].includes(adminSt));
+                        reportIsSubmitted ||
+                        (!needsRevision &&
+                            ([
+                                "submitted",
+                                "approved",
+                                "under_review",
+                                "payment_pending",
+                                "pending_payment",
+                                "payment_under_review",
+                                "paid",
+                                "verified",
+                                "finalized",
+                                "partner_verified",
+                            ].includes(st) ||
+                                ["verified", "approved"].includes(adminSt)));
                     if (needsRevision) {
                         setShowGuide(false);
                         setReadOnly(false);
