@@ -1,39 +1,11 @@
-import { NextResponse } from "next/server";
+import { NextRequest } from "next/server";
+import { proxyToNest } from "@/lib/bff-nest-proxy";
 
-export async function POST(request: Request) {
-    try {
-        const authHeader = request.headers.get("Authorization");
-        const { searchParams } = new URL(request.url);
-        const status = searchParams.get("status")?.trim() || "";
+/** Browse / filter student opportunities — proxies to Nest `GET|POST /students/opportunities`. */
+export async function GET(req: NextRequest) {
+    return proxyToNest(req, "students/opportunities");
+}
 
-        const backendUrl = new URL(`${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/students/opportunities`);
-        if (status) {
-            backendUrl.searchParams.set("status", status);
-        }
-
-        const response = await fetch(backendUrl, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "Authorization": authHeader || ""
-            },
-            // Forward body if present, though for a filter it might be empty
-            body: request.body ? request.body : undefined,
-        });
-
-        const data = await response.json();
-
-        if (!response.ok) {
-            return NextResponse.json(
-                { error: data.message || "Operation failed" },
-                { status: response.status }
-            );
-        }
-
-        return NextResponse.json(data);
-
-    } catch (error) {
-        console.error("Error in students/opportunities proxy:", error);
-        return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
-    }
+export async function POST(req: NextRequest) {
+    return proxyToNest(req, "students/opportunities");
 }

@@ -11,6 +11,7 @@ import PhoneConnectivityRow from "@/components/ui/PhoneConnectivityRow";
 import { DEFAULT_PHONE_COUNTRY_KEY, dialFromPhoneCountryKey } from "@/utils/countryCallingCodes";
 import { pakistaniUniversities } from "@/utils/universityData";
 import { isSafeInternalReturnPath } from "@/utils/verificationReturnUrl";
+import { LEGAL_REGISTRATION_TYPES, ORGANIZATION_CATEGORIES } from "@/utils/organizationTaxonomy";
 
 import { Suspense } from "react";
 
@@ -43,12 +44,36 @@ function SignUpContent() {
         department: "",
         orgName: "",
         orgType: "",
+        organizationCategory: "",
+        legalRegistrationType: "",
         contactPerson: "",
         phoneCountryKey: DEFAULT_PHONE_COUNTRY_KEY,
         phone: "",
         cnic: "",
         token: "",
     });
+
+    const orgRoleDefaults = (roleId: string) => {
+        const base = {
+            orgType: roleId,
+            organizationCategory: "",
+            legalRegistrationType: "",
+        };
+        if (roleId === "university") {
+            return {
+                ...base,
+                organizationCategory: "Educational Institution",
+                legalRegistrationType: "Educational Institution",
+            };
+        }
+        if (roleId === "ngo") {
+            return { ...base, organizationCategory: "Nonprofit Organization (NGO)" };
+        }
+        if (roleId === "corporate") {
+            return { ...base, organizationCategory: "Corporate Organization" };
+        }
+        return base;
+    };
 
     useEffect(() => {
         const emailParam = searchParams.get('email');
@@ -64,7 +89,7 @@ function SignUpContent() {
             setStep("form");
             setFormData((prev) => ({
                 ...prev,
-                ...(["university", "ngo", "corporate"].includes(roleParam) ? { orgType: roleParam } : {}),
+                ...( ["university", "ngo", "corporate"].includes(roleParam) ? orgRoleDefaults(roleParam) : {}),
                 ...(emailParam || tokenParam
                     ? {
                           email: emailParam || prev.email,
@@ -77,17 +102,17 @@ function SignUpContent() {
 
 
     const roles = [
-        { id: "student", label: "I'm a student", icon: GraduationCap, desc: "Join verified projects, document your community impact, and earn SDG‑aligned records.", color: "blue" },
-        { id: "faculty", label: "faculty", icon: User, desc: "Oversee student engagement, validate learning and impact, and support SDG‑ready reporting.", color: "amber" },
-        { id: "university", label: "uni/Institution admin", icon: School, desc: "Monitor engagement, aggregate verified impact data, and generate institutional SDG reports.", color: "indigo" },
-        { id: "ngo", label: "ngo admin", icon: Heart, desc: "Post SDG‑aligned opportunities, engage students, and receive verified impact reports.", color: "green" },
-        { id: "corporate", label: "corporate admin", icon: Building2, desc: "Support impactful projects and track CSR goals aligned with SDGs.", color: "slate" },
+        { id: "student", label: "I'm a Student", emoji: "👨‍🎓", icon: GraduationCap, desc: "Join verified projects, document your community impact, and earn SDG‑aligned records.", color: "blue" },
+        { id: "faculty", label: "I'm a Faculty Member", emoji: "👩‍🏫", icon: User, desc: "Oversee student engagement, validate learning and impact, and support SDG‑ready reporting.", color: "amber" },
+        { id: "university", label: "I'm a University Administrator", emoji: "🏛️", icon: School, desc: "Monitor engagement, aggregate verified impact data, and generate institutional SDG reports.", color: "indigo" },
+        { id: "ngo", label: "I'm an NGO Representative", emoji: "🤝", icon: Heart, desc: "Post SDG‑aligned opportunities, engage students, and receive verified impact reports.", color: "green" },
+        { id: "corporate", label: "I'm a Corporate Partner", emoji: "🏢", icon: Building2, desc: "Support impactful projects and track CSR goals aligned with SDGs.", color: "slate" },
     ];
 
-    const handleRoleSelect = (selectedRole: any) => {
+    const handleRoleSelect = (selectedRole: string) => {
         setRole(selectedRole);
         if (['university', 'ngo', 'corporate'].includes(selectedRole)) {
-            setFormData(prev => ({ ...prev, orgType: selectedRole }));
+            setFormData(prev => ({ ...prev, ...orgRoleDefaults(selectedRole) }));
         }
         setStep("form");
         setErrors({});
@@ -112,6 +137,8 @@ function SignUpContent() {
         if (['university', 'ngo', 'corporate'].includes(role || "")) {
             if (!formData.orgName.trim()) newErrors.orgName = "Organization Name is required";
             if (!formData.contactPerson.trim()) newErrors.contactPerson = "Contact Person is required";
+            if (!formData.organizationCategory.trim()) newErrors.organizationCategory = "Organization Type is required";
+            if (!formData.legalRegistrationType.trim()) newErrors.legalRegistrationType = "Legal Registration Type is required";
         } else {
             if (!formData.name.trim()) newErrors.name = "Full Name is required";
         }
@@ -394,7 +421,7 @@ function SignUpContent() {
                         {step === "role" && (
                             <div className="space-y-8 animate-in fade-in slide-in-from-right-8 duration-500">
                                 <div className="text-center lg:text-left">
-                                    <h3 className="text-4xl font-black text-[#1E293B] tracking-tight mb-3">Account Type</h3>
+                                    <h3 className="text-4xl font-black text-[#1E293B] tracking-tight mb-3">Account Category</h3>
                                     <p className="text-slate-500 font-medium">Select your professional category to proceed.</p>
                                 </div>
 
@@ -408,11 +435,11 @@ function SignUpContent() {
                                             className="group relative flex items-center gap-5 p-6 rounded-2xl border-2 border-slate-100 hover:border-emerald-500 hover:bg-emerald-50/50 hover:shadow-[0_20px_40px_-15px_rgba(0,0,0,0.05)] transition-all text-left overflow-hidden bg-white"
                                         >
                                             <div className="w-14 h-14 rounded-2xl bg-slate-50 text-slate-400 group-hover:bg-white group-hover:text-emerald-500 flex items-center justify-center transition-all duration-300 group-hover:scale-110 shadow-sm border border-slate-100 group-hover:border-emerald-100 group-hover:shadow-lg group-hover:shadow-emerald-50">
-                                                <r.icon className="w-7 h-7" />
+                                                <span className="text-2xl leading-none" aria-hidden>{r.emoji}</span>
                                             </div>
                                             <div className="flex-1">
                                                 <h4 className="text-base font-bold text-[#1E293B] mb-0.5">{r.label}</h4>
-                                                <p className="text-[10px] font-black text-slate-400 group-hover:text-emerald-600/70 transition-colors uppercase tracking-widest">Start impacting today</p>
+                                                <p className="text-[10px] font-black text-slate-400 group-hover:text-emerald-600/70 transition-colors uppercase tracking-widest">START IMPACTING TODAY</p>
                                             </div>
                                             <div className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center opacity-0 group-hover:opacity-100 -translate-x-4 group-hover:translate-x-0 transition-all duration-300 border border-slate-100 group-hover:bg-white group-hover:border-emerald-200">
                                                 <ArrowRight className="w-5 h-5 text-emerald-600" />
@@ -480,34 +507,70 @@ function SignUpContent() {
                                                 {errors.orgName && <p className="text-[10px] text-red-500 font-black uppercase tracking-widest ml-1">{errors.orgName}</p>}
                                             </div>
 
-                                            <div className="grid grid-cols-2 gap-4">
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                                 <div className="space-y-1.5">
-                                                    <label className="text-[11px] font-black uppercase tracking-widest text-slate-400 ml-1">Org Category</label>
-                                                    <select
-                                                        value={formData.orgType}
-                                                        onChange={(e) => setFormData({ ...formData, orgType: e.target.value })}
-                                                        className="w-full px-5 py-4 rounded-2xl border-2 border-slate-100 bg-slate-50/30 font-bold text-slate-400 cursor-not-allowed outline-none"
-                                                        disabled
-                                                    >
-                                                        <option value="ngo">NGO</option>
-                                                        <option value="university">University</option>
-                                                        <option value="corporate">Private Sector</option>
-                                                    </select>
+                                                    <label className="text-[11px] font-black uppercase tracking-widest text-slate-400 ml-1">Organization Type</label>
+                                                    <div className="relative">
+                                                        <select
+                                                            value={formData.organizationCategory}
+                                                            onChange={(e) => handleGenericChange("organizationCategory", e.target.value)}
+                                                            aria-invalid={!!errors.organizationCategory}
+                                                            aria-label="Organization type"
+                                                            className={institutionSelectClass(!!errors.organizationCategory)}
+                                                        >
+                                                            <option value="">Select organization type</option>
+                                                            {ORGANIZATION_CATEGORIES.map((option) => (
+                                                                <option key={option} value={option}>
+                                                                    {option}
+                                                                </option>
+                                                            ))}
+                                                        </select>
+                                                        <ChevronDown
+                                                            className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400"
+                                                            aria-hidden
+                                                        />
+                                                    </div>
+                                                    {errors.organizationCategory && <p className="text-[10px] text-red-500 font-black uppercase tracking-widest ml-1">{errors.organizationCategory}</p>}
                                                 </div>
                                                 <div className="space-y-1.5">
-                                                    <label className="text-[11px] font-black uppercase tracking-widest text-slate-400 ml-1">Lead Official</label>
-                                                    <input
-                                                        type="text"
-                                                        value={formData.contactPerson}
-                                                        onChange={(e) => handleGenericChange("contactPerson", e.target.value)}
-                                                        className={clsx(
-                                                            "w-full px-5 py-4 rounded-2xl border-2 bg-slate-50/50 focus:bg-white outline-none transition-all font-bold text-slate-800 placeholder:text-slate-300",
-                                                            errors.contactPerson ? "border-red-500 focus:border-red-500" : "border-slate-100 focus:border-emerald-600"
-                                                        )}
-                                                        placeholder="Full Name"
-                                                    />
-                                                    {errors.contactPerson && <p className="text-[10px] text-red-500 font-black uppercase tracking-widest ml-1">{errors.contactPerson}</p>}
+                                                    <label className="text-[11px] font-black uppercase tracking-widest text-slate-400 ml-1">Legal Registration Type</label>
+                                                    <div className="relative">
+                                                        <select
+                                                            value={formData.legalRegistrationType}
+                                                            onChange={(e) => handleGenericChange("legalRegistrationType", e.target.value)}
+                                                            aria-invalid={!!errors.legalRegistrationType}
+                                                            aria-label="Legal registration type"
+                                                            className={institutionSelectClass(!!errors.legalRegistrationType)}
+                                                        >
+                                                            <option value="">Select legal registration type</option>
+                                                            {LEGAL_REGISTRATION_TYPES.map((option) => (
+                                                                <option key={option} value={option}>
+                                                                    {option}
+                                                                </option>
+                                                            ))}
+                                                        </select>
+                                                        <ChevronDown
+                                                            className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400"
+                                                            aria-hidden
+                                                        />
+                                                    </div>
+                                                    {errors.legalRegistrationType && <p className="text-[10px] text-red-500 font-black uppercase tracking-widest ml-1">{errors.legalRegistrationType}</p>}
                                                 </div>
+                                            </div>
+
+                                            <div className="space-y-1.5">
+                                                <label className="text-[11px] font-black uppercase tracking-widest text-slate-400 ml-1">Lead Official</label>
+                                                <input
+                                                    type="text"
+                                                    value={formData.contactPerson}
+                                                    onChange={(e) => handleGenericChange("contactPerson", e.target.value)}
+                                                    className={clsx(
+                                                        "w-full px-5 py-4 rounded-2xl border-2 bg-slate-50/50 focus:bg-white outline-none transition-all font-bold text-slate-800 placeholder:text-slate-300",
+                                                        errors.contactPerson ? "border-red-500 focus:border-red-500" : "border-slate-100 focus:border-emerald-600"
+                                                    )}
+                                                    placeholder="Full Name"
+                                                />
+                                                {errors.contactPerson && <p className="text-[10px] text-red-500 font-black uppercase tracking-widest ml-1">{errors.contactPerson}</p>}
                                             </div>
                                         </div>
                                     ) : (
