@@ -381,9 +381,19 @@ function ReportFormContent() {
 
         // --- FLEXIBLE NAVIGATION (Progress Mode) ---
         // If not at the final step, allow navigation even if validation fails
+        if (isTeamMemberAttendanceOnly && activeStep !== 1) {
+            setStep(1);
+            toast.info("Only your team lead advances report sections. Update your attendance in Section 1.");
+            return;
+        }
+
         const isValid = validateCurrentSection();
         
         if (activeStep < 11) {
+            if (isTeamMemberAttendanceOnly) {
+                toast.info("Only your team lead advances report sections. Update your attendance in Section 1.");
+                return;
+            }
             setIsSaving(true);
             let updatedData = { ...data };
 
@@ -668,6 +678,7 @@ function ReportFormContent() {
         [canSubmitReport, isReadOnly, needsRevision, reportStatusLower],
     );
     const stepperLockedToSummaryOnly = summaryOnlyWorkspace || ciiVerifiedSummaryLock;
+    const stepperLockedToSection1Only = isTeamMemberAttendanceOnly && !isReadOnly;
 
     React.useEffect(() => {
         if (isLoading || showGuide) return;
@@ -804,6 +815,7 @@ function ReportFormContent() {
                                     <div
                                         onClick={() => {
                                             if (stepperLockedToSummaryOnly && stepNum !== 11) return;
+                                            if (stepperLockedToSection1Only && stepNum !== 1) return;
                                             if (isCompleted || isReadOnly || activeStep < 11) {
                                                 setStep(stepNum);
                                             } else if (!isActive && validateCurrentSection()) {
@@ -816,6 +828,7 @@ function ReportFormContent() {
                                         className={clsx(
                                             "flex items-center gap-1.5 px-2.5 py-1 rounded-md transition-all text-[10px] font-bold uppercase tracking-tight cursor-pointer",
                                             stepperLockedToSummaryOnly && stepNum !== 11 && "pointer-events-none cursor-not-allowed opacity-35",
+                                            stepperLockedToSection1Only && stepNum !== 1 && "pointer-events-none cursor-not-allowed opacity-35",
                                             isActive ? "bg-blue-600 text-white shadow-lg shadow-blue-200/50 scale-105"
                                                 : isCompleted || isReadOnly ? "bg-white text-blue-600 border border-blue-100 hover:bg-blue-50"
                                                     : "text-slate-400 bg-transparent border border-transparent hover:border-slate-200"
@@ -884,7 +897,7 @@ function ReportFormContent() {
                         )}
                     </div>
 
-                    {!isReadOnly && activeStep < 11 && (
+                    {!isReadOnly && activeStep < 11 && !isTeamMemberAttendanceOnly && (
                         <div className="flex justify-center sm:flex-1 sm:order-none order-2">
                             <Button
                                 type="button"
@@ -904,7 +917,11 @@ function ReportFormContent() {
                             <Button
                                 type="button"
                                 onClick={handleNext}
-                                disabled={isSaving || (activeStep === 11 && !canFinalizeSubmit && !needsRevision)}
+                                disabled={
+                                    isSaving ||
+                                    (activeStep === 11 && !canFinalizeSubmit && !needsRevision) ||
+                                    (isTeamMemberAttendanceOnly && activeStep === 1)
+                                }
                                 className="h-9 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm px-5 md:px-6 font-semibold shadow-sm shadow-blue-600/20 transition-all w-full sm:w-auto disabled:opacity-50"
                             >
                                 {isSaving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}

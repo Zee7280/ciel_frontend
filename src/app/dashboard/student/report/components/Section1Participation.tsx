@@ -25,6 +25,11 @@ import { resolveScopedTeamMembers } from "@/utils/reportTeamScope";
 import { effectiveParticipationStatusForReportActions } from "@/utils/studentJoinApplication";
 import { resolveAttendanceSubmitError } from "@/utils/attendanceSubmitError";
 import Section1AnalyticsPanel from "@/components/analytics/Section1AnalyticsPanel";
+import { fetchSection1Analytics } from "@/utils/section1Analytics";
+import {
+    participationAttendanceVerificationRequested,
+    resolveStudentAdminAttendanceUnlock,
+} from "@/utils/adminEnrollmentAttendance";
 
 /** Copy for verify-attendance UX: no reviewer emails shown; NGO/partner first, faculty fallback. */
 const ATTENDANCE_VERIFICATION_INFO = {
@@ -180,6 +185,7 @@ export default function Section1Participation({ projectData }: { projectData?: a
         isParticipationUnlocked,
         setParticipationUnlocked,
         setRequiredHours,
+        myParticipationIsTeamLead,
     } = useReportForm();
 
     const searchParams = useSearchParams();
@@ -224,37 +230,77 @@ export default function Section1Participation({ projectData }: { projectData?: a
     const [isVerified, setIsVerified] = React.useState(!!data.section1.team_lead.verified);
     const [participantId, setParticipantId] = React.useState<string | null>(data.section1.team_lead.id || null);
     const [currentUserEmail, setCurrentUserEmail] = React.useState<string | null>(null);
+    const [isLeavingTeam, setIsLeavingTeam] = React.useState(false);
+    const [myParticipationVerificationRequested, setMyParticipationVerificationRequested] =
+        React.useState(false);
+
+    const applyAdminParticipationUnlock = React.useCallback(() => {
+        setParticipationUnlocked(true);
+        setMyParticipationVerificationRequested(false);
+        const section1 = data.section1 as Record<string, unknown>;
+        if (
+            section1.attendance_verification_requested_at ||
+            section1.attendanceVerificationRequestedAt ||
+            section1.attendance_verification_locked === true
+        ) {
+            updateSection("section1", {
+                attendance_verification_requested_at: null,
+                attendance_verification_locked: false,
+                attendance_verification_status: null,
+            });
+        }
+    }, [data.section1, setParticipationUnlocked, updateSection]);
+
+    const syncParticipationAttendanceFlags = React.useCallback(
+        (myPart: Record<string, unknown>, teamRows?: unknown[] | null) => {
+            const adminUnlocked = resolveStudentAdminAttendanceUnlock(myPart, teamRows);
+            if (adminUnlocked) {
+                applyAdminParticipationUnlock();
+                return;
+            }
+            setMyParticipationVerificationRequested(
+                participationAttendanceVerificationRequested(myPart),
+            );
+        },
+        [applyAdminParticipationUnlock],
+    );
 
     React.useEffect(() => {
-        if (isTeamMemberAttendanceOnly && internalStep < 4) {
-            setInternalStep(4);
+        if (!isTeamMemberAttendanceOnly) return;
+        // Teammates skip identity/submit wizard steps and land on attendance logging.
+        if (internalStep === 1 || internalStep === 3) {
+            setInternalStep(2);
+            return;
         }
-    }, [isTeamMemberAttendanceOnly, internalStep]);
+        // Metrics dashboard is lead-only until finalized; teammates stay on attendance.
+        if (internalStep === 4 && !verifiedMetrics && !isSubmittedReport) {
+            setInternalStep(2);
+        }
+    }, [isTeamMemberAttendanceOnly, internalStep, verifiedMetrics, isSubmittedReport]);
 
     /** When CIEL admin enabled attendance override, unlock Section 1 logging for this project. */
     React.useEffect(() => {
         if (!projectIdFromUrl || isReadOnly) return;
         let cancelled = false;
+
+        const applyAdminUnlock = () => {
+            applyAdminParticipationUnlock();
+        };
+
         void (async () => {
             try {
-                const res = await authenticatedFetch(
+                const payload = await fetchSection1Analytics(
                     `/api/v1/student/projects/${encodeURIComponent(projectIdFromUrl)}/section1-analytics`,
-                    {},
-                    { redirectToLogin: false },
                 );
-                if (!res?.ok || cancelled) return;
-                const json = (await res.json().catch(() => null)) as Record<string, unknown> | null;
-                const fields =
-                    json?.data && typeof json.data === "object"
-                        ? (json.data as Record<string, unknown>)
-                        : json;
-                const unlock =
-                    fields?.attendance_logging_unlock_status &&
-                    typeof fields.attendance_logging_unlock_status === "object"
-                        ? (fields.attendance_logging_unlock_status as Record<string, unknown>)
-                        : null;
-                if (unlock?.admin_override === true && unlock?.unlocked === true) {
-                    setParticipationUnlocked(true);
+                if (cancelled || !payload?.fields) return;
+                const unlock = payload.fields.attendance_logging_unlock_status;
+                if (
+                    unlock &&
+                    typeof unlock === "object" &&
+                    (unlock as Record<string, unknown>).admin_override === true &&
+                    (unlock as Record<string, unknown>).unlocked === true
+                ) {
+                    applyAdminUnlock();
                 }
             } catch {
                 /* non-fatal */
@@ -263,7 +309,7 @@ export default function Section1Participation({ projectData }: { projectData?: a
         return () => {
             cancelled = true;
         };
-    }, [projectIdFromUrl, isReadOnly, setParticipationUnlocked]);
+    }, [projectIdFromUrl, isReadOnly, applyAdminParticipationUnlock]);
 
     // Identify current user for labeling
     React.useEffect(() => {
@@ -403,10 +449,16 @@ export default function Section1Participation({ projectData }: { projectData?: a
 
                 if (myPart) {
                     console.log(`[Identity] Syncing correct ID for this project: ${myPart.id}`);
+                    const myPartIsTeamLead =
+                        myPart.isTeamLead === true ||
+                        myPart.is_team_lead === true ||
+                        String(myPart.is_team_lead ?? "").toLowerCase() === "true";
+
                     setParticipantId(myPart.id);
-                    // Explicitly update selected ID if it was null or stale
-                    setSelectedParticipantId(`lead:${myPart.id}`);
-                    
+                    setSelectedParticipantId(
+                        myPartIsTeamLead ? `lead:${myPart.id}` : `member:0:${myPart.id}`,
+                    );
+
                     setLeadStatus(
                         effectiveParticipationStatusForReportActions(
                             myPart.status || 'pending_approval',
@@ -414,45 +466,47 @@ export default function Section1Participation({ projectData }: { projectData?: a
                         ),
                     );
                     setIsVerified(true);
-                    
+                    syncParticipationAttendanceFlags(myPart);
+
                     // Update wizard step based on progress
                     if (['submitted', 'verified', 'finalized'].includes(myPart.status)) {
                         setInternalStep(4);
                         setIsSubmitted(true);
                     }
 
-                    const tlLead = data.section1.team_lead as Record<string, unknown>;
-                    const partCnicDigits = String(myPart?.cnic ?? "")
-                        .replace(/\D/g, "")
-                        .slice(0, 13);
-                    const leadCnicDigits = String(tlLead?.cnic ?? "")
-                        .replace(/\D/g, "")
-                        .slice(0, 13);
-                    const resolvedLeadCnic =
-                        partCnicDigits.length === 13
-                            ? partCnicDigits
-                            : leadCnicDigits.length === 13
-                              ? leadCnicDigits
-                              : partCnicDigits || leadCnicDigits || String(myPart.cnic ?? tlLead.cnic ?? "");
+                    if (myPartIsTeamLead) {
+                        const tlLead = data.section1.team_lead as Record<string, unknown>;
+                        const partCnicDigits = String(myPart?.cnic ?? "")
+                            .replace(/\D/g, "")
+                            .slice(0, 13);
+                        const leadCnicDigits = String(tlLead?.cnic ?? "")
+                            .replace(/\D/g, "")
+                            .slice(0, 13);
+                        const resolvedLeadCnic =
+                            partCnicDigits.length === 13
+                                ? partCnicDigits
+                                : leadCnicDigits.length === 13
+                                  ? leadCnicDigits
+                                  : partCnicDigits || leadCnicDigits || String(myPart.cnic ?? tlLead.cnic ?? "");
 
-                    // Always refresh team_lead ID and name from the backend record
-                    updateSection('section1', {
-                        team_lead: {
-                            ...data.section1.team_lead,
-                            id: myPart.id,
-                            verified: true,
-                            name: myPart.fullName || myPart.name || myPart.studentName || data.section1.team_lead.name,
-                            fullName: myPart.fullName || myPart.name || myPart.studentName || (data.section1.team_lead as any).fullName,
-                            cnic: resolvedLeadCnic,
-                            email: myPart.email || (data.section1.team_lead as any).email,
-                            mobile: myPart.mobile || (data.section1.team_lead as any).mobile,
-                            universityName: myPart.universityName || (data.section1.team_lead as any).universityName,
-                            universityId: myPart.universityId || (data.section1.team_lead as any).universityId,
-                            academicProgram: myPart.academicProgram || (data.section1.team_lead as any).academicProgram,
-                            yearOfStudy: myPart.yearOfStudy || (data.section1.team_lead as any).yearOfStudy,
-                            academicIntegrationType: myPart.academicIntegrationType || (data.section1.team_lead as any).academicIntegrationType
-                        }
-                    });
+                        updateSection('section1', {
+                            team_lead: {
+                                ...data.section1.team_lead,
+                                id: myPart.id,
+                                verified: true,
+                                name: myPart.fullName || myPart.name || myPart.studentName || data.section1.team_lead.name,
+                                fullName: myPart.fullName || myPart.name || myPart.studentName || (data.section1.team_lead as any).fullName,
+                                cnic: resolvedLeadCnic,
+                                email: myPart.email || (data.section1.team_lead as any).email,
+                                mobile: myPart.mobile || (data.section1.team_lead as any).mobile,
+                                universityName: myPart.universityName || (data.section1.team_lead as any).universityName,
+                                universityId: myPart.universityId || (data.section1.team_lead as any).universityId,
+                                academicProgram: myPart.academicProgram || (data.section1.team_lead as any).academicProgram,
+                                yearOfStudy: myPart.yearOfStudy || (data.section1.team_lead as any).yearOfStudy,
+                                academicIntegrationType: myPart.academicIntegrationType || (data.section1.team_lead as any).academicIntegrationType
+                            }
+                        });
+                    }
 
                     // Pull faculty + teamId from backend participation record
                     const myPartFaculty = readFacultyEmails(myPart);
@@ -487,6 +541,7 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                 team_members: scopedMembers,
                                 participation_type: scopedMode,
                             });
+                            syncParticipationAttendanceFlags(myPart, teamRows);
                         }
                     }
 
@@ -647,8 +702,80 @@ export default function Section1Participation({ projectData }: { projectData?: a
         (data.section1 as any).attendance_verification_requested_at ||
         (data.section1 as any).attendanceVerificationRequestedAt ||
         "";
-    const isAttendanceVerificationRequested = !!attendanceVerificationRequestedAt;
-    const isRecordLocked = (isSubmittedReport && !isParticipationUnlocked) || isAttendanceVerificationRequested;
+    const isLeadReportVerificationRequested = !!attendanceVerificationRequestedAt;
+    const isAttendanceVerificationRequested = isTeamMemberAttendanceOnly
+        ? myParticipationVerificationRequested && !isParticipationUnlocked
+        : isLeadReportVerificationRequested;
+    const isAttendanceFormLocked = isTeamMemberAttendanceOnly
+        ? !isParticipationUnlocked &&
+          (isSubmittedReport || myParticipationVerificationRequested)
+        : !isParticipationUnlocked && (isSubmittedReport || isLeadReportVerificationRequested);
+    const lockTeamMemberAdd =
+        !isParticipationUnlocked && (isSubmittedReport || isAttendanceVerificationRequested);
+
+    const currentUserIsTeamLead = React.useMemo(() => {
+        if (myParticipationIsTeamLead === true) return true;
+        const leadEmail = String((team_lead as { email?: string })?.email ?? "")
+            .trim()
+            .toLowerCase();
+        const selfEmail = currentUserEmail?.trim().toLowerCase();
+        return Boolean(selfEmail && leadEmail && selfEmail === leadEmail);
+    }, [myParticipationIsTeamLead, team_lead, currentUserEmail]);
+
+    const canRemoveTeamMember = React.useCallback(
+        (member: { email?: string }) => {
+            if (isSubmittedReport && !isParticipationUnlocked) return false;
+            const memberEmail = String(member?.email ?? "").trim().toLowerCase();
+            const selfEmail = currentUserEmail?.trim().toLowerCase();
+            if (selfEmail && memberEmail && selfEmail === memberEmail) return true;
+            return currentUserIsTeamLead;
+        },
+        [isSubmittedReport, isParticipationUnlocked, currentUserEmail, currentUserIsTeamLead],
+    );
+
+    const handleSelfLeaveTeam = async () => {
+        if (isSubmittedReport && !isParticipationUnlocked) return;
+        const selfMember = team_members.find(
+            (m: { email?: string }) =>
+                String(m?.email ?? "").trim().toLowerCase() === currentUserEmail?.trim().toLowerCase(),
+        );
+        const selfParticipationId = String(
+            participantId || selfMember?.id || selfMember?.participantId || "",
+        ).trim();
+        if (!selfParticipationId) {
+            toast.error("Could not find your participation record. Refresh and try again.");
+            return;
+        }
+        if (
+            !window.confirm(
+                "Leave this team project?\n\nYour seat will be released and your attendance on this project will no longer be linked to the team report.",
+            )
+        ) {
+            return;
+        }
+        setIsLeavingTeam(true);
+        try {
+            const res = await authenticatedFetch(
+                `/api/v1/engagement/${encodeURIComponent(selfParticipationId)}`,
+                { method: "DELETE" },
+            );
+            if (!res?.ok) {
+                const err = await res?.json().catch(() => ({}));
+                toast.error(
+                    typeof (err as { message?: string }).message === "string"
+                        ? (err as { message: string }).message
+                        : "Could not leave this team project",
+                );
+                return;
+            }
+            toast.success("You have left this team project.");
+            window.location.href = "/dashboard/student";
+        } catch {
+            toast.error("Could not leave this team project.");
+        } finally {
+            setIsLeavingTeam(false);
+        }
+    };
 
     const handleRequestAttendanceVerification = async () => {
         if (isAttendanceVerificationRequested || isSubmittedReport) return;
@@ -843,6 +970,16 @@ export default function Section1Participation({ projectData }: { projectData?: a
                     <p className="mt-1 text-xs text-sky-800/90">
                         Your team lead completes and submits this report. You may log and update your own attendance below.
                     </p>
+                    {!isSubmittedReport || isParticipationUnlocked ? (
+                        <button
+                            type="button"
+                            onClick={() => void handleSelfLeaveTeam()}
+                            disabled={isLeavingTeam}
+                            className="mt-3 inline-flex items-center rounded-lg border border-rose-200 bg-white px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-rose-700 hover:bg-rose-50 disabled:opacity-60"
+                        >
+                            {isLeavingTeam ? "Leaving..." : "Leave team project"}
+                        </button>
+                    ) : null}
                 </div>
             ) : null}
 
@@ -853,14 +990,18 @@ export default function Section1Participation({ projectData }: { projectData?: a
                         <React.Fragment key={s.id}>
                             <button
                                 type="button"
-                                disabled={isTeamMemberAttendanceOnly && s.id < 4}
+                                disabled={
+                                    isTeamMemberAttendanceOnly
+                                        ? s.id === 1 || s.id === 3
+                                        : false
+                                }
                                 onClick={() => {
-                                    if (isTeamMemberAttendanceOnly && s.id < 4) return;
+                                    if (isTeamMemberAttendanceOnly && (s.id === 1 || s.id === 3)) return;
                                     if (internalStep > s.id) setInternalStep(s.id);
                                 }}
                                 className={clsx(
                                     "flex items-center gap-2 px-4 py-2 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all whitespace-nowrap",
-                                    isTeamMemberAttendanceOnly && s.id < 4
+                                    isTeamMemberAttendanceOnly && (s.id === 1 || s.id === 3)
                                         ? "cursor-not-allowed opacity-40 text-slate-400"
                                         : internalStep === s.id
                                           ? "bg-indigo-600 text-white shadow-lg shadow-indigo-100"
@@ -1069,7 +1210,8 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                     <TeamVerification
                                         projectId={data.project_id || projectIdFromUrl || ""}
                                         members={team_members}
-                                        isLocked={isRecordLocked}
+                                        lockAddMembers={lockTeamMemberAdd}
+                                        canRemoveMember={canRemoveTeamMember}
                                         teamId={teamId}
                                         primaryFacultyEmail={primaryFacultyEmail}
                                         secondaryFacultyEmail={secondaryFacultyEmail}
@@ -1270,13 +1412,13 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                             onSuccess={() => loadAllEntries()}
                                             selectedParticipantId={selectedParticipantId}
                                             onParticipantChange={setSelectedParticipantId}
-                                            isLocked={isRecordLocked}
+                                            isLocked={isAttendanceFormLocked}
                                             isParticipationUnlocked={isParticipationUnlocked}
                                             setParticipationUnlocked={setParticipationUnlocked}
                                             allowManualUnlock={!isAttendanceVerificationRequested}
                                         />
 
-                                        {!isSubmittedReport && (
+                                        {!isSubmittedReport && !isParticipationUnlocked && (
                                             <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
                                                 {isAttendanceVerificationRequested ? (
                                                     <div className="space-y-2">
@@ -1360,7 +1502,7 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                                             currentUserEmail,
                                                         )
                                                     }
-                                                    isLocked={isRecordLocked}
+                                                    isLocked={isAttendanceFormLocked}
                                                 />
                                             </div>
                                         </div>
@@ -1587,13 +1729,15 @@ export default function Section1Participation({ projectData }: { projectData?: a
                     </Button>
 
                     <div className="order-1 flex flex-col gap-3 sm:order-2 sm:flex-row sm:items-center sm:justify-end sm:gap-3">
-                        <Button
-                            variant="outline"
-                            onClick={() => saveReport(false)}
-                            className="inline-flex items-center justify-center gap-2 h-11 rounded-xl border-slate-200 bg-slate-50/80 px-6 font-semibold text-slate-800 hover:bg-slate-100 hover:shadow-sm transition-all duration-200 focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2"
-                        >
-                            <Save className="h-4 w-4 text-slate-500 shrink-0" /> Save Draft
-                        </Button>
+                        {!isTeamMemberAttendanceOnly ? (
+                            <Button
+                                variant="outline"
+                                onClick={() => saveReport(false)}
+                                className="inline-flex items-center justify-center gap-2 h-11 rounded-xl border-slate-200 bg-slate-50/80 px-6 font-semibold text-slate-800 hover:bg-slate-100 hover:shadow-sm transition-all duration-200 focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2"
+                            >
+                                <Save className="h-4 w-4 text-slate-500 shrink-0" /> Save Draft
+                            </Button>
+                        ) : null}
 
                         {internalStep < 4 ? (
                             <div className="flex flex-col gap-3 sm:flex-row sm:gap-3">
@@ -1609,19 +1753,25 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                 )}
                                 <Button
                                     onClick={handleNext}
-                                    disabled={(internalStep === 1 && !isVerified) || (internalStep === 3 && !isMinimumHoursMet)}
+                                    disabled={
+                                        (internalStep === 1 && !isVerified) ||
+                                        (internalStep === 3 && !isMinimumHoursMet) ||
+                                        (isTeamMemberAttendanceOnly && internalStep >= 2)
+                                    }
                                     className="inline-flex items-center justify-center gap-2 h-11 rounded-xl bg-report-primary px-6 font-semibold text-white shadow-md shadow-indigo-500/25 hover:bg-[#0049A3] hover:shadow-lg transition-all duration-200 disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-report-primary focus-visible:ring-offset-2"
                                 >
                                     {internalStep === 3 ? "Skip Submission & Continue" : "Continue"} <ChevronRight className="h-4 w-4 shrink-0" />
                                 </Button>
                             </div>
                         ) : (
+                            !isTeamMemberAttendanceOnly ? (
                             <Button
                                 onClick={handleNext}
                                 className="inline-flex items-center justify-center gap-2 h-11 rounded-xl bg-slate-900 px-6 font-semibold text-white shadow-md hover:bg-black hover:shadow-lg transition-all duration-200 focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2"
                             >
                                 Save & Continue to Next Section <ChevronRight className="h-4 w-4 shrink-0" />
                             </Button>
+                            ) : null
                         )}
                     </div>
                 </div>

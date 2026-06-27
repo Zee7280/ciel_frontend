@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Users, UserPlus, CheckCircle2, ChevronDown, ChevronUp, AlertCircle, Shield, LucideIcon, Trash2, Info } from "lucide-react";
+import { Users, UserPlus, CheckCircle2, Shield, Trash2, Info } from "lucide-react";
 import IdentityVerification, { Participant } from "../../engagement/components/IdentityVerification";
 import { Button } from "./ui/button";
 import clsx from "clsx";
@@ -11,7 +11,8 @@ export default function TeamVerification({
     projectId,
     members,
     onUpdateMembers,
-    isLocked = false,
+    lockAddMembers = false,
+    canRemoveMember,
     teamId = "",
     primaryFacultyEmail = "",
     secondaryFacultyEmail = ""
@@ -19,7 +20,8 @@ export default function TeamVerification({
     projectId: string;
     members: any[];
     onUpdateMembers: (newMembers: any[]) => void;
-    isLocked?: boolean;
+    lockAddMembers?: boolean;
+    canRemoveMember?: (member: any, index: number) => boolean;
     teamId?: string;
     primaryFacultyEmail?: string;
     secondaryFacultyEmail?: string;
@@ -29,12 +31,17 @@ export default function TeamVerification({
     const handleMemberSuccess = (index: number, participant: Participant) => {
         const newMembers = [...members];
         newMembers[index] = { ...newMembers[index], ...participant, verified: true };
-        onUpdateMembers(newMembers); // This will trigger fetchInitialData in parent if length/verified list changes
-        setExpandedIndex(null); // Collapse after success
+        onUpdateMembers(newMembers);
+        setExpandedIndex(null);
     };
 
     const removeMember = async (index: number) => {
         const member = members[index];
+        if (canRemoveMember && !canRemoveMember(member, index)) {
+            alert("You are not allowed to remove this team member.");
+            return;
+        }
+
         const participantId = member.id || member.participantId;
 
         if (participantId) {
@@ -71,7 +78,7 @@ export default function TeamVerification({
             role: 'Member',
             verified: false
         }]);
-        setExpandedIndex(members.length); // Expand the new member
+        setExpandedIndex(members.length);
     };
 
     return (
@@ -88,7 +95,7 @@ export default function TeamVerification({
                 </div>
 
                 <div className="flex items-center gap-3">
-                    {!isLocked && (
+                    {!lockAddMembers && (
                         <Button
                             onClick={handleAddMember}
                             className="bg-report-primary hover:opacity-90 text-white rounded-xl h-11 px-6 font-bold text-sm transition-all flex items-center gap-2 shadow-lg shadow-indigo-100 hover:scale-[1.02] active:scale-95"
@@ -112,7 +119,9 @@ export default function TeamVerification({
             </div>
 
             <div className="grid grid-cols-1 gap-4">
-                {members.map((member, idx) => (
+                {members.map((member, idx) => {
+                    const mayRemove = canRemoveMember ? canRemoveMember(member, idx) : !lockAddMembers;
+                    return (
                     <div
                         key={idx}
                         className={clsx(
@@ -120,7 +129,6 @@ export default function TeamVerification({
                             member.verified ? "border-emerald-100 bg-emerald-50/5" : "border-slate-100"
                         )}
                     >
-                        {/* Member Row */}
                         <div className="p-5 flex flex-col sm:flex-row items-center justify-between gap-4">
                             <div className="flex items-center gap-5">
                                 <div className={clsx(
@@ -157,33 +165,32 @@ export default function TeamVerification({
                             </div>
 
                             <div className="flex items-center gap-2.5 shrink-0">
-                                {!isLocked && (
-                                    <>
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={() => setExpandedIndex(expandedIndex === idx ? null : idx)}
-                                            className={clsx(
-                                                "h-10 px-5 rounded-xl text-xs font-black uppercase tracking-widest transition-all",
-                                                expandedIndex === idx ? "bg-slate-900 text-white border-slate-900" : "border-slate-200 text-slate-600 hover:bg-slate-50"
-                                            )}
-                                        >
-                                            {expandedIndex === idx ? "Cancel Edit" : "Configure"}
-                                        </Button>
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={() => removeMember(idx)}
-                                            className="h-10 w-10 p-0 flex items-center justify-center border-slate-100 text-slate-300 hover:text-red-500 hover:bg-red-50 hover:border-red-100 rounded-xl transition-all"
-                                        >
-                                            <Trash2 className="w-4.5 h-4.5" />
-                                        </Button>
-                                    </>
+                                {!lockAddMembers && (
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => setExpandedIndex(expandedIndex === idx ? null : idx)}
+                                        className={clsx(
+                                            "h-10 px-5 rounded-xl text-xs font-black uppercase tracking-widest transition-all",
+                                            expandedIndex === idx ? "bg-slate-900 text-white border-slate-900" : "border-slate-200 text-slate-600 hover:bg-slate-50"
+                                        )}
+                                    >
+                                        {expandedIndex === idx ? "Cancel Edit" : "Configure"}
+                                    </Button>
+                                )}
+                                {mayRemove && (
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => removeMember(idx)}
+                                        className="h-10 w-10 p-0 flex items-center justify-center border-slate-100 text-slate-300 hover:text-red-500 hover:bg-red-50 hover:border-red-100 rounded-xl transition-all"
+                                    >
+                                        <Trash2 className="w-4.5 h-4.5" />
+                                    </Button>
                                 )}
                             </div>
                         </div>
 
-                        {/* Accordion Content (Identity Verification) */}
                         {expandedIndex === idx && (
                             <div className="p-8 pt-2 border-t border-slate-100/60 bg-slate-50/20">
                                 <div className="mb-6 flex items-center gap-3 px-4 py-3 bg-white rounded-2xl border border-indigo-100 shadow-sm">
@@ -210,7 +217,7 @@ export default function TeamVerification({
                             </div>
                         )}
                     </div>
-                ))}
+                );})}
             </div>
 
             {members.length === 0 && (
@@ -223,7 +230,7 @@ export default function TeamVerification({
                         <p className="text-sm font-black text-slate-900 uppercase tracking-widest">Individual Participation</p>
                         <p className="text-xs text-slate-400 font-medium max-w-[280px] mx-auto leading-relaxed">No team members have been added yet. This report will be treated as an individual engagement.</p>
                     </div>
-                    {!isLocked && (
+                    {!lockAddMembers && (
                         <button 
                             onClick={handleAddMember}
                             className="text-[10px] font-black text-indigo-600 uppercase tracking-[0.2em] hover:text-indigo-700 transition-colors"

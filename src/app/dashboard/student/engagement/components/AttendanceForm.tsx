@@ -163,9 +163,10 @@ export default function AttendanceForm({
         typeof selectedUser.status === "string" &&
         selectedUser.status.trim().length > 0;
     
-    // Restore proper locking logic: record is locked if report is submitted OR if user is not yet approved
-    const effectiveLocked = !isUserApproved || (isLocked && !isParticipationUnlocked);
-    // const effectiveLocked = false; // Previously disabled, now restored
+    // Admin override unlocks attendance logging even after verification was requested.
+    const effectiveLocked = isParticipationUnlocked
+        ? false
+        : !isUserApproved || isLocked;
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();

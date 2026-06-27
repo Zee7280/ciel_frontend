@@ -54,9 +54,17 @@ export function buildIndividualRosterFromSection1(section1: {
     if (section1.participation_type !== "team") return undefined;
     const leadId = leadParticipantId ?? section1.team_lead?.id ?? null;
     if (!leadId) return undefined;
+    const leadEmail =
+        typeof (section1.team_lead as { email?: string } | undefined)?.email === "string"
+            ? (section1.team_lead as { email: string }).email.trim().toLowerCase()
+            : "";
     const ids: string[] = [`lead:${leadId}`];
     (section1.team_members ?? []).forEach((m, idx) => {
-        ids.push(`member:${idx}:${m?.id ?? m?.participantId ?? m?.cnic ?? m?.email ?? "anon"}`);
+        const memberId = m?.id ?? m?.participantId;
+        const memberEmail = typeof m?.email === "string" ? m.email.trim().toLowerCase() : "";
+        if (memberId && String(memberId) === String(leadId)) return;
+        if (memberEmail && leadEmail && memberEmail === leadEmail) return;
+        ids.push(`member:${idx}:${memberId ?? m?.cnic ?? m?.email ?? "anon"}`);
     });
     return ids;
 }

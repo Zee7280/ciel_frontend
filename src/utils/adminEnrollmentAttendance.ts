@@ -17,8 +17,71 @@ function asRecord(value: unknown): Record<string, unknown> {
     return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
 }
 
-export function parseAdminEnrollmentAttendanceRows(body: unknown): Map<string, AdminEnrollmentAttendanceMeta> {
-    const map = new Map<string, AdminEnrollmentAttendanceMeta>();
+export function participationAdminAttendanceEditable(row: unknown): boolean {
+    const raw = asRecord(row);
+    return raw.admin_attendance_editable === true || raw.adminAttendanceEditable === true;
+}
+
+export function participationAttendanceVerificationRequested(row: unknown): boolean {
+    const raw = asRecord(row);
+    return (
+        raw.attendance_verification_requested === true || raw.attendanceVerificationRequested === true
+    );
+}
+
+function sameTeamCohort(a: Record<string, unknown>, b: Record<string, unknown>): boolean {
+    const teamId = String(a.teamId ?? a.team_id ?? "").trim();
+    const teamIdB = String(b.teamId ?? b.team_id ?? "").trim();
+    if (teamId && teamIdB && teamId === teamIdB) return true;
+    const appId = String(a.applicationId ?? a.application_id ?? "").trim();
+    const appIdB = String(b.applicationId ?? b.application_id ?? "").trim();
+    return Boolean(appId && appIdB && appId === appIdB);
+}
+
+/** True when this student's seat (or same-team lead) has CIEL admin attendance override. */
+export function resolveStudentAdminAttendanceUnlock(
+    myPart: unknown,
+    teamRows?: unknown[] | null,
+): boolean {
+    if (participationAdminAttendanceEditable(myPart)) return true;
+    if (!teamRows?.length) return false;
+
+    const me = asRecord(myPart);
+    const myId = String(me.id ?? "").trim();
+    const myEmail = String(me.email ?? "").trim().toLowerCase();
+    const myRow = teamRows.find((row) => {
+        const r = asRecord(row);
+        return (
+            String(r.id ?? r.participantId ?? "").trim() === myId ||
+            (!!myEmail && String(r.email ?? "").trim().toLowerCase() === myEmail)
+        );
+    });
+
+    if (participationAdminAttendanceEditable(myRow)) return true;
+
+    const isLead = me.isTeamLead === true || me.is_team_lead === true;
+    if (isLead) return false;
+
+    const leadRow = teamRows.find((row) => {
+        const r = asRecord(row);
+        return r.isTeamLead === true || r.is_team_lead === true;
+    });
+    if (!leadRow || !participationAdminAttendanceEditable(leadRow)) return false;
+
+    const anchor = asRecord(myRow ?? me);
+    return sameTeamCohort(anchor, asRecord(leadRow));
+}
+
+export type AdminEnrollmentAttendanceIndex = {
+    byParticipationId: Map<string, AdminEnrollmentAttendanceMeta>;
+    studentIdsByParticipation: Map<string, string>;
+    emailsByParticipation: Map<string, string>;
+};
+
+export function parseAdminEnrollmentAttendanceRows(body: unknown): AdminEnrollmentAttendanceIndex {
+    const byParticipationId = new Map<string, AdminEnrollmentAttendanceMeta>();
+    const studentIdsByParticipation = new Map<string, string>();
+    const emailsByParticipation = new Map<string, string>();
     const root = asRecord(body);
     const data = asRecord(root.data);
     const enrollments = Array.isArray(data.enrollments) ? data.enrollments : [];
@@ -28,8 +91,13 @@ export function parseAdminEnrollmentAttendanceRows(body: unknown): Map<string, A
         const participationId = String(raw.participation_id ?? raw.participationId ?? "").trim();
         if (!participationId) continue;
 
+        const studentId = String(raw.student_id ?? raw.studentId ?? "").trim();
+        const email = String(raw.email ?? "").trim().toLowerCase();
+        if (studentId) studentIdsByParticipation.set(participationId, studentId);
+        if (email) emailsByParticipation.set(participationId, email);
+
         const unlockRaw = asRecord(raw.attendance_logging_unlock_status ?? raw.attendanceLoggingUnlockStatus);
-        map.set(participationId, {
+        byParticipationId.set(participationId, {
             participationId,
             adminAttendanceEditable: raw.admin_attendance_editable === true || raw.adminAttendanceEditable === true,
             attendanceLocked: raw.attendance_locked === true || raw.attendanceLocked === true,
@@ -48,7 +116,7 @@ export function parseAdminEnrollmentAttendanceRows(body: unknown): Map<string, A
         });
     }
 
-    return map;
+    return { byParticipationId, studentIdsByParticipation, emailsByParticipation };
 }
 
 export function attendanceUnlockLabel(meta: AdminEnrollmentAttendanceMeta | undefined): string {

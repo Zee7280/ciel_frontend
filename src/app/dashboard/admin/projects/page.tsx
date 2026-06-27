@@ -316,14 +316,38 @@ function flattenMergeableEnrollments(rows: TeamOverviewRow[]): MergeableEnrollme
     return out;
 }
 
+
 function mergeTeamRowsWithEnrollmentAttendance(
     rows: TeamOverviewRow[],
     attendanceByParticipation: Map<string, AdminEnrollmentAttendanceMeta>,
+    enrollmentStudentIdsByParticipation: Map<string, string>,
+    enrollmentEmailsByParticipation: Map<string, string>,
 ): TeamOverviewRow[] {
     return rows.map((team) => ({
         ...team,
         members: team.members.map((member) => {
-            const attendanceMeta = attendanceByParticipation.get(member.id.trim());
+            const participationId = member.id.trim();
+            let attendanceMeta = attendanceByParticipation.get(participationId);
+            if (!attendanceMeta) {
+                const studentUserId = member.studentUserId?.trim();
+                const email = member.email.trim().toLowerCase();
+                for (const [enrollmentParticipationId, meta] of attendanceByParticipation) {
+                    const enrollmentStudentId = enrollmentStudentIdsByParticipation
+                        .get(enrollmentParticipationId)
+                        ?.trim();
+                    const enrollmentEmail = enrollmentEmailsByParticipation
+                        .get(enrollmentParticipationId)
+                        ?.trim()
+                        .toLowerCase();
+                    if (
+                        (studentUserId && enrollmentStudentId && studentUserId === enrollmentStudentId) ||
+                        (email && enrollmentEmail && email === enrollmentEmail)
+                    ) {
+                        attendanceMeta = meta;
+                        break;
+                    }
+                }
+            }
             return attendanceMeta ? { ...member, attendanceMeta } : member;
         }),
     }));
@@ -874,14 +898,21 @@ export default function AdminProjectsPage() {
             }
 
             let attendanceByParticipation = new Map<string, AdminEnrollmentAttendanceMeta>();
+            let enrollmentStudentIdsByParticipation = new Map<string, string>();
+            let enrollmentEmailsByParticipation = new Map<string, string>();
             if (enrollmentsRes?.ok) {
                 const enrollmentBody = await enrollmentsRes.json().catch(() => ({}));
-                attendanceByParticipation = parseAdminEnrollmentAttendanceRows(enrollmentBody);
+                const enrollmentIndex = parseAdminEnrollmentAttendanceRows(enrollmentBody);
+                attendanceByParticipation = enrollmentIndex.byParticipationId;
+                enrollmentStudentIdsByParticipation = enrollmentIndex.studentIdsByParticipation;
+                enrollmentEmailsByParticipation = enrollmentIndex.emailsByParticipation;
             }
 
             const mappedRows = mergeTeamRowsWithEnrollmentAttendance(
                 extractTeamRows(data),
                 attendanceByParticipation,
+                enrollmentStudentIdsByParticipation,
+                enrollmentEmailsByParticipation,
             );
             setTeamOverviewRows(mappedRows);
             setTeamOverviewSummary(extractTeamSummary(data, mappedRows));

@@ -17,6 +17,51 @@ export function pickTeamIdFromRecord(rec: unknown): string {
 
 type ReportTeamRow = Record<string, unknown>;
 
+function participantIdentityKey(row: Record<string, unknown>): string {
+    const sid = row.studentId ?? row.student_id;
+    if (typeof sid === "string" && sid.trim()) return `s:${sid.trim()}`;
+    const em = typeof row.email === "string" ? row.email.trim().toLowerCase() : "";
+    if (em) return `e:${em}`;
+    return `id:${String(row.id ?? row.participantId ?? "").trim()}`;
+}
+
+/** Drop ghost seats: same person twice (lead row + duplicate member row) or duplicate email in roster. */
+export function dedupeTeamMemberRowsForReport(
+    members: ReportTeamRow[],
+    teamRows: unknown[],
+    leadHint?: Record<string, unknown> | null,
+): ReportTeamRow[] {
+    const leadEmails = new Set<string>();
+    const leadIds = new Set<string>();
+    const addLeadIdentity = (row: Record<string, unknown> | null | undefined) => {
+        if (!row) return;
+        const em = typeof row.email === "string" ? row.email.trim().toLowerCase() : "";
+        if (em) leadEmails.add(em);
+        const id = String(row.id ?? row.participantId ?? "").trim();
+        if (id) leadIds.add(id);
+    };
+    addLeadIdentity(leadHint ?? null);
+    for (const row of teamRows) {
+        if (!row || typeof row !== "object") continue;
+        const o = row as Record<string, unknown>;
+        if (o.isTeamLead === true || o.is_team_lead === true) addLeadIdentity(o);
+    }
+
+    const seen = new Set<string>();
+    const out: ReportTeamRow[] = [];
+    for (const member of members) {
+        const id = String(member.id ?? member.participantId ?? "").trim();
+        const em = typeof member.email === "string" ? member.email.trim().toLowerCase() : "";
+        if (id && leadIds.has(id)) continue;
+        if (em && leadEmails.has(em)) continue;
+        const key = participantIdentityKey(member);
+        if (seen.has(key)) continue;
+        seen.add(key);
+        out.push(member);
+    }
+    return out;
+}
+
 export function mapProjectTeamRowsForReport(teamRows: unknown[], myParticipantId: string): ReportTeamRow[] {
     if (!Array.isArray(teamRows) || !myParticipantId) return [];
     return teamRows
@@ -68,7 +113,21 @@ export function resolveScopedTeamMembers(participant: unknown, teamRows: unknown
         })
         : undefined;
     const myTeamId = pickTeamIdFromRecord(participant) || pickTeamIdFromRecord(matchedTeamRow);
-    const base = mapProjectTeamRowsForReport(teamRows, myId);
+    const leadHint =
+        p?.isTeamLead === true || p?.is_team_lead === true
+            ? (p as Record<string, unknown>)
+            : (Array.isArray(teamRows)
+                  ? (teamRows.find((row) => {
+                        if (!row || typeof row !== "object") return false;
+                        const o = row as Record<string, unknown>;
+                        return o.isTeamLead === true || o.is_team_lead === true;
+                    }) as Record<string, unknown> | undefined)
+                  : undefined);
+    const base = dedupeTeamMemberRowsForReport(
+        mapProjectTeamRowsForReport(teamRows, myId),
+        teamRows,
+        leadHint,
+    );
 
     if (!myTeamId) {
         return {
@@ -77,7 +136,11 @@ export function resolveScopedTeamMembers(participant: unknown, teamRows: unknown
         };
     }
 
-    const filtered = base.filter((m) => pickTeamIdFromRecord(m) === myTeamId);
+    const filtered = dedupeTeamMemberRowsForReport(
+        base.filter((m) => pickTeamIdFromRecord(m) === myTeamId),
+        teamRows,
+        leadHint,
+    );
     if (filtered.length > 0) {
         return { team_members: filtered, participation_type: "team" };
     }
@@ -355,7 +418,17 @@ export function prepareReportForVerifyDossier(report: Record<string, unknown>): 
     const normalized = rawMembers.map((row) => normalizeParticipationRowForDossier(row));
 
     const leadRow = normalized.find((r) => r.isTeamLead === true);
-    const memberRows = normalized.filter((r) => r.isTeamLead !== true);
+    const leadEmail =
+        typeof leadRow?.email === "string" ? leadRow.email.trim().toLowerCase() : "";
+    const leadId = String(leadRow?.id ?? leadRow?.participantId ?? "").trim();
+    const memberRows = normalized.filter((r) => {
+        if (r.isTeamLead === true) return false;
+        const em = typeof r.email === "string" ? r.email.trim().toLowerCase() : "";
+        const id = String(r.id ?? r.participantId ?? "").trim();
+        if (leadId && id === leadId) return false;
+        if (leadEmail && em && em === leadEmail) return false;
+        return true;
+    });
     const existingLead =
         section1.team_lead && typeof section1.team_lead === "object"
             ? (section1.team_lead as Record<string, unknown>)
