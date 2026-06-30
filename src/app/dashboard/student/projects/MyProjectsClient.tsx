@@ -6,7 +6,6 @@ import { toast } from "sonner";
 import { Button } from "../report/components/ui/button";
 import Link from "next/link";
 import { Badge } from "../report/components/ui/badge";
-import { authenticatedFetch } from "@/utils/api";
 import {
     canEditReturnedOpportunity,
     extractOpportunityReturnRemarkSections,
@@ -15,6 +14,7 @@ import {
     isStudentOpportunityLiveForReporting,
     resolveStudentOpportunityWorkflow,
 } from "@/utils/opportunityWorkflow";
+import { ParticipationPhaseBadge } from "@/components/participation/ParticipationPhaseBadge";
 import {
     canStudentAccessReportForProjectPayload,
     canStudentShowStartReportCta,
@@ -29,7 +29,9 @@ import {
     pickReportStatusFromCheckRow,
     resolveStudentBrowseReportCta,
 } from "@/utils/studentBrowseReportCta";
+import { resolveStudentProjectActionHref } from "@/utils/participationGuide";
 import { getStoredCurrentUserId } from "@/utils/currentUser";
+import { authenticatedFetch } from "@/utils/api";
 import { formatDisplayId } from "@/utils/displayIds";
 import {
     findLiveApplyPromptProject,
@@ -692,7 +694,21 @@ export default function MyProjectsPage() {
                         : joinBrowseReportCtaEligible);
                 const reportCta =
                     reportCtaEligible && (reportUnlocked || reportNeedsRevision)
-                        ? resolveStudentBrowseReportCta(project.id, project.report_status)
+                        ? (() => {
+                              const base = resolveStudentBrowseReportCta(project.id, project.report_status);
+                              if (!base) return null;
+                              if ((project as { is_team_member?: boolean }).is_team_member) {
+                                  return {
+                                      ...base,
+                                      href: resolveStudentProjectActionHref({
+                                          id: project.id,
+                                          is_team_member: true,
+                                      }),
+                                      label: "My attendance",
+                                  };
+                              }
+                              return base;
+                          })()
                         : null;
 
                 return {
@@ -956,6 +972,12 @@ export default function MyProjectsPage() {
                                                                 ? joinApplicationPendingLabel(pRecord)
                                                                 : detailStatusLabel}
                                                         </Badge>
+                                                        {(project as { participation_phase?: string }).participation_phase ? (
+                                                            <ParticipationPhaseBadge
+                                                                phase={(project as { participation_phase?: string }).participation_phase}
+                                                                label={(project as { participation_phase_label?: string }).participation_phase_label}
+                                                            />
+                                                        ) : null}
                                                         {project.report_status &&
                                                             project.report_status !== "none" && (
                                                                 <Badge
@@ -1051,12 +1073,19 @@ export default function MyProjectsPage() {
                                                             >
                                                                 Download cii (Certificate)
                                                             </Button>
-                                                            <Link href={`/dashboard/student/report?projectId=${project.id}`}>
+                                                            <Link
+                                                                href={resolveStudentProjectActionHref({
+                                                                    id: project.id,
+                                                                    is_team_member: (project as { is_team_member?: boolean }).is_team_member,
+                                                                })}
+                                                            >
                                                                 <Button
                                                                     size="sm"
                                                                     className="h-8 bg-emerald-600 text-white hover:bg-emerald-700"
                                                                 >
-                                                                    View final report
+                                                                    {(project as { is_team_member?: boolean }).is_team_member
+                                                                        ? "View my participation"
+                                                                        : "View final report"}
                                                                 </Button>
                                                             </Link>
                                                         </div>

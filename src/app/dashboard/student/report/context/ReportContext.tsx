@@ -577,8 +577,8 @@ export function ReportProvider({ children }: { children: React.ReactNode }) {
     );
 
     const isTeamMemberAttendanceOnly = useMemo(
-        () => isTeamMemberAttendanceOnlyMode(data, signedInEmail, myParticipationIsTeamLead, isReadOnly),
-        [data, signedInEmail, myParticipationIsTeamLead, isReadOnly],
+        () => isTeamMemberAttendanceOnlyMode(data, signedInEmail, myParticipationIsTeamLead),
+        [data.section1, signedInEmail, myParticipationIsTeamLead],
     );
 
     const isReportSectionsReadOnly = useMemo(

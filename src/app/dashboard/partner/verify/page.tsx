@@ -505,10 +505,10 @@ export default function VerifyWorkPage() {
             <div>
                 <h1 className="text-3xl font-bold text-slate-900">Partner Opportunity Approvals</h1>
                 <p className="text-slate-500">
-                    Yahan woh opportunities aati hain jinhon ne create karte waqt aapki NGO ko partner ke taur par add kiya ho.
+                    Opportunities appear here when a student listed your organisation as the partner while creating the project.
                 </p>
                 <p className="text-slate-500 text-sm mt-2">
-                    Ye report verification nahi hai. Ye partner approval queue hai, faculty approvals ke flow ki tarah.
+                    This is not impact report verification. It is the partner approval queue, similar to the faculty approvals flow.
                 </p>
             </div>
 
@@ -549,8 +549,8 @@ export default function VerifyWorkPage() {
                         </h3>
                         <p className="text-slate-500">
                             {tab === "pending"
-                                ? "Jab kisi opportunity mein aapki NGO partner ke taur par add hogi aur aapka step aayega, woh yahan nazar aayegi."
-                                : "Past partner-linked workflow items yahan appear hongi."}
+                                ? "When an opportunity lists your organisation as partner and your review step is due, it will appear here."
+                                : "Past partner-linked workflow items will appear here."}
                         </p>
                     </div>
                 ) : (

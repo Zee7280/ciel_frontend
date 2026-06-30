@@ -68,6 +68,7 @@ type TrackerOpportunitySnapshot = {
     partnerOrganizationEmail: string | null;
     facultySupervisorName: string | null;
     facultySupervisorEmail: string | null;
+    attendanceRoutingOverride: "auto" | "partner" | "faculty";
     awaitingLane: string | null;
     pipeline: Record<string, number>;
     pipelineTotal: number;
@@ -502,6 +503,14 @@ function extractTrackerSnapshot(summaryRaw: Record<string, unknown> | null): Tra
             pickString(o ?? {}, ["faculty_supervisor_name", "facultySupervisorName"]) || null,
         facultySupervisorEmail:
             pickString(o ?? {}, ["faculty_supervisor_email", "facultySupervisorEmail"]) || null,
+        attendanceRoutingOverride: (() => {
+            const rawOverride = pickString(o ?? {}, [
+                "attendance_routing_override",
+                "attendanceRoutingOverride",
+            ]);
+            if (rawOverride === "partner" || rawOverride === "faculty") return rawOverride;
+            return "auto";
+        })(),
         awaitingLane: humanizeApprovalLane(
             pickString(o ?? {}, ["awaiting_partner_or_faculty", "awaitingPartnerOrFaculty"]) || null,
         ),
@@ -515,6 +524,8 @@ export function ProjectTrackerModal({ row, onClose, onOpenTeamsEnrollments }: Pr
     const [roster, setRoster] = useState<ApplicationRosterRow[]>([]);
     const [snapshot, setSnapshot] = useState<TrackerOpportunitySnapshot | null>(null);
     const [enrollmentCount, setEnrollmentCount] = useState(0);
+    const [attendanceRoutingOverride, setAttendanceRoutingOverride] = useState<"auto" | "partner" | "faculty">("auto");
+    const [attendanceRoutingSaving, setAttendanceRoutingSaving] = useState(false);
 
     const load = useCallback(async () => {
         setLoading(true);
@@ -545,7 +556,9 @@ export function ProjectTrackerModal({ row, onClose, onOpenTeamsEnrollments }: Pr
                     ? (payload.summary as Record<string, unknown>)
                     : null;
             setRoster(extractApplicationsRoster(summaryRaw));
-            setSnapshot(extractTrackerSnapshot(summaryRaw));
+            const nextSnapshot = extractTrackerSnapshot(summaryRaw);
+            setSnapshot(nextSnapshot);
+            setAttendanceRoutingOverride(nextSnapshot?.attendanceRoutingOverride ?? "auto");
             const reg = Number(summaryRaw?.registered_teams ?? summaryRaw?.registeredTeams);
             setEnrollmentCount(Number.isFinite(reg) && reg >= 0 ? reg : 0);
         } catch {
@@ -556,6 +569,36 @@ export function ProjectTrackerModal({ row, onClose, onOpenTeamsEnrollments }: Pr
             setLoading(false);
         }
     }, [row.id]);
+
+    const saveAttendanceRouting = useCallback(async () => {
+        setAttendanceRoutingSaving(true);
+        try {
+            const res = await authenticatedFetch(
+                `/api/v1/admin/opportunities/${encodeURIComponent(row.id)}/attendance-routing`,
+                {
+                    method: "PATCH",
+                    body: JSON.stringify({ override: attendanceRoutingOverride }),
+                },
+            );
+            const data = res ? await res.json().catch(() => ({})) : {};
+            if (res?.ok) {
+                toast.success("Attendance routing updated");
+                setSnapshot((prev) =>
+                    prev ? { ...prev, attendanceRoutingOverride } : prev,
+                );
+            } else {
+                toast.error(
+                    typeof (data as { message?: string }).message === "string"
+                        ? (data as { message: string }).message
+                        : "Could not update attendance routing",
+                );
+            }
+        } catch {
+            toast.error("Could not update attendance routing");
+        } finally {
+            setAttendanceRoutingSaving(false);
+        }
+    }, [attendanceRoutingOverride, row.id]);
 
     useEffect(() => {
         void load();
@@ -620,6 +663,17 @@ export function ProjectTrackerModal({ row, onClose, onOpenTeamsEnrollments }: Pr
                 value: [snapshot?.facultySupervisorName, snapshot?.facultySupervisorEmail]
                     .filter(Boolean)
                     .join(" · ") || "—",
+            },
+            {
+                label: "Attendance routing (effective)",
+                value:
+                    snapshot?.attendanceRoutingOverride === "partner"
+                        ? "Partner (admin override)"
+                        : snapshot?.attendanceRoutingOverride === "faculty"
+                          ? "Faculty (admin override)"
+                          : snapshot?.partnerOrganizationEmail || snapshot?.executingOrganizationEmail
+                            ? "Partner (auto)"
+                            : "Faculty (auto)",
             },
         ];
     }, [row, creator, snapshot]);
@@ -707,6 +761,55 @@ export function ProjectTrackerModal({ row, onClose, onOpenTeamsEnrollments }: Pr
                                     >
                                         <ExternalLink className="w-3.5 h-3.5" /> Open public listing
                                     </Link>
+                                </div>
+                            </section>
+
+                            <section className="rounded-xl border border-slate-100 bg-slate-50/60 p-4">
+                                <div className="flex items-start gap-2 mb-3">
+                                    <Info className="w-4 h-4 text-slate-500 mt-0.5 shrink-0" />
+                                    <div>
+                                        <h3 className="text-xs font-black uppercase tracking-wider text-slate-600">
+                                            Attendance routing override
+                                        </h3>
+                                        <p className="text-xs text-slate-500 mt-1">
+                                            Auto follows partner contact when present, otherwise faculty. Override only when
+                                            you need to force a queue.
+                                        </p>
+                                    </div>
+                                </div>
+                                <div className="flex flex-col sm:flex-row gap-3 sm:items-end">
+                                    <label className="flex-1 text-sm">
+                                        <span className="block text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1">
+                                            Queue
+                                        </span>
+                                        <select
+                                            value={attendanceRoutingOverride}
+                                            onChange={(e) =>
+                                                setAttendanceRoutingOverride(
+                                                    e.target.value as "auto" | "partner" | "faculty",
+                                                )
+                                            }
+                                            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-800"
+                                        >
+                                            <option value="auto">Auto (partner if contact exists)</option>
+                                            <option value="partner">Force partner queue</option>
+                                            <option value="faculty">Force faculty queue</option>
+                                        </select>
+                                    </label>
+                                    <button
+                                        type="button"
+                                        onClick={() => void saveAttendanceRouting()}
+                                        disabled={
+                                            attendanceRoutingSaving ||
+                                            attendanceRoutingOverride === snapshot?.attendanceRoutingOverride
+                                        }
+                                        className="inline-flex items-center justify-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-sm font-bold text-white disabled:opacity-50"
+                                    >
+                                        {attendanceRoutingSaving ? (
+                                            <Loader2 className="w-4 h-4 animate-spin" />
+                                        ) : null}
+                                        Save routing
+                                    </button>
                                 </div>
                             </section>
 

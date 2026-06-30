@@ -16,6 +16,7 @@ import AttendanceSummaryTable from "../../engagement/components/AttendanceSummar
 import EngagementOverview from "../../engagement/components/EngagementOverview";
 import TeamVerification from "./TeamVerification";
 import { prepareReportEvidenceForSave } from "../utils/evidenceUpload";
+import { formTeamFromLead } from "@/utils/participationGuide";
 import { buildIndividualRosterFromSection1, calculateEngagementMetrics, effectiveHoursFromLog } from "../utils/engagementMetrics";
 import { isAttendanceLogCountedForVerifiedMetrics } from "@/utils/attendanceApprovalEligibility";
 import { normalizeEngagementAttendanceLog } from "@/utils/engagementAttendanceMap";
@@ -445,7 +446,10 @@ export default function Section1Participation({ projectData }: { projectData?: a
             if (partRes && partRes.ok) {
                 const parts = await partRes.json();
                 console.log("[Identity] Found my records:", parts.data.map((p: any) => `${p.projectId}: ${p.id} (${p.email})`));
-                const myPart = parts.data.find((p: any) => p.projectId === projectIdFromUrl);
+                const myPart = parts.data.find(
+                    (p: any) =>
+                        p.projectId === projectIdFromUrl || p.project_id === projectIdFromUrl,
+                );
 
                 if (myPart) {
                     console.log(`[Identity] Syncing correct ID for this project: ${myPart.id}`);
@@ -1222,11 +1226,45 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                                 participation_type: newType
                                             });
 
-                                            const hasVerified = newMembers.some((m: any) => m.verified && m.id);
+                                            const hasVerified = newMembers.some((m: any) => m.verified && (m.id || m.participantId));
                                             if (hasVerified) {
+                                                const verifiedIds = newMembers
+                                                    .filter((m: any) => m.verified && (m.id || m.participantId))
+                                                    .map((m: any) => String(m.id || m.participantId));
                                                 try {
                                                     const projectId = data.project_id || projectIdFromUrl || '';
-                                                    if (projectId) {
+                                                    if (projectId && verifiedIds.length) {
+                                                        const formRes = await formTeamFromLead(projectId, verifiedIds);
+                                                        if (formRes?.ok) {
+                                                            const formJson = await formRes.json().catch(() => ({}));
+                                                            if (formJson?.data?.formed) {
+                                                                toast.success(
+                                                                    formJson.data.team_display_name
+                                                                        ? `Team formed: ${formJson.data.team_display_name}`
+                                                                        : "Your project is now a team project.",
+                                                                );
+                                                                if (formJson.data.team_id) {
+                                                                    setTeamId(formJson.data.team_id);
+                                                                }
+                                                            } else {
+                                                                const msg =
+                                                                    typeof formJson?.data?.message === "string"
+                                                                        ? formJson.data.message
+                                                                        : typeof formJson?.message === "string"
+                                                                          ? formJson.message
+                                                                          : "Team was not formed. Add verified members and try again.";
+                                                                toast.error(msg);
+                                                            }
+                                                        } else {
+                                                            const errJson = formRes
+                                                                ? await formRes.json().catch(() => ({}))
+                                                                : {};
+                                                            toast.error(
+                                                                typeof (errJson as { message?: string }).message === "string"
+                                                                    ? (errJson as { message: string }).message
+                                                                    : "Could not form team. Please try again.",
+                                                            );
+                                                        }
                                                         const payload = await prepareReportEvidenceForSave(
                                                             {
                                                                 ...data,

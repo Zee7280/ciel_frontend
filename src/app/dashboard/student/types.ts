@@ -116,5 +116,11 @@ export interface DashboardData {
     quickActions?: DashboardQuickActions;
     notificationsPreview?: DashboardNotificationsPreview;
     pendingSummary?: DashboardPendingSummary;
+    team_member_tasks?: Array<{
+        project_id: string;
+        title: string;
+        team_display_name: string | null;
+        href: string;
+    }>;
     student_analytics?: StudentDashboardAnalytics;
 }

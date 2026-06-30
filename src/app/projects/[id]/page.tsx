@@ -532,7 +532,7 @@ export default function ProjectDetailsPage() {
                         {applyLabel}
                     </Link>
                     <p className="text-[10px] text-center text-slate-400 font-black mt-6 tracking-widest uppercase italic">
-                        Apply flow student dashboard me available hai. Login karke Browse Opportunities se apply karein.
+                        Apply through the student dashboard. Sign in and use Browse Opportunities to apply.
                     </p>
                 </div>
             </div>

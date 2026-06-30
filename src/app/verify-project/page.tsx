@@ -79,7 +79,7 @@ function VerifyProjectContent() {
         const bearer = typeof window !== "undefined" ? window.localStorage.getItem("ciel_token") : null;
         if (!bearer) {
             setStatus("auth_required");
-            setMessage("Pehle login karein.");
+            setMessage("Please sign in first.");
             return;
         }
 

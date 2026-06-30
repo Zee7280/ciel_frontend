@@ -23,6 +23,7 @@ import {
     resolveApplyOpportunityToastMessage,
     isAlreadyAppliedApplyErrorMessage,
 } from "@/utils/applyOpportunityUx";
+import { fetchParticipationGuide, type ParticipationGuide } from "@/utils/participationGuide";
 
 export type ApplySuccessMeta = {
     applicationId?: string;
@@ -112,8 +113,17 @@ export default function ApplicationDialog({
     ]);
     const [applicantPhoneCountryKey, setApplicantPhoneCountryKey] = useState(DEFAULT_PHONE_COUNTRY_KEY);
     const [applicantPhoneNational, setApplicantPhoneNational] = useState("");
+    const [participationGuide, setParticipationGuide] = useState<ParticipationGuide | null>(null);
 
     // Reset state when dialog opens/closes
+    useEffect(() => {
+        if (open && opportunityId) {
+            void fetchParticipationGuide(opportunityId).then(setParticipationGuide);
+        } else if (!open) {
+            setParticipationGuide(null);
+        }
+    }, [open, opportunityId]);
+
     useEffect(() => {
         if (open) {
             setParticipationType("individual");
@@ -496,6 +506,11 @@ export default function ApplicationDialog({
                 </DialogHeader>
 
                 <div className="space-y-8 py-4 px-1">
+                    {participationGuide?.messages?.en ? (
+                        <div className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">
+                            {participationGuide.messages.en}
+                        </div>
+                    ) : null}
                     <div className="space-y-3">
                         <Label className="text-base font-semibold">Participation Type</Label>
                         <RadioGroup
@@ -507,14 +522,14 @@ export default function ApplicationDialog({
                                 <RadioGroupItem value="individual" id="individual" className="sr-only" />
                                 <User className={`w-10 h-10 mb-4 ${participationType === 'individual' ? 'text-primary' : 'text-slate-400'}`} />
                                 <span className="font-bold text-lg">Individual</span>
-                                <span className="text-sm text-slate-500 text-center mt-1">I will participate on my own</span>
+                                <span className="text-sm text-slate-500 text-center mt-1">Starting my own work on this project (add teammates later in Section 1)</span>
                             </label>
 
-                            <label className={`flex flex-col items-center justify-between rounded-xl border-2 p-6 hover:bg-slate-50 cursor-pointer transition-all ${participationType === 'team' ? 'border-primary bg-blue-50/50' : 'border-slate-200'}`}>
+                            <label className={`flex flex-col items-center justify-between rounded-xl border-2 p-6 hover:bg-slate-50 cursor-pointer transition-all ${participationType === 'team' ? 'border-primary bg-blue-50/50' : 'border-slate-200'} ${participationGuide && !participationGuide.can_apply_as_team_lead ? 'opacity-50 pointer-events-none' : ''}`}>
                                 <RadioGroupItem value="team" id="team" className="sr-only" />
                                 <Users className={`w-10 h-10 mb-4 ${participationType === 'team' ? 'text-primary' : 'text-slate-400'}`} />
                                 <span className="font-bold text-lg">Team</span>
-                                <span className="text-sm text-slate-500 text-center mt-1">I am leading a group of students</span>
+                                <span className="text-sm text-slate-500 text-center mt-1">I am leading a new group (not joining someone who already started)</span>
                             </label>
                         </RadioGroup>
                     </div>

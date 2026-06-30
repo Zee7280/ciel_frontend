@@ -28,24 +28,31 @@ export function isTeamLeadForReportSubmit(
         return selfEmail === leadEmail;
     }
 
-    // Fail closed for team projects when lead identity is unclear.
     return false;
 }
 
-/** Teammate: attendance in Section 1 only; sections 2–10 read-only; no submit. */
-export function isTeamMemberAttendanceOnlyMode(
+/** Stable team-member role (stays true even when report is read-only). */
+export function isTeamMemberRole(
     data: Pick<ReportData, "section1">,
     userEmail?: string | null,
     myParticipationIsTeamLead?: boolean | null,
-    reportLocked?: boolean,
 ): boolean {
-    if (reportLocked) {
-        return false;
-    }
     if (data.section1?.participation_type !== "team") {
         return false;
     }
     return !isTeamLeadForReportSubmit(data, userEmail, myParticipationIsTeamLead);
+}
+
+/** Teammate: Section 1 attendance only; no draft save / submit on sections 2–11. */
+export function isTeamMemberAttendanceOnlyMode(
+    data: Pick<ReportData, "section1">,
+    userEmail?: string | null,
+    myParticipationIsTeamLead?: boolean | null,
+): boolean {
+    if (myParticipationIsTeamLead === false) {
+        return true;
+    }
+    return isTeamMemberRole(data, userEmail, myParticipationIsTeamLead);
 }
 
 export function canFinalizeReportSubmit(

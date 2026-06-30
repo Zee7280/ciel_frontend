@@ -41,20 +41,20 @@ export function friendlyVerificationVerifyMessage(apiMessage: string | undefined
     return raw;
 }
 
-/** Urdu-first defaults; backend `message` wins when present (403). */
+/** English defaults; backend `message` wins when present (403). */
 export function resolveVerificationVerifyUserMessage(apiMessage: string | undefined, httpStatus: number): string {
     const trimmed = (apiMessage || "").trim();
     if (httpStatus === 401) {
-        return trimmed || "Pehle login karein.";
+        return trimmed || "Please sign in first.";
     }
     if (httpStatus === 403) {
         return (
             trimmed ||
-            "Ye link is account se link nahi hai. Galat account hai — jis email par yeh link aayi thi usi email ke CIEL account se login karein."
+            "This link is not linked to your account. Sign in with the same email address that received this verification link."
         );
     }
     if (httpStatus === 404) {
-        return trimmed || "Ye link invalid ya expiry ho chuka hai.";
+        return trimmed || "This link is invalid or has expired.";
     }
     const friendly = friendlyVerificationVerifyMessage(trimmed, httpStatus);
     if (friendly) return friendly;

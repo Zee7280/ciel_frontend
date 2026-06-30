@@ -25,6 +25,7 @@ import { copyOpportunityShareLink } from "@/utils/opportunityShareLink";
 import { toast } from "sonner";
 import Link from "next/link";
 import ApplicationDialog from "../components/ApplicationDialog";
+import { fetchParticipationGuide, type ParticipationGuide } from "@/utils/participationGuide";
 import {
     readStudentInstitutionFromBrowserStorage,
     resolveStudentUniversityApplyEligibility,
@@ -124,6 +125,7 @@ export default function OpportunityDetailsPage() {
     const [opportunity, setOpportunity] = useState<OpportunityDetail | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [isPopupOpen, setIsPopupOpen] = useState(false);
+    const [participationGuide, setParticipationGuide] = useState<ParticipationGuide | null>(null);
     const [viewerNavRole, setViewerNavRole] = useState<DashboardNavRole | null>(null);
 
     useLayoutEffect(() => {
@@ -133,6 +135,7 @@ export default function OpportunityDetailsPage() {
     useEffect(() => {
         if (id) {
             fetchOpportunityDetails();
+            void fetchParticipationGuide(id).then(setParticipationGuide);
         }
     }, [id]);
 
@@ -327,6 +330,12 @@ export default function OpportunityDetailsPage() {
                         <p className="font-semibold">Applications are not open for your university on this listing</p>
                         <p className="text-rose-900/90 mt-1">{applyEligibility.blockedReason}</p>
                     </div>
+                </div>
+            ) : null}
+            {participationGuide?.messages?.en && !hideStudentApplyActions ? (
+                <div className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900 flex gap-3 items-start print:hidden">
+                    <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
+                    <p>{participationGuide.messages.en}</p>
                 </div>
             ) : null}
             {/* Header Actions */}

@@ -612,7 +612,11 @@ function extractTeamRows(body: unknown): TeamOverviewRow[] {
                 : [];
             return {
                 id,
-                teamName: pickString(raw, ["team_name", "teamName", "name"], "Untitled team"),
+                teamName: pickString(
+                    raw,
+                    ["team_display_name", "teamDisplayName", "team_name", "teamName", "name"],
+                    "Untitled team",
+                ),
                 leadName: pickString(raw, ["lead_name", "leadName", "student_name", "studentName"], members[0]?.name || "—"),
                 reportStatus: pickString(raw, ["report_status", "reportStatus", "status"], "not_started").replace(/_/g, " "),
                 reportAvailable: pickBoolean(raw, ["report_available", "reportAvailable", "is_report_available", "isReportAvailable"]),

@@ -120,6 +120,7 @@ function ReportFormContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const projectId = searchParams.get('project') || searchParams.get('projectId');
+    const memberAttendanceMode = searchParams.get('mode') === 'member-attendance';
     const {
         activeStep,
         nextStep,
@@ -148,6 +149,25 @@ function ReportFormContent() {
     const [projectDetails, setProjectDetails] = React.useState<ProjectDetails | null>(null);
     const [isLoading, setIsLoading] = React.useState(true);
     const [showGuide, setShowGuide] = React.useState(true);
+
+    React.useEffect(() => {
+        if (memberAttendanceMode) {
+            setMyParticipationIsTeamLead(false);
+        }
+    }, [memberAttendanceMode, setMyParticipationIsTeamLead]);
+
+    const resolveEngagementSeatForProject = React.useCallback(async () => {
+        const myRes = await authenticatedFetch(`/api/v1/engagement/my`);
+        if (!myRes?.ok) return null;
+        const myJson = await myRes.json().catch(() => ({}));
+        const rows = Array.isArray(myJson.data) ? myJson.data : [];
+        return (
+            rows.find(
+                (p: { projectId?: string; project_id?: string }) =>
+                    p && (p.projectId === projectId || p.project_id === projectId),
+            ) ?? null
+        );
+    }, [projectId]);
 
     // Initial Load
     React.useEffect(() => {
@@ -186,6 +206,28 @@ function ReportFormContent() {
                     router.push('/dashboard/student');
                     return;
                 }
+            }
+
+            const myPart = await resolveEngagementSeatForProject();
+            if (myPart) {
+                const isLeadFlag =
+                    myPart.isTeamLead === true ||
+                    myPart.is_team_lead === true ||
+                    String(myPart.is_team_lead ?? "").toLowerCase() === "true";
+                const isTeamMemberSeat =
+                    (myPart.participationMode === "team" || myPart.participation_mode === "team") &&
+                    !isLeadFlag;
+                if (isTeamMemberSeat && !memberAttendanceMode) {
+                    router.replace(
+                        `/dashboard/student/projects/${encodeURIComponent(projectId)}/participation`,
+                    );
+                    return;
+                }
+                setMyParticipationIsTeamLead(isLeadFlag);
+            } else if (memberAttendanceMode) {
+                setMyParticipationIsTeamLead(false);
+            } else {
+                setMyParticipationIsTeamLead(null);
             }
 
             const pickOpportunityTitle = (p: Record<string, unknown> | null): string => {
@@ -237,6 +279,15 @@ function ReportFormContent() {
                                     myPart.isTeamLead === true ||
                                     myPart.is_team_lead === true ||
                                     String(myPart.is_team_lead ?? "").toLowerCase() === "true";
+                                const isTeamMemberSeat =
+                                    (myPart.participationMode === "team" || myPart.participation_mode === "team") &&
+                                    !isLeadFlag;
+                                if (isTeamMemberSeat && !memberAttendanceMode) {
+                                    router.replace(
+                                        `/dashboard/student/projects/${encodeURIComponent(projectId)}/participation`,
+                                    );
+                                    return;
+                                }
                                 setMyParticipationIsTeamLead(isLeadFlag);
                                 const teamRes = await authenticatedFetch(
                                     `/api/v1/engagement/project/${encodeURIComponent(projectId)}/team`,
@@ -678,7 +729,7 @@ function ReportFormContent() {
         [canSubmitReport, isReadOnly, needsRevision, reportStatusLower],
     );
     const stepperLockedToSummaryOnly = summaryOnlyWorkspace || ciiVerifiedSummaryLock;
-    const stepperLockedToSection1Only = isTeamMemberAttendanceOnly && !isReadOnly;
+    const stepperLockedToSection1Only = isTeamMemberAttendanceOnly;
 
     React.useEffect(() => {
         if (isLoading || showGuide) return;
@@ -741,7 +792,7 @@ function ReportFormContent() {
                     </div>
 
                     {/* Eligibility Banner */}
-                    {isTeamMemberAttendanceOnly && !isReadOnly ? (
+                    {isTeamMemberAttendanceOnly ? (
                         <div className="hidden md:flex items-center gap-2.5 px-3 py-1.5 rounded-xl border bg-sky-50 border-sky-100 text-sky-800 shadow-sm max-w-md">
                             <div className="w-2.5 h-2.5 rounded-full bg-sky-500 animate-pulse" />
                             <div className="flex flex-col">

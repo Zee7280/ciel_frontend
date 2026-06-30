@@ -1,14 +1,40 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Loader2, AlertCircle, FileText, ChevronRight, Shield, Clock, TrendingUp } from "lucide-react";
+import { Loader2, AlertCircle, FileText, ChevronRight, Shield, Clock, TrendingUp, Users } from "lucide-react";
 import { authenticatedFetch } from "@/utils/api";
 import Link from "next/link";
 import EngagementOverview from "./components/EngagementOverview";
 
+type EngagementSeat = {
+    id: string;
+    projectId?: string;
+    project_id?: string;
+    participationMode?: string;
+    participation_mode?: string;
+    isTeamLead?: boolean;
+    is_team_lead?: boolean;
+    teamDisplayName?: string | null;
+    team_display_name?: string | null;
+    project?: { title?: string };
+};
+
+function participationRoleLabel(seat: EngagementSeat): { label: string; tone: string } {
+    const mode = seat.participationMode ?? seat.participation_mode ?? "individual";
+    const isLead = seat.isTeamLead === true || seat.is_team_lead === true;
+    if (mode === "team" && isLead) {
+        return { label: "Team lead", tone: "bg-violet-50 text-violet-700 border-violet-100" };
+    }
+    if (mode === "team") {
+        return { label: "Team member · attendance only", tone: "bg-amber-50 text-amber-800 border-amber-100" };
+    }
+    return { label: "Individual", tone: "bg-slate-50 text-slate-600 border-slate-200" };
+}
+
 export default function EngagementDashboard() {
     const [metrics, setMetrics] = useState<any>(null);
     const [summary, setSummary] = useState<string>("");
+    const [seats, setSeats] = useState<EngagementSeat[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
@@ -25,6 +51,7 @@ export default function EngagementDashboard() {
                 if (res && res.ok) {
                     const result = await res.json();
                     if (result.success && result.data.length > 0) {
+                        setSeats(result.data);
                         const participantId = result.data[0].id;
 
                         // 2. Fetch metrics
@@ -79,6 +106,48 @@ export default function EngagementDashboard() {
                     <p className="text-slate-500 font-medium">Identity authentication & engagement intensity tracking</p>
                 </div>
             </header>
+
+            {seats.length > 0 ? (
+                <section className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm sm:p-5">
+                    <div className="flex items-center gap-2 mb-3">
+                        <Users className="w-4 h-4 text-slate-500" />
+                        <h2 className="text-sm font-bold text-slate-800">Your participation roles</h2>
+                    </div>
+                    <div className="flex flex-col gap-2">
+                        {seats.map((seat) => {
+                            const role = participationRoleLabel(seat);
+                            const projectId = String(seat.projectId ?? seat.project_id ?? "");
+                            const isMember = role.label.startsWith("Team member");
+                            const href = isMember
+                                ? `/dashboard/student/projects/${projectId}/participation`
+                                : `/dashboard/student/report?projectId=${encodeURIComponent(projectId)}`;
+                            const displayName =
+                                seat.teamDisplayName ?? seat.team_display_name ?? seat.project?.title ?? "Project";
+                            return (
+                                <Link
+                                    key={seat.id}
+                                    href={href}
+                                    className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-xl border border-slate-100 px-4 py-3 hover:border-blue-200 hover:bg-blue-50/40 transition-colors"
+                                >
+                                    <div className="min-w-0">
+                                        <p className="font-semibold text-slate-900 truncate">{displayName}</p>
+                                        {isMember ? (
+                                            <p className="text-xs text-slate-500 mt-0.5">
+                                                Team lead files the report — you log attendance only.
+                                            </p>
+                                        ) : null}
+                                    </div>
+                                    <span
+                                        className={`inline-flex self-start shrink-0 rounded-full border px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wide ${role.tone}`}
+                                    >
+                                        {role.label}
+                                    </span>
+                                </Link>
+                            );
+                        })}
+                    </div>
+                </section>
+            ) : null}
 
             {metrics && <EngagementOverview metrics={metrics} />}
 

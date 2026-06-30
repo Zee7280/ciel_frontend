@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { proxyNestJson } from "../../../../../../../_lib/nestProxy";
 
 /**
  * Next: PATCH /api/v1/admin/opportunities/:opportunityId/teams/:teamId/members/:memberId
@@ -10,50 +11,13 @@ export async function PATCH(
 ) {
     try {
         const { id, teamId, memberId } = await params;
-        const backendBase = process.env.NEXT_PUBLIC_BACKEND_BASE_URL?.replace(/\/+$/, "");
-        if (!backendBase) {
-            return NextResponse.json({ success: false, message: "Backend URL is not configured" }, { status: 500 });
-        }
-
-        const authHeader = request.headers.get("Authorization");
-        let bodyPayload: Record<string, unknown> = {};
-        try {
-            const raw = await request.json();
-            bodyPayload =
-                typeof raw === "object" && raw !== null ? (raw as Record<string, unknown>) : {};
-        } catch {
-            bodyPayload = {};
-        }
-
-        const response = await fetch(
-            `${backendBase}/admin/opportunities/${encodeURIComponent(id)}/teams/${encodeURIComponent(teamId)}/members/${encodeURIComponent(memberId)}`,
-            {
-                method: "PATCH",
-                headers: {
-                    "Content-Type": "application/json",
-                    Authorization: authHeader || "",
-                },
-                body: JSON.stringify(bodyPayload),
-            },
+        return proxyNestJson(
+            request,
+            `admin/opportunities/${encodeURIComponent(id)}/teams/${encodeURIComponent(teamId)}/members/${encodeURIComponent(memberId)}`,
+            { defaultErrorMessage: "Failed to update member" },
         );
-
-        const payload = await response.json().catch(() => ({}));
-        if (!response.ok) {
-            return NextResponse.json(
-                {
-                    success: false,
-                    message:
-                        (payload as { message?: string; error?: string }).message ||
-                        (payload as { message?: string; error?: string }).error ||
-                        "Failed to update member",
-                },
-                { status: response.status },
-            );
-        }
-
-        return NextResponse.json(typeof payload === "object" && payload !== null ? payload : { success: true });
     } catch (error) {
-        console.error("admin/opportunities/[id]/teams/[teamId]/members/[memberId] PATCH proxy:", error);
+        console.error("admin team member PATCH proxy:", error);
         return NextResponse.json({ success: false, message: "Internal Server Error" }, { status: 500 });
     }
 }
@@ -68,44 +32,17 @@ export async function DELETE(
 ) {
     try {
         const { id, teamId, memberId } = await params;
-        const backendBase = process.env.NEXT_PUBLIC_BACKEND_BASE_URL?.replace(/\/+$/, "");
-        if (!backendBase) {
-            return NextResponse.json({ success: false, message: "Backend URL is not configured" }, { status: 500 });
-        }
-
-        const authHeader = request.headers.get("Authorization");
-        const response = await fetch(
-            `${backendBase}/admin/opportunities/${encodeURIComponent(id)}/teams/${encodeURIComponent(teamId)}/members/${encodeURIComponent(memberId)}`,
-            {
-                method: "DELETE",
-                headers: {
-                    "Content-Type": "application/json",
-                    Authorization: authHeader || "",
-                },
-            },
-        );
-
+        const basePath = `admin/opportunities/${encodeURIComponent(id)}/teams/${encodeURIComponent(teamId)}/members/${encodeURIComponent(memberId)}`;
+        const response = await proxyNestJson(request, basePath, {
+            method: "DELETE",
+            defaultErrorMessage: "Failed to remove member",
+        });
         if (response.status === 204) {
             return new NextResponse(null, { status: 204 });
         }
-
-        const payload = await response.json().catch(() => ({}));
-        if (!response.ok) {
-            return NextResponse.json(
-                {
-                    success: false,
-                    message:
-                        (payload as { message?: string; error?: string }).message ||
-                        (payload as { message?: string; error?: string }).error ||
-                        "Failed to remove member",
-                },
-                { status: response.status },
-            );
-        }
-
-        return NextResponse.json(typeof payload === "object" && payload !== null ? payload : { success: true });
+        return response;
     } catch (error) {
-        console.error("admin/opportunities/[id]/teams/[teamId]/members/[memberId] DELETE proxy:", error);
+        console.error("admin team member DELETE proxy:", error);
         return NextResponse.json({ success: false, message: "Internal Server Error" }, { status: 500 });
     }
 }
