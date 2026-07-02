@@ -19,7 +19,7 @@ export default function FinalCTA() {
                             Register as Student
                         </Link>
                         <Link
-                            href="/signup?role=partner"
+                            href="/signup?role=ngo"
                             className="inline-flex min-h-[48px] items-center justify-center rounded-xl border border-white bg-transparent px-8 py-3.5 text-center text-base font-bold text-white transition hover:bg-white/10"
                         >
                             Partner With Us

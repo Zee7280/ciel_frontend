@@ -7,7 +7,6 @@ import {
     Eye, 
     Search, 
     Loader2, 
-    Filter, 
     Download, 
     ExternalLink,
     CreditCard,
@@ -22,7 +21,6 @@ import { toast } from 'sonner';
 import { Button } from '../../student/report/components/ui/button';
 import { Card, CardContent, CardHeader } from '../../student/report/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '../../student/report/components/ui/dialog';
-import { Badge } from '../../student/report/components/ui/badge';
 import { Input } from '../../student/report/components/ui/input';
 import { formatPkrAmount, REPORTING_FEE_DISPLAY } from '@/config/reportingFee';
 
@@ -84,11 +82,29 @@ interface Payment {
     reportingFeePerMemberPkr: number | null;
     expectedPaidAmountPkr: number | null;
     submittedByIsTeamLead: boolean;
+    submissionNumber?: number;
+    submissionTotal?: number;
     /** When the admin last verified (approve/reject). */
     reviewedAt?: string;
     /** Display name or email of the admin who verified. */
     reviewedBy?: string;
     feedback?: string;
+}
+
+function extractPaymentRows(payload: unknown): Record<string, unknown>[] {
+    if (Array.isArray(payload)) {
+        return payload.filter((row): row is Record<string, unknown> => !!row && typeof row === "object");
+    }
+    if (payload && typeof payload === "object") {
+        const obj = payload as Record<string, unknown>;
+        if (Array.isArray(obj.payments)) {
+            return obj.payments.filter((row): row is Record<string, unknown> => !!row && typeof row === "object");
+        }
+        if (Array.isArray(obj.data)) {
+            return obj.data.filter((row): row is Record<string, unknown> => !!row && typeof row === "object");
+        }
+    }
+    return [];
 }
 
 function readTeamMembers(raw: Record<string, unknown>): PaymentTeamMember[] {
@@ -174,6 +190,8 @@ function normalizePayment(raw: Record<string, unknown>, fallbackStatus: PaymentS
     );
     const submittedByIsTeamLead =
         submittedBy?.is_team_lead === true || submittedBy?.isTeamLead === true;
+    const submissionNumber = readPositiveInt(raw.submission_number ?? raw.submissionNumber) ?? undefined;
+    const submissionTotal = readPositiveInt(raw.submission_total ?? raw.submissionTotal) ?? undefined;
     return {
         id,
         studentName: submittedBy?.name != null ? String(submittedBy.name) : studentName,
@@ -190,6 +208,8 @@ function normalizePayment(raw: Record<string, unknown>, fallbackStatus: PaymentS
         reportingFeePerMemberPkr,
         expectedPaidAmountPkr,
         submittedByIsTeamLead,
+        submissionNumber,
+        submissionTotal,
         reviewedAt,
         reviewedBy,
         feedback,
@@ -205,6 +225,24 @@ function formatTeamMembersSummary(members: PaymentTeamMember[], max = 3): string
     const rest = members.length - shown.length;
     return rest > 0 ? `${shown.join(', ')} +${rest} more` : shown.join(', ');
 }
+
+function formatPaymentDate(iso: string): string {
+    if (!iso) return '—';
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return '—';
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function formatPaymentDateTime(iso: string): string {
+    if (!iso) return '—';
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return '—';
+    return d.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+}
+
+const TH =
+    'px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500 whitespace-nowrap';
+const TD = 'px-4 py-3 align-middle text-sm text-slate-700';
 
 export default function AdminPaymentsPage() {
     const [activeTab, setActiveTab] = useState<PaymentStatusTab>('pending');
@@ -225,14 +263,71 @@ export default function AdminPaymentsPage() {
     const [revertReason, setRevertReason] = useState("");
     const [isRevertSubmitting, setIsRevertSubmitting] = useState(false);
 
+    const [submissionHistory, setSubmissionHistory] = useState<Payment[]>([]);
+    const [submissionHistoryLoading, setSubmissionHistoryLoading] = useState(false);
+    const [previewSubmissionId, setPreviewSubmissionId] = useState<string | null>(null);
+
+    const mapPaymentRows = useCallback(
+        (rawList: unknown, fallbackStatus: PaymentStatusTab): Payment[] =>
+            extractPaymentRows(rawList)
+                .map((row) => normalizePayment(row, fallbackStatus))
+                .filter((row) => row.id.trim() !== ""),
+        [],
+    );
+
+    const loadSubmissionHistory = useCallback(
+        async (payment: Payment) => {
+            setSubmissionHistoryLoading(true);
+            setPreviewSubmissionId(payment.id);
+            try {
+                const res = await authenticatedFetch(
+                    `/api/v1/admin/payments/${encodeURIComponent(payment.id)}/submissions`,
+                );
+                if (res?.ok) {
+                    const data = await res.json();
+                    if (data.success) {
+                        const list = mapPaymentRows(data.data, payment.status);
+                        setSubmissionHistory(list.length > 0 ? list : [payment]);
+                        const active =
+                            list.find((row) => row.id === payment.id) ??
+                            list[list.length - 1] ??
+                            payment;
+                        setPreviewSubmissionId(active.id);
+                        return;
+                    }
+                }
+                setSubmissionHistory([payment]);
+                setPreviewSubmissionId(payment.id);
+            } catch {
+                setSubmissionHistory([payment]);
+                setPreviewSubmissionId(payment.id);
+            } finally {
+                setSubmissionHistoryLoading(false);
+            }
+        },
+        [mapPaymentRows],
+    );
+
+    const openPaymentPreview = useCallback(
+        (payment: Payment) => {
+            setSelectedPayment(payment);
+            setIsPreviewOpen(true);
+            void loadSubmissionHistory(payment);
+        },
+        [loadSubmissionHistory],
+    );
+
+    const previewPayment =
+        submissionHistory.find((row) => row.id === previewSubmissionId) ?? selectedPayment;
+
     const refreshPendingCount = useCallback(async () => {
         try {
             const res = await authenticatedFetch(`/api/v1/admin/payments/pending`);
             if (res && res.ok) {
                 const data = await res.json();
                 if (data.success) {
-                    const list = data.data || [];
-                    setPendingCount(Array.isArray(list) ? list.length : 0);
+                    const list = extractPaymentRows(data.data);
+                    setPendingCount(list.length);
                 }
             }
         } catch {
@@ -248,10 +343,7 @@ export default function AdminPaymentsPage() {
                 if (res && res.ok) {
                     const data = await res.json();
                     if (data.success) {
-                        const rawList = data.data || [];
-                        const list = Array.isArray(rawList)
-                            ? rawList.map((row: Record<string, unknown>) => normalizePayment(row, 'pending'))
-                            : [];
+                        const list = mapPaymentRows(data.data, 'pending');
                         setPayments(list);
                         setPendingCount(list.length);
                     }
@@ -266,10 +358,7 @@ export default function AdminPaymentsPage() {
                 if (res && res.ok) {
                     const data = await res.json();
                     if (data.success) {
-                        const rawList = data.data || [];
-                        const list = Array.isArray(rawList)
-                            ? rawList.map((row: Record<string, unknown>) => normalizePayment(row, status))
-                            : [];
+                        const list = mapPaymentRows(data.data, status);
                         setPayments(list);
                     } else {
                         setPayments([]);
@@ -288,7 +377,7 @@ export default function AdminPaymentsPage() {
         } finally {
             setIsLoading(false);
         }
-    }, [activeTab]);
+    }, [activeTab, mapPaymentRows]);
 
     useEffect(() => {
         void (async () => {
@@ -399,235 +488,270 @@ export default function AdminPaymentsPage() {
     }[activeTab];
 
     return (
-        <div className="space-y-6 p-0 sm:space-y-8 lg:p-8">
-            <div className="flex flex-col items-stretch justify-between gap-4 sm:flex-row sm:items-center">
-                <div className="min-w-0">
-                    <h1 className="text-2xl font-black tracking-tight text-slate-900 sm:text-3xl">Payment Verification</h1>
-                    <p className="text-slate-500 font-medium">Review and approve manual bank transfer receipts from students.</p>
+        <div className="mx-auto max-w-[1600px] space-y-6 p-4 sm:p-6 lg:p-8">
+            {/* Page header */}
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0 space-y-1">
+                    <p className="text-[11px] font-semibold uppercase tracking-widest text-blue-600">Admin</p>
+                    <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-[1.65rem]">
+                        Payment Verification
+                    </h1>
+                    <p className="max-w-2xl text-sm leading-relaxed text-slate-500">
+                        Review manual bank transfer receipts, approve reporting fees, and track submission history.
+                    </p>
                 </div>
-                <div className="flex items-center gap-3">
-                    <div className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 shadow-sm">
-                        <CreditCard className="w-5 h-5 text-blue-600" />
-                        <span className="font-bold text-slate-700">{pendingCount} Pending</span>
+                <div className="flex shrink-0 items-center gap-2 self-start rounded-xl border border-slate-200 bg-white px-4 py-2.5 shadow-sm">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
+                        <CreditCard className="h-4 w-4" />
+                    </div>
+                    <div>
+                        <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Awaiting review</p>
+                        <p className="text-lg font-bold tabular-nums text-slate-900">{pendingCount}</p>
                     </div>
                 </div>
             </div>
 
-            <div className="bg-white rounded-2xl p-1.5 border border-slate-200 shadow-sm inline-flex gap-1 flex-wrap">
-                {tabs.map((tab) => (
-                    <button
-                        key={tab.id}
-                        type="button"
-                        onClick={() => setActiveTab(tab.id)}
-                        className={clsx(
-                            'px-5 py-2.5 rounded-xl font-bold text-sm transition-all',
-                            activeTab === tab.id
-                                ? 'bg-blue-600 text-white shadow-md shadow-blue-200'
-                                : 'text-slate-600 hover:bg-slate-50'
-                        )}
-                    >
-                        {tab.label}
-                        {tab.id === 'pending' ? (
-                            <span
-                                className={clsx(
-                                    'ml-2 px-2 py-0.5 rounded-lg text-xs font-black',
-                                    activeTab === tab.id ? 'bg-blue-500 text-white' : 'bg-slate-100 text-slate-600'
-                                )}
-                            >
-                                {pendingCount}
-                            </span>
-                        ) : null}
-                    </button>
-                ))}
+            {/* Tabs */}
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="inline-flex w-full max-w-md rounded-xl border border-slate-200 bg-white p-1 shadow-sm sm:w-auto">
+                    {tabs.map((tab) => (
+                        <button
+                            key={tab.id}
+                            type="button"
+                            onClick={() => setActiveTab(tab.id)}
+                            className={clsx(
+                                'flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-colors sm:flex-none',
+                                activeTab === tab.id
+                                    ? 'bg-slate-900 text-white shadow-sm'
+                                    : 'text-slate-600 hover:bg-slate-50',
+                            )}
+                        >
+                            {tab.label}
+                            {tab.id === 'pending' ? (
+                                <span
+                                    className={clsx(
+                                        'rounded-md px-1.5 py-0.5 text-[10px] font-bold tabular-nums',
+                                        activeTab === tab.id ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600',
+                                    )}
+                                >
+                                    {pendingCount}
+                                </span>
+                            ) : null}
+                        </button>
+                    ))}
+                </div>
+                <p className="text-xs text-slate-500">
+                    Showing <span className="font-semibold text-slate-700">{filteredPayments.length}</span>
+                    {searchQuery.trim() ? ' matching' : ''} {activeTab} payment{filteredPayments.length === 1 ? '' : 's'}
+                </p>
             </div>
 
-            <Card className="border-slate-200 shadow-sm overflow-hidden">
-                <CardHeader className="bg-slate-50/50 border-b border-slate-100 p-6">
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                        <div className="relative flex-1 max-w-md">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                            <Input 
-                                placeholder="Search by student or project..." 
-                                className="pl-10 bg-white border-slate-200"
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                            />
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <Button variant="outline" size="sm" className="gap-2">
-                                <Filter className="w-4 h-4" /> Filter
-                            </Button>
-                        </div>
+            <Card className="overflow-hidden rounded-xl border-slate-200 shadow-sm">
+                <CardHeader className="space-y-0 border-b border-slate-100 bg-slate-50/80 px-4 py-4 sm:px-5">
+                    <div className="relative max-w-lg">
+                        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                        <Input
+                            placeholder="Search student, email, project, or team member…"
+                            className="h-10 border-slate-200 bg-white pl-9 text-sm"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                        />
                     </div>
                 </CardHeader>
                 <CardContent className="p-0">
                     {isLoading ? (
-                        <div className="flex flex-col items-center justify-center py-20 gap-4">
-                            <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
-                            <p className="text-slate-500 font-medium">
-                                {activeTab === 'pending' ? 'Loading pending payments...' : `Loading ${activeTab} payments...`}
-                            </p>
+                        <div className="flex flex-col items-center justify-center gap-3 py-24">
+                            <Loader2 className="h-7 w-7 animate-spin text-blue-600" />
+                            <p className="text-sm font-medium text-slate-500">Loading {activeTab} payments…</p>
                         </div>
                     ) : filteredPayments.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center py-20 text-center space-y-4">
-                            <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center text-slate-300">
-                                <CreditCard className="w-8 h-8" />
+                        <div className="flex flex-col items-center justify-center space-y-3 px-6 py-24 text-center">
+                            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">
+                                <CreditCard className="h-6 w-6" />
                             </div>
-                            <div>
-                                <h3 className="text-lg font-bold text-slate-900">{emptyMessage.title}</h3>
-                                <p className="text-slate-500 text-sm max-w-md mx-auto px-4">{emptyMessage.body}</p>
+                            <div className="space-y-1">
+                                <h3 className="text-base font-semibold text-slate-900">{emptyMessage.title}</h3>
+                                <p className="mx-auto max-w-md text-sm text-slate-500">{emptyMessage.body}</p>
                             </div>
                         </div>
                     ) : (
                         <div className="overflow-x-auto">
-                            <table className="min-w-[980px] w-full border-collapse text-left">
-                                <thead>
-                                    <tr className="bg-slate-50 border-b border-slate-100">
-                                        <th className="px-6 py-4 text-xs font-black text-slate-400 uppercase tracking-widest">Submitted by</th>
-                                        <th className="px-6 py-4 text-xs font-black text-slate-400 uppercase tracking-widest">Project / Report</th>
-                                        <th className="px-6 py-4 text-xs font-black text-slate-400 uppercase tracking-widest">Amount</th>
-                                        <th className="px-6 py-4 text-xs font-black text-slate-400 uppercase tracking-widest">Submitted</th>
-                                        {activeTab !== 'pending' ? (
-                                            <th className="px-6 py-4 text-xs font-black text-slate-400 uppercase tracking-widest">Verified</th>
-                                        ) : null}
-                                        {activeTab === 'rejected' ? (
-                                            <th className="px-6 py-4 text-xs font-black text-slate-400 uppercase tracking-widest max-w-[200px]">Note</th>
-                                        ) : null}
-                                        <th className="px-6 py-4 text-xs font-black text-slate-400 uppercase tracking-widest text-right">Actions</th>
+                            <table className="w-full min-w-[1100px] border-collapse text-left">
+                                <thead className="sticky top-0 z-10 border-b border-slate-200 bg-slate-50/95 backdrop-blur-sm">
+                                    <tr>
+                                        <th className={TH}>Submitted by</th>
+                                        <th className={TH}>Team</th>
+                                        <th className={TH}>Project</th>
+                                        <th className={TH}>Amount</th>
+                                        <th className={TH}>Submitted</th>
+                                        <th className={TH}>Attempt</th>
+                                        {activeTab !== 'pending' ? <th className={TH}>Verified</th> : null}
+                                        {activeTab === 'rejected' ? <th className={TH}>Note</th> : null}
+                                        <th className={clsx(TH, 'text-right')}>Actions</th>
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-slate-100">
+                                <tbody className="divide-y divide-slate-100 bg-white">
                                     {filteredPayments.map((payment) => (
-                                        <tr key={payment.id} className="hover:bg-slate-50 transition-colors group">
-                                            <td className="px-6 py-4">
-                                                <div className="flex items-center gap-3">
-                                                    <div className="w-10 h-10 rounded-full bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-700 font-bold">
-                                                        {(payment.studentName || '?').charAt(0)}
+                                        <tr
+                                            key={payment.id}
+                                            className="transition-colors hover:bg-slate-50/80"
+                                        >
+                                            <td className={TD}>
+                                                <div className="flex min-w-[180px] max-w-[220px] items-center gap-2.5">
+                                                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-bold text-slate-600">
+                                                        {(payment.studentName || '?').charAt(0).toUpperCase()}
                                                     </div>
-                                                    <div>
-                                                        <p className="font-bold text-slate-900 leading-tight">{payment.studentName}</p>
-                                                        <p className="text-xs text-slate-500">{payment.studentEmail}</p>
+                                                    <div className="min-w-0">
+                                                        <p
+                                                            className="truncate text-sm font-semibold text-slate-900"
+                                                            title={payment.studentName}
+                                                        >
+                                                            {payment.studentName || '—'}
+                                                        </p>
+                                                        <p
+                                                            className="truncate text-xs text-slate-500"
+                                                            title={payment.studentEmail}
+                                                        >
+                                                            {payment.studentEmail}
+                                                        </p>
                                                         {payment.submittedByIsTeamLead ? (
-                                                            <Badge className="mt-1 h-5 border-0 bg-violet-100 px-1.5 text-[10px] font-black uppercase text-violet-800 hover:bg-violet-100">
+                                                            <span className="mt-1 inline-flex rounded-md bg-violet-50 px-1.5 py-0.5 text-[10px] font-semibold text-violet-700 ring-1 ring-inset ring-violet-200">
                                                                 Team lead
-                                                            </Badge>
+                                                            </span>
                                                         ) : null}
                                                     </div>
                                                 </div>
                                             </td>
-                                            <td className="px-6 py-4">
-                                                <p className="font-bold text-slate-800 leading-tight">{payment.projectTitle}</p>
-                                                <div className="mt-1 flex flex-wrap items-center gap-1">
-                                                    <Badge variant="outline" className="h-5 border-slate-200 text-[10px] font-black uppercase text-slate-400">
-                                                        Report Fee
-                                                    </Badge>
-                                                    <Badge
-                                                        variant="outline"
-                                                        className={`h-5 text-[10px] font-black uppercase ${
-                                                            payment.participationMode === 'team'
-                                                                ? 'border-indigo-200 text-indigo-800'
-                                                                : 'border-slate-200 text-slate-500'
-                                                        }`}
-                                                    >
-                                                        {payment.participationMode === 'team'
-                                                            ? `Team · ${payment.teamMemberCount} members`
-                                                            : 'Individual'}
-                                                    </Badge>
-                                                </div>
-                                                {payment.teamMembers.length > 0 ? (
+                                            <td className={TD}>
+                                                {payment.participationMode === 'team' ? (
+                                                    <div className="min-w-[120px] max-w-[160px] space-y-1">
+                                                        <span className="inline-flex rounded-md bg-indigo-50 px-2 py-0.5 text-[10px] font-semibold text-indigo-800 ring-1 ring-inset ring-indigo-200">
+                                                            {payment.teamMemberCount} members
+                                                        </span>
+                                                        {payment.teamMembers.length > 0 ? (
+                                                            <p
+                                                                className="line-clamp-2 text-[11px] leading-snug text-slate-500"
+                                                                title={formatTeamMembersSummary(payment.teamMembers, 20)}
+                                                            >
+                                                                {formatTeamMembersSummary(payment.teamMembers, 2)}
+                                                            </p>
+                                                        ) : null}
+                                                    </div>
+                                                ) : (
+                                                    <span className="text-xs font-medium text-slate-400">Individual</span>
+                                                )}
+                                            </td>
+                                            <td className={TD}>
+                                                <div className="min-w-[200px] max-w-[280px]">
                                                     <p
-                                                        className="mt-1.5 max-w-md text-xs leading-relaxed text-slate-500"
-                                                        title={payment.teamMembers
-                                                            .map((m) => {
-                                                                const who = m.name !== '—' ? m.name : m.email;
-                                                                return m.isTeamLead ? `${who} (lead)` : who;
-                                                            })
-                                                            .join(', ')}
+                                                        className="line-clamp-2 text-sm font-medium leading-snug text-slate-800"
+                                                        title={payment.projectTitle}
                                                     >
-                                                        {formatTeamMembersSummary(payment.teamMembers)}
+                                                        {payment.projectTitle || '—'}
                                                     </p>
-                                                ) : null}
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <span className="font-black text-slate-900">{payment.amount}</span>
-                                                {payment.participationMode === 'team' &&
-                                                payment.reportingFeePerMemberPkr != null ? (
-                                                    <p className="mt-0.5 text-xs text-slate-500">
-                                                        {payment.teamMemberCount} ×{' '}
-                                                        {formatPkrAmount(payment.reportingFeePerMemberPkr)}
-                                                    </p>
-                                                ) : null}
-                                                {payment.expectedPaidAmountPkr != null &&
-                                                payment.amount !== '—' &&
-                                                payment.amount.replace(/[^\d]/g, '') !==
-                                                    String(payment.expectedPaidAmountPkr) ? (
-                                                    <p className="mt-0.5 text-xs font-medium text-amber-700">
-                                                        Expected {formatPkrAmount(payment.expectedPaidAmountPkr)}
-                                                    </p>
-                                                ) : null}
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <div className="flex items-center gap-2 text-slate-500 text-sm">
-                                                    <Calendar className="w-3.5 h-3.5" />
-                                                    {payment.date ? new Date(payment.date).toLocaleDateString() : '—'}
+                                                    <span className="mt-1 inline-flex rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-600">
+                                                        Report fee
+                                                    </span>
                                                 </div>
+                                            </td>
+                                            <td className={TD}>
+                                                <div className="min-w-[100px] whitespace-nowrap">
+                                                    <p className="text-sm font-semibold tabular-nums text-slate-900">
+                                                        {payment.amount}
+                                                    </p>
+                                                    {payment.participationMode === 'team' &&
+                                                    payment.reportingFeePerMemberPkr != null ? (
+                                                        <p className="mt-0.5 text-[11px] text-slate-500">
+                                                            {payment.teamMemberCount} ×{' '}
+                                                            {formatPkrAmount(payment.reportingFeePerMemberPkr)}
+                                                        </p>
+                                                    ) : null}
+                                                    {payment.expectedPaidAmountPkr != null &&
+                                                    payment.amount !== '—' &&
+                                                    payment.amount.replace(/[^\d]/g, '') !==
+                                                        String(payment.expectedPaidAmountPkr) ? (
+                                                        <p className="mt-0.5 text-[11px] font-medium text-amber-700">
+                                                            Expected {formatPkrAmount(payment.expectedPaidAmountPkr)}
+                                                        </p>
+                                                    ) : null}
+                                                </div>
+                                            </td>
+                                            <td className={TD}>
+                                                <div className="flex items-center gap-1.5 whitespace-nowrap text-xs text-slate-600">
+                                                    <Calendar className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+                                                    {formatPaymentDate(payment.date)}
+                                                </div>
+                                            </td>
+                                            <td className={TD}>
+                                                {payment.submissionNumber && payment.submissionTotal ? (
+                                                    <span className="inline-flex rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-slate-700">
+                                                        {payment.submissionNumber} / {payment.submissionTotal}
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-xs text-slate-400">—</span>
+                                                )}
                                             </td>
                                             {activeTab !== 'pending' ? (
-                                                <td className="px-6 py-4 text-sm text-slate-600">
-                                                    <div className="flex flex-col gap-0.5">
-                                                        <span className="font-medium text-slate-800">
-                                                            {payment.reviewedAt
-                                                                ? new Date(payment.reviewedAt).toLocaleString()
-                                                                : '—'}
-                                                        </span>
+                                                <td className={TD}>
+                                                    <div className="min-w-[120px] space-y-0.5">
+                                                        <p className="text-xs font-medium text-slate-800">
+                                                            {formatPaymentDateTime(payment.reviewedAt || '')}
+                                                        </p>
                                                         {payment.reviewedBy ? (
-                                                            <span className="text-xs text-slate-500">by {payment.reviewedBy}</span>
+                                                            <p className="truncate text-[11px] text-slate-500" title={payment.reviewedBy}>
+                                                                by {payment.reviewedBy}
+                                                            </p>
                                                         ) : null}
                                                     </div>
                                                 </td>
                                             ) : null}
                                             {activeTab === 'rejected' ? (
-                                                <td className="px-6 py-4 text-xs text-slate-500 max-w-[220px] align-top">
-                                                    {payment.feedback || '—'}
+                                                <td className={TD}>
+                                                    <p
+                                                        className="line-clamp-3 max-w-[200px] text-xs leading-relaxed text-slate-600"
+                                                        title={payment.feedback || undefined}
+                                                    >
+                                                        {payment.feedback || '—'}
+                                                    </p>
                                                 </td>
                                             ) : null}
-                                            <td className="px-6 py-4 text-right">
-                                                <div className="flex items-center justify-end gap-2 flex-wrap">
-                                                    <Button 
-                                                        variant="ghost" 
-                                                        size="sm" 
-                                                        className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 font-bold"
-                                                        onClick={() => {
-                                                            setSelectedPayment(payment);
-                                                            setIsPreviewOpen(true);
-                                                        }}
+                                            <td className={clsx(TD, 'text-right')}>
+                                                <div className="flex items-center justify-end gap-1.5">
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        className="h-8 gap-1.5 border-slate-200 px-2.5 text-xs font-semibold text-slate-700"
+                                                        onClick={() => openPaymentPreview(payment)}
                                                     >
-                                                        <Eye className="w-4 h-4 mr-1.5" /> View Proof
+                                                        <Eye className="h-3.5 w-3.5" />
+                                                        <span className="hidden sm:inline">Proof</span>
                                                     </Button>
                                                     {activeTab === 'pending' ? (
                                                         <>
-                                                            <Button 
-                                                                size="sm" 
-                                                                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold"
+                                                            <Button
+                                                                size="sm"
+                                                                className="h-8 gap-1 bg-emerald-600 px-2.5 text-xs font-semibold hover:bg-emerald-700"
                                                                 onClick={() => {
                                                                     setSelectedPayment(payment);
                                                                     setActionType('approve');
                                                                     setIsActionOpen(true);
                                                                 }}
                                                             >
-                                                                <CheckCircle2 className="w-4 h-4 mr-1.5" /> Approve
+                                                                <CheckCircle2 className="h-3.5 w-3.5" />
+                                                                <span className="hidden md:inline">Approve</span>
                                                             </Button>
-                                                            <Button 
-                                                                variant="ghost" 
-                                                                size="sm" 
-                                                                className="text-red-500 hover:text-red-600 hover:bg-red-50 font-bold"
+                                                            <Button
+                                                                variant="outline"
+                                                                size="sm"
+                                                                className="h-8 w-8 border-red-200 p-0 text-red-600 hover:bg-red-50"
+                                                                title="Reject"
                                                                 onClick={() => {
                                                                     setSelectedPayment(payment);
                                                                     setActionType('reject');
                                                                     setIsActionOpen(true);
                                                                 }}
                                                             >
-                                                                <XCircle className="w-4 h-4" />
+                                                                <XCircle className="h-4 w-4" />
                                                             </Button>
                                                         </>
                                                     ) : null}
@@ -635,13 +759,14 @@ export default function AdminPaymentsPage() {
                                                         <Button
                                                             variant="outline"
                                                             size="sm"
-                                                            className="font-bold border-amber-200 text-amber-800 hover:bg-amber-50"
+                                                            className="h-8 gap-1 border-amber-200 px-2.5 text-xs font-semibold text-amber-800 hover:bg-amber-50"
                                                             onClick={() => {
                                                                 setSelectedPayment(payment);
                                                                 setIsRevertOpen(true);
                                                             }}
                                                         >
-                                                            <RotateCcw className="w-4 h-4 mr-1.5" /> Revert
+                                                            <RotateCcw className="h-3.5 w-3.5" />
+                                                            <span className="hidden md:inline">Revert</span>
                                                         </Button>
                                                     ) : null}
                                                 </div>
@@ -656,7 +781,16 @@ export default function AdminPaymentsPage() {
             </Card>
 
             {/* Proof Preview Dialog */}
-            <Dialog open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
+            <Dialog
+                open={isPreviewOpen}
+                onOpenChange={(open) => {
+                    setIsPreviewOpen(open);
+                    if (!open) {
+                        setSubmissionHistory([]);
+                        setPreviewSubmissionId(null);
+                    }
+                }}
+            >
                 <DialogContent className="flex h-[85vh] w-[calc(100vw-2rem)] max-w-3xl flex-col overflow-hidden p-0">
                     <DialogHeader className="border-b border-slate-100 p-4 sm:p-6">
                         <DialogTitle className="flex items-center gap-3 text-xl font-black tracking-tight">
@@ -666,26 +800,57 @@ export default function AdminPaymentsPage() {
                         <DialogDescription className="space-y-2 font-medium text-slate-500">
                             <span>
                                 Review the transfer slip uploaded by{' '}
-                                <span className="font-bold text-slate-900">{selectedPayment?.studentName}</span>
-                                {selectedPayment?.submittedByIsTeamLead ? ' (team lead)' : ''}.
+                                <span className="font-bold text-slate-900">{previewPayment?.studentName}</span>
+                                {previewPayment?.submittedByIsTeamLead ? ' (team lead)' : ''}.
                             </span>
-                            {selectedPayment?.participationMode === 'team' ? (
+                            {previewPayment?.participationMode === 'team' ? (
                                 <span className="block text-sm">
                                     Team size:{' '}
                                     <span className="font-bold text-slate-800">
-                                        {selectedPayment.teamMemberCount} members
+                                        {previewPayment.teamMemberCount} members
                                     </span>
-                                    {selectedPayment.teamMembers.length > 0
-                                        ? ` — ${formatTeamMembersSummary(selectedPayment.teamMembers, 8)}`
+                                    {previewPayment.teamMembers.length > 0
+                                        ? ` — ${formatTeamMembersSummary(previewPayment.teamMembers, 8)}`
                                         : ''}
                                 </span>
                             ) : null}
                         </DialogDescription>
+                        {submissionHistory.length > 1 ? (
+                            <div className="pt-3">
+                                <p className="mb-2 text-[10px] font-black uppercase tracking-widest text-slate-400">
+                                    All submissions ({submissionHistory.length})
+                                </p>
+                                <div className="flex flex-wrap gap-2">
+                                    {submissionHistory.map((row) => (
+                                        <button
+                                            key={row.id}
+                                            type="button"
+                                            onClick={() => setPreviewSubmissionId(row.id)}
+                                            className={clsx(
+                                                "rounded-xl border px-3 py-1.5 text-xs font-bold transition-colors",
+                                                previewSubmissionId === row.id
+                                                    ? "border-blue-300 bg-blue-50 text-blue-700"
+                                                    : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50",
+                                            )}
+                                        >
+                                            #{row.submissionNumber ?? "?"}{" "}
+                                            {row.date ? new Date(row.date).toLocaleDateString() : "—"}
+                                            <span className="ml-1 uppercase opacity-70">{row.status}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        ) : null}
                     </DialogHeader>
                     <div className="flex flex-1 items-center justify-center overflow-auto bg-slate-900 p-4 sm:p-8">
-                        {selectedPayment?.proofUrl ? (
+                        {submissionHistoryLoading ? (
+                            <div className="flex flex-col items-center gap-3 text-white">
+                                <Loader2 className="h-8 w-8 animate-spin text-slate-300" />
+                                <p className="text-sm font-medium text-slate-300">Loading submission history...</p>
+                            </div>
+                        ) : previewPayment?.proofUrl ? (
                             <img 
-                                src={selectedPayment.proofUrl} 
+                                src={previewPayment.proofUrl} 
                                 alt="Payment Proof" 
                                 className="max-w-full h-auto shadow-2xl rounded-lg"
                             />
@@ -698,7 +863,12 @@ export default function AdminPaymentsPage() {
                     </div>
                     <DialogFooter className="flex flex-col gap-3 border-t border-slate-100 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-6">
                         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
-                            <Button variant="outline" className="gap-2" onClick={() => window.open(selectedPayment?.proofUrl, '_blank')}>
+                            <Button
+                                variant="outline"
+                                className="gap-2"
+                                disabled={!previewPayment?.proofUrl}
+                                onClick={() => window.open(previewPayment?.proofUrl, '_blank')}
+                            >
                                 <ExternalLink className="w-4 h-4" /> Open Full
                             </Button>
                             <Button variant="outline" className="gap-2">
@@ -707,10 +877,13 @@ export default function AdminPaymentsPage() {
                         </div>
                         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                             <Button variant="ghost" onClick={() => setIsPreviewOpen(false)}>Close</Button>
-                            {selectedPayment?.status === 'pending' ? (
+                            {previewPayment?.status === 'pending' ? (
                                 <Button 
                                     className="bg-emerald-600 px-8 font-bold text-white hover:bg-emerald-700"
                                     onClick={() => {
+                                        if (previewPayment) {
+                                            setSelectedPayment(previewPayment);
+                                        }
                                         setIsPreviewOpen(false);
                                         setActionType('approve');
                                         setIsActionOpen(true);

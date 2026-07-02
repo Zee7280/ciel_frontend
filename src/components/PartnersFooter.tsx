@@ -7,7 +7,7 @@ import {
 } from "@/config/homePartnerLogos";
 
 const STATS = [
-    { value: "11+", label: "Partner Organisations" },
+    { value: `${HOME_PARTNER_LOGOS.length}+`, label: "Partner Organisations" },
     { value: "5+", label: "Cities Across Pakistan" },
     { value: "100%", label: "Education & Social Impact" },
 ];

@@ -4,6 +4,18 @@ import Link from "next/link";
 import Image from "next/image";
 import { Facebook, Instagram, Youtube, Twitter, Linkedin, Globe, MessageCircle } from "lucide-react";
 
+const companyLinks = [
+    { label: "About Us", href: "/about" },
+    { label: "Projects", href: "/projects" },
+    { label: "Tutorials", href: "/tutorials" },
+] as const;
+
+const resourceLinks = [
+    { label: "Help Center", href: "/contact" },
+    { label: "Contact Us", href: "/contact" },
+    { label: "How It Works", href: "/#how-it-works" },
+] as const;
+
 export default function Footer() {
     return (
         <footer className="bg-white pt-20 pb-10">
@@ -20,17 +32,22 @@ export default function Footer() {
                         </p>
 
                         <div className="flex flex-wrap gap-3 mt-4">
-                            {/* App Store Buttons - Using Images or Styled divs if images not available */}
-                            <Link href="#" className="w-[130px] h-[40px] bg-black rounded-md flex items-center justify-center gap-2 text-white">
-                                <div className="text-[8px] leading-none uppercase text-left">
-                                    Download on the <br /> <span className="text-sm font-bold normal-case">App Store</span>
+                            <span
+                                className="w-[130px] h-[40px] bg-slate-200 rounded-md flex items-center justify-center text-slate-500 cursor-not-allowed"
+                                title="Mobile app coming soon"
+                            >
+                                <div className="text-[8px] leading-none uppercase text-center">
+                                    App Store <br /> <span className="text-[10px] font-bold normal-case">Soon</span>
                                 </div>
-                            </Link>
-                            <Link href="#" className="w-[130px] h-[40px] bg-black rounded-md flex items-center justify-center gap-2 text-white">
-                                <div className="text-[8px] leading-none uppercase text-left">
-                                    GET IT ON <br /> <span className="text-sm font-bold normal-case">Google Play</span>
+                            </span>
+                            <span
+                                className="w-[130px] h-[40px] bg-slate-200 rounded-md flex items-center justify-center text-slate-500 cursor-not-allowed"
+                                title="Mobile app coming soon"
+                            >
+                                <div className="text-[8px] leading-none uppercase text-center">
+                                    Google Play <br /> <span className="text-[10px] font-bold normal-case">Soon</span>
                                 </div>
-                            </Link>
+                            </span>
                         </div>
                     </div>
 
@@ -38,10 +55,10 @@ export default function Footer() {
                     <div>
                         <h4 className="text-slate-900 font-bold text-lg mb-6">Company</h4>
                         <ul className="space-y-4">
-                            {['About Us', 'Projects', 'Services', 'FAQs'].map((item) => (
-                                <li key={item}>
-                                    <Link href="#" className="text-slate-500 hover:text-[#4285F4] transition-colors text-[15px] font-medium">
-                                        {item}
+                            {companyLinks.map((item) => (
+                                <li key={item.label}>
+                                    <Link href={item.href} className="text-slate-500 hover:text-[#4285F4] transition-colors text-[15px] font-medium">
+                                        {item.label}
                                     </Link>
                                 </li>
                             ))}
@@ -52,10 +69,10 @@ export default function Footer() {
                     <div>
                         <h4 className="text-slate-900 font-bold text-lg mb-6">Links</h4>
                         <ul className="space-y-4">
-                            {['Help Center', 'Site Map', 'Terms & Conditions'].map((item) => (
-                                <li key={item}>
-                                    <Link href="#" className="text-slate-500 hover:text-[#4285F4] transition-colors text-[15px] font-medium">
-                                        {item}
+                            {resourceLinks.map((item) => (
+                                <li key={item.label}>
+                                    <Link href={item.href} className="text-slate-500 hover:text-[#4285F4] transition-colors text-[15px] font-medium">
+                                        {item.label}
                                     </Link>
                                 </li>
                             ))}

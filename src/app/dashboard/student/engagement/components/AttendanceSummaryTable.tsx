@@ -1,7 +1,17 @@
 "use client";
 
 import React from "react";
-import { Clock, Calendar, Tag, CheckCircle2, Trash2, MessageSquareText } from "lucide-react";
+import {
+    Clock,
+    Calendar,
+    Tag,
+    CheckCircle2,
+    Trash2,
+    MessageSquareText,
+    MapPin,
+    User,
+    ExternalLink,
+} from "lucide-react";
 import clsx from "clsx";
 
 interface AttendanceEntry {
@@ -11,20 +21,15 @@ interface AttendanceEntry {
     end_time: string;
     hours: number;
     activity_type: string;
-    /** Session notes / narrative from attendance log (normalized snake_case or camelCase from API). */
     description?: string | null;
     session_description?: string | null;
-    entryStatus?: 'pending' | 'verified' | 'flagged';
-    /** From backend attendance approval (null = legacy). */
+    entryStatus?: "pending" | "verified" | "flagged";
     approval_status?: string | null;
-    /** Rejection / return notes from reviewer (see normalizeEngagementAttendanceLog). */
     approval_remark?: string | null;
-    /** Raw CIEL attendance entity (e.g. report JSON) when not normalized. */
     approvalActionReason?: string | null;
     approval_action_reason?: string | null;
-    evidence_file?: any;
+    evidence_file?: unknown;
     participantId?: string;
-    /** Organization / site label from form (`organizationName` / `location`). */
     location?: string | null;
     organizationName?: string | null;
     locationPin?: string | null;
@@ -33,7 +38,7 @@ interface AttendanceEntry {
 
 function displayApprovalLabel(entry: AttendanceEntry): string {
     const raw = entry.approval_status ?? entry.entryStatus;
-    if (raw == null || String(raw).trim() === "") return "Verified (legacy)";
+    if (raw == null || String(raw).trim() === "") return "Verified";
     const s = String(raw).trim().toLowerCase();
     if (s === "pending") return "Pending review";
     if (s === "approved") return "Approved";
@@ -44,12 +49,12 @@ function displayApprovalLabel(entry: AttendanceEntry): string {
 
 function approvalPillClass(entry: AttendanceEntry): string {
     const raw = (entry.approval_status ?? entry.entryStatus ?? "").toString().toLowerCase();
-    if (!raw || raw === "verified") return "bg-slate-50 text-slate-500 border-slate-100";
-    if (raw === "approved") return "bg-emerald-50 text-emerald-700 border-emerald-100";
-    if (raw === "rejected") return "bg-rose-50 text-rose-700 border-rose-100";
-    if (raw === "flagged") return "bg-amber-50 text-amber-800 border-amber-100";
-    if (raw === "pending") return "bg-amber-50/80 text-amber-800 border-amber-100";
-    return "bg-slate-50 text-slate-600 border-slate-100";
+    if (!raw || raw === "verified") return "bg-slate-100 text-slate-600";
+    if (raw === "approved") return "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100";
+    if (raw === "rejected") return "bg-rose-50 text-rose-700 ring-1 ring-rose-100";
+    if (raw === "flagged") return "bg-amber-50 text-amber-800 ring-1 ring-amber-100";
+    if (raw === "pending") return "bg-amber-50 text-amber-700 ring-1 ring-amber-100";
+    return "bg-slate-100 text-slate-600";
 }
 
 function isRejectedEntry(entry: AttendanceEntry): boolean {
@@ -63,10 +68,10 @@ function pickEntryLocation(entry: AttendanceEntry): string {
         locationPin?: string | null;
         location_pin?: string | null;
     };
-    const loc = [e.location, e.organizationName].find((x) => typeof x === "string" && x.trim())?.trim() ?? "";
-    const pin = [e.locationPin, e.location_pin].find((x) => typeof x === "string" && x.trim())?.trim() ?? "";
-    if (loc && pin) return `${loc}\n${pin}`;
-    return loc || pin || "—";
+    const loc =
+        [e.location, e.organizationName].find((x) => typeof x === "string" && x.trim())?.trim() ??
+        "";
+    return loc || "";
 }
 
 function pickDescription(entry: AttendanceEntry): string {
@@ -93,7 +98,10 @@ function engagementParticipantBareId(id: string | undefined | null): string {
     return id;
 }
 
-function resolveParticipantDisplayName(participantId: string | undefined, participantNames: Record<string, string>): string {
+function resolveParticipantDisplayName(
+    participantId: string | undefined,
+    participantNames: Record<string, string>,
+): string {
     if (!participantId) return "—";
     const trimmedMap = (k: string) => (participantNames[k] || "").trim();
     const direct = trimmedMap(participantId);
@@ -112,7 +120,6 @@ function isNativeFile(value: unknown): value is File {
     return typeof File !== "undefined" && value instanceof File;
 }
 
-/** Resolved href for attendance evidence (API URL, path, or metadata object). */
 function resolveAttendanceEvidenceHref(evidence: unknown, entry: AttendanceEntry): string | null {
     const ext = entry as AttendanceEntry & { evidenceUrl?: string; evidence_url?: string };
     for (const v of [ext.evidenceUrl, ext.evidence_url]) {
@@ -143,43 +150,195 @@ function evidenceLinkLabel(href: string): string {
     }
 }
 
-export default function AttendanceSummaryTable({ entries, onDelete, canDeleteEntry, isLocked = false, participantNames = {}, embedded = false }: {
-    entries: AttendanceEntry[],
-    onDelete?: (id: string) => void,
-    /** When set, delete is only offered for entries that pass this check (e.g. own attendance only). */
-    canDeleteEntry?: (entry: AttendanceEntry) => boolean,
-    isLocked?: boolean,
-    participantNames?: Record<string, string>,
-    /** When true, omit outer card chrome (parent already provides a panel). */
-    embedded?: boolean,
+function formatSessionDate(dateStr: string): string {
+    try {
+        return new Date(dateStr).toLocaleDateString(undefined, {
+            weekday: "short",
+            month: "short",
+            day: "numeric",
+            year: "numeric",
+        });
+    } catch {
+        return dateStr;
+    }
+}
+
+function SessionCard({
+    entry,
+    participantNames,
+    onDelete,
+    canDelete,
+    isLocked,
+}: {
+    entry: AttendanceEntry;
+    participantNames: Record<string, string>;
+    onDelete?: (id: string) => void;
+    canDelete: boolean;
+    isLocked: boolean;
 }) {
-    const [remarkOpenId, setRemarkOpenId] = React.useState<string | null>(null);
+    const [remarkOpen, setRemarkOpen] = React.useState(false);
+    const descText = pickDescription(entry);
+    const locationText = pickEntryLocation(entry);
+    const participantLabel = resolveParticipantDisplayName(entry.participantId, participantNames);
+    const evidenceHref = resolveAttendanceEvidenceHref(entry.evidence_file, entry);
+    const localFile = isNativeFile(entry.evidence_file);
+    const rejected = isRejectedEntry(entry);
+    const showDelete = !isLocked && canDelete && !!onDelete;
+
+    return (
+        <article className="group rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition-shadow hover:shadow-md">
+            <div className="flex items-start justify-between gap-3">
+                <div className="flex min-w-0 items-start gap-3">
+                    <div className="flex h-11 w-11 shrink-0 flex-col items-center justify-center rounded-lg bg-indigo-50 text-indigo-700 ring-1 ring-indigo-100">
+                        <span className="text-lg font-bold leading-none">
+                            {new Date(entry.date).getDate()}
+                        </span>
+                        <span className="text-[9px] font-medium uppercase" suppressHydrationWarning>
+                            {new Date(entry.date).toLocaleDateString(undefined, { month: "short" })}
+                        </span>
+                    </div>
+                    <div className="min-w-0">
+                        <p className="text-sm font-semibold text-slate-900" suppressHydrationWarning>
+                            {formatSessionDate(entry.date)}
+                        </p>
+                        <p className="mt-0.5 flex items-center gap-1 text-xs text-slate-500">
+                            <Clock className="h-3 w-3" />
+                            {entry.start_time} – {entry.end_time}
+                            <span className="mx-1 text-slate-300">·</span>
+                            <span className="font-semibold text-slate-700">{entry.hours} hrs</span>
+                        </p>
+                    </div>
+                </div>
+
+                <div className="flex shrink-0 items-center gap-2">
+                    {rejected ? (
+                        <button
+                            type="button"
+                            onClick={() => setRemarkOpen((v) => !v)}
+                            className={clsx(
+                                "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium",
+                                approvalPillClass(entry),
+                            )}
+                        >
+                            {displayApprovalLabel(entry)}
+                            <MessageSquareText className="h-3 w-3" />
+                        </button>
+                    ) : (
+                        <span
+                            className={clsx(
+                                "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium",
+                                approvalPillClass(entry),
+                            )}
+                        >
+                            {(entry.approval_status ?? entry.entryStatus ?? "")
+                                .toString()
+                                .toLowerCase() === "approved" ||
+                            (entry.approval_status ?? entry.entryStatus ?? "")
+                                .toString()
+                                .toLowerCase() === "verified" ? (
+                                <CheckCircle2 className="h-3 w-3" />
+                            ) : null}
+                            {displayApprovalLabel(entry)}
+                        </span>
+                    )}
+                    {showDelete ? (
+                        <button
+                            type="button"
+                            onClick={() => onDelete!(entry.id)}
+                            className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-400 transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-500"
+                            aria-label="Delete attendance entry"
+                        >
+                            <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                    ) : null}
+                </div>
+            </div>
+
+            <div className="mt-3 flex flex-wrap gap-2">
+                <span className="inline-flex items-center gap-1.5 rounded-md bg-slate-50 px-2 py-1 text-xs font-medium text-slate-700 ring-1 ring-slate-100">
+                    <Tag className="h-3 w-3 text-slate-400" />
+                    {entry.activity_type}
+                </span>
+                <span className="inline-flex items-center gap-1.5 rounded-md bg-slate-50 px-2 py-1 text-xs font-medium text-slate-700 ring-1 ring-slate-100">
+                    <User className="h-3 w-3 text-slate-400" />
+                    {participantLabel}
+                </span>
+                {locationText ? (
+                    <span className="inline-flex max-w-full items-center gap-1.5 truncate rounded-md bg-slate-50 px-2 py-1 text-xs font-medium text-slate-700 ring-1 ring-slate-100">
+                        <MapPin className="h-3 w-3 shrink-0 text-slate-400" />
+                        <span className="truncate">{locationText}</span>
+                    </span>
+                ) : null}
+            </div>
+
+            {descText ? (
+                <p className="mt-3 text-sm leading-relaxed text-slate-600 line-clamp-3">{descText}</p>
+            ) : null}
+
+            {evidenceHref ? (
+                <a
+                    href={evidenceHref}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-indigo-600 hover:text-indigo-800"
+                >
+                    <ExternalLink className="h-3 w-3" />
+                    {evidenceLinkLabel(evidenceHref)}
+                </a>
+            ) : localFile ? (
+                <p className="mt-3 text-xs text-slate-500">
+                    {(entry.evidence_file as File).name || "File attached"}
+                </p>
+            ) : null}
+
+            {remarkOpen && rejected ? (
+                <div className="mt-3 rounded-lg border border-rose-100 bg-rose-50/50 px-3 py-2.5 text-sm text-slate-700">
+                    <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-rose-700">
+                        Rejection remarks
+                    </p>
+                    <p className="whitespace-pre-wrap break-words leading-relaxed">
+                        {resolvedRejectRemark(entry) ||
+                            "No written remarks were provided for this rejection."}
+                    </p>
+                </div>
+            ) : null}
+        </article>
+    );
+}
+
+export default function AttendanceSummaryTable({
+    entries,
+    onDelete,
+    canDeleteEntry,
+    isLocked = false,
+    participantNames = {},
+    embedded = false,
+}: {
+    entries: AttendanceEntry[];
+    onDelete?: (id: string) => void;
+    canDeleteEntry?: (entry: AttendanceEntry) => boolean;
+    isLocked?: boolean;
+    participantNames?: Record<string, string>;
+    embedded?: boolean;
+}) {
     const rowCanDelete = (entry: AttendanceEntry) =>
         !isLocked && !!onDelete && (canDeleteEntry ? canDeleteEntry(entry) : true);
-    const actionCol = !isLocked && !!onDelete && entries.some(rowCanDelete);
-    const colSpan = actionCol ? 9 : 8;
 
-    const toggleRemarkRow = (id: string) => {
-        setRemarkOpenId((prev) => (prev === id ? null : id));
-    };
-
-    const entryIdsKey = entries.map((e) => e.id).join("|");
-    React.useEffect(() => {
-        setRemarkOpenId(null);
-    }, [entryIdsKey]);
     if (entries.length === 0) {
         return (
             <div
                 className={clsx(
-                    "p-10 text-center sm:p-12",
-                    embedded ? "rounded-2xl bg-slate-50/60" : "rounded-3xl border border-slate-100 bg-white",
+                    "px-6 py-12 text-center",
+                    embedded ? "" : "rounded-xl border border-slate-200 bg-white",
                 )}
             >
-                <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-slate-100 text-slate-300">
-                    <Calendar className="h-8 w-8" />
+                <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-slate-100">
+                    <Calendar className="h-6 w-6 text-slate-300" />
                 </div>
-                <h3 className="mb-1 text-lg font-bold text-slate-900">No attendance entries yet</h3>
-                <p className="text-sm font-medium text-slate-500">Your logged engagement sessions will appear here.</p>
+                <h3 className="text-sm font-semibold text-slate-900">No sessions logged yet</h3>
+                <p className="mt-1 text-xs text-slate-500">
+                    Your attendance entries will appear here after you save them.
+                </p>
             </div>
         );
     }
@@ -187,184 +346,21 @@ export default function AttendanceSummaryTable({ entries, onDelete, canDeleteEnt
     return (
         <div
             className={clsx(
-                "relative flex min-w-0 flex-col",
-                embedded
-                    ? ""
-                    : "overflow-hidden rounded-[2.5rem] border-2 border-slate-100 bg-white shadow-xl shadow-slate-200/40 transition-all hover:border-report-primary-border/20",
+                "min-w-0",
+                embedded ? "p-4" : "rounded-xl border border-slate-200 bg-slate-50/30 p-4",
             )}
         >
-            {!embedded ? (
-                <div className="absolute left-0 top-0 h-1 w-full bg-gradient-to-r from-transparent via-report-primary/30 to-transparent" />
-            ) : null}
-
-            <div className="w-full min-w-0 overflow-x-auto selection:bg-report-primary/10">
-                <table className="w-full text-left border-collapse min-w-[1060px]">
-                    <thead>
-                        <tr className="bg-slate-50/80 backdrop-blur-sm border-b border-slate-100">
-                            <th className="px-5 py-5 text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">Date &amp; session</th>
-                            <th className="px-5 py-5 text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">Location / pin</th>
-                            <th className="px-5 py-5 text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">Activity type</th>
-                            <th className="px-5 py-5 text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">Description</th>
-                            <th className="px-5 py-5 text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">Participant name</th>
-                            <th className="px-5 py-5 text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">Duration</th>
-                            <th className="px-5 py-5 text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">Approval</th>
-                            <th className="min-w-[10rem] px-5 py-5 text-left text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">Evidence link</th>
-                            {actionCol && (
-                                <th className="px-5 py-5 text-right text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">Actions</th>
-                            )}
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-50">
-                        {entries.map((entry) => {
-                            const descText = pickDescription(entry);
-                            const participantLabel = resolveParticipantDisplayName(entry.participantId, participantNames);
-                            const evidenceHref = resolveAttendanceEvidenceHref(entry.evidence_file, entry);
-                            const localFile = isNativeFile(entry.evidence_file);
-                            const linkedNoUrl = !evidenceHref && entry.evidence_file && !localFile;
-                            return (
-                            <React.Fragment key={entry.id}>
-                            <tr className="hover:bg-report-primary-soft/10 transition-all group border-b border-slate-50 last:border-0">
-                                <td className="px-5 py-7">
-                                    <div className="flex items-center gap-5">
-                                        <div className="w-14 h-14 rounded-2xl bg-white text-slate-900 flex items-center justify-center font-black text-lg shrink-0 border-2 border-slate-100 shadow-sm group-hover:border-report-primary/30 transition-all group-hover:scale-105 group-hover:rotate-2">
-                                            {new Date(entry.date).getDate()}
-                                        </div>
-                                        <div>
-                                            <p className="font-black text-slate-900 text-base tracking-tight" suppressHydrationWarning>
-                                                {new Date(entry.date).toLocaleDateString(undefined, { month: 'short', year: 'numeric' })}
-                                            </p>
-                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">
-                                                {entry.start_time} — {entry.end_time}
-                                            </p>
-                                        </div>
-                                    </div>
-                                </td>
-                                <td className="max-w-[13rem] px-5 py-7 align-top whitespace-pre-wrap text-xs font-medium leading-relaxed text-slate-700">
-                                    {pickEntryLocation(entry)}
-                                </td>
-                                <td className="px-5 py-7">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center text-slate-400 group-hover:bg-report-primary-soft group-hover:text-report-primary transition-colors">
-                                            <Tag className="w-4 h-4" />
-                                        </div>
-                                        <span className="text-xs font-black text-slate-700 uppercase tracking-wider">{entry.activity_type}</span>
-                                    </div>
-                                </td>
-                                <td className="max-w-[18rem] px-5 py-7 align-top lg:max-w-md">
-                                    {descText ? (
-                                        <p className="text-xs font-medium leading-relaxed text-slate-600 whitespace-pre-wrap break-words">
-                                            {descText}
-                                        </p>
-                                    ) : (
-                                        <span className="text-[9px] font-black uppercase tracking-[0.15em] text-slate-300">
-                                            No description
-                                        </span>
-                                    )}
-                                </td>
-                                <td className="min-w-[10rem] px-5 py-7 align-top">
-                                    <div className="flex items-start gap-2">
-                                        <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[11px] font-black text-slate-600">
-                                            {participantLabel.charAt(0).toUpperCase()}
-                                        </div>
-                                        <div className="min-w-0">
-                                            <p className="text-sm font-semibold leading-snug text-slate-900">{participantLabel}</p>
-                                            <p className="mt-0.5 break-all text-[10px] font-medium uppercase tracking-wide text-slate-400">
-                                                ID: {engagementParticipantBareId(entry.participantId) || "—"}
-                                            </p>
-                                        </div>
-                                    </div>
-                                </td>
-                                <td className="px-5 py-7">
-                                    <div className="flex items-center gap-2.5">
-                                        <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center text-blue-500">
-                                            <Clock className="w-4 h-4" />
-                                        </div>
-                                        <span className="text-lg font-black text-slate-900 tabular-nums">{entry.hours} <span className="text-[10px] text-slate-400 font-black uppercase ml-0.5">hrs</span></span>
-                                    </div>
-                                </td>
-                                <td className="px-5 py-7">
-                                    {isRejectedEntry(entry) ? (
-                                        <button
-                                            type="button"
-                                            onClick={() => toggleRemarkRow(entry.id)}
-                                            aria-expanded={remarkOpenId === entry.id}
-                                            className={clsx(
-                                                "inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[9px] font-black uppercase tracking-widest cursor-pointer transition-shadow hover:shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 focus-visible:ring-offset-1",
-                                                approvalPillClass(entry),
-                                            )}
-                                        >
-                                            {displayApprovalLabel(entry)}
-                                            <MessageSquareText className="w-3 h-3 shrink-0 opacity-80" aria-hidden />
-                                        </button>
-                                    ) : (
-                                        <span
-                                            className={clsx(
-                                                "inline-flex items-center rounded-lg border px-2.5 py-1 text-[9px] font-black uppercase tracking-widest",
-                                                approvalPillClass(entry),
-                                            )}
-                                        >
-                                            {displayApprovalLabel(entry)}
-                                        </span>
-                                    )}
-                                </td>
-                                <td className="min-w-[11rem] px-5 py-7 align-top">
-                                    {evidenceHref ? (
-                                        <a
-                                            href={evidenceHref}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="inline-flex max-w-full items-center gap-2 break-all rounded-xl border border-report-primary/25 bg-report-primary px-4 py-2.5 text-[11px] font-bold text-white shadow-sm shadow-report-primary-shadow transition hover:opacity-90"
-                                        >
-                                            <CheckCircle2 className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                                            <span className="min-w-0 underline-offset-2">{evidenceLinkLabel(evidenceHref)}</span>
-                                        </a>
-                                    ) : localFile ? (
-                                        <span className="text-xs font-medium text-slate-600">
-                                            {(entry.evidence_file as File).name || "File attached (save locally)"}
-                                        </span>
-                                    ) : linkedNoUrl ? (
-                                        <span className="text-[11px] font-semibold text-amber-800">
-                                            Evidence uploaded — URL not yet available
-                                        </span>
-                                    ) : (
-                                        <span className="text-[11px] font-semibold text-slate-400">No evidence</span>
-                                    )}
-                                </td>
-                                {rowCanDelete(entry) ? (
-                                    <td className="px-8 py-7 text-right">
-                                        <button
-                                            type="button"
-                                            onClick={() => onDelete!(entry.id)}
-                                            className="w-10 h-10 flex items-center justify-center text-slate-300 hover:text-red-500 transition-all bg-white rounded-xl border-2 border-slate-100 hover:border-red-100 hover:shadow-lg hover:shadow-red-50 hover:bg-red-50/30"
-                                            aria-label="Delete attendance entry"
-                                        >
-                                            <Trash2 className="w-4.5 h-4.5" />
-                                        </button>
-                                    </td>
-                                ) : actionCol ? (
-                                    <td className="px-8 py-7 text-right" aria-hidden />
-                                ) : null}
-                            </tr>
-                            {remarkOpenId === entry.id && isRejectedEntry(entry) ? (
-                                <tr className="bg-rose-50/50 border-b border-rose-100/80">
-                                    <td colSpan={colSpan} className="px-5 py-4">
-                                        <div className="rounded-xl border border-rose-100 bg-white/90 px-4 py-3 text-sm text-slate-700 shadow-sm">
-                                            <p className="text-[10px] font-black uppercase tracking-widest text-rose-700 mb-1.5">
-                                                Rejection remarks
-                                            </p>
-                                            <p className="leading-relaxed whitespace-pre-wrap break-words">
-                                                {resolvedRejectRemark(entry) ||
-                                                    "No written remarks were provided for this rejection."}
-                                            </p>
-                                        </div>
-                                    </td>
-                                </tr>
-                            ) : null}
-                            </React.Fragment>
-                            );
-                        })}
-                    </tbody>
-                </table>
+            <div className="space-y-3">
+                {entries.map((entry) => (
+                    <SessionCard
+                        key={entry.id}
+                        entry={entry}
+                        participantNames={participantNames}
+                        onDelete={onDelete}
+                        canDelete={rowCanDelete(entry)}
+                        isLocked={isLocked}
+                    />
+                ))}
             </div>
         </div>
     );

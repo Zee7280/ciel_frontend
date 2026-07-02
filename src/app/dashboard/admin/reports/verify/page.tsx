@@ -39,6 +39,8 @@ interface Report {
     status: string;
     partner_status: string;
     admin_status: string;
+    payment_status?: string | null;
+    payment_verified?: boolean;
     cii_score?: number | null;
     participation_mode?: 'individual' | 'team';
     team_member_count?: number;
@@ -97,6 +99,27 @@ function reportOverallStatus(report: Report): string {
 
 function reportAdminStatus(report: Report): string {
     return normalizeStatus(report.admin_status);
+}
+
+function reportPaymentQueueStatus(report: Report): string {
+    if (report.payment_verified === true) return 'paid';
+    const ps = normalizeStatus(report.payment_status || '');
+    if (ps === 'paid' || ps === 'approved') return 'paid';
+    if (ps === 'pending') return 'pending';
+    if (ps === 'rejected') return 'rejected';
+    if (ps === 'awaiting_payment') return 'awaiting_payment';
+    const overall = reportOverallStatus(report);
+    if (overall === 'verified' || overall === 'paid' || overall === 'partner_verified') {
+        return 'paid';
+    }
+    if (
+        overall === 'pending_payment' ||
+        overall === 'payment_pending' ||
+        overall === 'payment_under_review'
+    ) {
+        return 'awaiting_payment';
+    }
+    return ps || 'not_applicable';
 }
 
 function isReportAdminVerified(report: Report): boolean {
@@ -380,6 +403,8 @@ export default function AdminReportsVerificationPage() {
             approved: { color: 'bg-emerald-50 text-emerald-800 ring-emerald-200/60', icon: CheckCircle2, label: 'Approved' },
             not_applicable: { color: 'bg-slate-50 text-slate-500 ring-slate-200/80', icon: CheckCircle2, label: 'N/A' },
             not_required: { color: 'bg-slate-50 text-slate-500 ring-slate-200/80', icon: CheckCircle2, label: 'N/A' },
+            paid: { color: 'bg-emerald-50 text-emerald-800 ring-emerald-200/60', icon: CheckCircle2, label: 'Paid' },
+            awaiting_payment: { color: 'bg-orange-50 text-orange-800 ring-orange-200/60', icon: Clock, label: 'Awaiting' },
         };
 
         const key = normalizeStatus(status) || normalizeReportPartnerStatus(status);
@@ -825,6 +850,17 @@ export default function AdminReportsVerificationPage() {
                 name: 'NGO',
                 width: '100px',
                 cell: (report) => getStatusBadge(report.partner_status, true),
+            },
+            {
+                name: 'Payment',
+                width: '100px',
+                cell: (report) => {
+                    const paymentKey = reportPaymentQueueStatus(report);
+                    if (paymentKey === 'not_applicable' && reportOverallStatus(report) === 'draft') {
+                        return <span className="text-xs font-medium text-slate-400">—</span>;
+                    }
+                    return getStatusBadge(paymentKey, true);
+                },
             },
             {
                 name: 'CII',

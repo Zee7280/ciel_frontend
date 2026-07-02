@@ -1,5 +1,5 @@
 import React from "react";
-import { Users, User, UserPlus, Trash2, Shield, Info, AlertCircle, Clock, CheckCircle2, Loader2, Award, Zap, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Save, Lock, Unlock, PlusCircle, Activity } from "lucide-react";
+import { Users, User, UserPlus, Trash2, Shield, Info, AlertCircle, Clock, CheckCircle2, Loader2, Zap, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Save, Lock, Unlock, PlusCircle, Activity } from "lucide-react";
 import { Label } from "./ui/label";
 import { Input } from "./ui/input";
 import { Button } from "./ui/button";
@@ -987,45 +987,96 @@ export default function Section1Participation({ projectData }: { projectData?: a
                 </div>
             ) : null}
 
-            {/* Sticky Nav Progress */}
-            <div className="shrink-0 border-b border-slate-100 bg-white px-3 py-2.5 sm:px-5 lg:px-6">
-                <div className="flex min-w-0 flex-wrap items-center gap-2 sm:gap-3">
-                    {steps.map((s, idx) => (
-                        <React.Fragment key={s.id}>
-                            <button
-                                type="button"
-                                disabled={
-                                    isTeamMemberAttendanceOnly
-                                        ? s.id === 1 || s.id === 3
-                                        : false
-                                }
-                                onClick={() => {
-                                    if (isTeamMemberAttendanceOnly && (s.id === 1 || s.id === 3)) return;
-                                    if (internalStep > s.id) setInternalStep(s.id);
-                                }}
-                                className={clsx(
-                                    "flex items-center gap-2 px-4 py-2 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all whitespace-nowrap",
-                                    isTeamMemberAttendanceOnly && (s.id === 1 || s.id === 3)
-                                        ? "cursor-not-allowed opacity-40 text-slate-400"
-                                        : internalStep === s.id
-                                          ? "bg-indigo-600 text-white shadow-lg shadow-indigo-100"
-                                          : internalStep > s.id
-                                            ? "bg-emerald-50 text-emerald-600 border border-emerald-100"
-                                            : "text-slate-400 hover:text-slate-600",
-                                )}
-                            >
-                                <span className={clsx(
-                                    "w-5 h-5 rounded-full flex items-center justify-center text-[10px]",
-                                    internalStep === s.id ? "bg-white/20" : "bg-slate-100"
-                                )}>{s.id}</span>
-                                {s.title}
-                            </button>
-                            {idx < steps.length - 1 && (
-                                <div className="hidden h-px w-6 shrink-0 bg-slate-100 sm:block md:w-8" aria-hidden />
-                            )}
-                        </React.Fragment>
-                    ))}
-                </div>
+            {/* Section 1 — 4-step progress stepper */}
+            <div className="shrink-0 border-b border-slate-200 bg-white px-4 py-4 sm:px-6">
+                <nav aria-label="Section 1 progress" className="mx-auto max-w-3xl">
+                    <ol className="flex items-start">
+                        {steps.map((s, idx) => {
+                            const isComplete = internalStep > s.id;
+                            const isCurrent = internalStep === s.id;
+                            const isDisabled =
+                                isTeamMemberAttendanceOnly && (s.id === 1 || s.id === 3);
+                            const canNavigate = !isDisabled && isComplete;
+
+                            return (
+                                <li
+                                    key={s.id}
+                                    className={clsx(
+                                        "relative flex flex-1 flex-col items-center",
+                                        idx < steps.length - 1 && "pr-2 sm:pr-0",
+                                    )}
+                                >
+                                    {idx < steps.length - 1 ? (
+                                        <div
+                                            className={clsx(
+                                                "absolute left-[calc(50%+1rem)] right-0 top-4 hidden h-0.5 sm:block",
+                                                isComplete ? "bg-emerald-400" : "bg-slate-200",
+                                            )}
+                                            aria-hidden
+                                        />
+                                    ) : null}
+
+                                    <button
+                                        type="button"
+                                        disabled={isDisabled || (!canNavigate && !isCurrent)}
+                                        onClick={() => {
+                                            if (isDisabled) return;
+                                            if (canNavigate) setInternalStep(s.id);
+                                        }}
+                                        className={clsx(
+                                            "relative z-10 flex flex-col items-center gap-1.5 transition-opacity",
+                                            isDisabled
+                                                ? "cursor-not-allowed opacity-40"
+                                                : canNavigate || isCurrent
+                                                  ? "cursor-pointer"
+                                                  : "cursor-default",
+                                        )}
+                                    >
+                                        <span
+                                            className={clsx(
+                                                "flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold transition-all",
+                                                isCurrent &&
+                                                    "bg-indigo-600 text-white shadow-md shadow-indigo-200 ring-4 ring-indigo-50",
+                                                isComplete &&
+                                                    !isCurrent &&
+                                                    "bg-emerald-500 text-white",
+                                                !isCurrent &&
+                                                    !isComplete &&
+                                                    "bg-slate-100 text-slate-400 ring-1 ring-slate-200",
+                                            )}
+                                        >
+                                            {isComplete && !isCurrent ? (
+                                                <CheckCircle2 className="h-4 w-4" />
+                                            ) : (
+                                                s.id
+                                            )}
+                                        </span>
+                                        <span
+                                            className={clsx(
+                                                "hidden max-w-[5.5rem] text-center text-[11px] font-medium leading-tight sm:block",
+                                                isCurrent
+                                                    ? "text-indigo-700"
+                                                    : isComplete
+                                                      ? "text-emerald-700"
+                                                      : "text-slate-400",
+                                            )}
+                                        >
+                                            {s.title}
+                                        </span>
+                                        <span
+                                            className={clsx(
+                                                "max-w-[4.5rem] text-center text-[10px] font-medium leading-tight sm:hidden",
+                                                isCurrent ? "text-indigo-700" : "text-slate-400",
+                                            )}
+                                        >
+                                            {s.title.split(" ")[0]}
+                                        </span>
+                                    </button>
+                                </li>
+                            );
+                        })}
+                    </ol>
+                </nav>
             </div>
 
             {/* Scrollable Content Workspace */}
@@ -1076,9 +1127,10 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                 </div>
                             </div>
 
-                            <div className="space-y-1 mt-4">
-                                <h3 className="text-xl font-bold text-slate-900 uppercase tracking-tight">Step 1 — Identity & Context</h3>
-                                <p className="text-sm text-slate-500 font-medium">Verify your profile and team configuration to unlock attendance logging.</p>
+                            <div className="space-y-1">
+                                <p className="text-xs font-medium text-indigo-600">Step 1</p>
+                                <h3 className="text-xl font-semibold text-slate-900">Identity & team setup</h3>
+                                <p className="text-sm text-slate-500">Verify your profile and team configuration to unlock attendance logging.</p>
                             </div>
 
                             {/* 1. Identity Verification Accordion */}
@@ -1294,157 +1346,179 @@ export default function Section1Participation({ projectData }: { projectData?: a
                             </div>
                         </div>
                     )}                    {internalStep === 2 && (() => {
-                        return (
-                            <div className="space-y-8">
+                        const selectedStudentName =
+                            rawParticipants.find((u: { id: string }) => u.id === selectedParticipantId)
+                                ?.name || "Selected student";
+                        const participantLogs = data.section1.attendance_logs.filter(
+                            (l: { participantId?: string }) => {
+                                if (!selectedParticipantId) return true;
+                                return engagementParticipantIdsMatch(
+                                    l.participantId,
+                                    selectedParticipantId,
+                                );
+                            },
+                        );
+                        const loggedEff = participantLogs.reduce(
+                            (acc: number, log: (typeof participantLogs)[number]) =>
+                                acc + effectiveHoursFromLog(log),
+                            0,
+                        );
+                        const loggedRounded = Math.round(loggedEff * 100) / 100;
+                        const remainingHours = Math.max(
+                            0,
+                            Math.round((requiredHoursPerStudent - loggedEff) * 100) / 100,
+                        );
+                        const personalProgressPct =
+                            requiredHoursPerStudent > 0
+                                ? Math.min(100, Math.round((loggedEff / requiredHoursPerStudent) * 100))
+                                : 0;
+                        const teamProgressPct =
+                            projectGoal > 0
+                                ? Math.min(100, Math.round((collectiveProjectHours / projectGoal) * 100))
+                                : 0;
+                        const filteredLogCount = participantLogs.length;
 
-                                <div className="mb-4 flex min-w-0 flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                                    <div className="min-w-0 space-y-2">
-                                        <h3 className="text-xl font-bold text-slate-900 uppercase tracking-tight">Step 2: Attendance Logging</h3>
-                                        <p className="text-[13px] text-slate-500 leading-relaxed">Record and verify your engagement hours for HEC audit trails</p>
+                        return (
+                            <div className="space-y-6">
+
+                                <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                                    <div className="min-w-0">
+                                        <p className="text-xs font-medium text-indigo-600">Step 2</p>
+                                        <h3 className="mt-0.5 text-xl font-semibold text-slate-900">
+                                            Attendance logging
+                                        </h3>
+                                        <p className="mt-1 text-sm text-slate-500">
+                                            Record and verify your engagement hours for HEC audit trails.
+                                        </p>
                                     </div>
-                                    <div className="flex shrink-0 items-start gap-2 rounded-xl border border-amber-100 bg-amber-50 px-5 py-3 lg:max-w-md shadow-sm">
+                                    <div className="flex shrink-0 items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3.5 py-2.5 sm:max-w-xs">
                                         <Zap className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
-                                        <span className="text-[10px] font-black uppercase leading-snug tracking-[0.18em] text-amber-700">
-                                            Gateway active: each student must meet the required hour goal for community engagement.
-                                        </span>
+                                        <p className="text-xs leading-relaxed text-amber-800">
+                                            Each student must meet the required hour goal before submission.
+                                        </p>
                                     </div>
                                 </div>
 
-                                {/* Engagement Hours Summary Dashboard */}
-                                <div className="space-y-8 animate-in slide-in-from-top-4 duration-500">
-                                    {/* Level 1: Overall Project Context */}
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                        {[
-                                            {
-                                                label: "Project Goal",
-                                                value: projectGoal,
-                                                sub: "Required Institutional Hours",
-                                                color: "bg-slate-50 border-slate-100 text-slate-900",
-                                                icon: Shield
-                                            },
-                                            {
-                                                label: "Collective Hours",
-                                                value: collectiveProjectHours,
-                                                sub: "Total Project Engagement",
-                                                color: "bg-slate-50 border-slate-100 text-slate-600",
-                                                icon: Users
-                                            },
-                                            {
-                                                label: "Team Compliance",
-                                                value: `${
-                                                    projectGoal > 0
-                                                        ? Math.round((collectiveProjectHours / projectGoal) * 100)
-                                                        : 0
-                                                }%`,
-                                                sub: "Aggregated Progress",
-                                                color: "bg-slate-50 border-slate-100 text-slate-600",
-                                                icon: Activity
-                                            }
-                                        ].map((stat, i) => (
-                                            <div key={i} className={clsx("p-6 rounded-xl border shadow-sm flex items-center gap-5 transition-all duration-200 hover:bg-white hover:shadow-md", stat.color)}>
-                                                <div className="w-12 h-12 rounded-xl bg-white flex items-center justify-center shadow-sm">
-                                                    <stat.icon className="w-6 h-6" />
+                                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                                    {[
+                                        {
+                                            label: "Project goal",
+                                            value: projectGoal,
+                                            suffix: "hrs",
+                                            icon: Shield,
+                                            progress: null as number | null,
+                                        },
+                                        {
+                                            label: "Team hours logged",
+                                            value: collectiveProjectHours,
+                                            suffix: "hrs",
+                                            icon: Users,
+                                            progress: teamProgressPct,
+                                        },
+                                        {
+                                            label: "Team progress",
+                                            value: `${teamProgressPct}%`,
+                                            suffix: null,
+                                            icon: Activity,
+                                            progress: teamProgressPct,
+                                        },
+                                    ].map((stat, i) => (
+                                        <div
+                                            key={i}
+                                            className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
+                                        >
+                                            <div className="flex items-center gap-3">
+                                                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-50 text-slate-600 ring-1 ring-slate-100">
+                                                    <stat.icon className="h-4 w-4" />
+                                                </div>
+                                                <div className="min-w-0 flex-1">
+                                                    <p className="text-xs text-slate-500">{stat.label}</p>
+                                                    <p className="text-xl font-bold text-slate-900">
+                                                        {stat.value}
+                                                        {stat.suffix ? (
+                                                            <span className="ml-1 text-xs font-medium text-slate-400">
+                                                                {stat.suffix}
+                                                            </span>
+                                                        ) : null}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            {stat.progress != null ? (
+                                                <div className="mt-3">
+                                                    <div className="h-1.5 overflow-hidden rounded-full bg-slate-100">
+                                                        <div
+                                                            className="h-full rounded-full bg-indigo-500 transition-all"
+                                                            style={{ width: `${stat.progress}%` }}
+                                                        />
+                                                    </div>
+                                                </div>
+                                            ) : null}
+                                        </div>
+                                    ))}
+                                </div>
+
+                                {selectedParticipantId ? (
+                                    <div className="rounded-xl border border-indigo-100 bg-indigo-50/40 p-4 sm:p-5">
+                                        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                                            <div className="flex items-center gap-3">
+                                                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-indigo-600 text-white text-sm font-semibold">
+                                                    {selectedStudentName.charAt(0).toUpperCase()}
                                                 </div>
                                                 <div>
-                                                    <span className="text-[10px] font-black uppercase tracking-[0.18em] opacity-60">{stat.label}</span>
-                                                    <div className="flex items-baseline gap-1.5 mt-1">
-                                                        <span className="text-2xl font-black">{stat.value}</span>
-                                                        {stat.label !== "Team Compliance" && <span className="text-[10px] font-bold opacity-50">HRS</span>}
-                                                    </div>
-                                                    <p className="text-[9px] font-bold uppercase tracking-widest opacity-40 mt-1">{stat.sub}</p>
+                                                    <p className="text-xs text-slate-500">Personal tracking</p>
+                                                    <p className="text-sm font-semibold text-slate-900">
+                                                        {selectedStudentName}
+                                                    </p>
                                                 </div>
                                             </div>
-                                        ))}
+                                            <div className="flex items-center gap-6 text-center">
+                                                <div>
+                                                    <p className="text-xs text-slate-500">Logged</p>
+                                                    <p className="text-lg font-bold text-indigo-600">
+                                                        {loggedRounded}{" "}
+                                                        <span className="text-xs font-medium text-slate-400">hrs</span>
+                                                    </p>
+                                                </div>
+                                                <div>
+                                                    <p className="text-xs text-slate-500">Remaining</p>
+                                                    <p className="text-lg font-bold text-amber-600">
+                                                        {remainingHours}{" "}
+                                                        <span className="text-xs font-medium text-slate-400">hrs</span>
+                                                    </p>
+                                                </div>
+                                                <div>
+                                                    <p className="text-xs text-slate-500">Goal</p>
+                                                    <p className="text-lg font-bold text-slate-700">
+                                                        {requiredHoursPerStudent}{" "}
+                                                        <span className="text-xs font-medium text-slate-400">hrs</span>
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className="mt-4">
+                                            <div className="mb-1 flex justify-between text-xs text-slate-500">
+                                                <span>Individual progress</span>
+                                                <span className="font-medium text-slate-700">
+                                                    {personalProgressPct}%
+                                                </span>
+                                            </div>
+                                            <div className="h-2 overflow-hidden rounded-full bg-white ring-1 ring-indigo-100">
+                                                <div
+                                                    className={clsx(
+                                                        "h-full rounded-full transition-all",
+                                                        personalProgressPct >= 100
+                                                            ? "bg-emerald-500"
+                                                            : "bg-indigo-500",
+                                                    )}
+                                                    style={{ width: `${personalProgressPct}%` }}
+                                                />
+                                            </div>
+                                        </div>
                                     </div>
+                                ) : null}
 
-                                    {/* Level 2: Student Specific Tracking */}
-                                    {selectedParticipantId && (
-                                        <div className="p-10 bg-report-primary-soft/30 rounded-xl border-2 border-report-primary-border/30 relative overflow-hidden group/userbase shadow-sm">
-                                            <div className="absolute top-0 right-0 p-8 opacity-[0.03] group-hover/userbase:opacity-[0.07] transition-opacity duration-300">
-                                                <Award className="w-32 h-32 rotate-12" />
-                                            </div>
-
-                                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-8 relative z-10">
-                                                <div className="space-y-2">
-                                                    <div className="flex items-center gap-4">
-                                                        <div className="w-11 h-11 rounded-xl bg-report-primary text-white flex items-center justify-center shadow-md shadow-report-primary-shadow">
-                                                            <User className="w-5 h-5" />
-                                                        </div>
-                                                        <h4 className="text-lg font-black text-slate-900 tracking-tight">
-                                                            Personal Tracking: 
-                                                            <span className="text-report-primary ml-2">
-                                                                {(() => {
-                                                                    const lookupUsers = rawParticipants;
-                                                                    return lookupUsers.find((u: any) => u.id === selectedParticipantId)?.name || "Selected Student";
-                                                                })()}
-                                                            </span>
-                                                        </h4>
-                                                    </div>
-                                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.18em] pl-15">Individual Contribution Metrics</p>
-                                                </div>
-
-                                                <div className="flex gap-8">
-                                                    {(() => {
-                                                        const participantLogs = data.section1.attendance_logs.filter(
-                                                            (l: { participantId?: string }) => {
-                                                                if (!selectedParticipantId) return true;
-                                                                return engagementParticipantIdsMatch(
-                                                                    l.participantId,
-                                                                    selectedParticipantId,
-                                                                );
-                                                            },
-                                                        );
-                                                        const loggedEff = participantLogs.reduce(
-                                                            (acc: number, log: (typeof participantLogs)[number]) =>
-                                                                acc + effectiveHoursFromLog(log),
-                                                            0,
-                                                        );
-                                                        const loggedRounded = Math.round(loggedEff * 100) / 100;
-                                                        const participantStats = [
-                                                            {
-                                                                label: "Logged",
-                                                                val: loggedRounded,
-                                                                color: "text-report-primary",
-                                                            },
-                                                            {
-                                                                label: "Remaining",
-                                                                val: Math.max(
-                                                                    0,
-                                                                    Math.round(
-                                                                        (requiredHoursPerStudent - loggedEff) *
-                                                                            100,
-                                                                    ) / 100,
-                                                                ),
-                                                                color: "text-amber-600",
-                                                            },
-                                                        ];
-                                                        return participantStats.map((m, i) => (
-                                                            <div key={i} className="text-center">
-                                                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">
-                                                                    {m.label}
-                                                                </p>
-                                                                <div className="flex items-baseline justify-center gap-1">
-                                                                    <span className={clsx("report-h3 !text-3xl font-black", m.color)}>
-                                                                        {m.val}
-                                                                    </span>
-                                                                    <span className="text-[10px] font-bold text-slate-300">HRS</span>
-                                                                </div>
-                                                            </div>
-                                                        ));
-                                                    })()}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-
-                                <div className="grid min-w-0 grid-cols-1 gap-8 xl:grid-cols-[minmax(0,26rem)_minmax(0,1fr)] xl:items-start">
-                                    <div className="min-w-0 space-y-8">
-                                        <div className="p-1 bg-slate-100 rounded-xl flex gap-1">
-                                            <button className="flex-1 py-2.5 text-[10px] font-black uppercase tracking-[0.18em] bg-white text-report-primary rounded-xl shadow-sm transition-all duration-200 hover:shadow-md">New Entry</button>
-                                            <button className="flex-1 py-2.5 text-[10px] font-black uppercase tracking-[0.18em] text-slate-400 transition-colors duration-200 hover:text-slate-600">Bulk Import</button>
-                                        </div>
-
+                                <div className="grid min-w-0 grid-cols-1 gap-6 xl:grid-cols-[minmax(0,22rem)_minmax(0,1fr)] xl:items-start">
+                                    <div className="min-w-0 space-y-4">
                                         <AttendanceForm
                                             verifiedUsers={rawParticipants}
                                             onSuccess={() => loadAllEntries()}
@@ -1457,92 +1531,95 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                         />
 
                                         {!isSubmittedReport && !isParticipationUnlocked && (
-                                            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+                                            <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
                                                 {isAttendanceVerificationRequested ? (
-                                                    <div className="space-y-2">
-                                                        <p className="text-[10px] font-black uppercase tracking-[0.18em] text-emerald-700">
+                                                    <div className="space-y-1.5">
+                                                        <p className="text-xs font-semibold text-emerald-700">
                                                             Verification request sent
                                                         </p>
-                                                        <p className="text-[13px] text-slate-500 leading-relaxed">
+                                                        <p className="text-sm leading-relaxed text-slate-600">
                                                             {ATTENDANCE_VERIFICATION_INFO.afterSent}
-                                                            <span className="mt-2 block text-slate-600">
+                                                            <span className="mt-1.5 block text-slate-500">
                                                                 {ATTENDANCE_VERIFICATION_INFO.afterSentWho}
                                                             </span>
                                                         </p>
                                                     </div>
                                                 ) : (
-                                                    <div className="space-y-4">
+                                                    <div className="space-y-3">
                                                         <Button
                                                             type="button"
                                                             onClick={handleRequestAttendanceVerification}
-                                                            disabled={isRequestingAttendanceVerification || !data.section1.attendance_logs.length}
-                                                            className="w-full h-11 rounded-xl bg-slate-900 text-white hover:bg-slate-800 hover:shadow-md disabled:opacity-60 transition-all duration-200 focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2"
+                                                            disabled={
+                                                                isRequestingAttendanceVerification ||
+                                                                !data.section1.attendance_logs.length
+                                                            }
+                                                            className="h-10 w-full rounded-lg bg-slate-900 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-60"
                                                         >
                                                             {isRequestingAttendanceVerification ? (
                                                                 <span className="inline-flex items-center gap-2">
-                                                                    <Loader2 className="h-4 w-4 animate-spin shrink-0" />
-                                                                    Sending for verification...
+                                                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                                                    Sending for verification…
                                                                 </span>
                                                             ) : (
                                                                 <span className="inline-flex items-center gap-2">
-                                                                    <Lock className="h-4 w-4 shrink-0" />
-                                                                    Verify Attendance (One Time)
+                                                                    <Lock className="h-4 w-4" />
+                                                                    Verify attendance (one time)
                                                                 </span>
                                                             )}
                                                         </Button>
-                                                        <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-[13px] leading-relaxed text-slate-600">
-                                                            <p className="text-slate-700 font-medium">{ATTENDANCE_VERIFICATION_INFO.lockNote}</p>
-                                                            <p className="mt-2 text-slate-600">{ATTENDANCE_VERIFICATION_INFO.routing}</p>
+                                                        <div className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2.5 text-xs leading-relaxed text-slate-600">
+                                                            <p className="font-medium text-slate-700">
+                                                                {ATTENDANCE_VERIFICATION_INFO.lockNote}
+                                                            </p>
+                                                            <p className="mt-1.5">{ATTENDANCE_VERIFICATION_INFO.routing}</p>
                                                         </div>
                                                     </div>
                                                 )}
                                             </div>
                                         )}
+
+                                        <div className="rounded-xl border border-slate-200 bg-slate-900 px-4 py-3.5 text-white">
+                                            <p className="text-xs font-semibold">How approval works</p>
+                                            <p className="mt-1.5 text-xs leading-relaxed text-slate-300">
+                                                After you submit for verification, your assigned reviewer will
+                                                approve each session. Approved hours count toward your goal.
+                                            </p>
+                                        </div>
                                     </div>
-                                    <div className="min-w-0 space-y-6">
-                                        <div className="overflow-hidden rounded-xl border border-slate-100 bg-white shadow-sm">
-                                            <div className="flex flex-col gap-4 border-b border-slate-50 bg-slate-50/30 p-6 sm:flex-row sm:items-center sm:justify-between">
-                                                <div className="min-w-0 flex flex-col gap-2">
-                                                    <h4 className="flex flex-wrap items-center gap-2 font-black text-lg text-slate-900">
-                                                        <Clock className="h-5 w-5 shrink-0 text-report-primary" /> Logged Sessions
+
+                                    <div className="min-w-0 space-y-4">
+                                        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+                                            <div className="flex flex-col gap-2 border-b border-slate-100 px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between">
+                                                <div className="min-w-0">
+                                                    <h4 className="flex items-center gap-2 text-sm font-semibold text-slate-900">
+                                                        <Clock className="h-4 w-4 text-indigo-600" />
+                                                        Logged sessions
                                                     </h4>
-                                                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400 sm:pl-7">
-                                                        {selectedParticipantId ? `Filtered by: ${rawParticipants.find(u => u.id === selectedParticipantId)?.name || 'Self'}` : 'Showing records for all verified team members'}
+                                                    <p className="mt-0.5 text-xs text-slate-500">
+                                                        {selectedParticipantId
+                                                            ? `Showing entries for ${selectedStudentName}`
+                                                            : "Showing all team members"}
                                                     </p>
                                                 </div>
-                                                <span className="w-fit shrink-0 rounded-xl border border-slate-100 bg-white px-5 py-2 text-[10px] font-black uppercase tracking-[0.18em] text-report-primary shadow-sm">
-                                                    {data.section1.attendance_logs.filter((log: any) => {
-                                                        if (!selectedParticipantId) return true;
-                                                        return engagementParticipantIdsMatch(
-                                                            log.participantId,
-                                                            selectedParticipantId,
-                                                        );
-                                                    }).length}{" "}
-                                                    Records
+                                                <span className="w-fit shrink-0 rounded-full bg-indigo-50 px-3 py-1 text-xs font-medium text-indigo-700 ring-1 ring-indigo-100">
+                                                    {filteredLogCount}{" "}
+                                                    {filteredLogCount === 1 ? "entry" : "entries"}
                                                 </span>
                                             </div>
-                                            <div className="min-w-0 overflow-x-auto">
-                                                <AttendanceSummaryTable
-                                                    embedded
-                                                    entries={data.section1.attendance_logs.filter((log: any) => {
-                                                        if (!selectedParticipantId) return true;
-                                                        return engagementParticipantIdsMatch(
-                                                            log.participantId,
-                                                            selectedParticipantId,
-                                                        );
-                                                    })}
-                                                    participantNames={participantNamesMap}
-                                                    onDelete={handleDeleteEntry}
-                                                    canDeleteEntry={(entry) =>
-                                                        canDeleteAttendanceEntry(
-                                                            entry,
-                                                            selfParticipantIds,
-                                                            currentUserEmail,
-                                                        )
-                                                    }
-                                                    isLocked={isAttendanceFormLocked}
-                                                />
-                                            </div>
+                                            <AttendanceSummaryTable
+                                                embedded
+                                                entries={participantLogs}
+                                                participantNames={participantNamesMap}
+                                                onDelete={handleDeleteEntry}
+                                                canDeleteEntry={(entry) =>
+                                                    canDeleteAttendanceEntry(
+                                                        entry,
+                                                        selfParticipantIds,
+                                                        currentUserEmail,
+                                                    )
+                                                }
+                                                isLocked={isAttendanceFormLocked}
+                                            />
                                         </div>
                                     </div>
                                 </div>
@@ -1552,124 +1629,163 @@ export default function Section1Participation({ projectData }: { projectData?: a
 
 
                     {internalStep === 3 && (
-                        <div className="max-w-2xl mx-auto space-y-10 py-10">
+                        <div className="mx-auto max-w-2xl space-y-6 py-4">
 
-                            {/* HEADER */}
-                            <div className="text-center space-y-4">
-
-                                <div className="w-16 h-16 bg-report-primary text-white rounded-xl flex items-center justify-center mx-auto shadow-md shadow-report-primary-shadow">
-                                    <Shield className="w-8 h-8" />
+                            <div className="text-center">
+                                <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-600 text-white shadow-md shadow-indigo-200">
+                                    <Shield className="h-7 w-7" />
                                 </div>
-
-                                <h2 className="text-2xl font-bold text-slate-900 tracking-tight">
-                                    Final Verification & Submission
+                                <p className="text-xs font-medium text-indigo-600">Step 3</p>
+                                <h2 className="mt-1 text-xl font-semibold text-slate-900">
+                                    Review & submit
                                 </h2>
-
-                                <p className="text-[13px] text-slate-500 leading-relaxed">
-                                    Please review all information carefully before submitting the final report.
+                                <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-slate-500">
+                                    Confirm your attendance records are accurate before finalizing.
                                 </p>
-
                             </div>
 
-
-
-                            <div className="space-y-6">
-
-                                {/* WARNING CARD */}
-                                <div className="p-6 bg-amber-50 rounded-xl border border-amber-200 shadow-sm space-y-3">
-
-                                    <div className="flex items-center gap-4 text-amber-800">
-
-                                        <AlertCircle className="w-5 h-5 shrink-0" />
-
-                                        <h4 className="text-base font-bold text-amber-800">
-                                            Permanent Record Lock
-                                        </h4>
-
+                            <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                                <p className="text-xs font-medium text-slate-500">Hours summary</p>
+                                <div className="mt-3 grid grid-cols-3 gap-3 text-center">
+                                    <div className="rounded-lg bg-slate-50 px-2 py-2.5 ring-1 ring-slate-100">
+                                        <p className="text-lg font-bold text-slate-900">{projectGoal}</p>
+                                        <p className="text-[11px] text-slate-500">Project goal</p>
                                     </div>
-
-                                    <p className="text-[13px] text-amber-700 leading-relaxed">
-
-                                        By submitting this report, all participation records will become
-                                        <strong className="font-bold"> permanently locked </strong>
-                                        and no further edits will be allowed. Any inaccuracies will be reflected
-                                        in your official HEC verification record.
-
-                                    </p>
-
+                                    <div className="rounded-lg bg-slate-50 px-2 py-2.5 ring-1 ring-slate-100">
+                                        <p className="text-lg font-bold text-indigo-600">
+                                            {collectiveProjectHours}
+                                        </p>
+                                        <p className="text-[11px] text-slate-500">Team logged</p>
+                                    </div>
+                                    <div className="rounded-lg bg-slate-50 px-2 py-2.5 ring-1 ring-slate-100">
+                                        <p
+                                            className={clsx(
+                                                "text-lg font-bold",
+                                                isMinimumHoursMet ? "text-emerald-600" : "text-amber-600",
+                                            )}
+                                        >
+                                            {requiredHoursPerStudent}
+                                        </p>
+                                        <p className="text-[11px] text-slate-500">Per student</p>
+                                    </div>
                                 </div>
-
-                                {/* HOURS COMPLIANCE WARNING */}
-                                {!isMinimumHoursMet && (
-                                    <div className="p-6 bg-red-50 rounded-xl border border-red-100 shadow-sm flex items-start gap-4">
-                                        <div className="w-10 h-10 rounded-xl bg-red-100/50 flex items-center justify-center shrink-0">
-                                            <AlertCircle className="w-5 h-5 text-red-600" />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <h4 className="text-sm font-bold text-red-900">Minimum Hours Not Met</h4>
-                                            <p className="text-[13px] text-red-700 leading-relaxed">
-                                                To finalize this report and generate compliance results, every student must reach the minimum goal of 
-                                                <strong className="mx-1 font-bold">{requiredHoursPerStudent} hours</strong>. 
-                                                Please return to Step 2 to add the remaining sessions.
+                                <div className="mt-3 flex items-center gap-2 rounded-lg px-1 py-1">
+                                    {isMinimumHoursMet ? (
+                                        <>
+                                            <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" />
+                                            <p className="text-xs text-emerald-700">
+                                                All students have met the minimum hour requirement.
                                             </p>
-                                        </div>
-                                    </div>
-                                )}
-
-
-
-                                {/* CHECKLIST CARD */}
-                                <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
-
-                                    <div className="space-y-2">
-
-                                        {[
-                                            'I verify that all session entries are authentic.',
-                                            'I understand that no further edits are possible after submission.',
-                                            'I consent to institutional report sharing.'
-                                        ].map((check, i) => (
-
-                                            <label
-                                                key={i}
-                                                className="flex items-start gap-4 p-4 rounded-xl hover:bg-slate-50 transition-all duration-200 cursor-pointer"
-                                            >
-
-                                                <input
-                                                    type="checkbox"
-                                                    checked={reviewChecked[i]}
-                                                    onChange={() => {
-                                                        const newChecked = [...reviewChecked];
-                                                        newChecked[i] = !newChecked[i];
-
-                                                        updateSection('section1', {
-                                                            review_checked: newChecked,
-                                                            ...(i === 2 ? { privacy_consent: newChecked[i] } : {})
-                                                        });
-                                                    }}
-                                                    className="mt-0.5 w-5 h-5 rounded border-2 border-slate-300 text-report-primary focus:ring-2 focus:ring-report-primary focus:ring-offset-2 cursor-pointer transition-colors duration-200"
-                                                />
-
-                                                <span className="text-[13px] text-slate-600 leading-relaxed">
-                                                    {check}
-                                                </span>
-
-                                            </label>
-
-                                        ))}
-
-                                    </div>
-
+                                        </>
+                                    ) : (
+                                        <>
+                                            <AlertCircle className="h-4 w-4 shrink-0 text-amber-500" />
+                                            <p className="text-xs text-amber-700">
+                                                Some students still need more hours. Return to Step 2 to
+                                                add sessions.
+                                            </p>
+                                        </>
+                                    )}
                                 </div>
+                            </div>
 
+                            <div className="flex gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
+                                <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
+                                <div>
+                                    <h4 className="text-sm font-semibold text-amber-900">
+                                        Permanent record lock
+                                    </h4>
+                                    <p className="mt-1 text-sm leading-relaxed text-amber-800">
+                                        After submission, all participation records become{" "}
+                                        <strong>permanently locked</strong> and cannot be edited. Any
+                                        inaccuracies will appear on your official HEC verification record.
+                                    </p>
+                                </div>
+                            </div>
+
+                            {!isMinimumHoursMet ? (
+                                <div className="flex gap-3 rounded-xl border border-red-200 bg-red-50 p-4">
+                                    <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-red-600" />
+                                    <div>
+                                        <h4 className="text-sm font-semibold text-red-900">
+                                            Minimum hours not met
+                                        </h4>
+                                        <p className="mt-1 text-sm leading-relaxed text-red-700">
+                                            Every student must reach{" "}
+                                            <strong>{requiredHoursPerStudent} hours</strong> before you can
+                                            finalize. Go back to attendance logging to complete remaining
+                                            sessions.
+                                        </p>
+                                    </div>
+                                </div>
+                            ) : null}
+
+                            <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+                                <div className="border-b border-slate-100 bg-slate-50/80 px-5 py-3">
+                                    <h4 className="text-sm font-semibold text-slate-900">
+                                        Confirmation checklist
+                                    </h4>
+                                    <p className="mt-0.5 text-xs text-slate-500">
+                                        Check all items to enable finalization.
+                                    </p>
+                                </div>
+                                <div className="divide-y divide-slate-100 p-2">
+                                    {[
+                                        "I verify that all session entries are authentic.",
+                                        "I understand that no further edits are possible after submission.",
+                                        "I consent to institutional report sharing.",
+                                    ].map((check, i) => (
+                                        <label
+                                            key={i}
+                                            className="flex cursor-pointer items-start gap-3 rounded-lg px-3 py-3 transition-colors hover:bg-slate-50"
+                                        >
+                                            <input
+                                                type="checkbox"
+                                                checked={reviewChecked[i]}
+                                                onChange={() => {
+                                                    const newChecked = [...reviewChecked];
+                                                    newChecked[i] = !newChecked[i];
+                                                    updateSection("section1", {
+                                                        review_checked: newChecked,
+                                                        ...(i === 2
+                                                            ? { privacy_consent: newChecked[i] }
+                                                            : {}),
+                                                    });
+                                                }}
+                                                className="mt-0.5 h-4 w-4 cursor-pointer rounded border-slate-300 text-indigo-600 focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1"
+                                            />
+                                            <span className="text-sm leading-relaxed text-slate-700">
+                                                {check}
+                                            </span>
+                                        </label>
+                                    ))}
+                                </div>
                             </div>
 
                         </div>
-
                     )}
 
-                    {/* Metrics Dashboard (now step 4) */}
+                    {/* Metrics Dashboard (step 4) */}
                     {internalStep === 4 && (
-                        <div className="space-y-10 animate-in fade-in duration-500">
+                        <div className="space-y-6">
+
+                            <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+                                <div>
+                                    <p className="text-xs font-medium text-indigo-600">Step 4</p>
+                                    <h2 className="mt-0.5 text-xl font-semibold text-slate-900">
+                                        Metrics dashboard
+                                    </h2>
+                                    <p className="mt-1 text-sm text-slate-500">
+                                        Engagement intensity scores and HEC compliance results.
+                                    </p>
+                                </div>
+                                {isSubmitted ? (
+                                    <span className="inline-flex w-fit items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700 ring-1 ring-emerald-100">
+                                        <CheckCircle2 className="h-3.5 w-3.5" />
+                                        Record finalized
+                                    </span>
+                                ) : null}
+                            </div>
 
                             {verifiedMetrics ? (
 
@@ -1703,46 +1819,28 @@ export default function Section1Participation({ projectData }: { projectData?: a
 
                             ) : (
 
-                                <div className="py-28 text-center space-y-8 bg-white rounded-xl border border-slate-200 shadow-sm">
+                                <div className="rounded-xl border border-slate-200 bg-white py-16 text-center shadow-sm">
 
-                                    {/* Loader */}
-                                    <div className="relative flex justify-center">
+                                    <Loader2 className="mx-auto h-9 w-9 animate-spin text-indigo-600" />
 
-                                        <div className="absolute w-16 h-16 bg-indigo-50 rounded-full blur-lg opacity-50"></div>
+                                    <p className="mt-4 text-base font-semibold text-slate-800">
+                                        Generating analytics
+                                    </p>
 
-                                        <Loader2 className="w-10 h-10 text-indigo-600 animate-spin relative z-10" />
+                                    <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-slate-500">
+                                        Calculating engagement intensity scores and verifying HEC
+                                        compliance for your submission record.
+                                    </p>
 
-                                    </div>
-
-
-                                    {/* Text */}
-                                    <div className="space-y-3">
-
-                                        <p className="text-lg font-bold text-slate-800">
-                                            Generating Intensity Analytics
-                                        </p>
-
-                                        <p className="text-[13px] text-slate-500 max-w-[320px] mx-auto leading-relaxed">
-                                            Calculating engagement intensity scores and verifying HEC compliance status for your submission record.
-                                        </p>
-
-                                    </div>
-
-
-                                    {/* Return Button */}
-                                    {!isSubmitted && (
-
+                                    {!isSubmitted ? (
                                         <Button
                                             variant="outline"
                                             onClick={() => setInternalStep(3)}
-                                            className="inline-flex items-center gap-2 rounded-xl border border-indigo-200 text-indigo-600 font-semibold px-6 h-11 hover:bg-indigo-50 hover:shadow-sm transition-all duration-200 focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2"
+                                            className="mt-6 h-10 rounded-lg border-indigo-200 text-sm font-medium text-indigo-600 hover:bg-indigo-50"
                                         >
-
-                                            Return to Review & Submit
-
+                                            Return to review
                                         </Button>
-
-                                    )}
+                                    ) : null}
 
                                 </div>
 
@@ -1754,41 +1852,51 @@ export default function Section1Participation({ projectData }: { projectData?: a
                 </div>
             </main>
 
-            {/* Sticky Bottom Footer */}
-            <div className="mt-auto border-t border-slate-200/80 bg-white/95 backdrop-blur-md shadow-[0_-8px_30px_-12px_rgba(15,23,42,0.12)]">
-                <div className="mx-auto flex max-w-6xl flex-col gap-4 px-6 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-8">
+            {/* Sticky bottom actions */}
+            <div className="mt-auto border-t border-slate-200 bg-white">
+                <div className="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
                     <Button
                         variant="outline"
                         onClick={handleBack}
                         disabled={internalStep === 1}
-                        className="order-2 h-11 rounded-xl border-slate-200 px-6 font-semibold text-slate-700 hover:bg-slate-50 hover:shadow-sm sm:order-1 disabled:opacity-40 transition-all duration-200 focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2"
+                        className="order-2 h-10 rounded-lg border-slate-200 px-5 text-sm font-medium text-slate-700 hover:bg-slate-50 sm:order-1 disabled:opacity-40"
                     >
-                        <ChevronLeft className="mr-2 h-4 w-4 shrink-0" /> Back
+                        <ChevronLeft className="mr-1.5 h-4 w-4" />
+                        Back
                     </Button>
 
-                    <div className="order-1 flex flex-col gap-3 sm:order-2 sm:flex-row sm:items-center sm:justify-end sm:gap-3">
+                    <div className="order-1 flex flex-col gap-2 sm:order-2 sm:flex-row sm:items-center sm:gap-2">
                         {!isTeamMemberAttendanceOnly ? (
                             <Button
                                 variant="outline"
                                 onClick={() => saveReport(false)}
-                                className="inline-flex items-center justify-center gap-2 h-11 rounded-xl border-slate-200 bg-slate-50/80 px-6 font-semibold text-slate-800 hover:bg-slate-100 hover:shadow-sm transition-all duration-200 focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2"
+                                className="h-10 rounded-lg border-slate-200 bg-white px-5 text-sm font-medium text-slate-700 hover:bg-slate-50"
                             >
-                                <Save className="h-4 w-4 text-slate-500 shrink-0" /> Save Draft
+                                <Save className="mr-1.5 h-4 w-4 text-slate-400" />
+                                Save draft
                             </Button>
                         ) : null}
 
                         {internalStep < 4 ? (
-                            <div className="flex flex-col gap-3 sm:flex-row sm:gap-3">
-                                {internalStep === 3 && (
+                            <>
+                                {internalStep === 3 ? (
                                     <Button
                                         onClick={handleFinalSubmit}
-                                        disabled={!reviewChecked.every(Boolean) || isLoadingMetrics || !isMinimumHoursMet}
-                                        className="inline-flex items-center justify-center gap-2 h-11 rounded-xl bg-report-primary px-6 font-semibold text-white shadow-md shadow-indigo-500/25 hover:bg-[#0049A3] hover:shadow-lg transition-all duration-200 disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-report-primary focus-visible:ring-offset-2"
+                                        disabled={
+                                            !reviewChecked.every(Boolean) ||
+                                            isLoadingMetrics ||
+                                            !isMinimumHoursMet
+                                        }
+                                        className="h-10 rounded-lg bg-slate-900 px-5 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50"
                                     >
-                                        {isLoadingMetrics ? <Loader2 className="h-4 w-4 animate-spin shrink-0" /> : null}
-                                        Finalize & Generate Record <Lock className="h-4 w-4 shrink-0" />
+                                        {isLoadingMetrics ? (
+                                            <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                                        ) : (
+                                            <Lock className="mr-1.5 h-4 w-4" />
+                                        )}
+                                        Finalize & generate record
                                     </Button>
-                                )}
+                                ) : null}
                                 <Button
                                     onClick={handleNext}
                                     disabled={
@@ -1796,21 +1904,26 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                         (internalStep === 3 && !isMinimumHoursMet) ||
                                         (isTeamMemberAttendanceOnly && internalStep >= 2)
                                     }
-                                    className="inline-flex items-center justify-center gap-2 h-11 rounded-xl bg-report-primary px-6 font-semibold text-white shadow-md shadow-indigo-500/25 hover:bg-[#0049A3] hover:shadow-lg transition-all duration-200 disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-report-primary focus-visible:ring-offset-2"
+                                    className={clsx(
+                                        "h-10 rounded-lg px-5 text-sm font-semibold text-white disabled:opacity-50",
+                                        internalStep === 3
+                                            ? "bg-indigo-100 text-indigo-700 hover:bg-indigo-200 shadow-none"
+                                            : "bg-indigo-600 hover:bg-indigo-700 shadow-sm",
+                                    )}
                                 >
-                                    {internalStep === 3 ? "Skip Submission & Continue" : "Continue"} <ChevronRight className="h-4 w-4 shrink-0" />
+                                    {internalStep === 3 ? "Skip & continue" : "Continue"}
+                                    <ChevronRight className="ml-1.5 h-4 w-4" />
                                 </Button>
-                            </div>
-                        ) : (
-                            !isTeamMemberAttendanceOnly ? (
+                            </>
+                        ) : !isTeamMemberAttendanceOnly ? (
                             <Button
                                 onClick={handleNext}
-                                className="inline-flex items-center justify-center gap-2 h-11 rounded-xl bg-slate-900 px-6 font-semibold text-white shadow-md hover:bg-black hover:shadow-lg transition-all duration-200 focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2"
+                                className="h-10 rounded-lg bg-slate-900 px-5 text-sm font-semibold text-white hover:bg-slate-800"
                             >
-                                Save & Continue to Next Section <ChevronRight className="h-4 w-4 shrink-0" />
+                                Save & continue to next section
+                                <ChevronRight className="ml-1.5 h-4 w-4" />
                             </Button>
-                            ) : null
-                        )}
+                        ) : null}
                     </div>
                 </div>
             </div>

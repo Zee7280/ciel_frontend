@@ -59,6 +59,10 @@ export default function FeaturesBar() {
         <section className="relative overflow-hidden bg-white px-6 py-20 md:py-24">
             <div className="relative z-10 mx-auto max-w-6xl">
                 <div className="mb-12 text-center md:mb-16">
+                    <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-100 px-4 py-2 text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">
+                        <span className="h-1.5 w-1.5 rounded-full bg-[#34A853]" aria-hidden />
+                        Platform capabilities
+                    </div>
                     <div className="relative mb-4 inline-block">
                         <h2 className="text-3xl font-black tracking-tight text-slate-900 md:text-4xl lg:text-[42px] lg:leading-tight">
                             Exclusive Features
@@ -77,6 +81,9 @@ export default function FeaturesBar() {
                             />
                         </svg>
                     </div>
+                    <p className="mx-auto max-w-2xl text-base font-medium text-slate-500 md:text-lg">
+                        Everything you need to document, verify, and report community impact — in one place.
+                    </p>
                 </div>
 
                 <div className="grid grid-cols-1 gap-5 md:grid-cols-2 md:gap-6 lg:grid-cols-3">

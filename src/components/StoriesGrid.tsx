@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { ArrowRight, GraduationCap, Heart, Leaf, Users, Target, Search } from "lucide-react";
 import { useRouter } from "next/navigation";
 
@@ -15,10 +16,11 @@ interface Opportunity {
     id: string;
     title: string;
     description: string;
-    types: string[];
-    sdg_info: {
-        sdg_id: string;
+    types?: string[];
+    sdg_info?: {
+        sdg_id?: string;
     };
+    sdg?: string;
     participant_count?: number;
 }
 
@@ -40,13 +42,10 @@ export default function StoriesGrid() {
     useEffect(() => {
         const fetchOpportunities = async () => {
             try {
-                const backendUrl = (process.env.NEXT_PUBLIC_BACKEND_BASE_URL || "").replace(/\/$/, "");
-                if (!backendUrl) {
-                    console.error("StoriesGrid: NEXT_PUBLIC_BACKEND_BASE_URL is not set");
-                    setOpportunities([]);
-                    return;
-                }
-                const response = await fetch(`${backendUrl}/public/opportunities`, { cache: "no-store" });
+                const response = await fetch("/api/v1/public/opportunities", {
+                    headers: { Accept: "application/json" },
+                    cache: "no-store",
+                });
                 if (response.ok) {
                     const result = await response.json();
                     if (result.success && Array.isArray(result.data)) {
@@ -123,7 +122,8 @@ export default function StoriesGrid() {
                         ))
                     ) : opportunities.length > 0 ? (
                         opportunities.map((opp) => {
-                            const Icon = getSdgIcon(opp.sdg_info.sdg_id.match(/\d+/)?.[0] || 1);
+                            const sdgRaw = opp.sdg_info?.sdg_id ?? opp.sdg ?? "1";
+                            const Icon = getSdgIcon(sdgRaw.match(/\d+/)?.[0] || 1);
 
                             return (
                                 <article key={opp.id} className={cardShell}>
@@ -151,7 +151,7 @@ export default function StoriesGrid() {
                                                 <Icon className="h-7 w-7 text-[#3A72AA]" strokeWidth={1.75} />
                                             </div>
                                             <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#3A72AA]">
-                                                {opp.types[0] || "Community Service"}
+                                                {opp.types?.[0] || "Community Service"}
                                             </span>
                                         </div>
 
@@ -184,6 +184,18 @@ export default function StoriesGrid() {
                         </div>
                     )}
                 </div>
+
+                {!loading && opportunities.length > 0 ? (
+                    <div className="mt-12 text-center">
+                        <Link
+                            href="/projects"
+                            className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-8 py-3 text-sm font-bold text-slate-800 shadow-sm transition hover:border-[#3A72AA]/30 hover:text-[#3A72AA]"
+                        >
+                            View all projects
+                            <ArrowRight className="h-4 w-4" aria-hidden />
+                        </Link>
+                    </div>
+                ) : null}
             </div>
         </section>
     );

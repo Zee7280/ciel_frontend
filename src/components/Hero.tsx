@@ -50,7 +50,7 @@ export default function Hero() {
     const hoveredSdgData = hoveredSdg ? sdgData.find((sdg) => sdg.number === hoveredSdg) : null;
 
     return (
-        <section className="relative max-w-[1600px] mx-auto px-4 pt-14 pb-10 md:px-10 lg:pt-16 lg:pb-12 overflow-visible">
+        <section className="relative max-w-[1600px] mx-auto px-4 pt-28 pb-10 md:px-10 lg:pt-32 lg:pb-12 overflow-visible">
             {/* Soft Background Glow */}
             <div className="absolute top-0 left-0 w-[600px] h-[600px] bg-blue-50/50 rounded-full blur-[120px] -z-10" />
             <div className="absolute bottom-0 right-0 w-[600px] h-[600px] bg-emerald-50/50 rounded-full blur-[120px] -z-10" />
@@ -76,7 +76,7 @@ export default function Hero() {
                         <Link href="/projects" className="w-full sm:w-auto px-10 py-4 bg-[#4285F4] hover:bg-blue-600 text-white rounded-xl font-bold text-lg shadow-xl shadow-blue-100 transition-all duration-300 text-center">
                             Start Your Project
                         </Link>
-                        <Link href="/about" className="w-full sm:w-auto px-10 py-4 border-2 border-slate-200 text-slate-700 rounded-xl font-bold text-lg hover:bg-slate-50 transition-all duration-300 text-center">
+                        <Link href="/#how-it-works" className="w-full sm:w-auto px-10 py-4 border-2 border-slate-200 text-slate-700 rounded-xl font-bold text-lg hover:bg-slate-50 transition-all duration-300 text-center">
                             Explore How It Works
                         </Link>
                     </div>

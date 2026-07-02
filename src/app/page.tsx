@@ -14,10 +14,10 @@ export default function Home() {
     <main className="min-h-screen bg-white font-sans">
       <Navbar />
       <Hero />
+      <ImpactSnapshot />
       <WhoIsItFor />
       <HowWeWork />
       <FeaturesBar />
-      <ImpactSnapshot />
       <FinalCTA />
       <StoriesGrid />
       <PartnersFooter />

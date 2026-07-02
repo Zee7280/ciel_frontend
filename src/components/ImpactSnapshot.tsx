@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { GraduationCap, Clock, Globe2, Handshake, TrendingUp } from "lucide-react";
+import { GraduationCap, Clock, Globe2, Handshake, TrendingUp, Building2 } from "lucide-react";
 
 interface Stat {
     icon: React.ElementType;
@@ -20,6 +20,7 @@ type PlatformStatsData = {
     active_projects?: unknown;
     avg_cii_score?: unknown;
     contributors?: unknown;
+    universities?: unknown;
     impact_hours?: unknown;
     sdgs_impacted?: unknown;
 };
@@ -75,6 +76,15 @@ const defaultStats: Stat[] = [
         color: "text-[#4285F4]",
         iconBg: "bg-slate-50",
     },
+    {
+        icon: Building2,
+        value: 24,
+        suffix: "+",
+        label: "Partner Universities",
+        sub: "Approved institutions",
+        color: "text-[#4285F4]",
+        iconBg: "bg-slate-50",
+    },
 ];
 
 function normalizeCount(value: unknown, fallback: number): number {
@@ -86,7 +96,8 @@ function buildStats(data?: PlatformStatsData): Stat[] {
     return defaultStats.map((stat) => {
         switch (stat.label) {
             case "Students Enrolled":
-                return { ...stat, value: normalizeCount(data?.students_enrolled ?? data?.contributors, stat.value) };
+                // Sub-label is "Verified participants" — prefer live contributor count over total signups.
+                return { ...stat, value: normalizeCount(data?.contributors ?? data?.students_enrolled, stat.value) };
             case "Engagement Hours":
                 return { ...stat, value: normalizeCount(data?.engagement_hours ?? data?.impact_hours, stat.value) };
             case "SDGs Covered":
@@ -95,6 +106,8 @@ function buildStats(data?: PlatformStatsData): Stat[] {
                 return { ...stat, value: normalizeCount(data?.active_projects, stat.value) };
             case "Avg CII Score":
                 return { ...stat, value: normalizeCount(data?.avg_cii_score, stat.value) };
+            case "Partner Universities":
+                return { ...stat, value: normalizeCount(data?.universities, stat.value) };
             default:
                 return stat;
         }
@@ -164,7 +177,7 @@ export default function ImpactSnapshot() {
     }, []);
 
     return (
-        <section className="py-24 px-6 bg-slate-50/50 relative overflow-hidden">
+        <section id="platform-impact" className="py-24 px-6 bg-slate-50/50 relative overflow-hidden">
             {/* Radial glow */}
             <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(66,133,244,0.04)_0%,transparent_70%)] pointer-events-none" />
             {/* Dot grid */}
@@ -197,7 +210,7 @@ export default function ImpactSnapshot() {
                 </div>
 
                 {/* Stats grid */}
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6">
+                <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4 md:gap-6">
                     {stats.map((stat, i) => {
                         const Icon = stat.icon;
                         return (

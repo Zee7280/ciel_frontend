@@ -1,7 +1,23 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, Calendar, Clock, MapPin, Tag, FileText, Loader2, CheckCircle2, Upload, X, Lock, Users, Info, AlertCircle } from "lucide-react";
+import {
+    Plus,
+    Calendar,
+    Clock,
+    MapPin,
+    Tag,
+    Loader2,
+    CheckCircle2,
+    Upload,
+    X,
+    Lock,
+    Users,
+    Info,
+    AlertCircle,
+    ChevronDown,
+    ChevronUp,
+} from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "../../report/components/ui/button";
 import { Input } from "../../report/components/ui/input";
@@ -27,7 +43,11 @@ import dynamic from "next/dynamic";
 
 const LocationPicker = dynamic(() => import("@/components/ui/LocationPicker"), {
     ssr: false,
-    loading: () => <div className="h-[200px] w-full bg-slate-50 animate-pulse rounded-2xl flex items-center justify-center text-slate-400 font-bold text-xs uppercase tracking-widest">Loading Interactive Map...</div>
+    loading: () => (
+        <div className="flex h-[180px] w-full animate-pulse items-center justify-center rounded-xl bg-slate-50 text-xs text-slate-400">
+            Loading map…
+        </div>
+    ),
 });
 
 type AttendanceLogLike = {
@@ -93,6 +113,42 @@ function hasOverlappingAttendanceLog(
     });
 }
 
+function computeSessionHours(startTime: string, endTime: string): number | null {
+    const start = timeToMinutes(startTime);
+    const end = timeToMinutes(endTime);
+    if (start == null || end == null || end <= start) return null;
+    return Math.round((end - start) / 60 * 100) / 100;
+}
+
+function FormSection({
+    title,
+    description,
+    children,
+    step,
+}: {
+    title: string;
+    description?: string;
+    children: React.ReactNode;
+    step: number;
+}) {
+    return (
+        <section className="space-y-4">
+            <div className="flex items-start gap-3">
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-indigo-50 text-xs font-semibold text-indigo-600 ring-1 ring-indigo-100">
+                    {step}
+                </span>
+                <div className="min-w-0 pt-0.5">
+                    <h4 className="text-sm font-semibold text-slate-900">{title}</h4>
+                    {description ? (
+                        <p className="mt-0.5 text-xs leading-relaxed text-slate-500">{description}</p>
+                    ) : null}
+                </div>
+            </div>
+            <div className="ml-10 space-y-4">{children}</div>
+        </section>
+    );
+}
+
 export default function AttendanceForm({
     verifiedUsers,
     onSuccess,
@@ -103,49 +159,49 @@ export default function AttendanceForm({
     setParticipationUnlocked,
     allowManualUnlock = true,
 }: {
-    verifiedUsers: { id: string, name: string, status?: string }[],
-    onSuccess: () => void,
-    selectedParticipantId?: string | null,
-    onParticipantChange?: (id: string) => void,
-    isLocked?: boolean,
-    isParticipationUnlocked?: boolean,
-    setParticipationUnlocked?: (unlocked: boolean) => void,
-    allowManualUnlock?: boolean,
+    verifiedUsers: { id: string; name: string; status?: string }[];
+    onSuccess: () => void;
+    selectedParticipantId?: string | null;
+    onParticipantChange?: (id: string) => void;
+    isLocked?: boolean;
+    isParticipationUnlocked?: boolean;
+    setParticipationUnlocked?: (unlocked: boolean) => void;
+    allowManualUnlock?: boolean;
 }) {
     const { data: reportData, updateSection } = useReportForm();
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [submitError, setSubmitError] = useState<string | null>(null);
     const [evidenceFile, setEvidenceFile] = useState<File | null>(null);
+    const [showMap, setShowMap] = useState(false);
     const [mounted, setMounted] = React.useState(false);
     const [formData, setFormData] = useState({
-        participantId: selectedParticipantId || (verifiedUsers.length > 0 ? verifiedUsers[0].id : ''),
-        dateOfEngagement: '', // Default to empty to avoid hydration mismatch
-        startTime: '09:00',
-        endTime: '12:00',
-        organizationName: '',
-        activityType: 'Field Visit',
-        otherActivity: '',
-        description: '',
-        locationPin: '', // To store lat,lng
+        participantId: selectedParticipantId || (verifiedUsers.length > 0 ? verifiedUsers[0].id : ""),
+        dateOfEngagement: "",
+        startTime: "09:00",
+        endTime: "12:00",
+        organizationName: "",
+        activityType: "Field Visit",
+        otherActivity: "",
+        description: "",
+        locationPin: "",
     });
 
-    // Handle client-side initialization
     React.useEffect(() => {
         setMounted(true);
-        setFormData(prev => prev.dateOfEngagement
-            ? prev
-            : {
-                ...prev,
-                dateOfEngagement: new Date().toISOString().split('T')[0]
-            });
+        setFormData((prev) =>
+            prev.dateOfEngagement
+                ? prev
+                : { ...prev, dateOfEngagement: new Date().toISOString().split("T")[0] },
+        );
     }, []);
 
-    // Keep formData.participantId in sync with selectedParticipantId prop
     React.useEffect(() => {
         if (!selectedParticipantId) return;
-        setFormData(prev => selectedParticipantId === prev.participantId
-            ? prev
-            : { ...prev, participantId: selectedParticipantId });
+        setFormData((prev) =>
+            selectedParticipantId === prev.participantId
+                ? prev
+                : { ...prev, participantId: selectedParticipantId },
+        );
     }, [selectedParticipantId]);
 
     const { wordCount, charCount, overWords, overChars } = attendanceDescriptionOverLimit(
@@ -153,17 +209,12 @@ export default function AttendanceForm({
     );
     const descriptionLimitMessage = attendanceDescriptionLimitMessage(wordCount, charCount);
     const descriptionOverLimit = overWords || overChars;
+    const sessionHours = computeSessionHours(formData.startTime, formData.endTime);
 
-    const selectedUser = verifiedUsers.find(u => u.id === formData.participantId);
+    const selectedUser = verifiedUsers.find((u) => u.id === formData.participantId);
     const isUserApproved =
         !!selectedUser && canLogAttendanceForParticipationStatus(selectedUser.status);
-    const participationPendingApproval =
-        !!selectedUser &&
-        !isUserApproved &&
-        typeof selectedUser.status === "string" &&
-        selectedUser.status.trim().length > 0;
-    
-    // Admin override unlocks attendance logging even after verification was requested.
+
     const effectiveLocked = isParticipationUnlocked
         ? false
         : !isUserApproved || isLocked;
@@ -172,10 +223,9 @@ export default function AttendanceForm({
         e.preventDefault();
         if (isSubmitting) return;
 
-        // Strict Time Validation
-        const [h1, m1] = formData.startTime.split(':').map(Number);
-        const [h2, m2] = formData.endTime.split(':').map(Number);
-        const diffMinutes = (h2 * 60 + m2) - (h1 * 60 + m1);
+        const [h1, m1] = formData.startTime.split(":").map(Number);
+        const [h2, m2] = formData.endTime.split(":").map(Number);
+        const diffMinutes = h2 * 60 + m2 - (h1 * 60 + m1);
 
         if (diffMinutes <= 0) {
             alert("End time must be after start time");
@@ -215,13 +265,16 @@ export default function AttendanceForm({
             return;
         }
 
-        if (hasOverlappingAttendanceLog(currentLogs, {
-            participantId: activeParticipantId,
-            date: formData.dateOfEngagement,
-            startTime: formData.startTime,
-            endTime: formData.endTime,
-        })) {
-            const message = "This student already has an attendance entry for this date/time. Please choose a non-overlapping session.";
+        if (
+            hasOverlappingAttendanceLog(currentLogs, {
+                participantId: activeParticipantId,
+                date: formData.dateOfEngagement,
+                startTime: formData.startTime,
+                endTime: formData.endTime,
+            })
+        ) {
+            const message =
+                "This student already has an attendance entry for this date/time. Please choose a non-overlapping session.";
             setSubmitError(message);
             toast.error(message);
             return;
@@ -233,24 +286,23 @@ export default function AttendanceForm({
             start_time: formData.startTime,
             end_time: formData.endTime,
             location: formData.organizationName,
-            activity_type: formData.activityType === 'Other' ? formData.otherActivity : formData.activityType,
+            activity_type:
+                formData.activityType === "Other" ? formData.otherActivity : formData.activityType,
             description: formData.description,
             evidence_file: evidenceFile || undefined,
             hours: numericHours,
-            participantId: activeParticipantId // Tag it for frontend filtering
+            participantId: activeParticipantId,
         };
         let mergedEntry: Record<string, unknown> = { ...newEntry };
         setIsSubmitting(true);
         setSubmitError(null);
         try {
-            // Sync with backend if participantId exists
             if (activeParticipantId) {
-                // Determine if we need to send multipart/form-data or application/json
                 let fetchOptions: RequestInit = {};
 
-                // Strip prefix for API calls (e.g. member:0:ID -> ID)
-                const segments = activeParticipantId.split(':');
-                const realId = segments.length > 1 ? segments[segments.length - 1] : activeParticipantId;
+                const segments = activeParticipantId.split(":");
+                const realId =
+                    segments.length > 1 ? segments[segments.length - 1] : activeParticipantId;
 
                 if (!realId || realId === "anon") {
                     const message =
@@ -281,7 +333,10 @@ export default function AttendanceForm({
                     startTime: formData.startTime,
                     endTime: formData.endTime,
                     organizationName: formData.organizationName,
-                    activityType: formData.activityType === 'Other' ? formData.otherActivity : formData.activityType,
+                    activityType:
+                        formData.activityType === "Other"
+                            ? formData.otherActivity
+                            : formData.activityType,
                     description: formData.description,
                     sessionHours: numericHours,
                     evidenceUploaded: Boolean(presignedEvidenceUrl),
@@ -290,17 +345,18 @@ export default function AttendanceForm({
                 };
 
                 fetchOptions = {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
                     body: JSON.stringify(payload),
                 };
 
-                console.log(`[Attendance] Submitting session for Participant ID: ${realId}`);
-                const res = await authenticatedFetch(`/api/v1/engagement/${realId}/attendance`, fetchOptions);
+                const res = await authenticatedFetch(
+                    `/api/v1/engagement/${realId}/attendance`,
+                    fetchOptions,
+                );
 
                 if (!res || !res.ok) {
                     const message = await resolveAttendanceSubmitError(res);
-                    console.error("[Attendance] Save failed:", res?.status, res?.statusText, message);
                     setSubmitError(message);
                     toast.error(message, { duration: 8000 });
                     return;
@@ -325,20 +381,18 @@ export default function AttendanceForm({
                 }
             }
 
-            updateSection('section1', {
-                attendance_logs: [...currentLogs, mergedEntry]
+            updateSection("section1", {
+                attendance_logs: [...currentLogs, mergedEntry],
             });
 
             onSuccess();
-            // Reset form
             setFormData({
                 ...formData,
-                description: '',
-                otherActivity: ''
+                description: "",
+                otherActivity: "",
             });
             setEvidenceFile(null);
         } catch (error) {
-            console.error("[Attendance] Submit error:", error);
             const message =
                 error instanceof Error && error.message.trim()
                     ? error.message.trim()
@@ -348,299 +402,391 @@ export default function AttendanceForm({
         } finally {
             setIsSubmitting(false);
         }
-
     };
 
-    return (
-        <form onSubmit={handleSubmit} className="group/form relative min-w-0 space-y-8 overflow-hidden rounded-[2.5rem] border-2 border-slate-100 bg-white p-6 shadow-xl shadow-slate-200/50 transition-all hover:border-report-primary-border/30 sm:p-8">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-report-primary/5 rounded-full blur-3xl -mr-16 -mt-16 group-hover/form:bg-report-primary/10 transition-colors" />
+    const fieldClass =
+        "h-11 rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-900 shadow-sm transition-colors focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100";
 
-            <div className="flex justify-between items-center relative z-10">
-                <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-report-primary text-white rounded-xl flex items-center justify-center shadow-lg shadow-report-primary-shadow ring-4 ring-report-primary-soft">
-                        <Plus className="w-6 h-6" />
+    return (
+        <form
+            onSubmit={handleSubmit}
+            className="min-w-0 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm"
+        >
+            <div className="border-b border-slate-100 bg-slate-50/80 px-5 py-4">
+                <div className="flex items-center gap-3">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-600 text-white shadow-sm">
+                        <Plus className="h-4 w-4" />
                     </div>
                     <div>
-                        <h3 className="text-lg font-black text-slate-900 tracking-tight">Add Attendance Entry</h3>
-                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Session Verification Protocol</p>
+                        <h3 className="text-base font-semibold text-slate-900">Add attendance entry</h3>
+                        <p className="text-xs text-slate-500">Fill in your session details below</p>
                     </div>
                 </div>
             </div>
 
-            <div className="space-y-6">
-                {/* Student Selection (New) */}
-                <div className="space-y-2">
-                    <Label className="text-xs font-bold uppercase tracking-wider text-slate-500">Select Student</Label>
-                    <div className="relative">
-                        <Users className="absolute left-4 top-4 w-5 h-5 text-slate-400 z-10" />
-                        <select
-                            value={formData.participantId}
-                            onChange={(e) => {
-                                const newId = e.target.value;
-                                setFormData({ ...formData, participantId: newId });
-                                if (onParticipantChange) onParticipantChange(newId);
-                            }}
-                            className="w-full pl-12 h-14 bg-slate-50 border-2 border-transparent rounded-2xl font-bold text-base appearance-none focus:ring-4 focus:ring-report-primary/10 focus:border-report-primary/20 focus:bg-white transition-all cursor-pointer hover:bg-slate-100"
-                            required
-                        >
-                            {verifiedUsers.length === 0 && <option value="">No verified students found</option>}
-                            {verifiedUsers.map(u => (
-                                <option key={u.id} value={u.id}>{u.name}</option>
-                            ))}
-                        </select>
-                        <div className="absolute right-4 top-5 pointer-events-none">
-                            <Plus className="w-4 h-4 text-slate-400 rotate-45" />
-                        </div>
-                    </div>
-                </div>
-
-                {/* Date Row */}
-                <div className="space-y-2">
-                    <Label className="text-xs font-bold uppercase tracking-wider text-slate-500">Date of Engagement</Label>
-                    <div className="relative">
-                        <Calendar className="absolute left-4 top-4 w-5 h-5 text-slate-400" />
-                        <Input
-                            type="date"
-                            value={formData.dateOfEngagement}
-                            max={mounted ? new Date().toISOString().split('T')[0] : undefined}
-                            onChange={(e) => setFormData({ ...formData, dateOfEngagement: e.target.value })}
-                            className="pl-12 h-14 bg-slate-50 border-none rounded-2xl font-bold text-base shadow-sm focus:ring-2 focus:ring-report-primary/20"
-                            required
-                        />
-                    </div>
-                </div>
-
-                {/* Times Row */}
-                <div className="grid grid-cols-2 gap-6">
-                    {/* Start Time */}
+            <div className="space-y-8 px-5 py-6">
+                <FormSection
+                    step={1}
+                    title="Who & when"
+                    description="Select the student and session date/time."
+                >
                     <div className="space-y-2">
-                        <Label className="text-xs font-bold uppercase tracking-wider text-slate-500">Start Time</Label>
+                        <Label className="text-xs font-medium text-slate-600">Student</Label>
                         <div className="relative">
-                            <Clock className="absolute left-4 top-4 w-5 h-5 text-slate-400" />
-                            <Input
-                                type="time"
-                                value={formData.startTime}
-                                onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
-                                className="pl-12 h-14 bg-slate-50 border-none rounded-2xl font-bold text-base shadow-sm focus:ring-2 focus:ring-report-primary/20"
-                                required
-                            />
-                        </div>
-                    </div>
-
-                    {/* End Time */}
-                    <div className="space-y-2">
-                        <Label className="text-xs font-bold uppercase tracking-wider text-slate-500">End Time</Label>
-                        <div className="relative">
-                            <Clock className="absolute left-4 top-4 w-5 h-5 text-slate-400" />
-                            <Input
-                                type="time"
-                                value={formData.endTime}
-                                onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
-                                className="pl-12 h-14 bg-slate-50 border-none rounded-2xl font-bold text-base shadow-sm focus:ring-2 focus:ring-report-primary/20"
-                                required
-                            />
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                {/* Organization / Location */}
-                <div className="space-y-4 md:col-span-2">
-                    <div className="space-y-2">
-                        <Label className="text-xs font-bold uppercase tracking-wider text-slate-500">Organization / Location Name</Label>
-                        <div className="relative group/location">
-                            <MapPin className="absolute left-3 top-2.5 w-4 h-4 text-slate-400 z-10" />
-                            <Input
-                                placeholder="Enter organization or location name..."
-                                value={formData.organizationName}
-                                onChange={(e) => setFormData({ ...formData, organizationName: e.target.value })}
-                                className="pl-10 h-14 bg-slate-50 border-none rounded-2xl font-bold text-base shadow-sm focus:ring-2 focus:ring-report-primary/20 transition-all"
-                                required
-                            />
-                        </div>
-                    </div>
-
-                    <div className="space-y-2">
-                        <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-2 block">Pin Exact Location (Optional)</Label>
-                        <div className="rounded-[2rem] overflow-hidden border-2 border-slate-100 shadow-inner bg-slate-50 relative group/map">
-                            <LocationPicker
-                                onLocationSelect={(loc) => {
-                                    setFormData(prev => ({
-                                        ...prev,
-                                        organizationName: loc.address || prev.organizationName,
-                                        locationPin: `${loc.lat},${loc.lng}`
-                                    }));
+                            <Users className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                            <select
+                                value={formData.participantId}
+                                onChange={(e) => {
+                                    const newId = e.target.value;
+                                    setFormData({ ...formData, participantId: newId });
+                                    if (onParticipantChange) onParticipantChange(newId);
                                 }}
+                                className={clsx(fieldClass, "w-full appearance-none pl-10 pr-4")}
+                                required
+                            >
+                                {verifiedUsers.length === 0 && (
+                                    <option value="">No verified students found</option>
+                                )}
+                                {verifiedUsers.map((u) => (
+                                    <option key={u.id} value={u.id}>
+                                        {u.name}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                    </div>
+
+                    <div className="space-y-2">
+                        <Label className="text-xs font-medium text-slate-600">Date of engagement</Label>
+                        <div className="relative">
+                            <Calendar className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                            <Input
+                                type="date"
+                                value={formData.dateOfEngagement}
+                                max={mounted ? new Date().toISOString().split("T")[0] : undefined}
+                                onChange={(e) =>
+                                    setFormData({ ...formData, dateOfEngagement: e.target.value })
+                                }
+                                className={clsx(fieldClass, "pl-10")}
+                                required
                             />
-                            <div className="absolute bottom-4 right-4 z-[1000] pointer-events-none opacity-0 group-hover/map:opacity-100 transition-opacity">
-                                <div className="bg-white/90 backdrop-blur-md px-3 py-1.5 rounded-full shadow-lg border border-slate-100 text-[10px] font-black text-slate-500 uppercase tracking-wider">
-                                    Google Maps — click to set location
-                                </div>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-2">
+                            <Label className="text-xs font-medium text-slate-600">Start time</Label>
+                            <div className="relative">
+                                <Clock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                                <Input
+                                    type="time"
+                                    value={formData.startTime}
+                                    onChange={(e) =>
+                                        setFormData({ ...formData, startTime: e.target.value })
+                                    }
+                                    className={clsx(fieldClass, "pl-10")}
+                                    required
+                                />
                             </div>
                         </div>
-                        <p className="text-[10px] font-bold text-slate-400 flex items-center gap-1.5 px-2">
-                            <Info className="w-3 h-3" />
-                            Click the map to precisely mark your engagement site
-                        </p>
-                    </div>
-                </div>
-
-                {/* Activity Type */}
-                <div className="space-y-2 md:col-span-2">
-                    <Label className="text-xs font-bold uppercase tracking-wider text-slate-500">Activity Type</Label>
-                    <div className="relative">
-                        <Tag className="absolute left-3 top-2.5 w-4 h-4 text-slate-400 z-10" />
-                        <select
-                            value={formData.activityType}
-                            onChange={(e) => setFormData({ ...formData, activityType: e.target.value })}
-                            className="w-full pl-10 h-14 bg-slate-50 border-none rounded-2xl font-bold text-base appearance-none focus:ring-2 focus:ring-report-primary/20 transition-all cursor-pointer"
-                        >
-                            {['Training / Workshop', 'Awareness Session', 'Research / Survey', 'Mentoring / Coaching', 'Field Visit', 'Resource Distribution', 'Technical Support', 'Administrative', 'Other'].map(t => (
-                                <option key={t} value={t}>{t}</option>
-                            ))}
-                        </select>
-                    </div>
-                    {formData.activityType === 'Other' && (
-                        <Input
-                            placeholder="Specify other activity"
-                            value={formData.otherActivity}
-                            onChange={(e) => setFormData({ ...formData, otherActivity: e.target.value })}
-                            className="mt-2 h-14 bg-slate-50 border-none rounded-2xl font-bold text-base shadow-sm focus:ring-2 focus:ring-report-primary/20"
-                            required
-                        />
-                    )}
-                </div>
-            </div>
-
-            {/* Description */}
-            <div className="space-y-2">
-                <div className="flex justify-between items-center gap-2 flex-wrap">
-                    <Label className="text-xs font-bold uppercase tracking-wider text-slate-500">Brief Description</Label>
-                    <div className="flex flex-wrap gap-1.5">
-                        <span
-                            className={clsx(
-                                "text-[10px] font-bold px-1.5 py-0.5 rounded",
-                                overWords ? "bg-red-100 text-red-600" : "bg-slate-100 text-slate-500",
-                            )}
-                        >
-                            {wordCount} / {ATTENDANCE_DESCRIPTION_MAX_WORDS} words
-                        </span>
-                        <span
-                            className={clsx(
-                                "text-[10px] font-bold px-1.5 py-0.5 rounded",
-                                overChars ? "bg-red-100 text-red-600" : "bg-slate-100 text-slate-500",
-                            )}
-                        >
-                            {charCount} / {ATTENDANCE_DESCRIPTION_MAX_CHARS} characters
-                        </span>
-                    </div>
-                </div>
-                <div className="relative">
-                    <FileText className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
-                    <textarea spellCheck={true}
-                        placeholder="What did you accomplish during this session? (max 40 words and 2000 characters)"
-                        value={formData.description}
-                        maxLength={ATTENDANCE_DESCRIPTION_MAX_CHARS}
-                        onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                        className="w-full pl-10 p-4 h-32 bg-slate-50 border-none rounded-2xl font-bold text-base focus:ring-2 focus:ring-report-primary/20 resize-none shadow-sm transition-all"
-                        required
-                        aria-invalid={descriptionOverLimit}
-                        aria-describedby={descriptionOverLimit ? "attendance-description-limit" : undefined}
-                    />
-                </div>
-                {descriptionLimitMessage && (
-                    <p id="attendance-description-limit" className="text-xs font-medium text-red-600">
-                        {descriptionLimitMessage}
-                    </p>
-                )}
-            </div>
-
-            {/* Evidence Upload */}
-            <div className="space-y-2">
-                <Label className="text-xs font-bold uppercase tracking-wider text-slate-500">Supporting Evidence (Optional)</Label>
-                <div className="flex items-center gap-4">
-                    {evidenceFile ? (
-                        <div className="flex-1 flex items-center justify-between p-3 bg-report-primary-soft rounded-xl border border-report-primary-border">
-                            <div className="flex items-center gap-3">
-                                <CheckCircle2 className="w-5 h-5 text-report-primary" />
-                                <span className="text-sm font-bold text-report-primary">{evidenceFile.name} (linked)</span>
+                        <div className="space-y-2">
+                            <Label className="text-xs font-medium text-slate-600">End time</Label>
+                            <div className="relative">
+                                <Clock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                                <Input
+                                    type="time"
+                                    value={formData.endTime}
+                                    onChange={(e) =>
+                                        setFormData({ ...formData, endTime: e.target.value })
+                                    }
+                                    className={clsx(fieldClass, "pl-10")}
+                                    required
+                                />
                             </div>
-                            <button onClick={() => setEvidenceFile(null)} className="text-report-primary hover:text-report-primary-border">
-                                <X className="w-4 h-4" />
+                        </div>
+                    </div>
+
+                    {sessionHours != null ? (
+                        <div className="flex items-center gap-2 rounded-lg border border-indigo-100 bg-indigo-50/60 px-3 py-2 text-xs text-indigo-700">
+                            <Clock className="h-3.5 w-3.5 shrink-0" />
+                            <span>
+                                Session duration: <strong>{sessionHours} hours</strong>
+                            </span>
+                        </div>
+                    ) : formData.startTime && formData.endTime ? (
+                        <p className="text-xs text-amber-600">End time must be after start time.</p>
+                    ) : null}
+                </FormSection>
+
+                <FormSection
+                    step={2}
+                    title="Where"
+                    description="Name the organization or site where engagement took place."
+                >
+                    <div className="space-y-2">
+                        <Label className="text-xs font-medium text-slate-600">
+                            Organization / location name
+                        </Label>
+                        <div className="relative">
+                            <MapPin className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                            <Input
+                                placeholder="e.g. Green Earth NGO, Community Center"
+                                value={formData.organizationName}
+                                onChange={(e) =>
+                                    setFormData({ ...formData, organizationName: e.target.value })
+                                }
+                                className={clsx(fieldClass, "pl-10")}
+                                required
+                            />
+                        </div>
+                    </div>
+
+                    <div className="rounded-lg border border-slate-200 bg-slate-50/50">
+                        <button
+                            type="button"
+                            onClick={() => setShowMap((v) => !v)}
+                            className="flex w-full items-center justify-between px-3 py-2.5 text-left text-xs font-medium text-slate-600 hover:text-slate-900"
+                        >
+                            <span className="flex items-center gap-2">
+                                <MapPin className="h-3.5 w-3.5 text-slate-400" />
+                                Pin exact location on map
+                                <span className="rounded bg-slate-200/80 px-1.5 py-0.5 text-[10px] font-normal text-slate-500">
+                                    Optional
+                                </span>
+                            </span>
+                            {showMap ? (
+                                <ChevronUp className="h-4 w-4 text-slate-400" />
+                            ) : (
+                                <ChevronDown className="h-4 w-4 text-slate-400" />
+                            )}
+                        </button>
+                        {showMap ? (
+                            <div className="border-t border-slate-200 p-2">
+                                <div className="overflow-hidden rounded-lg border border-slate-200">
+                                    <LocationPicker
+                                        onLocationSelect={(loc) => {
+                                            setFormData((prev) => ({
+                                                ...prev,
+                                                organizationName: loc.address || prev.organizationName,
+                                                locationPin: `${loc.lat},${loc.lng}`,
+                                            }));
+                                        }}
+                                    />
+                                </div>
+                                {formData.locationPin ? (
+                                    <p className="mt-2 flex items-center gap-1.5 text-[11px] text-emerald-600">
+                                        <CheckCircle2 className="h-3 w-3" />
+                                        Location pinned
+                                    </p>
+                                ) : (
+                                    <p className="mt-2 flex items-center gap-1.5 text-[11px] text-slate-400">
+                                        <Info className="h-3 w-3" />
+                                        Click the map to mark your engagement site
+                                    </p>
+                                )}
+                            </div>
+                        ) : null}
+                    </div>
+                </FormSection>
+
+                <FormSection
+                    step={3}
+                    title="What you did"
+                    description="Describe the activity and your contribution."
+                >
+                    <div className="space-y-2">
+                        <Label className="text-xs font-medium text-slate-600">Activity type</Label>
+                        <div className="relative">
+                            <Tag className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                            <select
+                                value={formData.activityType}
+                                onChange={(e) =>
+                                    setFormData({ ...formData, activityType: e.target.value })
+                                }
+                                className={clsx(fieldClass, "w-full appearance-none pl-10 pr-4")}
+                            >
+                                {[
+                                    "Training / Workshop",
+                                    "Awareness Session",
+                                    "Research / Survey",
+                                    "Mentoring / Coaching",
+                                    "Field Visit",
+                                    "Resource Distribution",
+                                    "Technical Support",
+                                    "Administrative",
+                                    "Other",
+                                ].map((t) => (
+                                    <option key={t} value={t}>
+                                        {t}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                        {formData.activityType === "Other" && (
+                            <Input
+                                placeholder="Specify activity type"
+                                value={formData.otherActivity}
+                                onChange={(e) =>
+                                    setFormData({ ...formData, otherActivity: e.target.value })
+                                }
+                                className={fieldClass}
+                                required
+                            />
+                        )}
+                    </div>
+
+                    <div className="space-y-2">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                            <Label className="text-xs font-medium text-slate-600">
+                                Brief description
+                            </Label>
+                            <div className="flex gap-1.5">
+                                <span
+                                    className={clsx(
+                                        "rounded px-1.5 py-0.5 text-[10px] font-medium",
+                                        overWords
+                                            ? "bg-red-50 text-red-600"
+                                            : "bg-slate-100 text-slate-500",
+                                    )}
+                                >
+                                    {wordCount}/{ATTENDANCE_DESCRIPTION_MAX_WORDS} words
+                                </span>
+                                <span
+                                    className={clsx(
+                                        "rounded px-1.5 py-0.5 text-[10px] font-medium",
+                                        overChars
+                                            ? "bg-red-50 text-red-600"
+                                            : "bg-slate-100 text-slate-500",
+                                    )}
+                                >
+                                    {charCount}/{ATTENDANCE_DESCRIPTION_MAX_CHARS} chars
+                                </span>
+                            </div>
+                        </div>
+                        <textarea
+                            spellCheck
+                            placeholder="What did you accomplish during this session?"
+                            value={formData.description}
+                            maxLength={ATTENDANCE_DESCRIPTION_MAX_CHARS}
+                            onChange={(e) =>
+                                setFormData({ ...formData, description: e.target.value })
+                            }
+                            className={clsx(
+                                "w-full resize-none rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-900 shadow-sm transition-colors focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100",
+                                "min-h-[96px]",
+                            )}
+                            required
+                            aria-invalid={descriptionOverLimit}
+                            aria-describedby={
+                                descriptionOverLimit ? "attendance-description-limit" : undefined
+                            }
+                        />
+                        {descriptionLimitMessage ? (
+                            <p id="attendance-description-limit" className="text-xs text-red-600">
+                                {descriptionLimitMessage}
+                            </p>
+                        ) : null}
+                    </div>
+                </FormSection>
+
+                <FormSection
+                    step={4}
+                    title="Supporting evidence"
+                    description="Upload a photo or document to verify this session (optional)."
+                >
+                    {evidenceFile ? (
+                        <div className="flex items-center justify-between rounded-lg border border-indigo-100 bg-indigo-50/50 px-3 py-2.5">
+                            <div className="flex min-w-0 items-center gap-2">
+                                <CheckCircle2 className="h-4 w-4 shrink-0 text-indigo-600" />
+                                <span className="truncate text-sm font-medium text-indigo-700">
+                                    {evidenceFile.name}
+                                </span>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setEvidenceFile(null)}
+                                className="shrink-0 text-indigo-400 hover:text-indigo-600"
+                                aria-label="Remove file"
+                            >
+                                <X className="h-4 w-4" />
                             </button>
                         </div>
                     ) : (
-                        <div className="flex-1 relative">
+                        <div className="relative">
                             <input
                                 type="file"
                                 accept={REPORT_ATTACHMENT_ACCEPT}
                                 onChange={(e) => setEvidenceFile(e.target.files?.[0] || null)}
-                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                                className="absolute inset-0 z-10 cursor-pointer opacity-0"
                             />
-                            <div className="w-full p-4 border-2 border-dashed border-slate-200 rounded-2xl flex flex-col items-center gap-1 text-slate-400 group-hover:border-blue-300 transition-colors">
-                                <Upload className="w-6 h-6" />
-                                <span className="text-xs font-bold text-center px-2">
-                                    Photos (JPG, PNG, HEIC, WebP), PDF, or Word
+                            <div className="flex flex-col items-center gap-1.5 rounded-lg border-2 border-dashed border-slate-200 bg-slate-50/50 px-4 py-5 text-center transition-colors hover:border-indigo-200 hover:bg-indigo-50/30">
+                                <Upload className="h-5 w-5 text-slate-400" />
+                                <span className="text-xs font-medium text-slate-600">
+                                    Drop a file or click to upload
+                                </span>
+                                <span className="text-[10px] text-slate-400">
+                                    JPG, PNG, PDF, or Word
                                 </span>
                             </div>
                         </div>
                     )}
-                </div>
+                </FormSection>
             </div>
 
-            <div className="space-y-3">
-                {submitError && (
+            <div className="space-y-3 border-t border-slate-100 bg-slate-50/50 px-5 py-4">
+                {submitError ? (
                     <div
                         role="alert"
-                        className="flex gap-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
+                        className="flex gap-2.5 rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-red-800"
                     >
-                        <AlertCircle className="h-5 w-5 shrink-0 text-red-600" aria-hidden />
-                        <p className="min-w-0 leading-relaxed font-medium">{submitError}</p>
+                        <AlertCircle className="h-4 w-4 shrink-0 text-red-600" aria-hidden />
+                        <p className="min-w-0 leading-relaxed">{submitError}</p>
                     </div>
-                )}
+                ) : null}
+
                 <Button
                     type="submit"
                     disabled={isSubmitting || descriptionOverLimit || effectiveLocked}
                     className={clsx(
-                        "w-full h-14 rounded-2xl font-black text-sm transition-all shadow-xl",
+                        "h-11 w-full rounded-lg text-sm font-semibold transition-all",
                         effectiveLocked
-                            ? "bg-slate-100 text-slate-400 border border-slate-200 shadow-none cursor-not-allowed"
-                            : "bg-report-primary hover:bg-report-primary-border text-white shadow-report-primary-shadow hover:translate-y-[-2px]"
+                            ? "cursor-not-allowed border border-slate-200 bg-slate-100 text-slate-400 shadow-none"
+                            : "bg-indigo-600 text-white shadow-sm hover:bg-indigo-700",
                     )}
                 >
                     {isSubmitting ? (
-                        <Loader2 className="w-5 h-5 animate-spin mx-auto" />
+                        <Loader2 className="mx-auto h-4 w-4 animate-spin" />
                     ) : effectiveLocked ? (
                         <span className="flex items-center justify-center gap-2">
-                            <Lock className="w-4 h-4" />
-                            {!isUserApproved && selectedUser ? "APPROVAL PENDING" : "RECORD LOCKED"}
+                            <Lock className="h-4 w-4" />
+                            {!isUserApproved && selectedUser ? "Approval pending" : "Record locked"}
                         </span>
                     ) : (
                         <span className="flex items-center justify-center gap-2">
-                            <CheckCircle2 className="w-5 h-5" />
-                            SAVE ATTENDANCE ENTRY
+                            <CheckCircle2 className="h-4 w-4" />
+                            Save attendance entry
                         </span>
                     )}
                 </Button>
 
-                {effectiveLocked && setParticipationUnlocked && allowManualUnlock && (
+                {effectiveLocked && setParticipationUnlocked && allowManualUnlock ? (
                     <div className="text-center">
                         {!isUserApproved && selectedUser ? (
-                            <p className="text-[10px] font-bold text-amber-600 uppercase tracking-tight">
-                                Attendance logging for this student is disabled until the assigned reviewer approves participation.
+                            <p className="text-xs text-amber-600">
+                                Attendance logging is disabled until your reviewer approves
+                                participation.
                             </p>
                         ) : (
                             <button
                                 type="button"
                                 onClick={() => setParticipationUnlocked(true)}
-                                className="text-[10px] font-black uppercase tracking-widest text-report-primary hover:text-report-primary-border underline"
+                                className="text-xs font-medium text-indigo-600 underline hover:text-indigo-800"
                             >
                                 Unlock for editing
                             </button>
                         )}
                     </div>
-                )}
+                ) : null}
             </div>
         </form>
     );

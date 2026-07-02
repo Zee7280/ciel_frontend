@@ -69,7 +69,7 @@ const steps = [
 
 export default function HowWeWork() {
     return (
-        <section className="py-24 px-6 bg-white relative overflow-hidden">
+        <section id="how-it-works" className="py-24 px-6 bg-white relative overflow-hidden scroll-mt-28">
             {/* Subtle dot grid */}
             <div className="absolute inset-0 bg-[radial-gradient(rgba(0,0,0,0.03)_1px,transparent_1px)] bg-[size:32px_32px] pointer-events-none" />
 
@@ -98,46 +98,47 @@ export default function HowWeWork() {
                         </svg>
                     </div>
 
+                    <p className="text-base md:text-lg text-slate-500 font-medium max-w-2xl mx-auto mt-6">
+                        From registration to certification — every step is verified, documented, and SDG-aligned.
+                    </p>
                 </div>
 
                 {/* Steps — horizontal on desktop, vertical on mobile */}
                 <div className="relative">
-                    {/* Desktop horizontal connector line */}
                     <div className="hidden lg:block absolute top-[5.5rem] left-[10%] right-[10%] h-px bg-gradient-to-r from-violet-200 via-emerald-200 to-rose-200 z-0" />
 
                     <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 relative z-10">
-                        {[
-                            { icon: UserCheck, title: "Register & Join Project", description: "Sign up, verify your identity, and apply to a community project.", bg: "bg-blue-50 text-blue-600" },
-                            { icon: ClipboardList, title: "Record Activities", description: "Log each session with date, hours, activity type, and evidence.", bg: "bg-rose-50 text-rose-600" },
-                            { icon: Users, title: "Track Outputs", description: "Document who you helped and what you produced in each session.", bg: "bg-orange-50 text-orange-600" },
-                            { icon: BarChart2, title: "Measure Outcomes", description: "CIEL generates your engagement intensity score automatically.", bg: "bg-amber-50 text-amber-600" },
-                            { icon: Award, title: "Get Certified", description: "Receive your verified HEC-recognized digital certificate.", bg: "bg-emerald-50 text-emerald-600" }
-                        ].map((step, i) => {
+                        {steps.map((step, i) => {
                             const Icon = step.icon;
-                            const isLast = i === 4;
+                            const isLast = i === steps.length - 1;
+                            const iconTones = [
+                                "bg-blue-50 text-blue-600",
+                                "bg-rose-50 text-rose-600",
+                                "bg-orange-50 text-orange-600",
+                                "bg-amber-50 text-amber-600",
+                                "bg-emerald-50 text-emerald-600",
+                            ];
                             return (
-                                <div key={i} className="relative flex flex-col items-center text-center group">
-                                    {/* Icon Circle */}
-                                    <div className={`relative w-20 h-20 rounded-[1.5rem] ${step.bg} flex items-center justify-center mb-6 shadow-sm group-hover:shadow-xl group-hover:scale-110 transition-all duration-300`}>
+                                <div key={step.number} className="relative flex flex-col items-center text-center group">
+                                    <div
+                                        className={`relative w-20 h-20 rounded-[1.5rem] ${iconTones[i]} flex items-center justify-center mb-6 shadow-sm group-hover:shadow-xl group-hover:scale-110 transition-all duration-300`}
+                                    >
                                         <Icon className="w-9 h-9" strokeWidth={1.5} />
-                                        {/* Step number overlay */}
                                         <div className="absolute -top-2 -right-2 w-7 h-7 rounded-full bg-white border-2 border-slate-100 shadow-sm flex items-center justify-center text-[10px] font-black text-slate-900">
-                                            {i + 1}
+                                            {step.number}
                                         </div>
                                     </div>
 
-                                    {/* Arrow connector (mobile) */}
                                     {!isLast && (
                                         <div className="lg:hidden flex justify-center mb-4 opacity-30">
                                             <ArrowRight className="w-5 h-5 text-slate-400 rotate-90" />
                                         </div>
                                     )}
 
-                                    {/* Text */}
                                     <h3 className="text-base font-black text-slate-900 leading-snug mb-3 tracking-tight">
                                         {step.title}
                                     </h3>
-                                    <p className="text-sm text-slate-500 font-medium leading-relaxed max-w-[200px]">
+                                    <p className="text-sm text-slate-500 font-medium leading-relaxed max-w-[220px]">
                                         {step.description}
                                     </p>
                                 </div>
