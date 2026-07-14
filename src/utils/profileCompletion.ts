@@ -178,16 +178,33 @@ export function isPartnerRole(role: string): boolean {
     return PARTNER_DASHBOARD_ROLES.some((x) => x === r);
 }
 
+/** Profile update page for each dashboard role (student, faculty, partner). */
+export function getProfilePagePathForRole(role: string): string | null {
+    const r = String(role).toLowerCase();
+    if (r === "student") return "/dashboard/student/profile";
+    if (r === "faculty") return "/dashboard/faculty/profile";
+    if (isPartnerRole(r) || r === "partner") return "/dashboard/partner/organization";
+    return null;
+}
+
+export function isProfileCompleteForDashboardRole(role: string, user: Record<string, unknown>): boolean {
+    const r = String(role).toLowerCase();
+    if (r === "student") return isStudentProfileComplete(user);
+    if (r === "faculty") return isFacultyProfileComplete(user);
+    if (isPartnerRole(r) || r === "partner") return isPartnerProfileComplete(user);
+    return true;
+}
+
 export function profileCompletionRedirectPath(role: string, user: Record<string, unknown>): string | null {
     const r = String(role).toLowerCase();
     if (r === "student" && !isStudentProfileComplete(user)) {
         return "/dashboard/student/profile";
     }
-    if (isPartnerRole(r) && !isPartnerProfileComplete(user)) {
-        return "/dashboard/partner/organization";
-    }
     if (r === "faculty" && !isFacultyProfileComplete(user)) {
         return "/dashboard/faculty/profile";
+    }
+    if (isPartnerRole(r) && !isPartnerProfileComplete(user)) {
+        return "/dashboard/partner/organization";
     }
     return null;
 }

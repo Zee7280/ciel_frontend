@@ -10,6 +10,8 @@ import clsx from "clsx";
 import PhoneConnectivityRow from "@/components/ui/PhoneConnectivityRow";
 import { DEFAULT_PHONE_COUNTRY_KEY, dialFromPhoneCountryKey } from "@/utils/countryCallingCodes";
 import { pakistaniUniversities } from "@/utils/universityData";
+import { hecPrograms } from "@/utils/hecProgramsData";
+import SearchableSelect from "@/components/ui/SearchableSelect";
 import { isSafeInternalReturnPath } from "@/utils/verificationReturnUrl";
 import { LEGAL_REGISTRATION_TYPES, ORGANIZATION_CATEGORIES } from "@/utils/organizationTaxonomy";
 
@@ -67,7 +69,11 @@ function SignUpContent() {
             };
         }
         if (roleId === "ngo") {
-            return { ...base, organizationCategory: "Nonprofit Organization (NGO)" };
+            return {
+                ...base,
+                organizationCategory: "Nonprofit Organization (NGO)",
+                legalRegistrationType: "Nonprofit Organization (NGO)",
+            };
         }
         if (roleId === "corporate") {
             return { ...base, organizationCategory: "Corporate Organization" };
@@ -507,56 +513,58 @@ function SignUpContent() {
                                                 {errors.orgName && <p className="text-[10px] text-red-500 font-black uppercase tracking-widest ml-1">{errors.orgName}</p>}
                                             </div>
 
-                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                                <div className="space-y-1.5">
-                                                    <label className="text-[11px] font-black uppercase tracking-widest text-slate-400 ml-1">Organization Type</label>
-                                                    <div className="relative">
-                                                        <select
-                                                            value={formData.organizationCategory}
-                                                            onChange={(e) => handleGenericChange("organizationCategory", e.target.value)}
-                                                            aria-invalid={!!errors.organizationCategory}
-                                                            aria-label="Organization type"
-                                                            className={institutionSelectClass(!!errors.organizationCategory)}
-                                                        >
-                                                            <option value="">Select organization type</option>
-                                                            {ORGANIZATION_CATEGORIES.map((option) => (
-                                                                <option key={option} value={option}>
-                                                                    {option}
-                                                                </option>
-                                                            ))}
-                                                        </select>
-                                                        <ChevronDown
-                                                            className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400"
-                                                            aria-hidden
-                                                        />
+                                            {role === 'corporate' && (
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                                    <div className="space-y-1.5">
+                                                        <label className="text-[11px] font-black uppercase tracking-widest text-slate-400 ml-1">Organization Type</label>
+                                                        <div className="relative">
+                                                            <select
+                                                                value={formData.organizationCategory}
+                                                                onChange={(e) => handleGenericChange("organizationCategory", e.target.value)}
+                                                                aria-invalid={!!errors.organizationCategory}
+                                                                aria-label="Organization type"
+                                                                className={institutionSelectClass(!!errors.organizationCategory)}
+                                                            >
+                                                                <option value="">Select organization type</option>
+                                                                {ORGANIZATION_CATEGORIES.map((option) => (
+                                                                    <option key={option} value={option}>
+                                                                        {option}
+                                                                    </option>
+                                                                ))}
+                                                            </select>
+                                                            <ChevronDown
+                                                                className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400"
+                                                                aria-hidden
+                                                            />
+                                                        </div>
+                                                        {errors.organizationCategory && <p className="text-[10px] text-red-500 font-black uppercase tracking-widest ml-1">{errors.organizationCategory}</p>}
                                                     </div>
-                                                    {errors.organizationCategory && <p className="text-[10px] text-red-500 font-black uppercase tracking-widest ml-1">{errors.organizationCategory}</p>}
-                                                </div>
-                                                <div className="space-y-1.5">
-                                                    <label className="text-[11px] font-black uppercase tracking-widest text-slate-400 ml-1">Legal Registration Type</label>
-                                                    <div className="relative">
-                                                        <select
-                                                            value={formData.legalRegistrationType}
-                                                            onChange={(e) => handleGenericChange("legalRegistrationType", e.target.value)}
-                                                            aria-invalid={!!errors.legalRegistrationType}
-                                                            aria-label="Legal registration type"
-                                                            className={institutionSelectClass(!!errors.legalRegistrationType)}
-                                                        >
-                                                            <option value="">Select legal registration type</option>
-                                                            {LEGAL_REGISTRATION_TYPES.map((option) => (
-                                                                <option key={option} value={option}>
-                                                                    {option}
-                                                                </option>
-                                                            ))}
-                                                        </select>
-                                                        <ChevronDown
-                                                            className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400"
-                                                            aria-hidden
-                                                        />
+                                                    <div className="space-y-1.5">
+                                                        <label className="text-[11px] font-black uppercase tracking-widest text-slate-400 ml-1">Legal Registration Type</label>
+                                                        <div className="relative">
+                                                            <select
+                                                                value={formData.legalRegistrationType}
+                                                                onChange={(e) => handleGenericChange("legalRegistrationType", e.target.value)}
+                                                                aria-invalid={!!errors.legalRegistrationType}
+                                                                aria-label="Legal registration type"
+                                                                className={institutionSelectClass(!!errors.legalRegistrationType)}
+                                                            >
+                                                                <option value="">Select legal registration type</option>
+                                                                {LEGAL_REGISTRATION_TYPES.map((option) => (
+                                                                    <option key={option} value={option}>
+                                                                        {option}
+                                                                    </option>
+                                                                ))}
+                                                            </select>
+                                                            <ChevronDown
+                                                                className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400"
+                                                                aria-hidden
+                                                            />
+                                                        </div>
+                                                        {errors.legalRegistrationType && <p className="text-[10px] text-red-500 font-black uppercase tracking-widest ml-1">{errors.legalRegistrationType}</p>}
                                                     </div>
-                                                    {errors.legalRegistrationType && <p className="text-[10px] text-red-500 font-black uppercase tracking-widest ml-1">{errors.legalRegistrationType}</p>}
                                                 </div>
-                                            </div>
+                                            )}
 
                                             <div className="space-y-1.5">
                                                 <label className="text-[11px] font-black uppercase tracking-widest text-slate-400 ml-1">Lead Official</label>
@@ -618,16 +626,28 @@ function SignUpContent() {
                                             </div>
                                             <div className="space-y-1.5">
                                                 <label className="text-[11px] font-black uppercase tracking-widest text-slate-400 ml-1">{role === "student" ? "Program" : "Dept"}</label>
-                                                <input
-                                                    type="text"
-                                                    value={formData.department}
-                                                    onChange={(e) => handleGenericChange("department", e.target.value)}
-                                                    className={clsx(
-                                                        "w-full px-5 py-4 rounded-2xl border-2 bg-slate-50/50 focus:bg-white outline-none transition-all font-bold text-slate-800 placeholder:text-slate-300",
-                                                        errors.department ? "border-red-500 focus:border-red-500" : "border-slate-100 focus:border-emerald-600"
-                                                    )}
-                                                    placeholder={role === "student" ? "BS CS" : "Admin"}
-                                                />
+                                                {role === "student" ? (
+                                                    <SearchableSelect
+                                                        value={formData.department}
+                                                        onChange={(v) => handleGenericChange("department", v)}
+                                                        options={hecPrograms}
+                                                        placeholder="Select degree program"
+                                                        searchPlaceholder="Search HEC programs..."
+                                                        hasError={!!errors.department}
+                                                        ariaLabel="Degree program"
+                                                    />
+                                                ) : (
+                                                    <input
+                                                        type="text"
+                                                        value={formData.department}
+                                                        onChange={(e) => handleGenericChange("department", e.target.value)}
+                                                        className={clsx(
+                                                            "w-full px-5 py-4 rounded-2xl border-2 bg-slate-50/50 focus:bg-white outline-none transition-all font-bold text-slate-800 placeholder:text-slate-300",
+                                                            errors.department ? "border-red-500 focus:border-red-500" : "border-slate-100 focus:border-emerald-600"
+                                                        )}
+                                                        placeholder="Admin"
+                                                    />
+                                                )}
                                                 {errors.department && <p className="text-[10px] text-red-500 font-black uppercase tracking-widest ml-1">{errors.department}</p>}
                                             </div>
                                         </div>

@@ -6,6 +6,7 @@ import Link from "next/link";
 import { authenticatedFetch } from "@/utils/api";
 import PendingActionCards, { type PendingSummary } from "@/components/dashboard/PendingActionCards";
 import Section1AnalyticsPanel from "@/components/analytics/Section1AnalyticsPanel";
+import PendingAttendanceModal from "@/components/engagement/PendingAttendanceModal";
 
 type PartnerProject = {
     id: string;
@@ -104,6 +105,7 @@ export default function PartnerDashboard() {
 
     return (
         <div className="space-y-8">
+            <PendingAttendanceModal variant="partner" />
             {/* Welcome Section */}
             <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-blue-900 to-indigo-800 p-5 text-white sm:p-8">
                 <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -mr-16 -mt-16"></div>

@@ -6,7 +6,48 @@ export type ReportCiiSnapshot = {
     auditCapApplied?: number;
     breakdown?: Record<string, number>;
     suggestions?: string[];
+    evaluation_framework_version?: string;
+    cii_score_max?: number;
 };
+
+export const CII_SCORE_MAX_BY_FRAMEWORK: Record<string, number> = {
+    "v8.2": 100,
+    "v1.2": 100,
+};
+
+export function resolveCiiScoreMaxFromReport(report: unknown): number {
+    if (!report || typeof report !== "object") return 100;
+    const record = report as Record<string, unknown>;
+    const section11 =
+        record.section11 && typeof record.section11 === "object"
+            ? (record.section11 as Record<string, unknown>)
+            : {};
+    const ciiIndex =
+        (record.cii_index && typeof record.cii_index === "object"
+            ? (record.cii_index as Record<string, unknown>)
+            : null) ??
+        (section11.cii_index && typeof section11.cii_index === "object"
+            ? (section11.cii_index as Record<string, unknown>)
+            : null);
+
+    const explicitMax = coerceScore(ciiIndex?.cii_score_max, 100);
+    if (explicitMax !== null) return explicitMax;
+
+    const framework = pickFrameworkVersion(section11) ?? pickFrameworkVersion(ciiIndex);
+    if (framework && CII_SCORE_MAX_BY_FRAMEWORK[framework]) {
+        return CII_SCORE_MAX_BY_FRAMEWORK[framework];
+    }
+    return 100;
+}
+
+function pickFrameworkVersion(record: Record<string, unknown> | null): string | null {
+    if (!record) return null;
+    const raw =
+        (typeof record.evaluation_framework_version === "string" && record.evaluation_framework_version.trim()) ||
+        (typeof record.framework_version === "string" && record.framework_version.trim()) ||
+        "";
+    return raw || null;
+}
 
 export function deriveCiiLevel(score: number): string {
     if (score >= 91) return "Transformational Engagement";
@@ -17,15 +58,15 @@ export function deriveCiiLevel(score: number): string {
     return "Introductory Engagement";
 }
 
-function coerceScore(value: unknown): number | null {
+function coerceScore(value: unknown, maxScore = 100): number | null {
     if (typeof value === "number" && Number.isFinite(value)) {
-        return Math.min(100, Math.max(0, value));
+        return Math.min(maxScore, Math.max(0, value));
     }
     if (typeof value === "string") {
         const match = value.trim().match(/\d+(?:\.\d+)?/);
         if (!match) return null;
         const parsed = Number(match[0]);
-        return Number.isFinite(parsed) ? Math.min(100, Math.max(0, parsed)) : null;
+        return Number.isFinite(parsed) ? Math.min(maxScore, Math.max(0, parsed)) : null;
     }
     return null;
 }
@@ -37,40 +78,46 @@ function readNumberAfter(text: string, pattern: RegExp): number | null {
     return Number.isFinite(parsed) ? parsed : null;
 }
 
-function clampScore(score: number): number {
-    return Math.min(100, Math.max(0, score));
+function clampScore(score: number, maxScore = 100): number {
+    return Math.min(maxScore, Math.max(0, score));
 }
 
-function readOptionalScore(record: Record<string, unknown>, keys: string[]): number | undefined {
+function readOptionalScore(record: Record<string, unknown>, keys: string[], maxScore = 100): number | undefined {
     for (const key of keys) {
-        const score = coerceScore(record[key]);
+        const score = coerceScore(record[key], maxScore);
         if (score !== null) return score;
     }
     return undefined;
 }
 
-function normalizeCiiObject(raw: unknown): ReportCiiSnapshot | null {
+function normalizeCiiObject(raw: unknown, maxScore = 100): ReportCiiSnapshot | null {
     if (!raw || typeof raw !== "object") {
-        const scalar = coerceScore(raw);
-        return scalar === null ? null : { totalScore: scalar, level: deriveCiiLevel(scalar) };
+        const scalar = coerceScore(raw, maxScore);
+        return scalar === null ? null : { totalScore: scalar, level: deriveCiiLevel(scalar), cii_score_max: maxScore };
     }
 
     const record = raw as Record<string, unknown>;
+    const recordMax = coerceScore(record.cii_score_max, 100) ?? maxScore;
     const score =
-        coerceScore(record.totalScore) ??
-        coerceScore(record.total_score) ??
-        coerceScore(record.score) ??
-        coerceScore(record.cii_score) ??
-        coerceScore(record.ciiScore) ??
-        coerceScore(record.impact_score) ??
-        coerceScore(record.impactScore);
+        coerceScore(record.totalScore, recordMax) ??
+        coerceScore(record.total_score, recordMax) ??
+        coerceScore(record.score, recordMax) ??
+        coerceScore(record.cii_score, recordMax) ??
+        coerceScore(record.ciiScore, recordMax) ??
+        coerceScore(record.impact_score, recordMax) ??
+        coerceScore(record.impactScore, recordMax);
 
     if (score === null) return null;
 
+    const framework = pickFrameworkVersion(record);
+    const resolvedMax =
+        recordMax ||
+        (framework && CII_SCORE_MAX_BY_FRAMEWORK[framework]) ||
+        maxScore;
     const level = typeof record.level === "string" && record.level.trim()
         ? record.level.trim()
         : deriveCiiLevel(score);
-    const rawScore = readOptionalScore(record, ["rawScore", "raw_score", "rawCiiScore", "raw_cii_score"]);
+    const rawScore = readOptionalScore(record, ["rawScore", "raw_score", "rawCiiScore", "raw_cii_score"], resolvedMax);
     const penaltyApplied = readOptionalScore(record, [
         "penaltyApplied",
         "penalty_applied",
@@ -78,12 +125,12 @@ function normalizeCiiObject(raw: unknown): ReportCiiSnapshot | null {
         "penalties",
         "penaltyDeduction",
         "penalty_deduction",
-    ]);
-    const auditCapApplied = readOptionalScore(record, ["auditCapApplied", "audit_cap_applied", "auditCap", "audit_cap"]);
+    ], resolvedMax);
+    const auditCapApplied = readOptionalScore(record, ["auditCapApplied", "audit_cap_applied", "auditCap", "audit_cap"], resolvedMax);
     const breakdown = record.breakdown && typeof record.breakdown === "object"
         ? Object.fromEntries(
               Object.entries(record.breakdown as Record<string, unknown>)
-                  .map(([key, value]) => [key, coerceScore(value)])
+                  .map(([key, value]) => [key, coerceScore(value, resolvedMax)])
                   .filter((entry): entry is [string, number] => entry[1] !== null),
           )
         : undefined;
@@ -91,10 +138,20 @@ function normalizeCiiObject(raw: unknown): ReportCiiSnapshot | null {
         ? record.suggestions.filter((item): item is string => typeof item === "string" && item.trim().length > 0)
         : undefined;
 
-    return { totalScore: score, level, rawScore, penaltyApplied, auditCapApplied, breakdown, suggestions };
+    return {
+        totalScore: score,
+        level,
+        rawScore,
+        penaltyApplied,
+        auditCapApplied,
+        breakdown,
+        suggestions,
+        evaluation_framework_version: framework ?? undefined,
+        cii_score_max: resolvedMax,
+    };
 }
 
-function parseAdjustedCiiFromAuditText(text: unknown): ReportCiiSnapshot | null {
+function parseAdjustedCiiFromAuditText(text: unknown, maxScore = 100): ReportCiiSnapshot | null {
     if (typeof text !== "string" || !text.trim()) return null;
 
     const raw = readNumberAfter(text, /\bRaw\s+CII\s+Score\s*[:=-]?\s*(\d+(?:\.\d+)?)\s*(?:\/\s*100)?/i);
@@ -104,50 +161,52 @@ function parseAdjustedCiiFromAuditText(text: unknown): ReportCiiSnapshot | null 
         readNumberAfter(text, /\bPenalty\s+Deduction\s*[:=-]?\s*(\d+(?:\.\d+)?)/i);
     const auditCap = readNumberAfter(text, /\bAudit\s+Cap\s+Applied\s*[:=-]?\s*(\d+(?:\.\d+)?)/i);
     const finalAdjusted =
-        readNumberAfter(text, /\bFinal\s+Adjusted\s+CII\s+Score\s*[:=-]?\s*(\d+(?:\.\d+)?)\s*(?:\/\s*100)?/i) ??
-        readNumberAfter(text, /\bAdjusted\s+CII\s+Score\s*[:=-]?\s*(\d+(?:\.\d+)?)\s*(?:\/\s*100)?/i) ??
-        readNumberAfter(text, /\bFinal\s+CII\s+(?:Index\s+)?Score\s*[:=-]?\s*(\d+(?:\.\d+)?)\s*(?:\/\s*100)?/i);
+        readNumberAfter(text, /\bFinal\s+Adjusted\s+CII\s+Score\s*[:=-]?\s*(\d+(?:\.\d+)?)\s*(?:\/\s*(?:100|108))?/i) ??
+        readNumberAfter(text, /\bAdjusted\s+CII\s+Score\s*[:=-]?\s*(\d+(?:\.\d+)?)\s*(?:\/\s*(?:100|108))?/i) ??
+        readNumberAfter(text, /\bFinal\s+CII\s+(?:Index\s+)?Score\s*[:=-]?\s*(\d+(?:\.\d+)?)\s*(?:\/\s*(?:100|108))?/i);
 
     if (finalAdjusted !== null) {
-        const totalScore = clampScore(finalAdjusted);
+        const totalScore = clampScore(finalAdjusted, maxScore);
         return {
             totalScore,
             level: deriveCiiLevel(totalScore),
-            rawScore: raw === null ? undefined : clampScore(raw),
+            rawScore: raw === null ? undefined : clampScore(raw, maxScore),
             penaltyApplied: penalty === null ? undefined : penalty,
             auditCapApplied: auditCap === null ? undefined : auditCap,
+            cii_score_max: maxScore,
         };
     }
 
     if (raw === null || penalty === null) return null;
 
     const adjustedBeforeCap = raw - penalty;
-    const totalScore = clampScore(auditCap === null ? adjustedBeforeCap : Math.min(adjustedBeforeCap, auditCap));
+    const totalScore = clampScore(auditCap === null ? adjustedBeforeCap : Math.min(adjustedBeforeCap, auditCap), maxScore);
     return {
         totalScore,
         level: deriveCiiLevel(totalScore),
-        rawScore: clampScore(raw),
+        rawScore: clampScore(raw, maxScore),
         penaltyApplied: penalty,
         auditCapApplied: auditCap === null ? undefined : auditCap,
+        cii_score_max: maxScore,
     };
 }
 
-function parseCiiFromSummaryText(text: unknown): ReportCiiSnapshot | null {
+function parseCiiFromSummaryText(text: unknown, maxScore = 100): ReportCiiSnapshot | null {
     if (typeof text !== "string" || !text.trim()) return null;
 
     const patterns = [
-        /\bFinal\s+CII\s+Score\s*[:=-]?\s*(\d+(?:\.\d+)?)\s*(?:\/\s*100)?/i,
-        /\bCII\s+Index\s+Score\s*[:=-]?\s*(\d+(?:\.\d+)?)\s*(?:\/\s*100)?/i,
-        /\bCII\s+Score\s*[:=-]?\s*(\d+(?:\.\d+)?)\s*(?:\/\s*100)?/i,
-        /\bcalculated\s+CII\s+index\s+(?:score\s+)?(?:is|of)?\s*[:=-]?\s*(\d+(?:\.\d+)?)\s*(?:\/\s*100)?/i,
-        /\bCII-style\s+total\s+(?:is\s+)?(?:on\s+\w+\s+side\s+)?\(?(\d+(?:\.\d+)?)\s*\/\s*100/i,
+        /\bFinal\s+CII\s+Score\s*[:=-]?\s*(\d+(?:\.\d+)?)\s*(?:\/\s*(?:100|108))?/i,
+        /\bCII\s+Index\s+Score\s*[:=-]?\s*(\d+(?:\.\d+)?)\s*(?:\/\s*(?:100|108))?/i,
+        /\bCII\s+Score\s*[:=-]?\s*(\d+(?:\.\d+)?)\s*(?:\/\s*(?:100|108))?/i,
+        /\bcalculated\s+CII\s+index\s+(?:score\s+)?(?:is|of)?\s*[:=-]?\s*(\d+(?:\.\d+)?)\s*(?:\/\s*(?:100|108))?/i,
+        /\bCII-style\s+total\s+(?:is\s+)?(?:on\s+\w+\s+side\s+)?\(?(\d+(?:\.\d+)?)\s*\/\s*(?:100|108)/i,
     ];
 
     for (const pattern of patterns) {
         const match = text.match(pattern);
-        const score = match?.[1] ? coerceScore(match[1]) : null;
+        const score = match?.[1] ? coerceScore(match[1], maxScore) : null;
         if (score !== null) {
-            return { totalScore: score, level: deriveCiiLevel(score) };
+            return { totalScore: score, level: deriveCiiLevel(score), cii_score_max: maxScore };
         }
     }
 
@@ -156,6 +215,8 @@ function parseCiiFromSummaryText(text: unknown): ReportCiiSnapshot | null {
 
 export function readPersistedCiiSnapshot(report: unknown): ReportCiiSnapshot | null {
     if (!report || typeof report !== "object") return null;
+
+    const maxScore = resolveCiiScoreMaxFromReport(report);
 
     const record = report as Record<string, unknown>;
     const section11 = record.section11 && typeof record.section11 === "object"
@@ -174,10 +235,10 @@ export function readPersistedCiiSnapshot(report: unknown): ReportCiiSnapshot | n
         record.impactScore,
     ];
 
-    const adjustedSnapshot = parseAdjustedCiiFromAuditText(section11.summary_text);
+    const adjustedSnapshot = parseAdjustedCiiFromAuditText(section11.summary_text, maxScore);
 
     for (const candidate of candidates) {
-        const snapshot = normalizeCiiObject(candidate);
+        const snapshot = normalizeCiiObject(candidate, maxScore);
         if (snapshot) {
             return adjustedSnapshot
                 ? {
@@ -192,5 +253,5 @@ export function readPersistedCiiSnapshot(report: unknown): ReportCiiSnapshot | n
         }
     }
 
-    return adjustedSnapshot ?? parseCiiFromSummaryText(section11.summary_text);
+    return adjustedSnapshot ?? parseCiiFromSummaryText(section11.summary_text, maxScore);
 }

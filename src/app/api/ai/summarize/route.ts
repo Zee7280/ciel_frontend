@@ -2,7 +2,14 @@ import { NextResponse } from "next/server";
 import { parseSection11AuditSummary } from "@/lib/parseCIIauditSummary";
 import { parseSection11V61Response } from "@/lib/parseSection11V61";
 import { parseSection11V81Response } from "@/lib/parseSection11V81";
-import { buildSection11EvaluationUserMessage } from "./buildSection11EvaluationUserMessage";
+import {
+    buildSection11EvaluationUserMessage,
+    buildSection11MasterRubricUserMessage,
+} from "./buildSection11EvaluationUserMessage";
+import {
+    SECTION11_MASTER_RUBRIC_EVALUATOR_PROMPT,
+    SECTION11_MASTER_RUBRIC_JSON_ONLY_DEPLOYMENT_NOTE,
+} from "./prompts/section11MasterRubricPrompt";
 import {
     SECTION11_EVALUATOR_PROMPT,
     SECTION11_JSON_ONLY_DEPLOYMENT_NOTE,
@@ -1412,26 +1419,35 @@ Keep the full response under 180 words.`;
                 prompt = buildSection11EvaluationUserMessage(data);
                 break;
 
+            case "section11_master_rubric":
+                prompt = buildSection11MasterRubricUserMessage(data);
+                break;
+
             default:
                 prompt = `Summarize project data professionally: ${JSON.stringify(data)}`;
         }
 
 
-        const openAiOpts: OpenAiCompletionOpts | undefined =
-            section === "section11"
-                ? {
-                      temperature: 0.15,
-                      seed: 4210,
-                      maxTokens: 16000,
-                      responseFormat: { type: "json_object" },
-                      systemMessage: `${SECTION11_EVALUATOR_PROMPT}\n\n${SECTION11_JSON_ONLY_DEPLOYMENT_NOTE}`,
-                  }
-                : undefined;
+        const isSection11Evaluation =
+            section === "section11" || section === "section11_master_rubric";
+
+        const openAiOpts: OpenAiCompletionOpts | undefined = isSection11Evaluation
+            ? {
+                  temperature: 0.15,
+                  seed: section === "section11_master_rubric" ? 4212 : 4210,
+                  maxTokens: 16000,
+                  responseFormat: { type: "json_object" },
+                  systemMessage:
+                      section === "section11_master_rubric"
+                          ? `${SECTION11_MASTER_RUBRIC_EVALUATOR_PROMPT}\n\n${SECTION11_MASTER_RUBRIC_JSON_ONLY_DEPLOYMENT_NOTE}`
+                          : `${SECTION11_EVALUATOR_PROMPT}\n\n${SECTION11_JSON_ONLY_DEPLOYMENT_NOTE}`,
+              }
+            : undefined;
 
         const text = await generateSummaryWithOpenAI(prompt, openAiOpts);
         const summary = text.trim();
 
-        if (section === "section11") {
+        if (isSection11Evaluation) {
             const v81 = parseSection11V81Response(summary);
             if (v81) {
                 return NextResponse.json({

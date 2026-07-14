@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { authenticatedFetch } from "@/utils/api";
 import { pakistaniUniversities } from "@/utils/universityData";
 import PhoneConnectivityRow from "@/components/ui/PhoneConnectivityRow";
+import PartnerOrganizationGuidance from "@/components/ui/PartnerOrganizationGuidance";
 import type { AttendanceApproverType } from "@/utils/attendanceApproverRouting";
 import {
     DEFAULT_PHONE_COUNTRY_KEY,
@@ -511,6 +512,7 @@ export default function ApplicationDialog({
                             {participationGuide.messages.en}
                         </div>
                     ) : null}
+                    <PartnerOrganizationGuidance context="enroll" />
                     <div className="space-y-3">
                         <Label className="text-base font-semibold">Participation Type</Label>
                         <RadioGroup

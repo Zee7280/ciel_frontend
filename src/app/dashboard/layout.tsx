@@ -1,6 +1,7 @@
 import Sidebar from "@/components/Sidebar";
 import DashboardHeader from "@/components/DashboardHeader";
 import ProfileCompletionGate from "@/components/ProfileCompletionGate";
+import WelcomeModal from "@/components/WelcomeModal";
 export default function DashboardLayout({
     children,
 }: {
@@ -18,6 +19,9 @@ export default function DashboardLayout({
                 <main className="flex-1 p-4 pb-24 sm:p-6 lg:ml-64 lg:p-8 lg:pb-8 print:ml-0 print:p-0 print:w-full">
                     <ProfileCompletionGate>{children}</ProfileCompletionGate>
                 </main>
+            </div>
+            <div className="print:hidden">
+                <WelcomeModal />
             </div>
         </div>
     );

@@ -31,6 +31,7 @@ import { authenticatedFetch } from "@/utils/api";
 import Section1AnalyticsPanel from "@/components/analytics/Section1AnalyticsPanel";
 import PendingActionCards, { type PendingSummary } from "@/components/dashboard/PendingActionCards";
 import { writeFacultyScopeSession, readFacultyDashboardViewPreference, writeFacultyDashboardViewPreference, type FacultyDashboardViewClient } from "@/utils/facultyScopeSession";
+import PendingAttendanceModal from "@/components/engagement/PendingAttendanceModal";
 
 type FacultyCourse = {
     id?: string;
@@ -270,6 +271,7 @@ export default function FacultyDashboard() {
 
     return (
         <div className="space-y-8 p-6">
+            <PendingAttendanceModal variant="faculty" />
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                     <h1 className="text-2xl font-bold text-slate-900">Faculty Dashboard</h1>

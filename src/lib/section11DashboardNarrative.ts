@@ -1,6 +1,6 @@
 import { parseSection11AuditSummary } from "@/lib/parseCIIauditSummary";
 import { parseSection11V61Response } from "@/lib/parseSection11V61";
-import { parseSection11V81Response } from "@/lib/parseSection11V81";
+import { clampPlatformCiiScore, parseSection11V81Response } from "@/lib/parseSection11V81";
 
 export type Section11DashboardHighlights = {
     finalScore?: string;
@@ -184,10 +184,11 @@ export function buildSection11DashboardView(fullText: string): Section11Dashboar
             .filter(Boolean)
             .join("\n\n");
         const cii = v81.evaluation.final_result?.cii_score;
+        const clampedCii = typeof cii === "number" ? clampPlatformCiiScore(cii) : undefined;
         return {
             narrative: narrative || v81.summaryText.split("\n\n").slice(0, 2).join("\n\n"),
             highlights: {
-                finalScore: typeof cii === "number" ? `${Math.round(cii)} / 100` : undefined,
+                finalScore: clampedCii !== undefined ? `${Math.round(clampedCii)} / 100` : undefined,
                 band: v81.evaluation.final_result?.badge_title,
                 recommendedAction: v81.auditMeta.risk_level || undefined,
             },

@@ -1,7 +1,7 @@
 import { generateAISummary } from "@/app/dashboard/student/report/utils/aiSummarizer";
 import { calculateCII } from "@/app/dashboard/student/report/utils/calculateCII";
 import type { ReportData } from "@/app/dashboard/student/report/context/ReportContext";
-import { readPersistedCiiSnapshot } from "@/utils/reportCiiSnapshot";
+import { readPersistedCiiSnapshot, type ReportCiiSnapshot } from "@/utils/reportCiiSnapshot";
 import { prepareReportForVerifyDossier } from "@/utils/reportTeamScope";
 import { authenticatedFetch } from "@/utils/api";
 
@@ -9,7 +9,10 @@ export type RegenerateAiScoreResult = {
     success: boolean;
     score?: number;
     error?: string;
+    framework?: Section11AiFramework;
 };
+
+export type Section11AiFramework = "v8.2" | "v1.2";
 
 export type Section11AiSummarizeRequest = {
     section: "section11";
@@ -142,19 +145,22 @@ export async function fetchAdminReportDetail(reportId: string): Promise<ReportDa
 export async function regenerateAdminReportAiScore(
     reportId: string,
     existingReport?: ReportData | null,
+    options?: { framework?: Section11AiFramework },
 ): Promise<RegenerateAiScoreResult> {
+    const framework = options?.framework ?? "v8.2";
     const evaluationPayload = await fetchAdminReportAiEvaluationPayload(reportId);
     if (!evaluationPayload) {
-        return { success: false, error: "Failed to load AI evaluation payload" };
+        return { success: false, error: "Failed to load AI evaluation payload", framework };
     }
 
     const report = existingReport ?? (await fetchAdminReportDetail(reportId));
-    const legacyCii = report ? calculateCII(buildReportPayloadForAi(report)) : null;
+    const legacyCii = report && framework === "v8.2" ? calculateCII(buildReportPayloadForAi(report)) : null;
     const requestBody = buildSection11AiSummarizeRequest(evaluationPayload);
-    const section11Res = await generateAISummary("section11", requestBody.data);
+    const summarizeSection = framework === "v1.2" ? "section11_master_rubric" : "section11";
+    const section11Res = await generateAISummary(summarizeSection, requestBody.data);
 
     if (section11Res.error || !section11Res.summary) {
-        return { success: false, error: section11Res.error || "AI scoring failed" };
+        return { success: false, error: section11Res.error || "AI scoring failed", framework };
     }
 
     const draftSection11 = {
@@ -162,16 +168,16 @@ export async function regenerateAdminReportAiScore(
         summary_text: section11Res.summary,
         is_ai_generated: true,
         audit_meta: section11Res.auditMeta ?? null,
+        evaluation_framework_version: framework,
         ...(legacyCii ? { legacy_cii_index: legacyCii } : {}),
     };
-    const persistedCii = readPersistedCiiSnapshot({
-        section11: draftSection11,
-    });
+    const persistedCii = resolvePersistedCiiSnapshot(draftSection11);
 
     if (!persistedCii) {
         return {
             success: false,
             error: "AI evaluation completed but no parseable FINAL CII SCORE was returned",
+            framework,
         };
     }
 
@@ -196,8 +202,22 @@ export async function regenerateAdminReportAiScore(
 
     if (!response?.ok) {
         const message = await response?.text().catch(() => "");
-        return { success: false, error: message || "Failed to save AI score" };
+        return { success: false, error: message || "Failed to save AI score", framework };
     }
 
-    return { success: true, score: Math.round(persistedCii.totalScore) };
+    return { success: true, score: Math.round(persistedCii.totalScore), framework };
+}
+
+/** Admin-only: Master Rubric v1.2 evaluation (0–100 CII scale). */
+export async function regenerateAdminReportMasterRubricAiScore(
+    reportId: string,
+    existingReport?: ReportData | null,
+): Promise<RegenerateAiScoreResult> {
+    return regenerateAdminReportAiScore(reportId, existingReport, { framework: "v1.2" });
+}
+
+function resolvePersistedCiiSnapshot(
+    section11: Record<string, unknown>,
+): ReportCiiSnapshot | null {
+    return readPersistedCiiSnapshot({ section11 });
 }

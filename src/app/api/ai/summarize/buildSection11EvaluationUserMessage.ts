@@ -160,11 +160,16 @@ function formatEvidenceInventory(data: UnknownRecord): string {
         .join("\n");
 }
 
+export type Section11EvaluationFrameworkVersion = "v8.2" | "v1.2";
+
 /**
- * Formats submission data for the CIEL PK v8.2 user message wrapper.
+ * Formats submission data for the CIEL PK Section 11 user message wrapper.
  * Accepts either the backend `buildCielPkAiEvaluationPayload` shape or the student report object.
  */
-export function buildSection11EvaluationUserMessage(data: unknown): string {
+export function buildSection11EvaluationUserMessage(
+    data: unknown,
+    frameworkVersion: Section11EvaluationFrameworkVersion = "v8.2",
+): string {
     const root = asRecord(data);
     const backendPayload = isBackendEvaluationPayload(root);
     const submissionId = resolveSubmissionId(root);
@@ -221,11 +226,20 @@ export function buildSection11EvaluationUserMessage(data: unknown): string {
     lines.push("INSTRUCTIONS");
     lines.push("==========================================");
     lines.push("");
+    const frameworkLabel =
+        frameworkVersion === "v1.2"
+            ? "Master Evaluation Rubric v1.2"
+            : "CIEL PK v8.2 framework";
     lines.push(
-        "Evaluate this submission against the CIEL PK v8.2 framework embedded in your system prompt. " +
-            "When operating in JSON-only deployment mode, emit exactly one JSON object matching the v8.2 schema " +
-            "with framework_version set to \"v8.2\".",
+        `Evaluate this submission against the ${frameworkLabel} embedded in your system prompt. ` +
+            `When operating in JSON-only deployment mode, emit exactly one JSON object matching the ${frameworkVersion} schema ` +
+            `with framework_version set to "${frameworkVersion}".`,
     );
 
     return lines.join("\n");
+}
+
+/** Master Rubric v1.2 admin evaluation — same payload shape, different framework instructions. */
+export function buildSection11MasterRubricUserMessage(data: unknown): string {
+    return buildSection11EvaluationUserMessage(data, "v1.2");
 }

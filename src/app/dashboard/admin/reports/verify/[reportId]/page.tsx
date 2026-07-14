@@ -29,6 +29,7 @@ import {
     Sparkles,
     Loader2,
     Download,
+    Award,
 } from "lucide-react";
 import { toast } from 'sonner';
 import clsx from 'clsx';
@@ -41,11 +42,12 @@ import { parseSection11AuditSummary, type ReportCIIauditMeta } from "@/lib/parse
 import type { ReportData } from "../../../../student/report/context/ReportContext";
 import { calculateCII } from "../../../../student/report/utils/calculateCII";
 import { formatSdgGoalPadded, mergeReportSdgSnapshotRows } from "../../../../student/report/utils/reportSdgMerge";
-import { readPersistedCiiSnapshot } from "@/utils/reportCiiSnapshot";
+import { readPersistedCiiSnapshot, resolveCiiScoreMaxFromReport } from "@/utils/reportCiiSnapshot";
 import {
     buildReportPayloadForAi,
     downloadAdminReportAiPayload,
     regenerateAdminReportAiScore,
+    regenerateAdminReportMasterRubricAiScore,
 } from "@/utils/adminRegenerateReportAiScore";
 import { prepareReportForVerifyDossier } from "@/utils/reportTeamScope";
 import { getReportProjectContextDisplay } from "@/utils/reportProjectContext";
@@ -545,6 +547,7 @@ export default function AdminReportDetailPage() {
     const [feedback, setFeedback] = useState('');
     const [isVerifying, setIsVerifying] = useState(false);
     const [isRegeneratingAiScore, setIsRegeneratingAiScore] = useState(false);
+    const [isRegeneratingMasterRubricAiScore, setIsRegeneratingMasterRubricAiScore] = useState(false);
     const [isDownloadingAiPayload, setIsDownloadingAiPayload] = useState(false);
     const [showStickyActions, setShowStickyActions] = useState(false);
     const [qualityAlerts, setQualityAlerts] = useState<QualityAlert[]>([]);
@@ -620,6 +623,8 @@ export default function AdminReportDetailPage() {
             return null;
         }
     }, [report]);
+
+    const ciiScoreMax = report ? resolveCiiScoreMaxFromReport(report) : 100;
 
     const section1ParticipationDisplay = useMemo(() => {
         if (!report?.section1) return null;
@@ -762,11 +767,11 @@ export default function AdminReportDetailPage() {
     };
 
     const handleRegenerateAiScore = async () => {
-        if (!report || isRegeneratingAiScore) return;
+        if (!report || isRegeneratingAiScore || isRegeneratingMasterRubricAiScore) return;
 
         setIsRegeneratingAiScore(true);
         try {
-            toast.info("Running ChatGPT CII audit — this may take up to 3 minutes.");
+            toast.info("Running ChatGPT CII audit (v8.2) — this may take up to 3 minutes.");
             const result = await regenerateAdminReportAiScore(
                 String(params.reportId),
                 buildReportPayloadForAi(report as ReportData),
@@ -786,6 +791,34 @@ export default function AdminReportDetailPage() {
             toast.error("AI scoring failed. Please try again.");
         } finally {
             setIsRegeneratingAiScore(false);
+        }
+    };
+
+    const handleRegenerateMasterRubricAiScore = async () => {
+        if (!report || isRegeneratingMasterRubricAiScore || isRegeneratingAiScore) return;
+
+        setIsRegeneratingMasterRubricAiScore(true);
+        try {
+            toast.info("Running Master Rubric v1.2 AI audit — this may take up to 3 minutes.");
+            const result = await regenerateAdminReportMasterRubricAiScore(
+                String(params.reportId),
+                buildReportPayloadForAi(report as ReportData),
+            );
+            if (!result.success) {
+                toast.error(result.error || "Master Rubric AI scoring failed");
+                return;
+            }
+            toast.success(
+                typeof result.score === "number"
+                    ? `Master Rubric CII updated (${result.score}/100)`
+                    : "Master Rubric CII updated",
+            );
+            await fetchReportDetail();
+        } catch (error) {
+            console.error("Admin Master Rubric AI score regeneration failed:", error);
+            toast.error("Master Rubric AI scoring failed. Please try again.");
+        } finally {
+            setIsRegeneratingMasterRubricAiScore(false);
         }
     };
 
@@ -971,7 +1004,7 @@ export default function AdminReportDetailPage() {
                                     <div className="text-right">
                                         <p className="text-2xl font-bold tabular-nums tracking-tight text-slate-900 sm:text-3xl">
                                             {ciiSnapshot.totalScore}
-                                            <span className="text-base font-semibold text-slate-500 sm:text-lg">/100</span>
+                                            <span className="text-base font-semibold text-slate-500 sm:text-lg">/{ciiScoreMax}</span>
                                         </p>
                                         <p className="mt-0.5 max-w-[16rem] text-right text-xs font-medium leading-snug text-slate-600 sm:max-w-[14rem]">
                                             {ciiSnapshot.level}
@@ -983,16 +1016,30 @@ export default function AdminReportDetailPage() {
                             <button
                                 type="button"
                                 onClick={handleRegenerateAiScore}
-                                disabled={isRegeneratingAiScore || isVerifying}
+                                disabled={isRegeneratingAiScore || isRegeneratingMasterRubricAiScore || isVerifying}
                                 className="inline-flex min-h-[2.75rem] w-full items-center justify-center gap-2 rounded-xl border border-violet-200 bg-violet-50 px-4 py-2.5 text-sm font-semibold text-violet-800 shadow-sm transition-colors hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
-                                title="Run ChatGPT CII audit and save updated score to this report"
+                                title="Run ChatGPT CII audit (v8.2) and save updated score to this report"
                             >
                                 {isRegeneratingAiScore ? (
                                     <Loader2 className="h-4 w-4 shrink-0 animate-spin" aria-hidden />
                                 ) : (
                                     <Sparkles className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
                                 )}
-                                {isRegeneratingAiScore ? "Updating score…" : "Regenerate AI score"}
+                                {isRegeneratingAiScore ? "Updating score…" : "Regenerate AI score (v8.2)"}
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleRegenerateMasterRubricAiScore}
+                                disabled={isRegeneratingMasterRubricAiScore || isRegeneratingAiScore || isVerifying}
+                                className="inline-flex min-h-[2.75rem] w-full items-center justify-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm font-semibold text-amber-900 shadow-sm transition-colors hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+                                title="Score with Master Rubric v1.2 (0–100 CII)"
+                            >
+                                {isRegeneratingMasterRubricAiScore ? (
+                                    <Loader2 className="h-4 w-4 shrink-0 animate-spin" aria-hidden />
+                                ) : (
+                                    <Award className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
+                                )}
+                                {isRegeneratingMasterRubricAiScore ? "Scoring…" : "Master Rubric v1.2 score"}
                             </button>
                             <button
                                 type="button"
@@ -1141,7 +1188,7 @@ export default function AdminReportDetailPage() {
                                         <>
                                             <p className="text-2xl font-bold tabular-nums tracking-tight text-white">
                                                 {ciiSnapshot.totalScore}
-                                                <span className="text-lg font-semibold text-slate-400">/100</span>
+                                                <span className="text-lg font-semibold text-slate-400">/{ciiScoreMax}</span>
                                             </p>
                                             <p className="mt-1 line-clamp-3 text-[11px] font-medium leading-snug text-slate-400">
                                                 {ciiSnapshot.level}
@@ -2019,7 +2066,7 @@ export default function AdminReportDetailPage() {
                                 </span>
                                 <span className="text-xl font-bold tabular-nums text-slate-900">
                                     {ciiSnapshot.totalScore}
-                                    <span className="text-sm font-semibold text-slate-500">/100</span>
+                                    <span className="text-sm font-semibold text-slate-500">/{ciiScoreMax}</span>
                                 </span>
                                 <span className="hidden text-slate-300 sm:inline" aria-hidden>
                                     ·
@@ -2034,16 +2081,30 @@ export default function AdminReportDetailPage() {
                         <button
                             type="button"
                             onClick={handleRegenerateAiScore}
-                            disabled={isRegeneratingAiScore || isVerifying}
+                            disabled={isRegeneratingAiScore || isRegeneratingMasterRubricAiScore || isVerifying}
                             className="inline-flex min-h-[2.75rem] items-center justify-center gap-2 rounded-xl border border-violet-200 bg-violet-50 px-5 py-2.5 text-sm font-semibold text-violet-800 shadow-sm transition-colors hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-60"
-                            title="Run ChatGPT CII audit and save updated score to this report"
+                            title="Run ChatGPT CII audit (v8.2) and save updated score to this report"
                         >
                             {isRegeneratingAiScore ? (
                                 <Loader2 className="h-4 w-4 shrink-0 animate-spin" aria-hidden />
                             ) : (
                                 <Sparkles className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
                             )}
-                            {isRegeneratingAiScore ? "Running AI audit…" : "Regenerate AI score & audit"}
+                            {isRegeneratingAiScore ? "Running AI audit…" : "Regenerate AI score (v8.2)"}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={handleRegenerateMasterRubricAiScore}
+                            disabled={isRegeneratingMasterRubricAiScore || isRegeneratingAiScore || isVerifying}
+                            className="inline-flex min-h-[2.75rem] items-center justify-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-5 py-2.5 text-sm font-semibold text-amber-900 shadow-sm transition-colors hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
+                            title="Score with Master Rubric v1.2 (0–100 CII)"
+                        >
+                            {isRegeneratingMasterRubricAiScore ? (
+                                <Loader2 className="h-4 w-4 shrink-0 animate-spin" aria-hidden />
+                            ) : (
+                                <Award className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
+                            )}
+                            {isRegeneratingMasterRubricAiScore ? "Scoring…" : "Master Rubric v1.2 score"}
                         </button>
                         <button
                             type="button"

@@ -109,10 +109,18 @@ export function isSection11V81Evaluation(value: unknown): value is Section11V81E
     if (!value || typeof value !== "object") return false;
     const v = value as Section11V81Evaluation;
     const version = pickString(v.framework_version).toLowerCase();
+    if (version === "v1.2") return true;
     if (version === "v8.2" || version === "v8.1" || version.startsWith("v8.")) return true;
     if (v.final_result && typeof v.final_result.cii_score === "number") return true;
     if (Array.isArray(v.section_scores) && v.section_scores.length > 0 && v.student_feedback) return true;
     return false;
+}
+
+export const CII_PLATFORM_MAX = 100;
+export const CII_MASTER_BONUS_MAX = 5;
+
+export function clampPlatformCiiScore(score: number): number {
+    return Math.min(CII_PLATFORM_MAX, Math.max(0, Math.round(score * 10) / 10));
 }
 
 function resolveFrameworkVersion(evalData: Section11V81Evaluation): string {
@@ -134,11 +142,74 @@ function resolveSectionScore(row: Section11V81SectionScore): number | null {
     return pickNumber(row.score) ?? pickNumber(row.final_section_score);
 }
 
+function resolveCiiScoreMax(_evalData: Section11V81Evaluation): number {
+    return CII_PLATFORM_MAX;
+}
+
+function sumSectionScores(evalData: Section11V81Evaluation): number {
+    let sum = 0;
+    for (const row of evalData.section_scores ?? []) {
+        const sectionScore = resolveSectionScore(row);
+        if (sectionScore !== null) sum += sectionScore;
+    }
+    return sum;
+}
+
+function sumIndividualMasterBonuses(evalData: Section11V81Evaluation): number {
+    let sum = 0;
+    for (const entry of evalData.bonuses ?? []) {
+        const row = asRecord(entry);
+        const amount =
+            pickNumber(row.amount) ??
+            pickNumber(row.bonus_amount) ??
+            pickNumber(row.points) ??
+            pickNumber(row.value) ??
+            0;
+        sum += amount;
+    }
+    return Math.min(CII_MASTER_BONUS_MAX, Math.round(sum * 10) / 10);
+}
+
+function resolvePenaltyTotal(evalData: Section11V81Evaluation): number {
+    const trace = asRecord(evalData.cii_calculation_trace);
+    return (
+        pickNumber(trace.penalty_total) ??
+        pickNumber(trace.penalties_applied) ??
+        pickNumber(trace.penalty_applied) ??
+        0
+    );
+}
+
+function resolveObtainedScore(evalData: Section11V81Evaluation): number {
+    const trace = asRecord(evalData.cii_calculation_trace);
+    const fromTrace =
+        pickNumber(trace.sections_obtained) ??
+        pickNumber(trace.obtained_score) ??
+        pickNumber(trace.section_scores_total);
+    if (fromTrace !== null) {
+        return Math.min(CII_PLATFORM_MAX, Math.round(fromTrace * 10) / 10);
+    }
+    return Math.min(CII_PLATFORM_MAX, Math.round(sumSectionScores(evalData) * 10) / 10);
+}
+
 function resolveCiiScore(evalData: Section11V81Evaluation): number | null {
     const fromFinal = pickNumber(evalData.final_result?.cii_score);
-    if (fromFinal !== null) return Math.round(fromFinal * 10) / 10;
+    if (fromFinal !== null) return clampPlatformCiiScore(fromFinal);
+
     const trace = asRecord(evalData.cii_calculation_trace);
-    return pickNumber(trace.cii_final) ?? pickNumber(trace.cii_raw);
+    const fromTraceFinal = pickNumber(trace.cii_final) ?? pickNumber(trace.cii_clamped);
+    if (fromTraceFinal !== null) return clampPlatformCiiScore(fromTraceFinal);
+
+    const hasSections = (evalData.section_scores?.length ?? 0) > 0;
+    const bonusTotal = sumIndividualMasterBonuses(evalData);
+    if (hasSections || bonusTotal > 0) {
+        const obtained = resolveObtainedScore(evalData);
+        const penalties = resolvePenaltyTotal(evalData);
+        return clampPlatformCiiScore(obtained + bonusTotal - penalties);
+    }
+
+    const fromRaw = pickNumber(trace.cii_raw);
+    return fromRaw !== null ? clampPlatformCiiScore(fromRaw) : null;
 }
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -199,6 +270,7 @@ export function formatSection11V81AsSummaryText(evalData: Section11V81Evaluation
     const certificateLine = pickString(evalData.final_result?.certificate_line);
     const feedback = resolveStudentFeedback(evalData);
     const frameworkVersion = resolveFrameworkVersion(evalData);
+    const ciiMax = resolveCiiScoreMax(evalData);
     const parts: string[] = [];
 
     parts.push(`CIEL PK EVALUATION (${frameworkVersion})`);
@@ -206,8 +278,8 @@ export function formatSection11V81AsSummaryText(evalData: Section11V81Evaluation
         parts.push(`One-line verdict: ${evalData.final_result?.one_line_verdict}`);
     }
     if (cii !== null) {
-        parts.push(`Final CII Score: ${cii} / 100`);
-        parts.push(`CII Index Score: ${Math.round(cii)} / 100`);
+        parts.push(`Final CII Score: ${cii} / ${ciiMax}`);
+        parts.push(`CII Index Score: ${Math.round(cii)} / ${ciiMax}`);
     }
     if (level !== undefined) {
         parts.push(`Level: ${level}${badgeTitle ? ` — ${badgeTitle}` : ""}`);
@@ -300,7 +372,7 @@ export function formatSection11V81AsSummaryText(evalData: Section11V81Evaluation
         [
             "Component 9 — Final Decision",
             `Recommended Action: ${recommended}`,
-            cii !== null ? `Current Band: ${badgeTitle || "—"} — score: ${Math.round(cii)} / 100` : null,
+            cii !== null ? `Current Band: ${badgeTitle || "—"} — score: ${Math.round(cii)} / ${resolveCiiScoreMax(evalData)}` : null,
             feedback?.encouragement ? `Path Forward:\n${feedback.encouragement}` : null,
         ]
             .filter(Boolean)
@@ -361,7 +433,7 @@ export function section11V81ToAuditMeta(evalData: Section11V81Evaluation): Repor
         risk_level: recommended,
         top_fixes: actions,
         final_remark: [
-            cii !== null ? `CII: ${Math.round(cii)}/100` : null,
+            cii !== null ? `CII: ${Math.round(cii)}/${resolveCiiScoreMax(evalData)}` : null,
             evalData.final_result?.badge_title ? `${evalData.final_result.badge_title}` : null,
             pickString(evalData.final_result?.certificate_line) || null,
         ]
@@ -395,7 +467,8 @@ export function parseSection11V81Response(raw: string): {
 export function buildCiiSnapshotFromV81(evalData: Section11V81Evaluation) {
     const cii = resolveCiiScore(evalData);
     if (cii === null) return null;
-    const rounded = Math.round(cii);
+    const ciiMax = resolveCiiScoreMax(evalData);
+    const rounded = Math.min(ciiMax, Math.max(0, Math.round(cii)));
     const breakdown: Record<string, number> = {};
     for (const row of evalData.section_scores || []) {
         const n = row.section_number;
@@ -429,5 +502,7 @@ export function buildCiiSnapshotFromV81(evalData: Section11V81Evaluation) {
         )
             .map((a) => pickString(a))
             .filter(Boolean),
+        evaluation_framework_version: resolveFrameworkVersion(evalData),
+        cii_score_max: ciiMax,
     };
 }

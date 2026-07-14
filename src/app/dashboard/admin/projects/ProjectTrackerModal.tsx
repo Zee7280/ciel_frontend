@@ -66,6 +66,7 @@ type TrackerOpportunitySnapshot = {
     executingOrganizationEmail: string | null;
     partnerOrganizationName: string | null;
     partnerOrganizationEmail: string | null;
+    partnerContactPerson: string | null;
     facultySupervisorName: string | null;
     facultySupervisorEmail: string | null;
     attendanceRoutingOverride: "auto" | "partner" | "faculty";
@@ -499,6 +500,8 @@ function extractTrackerSnapshot(summaryRaw: Record<string, unknown> | null): Tra
             pickString(o ?? {}, ["partner_organization_name", "partnerOrganizationName"]) || null,
         partnerOrganizationEmail:
             pickString(o ?? {}, ["partner_organization_email", "partnerOrganizationEmail"]) || null,
+        partnerContactPerson:
+            pickString(o ?? {}, ["partner_contact_person", "partnerContactPerson"]) || null,
         facultySupervisorName:
             pickString(o ?? {}, ["faculty_supervisor_name", "facultySupervisorName"]) || null,
         facultySupervisorEmail:
@@ -526,6 +529,24 @@ export function ProjectTrackerModal({ row, onClose, onOpenTeamsEnrollments }: Pr
     const [enrollmentCount, setEnrollmentCount] = useState(0);
     const [attendanceRoutingOverride, setAttendanceRoutingOverride] = useState<"auto" | "partner" | "faculty">("auto");
     const [attendanceRoutingSaving, setAttendanceRoutingSaving] = useState(false);
+    const [facultySupervisorName, setFacultySupervisorName] = useState("");
+    const [facultySupervisorEmail, setFacultySupervisorEmail] = useState("");
+    const [partnerOrganizationName, setPartnerOrganizationName] = useState("");
+    const [partnerContactPerson, setPartnerContactPerson] = useState("");
+    const [partnerContactEmail, setPartnerContactEmail] = useState("");
+    const [contactsSaving, setContactsSaving] = useState(false);
+
+    const syncContactFormFromSnapshot = useCallback((nextSnapshot: TrackerOpportunitySnapshot | null) => {
+        setFacultySupervisorName(nextSnapshot?.facultySupervisorName ?? "");
+        setFacultySupervisorEmail(nextSnapshot?.facultySupervisorEmail ?? "");
+        setPartnerOrganizationName(
+            nextSnapshot?.executingOrganizationName ?? nextSnapshot?.partnerOrganizationName ?? "",
+        );
+        setPartnerContactPerson(nextSnapshot?.partnerContactPerson ?? "");
+        setPartnerContactEmail(
+            nextSnapshot?.executingOrganizationEmail ?? nextSnapshot?.partnerOrganizationEmail ?? "",
+        );
+    }, []);
 
     const load = useCallback(async () => {
         setLoading(true);
@@ -559,6 +580,7 @@ export function ProjectTrackerModal({ row, onClose, onOpenTeamsEnrollments }: Pr
             const nextSnapshot = extractTrackerSnapshot(summaryRaw);
             setSnapshot(nextSnapshot);
             setAttendanceRoutingOverride(nextSnapshot?.attendanceRoutingOverride ?? "auto");
+            syncContactFormFromSnapshot(nextSnapshot);
             const reg = Number(summaryRaw?.registered_teams ?? summaryRaw?.registeredTeams);
             setEnrollmentCount(Number.isFinite(reg) && reg >= 0 ? reg : 0);
         } catch {
@@ -568,7 +590,95 @@ export function ProjectTrackerModal({ row, onClose, onOpenTeamsEnrollments }: Pr
         } finally {
             setLoading(false);
         }
-    }, [row.id]);
+    }, [row.id, syncContactFormFromSnapshot]);
+
+    const contactsDirty = useMemo(() => {
+        if (!snapshot) return false;
+        const savedPartnerName =
+            snapshot.executingOrganizationName ?? snapshot.partnerOrganizationName ?? "";
+        const savedPartnerEmail =
+            snapshot.executingOrganizationEmail ?? snapshot.partnerOrganizationEmail ?? "";
+        return (
+            facultySupervisorName.trim() !== (snapshot.facultySupervisorName ?? "").trim() ||
+            facultySupervisorEmail.trim() !== (snapshot.facultySupervisorEmail ?? "").trim() ||
+            partnerOrganizationName.trim() !== savedPartnerName.trim() ||
+            partnerContactPerson.trim() !== (snapshot.partnerContactPerson ?? "").trim() ||
+            partnerContactEmail.trim() !== savedPartnerEmail.trim()
+        );
+    }, [
+        facultySupervisorEmail,
+        facultySupervisorName,
+        partnerContactEmail,
+        partnerContactPerson,
+        partnerOrganizationName,
+        snapshot,
+    ]);
+
+    const saveContacts = useCallback(async () => {
+        setContactsSaving(true);
+        try {
+            const res = await authenticatedFetch(
+                `/api/v1/admin/opportunities/${encodeURIComponent(row.id)}/contacts`,
+                {
+                    method: "PATCH",
+                    body: JSON.stringify({
+                        faculty_supervisor_name: facultySupervisorName.trim(),
+                        faculty_supervisor_email: facultySupervisorEmail.trim(),
+                        partner_organization_name: partnerOrganizationName.trim(),
+                        partner_contact_person: partnerContactPerson.trim(),
+                        partner_contact_email: partnerContactEmail.trim(),
+                    }),
+                },
+            );
+            const data = res ? await res.json().catch(() => ({})) : {};
+            if (res?.ok) {
+                const payload =
+                    data && typeof data === "object"
+                        ? (data as { data?: { propagation?: Record<string, number>; faculty_account_linked?: boolean } }).data
+                        : undefined;
+                const propagation = payload?.propagation;
+                const facultyLinked = payload?.faculty_account_linked === true;
+                const parts = [
+                    propagation?.participations_updated
+                        ? `${propagation.participations_updated} enrollment(s)`
+                        : null,
+                    propagation?.applications_updated
+                        ? `${propagation.applications_updated} application(s)`
+                        : null,
+                    propagation?.reports_updated ? `${propagation.reports_updated} report(s)` : null,
+                ].filter(Boolean);
+                toast.success(
+                    parts.length
+                        ? `Contacts updated — rebound ${parts.join(", ")}`
+                        : "Faculty and partner contacts updated",
+                );
+                if (facultySupervisorEmail.trim() && !facultyLinked) {
+                    toast.message(
+                        "Faculty email saved. Hub access will activate when that person registers a CIEL faculty account with this email.",
+                    );
+                }
+                await load();
+            } else {
+                toast.error(
+                    typeof (data as { message?: string }).message === "string"
+                        ? (data as { message: string }).message
+                        : "Could not update contacts",
+                );
+            }
+        } catch {
+            toast.error("Could not update contacts");
+        } finally {
+            setContactsSaving(false);
+        }
+    }, [
+        facultySupervisorEmail,
+        facultySupervisorName,
+        load,
+        partnerContactEmail,
+        partnerContactPerson,
+        partnerOrganizationName,
+        row.id,
+    ]);
 
     const saveAttendanceRouting = useCallback(async () => {
         setAttendanceRoutingSaving(true);
@@ -646,23 +756,6 @@ export function ProjectTrackerModal({ row, onClose, onOpenTeamsEnrollments }: Pr
             {
                 label: "Partner org (linked account)",
                 value: snapshot?.organizationName ?? row.subtitle,
-            },
-            {
-                label: "Execution / partner org (form)",
-                value: snapshot?.executingOrganizationName ?? snapshot?.partnerOrganizationName ?? "—",
-            },
-            {
-                label: "Partner contact email",
-                value:
-                    snapshot?.executingOrganizationEmail ??
-                    snapshot?.partnerOrganizationEmail ??
-                    "—",
-            },
-            {
-                label: "Faculty supervisor",
-                value: [snapshot?.facultySupervisorName, snapshot?.facultySupervisorEmail]
-                    .filter(Boolean)
-                    .join(" · ") || "—",
             },
             {
                 label: "Attendance routing (effective)",
@@ -761,6 +854,94 @@ export function ProjectTrackerModal({ row, onClose, onOpenTeamsEnrollments }: Pr
                                     >
                                         <ExternalLink className="w-3.5 h-3.5" /> Open public listing
                                     </Link>
+                                </div>
+                            </section>
+
+                            <section className="rounded-xl border border-slate-100 bg-slate-50/60 p-4">
+                                <div className="flex items-start gap-2 mb-3">
+                                    <Info className="w-4 h-4 text-slate-500 mt-0.5 shrink-0" />
+                                    <div>
+                                        <h3 className="text-xs font-black uppercase tracking-wider text-slate-600">
+                                            Faculty &amp; partner contacts
+                                        </h3>
+                                        <p className="text-xs text-slate-500 mt-1">
+                                            Update supervising faculty or partner contact. Pending attendance reviews and
+                                            approval routing will rebind to the new contacts; live listings stay published.
+                                        </p>
+                                    </div>
+                                </div>
+                                <div className="grid gap-3 sm:grid-cols-2">
+                                    <label className="text-sm sm:col-span-2">
+                                        <span className="block text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1">
+                                            Faculty supervisor name
+                                        </span>
+                                        <input
+                                            type="text"
+                                            value={facultySupervisorName}
+                                            onChange={(e) => setFacultySupervisorName(e.target.value)}
+                                            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-800"
+                                            placeholder="e.g. Nighat Akbar"
+                                        />
+                                    </label>
+                                    <label className="text-sm sm:col-span-2">
+                                        <span className="block text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1">
+                                            Faculty supervisor email
+                                        </span>
+                                        <input
+                                            type="email"
+                                            value={facultySupervisorEmail}
+                                            onChange={(e) => setFacultySupervisorEmail(e.target.value)}
+                                            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-800"
+                                            placeholder="faculty@university.edu"
+                                        />
+                                    </label>
+                                    <label className="text-sm sm:col-span-2">
+                                        <span className="block text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1">
+                                            Partner / execution org (form)
+                                        </span>
+                                        <input
+                                            type="text"
+                                            value={partnerOrganizationName}
+                                            onChange={(e) => setPartnerOrganizationName(e.target.value)}
+                                            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-800"
+                                            placeholder="Organization name"
+                                        />
+                                    </label>
+                                    <label className="text-sm">
+                                        <span className="block text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1">
+                                            Partner contact person
+                                        </span>
+                                        <input
+                                            type="text"
+                                            value={partnerContactPerson}
+                                            onChange={(e) => setPartnerContactPerson(e.target.value)}
+                                            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-800"
+                                            placeholder="Optional"
+                                        />
+                                    </label>
+                                    <label className="text-sm">
+                                        <span className="block text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1">
+                                            Partner contact email
+                                        </span>
+                                        <input
+                                            type="email"
+                                            value={partnerContactEmail}
+                                            onChange={(e) => setPartnerContactEmail(e.target.value)}
+                                            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-800"
+                                            placeholder="partner@org.org"
+                                        />
+                                    </label>
+                                </div>
+                                <div className="mt-3 flex justify-end">
+                                    <button
+                                        type="button"
+                                        onClick={() => void saveContacts()}
+                                        disabled={contactsSaving || !contactsDirty}
+                                        className="inline-flex items-center justify-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-sm font-bold text-white disabled:opacity-50"
+                                    >
+                                        {contactsSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                                        Save contacts
+                                    </button>
                                 </div>
                             </section>
 

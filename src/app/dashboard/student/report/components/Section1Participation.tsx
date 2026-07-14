@@ -31,19 +31,25 @@ import {
     participationAttendanceVerificationRequested,
     resolveStudentAdminAttendanceUnlock,
 } from "@/utils/adminEnrollmentAttendance";
+import {
+    opportunityHasPartner,
+    type AttendanceApproverType,
+} from "@/utils/attendanceApproverRouting";
 
-/** Copy for verify-attendance UX: no reviewer emails shown; NGO/partner first, faculty fallback. */
+/** Copy for verify-attendance UX: student picks faculty or partner after the oath. */
 const ATTENDANCE_VERIFICATION_INFO = {
     lockNote:
         "One-time step: after you confirm, attendance stays locked until approval is complete.",
     routing:
-        "Your attendance approval goes to the NGO or partner organisation linked to this project when one exists. If there is no NGO or partner on record, your faculty supervisor handles approval instead.",
+        "After the oath in Step 3, choose whether Faculty or Partner should approve your attendance. Pending requests appear on that reviewer’s dashboard.",
     confirmBody:
-        "Your attendance entries will lock for editing. The request goes to your NGO or partner when this project has one linked; otherwise your faculty supervisor receives it.",
+        "Your attendance entries will lock for editing and go to the reviewer you selected (Faculty or Partner).",
     afterSent:
         "Attendance is locked until a reviewer completes approval.",
     afterSentWho:
-        "NGO or partner is notified when linked; if not, your faculty supervisor receives the request.",
+        "Your selected Faculty or Partner reviewer has been notified and will see a pending attendance item on their dashboard.",
+    step2Hint:
+        "When every student has met the minimum hours, go to Step 3 (Review & submit), complete the oath, choose Faculty or Partner approval, then use Verify attendance (one time).",
 } as const;
 
 /** Align dropdown ids (`lead:uuid`, `member:0:…`) with API `participantId` (bare uuid/key). */
@@ -225,6 +231,17 @@ export default function Section1Participation({ projectData }: { projectData?: a
     const reviewChecked = data.section1.review_checked || [false, false, false];
     const [isDeleting, setIsDeleting] = React.useState<string | null>(null);
     const [isRequestingAttendanceVerification, setIsRequestingAttendanceVerification] = React.useState(false);
+    const [attendanceApproverChoice, setAttendanceApproverChoice] =
+        React.useState<AttendanceApproverType | "">(() => {
+            const stored = (data.section1 as { attendance_approver_type?: string })
+                ?.attendance_approver_type;
+            return stored === "faculty" || stored === "partner" ? stored : "";
+        });
+    const [facultyApproverEmail, setFacultyApproverEmail] = React.useState(() => {
+        const stored = (data.section1 as { attendance_faculty_email?: string })
+            ?.attendance_faculty_email;
+        return typeof stored === "string" ? stored.trim() : "";
+    });
     const [selectedParticipantId, setSelectedParticipantId] = React.useState<string | null>(null);
     const [isEditingLead, setIsEditingLead] = React.useState(false);
     const [leadStatus, setLeadStatus] = React.useState<string>('pending_approval');
@@ -791,6 +808,27 @@ export default function Section1Participation({ projectData }: { projectData?: a
             toast.error("Please add at least one attendance entry before verification.");
             return;
         }
+        if (!isMinimumHoursMet) {
+            toast.error(
+                `Every student must reach at least ${requiredHoursPerStudent} hours before you can request verification.`,
+            );
+            return;
+        }
+        if (!reviewChecked.every(Boolean)) {
+            toast.error("Please complete the confirmation checklist (oath) before requesting verification.");
+            return;
+        }
+        if (attendanceApproverChoice !== "faculty" && attendanceApproverChoice !== "partner") {
+            toast.error("Please choose who should approve your attendance: Faculty or Partner.");
+            return;
+        }
+        const facultyEmailTrimmed = facultyApproverEmail.trim();
+        if (attendanceApproverChoice === "faculty") {
+            if (!facultyEmailTrimmed || !facultyEmailTrimmed.includes("@")) {
+                toast.error("Enter the faculty email who should approve your attendance.");
+                return;
+            }
+        }
         const confirmed = window.confirm(
             "Request attendance verification?\n\n" +
                 ATTENDANCE_VERIFICATION_INFO.confirmBody +
@@ -807,6 +845,10 @@ export default function Section1Participation({ projectData }: { projectData?: a
             attendance_verification_status: "pending_approval",
             attendance_verification_locked: true,
             attendance_verification_email_notified: false,
+            attendance_approver_type: attendanceApproverChoice,
+            ...(attendanceApproverChoice === "faculty"
+                ? { attendance_faculty_email: facultyEmailTrimmed }
+                : {}),
         });
         setParticipationUnlocked(false);
 
@@ -820,8 +862,21 @@ export default function Section1Participation({ projectData }: { projectData?: a
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
                         projectId: projectIdFromUrl,
-                        participantId: participantId || undefined,
+                        // Nest DTO requires a bare UUID — strip UI prefixes like `lead:` / `member:N:`.
+                        participantId: (() => {
+                            const raw = String(participantId || "").trim();
+                            if (!raw) return undefined;
+                            if (raw.startsWith("lead:")) return raw.slice("lead:".length) || undefined;
+                            const memberMatch = /^member:\d+:(.+)$/.exec(raw);
+                            if (memberMatch?.[1]) return memberMatch[1];
+                            return raw;
+                        })(),
                         requestedAt,
+                        attendanceApproverType: attendanceApproverChoice,
+                        oathCompleted: true,
+                        ...(attendanceApproverChoice === "faculty"
+                            ? { facultyEmail: facultyEmailTrimmed }
+                            : {}),
                     }),
                 },
             );
@@ -831,7 +886,12 @@ export default function Section1Participation({ projectData }: { projectData?: a
                 serverNotified = Boolean(json?.emailNotified);
                 requestType = typeof json?.type === "string" ? json.type : "created";
             } else {
-                toast.warning("Verification locked. Email notify endpoint not available yet.");
+                const err = await res?.json().catch(() => ({}));
+                const msg =
+                    typeof (err as { message?: string }).message === "string"
+                        ? (err as { message: string }).message
+                        : "Verification locked. Reviewer notify endpoint not available yet.";
+                toast.warning(msg);
             }
         } catch {
             toast.warning("Verification locked. Email notify endpoint not available yet.");
@@ -841,6 +901,10 @@ export default function Section1Participation({ projectData }: { projectData?: a
                 attendance_verification_status: "pending_approval",
                 attendance_verification_locked: true,
                 attendance_verification_email_notified: serverNotified,
+                attendance_approver_type: attendanceApproverChoice,
+                ...(attendanceApproverChoice === "faculty"
+                    ? { attendance_faculty_email: facultyEmailTrimmed }
+                    : {}),
             });
             await saveReport(true);
             setIsRequestingAttendanceVerification(false);
@@ -853,7 +917,7 @@ export default function Section1Participation({ projectData }: { projectData?: a
 
         toast.success(
             serverNotified
-                ? "Attendance submitted for verification. The assigned reviewer has been notified."
+                ? `Attendance submitted for verification. Your ${attendanceApproverChoice === "partner" ? "Partner" : "Faculty"} reviewer has been notified.`
                 : "Attendance locked for verification.",
         );
     };
@@ -956,14 +1020,25 @@ export default function Section1Participation({ projectData }: { projectData?: a
 
     const isMinimumHoursMet = rawParticipants.every(u => {
         const hours = data.section1.attendance_logs
-            .filter(
-                (l: any) =>
-                    engagementParticipantIdsMatch(l.participantId, u.id) &&
-                    isAttendanceLogCountedForVerifiedMetrics(l),
-            )
+            .filter((l: any) => {
+                if (!engagementParticipantIdsMatch(l.participantId, u.id)) return false;
+                // Before one-time verification, count logged (non-rejected) hours — not only approved.
+                const status = String(l.approval_status ?? l.approvalStatus ?? "")
+                    .trim()
+                    .toLowerCase();
+                return status !== "rejected";
+            })
             .reduce((acc: number, log: any) => acc + (Number(log.hours) || 0), 0);
         return hours >= requiredHoursPerStudent;
     });
+
+    // Prefill faculty email from apply / team supervision when switching to Faculty approval.
+    React.useEffect(() => {
+        if (attendanceApproverChoice !== "faculty") return;
+        if (facultyApproverEmail.trim()) return;
+        const fromState = (primaryFacultyEmail || secondaryFacultyEmail || "").trim();
+        if (fromState) setFacultyApproverEmail(fromState);
+    }, [attendanceApproverChoice, facultyApproverEmail, primaryFacultyEmail, secondaryFacultyEmail]);
 
 
     return (
@@ -1545,34 +1620,11 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                                         </p>
                                                     </div>
                                                 ) : (
-                                                    <div className="space-y-3">
-                                                        <Button
-                                                            type="button"
-                                                            onClick={handleRequestAttendanceVerification}
-                                                            disabled={
-                                                                isRequestingAttendanceVerification ||
-                                                                !data.section1.attendance_logs.length
-                                                            }
-                                                            className="h-10 w-full rounded-lg bg-slate-900 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-60"
-                                                        >
-                                                            {isRequestingAttendanceVerification ? (
-                                                                <span className="inline-flex items-center gap-2">
-                                                                    <Loader2 className="h-4 w-4 animate-spin" />
-                                                                    Sending for verification…
-                                                                </span>
-                                                            ) : (
-                                                                <span className="inline-flex items-center gap-2">
-                                                                    <Lock className="h-4 w-4" />
-                                                                    Verify attendance (one time)
-                                                                </span>
-                                                            )}
-                                                        </Button>
-                                                        <div className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2.5 text-xs leading-relaxed text-slate-600">
-                                                            <p className="font-medium text-slate-700">
-                                                                {ATTENDANCE_VERIFICATION_INFO.lockNote}
-                                                            </p>
-                                                            <p className="mt-1.5">{ATTENDANCE_VERIFICATION_INFO.routing}</p>
-                                                        </div>
+                                                    <div className="rounded-lg border border-indigo-100 bg-indigo-50/70 px-3 py-2.5 text-xs leading-relaxed text-indigo-900">
+                                                        <p className="font-semibold text-indigo-800">
+                                                            Verify attendance (one time) — available on Step 3
+                                                        </p>
+                                                        <p className="mt-1.5">{ATTENDANCE_VERIFICATION_INFO.step2Hint}</p>
                                                     </div>
                                                 )}
                                             </div>
@@ -1581,8 +1633,9 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                         <div className="rounded-xl border border-slate-200 bg-slate-900 px-4 py-3.5 text-white">
                                             <p className="text-xs font-semibold">How approval works</p>
                                             <p className="mt-1.5 text-xs leading-relaxed text-slate-300">
-                                                After you submit for verification, your assigned reviewer will
-                                                approve each session. Approved hours count toward your goal.
+                                                After you take the oath and submit for verification in Step 3,
+                                                your chosen Faculty or Partner reviewer will approve each session.
+                                                Approved hours count toward your goal.
                                             </p>
                                         </div>
                                     </div>
@@ -1726,7 +1779,7 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                         Confirmation checklist
                                     </h4>
                                     <p className="mt-0.5 text-xs text-slate-500">
-                                        Check all items to enable finalization.
+                                        Complete this oath, then choose your attendance approver and verify.
                                     </p>
                                 </div>
                                 <div className="divide-y divide-slate-100 p-2">
@@ -1761,6 +1814,189 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                     ))}
                                 </div>
                             </div>
+
+                            {!isSubmittedReport && !isTeamMemberAttendanceOnly ? (
+                                <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+                                    <div>
+                                        <h4 className="text-sm font-black uppercase tracking-wide text-slate-900">
+                                            Who should approve your attendance?
+                                        </h4>
+                                        <p className="mt-1 text-xs leading-relaxed text-slate-500">
+                                            {ATTENDANCE_VERIFICATION_INFO.routing}
+                                        </p>
+                                    </div>
+
+                                    {(() => {
+                                        const partnerAvailable = opportunityHasPartner(
+                                            projectRecord,
+                                        );
+                                        const facultyOptions = [
+                                            primaryFacultyEmail,
+                                            secondaryFacultyEmail,
+                                        ]
+                                            .map((e) => e.trim())
+                                            .filter(Boolean)
+                                            .filter(
+                                                (e, i, arr) =>
+                                                    arr.findIndex(
+                                                        (x) => x.toLowerCase() === e.toLowerCase(),
+                                                    ) === i,
+                                            );
+                                        return (
+                                            <div className="space-y-4">
+                                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                                <label
+                                                    className={clsx(
+                                                        "flex cursor-pointer items-start gap-3 rounded-xl border-2 p-4 transition-colors",
+                                                        attendanceApproverChoice === "faculty"
+                                                            ? "border-indigo-500 bg-indigo-50/60"
+                                                            : "border-slate-200 hover:border-slate-300",
+                                                        isAttendanceVerificationRequested && "pointer-events-none opacity-70",
+                                                    )}
+                                                >
+                                                    <input
+                                                        type="radio"
+                                                        name="attendanceApprover"
+                                                        className="mt-1 text-indigo-600"
+                                                        checked={attendanceApproverChoice === "faculty"}
+                                                        disabled={isAttendanceVerificationRequested}
+                                                        onChange={() => setAttendanceApproverChoice("faculty")}
+                                                    />
+                                                    <span>
+                                                        <span className="block text-sm font-bold text-slate-900">
+                                                            Faculty
+                                                        </span>
+                                                        <span className="mt-0.5 block text-xs text-slate-500">
+                                                            Supervising faculty receives pending attendance on their dashboard.
+                                                        </span>
+                                                    </span>
+                                                </label>
+                                                <label
+                                                    className={clsx(
+                                                        "flex items-start gap-3 rounded-xl border-2 p-4 transition-colors",
+                                                        partnerAvailable
+                                                            ? "cursor-pointer"
+                                                            : "cursor-not-allowed opacity-50",
+                                                        attendanceApproverChoice === "partner"
+                                                            ? "border-amber-500 bg-amber-50/60"
+                                                            : "border-slate-200 hover:border-slate-300",
+                                                        isAttendanceVerificationRequested && "pointer-events-none opacity-70",
+                                                    )}
+                                                >
+                                                    <input
+                                                        type="radio"
+                                                        name="attendanceApprover"
+                                                        className="mt-1 text-amber-600"
+                                                        checked={attendanceApproverChoice === "partner"}
+                                                        disabled={
+                                                            !partnerAvailable || isAttendanceVerificationRequested
+                                                        }
+                                                        onChange={() => setAttendanceApproverChoice("partner")}
+                                                    />
+                                                    <span>
+                                                        <span className="block text-sm font-bold text-slate-900">
+                                                            Partner
+                                                        </span>
+                                                        <span className="mt-0.5 block text-xs text-slate-500">
+                                                            {partnerAvailable
+                                                                ? "Partner organisation receives pending attendance on their dashboard."
+                                                                : "Not available — this opportunity has no partner contact email."}
+                                                        </span>
+                                                    </span>
+                                                </label>
+                                            </div>
+
+                                            {attendanceApproverChoice === "faculty" &&
+                                            !isAttendanceVerificationRequested ? (
+                                                <div className="rounded-xl border border-indigo-100 bg-indigo-50/50 p-4 space-y-3">
+                                                    <div>
+                                                        <label className="text-xs font-black uppercase tracking-wider text-indigo-800">
+                                                            Faculty email <span className="text-red-500">*</span>
+                                                        </label>
+                                                        <p className="mt-0.5 text-[11px] text-indigo-700/80">
+                                                            Select a faculty email from your application, or type another faculty email. They will see a pending attendance popup on their dashboard.
+                                                        </p>
+                                                    </div>
+                                                    {facultyOptions.length > 0 ? (
+                                                        <div className="flex flex-wrap gap-2">
+                                                            {facultyOptions.map((email) => (
+                                                                <button
+                                                                    key={email}
+                                                                    type="button"
+                                                                    onClick={() => setFacultyApproverEmail(email)}
+                                                                    className={clsx(
+                                                                        "rounded-lg border px-3 py-1.5 text-xs font-bold transition",
+                                                                        facultyApproverEmail.trim().toLowerCase() ===
+                                                                            email.toLowerCase()
+                                                                            ? "border-indigo-600 bg-indigo-600 text-white"
+                                                                            : "border-indigo-200 bg-white text-indigo-800 hover:bg-indigo-50",
+                                                                    )}
+                                                                >
+                                                                    {email}
+                                                                </button>
+                                                            ))}
+                                                        </div>
+                                                    ) : null}
+                                                    <Input
+                                                        type="email"
+                                                        value={facultyApproverEmail}
+                                                        onChange={(e) =>
+                                                            setFacultyApproverEmail(e.target.value)
+                                                        }
+                                                        placeholder="faculty@university.edu.pk"
+                                                        className="h-10 bg-white border-indigo-200"
+                                                    />
+                                                </div>
+                                            ) : null}
+                                            </div>
+                                        );
+                                    })()}
+
+                                    {isAttendanceVerificationRequested ? (
+                                        <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+                                            <p className="font-semibold">Verification request sent</p>
+                                            <p className="mt-1 text-xs text-emerald-700">
+                                                {ATTENDANCE_VERIFICATION_INFO.afterSent}{" "}
+                                                {ATTENDANCE_VERIFICATION_INFO.afterSentWho}
+                                            </p>
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-2">
+                                            <Button
+                                                type="button"
+                                                onClick={handleRequestAttendanceVerification}
+                                                disabled={
+                                                    isRequestingAttendanceVerification ||
+                                                    !isMinimumHoursMet ||
+                                                    !reviewChecked.every(Boolean) ||
+                                                    (attendanceApproverChoice !== "faculty" &&
+                                                        attendanceApproverChoice !== "partner") ||
+                                                    (attendanceApproverChoice === "faculty" &&
+                                                        !facultyApproverEmail.trim().includes("@")) ||
+                                                    !data.section1.attendance_logs.length
+                                                }
+                                                className="h-12 w-full rounded-xl bg-slate-900 text-sm font-black uppercase tracking-widest text-white shadow-md hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                                            >
+                                                {isRequestingAttendanceVerification ? (
+                                                    <span className="inline-flex items-center gap-2">
+                                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                                        Sending for verification…
+                                                    </span>
+                                                ) : (
+                                                    <span className="inline-flex items-center gap-2">
+                                                        <Lock className="h-4 w-4" />
+                                                        Verify attendance (one time)
+                                                    </span>
+                                                )}
+                                            </Button>
+                                            <p className="text-center text-[11px] font-medium leading-relaxed text-slate-500">
+                                                Enabled only when every student has met minimum hours and the oath
+                                                checklist above is complete. {ATTENDANCE_VERIFICATION_INFO.lockNote}
+                                            </p>
+                                        </div>
+                                    )}
+                                </div>
+                            ) : null}
 
                         </div>
                     )}

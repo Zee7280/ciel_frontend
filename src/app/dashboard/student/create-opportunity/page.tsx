@@ -11,6 +11,7 @@ import { findSdgById, opportunityFormSdgList } from "@/utils/sdgData";
 import { isStudentProfileComplete, isValidEmailFormat, pickProfileEmail } from "@/utils/profileCompletion";
 import { mapOpportunityDetailToStudentForm } from "./mapDetailToStudentForm";
 import PhoneConnectivityRow from "@/components/ui/PhoneConnectivityRow";
+import PartnerOrganizationGuidance from "@/components/ui/PartnerOrganizationGuidance";
 import {
     composeInternationalPhone,
     DEFAULT_PHONE_COUNTRY_KEY,
@@ -2074,6 +2075,7 @@ export default function StudentOpportunityCreationPage() {
                     {/* F2 Executing context */}
                     <div className="space-y-4 border-t border-slate-100 pt-8">
                         <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wide">F2. Executing context (choose one)</h3>
+                        <PartnerOrganizationGuidance context="create" />
                         <p className="text-sm text-slate-600">Is this opportunity conducted with an external organization?</p>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                             <label className={`flex items-start gap-3 p-4 rounded-xl border cursor-pointer ${formData.supervision.executingContext === "partner" ? "border-orange-300 bg-orange-50/50" : "border-slate-200 hover:border-slate-300"}`}>
@@ -2100,6 +2102,10 @@ export default function StudentOpportunityCreationPage() {
                         {formData.supervision.executingContext === "partner" && (
                             <div className="space-y-3 animate-in fade-in slide-in-from-top-2">
                                 <p className="text-xs font-bold text-slate-500 uppercase">Partner organization</p>
+                                <p className="text-xs text-blue-800 bg-blue-50 border border-blue-100 rounded-lg px-3 py-2 leading-relaxed">
+                                    Add the NGO, company, or institution where you will carry out this activity. Use the
+                                    partner&apos;s official contact email so they can log in to CIEL and approve your opportunity.
+                                </p>
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                     <input
                                         type="text"
