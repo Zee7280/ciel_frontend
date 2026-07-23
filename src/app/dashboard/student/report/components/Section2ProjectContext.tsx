@@ -3,8 +3,7 @@ import React, { useMemo, useState, useEffect, useLayoutEffect, useRef } from "re
 import { generateAISummary } from "../utils/aiSummarizer";
 import { calculateSection2CII } from "@/utils/reportQuality";
 import { toast } from "sonner";
-import { Sparkles, Loader2 } from "lucide-react";
-import { Building, Globe, Users, BookOpen, AlertCircle, Clock, CheckCircle2, Save, MapPin, Calendar, XCircle } from "lucide-react";
+import { Sparkles, Loader2, Building, FileText, Users, BookOpen, AlertCircle, CheckCircle2, MapPin, Calendar, X } from "lucide-react";
 import { Label } from "./ui/label";
 import { Textarea } from "./ui/textarea";
 import { Input } from "./ui/input";
@@ -334,387 +333,404 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
     const startDate = formatDate(pickString(projectData?.start_date, projectData?.startDate, projectTimeline?.start_date, projectTimeline?.startDate));
     const endDate = formatDate(pickString(projectData?.end_date, projectData?.endDate, projectTimeline?.end_date, projectTimeline?.endDate));
 
+    const charCount = (sectionData.problem_statement || "").length;
+    const disciplineCharCount = (sectionData.discipline_contribution || "").length;
+
+    const sectionLabel = "text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500";
+    const badgeMandatory =
+        "shrink-0 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700";
+    const badgeRequired =
+        "shrink-0 rounded-full border border-rose-200 bg-rose-50 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-rose-600";
+
     return (
-        <div className="space-y-5 pb-6">
+        <div className="mx-auto max-w-4xl space-y-8 pb-8">
 
             {/* ── Section Header ─────────────────────────────────────────── */}
             <div className="space-y-5">
-                <div className="flex items-center gap-4">
-                    <div className="w-14 h-14 rounded-2xl bg-report-primary text-white flex items-center justify-center shadow-xl shadow-report-primary-shadow ring-4 ring-report-primary-soft">
-                        <Globe className="w-7 h-7" />
+                <div className="flex items-center gap-3.5">
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-indigo-600 text-white shadow-sm">
+                        <FileText className="h-5 w-5" />
                     </div>
                     <div>
-                        <h2 className="report-h2">SECTION 2 — PROJECT CONTEXT</h2>
-                        <p className="report-label">Baseline Definition &amp; Academic Framing</p>
+                        <h2 className="text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl">
+                            <span className="text-indigo-600">SECTION 2:</span> Project context
+                        </h2>
                     </div>
                 </div>
 
-                {/* Purpose callout */}
-                <div className="p-6 bg-report-primary-soft/50 rounded-3xl border-2 border-report-primary-border/50 relative overflow-hidden shadow-sm">
-                    <div className="absolute -right-4 -top-4 w-32 h-32 bg-report-primary/5 rounded-full blur-3xl" />
-                    <div className="relative z-10 space-y-3">
-                        <h4 className="font-black text-report-primary uppercase tracking-wider text-[11px] flex items-center gap-2">
-                            🎯 Purpose of This Section
-                        </h4>
-                        <p className="text-[11px] text-slate-700 leading-relaxed font-bold max-w-3xl">
-                            This section establishes the <strong className="text-report-primary">baseline condition before your intervention</strong>.
-                            You must clearly describe what problem existed, who was affected, what gap required attention, and what informed your understanding of the issue.
-                        </p>
-                        <div className="flex items-center gap-2 pt-1 border-t border-report-primary-border/20">
-                            <AlertCircle className="w-3 h-3 text-amber-600 shrink-0" />
-                            <p className="text-[9px] font-black text-amber-700 uppercase tracking-widest">
-                                This section describes the situation BEFORE your project activities. Do not describe results, outcomes, or achievements here.
-                            </p>
-                        </div>
-                    </div>
+                <div className="rounded-xl border border-indigo-100 bg-indigo-50/70 px-4 py-3.5 sm:px-5">
+                    <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-indigo-600">
+                        Purpose of this section
+                    </p>
+                    <p className="mt-1.5 text-sm leading-relaxed text-slate-700">
+                        This section establishes the{" "}
+                        <span className="font-semibold text-slate-900">
+                            baseline condition before your intervention
+                        </span>
+                        . Describe what problem existed, who was affected, what gap required attention,
+                        and what informed your understanding of the issue.
+                    </p>
+                </div>
+
+                <div className="flex gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 sm:px-5">
+                    <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+                    <p className="text-sm leading-relaxed text-amber-900">
+                        This section describes the situation{" "}
+                        <span className="font-semibold">before</span> your project activities. Do not
+                        describe results, outcomes, or achievements here — those belong in Section 5.
+                    </p>
                 </div>
             </div>
 
-            {/* ── 2.1 Project Identity (Auto-Filled | Read-Only) ─────────── */}
-            <div className="space-y-5">
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center font-black text-[10px]">2.1</div>
-                        <h3 className="report-h3">Project Identity</h3>
+            {/* ── 2.1 Project Identity ───────────────────────────────────── */}
+            <section className="space-y-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0 space-y-1">
+                        <div className="flex items-center gap-2.5">
+                            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-900 text-[11px] font-bold text-white">
+                                2.1
+                            </span>
+                            <h3 className="text-base font-semibold text-slate-900">Project Identity</h3>
+                        </div>
+                        <p className="pl-9 text-sm text-slate-500">
+                            Project information is displayed automatically for institutional
+                            traceability and reporting consistency.
+                        </p>
                     </div>
-                    <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 text-slate-500 font-black text-[9px] uppercase tracking-widest border border-slate-200">
-                        <CheckCircle2 className="w-3 h-3 text-emerald-500" /> Auto-Filled · Read-Only
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-emerald-700">
+                        <CheckCircle2 className="h-3 w-3" />
+                        Auto-filled · read-only
                     </span>
                 </div>
-                <p className="report-help pl-11">
-                    The system automatically displays project information for institutional traceability and reporting consistency.
-                </p>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                     {[
                         { label: "Partner Organization", value: partner, icon: Building },
                         { label: "Location", value: locationDisplay, icon: MapPin },
                         { label: "Project Duration", value: `${startDate} – ${endDate}`, icon: Calendar },
                     ].map((item) => (
-                        <div key={item.label} className="bg-white rounded-2xl p-5 border-2 border-slate-100 shadow-sm space-y-2.5 relative overflow-hidden flex flex-col justify-between">
-                            <div className="space-y-2.5">
-                                <div className="flex items-center gap-2">
-                                    <div className="w-7 h-7 rounded-lg bg-report-primary-soft text-report-primary flex items-center justify-center shrink-0">
-                                        <item.icon className="w-3.5 h-3.5" />
-                                    </div>
-                                    <p className="report-label !leading-none">{item.label}</p>
+                        <div
+                            key={item.label}
+                            className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
+                        >
+                            <div className="mb-2.5 flex items-center gap-2">
+                                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
+                                    <item.icon className="h-3.5 w-3.5" />
                                 </div>
-                                <p className="report-body !text-xs !leading-relaxed min-h-[1.5rem] line-clamp-2">{item.value}</p>
+                                <p className={sectionLabel}>{item.label}</p>
                             </div>
-                            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-report-primary to-transparent opacity-20" />
+                            <p className="text-sm font-medium leading-relaxed text-slate-800">
+                                {item.value}
+                            </p>
                         </div>
                     ))}
                 </div>
-            </div>
+            </section>
 
             {/* ── 2.2 Problem / System Need ──────────────────────────────── */}
-            <div className="space-y-5">
-                <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center font-black text-[10px]">2.2</div>
-                    <h3 className="report-h3">Problem / System Need</h3>
-                    <span className="ml-auto px-3 py-1 rounded-full bg-amber-50 text-amber-700 font-black text-[9px] uppercase tracking-widest border border-amber-100">Mandatory · 100–200 Words</span>
+            <section className="space-y-4">
+                <div className="flex flex-wrap items-center gap-2.5">
+                    <span className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-900 text-[11px] font-bold text-white">
+                        2.2
+                    </span>
+                    <h3 className="text-base font-semibold text-slate-900">Problem / system need</h3>
+                    <span className={clsx(badgeMandatory, "ml-auto")}>Mandatory · 100–200 words</span>
                 </div>
 
-                <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-8">
-                    {/* Guidance */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-3 bg-slate-50/50 rounded-2xl p-5 border border-slate-100">
-                            <p className="report-label !text-slate-900 border-b border-slate-100 pb-2 mb-3 flex items-center gap-2">
-                                <CheckCircle2 className="w-4 h-4 text-report-primary" />
-                                Describe the Situation
+                <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+                    <div className="grid grid-cols-1 divide-y divide-slate-100 md:grid-cols-2 md:divide-x md:divide-y-0">
+                        <div className="space-y-3 bg-indigo-50/40 p-5">
+                            <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-indigo-600">
+                                Describe the situation
                             </p>
-                            <div className="space-y-2">
+                            <ul className="space-y-2">
                                 {[
                                     "What specific issue or challenge existed?",
                                     "Who was affected?",
                                     "What gap was present? (skills, access, systems)",
                                     "Why was a structured intervention necessary?",
-                                ].map(q => (
-                                    <div key={q} className="flex items-start gap-2">
-                                        <div className="w-1 h-1 rounded-full bg-report-primary mt-1.5 shrink-0" />
-                                        <p className="text-[10px] font-bold text-slate-600 leading-relaxed">{q}</p>
-                                    </div>
+                                ].map((q) => (
+                                    <li
+                                        key={q}
+                                        className="flex items-start gap-2 text-sm leading-relaxed text-slate-700"
+                                    >
+                                        <span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-indigo-500" />
+                                        {q}
+                                    </li>
                                 ))}
-                            </div>
+                            </ul>
                         </div>
-                        <div className="space-y-3 bg-red-50/50 rounded-2xl p-5 border border-red-100">
-                            <p className="report-label !text-red-500 border-b border-red-100 pb-2 mb-3 flex items-center gap-2">
-                                <AlertCircle className="w-4 h-4" />
-                                Important Guidelines
+                        <div className="space-y-3 bg-rose-50/50 p-5">
+                            <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-rose-600">
+                                Avoid
                             </p>
-                            <div className="space-y-2">
+                            <ul className="space-y-2">
                                 {[
-                                    ["✔", "Focus only on the baseline condition", "text-emerald-700"],
-                                    ["✔", "Be specific and realistic", "text-emerald-700"],
-                                    ["✔", "Use factual, clear language", "text-emerald-700"],
-                                    ["✗", "Do not describe your activities", "text-red-600"],
-                                    ["✗", "Do not describe results", "text-red-600"],
-                                ].map(([icon, text, color]) => (
-                                    <div key={text as string} className="flex items-start gap-2">
-                                        <span className={clsx("text-xs font-black shrink-0", color)}>{icon}</span>
-                                        <p className={clsx("text-[10px] font-bold leading-relaxed", color)}>{text}</p>
-                                    </div>
+                                    "Do not describe your activities here",
+                                    "Do not describe results or outcomes",
+                                    "Do not claim achievements yet",
+                                ].map((q) => (
+                                    <li
+                                        key={q}
+                                        className="flex items-start gap-2 text-sm leading-relaxed text-rose-800/80"
+                                    >
+                                        <X className="mt-0.5 h-3.5 w-3.5 shrink-0 text-rose-500" />
+                                        {q}
+                                    </li>
                                 ))}
-                            </div>
+                            </ul>
                         </div>
                     </div>
 
-                    {/* Textarea */}
-                    <div className="space-y-4">
+                    <div className="space-y-3 border-t border-slate-100 p-5">
                         <Textarea
-                            placeholder="Before our intervention, the situation was characterized by... [100–200 Words]"
+                            placeholder="Before our intervention, the situation was characterized by…"
                             readOnly={isReadOnly}
                             disabled={isReadOnly}
                             className={clsx(
-                                "min-h-[200px] rounded-3xl border-2 border-slate-100 p-6 text-slate-700 font-bold leading-relaxed resize-none focus:ring-8 focus:ring-report-primary-soft/50 focus:border-report-primary-border transition-all text-sm bg-white",
-                                getFieldError('problem_statement') && "border-red-400 bg-red-50/30"
+                                "min-h-[180px] resize-none rounded-xl border border-slate-200 bg-white p-4 text-sm leading-relaxed text-slate-800 shadow-sm placeholder:text-slate-400 focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100",
+                                getFieldError("problem_statement") && "border-red-400 bg-red-50/30",
                             )}
                             value={sectionData.problem_statement}
-                            onChange={(e) => updateSection('section2', { problem_statement: e.target.value })}
+                            onChange={(e) =>
+                                updateSection("section2", { problem_statement: e.target.value })
+                            }
                         />
-
-                        {/* Word count bar */}
-                        <div className="flex items-center justify-between px-2">
-                            <div className="flex items-center gap-4">
-                                <div className="h-2 w-48 bg-slate-100 rounded-full overflow-hidden">
-                                    <div
-                                        className={clsx(
-                                            "h-full rounded-full transition-all duration-700",
-                                            wordCount < 100 ? "bg-amber-400" : wordCount > 200 ? "bg-red-500" : "bg-emerald-500"
-                                        )}
-                                        style={{ width: `${Math.min((wordCount / 200) * 100, 100)}%` }}
-                                    />
-                                </div>
-                                <span className={clsx(
-                                    "report-label",
-                                    wordCount >= 100 && wordCount <= 200 ? "text-emerald-600" : wordCount > 200 ? "text-red-500" : "text-amber-500"
-                                )}>
-                                    {wordCount} / 200 words (Min 100)
-                                </span>
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div className="h-1.5 w-40 overflow-hidden rounded-full bg-slate-100 sm:w-48">
+                                <div
+                                    className={clsx(
+                                        "h-full rounded-full transition-all",
+                                        wordCount < 100
+                                            ? "bg-amber-400"
+                                            : wordCount > 200
+                                              ? "bg-red-500"
+                                              : "bg-emerald-500",
+                                    )}
+                                    style={{
+                                        width: `${Math.min((wordCount / 200) * 100, 100)}%`,
+                                    }}
+                                />
                             </div>
-                            <span className="report-help">
-                                Requirement: 100–200 Words
-                            </span>
+                            <p
+                                className={clsx(
+                                    "text-[11px] tabular-nums",
+                                    wordCount >= 100 && wordCount <= 200
+                                        ? "text-emerald-600"
+                                        : wordCount > 200
+                                          ? "text-red-500"
+                                          : "text-slate-400",
+                                )}
+                            >
+                                {wordCount} / 200 words · {charCount} characters
+                            </p>
                         </div>
-                        <FieldError message={getFieldError('problem_statement')} />
+                        <FieldError message={getFieldError("problem_statement")} />
                     </div>
                 </div>
-            </div>
+            </section>
 
             {/* ── 2.3 Academic Discipline Applied ────────────────────────── */}
-            <div className="space-y-5">
-                <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center font-black text-[10px]">2.3</div>
-                    <h3 className="report-h3">Academic Discipline Applied</h3>
-                    <span className="ml-auto px-3 py-1 rounded-full bg-amber-50 text-amber-700 font-black text-[9px] uppercase tracking-widest border border-amber-100">Mandatory</span>
+            <section className="space-y-4">
+                <div className="flex flex-wrap items-center gap-2.5">
+                    <span className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-900 text-[11px] font-bold text-white">
+                        2.3
+                    </span>
+                    <h3 className="text-base font-semibold text-slate-900">
+                        Academic discipline applied
+                    </h3>
+                    <span className={clsx(badgeMandatory, "ml-auto")}>Mandatory</span>
                 </div>
 
-                <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-8">
-                    {/* Section Header */}
+                <p className="pl-9 text-sm text-slate-500">
+                    Describe how your academic discipline helped you analyse the problem and structure
+                    your engagement approach.
+                </p>
+
+                <div className="space-y-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
                     <div className="space-y-2">
-                        <h2 className="text-lg font-bold text-slate-900 tracking-tight">
-                            Academic Discipline Contribution
-                        </h2>
-                        <p className="text-sm text-slate-500 max-w-xl">
-                            Describe how your academic discipline helped you analyse the problem and
-                            structure your engagement approach.
-                        </p>
-                    </div>
-
-
-                    {/* Discipline Picker */}
-                    <div className="space-y-4">
-                        <Label className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                            Primary Academic Discipline
-                        </Label>
-
+                        <Label className={sectionLabel}>Primary Academic Discipline</Label>
                         <SingleSelect
                             options={disciplines}
                             value={sectionData.discipline}
-                            onChange={(val) => updateSection('section2', { discipline: val })}
+                            onChange={(val) => updateSection("section2", { discipline: val })}
                             placeholder="Select a discipline..."
                             disabled={isReadOnly}
                         />
-
-                        <FieldError message={getFieldError('discipline')} />
+                        <FieldError message={getFieldError("discipline")} />
                     </div>
 
+                    <div className="space-y-3 border-t border-slate-100 pt-6">
+                        <Label className={sectionLabel}>Problem Statement Summary</Label>
+                        <p className="text-sm leading-relaxed text-slate-500">
+                            Explain how your academic background helped you analyse the problem, design
+                            a structured approach, or apply technical, research, legal, financial, or
+                            social frameworks.
+                        </p>
 
-                    {/* Contribution Section */}
-                    <div className="space-y-5 pt-8 border-t border-slate-100">
-
-                        {/* Guidance */}
-                        <div className="bg-slate-50 border border-slate-100 rounded-xl p-5 space-y-3">
-                            <Label className="text-xs font-bold uppercase tracking-wider text-slate-600">
-                                Problem Statement Summary
-                            </Label>
-
-                            <p className="text-sm text-slate-500 leading-relaxed">
-                                Explain how your academic background helped you analyse the problem,
-                                design a structured approach, or apply technical, research, legal,
-                                financial, or social frameworks.
-                            </p>
-
-                            <div className="flex gap-6 text-xs font-semibold">
-                                <span className="text-emerald-700">
-                                    ✔ Be specific: Explain how your knowledge was applied
-                                </span>
-                                <span className="text-slate-500 italic">
-                                    ✗ Avoid: "My degree helped me understand society"
-                                </span>
-                            </div>
+                        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:gap-x-6 sm:gap-y-1">
+                            <span className="inline-flex items-start gap-1.5 text-xs font-medium text-emerald-700">
+                                <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                                Be specific: explain how your knowledge was applied.
+                            </span>
+                            <span className="inline-flex items-start gap-1.5 text-xs font-medium text-rose-600">
+                                <X className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                                Avoid: &ldquo;My degree helped me understand society.&rdquo;
+                            </span>
                         </div>
 
-
-                        {/* Textarea */}
-                        <div className="space-y-3">
-
-                            <Textarea
-                                placeholder="Example: Utilized Engineering optimization models to identify inefficiencies in waste collection routing..."
-                                readOnly={isReadOnly}
-                                disabled={isReadOnly}
+                        <Textarea
+                            placeholder="Example: Utilized engineering optimization models to identify inefficiencies in waste collection routing…"
+                            readOnly={isReadOnly}
+                            disabled={isReadOnly}
+                            className={clsx(
+                                "min-h-[140px] resize-none rounded-xl border border-slate-200 bg-white p-4 text-sm leading-relaxed text-slate-800 shadow-sm placeholder:text-slate-400 focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100",
+                                getFieldError("discipline_contribution") && "border-red-300",
+                                disciplineWordCount > 200 && "border-red-400",
+                            )}
+                            value={sectionData.discipline_contribution}
+                            onChange={(e) =>
+                                updateSection("section2", {
+                                    discipline_contribution: e.target.value,
+                                })
+                            }
+                        />
+                        <div className="flex justify-end">
+                            <p
                                 className={clsx(
-                                    "min-h-[160px] bg-white border border-slate-200 rounded-xl p-6 text-sm font-medium text-slate-700 leading-relaxed shadow-sm focus:ring-4 focus:ring-report-primary-soft/40 focus:border-report-primary-border transition resize-none",
-                                    getFieldError('discipline_contribution') && "border-red-300",
-                                    disciplineWordCount > 200 && "border-red-400"
-                                )}
-                                value={sectionData.discipline_contribution}
-                                onChange={(e) => updateSection('section2', { discipline_contribution: e.target.value })}
-                            />
-
-                            {/* Word Counter */}
-                            <div className="flex justify-between items-center text-xs font-semibold">
-                                <span className="text-slate-400 uppercase tracking-wider">
-                                    100 – 200 Words Required
-                                </span>
-
-                                <span className={clsx(
-                                    "font-bold",
+                                    "text-[11px] tabular-nums",
                                     disciplineWordCount > 200
                                         ? "text-red-500"
                                         : disciplineWordCount >= 100
-                                            ? "text-emerald-600"
-                                            : "text-slate-400"
-                                )}>
-                                    {disciplineWordCount} / 200
-                                </span>
-                            </div>
-
-                            <FieldError message={getFieldError('discipline_contribution')} />
+                                          ? "text-emerald-600"
+                                          : "text-slate-400",
+                                )}
+                            >
+                                {disciplineWordCount} / 200 words · {disciplineCharCount} characters
+                            </p>
                         </div>
-
+                        <FieldError message={getFieldError("discipline_contribution")} />
                     </div>
-
                 </div>
-            </div>
+            </section>
 
             {/* ── 2.4 Baseline Evidence Source ───────────────────────────── */}
-            <div className="space-y-5">
-                <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center font-black text-[10px]">2.4</div>
-                    <h3 className="report-h3">Baseline Evidence Source</h3>
-                    <span className="ml-auto px-3 py-1 rounded-full bg-amber-50 text-amber-700 font-black text-[9px] uppercase tracking-widest border border-amber-100">Required</span>
+            <section className="space-y-4">
+                <div className="flex flex-wrap items-center gap-2.5">
+                    <span className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-900 text-[11px] font-bold text-white">
+                        2.4
+                    </span>
+                    <h3 className="text-base font-semibold text-slate-900">
+                        Baseline evidence source
+                    </h3>
+                    <span className={clsx(badgeRequired, "ml-auto")}>Required</span>
                 </div>
 
-                <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm space-y-4">
-                    <div className="space-y-5">
-                        <div className="space-y-1">
-                            <Label className="report-label !text-slate-900">Select what informed your understanding of the problem</Label>
-                            <p className="report-help !pl-0">What specific data or observation informed your understanding of the baseline situation?</p>
-                        </div>
-
-                        <MultiSelect
-                            options={evidenceTypes}
-                            selected={sectionData.baseline_evidence || []}
-                            onChange={(values) => {
-                                const s = syncBaselineOtherSlots(
-                                    values,
-                                    sectionData.baseline_other_entries,
-                                );
-                                updateSection("section2", {
-                                    baseline_evidence: s.evidence,
-                                    baseline_other_entries: s.entries,
-                                    baseline_evidence_other: s.legacyOther,
-                                });
-                            }}
-                            getTagLabel={otherTagLabel}
-                            isDropdownOptionSelected={(opt, sel) =>
-                                opt === "Other"
-                                    ? sel.some((x) => isOtherSlotToken(x) || x === "Other")
-                                    : sel.includes(opt)
-                            }
-                            resolveToggle={(opt, cur) => {
-                                if (opt === "Other") {
-                                    const hasAnyOther = cur.some((x) => isOtherSlotToken(x) || x === "Other");
-                                    if (hasAnyOther) {
-                                        return cur.filter((x) => !isOtherSlotToken(x) && x !== "Other");
-                                    }
-                                    return [...cur, "__o_0"];
-                                }
-                                if (isOtherSlotToken(opt)) {
-                                    return cur.filter((x) => x !== opt);
-                                }
-                                if (cur.includes(opt)) {
-                                    return cur.filter((x) => x !== opt);
-                                }
-                                return [...cur, opt];
-                            }}
-                            placeholder="Select data or observations..."
-                            disabled={isReadOnly}
-                        />
-                        <FieldError message={getFieldError("baseline_evidence")} />
+                <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+                    <div className="space-y-1">
+                        <Label className={sectionLabel}>
+                            What informed your understanding of the problem?
+                        </Label>
+                        <p className="text-sm text-slate-500">
+                            What specific data or observation informed your understanding of the
+                            baseline situation?
+                        </p>
                     </div>
 
+                    <MultiSelect
+                        options={evidenceTypes}
+                        selected={sectionData.baseline_evidence || []}
+                        onChange={(values) => {
+                            const s = syncBaselineOtherSlots(
+                                values,
+                                sectionData.baseline_other_entries,
+                            );
+                            updateSection("section2", {
+                                baseline_evidence: s.evidence,
+                                baseline_other_entries: s.entries,
+                                baseline_evidence_other: s.legacyOther,
+                            });
+                        }}
+                        getTagLabel={otherTagLabel}
+                        isDropdownOptionSelected={(opt, sel) =>
+                            opt === "Other"
+                                ? sel.some((x) => isOtherSlotToken(x) || x === "Other")
+                                : sel.includes(opt)
+                        }
+                        resolveToggle={(opt, cur) => {
+                            if (opt === "Other") {
+                                const hasAnyOther = cur.some(
+                                    (x) => isOtherSlotToken(x) || x === "Other",
+                                );
+                                if (hasAnyOther) {
+                                    return cur.filter(
+                                        (x) => !isOtherSlotToken(x) && x !== "Other",
+                                    );
+                                }
+                                return [...cur, "__o_0"];
+                            }
+                            if (isOtherSlotToken(opt)) {
+                                return cur.filter((x) => x !== opt);
+                            }
+                            if (cur.includes(opt)) {
+                                return cur.filter((x) => x !== opt);
+                            }
+                            return [...cur, opt];
+                        }}
+                        placeholder="Select data or observations..."
+                        disabled={isReadOnly}
+                    />
+                    <FieldError message={getFieldError("baseline_evidence")} />
+
                     {otherCount > 0 && (
-                        <div className="animate-in fade-in slide-in-from-top-4 duration-400 pt-8 border-t-2 border-slate-50 space-y-5">
-                            <div className="space-y-2">
-                                <Label className="report-label !text-slate-900 border-b border-slate-100 pb-2 mb-3 flex items-center gap-2">
-                                    <AlertCircle className="w-4 h-4 text-amber-500" />
+                        <div className="space-y-4 border-t border-slate-100 pt-5">
+                            <div className="space-y-1">
+                                <Label className="flex items-center gap-2 text-sm font-semibold text-slate-900">
+                                    <AlertCircle className="h-4 w-4 text-amber-500" />
                                     Specify evidence source{otherCount > 1 ? "s" : ""}
                                 </Label>
-                                <p className="text-[10px] font-bold text-slate-500 leading-relaxed max-w-2xl pl-1">
-                                    Clearly explain what specific documentation, professional consultation, or institutional data
-                                    informed your understanding of the baseline situation. Add another &quot;Other&quot; in the
-                                    list above, or use the button below, if you need more than one custom source.
+                                <p className="text-xs leading-relaxed text-slate-500">
+                                    Clearly explain what documentation, consultation, or institutional
+                                    data informed your baseline understanding. Use the button below if
+                                    you need more than one custom source.
                                 </p>
                             </div>
-                            {otherEntries.map((entryText, i) => {
-                                return (
-                                    <div key={`baseline-other-${i}`} className="space-y-2">
-                                        {otherCount > 1 ? (
-                                            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest pl-1">
-                                                Other source {i + 1}
-                                            </p>
-                                        ) : null}
-                                        <Input
-                                            placeholder="Example: Review of internal performance records and consultation with local administrative leads..."
-                                            readOnly={isReadOnly}
-                                            disabled={isReadOnly}
-                                            className={clsx(
-                                                "h-12 w-full border-2 border-slate-100 rounded-2xl bg-white px-4 text-left text-sm font-medium text-slate-900 shadow-sm",
-                                                "placeholder:text-slate-400 placeholder:font-normal",
-                                                "focus-visible:ring-4 focus-visible:ring-report-primary-soft/50 focus-visible:border-report-primary-border",
-                                                getFieldError(`baseline_other_entries.${i}`) && "border-red-400 bg-red-50/30",
-                                            )}
-                                            value={entryText}
-                                            onChange={(e) => {
-                                                const next = [...otherEntries];
-                                                next[i] = e.target.value;
-                                                updateSection("section2", {
-                                                    baseline_other_entries: next,
-                                                    baseline_evidence_other: next.join("\n\n---\n\n"),
-                                                });
-                                            }}
-                                        />
-                                        <FieldError message={getFieldError(`baseline_other_entries.${i}`)} />
-                                    </div>
-                                );
-                            })}
+                            {otherEntries.map((entryText, i) => (
+                                <div key={`baseline-other-${i}`} className="space-y-2">
+                                    {otherCount > 1 ? (
+                                        <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                                            Other source {i + 1}
+                                        </p>
+                                    ) : null}
+                                    <Input
+                                        placeholder="Example: Review of internal performance records and consultation with local administrative leads…"
+                                        readOnly={isReadOnly}
+                                        disabled={isReadOnly}
+                                        className={clsx(
+                                            "h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm placeholder:text-slate-400 focus-visible:border-indigo-300 focus-visible:ring-2 focus-visible:ring-indigo-100",
+                                            getFieldError(`baseline_other_entries.${i}`) &&
+                                                "border-red-400 bg-red-50/30",
+                                        )}
+                                        value={entryText}
+                                        onChange={(e) => {
+                                            const next = [...otherEntries];
+                                            next[i] = e.target.value;
+                                            updateSection("section2", {
+                                                baseline_other_entries: next,
+                                                baseline_evidence_other: next.join("\n\n---\n\n"),
+                                            });
+                                        }}
+                                    />
+                                    <FieldError
+                                        message={getFieldError(`baseline_other_entries.${i}`)}
+                                    />
+                                </div>
+                            ))}
                             {!isReadOnly && otherCount > 0 ? (
                                 <Button
                                     type="button"
                                     variant="outline"
-                                    className="w-full sm:w-auto rounded-xl border-slate-200 text-slate-700"
+                                    className="w-full rounded-lg border-slate-200 text-sm font-medium text-slate-700 sm:w-auto"
                                     onClick={() => {
                                         const ev = sectionData.baseline_evidence || [];
                                         const c = otherSlotCount(ev);
@@ -736,99 +752,91 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
                         </div>
                     )}
                 </div>
-            </div>
+            </section>
 
-            <div className="pt-8 border-t-2 border-slate-100 space-y-6">
-                <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-                    <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 rounded-xl bg-report-primary text-white flex items-center justify-center shadow-lg shadow-report-primary-shadow ring-4 ring-report-primary-soft">
-                            <BookOpen className="w-5 h-5" />
+            {/* ── System-Generated Summary (logic preserved) ─────────────── */}
+            <section className="space-y-4 border-t border-slate-200 pt-8">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex items-center gap-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-sm">
+                            <BookOpen className="h-5 w-5" />
                         </div>
                         <div>
-                            <h3 className="report-h3 !text-base !leading-none mb-1.5">System-Generated Summary</h3>
-                            <p className="report-label !text-slate-400">CIEL Baseline Intelligence Engine</p>
+                            <h3 className="text-base font-semibold text-slate-900">
+                                System-generated summary
+                            </h3>
+                            <p className="text-xs text-slate-500">Auto-built from your answers above</p>
                         </div>
                     </div>
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2">
                         <button
                             type="button"
                             onClick={handleGenerateAISummary}
-                            disabled={isGenerating}
-                            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-report-primary text-white text-[10px] font-black uppercase tracking-widest hover:opacity-90 disabled:opacity-40 transition-all shadow-md shadow-report-primary-shadow"
+                            disabled={isGenerating || isReadOnly}
+                            className="inline-flex h-9 items-center gap-2 rounded-lg bg-indigo-600 px-4 text-xs font-semibold text-white shadow-sm transition hover:bg-indigo-700 disabled:opacity-40"
                         >
-                            {isGenerating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                            {isGenerating ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                                <Sparkles className="h-3.5 w-3.5" />
+                            )}
                             {isGenerating ? "Generating…" : "Improve with AI"}
                         </button>
-                        <div className="px-4 py-2 rounded-xl bg-slate-900 text-white text-[10px] font-black uppercase tracking-widest border border-slate-800 shadow-sm">
-                            Auto-Generated
-                        </div>
+                        <span className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                            Auto-generated
+                        </span>
                     </div>
                 </div>
 
                 {sectionData.summary_text ? (
-                    <div className="bg-white border border-slate-200 rounded-2xl p-6 relative overflow-hidden shadow-sm space-y-6">
-                        <div className="absolute -bottom-8 -right-8 opacity-5">
-                            <Building className="w-64 h-64 text-slate-900" />
-                        </div>
-
-                        <div className="relative z-10 space-y-6">
-                            {/* Tags */}
-                            <div className="flex flex-wrap gap-2.5">
-                                <div className="flex items-center gap-2 px-4 py-1.5 rounded-full bg-slate-900 text-white text-[9px] font-black uppercase tracking-widest shadow-sm">
-                                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+                        <div className="flex flex-wrap gap-2">
+                            {sectionData.problem_category ? (
+                                <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-900 px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-white">
+                                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
                                     {sectionData.problem_category}
-                                </div>
-                                <div className="flex items-center gap-2 px-4 py-1.5 rounded-full bg-report-primary-soft border border-report-primary-border text-report-primary text-[9px] font-black uppercase tracking-widest">
-                                    <Users className="w-3.5 h-3.5" />
+                                </span>
+                            ) : null}
+                            {sectionData.primary_beneficiary ? (
+                                <span className="inline-flex items-center gap-1.5 rounded-full border border-indigo-100 bg-indigo-50 px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-indigo-700">
+                                    <Users className="h-3 w-3" />
                                     {sectionData.primary_beneficiary}
-                                </div>
-                                <div className="flex items-center gap-2 px-4 py-1.5 rounded-full bg-slate-50 border border-slate-200 text-slate-500 text-[9px] font-black uppercase tracking-widest">
-                                    <MapPin className="w-3.5 h-3.5" />
-                                    {district}, {province}
-                                </div>
-                            </div>
-
-                            {/* Summary text */}
-                            <div className="relative px-2">
-                                <span className="absolute -top-6 -left-4 text-5xl font-serif text-report-primary-soft select-none opacity-40">“</span>
-                                <p className="report-ai-text !leading-relaxed !text-slate-800">
-                                    {sectionData.summary_text}
-                                </p>
-                                <span className="absolute -bottom-10 -right-4 text-5xl font-serif text-report-primary-soft select-none rotate-180 opacity-40">“</span>
-                            </div>
-
-                            {/* Footer */}
-                            <div className="pt-8 border-t border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-3">
-                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.15em]">CIEL Institutional Traceability Protocol · Auto-Validated</p>
-                                <div className="flex items-center gap-2.5">
-                                    <span className="report-label !text-slate-300">Auth Signature</span>
-                                    <p className="text-[10px] font-black text-report-primary uppercase tracking-widest bg-report-primary-soft px-4 py-2 rounded-xl border border-report-primary-border shadow-sm">
-                                        REF: {projectData?.id?.substring(0, 12).toUpperCase() || 'BASE-REG-2024'}
-                                    </p>
-                                </div>
-                            </div>
+                                </span>
+                            ) : null}
+                            {(district || province) && (district !== "—" || province !== "—") ? (
+                                <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-600">
+                                    <MapPin className="h-3 w-3" />
+                                    {[district, province].filter((x) => x && x !== "—").join(", ")}
+                                </span>
+                            ) : null}
+                        </div>
+                        <p className="text-sm leading-relaxed text-slate-700">
+                            {sectionData.summary_text}
+                        </p>
+                        <div className="flex flex-col gap-2 border-t border-slate-100 pt-4 sm:flex-row sm:items-center sm:justify-between">
+                            <p className="text-[10px] font-medium uppercase tracking-wide text-slate-400">
+                                CIEL institutional traceability
+                            </p>
+                            <p className="rounded-lg border border-indigo-100 bg-indigo-50 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-indigo-700">
+                                REF:{" "}
+                                {projectData?.id?.substring(0, 12).toUpperCase() || "BASE-REG-2024"}
+                            </p>
                         </div>
                     </div>
                 ) : (
-                    <div className="p-8 bg-slate-50 border border-dashed border-slate-200 rounded-2xl flex flex-col items-center justify-center text-center space-y-4">
-                        <div className="w-16 h-16 rounded-full bg-white shadow-lg flex items-center justify-center text-slate-200">
-                            <BookOpen className="w-8 h-8" />
+                    <div className="flex flex-col items-center rounded-xl border border-dashed border-slate-200 bg-slate-50/80 px-6 py-10 text-center">
+                        <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-white text-slate-300 shadow-sm">
+                            <BookOpen className="h-6 w-6" />
                         </div>
-                        <div className="space-y-2 max-w-sm">
-                            <p className="text-sm font-black text-slate-700 uppercase tracking-[0.15em]">Baseline Engine Active</p>
-                            <p className="text-[10px] font-semibold text-slate-400 leading-relaxed">
-                                After you complete the Problem Statement (100+ words), select an Academic Discipline, and choose a Baseline Evidence Source — the system will automatically generate a structured baseline summary here.
-                            </p>
-                            <p className="text-[10px] font-black text-slate-400 italic mt-2">
-                                Example: "This project addresses a documented gap in Skills Development affecting Youth in Lahore, Punjab, Pakistan…"
-                            </p>
-                        </div>
+                        <p className="text-sm font-semibold text-slate-700">Summary not ready yet</p>
+                        <p className="mt-1.5 max-w-md text-xs leading-relaxed text-slate-500">
+                            Complete the problem statement (100+ words), select a discipline, and choose
+                            a baseline evidence source — a structured summary will appear here
+                            automatically.
+                        </p>
                     </div>
                 )}
-            </div>
-
-            
-
+            </section>
         </div>
     );
 }

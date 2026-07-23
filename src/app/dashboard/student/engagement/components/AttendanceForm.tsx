@@ -2,21 +2,17 @@
 
 import { useState } from "react";
 import {
-    Plus,
     Calendar,
     Clock,
     MapPin,
-    Tag,
     Loader2,
     CheckCircle2,
     Upload,
     X,
     Lock,
-    Users,
     Info,
     AlertCircle,
     ChevronDown,
-    ChevronUp,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "../../report/components/ui/button";
@@ -44,7 +40,7 @@ import dynamic from "next/dynamic";
 const LocationPicker = dynamic(() => import("@/components/ui/LocationPicker"), {
     ssr: false,
     loading: () => (
-        <div className="flex h-[180px] w-full animate-pulse items-center justify-center rounded-xl bg-slate-50 text-xs text-slate-400">
+        <div className="flex h-[180px] w-full animate-pulse items-center justify-center rounded-xl bg-slate-100 text-xs text-slate-400">
             Loading map…
         </div>
     ),
@@ -117,37 +113,14 @@ function computeSessionHours(startTime: string, endTime: string): number | null 
     const start = timeToMinutes(startTime);
     const end = timeToMinutes(endTime);
     if (start == null || end == null || end <= start) return null;
-    return Math.round((end - start) / 60 * 100) / 100;
+    return Math.round(((end - start) / 60) * 100) / 100;
 }
 
-function FormSection({
-    title,
-    description,
-    children,
-    step,
-}: {
-    title: string;
-    description?: string;
-    children: React.ReactNode;
-    step: number;
-}) {
-    return (
-        <section className="space-y-4">
-            <div className="flex items-start gap-3">
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-indigo-50 text-xs font-semibold text-indigo-600 ring-1 ring-indigo-100">
-                    {step}
-                </span>
-                <div className="min-w-0 pt-0.5">
-                    <h4 className="text-sm font-semibold text-slate-900">{title}</h4>
-                    {description ? (
-                        <p className="mt-0.5 text-xs leading-relaxed text-slate-500">{description}</p>
-                    ) : null}
-                </div>
-            </div>
-            <div className="ml-10 space-y-4">{children}</div>
-        </section>
-    );
-}
+const labelClass =
+    "text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500";
+
+const fieldClass =
+    "h-11 rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-900 shadow-sm transition-colors placeholder:text-slate-400 focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100";
 
 export default function AttendanceForm({
     verifiedUsers,
@@ -173,6 +146,7 @@ export default function AttendanceForm({
     const [submitError, setSubmitError] = useState<string | null>(null);
     const [evidenceFile, setEvidenceFile] = useState<File | null>(null);
     const [showMap, setShowMap] = useState(false);
+    const [pinnedAddress, setPinnedAddress] = useState("");
     const [mounted, setMounted] = React.useState(false);
     const [formData, setFormData] = useState({
         participantId: selectedParticipantId || (verifiedUsers.length > 0 ? verifiedUsers[0].id : ""),
@@ -212,6 +186,7 @@ export default function AttendanceForm({
     const sessionHours = computeSessionHours(formData.startTime, formData.endTime);
 
     const selectedUser = verifiedUsers.find((u) => u.id === formData.participantId);
+    const selectedInitial = (selectedUser?.name || "S").charAt(0).toUpperCase();
     const isUserApproved =
         !!selectedUser && canLogAttendanceForParticipationStatus(selectedUser.status);
 
@@ -404,336 +379,278 @@ export default function AttendanceForm({
         }
     };
 
-    const fieldClass =
-        "h-11 rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-900 shadow-sm transition-colors focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100";
-
     return (
-        <form
-            onSubmit={handleSubmit}
-            className="min-w-0 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm"
-        >
-            <div className="border-b border-slate-100 bg-slate-50/80 px-5 py-4">
-                <div className="flex items-center gap-3">
-                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-600 text-white shadow-sm">
-                        <Plus className="h-4 w-4" />
+        <form onSubmit={handleSubmit} className="min-w-0 space-y-5">
+            {/* Select Student */}
+            <div className="space-y-1.5">
+                <Label className={labelClass}>Select Student</Label>
+                <div className="relative">
+                    <div className="pointer-events-none absolute left-3 top-1/2 z-10 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full bg-indigo-600 text-xs font-bold text-white">
+                        {selectedInitial}
                     </div>
-                    <div>
-                        <h3 className="text-base font-semibold text-slate-900">Add attendance entry</h3>
-                        <p className="text-xs text-slate-500">Fill in your session details below</p>
+                    <select
+                        value={formData.participantId}
+                        onChange={(e) => {
+                            const newId = e.target.value;
+                            setFormData({ ...formData, participantId: newId });
+                            if (onParticipantChange) onParticipantChange(newId);
+                        }}
+                        className={clsx(fieldClass, "w-full appearance-none pl-12 pr-9")}
+                        required
+                    >
+                        {verifiedUsers.length === 0 && (
+                            <option value="">No verified students found</option>
+                        )}
+                        {verifiedUsers.map((u) => (
+                            <option key={u.id} value={u.id}>
+                                {u.name}
+                            </option>
+                        ))}
+                    </select>
+                    <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                </div>
+            </div>
+
+            {/* Date & Time row */}
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <div className="space-y-1.5">
+                    <Label className={labelClass}>Date of Engagement</Label>
+                    <div className="relative">
+                        <Input
+                            type="date"
+                            value={formData.dateOfEngagement}
+                            max={mounted ? new Date().toISOString().split("T")[0] : undefined}
+                            onChange={(e) =>
+                                setFormData({ ...formData, dateOfEngagement: e.target.value })
+                            }
+                            className={clsx(fieldClass, "pr-10")}
+                            required
+                        />
+                        <Calendar className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    </div>
+                </div>
+                <div className="space-y-1.5">
+                    <Label className={labelClass}>Start Time</Label>
+                    <div className="relative">
+                        <Input
+                            type="time"
+                            value={formData.startTime}
+                            onChange={(e) =>
+                                setFormData({ ...formData, startTime: e.target.value })
+                            }
+                            className={clsx(fieldClass, "pr-10")}
+                            required
+                        />
+                        <Clock className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    </div>
+                </div>
+                <div className="space-y-1.5">
+                    <Label className={labelClass}>End Time</Label>
+                    <div className="relative">
+                        <Input
+                            type="time"
+                            value={formData.endTime}
+                            onChange={(e) =>
+                                setFormData({ ...formData, endTime: e.target.value })
+                            }
+                            className={clsx(fieldClass, "pr-10")}
+                            required
+                        />
+                        <Clock className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                     </div>
                 </div>
             </div>
 
-            <div className="space-y-8 px-5 py-6">
-                <FormSection
-                    step={1}
-                    title="Who & when"
-                    description="Select the student and session date/time."
-                >
-                    <div className="space-y-2">
-                        <Label className="text-xs font-medium text-slate-600">Student</Label>
-                        <div className="relative">
-                            <Users className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                            <select
-                                value={formData.participantId}
-                                onChange={(e) => {
-                                    const newId = e.target.value;
-                                    setFormData({ ...formData, participantId: newId });
-                                    if (onParticipantChange) onParticipantChange(newId);
-                                }}
-                                className={clsx(fieldClass, "w-full appearance-none pl-10 pr-4")}
-                                required
-                            >
-                                {verifiedUsers.length === 0 && (
-                                    <option value="">No verified students found</option>
-                                )}
-                                {verifiedUsers.map((u) => (
-                                    <option key={u.id} value={u.id}>
-                                        {u.name}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-                    </div>
+            {sessionHours != null ? (
+                <p className="text-xs text-slate-500">
+                    Session duration:{" "}
+                    <span className="font-semibold text-slate-700">{sessionHours} hrs</span>
+                </p>
+            ) : formData.startTime && formData.endTime ? (
+                <p className="text-xs text-amber-600">End time must be after start time.</p>
+            ) : null}
 
-                    <div className="space-y-2">
-                        <Label className="text-xs font-medium text-slate-600">Date of engagement</Label>
-                        <div className="relative">
-                            <Calendar className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                            <Input
-                                type="date"
-                                value={formData.dateOfEngagement}
-                                max={mounted ? new Date().toISOString().split("T")[0] : undefined}
-                                onChange={(e) =>
-                                    setFormData({ ...formData, dateOfEngagement: e.target.value })
-                                }
-                                className={clsx(fieldClass, "pl-10")}
-                                required
-                            />
-                        </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-2">
-                            <Label className="text-xs font-medium text-slate-600">Start time</Label>
-                            <div className="relative">
-                                <Clock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                                <Input
-                                    type="time"
-                                    value={formData.startTime}
-                                    onChange={(e) =>
-                                        setFormData({ ...formData, startTime: e.target.value })
-                                    }
-                                    className={clsx(fieldClass, "pl-10")}
-                                    required
-                                />
-                            </div>
-                        </div>
-                        <div className="space-y-2">
-                            <Label className="text-xs font-medium text-slate-600">End time</Label>
-                            <div className="relative">
-                                <Clock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                                <Input
-                                    type="time"
-                                    value={formData.endTime}
-                                    onChange={(e) =>
-                                        setFormData({ ...formData, endTime: e.target.value })
-                                    }
-                                    className={clsx(fieldClass, "pl-10")}
-                                    required
-                                />
-                            </div>
-                        </div>
-                    </div>
-
-                    {sessionHours != null ? (
-                        <div className="flex items-center gap-2 rounded-lg border border-indigo-100 bg-indigo-50/60 px-3 py-2 text-xs text-indigo-700">
-                            <Clock className="h-3.5 w-3.5 shrink-0" />
-                            <span>
-                                Session duration: <strong>{sessionHours} hours</strong>
-                            </span>
-                        </div>
-                    ) : formData.startTime && formData.endTime ? (
-                        <p className="text-xs text-amber-600">End time must be after start time.</p>
-                    ) : null}
-                </FormSection>
-
-                <FormSection
-                    step={2}
-                    title="Where"
-                    description="Name the organization or site where engagement took place."
-                >
-                    <div className="space-y-2">
-                        <Label className="text-xs font-medium text-slate-600">
-                            Organization / location name
-                        </Label>
-                        <div className="relative">
-                            <MapPin className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                            <Input
-                                placeholder="e.g. Green Earth NGO, Community Center"
-                                value={formData.organizationName}
-                                onChange={(e) =>
-                                    setFormData({ ...formData, organizationName: e.target.value })
-                                }
-                                className={clsx(fieldClass, "pl-10")}
-                                required
-                            />
-                        </div>
-                    </div>
-
-                    <div className="rounded-lg border border-slate-200 bg-slate-50/50">
-                        <button
-                            type="button"
-                            onClick={() => setShowMap((v) => !v)}
-                            className="flex w-full items-center justify-between px-3 py-2.5 text-left text-xs font-medium text-slate-600 hover:text-slate-900"
-                        >
-                            <span className="flex items-center gap-2">
-                                <MapPin className="h-3.5 w-3.5 text-slate-400" />
-                                Pin exact location on map
-                                <span className="rounded bg-slate-200/80 px-1.5 py-0.5 text-[10px] font-normal text-slate-500">
-                                    Optional
-                                </span>
-                            </span>
-                            {showMap ? (
-                                <ChevronUp className="h-4 w-4 text-slate-400" />
-                            ) : (
-                                <ChevronDown className="h-4 w-4 text-slate-400" />
-                            )}
-                        </button>
-                        {showMap ? (
-                            <div className="border-t border-slate-200 p-2">
-                                <div className="overflow-hidden rounded-lg border border-slate-200">
-                                    <LocationPicker
-                                        onLocationSelect={(loc) => {
-                                            setFormData((prev) => ({
-                                                ...prev,
-                                                organizationName: loc.address || prev.organizationName,
-                                                locationPin: `${loc.lat},${loc.lng}`,
-                                            }));
-                                        }}
-                                    />
-                                </div>
-                                {formData.locationPin ? (
-                                    <p className="mt-2 flex items-center gap-1.5 text-[11px] text-emerald-600">
-                                        <CheckCircle2 className="h-3 w-3" />
-                                        Location pinned
-                                    </p>
-                                ) : (
-                                    <p className="mt-2 flex items-center gap-1.5 text-[11px] text-slate-400">
-                                        <Info className="h-3 w-3" />
-                                        Click the map to mark your engagement site
-                                    </p>
-                                )}
-                            </div>
-                        ) : null}
-                    </div>
-                </FormSection>
-
-                <FormSection
-                    step={3}
-                    title="What you did"
-                    description="Describe the activity and your contribution."
-                >
-                    <div className="space-y-2">
-                        <Label className="text-xs font-medium text-slate-600">Activity type</Label>
-                        <div className="relative">
-                            <Tag className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                            <select
-                                value={formData.activityType}
-                                onChange={(e) =>
-                                    setFormData({ ...formData, activityType: e.target.value })
-                                }
-                                className={clsx(fieldClass, "w-full appearance-none pl-10 pr-4")}
-                            >
-                                {[
-                                    "Training / Workshop",
-                                    "Awareness Session",
-                                    "Research / Survey",
-                                    "Mentoring / Coaching",
-                                    "Field Visit",
-                                    "Resource Distribution",
-                                    "Technical Support",
-                                    "Administrative",
-                                    "Other",
-                                ].map((t) => (
-                                    <option key={t} value={t}>
-                                        {t}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-                        {formData.activityType === "Other" && (
-                            <Input
-                                placeholder="Specify activity type"
-                                value={formData.otherActivity}
-                                onChange={(e) =>
-                                    setFormData({ ...formData, otherActivity: e.target.value })
-                                }
-                                className={fieldClass}
-                                required
-                            />
-                        )}
-                    </div>
-
-                    <div className="space-y-2">
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                            <Label className="text-xs font-medium text-slate-600">
-                                Brief description
-                            </Label>
-                            <div className="flex gap-1.5">
-                                <span
-                                    className={clsx(
-                                        "rounded px-1.5 py-0.5 text-[10px] font-medium",
-                                        overWords
-                                            ? "bg-red-50 text-red-600"
-                                            : "bg-slate-100 text-slate-500",
-                                    )}
-                                >
-                                    {wordCount}/{ATTENDANCE_DESCRIPTION_MAX_WORDS} words
-                                </span>
-                                <span
-                                    className={clsx(
-                                        "rounded px-1.5 py-0.5 text-[10px] font-medium",
-                                        overChars
-                                            ? "bg-red-50 text-red-600"
-                                            : "bg-slate-100 text-slate-500",
-                                    )}
-                                >
-                                    {charCount}/{ATTENDANCE_DESCRIPTION_MAX_CHARS} chars
-                                </span>
-                            </div>
-                        </div>
-                        <textarea
-                            spellCheck
-                            placeholder="What did you accomplish during this session?"
-                            value={formData.description}
-                            maxLength={ATTENDANCE_DESCRIPTION_MAX_CHARS}
-                            onChange={(e) =>
-                                setFormData({ ...formData, description: e.target.value })
-                            }
-                            className={clsx(
-                                "w-full resize-none rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-900 shadow-sm transition-colors focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100",
-                                "min-h-[96px]",
-                            )}
-                            required
-                            aria-invalid={descriptionOverLimit}
-                            aria-describedby={
-                                descriptionOverLimit ? "attendance-description-limit" : undefined
-                            }
-                        />
-                        {descriptionLimitMessage ? (
-                            <p id="attendance-description-limit" className="text-xs text-red-600">
-                                {descriptionLimitMessage}
-                            </p>
-                        ) : null}
-                    </div>
-                </FormSection>
-
-                <FormSection
-                    step={4}
-                    title="Supporting evidence"
-                    description="Upload a photo or document to verify this session (optional)."
-                >
-                    {evidenceFile ? (
-                        <div className="flex items-center justify-between rounded-lg border border-indigo-100 bg-indigo-50/50 px-3 py-2.5">
-                            <div className="flex min-w-0 items-center gap-2">
-                                <CheckCircle2 className="h-4 w-4 shrink-0 text-indigo-600" />
-                                <span className="truncate text-sm font-medium text-indigo-700">
-                                    {evidenceFile.name}
-                                </span>
-                            </div>
-                            <button
-                                type="button"
-                                onClick={() => setEvidenceFile(null)}
-                                className="shrink-0 text-indigo-400 hover:text-indigo-600"
-                                aria-label="Remove file"
-                            >
-                                <X className="h-4 w-4" />
-                            </button>
-                        </div>
-                    ) : (
-                        <div className="relative">
-                            <input
-                                type="file"
-                                accept={REPORT_ATTACHMENT_ACCEPT}
-                                onChange={(e) => setEvidenceFile(e.target.files?.[0] || null)}
-                                className="absolute inset-0 z-10 cursor-pointer opacity-0"
-                            />
-                            <div className="flex flex-col items-center gap-1.5 rounded-lg border-2 border-dashed border-slate-200 bg-slate-50/50 px-4 py-5 text-center transition-colors hover:border-indigo-200 hover:bg-indigo-50/30">
-                                <Upload className="h-5 w-5 text-slate-400" />
-                                <span className="text-xs font-medium text-slate-600">
-                                    Drop a file or click to upload
-                                </span>
-                                <span className="text-[10px] text-slate-400">
-                                    JPG, PNG, PDF, or Word
-                                </span>
-                            </div>
-                        </div>
-                    )}
-                </FormSection>
+            {/* Organization / Location */}
+            <div className="space-y-1.5">
+                <Label className={labelClass}>Organization / Location Name</Label>
+                <Input
+                    placeholder="Enter organization or location name"
+                    value={formData.organizationName}
+                    onChange={(e) =>
+                        setFormData({ ...formData, organizationName: e.target.value })
+                    }
+                    className={fieldClass}
+                    required
+                />
             </div>
 
-            <div className="space-y-3 border-t border-slate-100 bg-slate-50/50 px-5 py-4">
+            {/* Pin exact location */}
+            <div className="space-y-1.5">
+                <Label className={labelClass}>Pin Exact Location</Label>
+                {!showMap ? (
+                    <button
+                        type="button"
+                        onClick={() => setShowMap(true)}
+                        className="flex h-[120px] w-full flex-col items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-100/80 text-center transition-colors hover:border-indigo-200 hover:bg-indigo-50/40"
+                    >
+                        <MapPin className="h-5 w-5 text-rose-500" />
+                        <span className="text-xs font-medium text-slate-500">
+                            Map preview — tap to search or drop a pin
+                        </span>
+                    </button>
+                ) : (
+                    <div className="overflow-hidden rounded-xl border border-slate-200">
+                        <LocationPicker
+                            onLocationSelect={(loc) => {
+                                setPinnedAddress(loc.address || "");
+                                setFormData((prev) => ({
+                                    ...prev,
+                                    organizationName: loc.address || prev.organizationName,
+                                    locationPin: `${loc.lat},${loc.lng}`,
+                                }));
+                            }}
+                        />
+                    </div>
+                )}
+                <p className="flex items-start gap-1.5 text-[11px] leading-relaxed text-slate-400">
+                    {formData.locationPin ? (
+                        <>
+                            <CheckCircle2 className="mt-0.5 h-3 w-3 shrink-0 text-emerald-500" />
+                            <span>
+                                {pinnedAddress || formData.organizationName || "Location pinned"}
+                                {formData.locationPin ? ` · GPS ${formData.locationPin}` : ""}
+                            </span>
+                        </>
+                    ) : (
+                        <>
+                            <Info className="mt-0.5 h-3 w-3 shrink-0" />
+                            <span>Optional — pin helps verify your engagement site</span>
+                        </>
+                    )}
+                </p>
+            </div>
+
+            {/* Activity Type */}
+            <div className="space-y-1.5">
+                <Label className={labelClass}>Activity Type</Label>
+                <div className="relative">
+                    <select
+                        value={formData.activityType}
+                        onChange={(e) =>
+                            setFormData({ ...formData, activityType: e.target.value })
+                        }
+                        className={clsx(fieldClass, "w-full appearance-none pr-9")}
+                    >
+                        {[
+                            "Training / Workshop",
+                            "Awareness Session",
+                            "Research / Survey",
+                            "Mentoring / Coaching",
+                            "Field Visit",
+                            "Resource Distribution",
+                            "Technical Support",
+                            "Administrative",
+                            "Other",
+                        ].map((t) => (
+                            <option key={t} value={t}>
+                                {t}
+                            </option>
+                        ))}
+                    </select>
+                    <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                </div>
+                {formData.activityType === "Other" && (
+                    <Input
+                        placeholder="Specify activity type"
+                        value={formData.otherActivity}
+                        onChange={(e) =>
+                            setFormData({ ...formData, otherActivity: e.target.value })
+                        }
+                        className={fieldClass}
+                        required
+                    />
+                )}
+            </div>
+
+            {/* Brief Description */}
+            <div className="space-y-1.5">
+                <Label className={labelClass}>Brief Description</Label>
+                <textarea
+                    spellCheck
+                    placeholder="What activities were performed? What was achieved?"
+                    value={formData.description}
+                    maxLength={ATTENDANCE_DESCRIPTION_MAX_CHARS}
+                    onChange={(e) =>
+                        setFormData({ ...formData, description: e.target.value })
+                    }
+                    className={clsx(
+                        "min-h-[110px] w-full resize-none rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-900 shadow-sm transition-colors placeholder:text-slate-400 focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100",
+                    )}
+                    required
+                    aria-invalid={descriptionOverLimit}
+                    aria-describedby={
+                        descriptionOverLimit ? "attendance-description-limit" : undefined
+                    }
+                />
+                <div className="flex items-center justify-end gap-1 text-[11px] text-slate-400">
+                    <span className={overWords ? "font-medium text-red-600" : undefined}>
+                        {wordCount} / {ATTENDANCE_DESCRIPTION_MAX_WORDS} words
+                    </span>
+                    <span className="text-slate-300">·</span>
+                    <span className={overChars ? "font-medium text-red-600" : undefined}>
+                        {charCount} / {ATTENDANCE_DESCRIPTION_MAX_CHARS} characters
+                    </span>
+                </div>
+                {descriptionLimitMessage ? (
+                    <p id="attendance-description-limit" className="text-xs text-red-600">
+                        {descriptionLimitMessage}
+                    </p>
+                ) : null}
+            </div>
+
+            {/* Supporting Evidence */}
+            <div className="space-y-1.5">
+                <Label className={labelClass}>Supporting Evidence</Label>
+                {evidenceFile ? (
+                    <div className="flex items-center justify-between rounded-xl border border-indigo-100 bg-indigo-50/50 px-4 py-3">
+                        <div className="flex min-w-0 items-center gap-2">
+                            <CheckCircle2 className="h-4 w-4 shrink-0 text-indigo-600" />
+                            <span className="truncate text-sm font-medium text-indigo-700">
+                                {evidenceFile.name}
+                            </span>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() => setEvidenceFile(null)}
+                            className="shrink-0 text-indigo-400 hover:text-indigo-600"
+                            aria-label="Remove file"
+                        >
+                            <X className="h-4 w-4" />
+                        </button>
+                    </div>
+                ) : (
+                    <div className="relative">
+                        <input
+                            type="file"
+                            accept={REPORT_ATTACHMENT_ACCEPT}
+                            onChange={(e) => setEvidenceFile(e.target.files?.[0] || null)}
+                            className="absolute inset-0 z-10 cursor-pointer opacity-0"
+                        />
+                        <div className="flex flex-col items-center gap-1.5 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50/40 px-4 py-8 text-center transition-colors hover:border-indigo-200 hover:bg-indigo-50/30">
+                            <Upload className="h-5 w-5 text-slate-400" />
+                            <span className="text-sm font-medium text-slate-600">
+                                Drop files or click to upload
+                            </span>
+                            <span className="text-[11px] text-slate-400">
+                                JPG, PNG, HEIC, WebP, PDF, Word
+                            </span>
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            {/* Submit */}
+            <div className="space-y-3 pt-1">
                 {submitError ? (
                     <div
                         role="alert"

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { BarChart3, Loader2 } from "lucide-react";
+import { BarChart3, Loader2, Lock, Sparkles } from "lucide-react";
 import {
     Card,
     CardContent,
@@ -11,8 +11,16 @@ import {
 } from "@/app/dashboard/student/report/components/ui/card";
 import AnalyticsFieldValue, { analyticsFieldSpan } from "@/components/analytics/AnalyticsFieldValue";
 import {
+    ANALYTICS_CATEGORY_LABELS,
+    ANALYTICS_CATEGORY_ORDER,
+    categoryAccentDot,
+    categoryBandHeaderClasses,
+    categoryCardClasses,
+    categoryPillClasses,
+} from "@/components/analytics/analyticsCategoryStyles";
+import {
     fetchSection1Analytics,
-    orderedSection1FieldEntries,
+    orderedEntriesForCategory,
     section1FieldLabel,
     type Section1AnalyticsPayload,
 } from "@/utils/section1Analytics";
@@ -69,15 +77,29 @@ export default function Section1AnalyticsPanel({
         };
     }, [apiPath, JSON.stringify(query ?? {})]);
 
-    const entries = useMemo(() => {
+    const bands = useMemo(() => {
         if (!data) return [];
-        const all = orderedSection1FieldEntries(data);
-        return maxFields > 0 ? all.slice(0, maxFields) : all;
+        let remaining = maxFields > 0 ? maxFields : Number.POSITIVE_INFINITY;
+        const result: Array<{
+            category: (typeof ANALYTICS_CATEGORY_ORDER)[number];
+            entries: Array<[string, unknown]>;
+        }> = [];
+        for (const category of ANALYTICS_CATEGORY_ORDER) {
+            if (remaining <= 0) break;
+            const all = orderedEntriesForCategory(data, category);
+            if (all.length === 0) continue;
+            const slice = all.slice(0, remaining);
+            remaining -= slice.length;
+            result.push({ category, entries: slice });
+        }
+        return result;
     }, [data, maxFields]);
 
     if (loading) {
         return (
-            <div className={`overflow-hidden rounded-2xl border border-slate-200/80 bg-gradient-to-br from-white to-slate-50/80 shadow-sm ${className}`}>
+            <div
+                className={`overflow-hidden rounded-2xl border border-slate-200/80 bg-gradient-to-br from-white to-slate-50/80 shadow-sm ${className}`}
+            >
                 <div className="border-b border-slate-100 px-6 py-5">
                     <div className="flex items-center gap-3">
                         <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-100 text-indigo-600">
@@ -98,7 +120,7 @@ export default function Section1AnalyticsPanel({
         );
     }
 
-    if (!data || entries.length === 0) {
+    if (!data || bands.length === 0) {
         return hideOnError ? null : (
             <Card className={className}>
                 <CardContent className="p-6 text-sm text-slate-500">Analytics unavailable.</CardContent>
@@ -107,7 +129,9 @@ export default function Section1AnalyticsPanel({
     }
 
     return (
-        <Card className={`overflow-hidden border-slate-200/80 bg-gradient-to-br from-white to-slate-50/50 shadow-md shadow-slate-200/40 ${className}`}>
+        <Card
+            className={`overflow-hidden border-slate-200/80 bg-gradient-to-br from-white to-slate-50/50 shadow-md shadow-slate-200/40 ${className}`}
+        >
             <CardHeader className="border-b border-slate-100 bg-white/80 pb-4">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                     <div className="flex min-w-0 items-start gap-3">
@@ -116,7 +140,9 @@ export default function Section1AnalyticsPanel({
                         </div>
                         <div className="min-w-0">
                             <CardTitle className="text-lg font-bold text-slate-900">{title}</CardTitle>
-                            <CardDescription className="mt-1 max-w-2xl text-sm leading-relaxed">{description}</CardDescription>
+                            <CardDescription className="mt-1 max-w-2xl text-sm leading-relaxed">
+                                {description}
+                            </CardDescription>
                         </div>
                     </div>
                     <div className="flex flex-wrap gap-2">
@@ -129,30 +155,61 @@ export default function Section1AnalyticsPanel({
                     </div>
                 </div>
             </CardHeader>
-            <CardContent className="p-6">
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                    {entries.map(([key, value]) => {
-                        const span = analyticsFieldSpan(key, value);
-                        const spanClass =
-                            span === "full"
-                                ? "sm:col-span-2 xl:col-span-3"
-                                : span === "wide"
-                                  ? "sm:col-span-2"
-                                  : "";
+            <CardContent className="space-y-4 p-6">
+                {bands.map(({ category, entries }) => (
+                    <section key={category} className="overflow-hidden border border-slate-200 bg-white">
+                        <div
+                            className={`flex items-center gap-2 border-b px-3 py-2 ${categoryBandHeaderClasses(category)}`}
+                        >
+                            <span className={`h-2 w-2 rounded-full ${categoryAccentDot(category)}`} />
+                            <p className="text-xs font-semibold text-slate-800">
+                                {ANALYTICS_CATEGORY_LABELS[category]}
+                            </p>
+                            {category === "premium" ? (
+                                <Sparkles className="h-3 w-3 text-amber-600" aria-hidden />
+                            ) : null}
+                            {category === "restricted" ? (
+                                <Lock className="h-3 w-3 text-rose-600" aria-hidden />
+                            ) : null}
+                            <span className="ml-auto text-[10px] font-semibold tabular-nums text-slate-500">
+                                {entries.length}
+                            </span>
+                        </div>
+                        <div className="grid grid-cols-1 gap-3 p-3 sm:grid-cols-2 xl:grid-cols-3">
+                            {entries.map(([key, value]) => {
+                                const meta = data.meta[key];
+                                const span = analyticsFieldSpan(key, value);
+                                const spanClass =
+                                    span === "full"
+                                        ? "sm:col-span-2 xl:col-span-3"
+                                        : span === "wide"
+                                          ? "sm:col-span-2"
+                                          : "";
 
-                        return (
-                            <article
-                                key={key}
-                                className={`rounded-2xl border border-slate-100 bg-white p-5 shadow-sm transition-shadow hover:shadow-md ${spanClass}`}
-                            >
-                                <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">
-                                    {section1FieldLabel(key)}
-                                </p>
-                                <AnalyticsFieldValue fieldKey={key} value={value} meta={data.meta[key]} />
-                            </article>
-                        );
-                    })}
-                </div>
+                                return (
+                                    <article
+                                        key={key}
+                                        className={`rounded-xl border border-slate-100 p-4 shadow-sm ${categoryCardClasses(meta?.category)} ${spanClass}`}
+                                    >
+                                        <div className="mb-2 flex items-start justify-between gap-2">
+                                            <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">
+                                                {section1FieldLabel(key)}
+                                            </p>
+                                            {meta?.category ? (
+                                                <span
+                                                    className={`inline-flex items-center gap-1 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide ${categoryPillClasses(meta.category)}`}
+                                                >
+                                                    {ANALYTICS_CATEGORY_LABELS[meta.category]}
+                                                </span>
+                                            ) : null}
+                                        </div>
+                                        <AnalyticsFieldValue fieldKey={key} value={value} meta={meta} />
+                                    </article>
+                                );
+                            })}
+                        </div>
+                    </section>
+                ))}
             </CardContent>
         </Card>
     );

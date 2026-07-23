@@ -1,33 +1,42 @@
 "use client";
 
-import { BarChart3 } from "lucide-react";
 import AnalyticsHub from "@/components/analytics/AnalyticsHub";
+import UnifiedAnalyticsOverview from "@/components/analytics/UnifiedAnalyticsOverview";
 
 export default function PartnerAnalyticsPage() {
     return (
-        <div className="space-y-6">
-            <div>
-                <div className="mb-2 flex items-center gap-2 text-indigo-600">
-                    <BarChart3 className="h-5 w-5" />
-                    <span className="text-xs font-bold uppercase tracking-wider">Insights</span>
-                </div>
-                <h1 className="text-2xl font-bold text-slate-900">Analytics</h1>
+        <div className="mx-auto max-w-[1400px] space-y-4 pb-10">
+            <header className="border-b border-slate-200 pb-3">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">BI workspace</p>
+                <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Analytics</h1>
                 <p className="mt-1 text-sm text-slate-500">
                     Organization-wide participation and verification by report section.
                 </p>
-            </div>
+            </header>
 
-            <AnalyticsHub
-                views={[
-                    {
-                        id: "partner",
-                        label: "Partner",
-                        apiPath: "/api/v1/partners/analytics/section1",
-                        query: { scope: "aggregate" },
-                    },
-                ]}
-                hideOnError={false}
+            <UnifiedAnalyticsOverview
+                apiPath="/api/v1/partners/analytics/overview"
+                query={{ scope: "aggregate" }}
+                title="Organization overview"
             />
+
+            <div className="border-t border-slate-200 pt-4">
+                <div className="mb-3">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">Drill-down</p>
+                    <h2 className="text-base font-semibold tracking-tight text-slate-900">Report analytics by section</h2>
+                </div>
+                <AnalyticsHub
+                    views={[
+                        {
+                            id: "partner",
+                            label: "Partner",
+                            apiPath: "/api/v1/partners/analytics/section1",
+                            query: { scope: "aggregate" },
+                        },
+                    ]}
+                    hideOnError={false}
+                />
+            </div>
         </div>
     );
 }

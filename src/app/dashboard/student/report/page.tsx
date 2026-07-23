@@ -931,7 +931,7 @@ function ReportFormContent() {
             </div>
 
 
-            {!(summaryOnlyWorkspace || ciiVerifiedSummaryLock) && (
+            {!(summaryOnlyWorkspace || ciiVerifiedSummaryLock) && activeStep !== 1 && (
                 <div className="mt-4 rounded-xl border border-slate-200/80 bg-white/90 shadow-sm shadow-slate-200/50 backdrop-blur-sm px-3 py-3 md:px-5 md:py-3.5">
                 <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between max-w-[1600px] mx-auto">
                     <div className="flex justify-start sm:flex-1">

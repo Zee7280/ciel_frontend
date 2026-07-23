@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { BarChart3, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import AnalyticsHub from "@/components/analytics/AnalyticsHub";
+import UnifiedAnalyticsOverview from "@/components/analytics/UnifiedAnalyticsOverview";
 import { authenticatedFetch } from "@/utils/api";
 import { readStudentDashboardCache } from "@/utils/student-dashboard-fetch";
 
@@ -61,35 +62,46 @@ export default function StudentAnalyticsPage() {
     }
 
     return (
-        <div className="space-y-6">
-            <div>
-                <div className="mb-2 flex items-center gap-2 text-indigo-600">
-                    <BarChart3 className="h-5 w-5" />
-                    <span className="text-xs font-bold uppercase tracking-wider">Insights</span>
-                </div>
-                <h1 className="text-2xl font-bold text-slate-900">Analytics</h1>
-                <p className="mt-1 text-sm text-slate-500">Read-only report metrics for your active project, organized by section.</p>
-            </div>
+        <div className="mx-auto max-w-[1400px] space-y-4 pb-10">
+            <header className="border-b border-slate-200 pb-3">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">BI workspace</p>
+                <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Analytics</h1>
+                <p className="mt-1 text-sm text-slate-500">
+                    Read-only report metrics for your active project, organized by section.
+                </p>
+            </header>
 
             {projectId ? (
-                <AnalyticsHub
-                    views={[
-                        {
-                            id: "student",
-                            label: "Student",
-                            apiPath: `/api/v1/student/projects/${encodeURIComponent(projectId)}/section1-analytics`,
-                        },
-                    ]}
-                    projectTitleOverride={projectTitle ?? undefined}
-                    reportLink={`/dashboard/student/report?projectId=${encodeURIComponent(projectId)}`}
-                    hideOnError={false}
-                />
+                <>
+                    <UnifiedAnalyticsOverview
+                        apiPath={`/api/v1/student/projects/${encodeURIComponent(projectId)}/analytics/overview`}
+                        title={projectTitle ? `${projectTitle} overview` : "Project overview"}
+                    />
+                    <div className="border-t border-slate-200 pt-4">
+                        <div className="mb-3">
+                            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">Drill-down</p>
+                            <h2 className="text-base font-semibold tracking-tight text-slate-900">My report by section</h2>
+                        </div>
+                        <AnalyticsHub
+                            views={[
+                                {
+                                    id: "student",
+                                    label: "Student",
+                                    apiPath: `/api/v1/student/projects/${encodeURIComponent(projectId)}/section1-analytics`,
+                                },
+                            ]}
+                            projectTitleOverride={projectTitle ?? undefined}
+                            reportLink={`/dashboard/student/report?projectId=${encodeURIComponent(projectId)}`}
+                            hideOnError={false}
+                        />
+                    </div>
+                </>
             ) : (
-                <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm">
+                <div className="border border-slate-200 bg-white px-6 py-8 text-center">
                     <p className="text-sm text-slate-600">No active project found yet.</p>
                     <Link
                         href="/dashboard/student/projects"
-                        className="mt-3 inline-block text-sm font-semibold text-indigo-600 hover:underline"
+                        className="mt-3 inline-block text-sm font-semibold text-slate-900 underline"
                     >
                         View my projects
                     </Link>

@@ -1,6 +1,6 @@
 import {
-    Package, Plus, Trash2, FileText, Save, Info, AlertCircle,
-    Banknote, CheckCircle2, Activity, Users, BarChart3
+    Package, Plus, Trash2, FileText, Info, AlertCircle,
+    Banknote, CheckCircle2, Activity, Users, BarChart3, Upload, ChevronDown,
 } from "lucide-react";
 import { Label } from "./ui/label";
 import { Input } from "./ui/input";
@@ -33,7 +33,6 @@ function filterOversizedImages(files: File[], input: HTMLInputElement): File[] {
     return accepted;
 }
 
-// ─── Static data ──────────────────────────────────────────────────────────────
 const resourceTypes = [
     "Financial (Cash Funding)",
     "In-kind Materials (Food / Books / Supplies / Kits)",
@@ -50,12 +49,12 @@ const resourceTypes = [
     "Corporate / CSR Sponsorship",
     "Government Program Support",
     "International Development Support",
-    "Other (Specify)"
+    "Other (Specify)",
 ];
 
 const unitOptions = [
     "PKR", "USD", "Number (#)", "Hours", "Units", "Kg", "Liters",
-    "Sessions", "Licenses", "Devices", "Kits", "Other (Specify)"
+    "Sessions", "Licenses", "Devices", "Kits", "Other (Specify)",
 ];
 
 const sourceOptions = [
@@ -68,7 +67,7 @@ const sourceOptions = [
     "Community Members",
     "International Organization",
     "Self-Funded",
-    "Other (Specify)"
+    "Other (Specify)",
 ];
 
 const verificationOptions = [
@@ -77,23 +76,73 @@ const verificationOptions = [
     "University Confirmed",
     "Official Documentation",
     "Self-Reported",
-    "Pending Verification"
+    "Pending Verification",
 ];
 
 const evidenceDocTypes = [
-    "Receipts", "Sponsorship Letters", "Official Emails", "Photos",
-    "Venue Confirmation", "Partner Letter", "Government Approval"
+    "Receipts", "Sponsorship letters", "Official emails", "Photos",
+    "Venue confirmation", "Partner letter", "Government approval",
 ];
 
-// ─── Empty resource factory ────────────────────────────────────────────────────
 const emptyResource = () => ({
-    type: '', type_other: '', amount: '', unit: '', unit_other: '',
-    sources: [] as string[], source_other: '', purpose: '', verification: [] as string[]
+    type: "", type_other: "", amount: "", unit: "", unit_other: "",
+    sources: [] as string[], source_other: "", purpose: "", verification: [] as string[],
 });
 
-// ─── File Preview ──────────────────────────────────────────────────────────────
+const inputClasses =
+    "h-11 w-full min-w-0 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-800 shadow-sm outline-none transition-colors placeholder:text-slate-400 focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100";
+const selectClasses =
+    "h-11 w-full min-w-0 appearance-none rounded-lg border border-slate-200 bg-white px-3 pr-9 text-sm font-medium text-slate-800 shadow-sm outline-none transition-colors focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100";
+const textareaClasses =
+    "min-h-[110px] w-full min-w-0 resize-y rounded-xl border border-slate-200 bg-white p-4 text-sm font-medium leading-relaxed text-slate-800 shadow-sm outline-none transition-colors placeholder:text-slate-400 focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100";
+const fieldLabel =
+    "text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500";
+
+function CheckGrid({
+    options,
+    selected,
+    onToggle,
+}: {
+    options: string[];
+    selected: string[];
+    onToggle: (value: string) => void;
+}) {
+    return (
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            {options.map((opt) => {
+                const active = selected.includes(opt);
+                return (
+                    <button
+                        key={opt}
+                        type="button"
+                        onClick={() => onToggle(opt)}
+                        className={clsx(
+                            "flex items-center gap-2.5 rounded-lg border px-3 py-2.5 text-left text-xs font-medium transition-colors",
+                            active
+                                ? "border-indigo-200 bg-indigo-50 text-indigo-800"
+                                : "border-slate-200 bg-white text-slate-600 hover:border-indigo-100 hover:bg-slate-50",
+                        )}
+                    >
+                        <span
+                            className={clsx(
+                                "flex h-4 w-4 shrink-0 items-center justify-center rounded border",
+                                active
+                                    ? "border-indigo-600 bg-indigo-600 text-white"
+                                    : "border-slate-300 bg-white",
+                            )}
+                        >
+                            {active ? <CheckCircle2 className="h-3 w-3" /> : null}
+                        </span>
+                        {opt}
+                    </button>
+                );
+            })}
+        </div>
+    );
+}
+
 function FilePreview({ file }: { file: any }) {
-    const isImage = file?.type?.startsWith('image/') || file?.name?.match(/\.(jpg|jpeg|png|gif|webp|heic|heif)$/i);
+    const isImage = file?.type?.startsWith("image/") || file?.name?.match(/\.(jpg|jpeg|png|gif|webp|heic|heif)$/i);
     const [previewUrl, setPreviewUrl] = React.useState<string | null>(null);
 
     useEffect(() => {
@@ -102,7 +151,7 @@ function FilePreview({ file }: { file: any }) {
                 const url = URL.createObjectURL(file);
                 setPreviewUrl(url);
                 return () => URL.revokeObjectURL(url);
-            } else if (typeof file === 'string') {
+            } else if (typeof file === "string") {
                 setPreviewUrl(file);
             } else if (file?.url) {
                 setPreviewUrl(file.url);
@@ -112,21 +161,21 @@ function FilePreview({ file }: { file: any }) {
 
     if (isImage && previewUrl) {
         return (
-            <div className="w-10 h-10 rounded-lg overflow-hidden shrink-0 border border-slate-200 bg-slate-100 flex items-center justify-center">
-                <img src={previewUrl} alt={file?.name || 'Preview'} className="w-full h-full object-cover" />
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-slate-100">
+                <img src={previewUrl} alt={file?.name || "Preview"} className="h-full w-full object-cover" />
             </div>
         );
     }
 
     return (
-        <div className="w-10 h-10 rounded-lg bg-report-primary-soft text-report-primary flex items-center justify-center shrink-0 border border-slate-100">
-            <FileText className="w-5 h-5" />
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-indigo-100 bg-indigo-50 text-indigo-600">
+            <FileText className="h-5 w-5" />
         </div>
     );
 }
 
 function FullFilePreview({ file }: { file: any }) {
-    const isImage = file?.type?.startsWith('image/') || file?.name?.match(/\.(jpg|jpeg|png|gif|webp|heic|heif)$/i);
+    const isImage = file?.type?.startsWith("image/") || file?.name?.match(/\.(jpg|jpeg|png|gif|webp|heic|heif)$/i);
     const [previewUrl, setPreviewUrl] = React.useState<string | null>(null);
 
     useEffect(() => {
@@ -136,7 +185,7 @@ function FullFilePreview({ file }: { file: any }) {
                 const url = URL.createObjectURL(file);
                 setPreviewUrl(url);
                 return () => URL.revokeObjectURL(url);
-            } else if (typeof file === 'string') {
+            } else if (typeof file === "string") {
                 setPreviewUrl(file);
             } else if (file?.url) {
                 setPreviewUrl(file.url);
@@ -148,266 +197,224 @@ function FullFilePreview({ file }: { file: any }) {
 
     if (isImage && previewUrl) {
         return (
-            <img src={previewUrl} alt={file?.name || 'Preview'} className="max-w-full max-h-[70vh] object-contain rounded-lg" />
+            <img src={previewUrl} alt={file?.name || "Preview"} className="max-h-[70vh] max-w-full rounded-lg object-contain" />
         );
     }
 
     return (
-        <div className="flex flex-col items-center justify-center p-12 text-slate-400 space-y-4">
-            <FileText className="w-16 h-16 text-slate-200" />
+        <div className="flex flex-col items-center justify-center space-y-4 p-12 text-slate-400">
+            <FileText className="h-16 w-16 text-slate-200" />
             <p className="text-sm font-semibold">Preview not available for this file type</p>
             <p className="text-xs text-slate-400">({file?.name})</p>
         </div>
     );
 }
 
-// ─── Resource Card ─────────────────────────────────────────────────────────────
 function ResourceCard({
-    res, idx, onUpdate, onRemove, canRemove, getFieldError
+    res, idx, onUpdate, onRemove, canRemove, getFieldError,
 }: {
     res: any; idx: number; canRemove: boolean;
     onUpdate: (field: string, val: any) => void;
     onRemove: () => void;
     getFieldError: (key: string) => string | undefined;
 }) {
-    const purposeWords = (res.purpose || '').trim().split(/\s+/).filter((w: string) => w.length > 0).length;
+    const purposeWords = countWords(res.purpose || "");
     const sources: string[] = res.sources || [];
     const verifications: string[] = Array.isArray(res.verification)
         ? res.verification
-        : typeof res.verification === 'string' && res.verification
+        : typeof res.verification === "string" && res.verification
             ? [res.verification]
             : [];
 
     const toggleSource = (s: string) => {
-        onUpdate('sources', sources.includes(s) ? sources.filter(x => x !== s) : [...sources, s]);
+        onUpdate("sources", sources.includes(s) ? sources.filter(x => x !== s) : [...sources, s]);
     };
 
     const toggleVerification = (v: string) => {
-        onUpdate('verification', verifications.includes(v) ? verifications.filter(x => x !== v) : [...verifications, v]);
+        onUpdate("verification", verifications.includes(v) ? verifications.filter(x => x !== v) : [...verifications, v]);
     };
 
     return (
-        <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm space-y-4 relative group">
-            {/* Header */}
-            <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                    <div className="w-7 h-7 rounded-full bg-slate-800 text-white flex items-center justify-center font-black text-[10px]">
+        <div className="space-y-5 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+            <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5">
+                    <span className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-900 text-[11px] font-bold text-white">
                         {idx + 1}
-                    </div>
-                    <span className="report-label">Resource Entry</span>
+                    </span>
+                    <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                        Resource entry
+                    </span>
                 </div>
-                {canRemove && (
+                {canRemove ? (
                     <button
-                        type="button" onClick={onRemove}
-                        className="w-8 h-8 rounded-full bg-red-50 text-red-400 flex items-center justify-center hover:bg-red-100 hover:text-red-600 transition-all"
+                        type="button"
+                        onClick={onRemove}
+                        className="inline-flex items-center gap-1.5 text-xs font-semibold text-red-500 transition-colors hover:text-red-700"
                     >
-                        <Trash2 className="w-4 h-4" />
+                        <Trash2 className="h-3.5 w-3.5" />
+                        Remove
                     </button>
-                )}
+                ) : null}
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                {/* Left column */}
-                <div className="space-y-6">
-                    {/* 6.2.1 Resource Type */}
-                    <div className="space-y-3">
-                        <Label className="report-label">6.2.1 — Resource Type (Required)</Label>
+            <div className="space-y-1.5">
+                <Label className={fieldLabel}>
+                    6.2.1 Resource type <span className="normal-case text-red-500">· required</span>
+                </Label>
+                <div className="relative">
+                    <select
+                        value={res.type}
+                        onChange={e => onUpdate("type", e.target.value)}
+                        className={selectClasses}
+                    >
+                        <option value="">Select resource type...</option>
+                        {resourceTypes.map(t => <option key={t} value={t}>{t}</option>)}
+                    </select>
+                    <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                </div>
+                {res.type === "Other (Specify)" ? (
+                    <div className="space-y-1.5 pt-1">
+                        <Textarea
+                            placeholder="Specify resource type (50–200 words)…"
+                            value={res.type_other || ""}
+                            onChange={e => onUpdate("type_other", e.target.value)}
+                            className={textareaClasses}
+                        />
+                        <div className="flex items-center justify-between gap-2 text-[11px]">
+                            <span className={clsx(
+                                countWords(res.type_other || "") >= 50 && countWords(res.type_other || "") <= 200
+                                    ? "text-emerald-600"
+                                    : "text-amber-600",
+                            )}>
+                                {countWords(res.type_other || "")} / 200 words (min 50)
+                            </span>
+                            <FieldError message={getFieldError(`resources.${idx}.type_other`)} />
+                        </div>
+                    </div>
+                ) : null}
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                    <Label className={fieldLabel}>6.2.2 Amount</Label>
+                    <Input
+                        type="number"
+                        placeholder="0"
+                        value={res.amount}
+                        onChange={e => onUpdate("amount", e.target.value)}
+                        className={inputClasses}
+                    />
+                    <FieldError message={getFieldError(`resources.${idx}.amount`)} />
+                </div>
+                <div className="space-y-1.5">
+                    <Label className={fieldLabel}>6.2.3 Unit</Label>
+                    <div className="relative">
                         <select
-                            value={res.type}
-                            onChange={e => onUpdate('type', e.target.value)}
-                            className="w-full h-12 bg-slate-50 border-2 border-slate-100 rounded-xl px-4 font-bold text-slate-700 text-xs outline-none focus:border-report-primary-border"
+                            value={res.unit}
+                            onChange={e => onUpdate("unit", e.target.value)}
+                            className={selectClasses}
                         >
-                            <option value="">Select Resource Type...</option>
-                            {resourceTypes.map(t => <option key={t} value={t}>{t}</option>)}
+                            <option value="">Select unit...</option>
+                            {unitOptions.map(u => <option key={u} value={u}>{u}</option>)}
                         </select>
-                        {res.type === 'Other (Specify)' && (
-                            <div className="space-y-2 mt-2">
-                                <Textarea
-                                    placeholder="Specify resource type (50-200 Words)..."
-                                    value={res.type_other || ''}
-                                    onChange={e => onUpdate('type_other', e.target.value)}
-                                    className="w-full h-24 bg-slate-50 border-2 border-report-primary-border rounded-xl px-4 py-3 text-xs font-bold text-slate-700 outline-none focus:border-report-primary resize-none"
-                                />
-                                <div className="flex items-center justify-between px-1">
-                                    <p className={clsx(
-                                        "report-label !text-[9px]",
-                                        countWords(res.type_other || '') >= 50 && countWords(res.type_other || '') <= 200 ? "text-blue-600" : "text-amber-500"
-                                    )}>
-                                        {countWords(res.type_other || '')} / 200 words (Min 50)
-                                    </p>
-                                    <FieldError message={getFieldError(`resources.${idx}.type_other`)} />
-                                </div>
-                            </div>
-                        )}
-                    </div>
-
-                    {/* 6.2.2 + 6.2.3 Amount & Unit */}
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <Label className="report-label">6.2.2 — Amount</Label>
-                            <Input
-                                type="number" placeholder="0"
-                                value={res.amount}
-                                onChange={e => onUpdate('amount', e.target.value)}
-                                className="h-12 bg-slate-50 border-2 border-slate-100 rounded-xl font-black text-slate-700"
-                            />
-                            <FieldError message={getFieldError(`resources.${idx}.amount`)} />
-                        </div>
-                        <div className="space-y-2">
-                            <Label className="report-label">6.2.3 — Unit</Label>
-                            <select
-                                value={res.unit}
-                                onChange={e => onUpdate('unit', e.target.value)}
-                                className="w-full h-12 bg-slate-50 border-2 border-slate-100 rounded-xl px-3 font-bold text-slate-700 text-xs outline-none"
-                            >
-                                <option value="">Unit...</option>
-                                {unitOptions.map(u => <option key={u} value={u}>{u}</option>)}
-                            </select>
-                        </div>
-                    </div>
-                    {res.unit === 'Other (Specify)' && (
-                        <div className="space-y-2 mt-2">
-                            <Textarea
-                                placeholder="Specify unit (50-200 Words)..."
-                                value={res.unit_other || ''}
-                                onChange={e => onUpdate('unit_other', e.target.value)}
-                                className="w-full h-24 bg-slate-50 border-2 border-report-primary-border rounded-xl px-4 py-3 text-xs font-bold text-slate-700 outline-none focus:border-report-primary resize-none"
-                            />
-                            <div className="flex items-center justify-between px-1">
-                                <p className={clsx(
-                                    "report-label !text-[9px]",
-                                    countWords(res.unit_other || '') >= 50 && countWords(res.unit_other || '') <= 200 ? "text-blue-600" : "text-amber-500"
-                                )}>
-                                    {countWords(res.unit_other || '')} / 200 words (Min 50)
-                                </p>
-                                <FieldError message={getFieldError(`resources.${idx}.unit_other`)} />
-                            </div>
-                        </div>
-                    )}
-
-                    {/* 6.2.6 Verification — multi-select */}
-                    <div className="space-y-3">
-                        <Label className="report-label">6.2.6 — Verification Status (Select All That Apply)</Label>
-                        <div className="grid grid-cols-1 gap-1.5">
-                            {verificationOptions.map(v => (
-                                <button
-                                    key={v} type="button"
-                                    onClick={() => toggleVerification(v)}
-                                    className={clsx(
-                                        "flex items-center gap-2 px-3 py-2 rounded-xl border-2 report-label !text-[9px] text-left transition-all",
-                                        verifications.includes(v)
-                                            ? "border-report-primary bg-report-primary-soft text-report-primary"
-                                            : "border-slate-50 bg-slate-50 text-slate-500 hover:bg-slate-100"
-                                    )}
-                                >
-                                    <div className={clsx(
-                                        "w-3 h-3 rounded-sm border-2 flex items-center justify-center flex-shrink-0",
-                                        verifications.includes(v) ? "border-report-primary bg-report-primary" : "border-slate-300"
-                                    )}>
-                                        {verifications.includes(v) && <CheckCircle2 className="w-2 h-2 text-white" />}
-                                    </div>
-                                    {v}
-                                </button>
-                            ))}
-                        </div>
+                        <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                     </div>
                 </div>
+            </div>
 
-                {/* Right column */}
-                <div className="space-y-6">
-                    {/* 6.2.4 Source — multi-select */}
-                    <div className="space-y-3">
-                        <Label className="report-label">6.2.4 — Source of Resource (Select All That Apply)</Label>
-                        <div className="grid grid-cols-1 gap-1.5">
-                            {sourceOptions.map(s => (
-                                <button
-                                    key={s} type="button"
-                                    onClick={() => toggleSource(s)}
-                                    className={clsx(
-                                        "flex items-center gap-2 px-3 py-2 rounded-xl border-2 report-label !text-[9px] text-left transition-all",
-                                        sources.includes(s)
-                                            ? "border-report-primary bg-report-primary-soft text-report-primary"
-                                            : "border-slate-50 bg-slate-50 text-slate-500 hover:bg-slate-100"
-                                    )}
-                                >
-                                    <div className={clsx(
-                                        "w-3 h-3 rounded-sm border-2 flex items-center justify-center flex-shrink-0",
-                                        sources.includes(s) ? "border-report-primary bg-report-primary" : "border-slate-300"
-                                    )}>
-                                        {sources.includes(s) && <CheckCircle2 className="w-2 h-2 text-white" />}
-                                    </div>
-                                    {s}
-                                </button>
-                            ))}
-                        </div>
-                        {sources.includes('Other (Specify)') && (
-                            <div className="space-y-2 mt-2">
-                                <Textarea
-                                    placeholder="Specify source (50-200 Words)..."
-                                    value={res.source_other || ''}
-                                    onChange={e => onUpdate('source_other', e.target.value)}
-                                    className="w-full h-24 bg-slate-50 border-2 border-report-primary-border rounded-xl px-4 py-3 text-xs font-bold text-slate-700 outline-none focus:border-report-primary resize-none"
-                                />
-                                <div className="flex items-center justify-between px-1">
-                                    <p className={clsx(
-                                        "report-label !text-[9px]",
-                                        countWords(res.source_other || '') >= 50 && countWords(res.source_other || '') <= 200 ? "text-blue-600" : "text-amber-500"
-                                    )}>
-                                        {countWords(res.source_other || '')} / 200 words (Min 50)
-                                    </p>
-                                    <FieldError message={getFieldError(`resources.${idx}.source_other`)} />
-                                </div>
-                            </div>
-                        )}
+            {res.unit === "Other (Specify)" ? (
+                <div className="space-y-1.5">
+                    <Textarea
+                        placeholder="Specify unit (50–200 words)…"
+                        value={res.unit_other || ""}
+                        onChange={e => onUpdate("unit_other", e.target.value)}
+                        className={textareaClasses}
+                    />
+                    <div className="flex items-center justify-between gap-2 text-[11px]">
+                        <span className={clsx(
+                            countWords(res.unit_other || "") >= 50 && countWords(res.unit_other || "") <= 200
+                                ? "text-emerald-600"
+                                : "text-amber-600",
+                        )}>
+                            {countWords(res.unit_other || "")} / 200 words (min 50)
+                        </span>
+                        <FieldError message={getFieldError(`resources.${idx}.unit_other`)} />
                     </div>
+                </div>
+            ) : null}
 
-                    {/* 6.2.5 Purpose — 20-40 words */}
-                    <div className="space-y-3">
-                        <Label className="report-label">6.2.5 — Purpose of Resource (50–200 Words)</Label>
-                        <textarea spellCheck={true}
-                            placeholder="Explain what exactly this resource enabled (e.g. 'Used to purchase hygiene kits for 45 participants')"
-                            value={res.purpose}
-                            onChange={e => onUpdate('purpose', e.target.value)}
-                            rows={3}
-                            className="w-full bg-slate-50 border-2 border-slate-100 rounded-xl px-4 py-3 text-xs font-bold text-slate-700 outline-none focus:border-report-primary-border resize-none"
+            <div className="space-y-2">
+                <Label className={fieldLabel}>6.2.4 Source of resource</Label>
+                <p className="text-xs text-slate-500">Select all that apply</p>
+                <CheckGrid options={sourceOptions} selected={sources} onToggle={toggleSource} />
+                {sources.includes("Other (Specify)") ? (
+                    <div className="space-y-1.5 pt-1">
+                        <Textarea
+                            placeholder="Specify source (50–200 words)…"
+                            value={res.source_other || ""}
+                            onChange={e => onUpdate("source_other", e.target.value)}
+                            className={textareaClasses}
                         />
-                        <div className="flex items-center justify-between px-1">
-                            <p className={clsx(
-                                "report-label !text-[9px]",
-                                purposeWords >= 50 && purposeWords <= 200 ? "text-blue-600" : purposeWords > 200 ? "text-red-500" : "text-amber-500"
+                        <div className="flex items-center justify-between gap-2 text-[11px]">
+                            <span className={clsx(
+                                countWords(res.source_other || "") >= 50 && countWords(res.source_other || "") <= 200
+                                    ? "text-emerald-600"
+                                    : "text-amber-600",
                             )}>
-                                {purposeWords} / 200 words (Min 50)
-                            </p>
-                            <FieldError message={getFieldError(`resources.${idx}.purpose`)} />
-                            {purposeWords >= 50 && purposeWords <= 200 && (
-                                <span className="report-label !text-[9px] !text-report-primary !flex !items-center !gap-1">
-                                    <CheckCircle2 className="w-3 h-3" /> Within range
-                                </span>
-                            )}
+                                {countWords(res.source_other || "")} / 200 words (min 50)
+                            </span>
+                            <FieldError message={getFieldError(`resources.${idx}.source_other`)} />
                         </div>
                     </div>
+                ) : null}
+            </div>
+
+            <div className="space-y-2">
+                <Label className={fieldLabel}>6.2.6 Verification status</Label>
+                <p className="text-xs text-slate-500">Select all that apply</p>
+                <CheckGrid options={verificationOptions} selected={verifications} onToggle={toggleVerification} />
+            </div>
+
+            <div className="space-y-1.5">
+                <Label className={fieldLabel}>6.2.5 Purpose of resource</Label>
+                <Textarea
+                    placeholder="Explain what exactly this resource enabled (e.g. 'Used to purchase hygiene kits for 45 participants')"
+                    value={res.purpose}
+                    onChange={e => onUpdate("purpose", e.target.value)}
+                    className={clsx(textareaClasses, "min-h-[120px]")}
+                />
+                <div className="flex flex-wrap items-center justify-between gap-2 text-[11px]">
+                    <span className={clsx(
+                        purposeWords >= 50 && purposeWords <= 200
+                            ? "text-emerald-600"
+                            : purposeWords > 200
+                              ? "text-red-500"
+                              : "text-amber-600",
+                    )}>
+                        {purposeWords} / 200 words · min 50
+                    </span>
+                    <FieldError message={getFieldError(`resources.${idx}.purpose`)} />
                 </div>
             </div>
         </div>
     );
 }
 
-// ─── Main Component ────────────────────────────────────────────────────────────
 export default function Section6Resources({ projectData }: { projectData?: unknown } = {}) {
-    const { data, updateSection, getFieldError, saveReport } = useReportForm();
+    const { data, updateSection, getFieldError } = useReportForm();
     const { section1, section3, section4, section6 } = data;
     const { use_resources, resources } = section6;
 
     const [previewFile, setPreviewFile] = useState<any>(null);
 
-    const update = (field: string, val: any) => updateSection('section6', { [field]: val });
+    const update = (field: string, val: any) => updateSection("section6", { [field]: val });
 
-    const addResource = () => update('resources', [...resources, emptyResource()]);
-    const removeResource = (i: number) => update('resources', resources.filter((_, idx) => idx !== i));
+    const addResource = () => update("resources", [...resources, emptyResource()]);
+    const removeResource = (i: number) => update("resources", resources.filter((_, idx) => idx !== i));
     const updateResource = (i: number, field: string, val: any) => {
         const next = [...resources];
         next[i] = { ...next[i], [field]: val };
-        update('resources', next);
+        update("resources", next);
     };
 
     const verifiedHoursSnapshot = useMemo(() => {
@@ -435,577 +442,374 @@ export default function Section6Resources({ projectData }: { projectData?: unkno
         return formatMergedSdgGoalsSnapshotLabels(rows);
     }, [projectData, section3]);
 
-    // ── Auto-generated narrative ──────────────────────────────────────────────
+    const activityTypesCount = useMemo(
+        () => (section4.activity_blocks || []).filter((a: any) => a.primary_category || a.title).length,
+        [section4.activity_blocks],
+    );
+
+    const outputsCount = useMemo(
+        () => (section4.activity_blocks || []).reduce((acc: number, b: any) => acc + (b.outputs?.length || 0), 0),
+        [section4.activity_blocks],
+    );
+
     const autoNarrative = useMemo(() => {
-        if (use_resources === 'no' || use_resources === '') {
+        if (use_resources === "no" || use_resources === "") {
             return `Resource Model: Volunteer-Based Implementation. Total Verified Hours: ${verifiedHoursSnapshot}h. Financial Mobilization: 0.`;
         }
         if (resources.length === 0) return "Resource narrative will appear once entries are added.";
         const typesUsed = [...new Set(resources.map(r => r.type).filter(Boolean))];
         const allSources = [...new Set(resources.flatMap(r => r.sources || []).filter(Boolean))];
-        return `The project mobilized ${typesUsed.length > 0 ? typesUsed.slice(0, 2).join(' and ').toLowerCase() : 'resources'} from ${allSources.length > 0 ? allSources.slice(0, 2).join(' and ').toLowerCase() : 'contributing sources'}, enabling structured delivery of activities and beneficiary engagement. A total of ${resources.length} resource ${resources.length === 1 ? 'category was' : 'categories were'} recorded to support implementation.`;
+        return `The project mobilized ${typesUsed.length > 0 ? typesUsed.slice(0, 2).join(" and ").toLowerCase() : "resources"} from ${allSources.length > 0 ? allSources.slice(0, 2).join(" and ").toLowerCase() : "contributing sources"}, enabling structured delivery of activities and beneficiary engagement. A total of ${resources.length} resource ${resources.length === 1 ? "category was" : "categories were"} recorded to support implementation.`;
     }, [use_resources, resources, verifiedHoursSnapshot]);
 
     useEffect(() => {
         if (section6.summary_text !== autoNarrative) {
-            updateSection('section6', { summary_text: autoNarrative });
+            updateSection("section6", { summary_text: autoNarrative });
         }
-    }, [autoNarrative, section6.summary_text]);
+    }, [autoNarrative, section6.summary_text, updateSection]);
 
-    // ── Analytics ─────────────────────────────────────────────────────────────
     const financialTypes = resources.filter(r =>
-        r.type?.toLowerCase().includes('financial') || r.unit === 'PKR' || r.unit === 'USD'
+        r.type?.toLowerCase().includes("financial") || r.unit === "PKR" || r.unit === "USD",
     );
     const inKindTypes = resources.filter(r => !financialTypes.includes(r));
     const uniqueSources = new Set(resources.flatMap(r => r.sources || [])).size;
 
     return (
-        <div className="space-y-5 pb-10">
-            {/* ─── Header ─────────────────────────────────────────────────── */}
-            <div className="space-y-4">
-
-                <div className="flex items-center gap-4">
-
-                    <div className="w-14 h-14 rounded-2xl bg-report-primary text-white flex items-center justify-center shadow-xl shadow-report-primary-shadow ring-4 ring-report-primary-soft">
-                        <Package className="w-7 h-7" />
-                    </div>
-
-                    <div className="space-y-0.5">
-                        <h2 className="report-h2">
-                            Section 6 — Resources & Implementation Support
-                        </h2>
-
-                        <p className="report-label">
-                            How Your Project Was Enabled
-                        </p>
-                    </div>
-
+        <div className="mx-auto max-w-4xl space-y-8 pb-10">
+            {/* Header */}
+            <div className="flex items-center gap-3.5">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-indigo-600 text-white shadow-sm">
+                    <Package className="h-5 w-5" />
                 </div>
-
+                <div>
+                    <h2 className="text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl">
+                        <span className="text-indigo-600">SECTION 6:</span> Resources &amp; implementation support
+                    </h2>
+                </div>
             </div>
 
-            {/* ─── 6.0 Project Snapshot ────────────────────────────────────── */}
-            <div className="space-y-6">
-
-                <div className="flex items-center gap-3">
-
-                    <div className="w-8 h-8 rounded-full bg-report-primary text-white flex items-center justify-center text-[11px] font-black">
-                        6.0
+            {/* 6.0 Project Snapshot */}
+            <section className="space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex items-center gap-2.5">
+                        <span className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-900 text-[11px] font-bold text-white">
+                            6.0
+                        </span>
+                        <h3 className="text-base font-semibold text-slate-900">Project snapshot</h3>
                     </div>
-
-                    <h3 className="report-h3">
-                        Project Snapshot
-                    </h3>
-
-                    <span className="report-label !text-report-primary bg-report-primary-soft border border-report-primary-border px-3 py-1 rounded-full">
-                        Auto-Generated · Read-Only
+                    <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                        Auto-generated · read-only
                     </span>
-
                 </div>
 
-
-                <div className="bg-white rounded-xl border border-slate-200 p-4 md:p-5 text-slate-900 relative overflow-hidden shadow-sm">
-
-                    <div className="absolute top-0 right-0 p-6 opacity-[0.04] pointer-events-none">
-                        <BarChart3 className="w-40 h-40 text-report-primary" />
-                    </div>
-
-                    <div className="relative z-10 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-
+                <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-4 sm:p-5">
+                    <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
                         {[
-                            { label: "SDG Goals", val: mappedSdgsDisplay },
-                            { label: "SDG Targets", val: mappedSdgTargetsDisplay },
-                            { label: "Beneficiaries", val: `${section4.project_summary?.distinct_total_beneficiaries || "0"} Reached` },
-                            { label: "Verified Hours", val: `${verifiedHoursSnapshot}h` },
-                            { label: "Activity Types", val: `${(section4.activity_blocks || []).filter((a: any) => a.type).length} Recorded` },
-                            { label: "Outputs", val: `${(section4.activity_blocks || []).reduce((acc: number, b: any) => acc + (b.outputs?.length || 0), 0)} Recorded` },
+                            { label: "SDG goals", val: mappedSdgsDisplay },
+                            { label: "SDG targets", val: mappedSdgTargetsDisplay },
+                            { label: "Beneficiaries", val: `${section4.project_summary?.distinct_total_beneficiaries || "0"} reached` },
+                            { label: "Verified hours", val: `${verifiedHoursSnapshot}h` },
+                            { label: "Activity types", val: `${activityTypesCount} recorded` },
+                            { label: "Outputs", val: `${outputsCount} recorded` },
                         ].map(({ label, val }) => (
-
-                            <div key={label} className="bg-slate-50 rounded-lg p-3 border border-slate-100 min-w-0 space-y-1">
-
-                                <p className="text-[9px] font-bold uppercase text-slate-500 tracking-wide">
-                                    {label}
-                                </p>
-
-                                <p className="text-sm font-black text-slate-900 truncate" title={typeof val === "string" ? val : undefined}>
+                            <div key={label} className="min-w-0 rounded-lg border border-slate-200 bg-white p-3">
+                                <p className={clsx(fieldLabel, "mb-1")}>{label}</p>
+                                <p className="truncate text-sm font-semibold text-slate-900" title={typeof val === "string" ? val : undefined}>
                                     {val}
                                 </p>
-
                             </div>
-
                         ))}
-
                     </div>
-
                 </div>
 
-
-                <div className="p-4 bg-report-primary-soft border border-report-primary-border rounded-xl flex items-start gap-3">
-
-                    <AlertCircle className="w-4 h-4 text-report-primary mt-0.5 shrink-0" />
-
-                    <p className="text-sm font-semibold text-report-primary">
+                <div className="flex items-start gap-3 rounded-xl border border-indigo-100 bg-indigo-50/70 px-4 py-3">
+                    <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-indigo-600" />
+                    <p className="text-sm leading-relaxed text-indigo-900/90">
                         This information is automatically pulled from previous sections and cannot be edited.
                     </p>
-
                 </div>
+            </section>
 
-            </div>
-
-            {/* ─── Step 1: Resource Confirmation ───────────────────────────── */}
-            <div className="space-y-6">
-
-                <div className="flex items-center gap-3">
-
-                    <div className="w-8 h-8 rounded-full bg-report-primary text-white flex items-center justify-center text-[11px] font-black">
+            {/* 6.1 Resource Confirmation */}
+            <section className="space-y-4">
+                <div className="flex items-center gap-2.5">
+                    <span className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-900 text-[11px] font-bold text-white">
                         6.1
-                    </div>
-
-                    <h3 className="report-h3">
-                        Step 1 — Resource Confirmation
-                    </h3>
-
+                    </span>
+                    <h3 className="text-base font-semibold text-slate-900">Step 1 — Resource confirmation</h3>
                 </div>
 
+                <div className="space-y-5 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+                    <Label className={fieldLabel}>Did this project use additional resources?</Label>
 
-                <div className="bg-white rounded-xl border border-slate-200 p-8 shadow-sm space-y-6">
-
-                    <Label className="text-sm font-semibold text-slate-800">
-                        Did This Project Use Additional Resources?
-                    </Label>
-
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-
-                        {/* Option 1 */}
+                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                         <button
                             type="button"
-                            onClick={() => update('use_resources', 'no')}
+                            onClick={() => update("use_resources", "no")}
                             className={clsx(
-                                "p-6 rounded-lg border text-left transition space-y-2",
-                                use_resources === 'no'
-                                    ? "border-slate-900 bg-slate-900 text-white shadow-md"
-                                    : "border-slate-200 bg-slate-50 text-slate-600 hover:border-slate-400"
+                                "rounded-xl border p-5 text-left transition-colors",
+                                use_resources === "no"
+                                    ? "border-slate-900 bg-slate-900 text-white shadow-sm"
+                                    : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50",
                             )}
                         >
-
-                            <p className="text-sm font-semibold">
-                                Time & Volunteer Effort Only
-                            </p>
-
+                            <p className="text-sm font-semibold">Time &amp; volunteer effort only</p>
                             <p className={clsx(
-                                "text-sm",
-                                use_resources === 'no' ? "text-slate-300" : "text-slate-400"
+                                "mt-1.5 text-xs leading-relaxed",
+                                use_resources === "no" ? "text-slate-300" : "text-slate-500",
                             )}>
                                 No financial, material, or external resources were used.
                             </p>
-
                         </button>
 
-
-                        {/* Option 2 */}
                         <button
                             type="button"
-                            onClick={() => update('use_resources', 'yes')}
+                            onClick={() => update("use_resources", "yes")}
                             className={clsx(
-                                "p-6 rounded-lg border text-left transition space-y-2",
-                                use_resources === 'yes'
-                                    ? "border-report-primary bg-report-primary text-white shadow-md"
-                                    : "border-slate-200 bg-slate-50 text-slate-600 hover:border-report-primary"
+                                "rounded-xl border p-5 text-left transition-colors",
+                                use_resources === "yes"
+                                    ? "border-indigo-600 bg-indigo-600 text-white shadow-sm"
+                                    : "border-slate-200 bg-white text-slate-700 hover:border-indigo-200 hover:bg-indigo-50/40",
                             )}
                         >
-
                             <p className="text-sm font-semibold">
-                                Yes — Financial, Material, or Other Resources Were Used
+                                Yes — financial, material, or other resources were used
                             </p>
-
                             <p className={clsx(
-                                "text-sm",
-                                use_resources === 'yes' ? "text-report-primary-soft" : "text-slate-400"
+                                "mt-1.5 text-xs leading-relaxed",
+                                use_resources === "yes" ? "text-indigo-100" : "text-slate-500",
                             )}>
                                 Continue to Step 2 to record each resource.
                             </p>
-
                         </button>
-
                     </div>
 
-
-
-                    {/* Time-only confirmation */}
-                    {use_resources === 'no' && (
-
-                        <div className="p-5 bg-slate-50 rounded-lg border border-slate-200 space-y-3 animate-in fade-in duration-300">
-
-                            <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide">
-                                System Records
+                    {use_resources === "no" ? (
+                        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                            <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                                System records
                             </p>
-
-                            <div className="grid grid-cols-3 gap-6">
-
+                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                                 {[
-                                    { label: "Resource Model", val: "Volunteer-Based" },
-                                    { label: "Verified Hours", val: `${verifiedHoursSnapshot}h` },
-                                    { label: "Financial Mobilization", val: "0" }
+                                    { label: "Resource model", val: "Volunteer-based" },
+                                    { label: "Verified hours", val: `${verifiedHoursSnapshot}h` },
+                                    { label: "Financial mobilization", val: "0" },
                                 ].map(({ label, val }) => (
-
-                                    <div key={label} className="space-y-1">
-
-                                        <p className="text-xs text-slate-400 uppercase tracking-wide">
-                                            {label}
-                                        </p>
-
-                                        <p className="text-sm font-semibold text-slate-800">
-                                            {val}
-                                        </p>
-
+                                    <div key={label}>
+                                        <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">{label}</p>
+                                        <p className="mt-0.5 text-sm font-semibold text-slate-800">{val}</p>
                                     </div>
-
                                 ))}
-
                             </div>
-
                         </div>
-
-                    )}
-
+                    ) : null}
                 </div>
+            </section>
 
-            </div>
-
-            {/* ─── Step 2: Resource Entries ─────────────────────────────────── */}
-            {use_resources === 'yes' && (
-
-                <div className="space-y-8 animate-in fade-in slide-in-from-top-4 duration-500">
-
-                    {/* Header */}
-
-                    <div className="flex items-center justify-between">
-
-                        <div className="flex items-center gap-3">
-
-                            <div className="w-8 h-8 rounded-full bg-report-primary text-white flex items-center justify-center text-[11px] font-semibold">
-                                6.2
+            {/* 6.2 + 6.3 when yes */}
+            {use_resources === "yes" ? (
+                <div className="space-y-8">
+                    <section className="space-y-4">
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                            <div className="flex items-center gap-2.5">
+                                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-900 text-[11px] font-bold text-white">
+                                    6.2
+                                </span>
+                                <h3 className="text-base font-semibold text-slate-900">
+                                    Step 2 — Resource contribution details
+                                </h3>
                             </div>
-
-                            <h3 className="text-base font-semibold text-slate-900">
-                                Step 2 — Resource Contribution Details
-                            </h3>
-
-                        </div>
-
-                        <Button
-                            type="button"
-                            variant="ghost"
-                            onClick={addResource}
-                            className="h-9 px-4 rounded-lg bg-report-primary-soft text-report-primary text-xs font-semibold hover:bg-report-primary-border"
-                        >
-                            <Plus className="w-4 h-4 mr-2" />
-                            Add Resource Entry
-                        </Button>
-
-                    </div>
-
-
-
-                    {/* Empty State */}
-
-                    {resources.length === 0 ? (
-
-                        <div className="py-16 text-center bg-slate-50 rounded-xl border border-dashed border-slate-200 space-y-4">
-
-                            <Package className="w-10 h-10 text-slate-300 mx-auto" />
-
-                            <p className="text-sm font-semibold text-slate-600">
-                                No resources added yet
-                            </p>
-
                             <Button
                                 type="button"
                                 onClick={addResource}
-                                variant="ghost"
-                                className="h-9 px-5 bg-slate-900 text-white rounded-lg text-xs font-semibold"
+                                className="h-10 shrink-0 rounded-lg bg-indigo-600 px-4 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700"
                             >
-                                <Plus className="w-4 h-4 mr-2" />
-                                Add First Resource
+                                <Plus className="mr-1.5 h-4 w-4" />
+                                Add resource entry
                             </Button>
-
                         </div>
 
-                    ) : (
-
-                        <div className="space-y-6">
-
-                            {resources.map((res, idx) => (
-
-                                <ResourceCard
-                                    key={idx}
-                                    res={res}
-                                    idx={idx}
-                                    canRemove={resources.length > 1}
-                                    onUpdate={(field, val) => updateResource(idx, field, val)}
-                                    onRemove={() => removeResource(idx)}
-                                    getFieldError={getFieldError}
-                                />
-
-                            ))}
-
-                        </div>
-
-                    )}
-
-
-
-                    {/* ─── Step 3: Evidence Upload ─────────────────── */}
-
-                    <div className="space-y-6">
-
-                        <div className="flex items-center gap-3">
-
-                            <div className="w-8 h-8 rounded-full bg-report-primary text-white flex items-center justify-center text-[11px] font-semibold">
-                                6.3
+                        {resources.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center space-y-3 rounded-xl border border-dashed border-slate-300 bg-slate-50/80 px-6 py-12 text-center">
+                                <Package className="h-10 w-10 text-slate-300" />
+                                <p className="text-sm font-semibold text-slate-700">No resources added yet</p>
+                                <Button
+                                    type="button"
+                                    onClick={addResource}
+                                    className="h-9 rounded-lg bg-slate-900 px-4 text-xs font-semibold text-white hover:bg-slate-800"
+                                >
+                                    <Plus className="mr-1.5 h-3.5 w-3.5" />
+                                    Add first resource
+                                </Button>
                             </div>
+                        ) : (
+                            <div className="space-y-4">
+                                {resources.map((res, idx) => (
+                                    <ResourceCard
+                                        key={idx}
+                                        res={res}
+                                        idx={idx}
+                                        canRemove={resources.length > 1}
+                                        onUpdate={(field, val) => updateResource(idx, field, val)}
+                                        onRemove={() => removeResource(idx)}
+                                        getFieldError={getFieldError}
+                                    />
+                                ))}
+                            </div>
+                        )}
+                    </section>
 
+                    {/* 6.3 Evidence */}
+                    <section className="space-y-4">
+                        <div className="flex items-center gap-2.5">
+                            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-900 text-[11px] font-bold text-white">
+                                6.3
+                            </span>
                             <h3 className="text-base font-semibold text-slate-900">
-                                Step 3 — Optional Evidence Upload
+                                Step 3 — Optional evidence upload
                             </h3>
-
                         </div>
 
-
-
-                        <div className="bg-white rounded-xl border border-slate-200 p-8 shadow-sm space-y-6">
-
-                            {/* Info box */}
-
-                            <div className="flex items-start gap-3 p-4 bg-report-primary-soft rounded-lg border border-report-primary-border">
-
-                                <Info className="w-4 h-4 text-report-primary mt-0.5" />
-
-                                <p className="text-sm text-report-primary">
+                        <div className="space-y-5 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+                            <div className="flex items-start gap-3 rounded-xl border border-indigo-100 bg-indigo-50/70 px-4 py-3">
+                                <Info className="mt-0.5 h-4 w-4 shrink-0 text-indigo-600" />
+                                <p className="text-sm leading-relaxed text-indigo-900/90">
                                     Upload supporting documentation. Max 5 files per resource entry. Max 10MB per file.
                                 </p>
-
                             </div>
 
-
-
-                            {/* Accepted docs */}
-
-                            <div className="space-y-3">
-
-                                <Label className="text-xs font-semibold text-slate-600 uppercase tracking-wide">
-                                    Accepted Document Types
-                                </Label>
-
+                            <div className="space-y-2">
+                                <Label className={fieldLabel}>Accepted document types</Label>
                                 <div className="flex flex-wrap gap-2">
-
                                     {evidenceDocTypes.map(doc => (
-
                                         <span
                                             key={doc}
-                                            className="px-3 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-600 flex items-center gap-1"
+                                            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-medium text-slate-600"
                                         >
-                                            <FileText className="w-3 h-3" />
+                                            <FileText className="h-3 w-3 text-slate-400" />
                                             {doc}
                                         </span>
-
                                     ))}
-
                                 </div>
-
                             </div>
 
-
-
-                            {/* Upload box */}
-
-                            <div className="relative border border-dashed border-slate-300 rounded-lg p-8 text-center space-y-3 hover:border-report-primary transition">
-
-                                <FileText className="w-8 h-8 text-slate-300 mx-auto" />
-
-                                <p className="text-sm text-slate-500">
-                                    Drag & drop or click to upload
+                            <div className="relative rounded-xl border-2 border-dashed border-slate-200 bg-slate-50/50 px-6 py-10 text-center transition-colors hover:border-indigo-300 hover:bg-indigo-50/30">
+                                <Upload className="mx-auto h-8 w-8 text-slate-300" />
+                                <p className="mt-3 text-sm font-medium text-slate-600">
+                                    Drag &amp; drop files here, or click to browse
                                 </p>
-
+                                <p className="mt-1 text-xs text-slate-400">Images, PDF, Word — max {MAX_REPORT_UPLOAD_LABEL}</p>
                                 <input
                                     type="file"
                                     multiple
                                     accept={REPORT_ATTACHMENT_ACCEPT}
-                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                    className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
                                     onChange={e => {
                                         if (e.target.files) {
                                             const newFiles = filterOversizedImages(Array.from(e.target.files), e.currentTarget);
                                             if (!newFiles.length) return;
-                                            updateSection('section6', {
-                                                evidence_files: [...(section6.evidence_files || []), ...newFiles]
+                                            updateSection("section6", {
+                                                evidence_files: [...(section6.evidence_files || []), ...newFiles],
                                             });
                                         }
                                     }}
                                 />
-
                             </div>
 
-
-
-                            {/* Selected files */}
-
-                            {section6.evidence_files && section6.evidence_files.length > 0 && (
-
-                                <div className="space-y-4">
-
-                                    <Label className="text-xs font-semibold text-slate-600 uppercase">
-                                        Selected Files ({section6.evidence_files.length})
+                            {section6.evidence_files && section6.evidence_files.length > 0 ? (
+                                <div className="space-y-3">
+                                    <Label className={fieldLabel}>
+                                        Selected files ({section6.evidence_files.length})
                                     </Label>
-
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-
+                                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                                         {section6.evidence_files.map((file, fIdx) => (
-
                                             <div
                                                 key={fIdx}
-                                                className="flex items-center justify-between p-3 bg-slate-50 border border-slate-200 rounded-lg"
+                                                className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5"
                                             >
-
                                                 <div
-                                                    className="flex items-center gap-3 overflow-hidden cursor-pointer flex-1"
+                                                    className="flex min-w-0 flex-1 cursor-pointer items-center gap-3"
                                                     onClick={() => setPreviewFile(file)}
                                                 >
-
                                                     <FilePreview file={file} />
-
-                                                    <div className="overflow-hidden">
-
-                                                        <p className="text-sm font-medium text-slate-700 truncate">
+                                                    <div className="min-w-0">
+                                                        <p className="truncate text-sm font-medium text-slate-700">
                                                             {file.name}
                                                         </p>
-
                                                         <p className="text-xs text-slate-400">
                                                             {file.size ? (file.size / (1024 * 1024)).toFixed(2) : 0} MB
                                                         </p>
-
                                                     </div>
-
                                                 </div>
-
                                                 <button
+                                                    type="button"
                                                     onClick={() => {
                                                         const kept = section6.evidence_files.filter((_, i) => i !== fIdx);
-                                                        updateSection('section6', { evidence_files: kept });
+                                                        updateSection("section6", { evidence_files: kept });
                                                     }}
-                                                    className="w-7 h-7 rounded-lg bg-white text-slate-400 flex items-center justify-center hover:bg-red-50 hover:text-red-500 border border-slate-200"
+                                                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-400 transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-500"
+                                                    aria-label="Remove file"
                                                 >
-
-                                                    <Trash2 className="w-3.5 h-3.5" />
-
+                                                    <Trash2 className="h-3.5 w-3.5" />
                                                 </button>
-
                                             </div>
-
                                         ))}
-
                                     </div>
-
                                 </div>
-
-                            )}
-
+                            ) : null}
                         </div>
+                    </section>
 
-                    </div>
-
-
-
-                    {/* ─── Auto Generated Summary ───────────────────────── */}
-
-                    <div className="pt-10 border-t border-slate-200 space-y-6">
-
-                        <div className="flex items-center justify-between">
-
+                    {/* Auto summary */}
+                    <section className="space-y-4 border-t border-slate-200 pt-8">
+                        <div className="flex flex-wrap items-center justify-between gap-3">
                             <div className="flex items-center gap-3">
-
-                                <div className="w-10 h-10 rounded-lg bg-report-primary text-white flex items-center justify-center">
-                                    <Activity className="w-5 h-5" />
+                                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-sm">
+                                    <Activity className="h-5 w-5" />
                                 </div>
-
-                                <h3 className="text-lg font-semibold text-slate-900">
-                                    System-Generated Resource Summary
+                                <h3 className="text-base font-semibold text-slate-900">
+                                    System-generated resource summary
                                 </h3>
-
                             </div>
-
-                            <span className="text-xs font-semibold bg-slate-100 px-3 py-1 rounded-lg">
-                                Read-Only
+                            <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                                Read-only
                             </span>
-
                         </div>
 
-
-
-                        {/* Analytics cards */}
-
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-
+                        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
                             {[
-                                { icon: Banknote, label: "Financial Entries", val: financialTypes.length, color: "bg-emerald-50 text-emerald-700" },
-                                { icon: Package, label: "In-Kind Entries", val: inKindTypes.length, color: "bg-blue-50 text-blue-700" },
-                                { icon: Users, label: "Unique Sources", val: uniqueSources, color: "bg-purple-50 text-purple-700" },
-                                { icon: BarChart3, label: "Total Entries", val: resources.length, color: "bg-slate-100 text-slate-700" },
-                            ].map(({ icon: Icon, label, val, color }) => (
-
-                                <div key={label} className={`rounded-xl p-4 space-y-1 ${color}`}>
-
-                                    <Icon className="w-5 h-5 opacity-70" />
-
-                                    <p className="text-xl font-semibold">
-                                        {val}
-                                    </p>
-
-                                    <p className="text-xs opacity-70">
-                                        {label}
-                                    </p>
-
+                                { icon: Banknote, label: "Financial entries", val: financialTypes.length },
+                                { icon: Package, label: "In-kind entries", val: inKindTypes.length },
+                                { icon: Users, label: "Unique sources", val: uniqueSources },
+                                { icon: BarChart3, label: "Total entries", val: resources.length },
+                            ].map(({ icon: Icon, label, val }) => (
+                                <div key={label} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                                    <Icon className="mb-2 h-4 w-4 text-indigo-600" />
+                                    <p className="text-xl font-semibold text-slate-900">{val}</p>
+                                    <p className="mt-0.5 text-[11px] text-slate-500">{label}</p>
                                 </div>
-
                             ))}
-
                         </div>
 
-
-
-                        {/* Narrative */}
-
-                        <div className="bg-white border border-slate-200 rounded-xl p-8 relative">
-
-                            <span className="absolute -top-5 -left-3 text-6xl text-slate-100">
-                                "
-                            </span>
-
-                            <p className="report-ai-text text-lg">
-                                {autoNarrative}
-                            </p>
-
+                        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+                            <p className="text-sm leading-relaxed text-slate-700">{autoNarrative}</p>
                         </div>
-
-                    </div>
-
+                    </section>
                 </div>
+            ) : null}
 
-            )}
-
-            
-            {/* ─── Full File Preview Dialog ─────────────────────────────────── */}
             <Dialog open={!!previewFile} onOpenChange={(open) => !open && setPreviewFile(null)}>
-                <DialogContent className="max-w-4xl p-6 bg-white flex flex-col items-center">
-                    <DialogHeader className="w-full flex flex-col justify-start items-start mb-4">
-                        <DialogTitle className="text-sm font-bold truncate pr-8 text-slate-800 break-all w-full">{previewFile?.name}</DialogTitle>
+                <DialogContent className="flex max-w-4xl flex-col items-center bg-white p-6">
+                    <DialogHeader className="mb-4 flex w-full flex-col items-start justify-start">
+                        <DialogTitle className="w-full truncate break-all pr-8 text-sm font-bold text-slate-800">
+                            {previewFile?.name}
+                        </DialogTitle>
                     </DialogHeader>
-                    <div className="w-full flex justify-center items-center overflow-auto max-h-[80vh] rounded-xl border border-slate-100 bg-slate-50 p-2">
+                    <div className="flex max-h-[80vh] w-full items-center justify-center overflow-auto rounded-xl border border-slate-100 bg-slate-50 p-2">
                         <FullFilePreview file={previewFile} />
                     </div>
                 </DialogContent>
             </Dialog>
-
         </div>
     );
 }

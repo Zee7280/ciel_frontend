@@ -5,6 +5,12 @@ export type Section1AnalyticsFieldMeta = {
     presentation: string;
 };
 
+export type AnalyticsCategory = Section1AnalyticsFieldMeta["category"];
+
+export type Section1FieldsByCategory = Record<AnalyticsCategory, Record<string, unknown>>;
+
+export type Section1CategoryCounts = Record<AnalyticsCategory, number>;
+
 export type Section1AnalyticsPayload = {
     stakeholder: string;
     scope: "project" | "aggregate";
@@ -13,6 +19,9 @@ export type Section1AnalyticsPayload = {
     organization_id?: string;
     fields: Record<string, unknown>;
     meta: Record<string, Section1AnalyticsFieldMeta>;
+    /** Additive backend helper — optional for older responses. */
+    fields_by_category?: Section1FieldsByCategory;
+    category_counts?: Section1CategoryCounts;
 };
 
 export type Section1AnalyticsResponse = {
@@ -121,4 +130,43 @@ export function orderedSection1FieldEntries(payload: Section1AnalyticsPayload): 
         if (bi != null) return 1;
         return a.localeCompare(b);
     });
+}
+
+function sortFieldEntries(entries: Array<[string, unknown]>): Array<[string, unknown]> {
+    const order = new Map(SECTION1_PRIMARY_FIELD_KEYS.map((k, i) => [k, i]));
+    return [...entries].sort(([a], [b]) => {
+        const ai = order.get(a as (typeof SECTION1_PRIMARY_FIELD_KEYS)[number]);
+        const bi = order.get(b as (typeof SECTION1_PRIMARY_FIELD_KEYS)[number]);
+        if (ai != null && bi != null) return ai - bi;
+        if (ai != null) return -1;
+        if (bi != null) return 1;
+        return a.localeCompare(b);
+    });
+}
+
+/** Prefer backend `fields_by_category`; fall back to client grouping from `meta`. */
+export function resolveFieldsByCategory(
+    payload: Section1AnalyticsPayload,
+): Section1FieldsByCategory {
+    if (payload.fields_by_category) {
+        return {
+            basic: payload.fields_by_category.basic ?? {},
+            premium: payload.fields_by_category.premium ?? {},
+            restricted: payload.fields_by_category.restricted ?? {},
+        };
+    }
+    const grouped: Section1FieldsByCategory = { basic: {}, premium: {}, restricted: {} };
+    for (const [key, value] of Object.entries(payload.fields)) {
+        const cat = payload.meta[key]?.category ?? "basic";
+        grouped[cat][key] = value;
+    }
+    return grouped;
+}
+
+export function orderedEntriesForCategory(
+    payload: Section1AnalyticsPayload,
+    category: AnalyticsCategory,
+): Array<[string, unknown]> {
+    const bucket = resolveFieldsByCategory(payload)[category];
+    return sortFieldEntries(Object.entries(bucket));
 }

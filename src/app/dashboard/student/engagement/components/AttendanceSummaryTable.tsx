@@ -2,14 +2,10 @@
 
 import React from "react";
 import {
-    Clock,
     Calendar,
-    Tag,
     CheckCircle2,
     Trash2,
     MessageSquareText,
-    MapPin,
-    User,
     ExternalLink,
 } from "lucide-react";
 import clsx from "clsx";
@@ -150,19 +146,6 @@ function evidenceLinkLabel(href: string): string {
     }
 }
 
-function formatSessionDate(dateStr: string): string {
-    try {
-        return new Date(dateStr).toLocaleDateString(undefined, {
-            weekday: "short",
-            month: "short",
-            day: "numeric",
-            year: "numeric",
-        });
-    } catch {
-        return dateStr;
-    }
-}
-
 function SessionCard({
     entry,
     participantNames,
@@ -184,124 +167,132 @@ function SessionCard({
     const localFile = isNativeFile(entry.evidence_file);
     const rejected = isRejectedEntry(entry);
     const showDelete = !isLocked && canDelete && !!onDelete;
+    const approvalRaw = (entry.approval_status ?? entry.entryStatus ?? "")
+        .toString()
+        .toLowerCase();
+    const showApproval =
+        approvalRaw === "pending" ||
+        approvalRaw === "rejected" ||
+        approvalRaw === "flagged" ||
+        approvalRaw === "approved";
+
+    let dayNum = "";
+    let monthShort = "";
+    try {
+        const d = new Date(entry.date);
+        dayNum = String(d.getDate());
+        monthShort = d.toLocaleDateString(undefined, { month: "short" }).toUpperCase();
+    } catch {
+        dayNum = "—";
+        monthShort = "";
+    }
 
     return (
-        <article className="group rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition-shadow hover:shadow-md">
-            <div className="flex items-start justify-between gap-3">
-                <div className="flex min-w-0 items-start gap-3">
-                    <div className="flex h-11 w-11 shrink-0 flex-col items-center justify-center rounded-lg bg-indigo-50 text-indigo-700 ring-1 ring-indigo-100">
-                        <span className="text-lg font-bold leading-none">
-                            {new Date(entry.date).getDate()}
-                        </span>
-                        <span className="text-[9px] font-medium uppercase" suppressHydrationWarning>
-                            {new Date(entry.date).toLocaleDateString(undefined, { month: "short" })}
-                        </span>
-                    </div>
-                    <div className="min-w-0">
-                        <p className="text-sm font-semibold text-slate-900" suppressHydrationWarning>
-                            {formatSessionDate(entry.date)}
-                        </p>
-                        <p className="mt-0.5 flex items-center gap-1 text-xs text-slate-500">
-                            <Clock className="h-3 w-3" />
-                            {entry.start_time} – {entry.end_time}
-                            <span className="mx-1 text-slate-300">·</span>
-                            <span className="font-semibold text-slate-700">{entry.hours} hrs</span>
-                        </p>
-                    </div>
+        <article className="rounded-xl border border-slate-200 bg-white transition-shadow hover:shadow-sm">
+            <div className="flex items-stretch gap-0">
+                {/* Date badge */}
+                <div className="flex w-[52px] shrink-0 flex-col items-center justify-center rounded-l-xl bg-indigo-50 px-2 py-3 text-indigo-700">
+                    <span className="text-[9px] font-bold uppercase tracking-wider" suppressHydrationWarning>
+                        {monthShort}
+                    </span>
+                    <span className="text-lg font-bold leading-none" suppressHydrationWarning>
+                        {dayNum}
+                    </span>
                 </div>
 
-                <div className="flex shrink-0 items-center gap-2">
-                    {rejected ? (
-                        <button
-                            type="button"
-                            onClick={() => setRemarkOpen((v) => !v)}
-                            className={clsx(
-                                "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium",
-                                approvalPillClass(entry),
-                            )}
-                        >
-                            {displayApprovalLabel(entry)}
-                            <MessageSquareText className="h-3 w-3" />
-                        </button>
-                    ) : (
-                        <span
-                            className={clsx(
-                                "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium",
-                                approvalPillClass(entry),
-                            )}
-                        >
-                            {(entry.approval_status ?? entry.entryStatus ?? "")
-                                .toString()
-                                .toLowerCase() === "approved" ||
-                            (entry.approval_status ?? entry.entryStatus ?? "")
-                                .toString()
-                                .toLowerCase() === "verified" ? (
-                                <CheckCircle2 className="h-3 w-3" />
+                {/* Details */}
+                <div className="min-w-0 flex-1 px-3.5 py-3">
+                    <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                            <p className="text-sm font-semibold text-slate-900">
+                                {entry.start_time} – {entry.end_time}
+                            </p>
+                            <p className="mt-0.5 truncate text-xs text-slate-500">
+                                {locationText || participantLabel}
+                            </p>
+                        </div>
+                        <div className="flex shrink-0 flex-col items-end gap-1.5">
+                            <span className="text-xs font-medium text-indigo-600">
+                                {entry.activity_type}
+                            </span>
+                            {showDelete ? (
+                                <button
+                                    type="button"
+                                    onClick={() => onDelete!(entry.id)}
+                                    className="flex h-6 w-6 items-center justify-center rounded text-slate-300 transition-colors hover:bg-red-50 hover:text-red-500"
+                                    aria-label="Delete attendance entry"
+                                >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                </button>
                             ) : null}
-                            {displayApprovalLabel(entry)}
-                        </span>
-                    )}
-                    {showDelete ? (
-                        <button
-                            type="button"
-                            onClick={() => onDelete!(entry.id)}
-                            className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-400 transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-500"
-                            aria-label="Delete attendance entry"
+                        </div>
+                    </div>
+
+                    {showApproval ? (
+                        <div className="mt-2">
+                            {rejected ? (
+                                <button
+                                    type="button"
+                                    onClick={() => setRemarkOpen((v) => !v)}
+                                    className={clsx(
+                                        "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium",
+                                        approvalPillClass(entry),
+                                    )}
+                                >
+                                    {displayApprovalLabel(entry)}
+                                    <MessageSquareText className="h-2.5 w-2.5" />
+                                </button>
+                            ) : (
+                                <span
+                                    className={clsx(
+                                        "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium",
+                                        approvalPillClass(entry),
+                                    )}
+                                >
+                                    {approvalRaw === "approved" ? (
+                                        <CheckCircle2 className="h-2.5 w-2.5" />
+                                    ) : null}
+                                    {displayApprovalLabel(entry)}
+                                </span>
+                            )}
+                        </div>
+                    ) : null}
+
+                    {descText ? (
+                        <p className="mt-1.5 line-clamp-2 text-[11px] leading-relaxed text-slate-500">
+                            {descText}
+                        </p>
+                    ) : null}
+
+                    {evidenceHref ? (
+                        <a
+                            href={evidenceHref}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="mt-1.5 inline-flex items-center gap-1 text-[11px] font-medium text-indigo-600 hover:text-indigo-800"
                         >
-                            <Trash2 className="h-3.5 w-3.5" />
-                        </button>
+                            <ExternalLink className="h-2.5 w-2.5" />
+                            {evidenceLinkLabel(evidenceHref)}
+                        </a>
+                    ) : localFile ? (
+                        <p className="mt-1.5 text-[11px] text-slate-500">
+                            {(entry.evidence_file as File).name || "File attached"}
+                        </p>
+                    ) : null}
+
+                    {remarkOpen && rejected ? (
+                        <div className="mt-2 rounded-lg border border-rose-100 bg-rose-50/50 px-2.5 py-2 text-xs text-slate-700">
+                            <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-wide text-rose-700">
+                                Rejection remarks
+                            </p>
+                            <p className="whitespace-pre-wrap break-words leading-relaxed">
+                                {resolvedRejectRemark(entry) ||
+                                    "No written remarks were provided for this rejection."}
+                            </p>
+                        </div>
                     ) : null}
                 </div>
             </div>
-
-            <div className="mt-3 flex flex-wrap gap-2">
-                <span className="inline-flex items-center gap-1.5 rounded-md bg-slate-50 px-2 py-1 text-xs font-medium text-slate-700 ring-1 ring-slate-100">
-                    <Tag className="h-3 w-3 text-slate-400" />
-                    {entry.activity_type}
-                </span>
-                <span className="inline-flex items-center gap-1.5 rounded-md bg-slate-50 px-2 py-1 text-xs font-medium text-slate-700 ring-1 ring-slate-100">
-                    <User className="h-3 w-3 text-slate-400" />
-                    {participantLabel}
-                </span>
-                {locationText ? (
-                    <span className="inline-flex max-w-full items-center gap-1.5 truncate rounded-md bg-slate-50 px-2 py-1 text-xs font-medium text-slate-700 ring-1 ring-slate-100">
-                        <MapPin className="h-3 w-3 shrink-0 text-slate-400" />
-                        <span className="truncate">{locationText}</span>
-                    </span>
-                ) : null}
-            </div>
-
-            {descText ? (
-                <p className="mt-3 text-sm leading-relaxed text-slate-600 line-clamp-3">{descText}</p>
-            ) : null}
-
-            {evidenceHref ? (
-                <a
-                    href={evidenceHref}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-indigo-600 hover:text-indigo-800"
-                >
-                    <ExternalLink className="h-3 w-3" />
-                    {evidenceLinkLabel(evidenceHref)}
-                </a>
-            ) : localFile ? (
-                <p className="mt-3 text-xs text-slate-500">
-                    {(entry.evidence_file as File).name || "File attached"}
-                </p>
-            ) : null}
-
-            {remarkOpen && rejected ? (
-                <div className="mt-3 rounded-lg border border-rose-100 bg-rose-50/50 px-3 py-2.5 text-sm text-slate-700">
-                    <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-rose-700">
-                        Rejection remarks
-                    </p>
-                    <p className="whitespace-pre-wrap break-words leading-relaxed">
-                        {resolvedRejectRemark(entry) ||
-                            "No written remarks were provided for this rejection."}
-                    </p>
-                </div>
-            ) : null}
         </article>
     );
 }
@@ -328,12 +319,12 @@ export default function AttendanceSummaryTable({
         return (
             <div
                 className={clsx(
-                    "px-6 py-12 text-center",
+                    "px-5 py-10 text-center",
                     embedded ? "" : "rounded-xl border border-slate-200 bg-white",
                 )}
             >
-                <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-slate-100">
-                    <Calendar className="h-6 w-6 text-slate-300" />
+                <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-slate-100">
+                    <Calendar className="h-5 w-5 text-slate-300" />
                 </div>
                 <h3 className="text-sm font-semibold text-slate-900">No sessions logged yet</h3>
                 <p className="mt-1 text-xs text-slate-500">
@@ -344,13 +335,8 @@ export default function AttendanceSummaryTable({
     }
 
     return (
-        <div
-            className={clsx(
-                "min-w-0",
-                embedded ? "p-4" : "rounded-xl border border-slate-200 bg-slate-50/30 p-4",
-            )}
-        >
-            <div className="space-y-3">
+        <div className={clsx("min-w-0", embedded ? "p-4" : "space-y-3 p-0")}>
+            <div className="space-y-2.5">
                 {entries.map((entry) => (
                     <SessionCard
                         key={entry.id}

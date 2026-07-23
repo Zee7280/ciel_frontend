@@ -1,81 +1,149 @@
-import { BookOpen, GraduationCap, BrainCircuit, Star, Save, Info, AlertCircle, Quote, TrendingUp } from "lucide-react";
+import React, { useMemo, useEffect, useState } from "react";
+import {
+    GraduationCap, BrainCircuit, Star, Info, TrendingUp,
+    Users2, ChevronDown, Compass,
+} from "lucide-react";
 import { Label } from "./ui/label";
 import { Textarea } from "./ui/textarea";
-import { Button } from "./ui/button";
 import { useReportForm } from "../context/ReportContext";
 import { FieldError } from "./ui/FieldError";
-import React, { useMemo, useEffect } from "react";
 import clsx from "clsx";
 
 // ─── Static configuration ───────────────────────────────────────────────────
 const integrationOptions = [
-    { id: "Voluntary extracurricular activity", label: "Voluntary Extracurricular", color: "text-report-primary border-report-primary-border bg-report-primary-soft shadow-sm shadow-report-primary-shadow" },
-    { id: "Course-linked assignment", label: "Course-linked Assignment", color: "text-report-primary border-report-primary-border bg-report-primary-soft shadow-sm shadow-report-primary-shadow" },
-    { id: "Credit-bearing component", label: "Credit-bearing Component", color: "text-report-primary border-report-primary-border bg-report-primary-soft shadow-sm shadow-report-primary-shadow" },
-    { id: "Capstone / Thesis-linked project", label: "Capstone / Thesis", color: "text-report-primary border-report-primary-border bg-report-primary-soft shadow-sm shadow-report-primary-shadow" },
-    { id: "Research-integrated project", label: "Research-integrated", color: "text-report-primary border-report-primary-border bg-report-primary-soft shadow-sm shadow-report-primary-shadow" }
+    { id: "Voluntary extracurricular activity", label: "Voluntary extracurricular" },
+    { id: "Course-linked assignment", label: "Course-linked assignment" },
+    { id: "Credit-bearing component", label: "Credit-bearing component" },
+    { id: "Capstone / Thesis-linked project", label: "Capstone / thesis" },
+    { id: "Research-integrated project", label: "Research-integrated" },
+];
+
+const ratingGuide = [
+    { val: "1", meaning: "Low", context: "No meaningful engagement — little to no involvement in this area" },
+    { val: "2", meaning: "Basic", context: "Initial exposure — limited opportunity to apply independently" },
+    { val: "3", meaning: "Moderate", context: "Developing capability — applied with some guidance" },
+    { val: "4", meaning: "Strong", context: "Independent application — effective use in real situations" },
+    { val: "5", meaning: "Advanced", context: "High proficiency — initiative or leadership demonstrated" },
 ];
 
 const competencies = [
     {
-        id: 'cognitive', icon: BrainCircuit, label: 'Cognitive Competencies', items: [
-            { key: 'cognitive_systemic', label: 'Understanding Interconnected Social, Environmental & Economic Issues', description: 'You can confidently connect theory to real-life problems.' },
-            { key: 'cognitive_critical', label: 'Critical and Ethical Reasoning', description: 'You are developing judgment but can improve independent decision-making.' },
-            { key: 'cognitive_evaluate', label: 'Ability to Evaluate Impact', description: 'You can evaluate effectiveness, not just participation.' }
-        ]
+        id: "cognitive",
+        icon: Compass,
+        label: "Cognitive competencies",
+        items: [
+            { key: "cognitive_systemic", label: "Understanding interconnected issues", description: "You can confidently connect theory to real-life problems." },
+            { key: "cognitive_critical", label: "Critical and ethical reasoning", description: "You are developing judgment but can improve independent decision-making." },
+            { key: "cognitive_evaluate", label: "Ability to evaluate impact", description: "You can evaluate effectiveness, not just participation." },
+        ],
     },
     {
-        id: 'practical', icon: Star, label: 'Practical Competencies', items: [
-            { key: 'practical_design', label: 'Project Design & Implementation', description: 'You can turn ideas into action.' },
-            { key: 'practical_evidence', label: 'Evidence-Based Reporting', description: 'You worked at a professional, audit-ready level.' },
-            { key: 'practical_engagement', label: 'Community Engagement', description: 'You showed strong field presence and interpersonal impact.' }
-        ]
+        id: "practical",
+        icon: Star,
+        label: "Practical competencies",
+        items: [
+            { key: "practical_design", label: "Project design & implementation", description: "You can turn ideas into action." },
+            { key: "practical_evidence", label: "Evidence-based reporting", description: "You worked at a professional, audit-ready level." },
+            { key: "practical_engagement", label: "Community engagement", description: "You showed strong field presence and interpersonal impact." },
+        ],
     },
     {
-        id: 'social', icon: Info, label: 'Social & Civic Competencies', items: [
-            { key: 'social_empathy', label: 'Responsibility & Empathy', description: 'You went beyond task completion and connected on a human level.' },
-            { key: 'social_diversity', label: 'Awareness of Diversity & Inclusion', description: 'You respected and adapted to diverse community needs.' },
-            { key: 'social_collaboration', label: 'Collaborative Problem-Solving', description: 'You demonstrated leadership and teamwork.' }
-        ]
+        id: "social",
+        icon: Users2,
+        label: "Social & civic competencies",
+        items: [
+            { key: "social_empathy", label: "Responsibility & empathy", description: "You went beyond task completion and connected on a human level." },
+            { key: "social_diversity", label: "Awareness of diversity & inclusion", description: "You respected and adapted to diverse community needs." },
+            { key: "social_collaboration", label: "Collaborative problem-solving", description: "You demonstrated leadership and teamwork." },
+        ],
     },
     {
-        id: 'transformative', icon: TrendingUp, label: 'Transformative Competencies', items: [
-            { key: 'transformative_longterm', label: 'Long-Term Thinking', description: 'You are beginning to think beyond short-term results.' },
-            { key: 'transformative_benefits', label: 'Understanding Benefits & Possible Downsides', description: 'You think in a balanced and realistic way.' },
-            { key: 'transformative_sustainability', label: 'Sustainability-Oriented Decision Making', description: 'You are developing a sustainability mindset.' }
-        ]
-    }
+        id: "transformative",
+        icon: TrendingUp,
+        label: "Transformative competencies",
+        items: [
+            { key: "transformative_longterm", label: "Long-term thinking", description: "You are beginning to think beyond short-term results." },
+            { key: "transformative_benefits", label: "Understanding benefits & downsides", description: "You think in a balanced and realistic way." },
+            { key: "transformative_sustainability", label: "Sustainability-oriented decision making", description: "You are developing a sustainability mindset." },
+        ],
+    },
 ];
 
+const textareaClasses =
+    "min-h-[140px] w-full min-w-0 resize-y rounded-xl border border-slate-200 bg-white p-4 text-sm font-medium leading-relaxed text-slate-800 shadow-sm outline-none transition-colors placeholder:text-slate-400 focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100";
+const fieldLabel =
+    "text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500";
+
+function StepHeader({ n, title }: { n: string; title: string }) {
+    return (
+        <div className="flex items-center gap-2.5">
+            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-900 text-[11px] font-bold text-white">
+                {n}
+            </span>
+            <h3 className="text-base font-semibold text-slate-900">{title}</h3>
+        </div>
+    );
+}
+
+function WordCount({ count }: { count: number }) {
+    return (
+        <span
+            className={clsx(
+                "text-xs font-medium",
+                count >= 100 && count <= 200
+                    ? "text-indigo-600"
+                    : count > 200
+                        ? "text-red-500"
+                        : "text-amber-600",
+            )}
+        >
+            {count} / 200 words (min 100)
+        </span>
+    );
+}
 
 export default function Section9Reflection() {
-    const { data, updateSection, getFieldError, saveReport } = useReportForm();
+    const { data, updateSection, getFieldError } = useReportForm();
     const { section9, section2 } = data;
     const {
-        academic_integration, personal_learning, academic_application,
-        competency_scores
+        academic_integration,
+        personal_learning,
+        academic_application,
+        competency_scores,
     } = section9;
 
-    const update = (field: string, val: any) => updateSection('section9', { [field]: val });
-    const updateScore = (key: string, val: number) => update('competency_scores', { ...competency_scores, [key]: val });
+    const [showRatingGuide, setShowRatingGuide] = useState(false);
 
-    const getWordCount = (text: string) => (text || '').trim().split(/\s+/).filter(w => w.length > 0).length;
+    const update = (field: string, val: unknown) => updateSection("section9", { [field]: val });
+    const updateScore = (key: string, val: number) =>
+        update("competency_scores", { ...competency_scores, [key]: val });
+
+    const getWordCount = (text: string) =>
+        (text || "").trim().split(/\s+/).filter((w) => w.length > 0).length;
     const plWords = getWordCount(personal_learning);
     const aaWords = getWordCount(academic_application);
 
-    // ── Content generation ────────────────────────────────────────────────────
-    const autoNarrative = useMemo(() => {
-        const typeStr = integrationOptions.find(o => o.id === academic_integration)?.label.toLowerCase() || 'unspecified academic engagement';
+    const avgScore = useMemo(() => {
+        const values = Object.values(competency_scores || {}).map(Number);
+        if (!values.length) return 0;
+        return values.reduce((a, b) => a + b, 0) / 12;
+    }, [competency_scores]);
 
-        // find strongest category average
-        let bestCategory = 'technical and social';
+    const autoNarrative = useMemo(() => {
+        const typeStr =
+            integrationOptions.find((o) => o.id === academic_integration)?.label.toLowerCase() ||
+            "unspecified academic engagement";
+
+        let bestCategory = "technical and social";
         let highestAvg = 0;
-        competencies.forEach(cat => {
-            const scores = cat.items.map(i => competency_scores[i.key as keyof typeof competency_scores] || 0);
+        competencies.forEach((cat) => {
+            const scores = cat.items.map(
+                (i) => competency_scores[i.key as keyof typeof competency_scores] || 0,
+            );
             const avg = scores.reduce((a, b) => a + b, 0) / scores.length;
             if (avg > highestAvg) {
                 highestAvg = avg;
-                bestCategory = cat.label.replace(' Competencies', '').toLowerCase();
+                bestCategory = cat.label.replace(/ competencies$/i, "").toLowerCase();
             }
         });
 
@@ -84,496 +152,330 @@ export default function Section9Reflection() {
 
     useEffect(() => {
         if (section9.summary_text !== autoNarrative) {
-            updateSection('section9', { summary_text: autoNarrative });
+            updateSection("section9", { summary_text: autoNarrative });
         }
-    }, [autoNarrative, section9.summary_text]);
-
+    }, [autoNarrative, section9.summary_text, updateSection]);
 
     return (
-        <div className="space-y-5 pb-10">
-            {/* ─── Header ─────────────────────────────────────────────────── */}
-            <div className="flex items-center gap-4">
-
-                <div className="w-14 h-14 rounded-2xl bg-report-primary text-white flex items-center justify-center shadow-xl shadow-report-primary-shadow ring-4 ring-report-primary-soft">
-                    <GraduationCap className="w-7 h-7" />
-                </div>
-
-                <div>
-                    <h2 className="report-h2">
-                        Section 9 — Reflection
-                    </h2>
-
-                    <p className="report-label">
-                        Student Growth & Academic Integration
-                    </p>
-                </div>
-
-            </div>
-
-            {/* ─── Purpose note ────────────────────────────────────────────── */}
-            <div className="p-5 bg-report-primary-soft border border-report-primary-border rounded-2xl flex items-start gap-4">
-                <Info className="w-5 h-5 text-report-primary shrink-0 mt-0.5" />
-
-                <div className="space-y-2">
-                    <p className="report-label !text-report-primary">
-                        This section captures what you learned, how your academic knowledge was applied, and which competencies you developed.
-                    </p>
-
-                    <p className="report-help !text-report-primary">
-                        It transforms your report from simple volunteering into structured academic engagement.
-                    </p>
-                </div>
-            </div>
-
-
-            {/* ─── Step 1: Academic Integration ───────────────────────────── */}
+        <div className="space-y-8 pb-10">
+            {/* Header */}
             <div className="space-y-4">
-
-                <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-report-primary text-white flex items-center justify-center font-black text-[10px]">
-                        9.0
+                <div className="flex items-center gap-3.5">
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-indigo-600 text-white shadow-sm">
+                        <GraduationCap className="h-5 w-5" />
                     </div>
-
-                    <h3 className="report-h3">
-                        Step 1 — Academic Integration Level (Mandatory)
-                    </h3>
+                    <div>
+                        <h2 className="text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl">
+                            <span className="text-indigo-600">SECTION 9:</span> Reflection
+                        </h2>
+                    </div>
                 </div>
 
+                <div className="flex items-start gap-3 rounded-xl border border-indigo-100 bg-indigo-50/70 px-4 py-3.5 sm:px-5">
+                    <Info className="mt-0.5 h-4 w-4 shrink-0 text-indigo-600" />
+                    <div>
+                        <p className="text-sm font-semibold text-indigo-900">
+                            This section captures what you learned, how your academic knowledge was applied, and which competencies you developed.
+                        </p>
+                        <p className="mt-1 text-sm leading-relaxed text-indigo-900/80">
+                            It transforms your report from simple volunteering into structured academic engagement.
+                        </p>
+                    </div>
+                </div>
+            </div>
 
-                <div className="bg-white rounded-[2rem] border-2 border-slate-100 p-8 shadow-sm space-y-6">
+            {/* 9.0 Academic integration */}
+            <section className="space-y-4">
+                <StepHeader n="9.0" title="Step 1 — Academic integration level (mandatory)" />
 
-                    <Label className="report-h3 !text-sm !tracking-tight">
+                <div className="space-y-5 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+                    <Label className={fieldLabel}>
                         How does this project connect to your academic program?
                     </Label>
 
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-
-                        {integrationOptions.map(opt => (
-
-                            <button
-                                key={opt.id}
-                                type="button"
-                                onClick={() => update('academic_integration', opt.id)}
-                                className={clsx(
-                                    "p-4 rounded-xl border-2 text-left transition-all relative overflow-hidden",
-                                    academic_integration === opt.id
-                                        ? opt.color
-                                        : "bg-slate-50 border-slate-100 text-slate-600 hover:border-slate-300 hover:bg-white"
-                                )}
-                            >
-
-                                <p className="report-label !tracking-wide !text-xs">
+                    <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
+                        {integrationOptions.map((opt) => {
+                            const active = academic_integration === opt.id;
+                            return (
+                                <button
+                                    key={opt.id}
+                                    type="button"
+                                    onClick={() => update("academic_integration", opt.id)}
+                                    className={clsx(
+                                        "rounded-xl border px-4 py-3.5 text-left text-sm font-semibold transition-colors",
+                                        active
+                                            ? "border-indigo-600 bg-indigo-600 text-white shadow-sm"
+                                            : "border-slate-200 bg-white text-slate-700 hover:border-indigo-200 hover:bg-indigo-50/40",
+                                    )}
+                                >
                                     {opt.label}
-                                </p>
-
-                                {academic_integration === opt.id && (
-                                    <div className="absolute top-4 right-4 w-2 h-2 rounded-full bg-current animate-pulse" />
-                                )}
-
-                            </button>
-
-                        ))}
-
+                                </button>
+                            );
+                        })}
                     </div>
 
-                    <FieldError message={getFieldError('academic_integration')} />
-
+                    <FieldError message={getFieldError("academic_integration")} />
                 </div>
+            </section>
 
-            </div>
-            {/* ─── Step 2: Personal Learning ──────────────────────────────── */}
-            <div className="space-y-4">
+            {/* 9.1 Personal learning */}
+            <section className="space-y-4">
+                <StepHeader n="9.1" title="Step 2 — Personal learning reflection" />
 
-                <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-report-primary text-white flex items-center justify-center font-black text-[10px]">
-                        9.1
-                    </div>
-
-                    <h3 className="report-h3">
-                        Step 2 — Personal Learning Reflection
-                    </h3>
-                </div>
-
-
-                <div className="bg-white rounded-[2rem] border-2 border-slate-100 p-8 shadow-sm space-y-4">
-
-                    <div className="space-y-1">
-                        <Label className="report-h3 !text-sm !tracking-tight">
-                            Personal Learning Reflecting (Mandatory)
-                        </Label>
-
-                        <p className="report-help">
-                            Reflect on new skills, community insights, perspective changes, and challenges. Focus on learning, not just repeating activities.
+                <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+                    <div>
+                        <Label className={fieldLabel}>Personal learning reflection (mandatory)</Label>
+                        <p className="mt-1.5 text-sm leading-relaxed text-slate-500">
+                            Reflect on new skills, community insights, perspective changes, and challenges.
+                            Focus on learning, not just repeating activities.
                         </p>
                     </div>
-
 
                     <Textarea
                         placeholder="Through this project, I improved my communication and teamwork skills while working with community members..."
                         value={personal_learning}
-                        onChange={e => update('personal_learning', e.target.value)}
-                        className="min-h-[140px] w-full rounded-[1.5rem] border-2 border-slate-50 p-6 text-slate-700 font-medium bg-slate-50 outline-none focus:border-report-primary-border transition-all focus:bg-white resize-none"
+                        onChange={(e) => update("personal_learning", e.target.value)}
+                        className={textareaClasses}
                     />
 
-
-                    <div className="flex items-center justify-between px-2">
-                        <span className={clsx(
-                            "report-label",
-                            plWords >= 100 && plWords <= 200
-                                ? "text-report-primary"
-                                : plWords > 200
-                                    ? "text-red-500"
-                                    : "text-amber-500"
-                        )}>
-                            {plWords} / 200 words (Min 100)
-                        </span>
-                    </div>
-
-                    <FieldError message={getFieldError('personal_learning')} />
-
+                    <WordCount count={plWords} />
+                    <FieldError message={getFieldError("personal_learning")} />
                 </div>
+            </section>
 
-            </div>
+            {/* 9.2 Academic application */}
+            <section className="space-y-4">
+                <StepHeader n="9.2" title="Step 3 — Academic application" />
 
-
-            {/* ─── Step 3: Academic Application ───────────────────────────── */}
-            <div className="space-y-4">
-
-                <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-report-primary text-white flex items-center justify-center font-black text-[10px]">
-                        9.2
-                    </div>
-
-                    <h3 className="report-h3">
-                        Step 3 — Academic Application
-                    </h3>
-                </div>
-
-
-                <div className="bg-white rounded-[2rem] border-2 border-slate-100 p-8 shadow-sm space-y-4">
-
-                    <div className="space-y-1">
-
-                        <Label className="report-h3 !text-sm !tracking-tight">
-                            Academic Application & Discipline Contribution (Mandatory)
+                <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+                    <div>
+                        <Label className={fieldLabel}>
+                            Academic application &amp; discipline contribution (mandatory)
                         </Label>
-
-                        <p className="report-help">
-                            Explain how your field of study helped you understand the problem, design the intervention, or apply technical methods.
+                        <p className="mt-1.5 text-sm leading-relaxed text-slate-500">
+                            Explain how your field of study helped you understand the problem, design the
+                            intervention, or apply technical methods.
                         </p>
-
-                        {section2?.discipline && (
-                            <p className="report-label !text-report-primary bg-report-primary-soft !px-3 !py-1 !rounded-lg !inline-flex mt-2">
-                                Your Discipline: {section2.discipline}
+                        {section2?.discipline ? (
+                            <p className="mt-2 inline-flex rounded-lg border border-indigo-100 bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700">
+                                Your discipline: {section2.discipline}
                             </p>
-                        )}
-
+                        ) : null}
                     </div>
-
 
                     <Textarea
                         placeholder="As a student, I applied basic data analysis techniques to track attendance and measure improvement..."
                         value={academic_application}
-                        onChange={e => update('academic_application', e.target.value)}
-                        className="min-h-[120px] w-full rounded-[1.5rem] border-2 border-slate-50 p-6 text-slate-700 font-medium bg-slate-50 outline-none focus:border-report-primary-border transition-all focus:bg-white resize-none"
+                        onChange={(e) => update("academic_application", e.target.value)}
+                        className={textareaClasses}
                     />
 
-
-                    <div className="flex items-center justify-between px-2">
-                        <span className={clsx(
-                            "report-label",
-                            aaWords >= 100 && aaWords <= 200
-                                ? "text-report-primary"
-                                : aaWords > 200
-                                    ? "text-red-500"
-                                    : "text-amber-500"
-                        )}>
-                            {aaWords} / 200 words (Min 100)
-                        </span>
-                    </div>
-
-                    <FieldError message={getFieldError('academic_application')} />
-
+                    <WordCount count={aaWords} />
+                    <FieldError message={getFieldError("academic_application")} />
                 </div>
+            </section>
 
-            </div>
+            {/* 9.3 Competency self-assessment */}
+            <section className="space-y-4">
+                <StepHeader n="9.3" title="Step 4 — Competency self-assessment" />
 
+                <div className="space-y-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+                    <button
+                        type="button"
+                        onClick={() => setShowRatingGuide((v) => !v)}
+                        className="inline-flex items-center gap-1.5 text-sm font-semibold text-indigo-600 hover:text-indigo-700"
+                    >
+                        Rating guide — what each score means
+                        <ChevronDown
+                            className={clsx(
+                                "h-4 w-4 transition-transform",
+                                showRatingGuide && "rotate-180",
+                            )}
+                        />
+                    </button>
 
-
-
-            {/* ─── Step 5: Competencies ───────────────────────────────────── */}
-            <div className="space-y-4">
-
-                <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-report-primary text-white flex items-center justify-center font-black text-[10px]">
-                        9.3
-                    </div>
-
-                    <h3 className="report-h3">
-                        Step 4 — Competency Self-Assessment
-                    </h3>
-                </div>
-
-
-                <div className="bg-slate-50 border-2 border-slate-100 rounded-[2rem] p-10 space-y-12">
-
-                    <div className="space-y-4 max-w-3xl mx-auto">
-                        <div className="bg-white rounded-2xl border-2 border-slate-100 overflow-hidden shadow-sm">
+                    {showRatingGuide ? (
+                        <div className="overflow-hidden rounded-xl border border-slate-200">
                             <table className="w-full text-left">
-                                <thead className="bg-slate-50 border-b-2 border-slate-100">
+                                <thead className="border-b border-slate-100 bg-slate-50">
                                     <tr>
-                                        <th className="px-6 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400">Rating</th>
-                                        <th className="px-6 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400">Meaning</th>
-                                        <th className="px-6 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400">What it looks like in your work</th>
+                                        <th className="px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                                            Rating
+                                        </th>
+                                        <th className="px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                                            Meaning
+                                        </th>
+                                        <th className="hidden px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400 sm:table-cell">
+                                            What it looks like
+                                        </th>
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-slate-50">
-                                    {[
-                                        { val: "1", meaning: "Low", context: "No meaningful engagement — You had little to no involvement in this area and did not develop this competency during the project" },
-                                        { val: "2", meaning: "Basic", context: "Initial exposure — You were introduced to this competency but had limited opportunity to apply it independently" },
-                                        { val: "3", meaning: "Moderate", context: "Developing capability — You applied this competency with some guidance and are building confidence in using it" },
-                                        { val: "4", meaning: "Strong", context: "Independent application — You applied this competency effectively and independently in real project situations" },
-                                        { val: "5", meaning: "Advanced", context: "High level of proficiency — You demonstrated strong command, initiative, or leadership in applying this competency" }
-                                    ].map(r => (
-                                        <tr key={r.val} className="hover:bg-slate-50/50 transition-colors">
-                                            <td className="px-6 py-4">
-                                                <span className="w-6 h-6 rounded-md bg-slate-900 text-white flex items-center justify-center font-black text-[10px] tracking-tight">{r.val}</span>
+                                <tbody className="divide-y divide-slate-100">
+                                    {ratingGuide.map((r) => (
+                                        <tr key={r.val}>
+                                            <td className="px-4 py-3">
+                                                <span className="flex h-6 w-6 items-center justify-center rounded-md bg-slate-900 text-[10px] font-bold text-white">
+                                                    {r.val}
+                                                </span>
                                             </td>
-                                            <td className="px-6 py-4">
-                                                <span className="text-xs font-bold text-slate-700">{r.meaning}</span>
+                                            <td className="px-4 py-3 text-xs font-semibold text-slate-700">
+                                                {r.meaning}
                                             </td>
-                                            <td className="px-6 py-4">
-                                                <p className="text-[10px] font-medium text-slate-500 leading-relaxed">{r.context}</p>
+                                            <td className="hidden px-4 py-3 text-xs text-slate-500 sm:table-cell">
+                                                {r.context}
                                             </td>
                                         </tr>
                                     ))}
                                 </tbody>
                             </table>
                         </div>
-                    </div>
+                    ) : null}
 
-
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-
-                        {competencies.map(cat => (
-
+                    <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+                        {competencies.map((cat) => (
                             <div
                                 key={cat.id}
-                                className="bg-white p-8 rounded-[2rem] border-2 border-slate-100 shadow-sm space-y-6"
+                                className="space-y-5 rounded-xl border border-slate-200 bg-slate-50/50 p-4 sm:p-5"
                             >
-
-                                <div className="flex items-center gap-3 border-b-2 border-slate-50 pb-4">
-                                    <cat.icon className="w-5 h-5 text-report-primary" />
-
-                                    <h4 className="report-h3 !text-sm !tracking-tight">
+                                <div className="flex items-center gap-2.5 border-b border-slate-200 pb-3">
+                                    <cat.icon className="h-4 w-4 text-indigo-600" />
+                                    <h4 className="text-sm font-semibold uppercase tracking-wide text-slate-800">
                                         {cat.label}
                                     </h4>
                                 </div>
 
-
-                                <div className="space-y-6">
-
-                                    {cat.items.map(item => {
-
+                                <div className="space-y-5">
+                                    {cat.items.map((item) => {
                                         const score =
                                             competency_scores[item.key as keyof typeof competency_scores] || 0;
-
                                         return (
-
-                                            <div key={item.key} className="space-y-3">
-
-                                                <div className="flex justify-between items-center gap-4">
-
-                                                    <div className="space-y-0.5">
-                                                        <p className="font-bold text-slate-900 text-[11px] leading-tight">
+                                            <div key={item.key} className="space-y-2.5">
+                                                <div className="flex items-start justify-between gap-3">
+                                                    <div className="min-w-0 space-y-0.5">
+                                                        <p className="text-xs font-semibold leading-snug text-slate-900">
                                                             {item.label}
                                                         </p>
-                                                        {item.description && (
-                                                            <p className="text-[10px] font-medium text-slate-400 italic">
+                                                        {item.description ? (
+                                                            <p className="text-[11px] italic leading-relaxed text-slate-400">
                                                                 {item.description}
                                                             </p>
-                                                        )}
+                                                        ) : null}
                                                     </div>
- 
-                                                    <div className="w-8 h-8 rounded-lg bg-slate-50 border border-slate-100 text-slate-900 flex items-center justify-center font-black text-xs shrink-0">
-                                                        {score > 0 ? score : '-'}
-                                                    </div>
-
+                                                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-white text-xs font-bold text-slate-800">
+                                                        {score > 0 ? score : "—"}
+                                                    </span>
                                                 </div>
 
-
-                                                <div className="flex gap-1.5 h-10">
-
-                                                    {[1, 2, 3, 4, 5].map(v => (
-
+                                                <div className="flex gap-1.5">
+                                                    {[1, 2, 3, 4, 5].map((v) => (
                                                         <button
                                                             key={v}
                                                             type="button"
                                                             onClick={() => updateScore(item.key, v)}
                                                             className={clsx(
-                                                                "flex-1 rounded-md transition-all report-label !not-italic !text-xs flex items-center justify-center",
+                                                                "flex h-9 flex-1 items-center justify-center rounded-md text-xs font-semibold transition-colors",
                                                                 score === v
-                                                                    ? "bg-report-primary text-white scale-105 shadow-md shadow-report-primary-shadow"
+                                                                    ? "bg-indigo-600 text-white shadow-sm"
                                                                     : score > v
-                                                                        ? "bg-report-primary-soft text-report-primary"
-                                                                        : "bg-slate-100 text-slate-400 hover:bg-slate-200"
+                                                                        ? "bg-indigo-100 text-indigo-700"
+                                                                        : "bg-white text-slate-400 hover:bg-slate-100 border border-slate-200",
                                                             )}
                                                         >
                                                             {v}
                                                         </button>
-
                                                     ))}
-
                                                 </div>
-
                                             </div>
-
                                         );
-
                                     })}
-
                                 </div>
-
                             </div>
-
                         ))}
-
                     </div>
 
+                    <div className="flex items-center justify-between rounded-xl border border-indigo-100 bg-indigo-50/70 px-4 py-3.5 sm:px-5">
+                        <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-indigo-700">
+                            Average competency score
+                        </p>
+                        <p className="text-sm font-semibold text-indigo-900">
+                            {avgScore > 0 ? avgScore.toFixed(1) : "—"} / 5
+                        </p>
+                    </div>
                 </div>
+            </section>
 
-            </div>
-
-            {/* ─── Auto-Generated System Analytics ────────────────────────────── */}
-            <div className="pt-8 border-t-2 border-slate-100 space-y-6">
-
-                <div className="flex items-center justify-between">
-
-                    <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 rounded-xl bg-report-primary text-white flex items-center justify-center shadow-lg shadow-report-primary-shadow">
-                            <BrainCircuit className="w-5 h-5" />
+            {/* System summary */}
+            <section className="space-y-4 border-t border-slate-200 pt-8">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex items-center gap-2.5">
+                        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-600 text-white">
+                            <BrainCircuit className="h-4 w-4" />
                         </div>
-
-                        <h3 className="report-h3 !text-lg">
-                            System-Generated Academic Summary
+                        <h3 className="text-base font-semibold text-slate-900">
+                            System-generated academic summary
                         </h3>
                     </div>
-
-                    <span className="report-label !bg-slate-100 !px-3 !py-1 !rounded-xl">
-                        Read-Only
+                    <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                        Read-only
                     </span>
-
                 </div>
 
-
-                <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
-
-                    {/* Academic Integration Grid */}
-                    <div className="md:col-span-12 bg-white border-2 border-slate-100 rounded-[2rem] p-8 space-y-6">
-
-                        <p className="report-label !mb-4">
-                            Academic Integration Overview
-                        </p>
-
-
-                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-
-                            <div className="bg-slate-50 rounded-2xl p-5 space-y-2">
-                                <p className="text-sm font-black text-slate-900 leading-snug line-clamp-2">
-                                    {integrationOptions.find(o => o.id === academic_integration)?.label || 'Pending'}
-                                </p>
-
-                                <p className="report-label !text-[8px] !text-slate-500">
-                                    Integration Level
-                                </p>
-                            </div>
-
-
-                            <div className="bg-slate-50 rounded-2xl p-5 space-y-2">
-                                <p className="text-sm font-black text-slate-900 leading-snug line-clamp-2">
-                                    {section2?.discipline || 'N/A'}
-                                </p>
-
-                                <p className="report-label !text-[8px] !text-slate-500">
-                                    Discipline Applied
-                                </p>
-                            </div>
-
-
-                            <div className="bg-slate-50 rounded-2xl p-5 space-y-2">
-                                <p className="report-h3 !text-2xl font-black">
-                                    {(Object.values(competency_scores).reduce((a, b) => a + Number(b), 0) / 12).toFixed(1)}
-                                </p>
-
-                                <p className="report-label !text-[8px] !text-slate-500">
-                                    Avg Competency Score
-                                </p>
-                            </div>
-
-
-
-                        </div>
-
-                    </div>
-
-                </div>
-
-
-                {/* Auto narrative */}
-                {/* ─── Auto-Generated Summary ────────────────────────────── */}
-                <div className="pt-16 border-t-2 border-slate-100">
-
-                    <div className="flex items-center justify-between mb-8">
-
-                        <div className="flex items-center gap-4">
-                            <div className="w-10 h-10 rounded-xl bg-report-primary text-white flex items-center justify-center shadow-lg shadow-report-primary-shadow">
-                                <BrainCircuit className="w-6 h-6" />
-                            </div>
-
-                            <h3 className="report-h3 !text-xl !italic">
-                                Academic Reflection Summary
-                            </h3>
-                        </div>
-
-                        <div className="px-5 py-2.5 rounded-xl bg-slate-900 text-white text-[10px] font-black uppercase tracking-widest border border-slate-800">
-                            Auto-Generated
-                        </div>
-
-                    </div>
-
-
-                    <div className="bg-white border-2 border-slate-200 rounded-[3rem] p-12 relative overflow-hidden shadow-xl space-y-10 group">
-
-                        {/* watermark icon */}
-                        <div className="absolute -bottom-10 -right-10 opacity-5 group-hover:opacity-10 transition-opacity duration-1000 rotate-12">
-                            <BrainCircuit className="w-80 h-80 text-slate-900" />
-                        </div>
-
-                        <div className="relative z-10 space-y-6">
-
-                            {/* opening quote */}
-                            <span className="absolute -top-10 -left-6 text-7xl font-serif text-slate-100 select-none">
-                                “
-                            </span>
-
-                            <p className="report-ai-text">
-                                {autoNarrative}
+                <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+                    <p className={clsx(fieldLabel, "mb-4")}>Academic integration overview</p>
+                    <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+                        <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                            <p className="text-sm font-semibold leading-snug text-slate-900 line-clamp-2">
+                                {integrationOptions.find((o) => o.id === academic_integration)?.label || "Pending"}
                             </p>
-
-                            {/* closing quote */}
-                            <span className="absolute -bottom-16 -right-6 text-7xl font-serif text-slate-100 select-none rotate-180">
-                                “
-                            </span>
-
+                            <p className="mt-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                                Integration level
+                            </p>
                         </div>
-
+                        <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                            <p className="text-sm font-semibold leading-snug text-slate-900 line-clamp-2">
+                                {section2?.discipline || "N/A"}
+                            </p>
+                            <p className="mt-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                                Discipline applied
+                            </p>
+                        </div>
+                        <div className="rounded-lg border border-indigo-100 bg-indigo-50/70 p-4 col-span-2 lg:col-span-1">
+                            <p className="text-2xl font-semibold text-indigo-700">
+                                {avgScore > 0 ? avgScore.toFixed(1) : "—"}
+                            </p>
+                            <p className="mt-1 text-[10px] font-semibold uppercase tracking-wide text-indigo-600/80">
+                                Avg competency score
+                            </p>
+                        </div>
                     </div>
+                </div>
+            </section>
 
+            {/* Auto narrative */}
+            <section className="space-y-4 border-t border-slate-200 pt-8">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex items-center gap-2.5">
+                        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-600 text-white">
+                            <BrainCircuit className="h-4 w-4" />
+                        </div>
+                        <h3 className="text-base font-semibold text-slate-900">
+                            Academic reflection summary
+                        </h3>
+                    </div>
+                    <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                        Auto-generated
+                    </span>
                 </div>
 
-            </div>
-            
+                <div className="relative overflow-hidden rounded-xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+                    <div className="absolute -bottom-10 -right-10 rotate-12 opacity-5">
+                        <BrainCircuit className="h-64 w-64 text-slate-900" />
+                    </div>
+                    <p className="relative z-10 text-sm leading-relaxed text-slate-700">
+                        {autoNarrative}
+                    </p>
+                </div>
+            </section>
         </div>
     );
 }

@@ -22,6 +22,138 @@ function toneFromPercent(p: number): AnalyticsKpiCard["tone"] {
     return "danger";
 }
 
+/** Extract up to 6 KPI cards for any section payload (Section 1–10). */
+export function extractSectionKpis(payload: Section1AnalyticsPayload, section = 1): AnalyticsKpiCard[] {
+    if (section === 1) return extractSection1Kpis(payload);
+    return extractGenericSectionKpis(payload);
+}
+
+function extractGenericSectionKpis(payload: Section1AnalyticsPayload): AnalyticsKpiCard[] {
+    const f = payload.fields;
+    const cards: AnalyticsKpiCard[] = [];
+
+    const completion = f.section_completion_rate;
+    if (isObj(completion) && completion.percent != null) {
+        const pct = num(completion.percent) ?? 0;
+        cards.push({
+            id: "completion",
+            label: "Section completion",
+            value: `${pct}%`,
+            tone: toneFromPercent(pct),
+        });
+    }
+
+    if (typeof f.reports_with_section === "number") {
+        cards.push({
+            id: "reports",
+            label: "Reports with data",
+            value: f.reports_with_section.toLocaleString(),
+        });
+    }
+
+    if (typeof f.total_beneficiaries === "number") {
+        cards.push({
+            id: "beneficiaries",
+            label: "Beneficiaries",
+            value: f.total_beneficiaries.toLocaleString(),
+            tone: "success",
+        });
+    }
+
+    if (typeof f.total_resource_entries === "number") {
+        cards.push({
+            id: "resources",
+            label: "Resource entries",
+            value: f.total_resource_entries.toLocaleString(),
+        });
+    }
+
+    if (typeof f.goal_coverage_count === "number") {
+        cards.push({
+            id: "sdg_goals",
+            label: "SDG goals covered",
+            value: String(f.goal_coverage_count),
+            tone: "success",
+        });
+    }
+
+    const partners = f.projects_with_partners_percent;
+    if (isObj(partners) && partners.percent != null) {
+        cards.push({
+            id: "partners",
+            label: "With partners",
+            value: `${num(partners.percent) ?? 0}%`,
+            tone: toneFromPercent(num(partners.percent) ?? 0),
+        });
+    }
+
+    const evidence = f.evidence_backed_percent;
+    if (isObj(evidence) && evidence.percent != null) {
+        cards.push({
+            id: "evidence",
+            label: "Evidence-backed",
+            value: `${num(evidence.percent) ?? 0}%`,
+            tone: toneFromPercent(num(evidence.percent) ?? 0),
+        });
+    }
+
+    const cred = f.avg_credibility_score;
+    if (isObj(cred) && cred.score != null) {
+        cards.push({
+            id: "credibility",
+            label: "Avg credibility",
+            value: String(num(cred.score) ?? 0),
+            tone: toneFromPercent(num(cred.score) ?? 0),
+        });
+    }
+
+    if (typeof f.avg_self_rating === "number") {
+        cards.push({
+            id: "rating",
+            label: "Avg competency",
+            value: String(f.avg_self_rating),
+        });
+    }
+
+    const cont = f.continuation_yes_rate;
+    if (isObj(cont) && cont.percent != null) {
+        cards.push({
+            id: "continuation",
+            label: "Planning to continue",
+            value: `${num(cont.percent) ?? 0}%`,
+            tone: toneFromPercent(num(cont.percent) ?? 0),
+        });
+    }
+
+    const formal = f.formalization_rate;
+    if (isObj(formal) && formal.percent != null) {
+        cards.push({
+            id: "formal",
+            label: "Formalized",
+            value: `${num(formal.percent) ?? 0}%`,
+            tone: toneFromPercent(num(formal.percent) ?? 0),
+        });
+    }
+
+    if (typeof f.distinct_partners_estimate === "number") {
+        cards.push({
+            id: "distinct_partners",
+            label: "Distinct partners",
+            value: f.distinct_partners_estimate.toLocaleString(),
+        });
+    }
+
+    if (cards.length === 0) {
+        cards.push({
+            id: "status",
+            label: "Section status",
+            value: formatSection1FieldValue(f.section_completion_rate ?? "—"),
+        });
+    }
+
+    return cards.slice(0, 6);
+}
+
 export function extractSection1Kpis(payload: Section1AnalyticsPayload): AnalyticsKpiCard[] {
     const f = payload.fields;
     const cards: AnalyticsKpiCard[] = [];
@@ -145,13 +277,25 @@ export function extractProjectContext(payload: Section1AnalyticsPayload): {
     return { title, subtitle, progressMode };
 }
 
-export function categoryCounts(payload: Section1AnalyticsPayload): { basic: number; premium: number; restricted: number } {
+export function categoryCounts(payload: Section1AnalyticsPayload): {
+    basic: number;
+    premium: number;
+    restricted: number;
+} {
+    if (payload.category_counts) {
+        return {
+            basic: payload.category_counts.basic ?? 0,
+            premium: payload.category_counts.premium ?? 0,
+            restricted: payload.category_counts.restricted ?? 0,
+        };
+    }
     const counts = { basic: 0, premium: 0, restricted: 0 };
     for (const key of Object.keys(payload.fields)) {
         const cat = payload.meta[key]?.category;
         if (cat === "basic") counts.basic += 1;
         else if (cat === "premium") counts.premium += 1;
         else if (cat === "restricted") counts.restricted += 1;
+        else counts.basic += 1;
     }
     return counts;
 }

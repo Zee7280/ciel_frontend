@@ -273,6 +273,7 @@ export interface ReportData {
         evidence_types: string[];
         evidence_files: File[];
         description: string;
+        linked_items?: string[]; // optional tags linking evidence to activities / outcomes
         ethical_compliance: {
             authentic: boolean;
             informed_consent: boolean;
@@ -431,6 +432,7 @@ const defaultReportData: ReportData = {
         evidence_types: [],
         evidence_files: [],
         description: '',
+        linked_items: [],
         ethical_compliance: {
             authentic: false,
             informed_consent: false,

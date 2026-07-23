@@ -82,14 +82,19 @@ export default function Hero() {
                     </div>
 
                     {/* Impact Badges Row */}
-                    <div className="mt-10 flex flex-wrap justify-center lg:justify-start items-center gap-x-6 gap-y-3">
+                    <div className="mt-10 flex flex-wrap justify-center lg:justify-start items-center gap-x-7 gap-y-3">
                         {[
                             "SDG-Aligned Projects",
                             "Verified Impact Tracking",
-                            "CII Score Generated"
+                            "CII Score Generated",
                         ].map((badge) => (
-                            <div key={badge} className="flex items-center gap-2 text-slate-500 font-bold text-sm italic">
-                                <Check className="w-4 h-4 text-slate-800" strokeWidth={3} />
+                            <div
+                                key={badge}
+                                className="flex items-center gap-2.5 text-sm font-semibold text-slate-600"
+                            >
+                                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-100">
+                                    <Check className="h-3 w-3 text-emerald-700" strokeWidth={3} />
+                                </span>
                                 <span>{badge}</span>
                             </div>
                         ))}

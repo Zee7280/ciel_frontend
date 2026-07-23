@@ -15,7 +15,8 @@ import {
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/app/dashboard/student/report/components/ui/card";
 import { authenticatedFetch } from "@/utils/api";
-import Section1AnalyticsPanel from "@/components/analytics/Section1AnalyticsPanel";
+import AnalyticsHub from "@/components/analytics/AnalyticsHub";
+import UnifiedAnalyticsOverview from "@/components/analytics/UnifiedAnalyticsOverview";
 
 type DegreeRow = { degree: string; count: number };
 type YearRow = { year_of_study: string; count: number };
@@ -78,15 +79,6 @@ export default function PartnerUniversityAnalyticsPage() {
         void load();
     }, [load]);
 
-    if (loading) {
-        return (
-            <div className="flex min-h-[320px] items-center justify-center gap-2 text-slate-600">
-                <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
-                <span className="text-sm font-medium">Loading institution analytics…</span>
-            </div>
-        );
-    }
-
     if (forbidden) {
         return (
             <div className="mx-auto max-w-2xl space-y-4 p-4">
@@ -106,23 +98,6 @@ export default function PartnerUniversityAnalyticsPage() {
                         Your organization profile is not typed as a university in CIEL, so this report is hidden. Other partner
                         tools are unchanged.
                     </CardContent>
-                </Card>
-            </div>
-        );
-    }
-
-    if (error) {
-        return (
-            <div className="mx-auto max-w-2xl space-y-4 p-4">
-                <Link
-                    href="/dashboard/partner"
-                    className="inline-flex items-center gap-1 text-sm font-bold text-indigo-600 hover:text-indigo-700"
-                >
-                    <ArrowLeft className="h-4 w-4" />
-                    Partner dashboard
-                </Link>
-                <Card>
-                    <CardContent className="p-6 text-sm text-red-600">{error}</CardContent>
                 </Card>
             </div>
         );
@@ -152,6 +127,23 @@ export default function PartnerUniversityAnalyticsPage() {
                 </p>
             </div>
 
+            {error ? (
+                <Card className="border-rose-200 bg-rose-50/70">
+                    <CardContent className="p-4 text-sm text-rose-700">
+                        Enrollment overview could not be loaded ({error}). Report analytics below still work independently.
+                    </CardContent>
+                </Card>
+            ) : null}
+
+            {loading && !data ? (
+                <div className="flex min-h-[100px] items-center justify-center gap-2 text-slate-600">
+                    <Loader2 className="h-6 w-6 animate-spin text-indigo-600" />
+                    <span className="text-sm font-medium">Loading enrollment overview…</span>
+                </div>
+            ) : null}
+
+            {data ? (
+                <>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 {[
                     {
@@ -274,12 +266,34 @@ export default function PartnerUniversityAnalyticsPage() {
                     </CardContent>
                 </Card>
             </div>
+                </>
+            ) : null}
 
-            <Section1AnalyticsPanel
-                apiPath="/api/v1/partners/university/analytics/section1"
-                title="Participation & attendance"
-                description="Aggregated participation, verification, and compliance indicators for your university organization."
-            />
+            <div className="border-t border-slate-200 pt-10">
+                <UnifiedAnalyticsOverview
+                    apiPath="/api/v1/partners/university/analytics/overview"
+                    query={{ scope: "aggregate" }}
+                    title="Institution report overview"
+                />
+            </div>
+
+            <div className="border-t border-slate-200 pt-10">
+                <h2 className="mb-2 text-lg font-bold text-slate-900">Report analytics (Sections 1–10)</h2>
+                <p className="mb-4 text-sm text-slate-500">
+                    Institution-scoped metrics from student reports — same hub as partner/admin/faculty analytics.
+                </p>
+                <AnalyticsHub
+                    views={[
+                        {
+                            id: "university",
+                            label: "University",
+                            apiPath: "/api/v1/partners/university/analytics/section1",
+                            query: { scope: "aggregate" },
+                        },
+                    ]}
+                    hideOnError={false}
+                />
+            </div>
         </div>
     );
 }

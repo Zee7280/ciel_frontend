@@ -1,5 +1,5 @@
 import React from "react";
-import { Users, User, UserPlus, Trash2, Shield, Info, AlertCircle, Clock, CheckCircle2, Loader2, Zap, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Save, Lock, Unlock, PlusCircle, Activity } from "lucide-react";
+import { Users, User, UserPlus, Trash2, Shield, Info, AlertCircle, Clock, CheckCircle2, Check, Loader2, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Save, Lock, Unlock, PlusCircle, Sparkles } from "lucide-react";
 import { Label } from "./ui/label";
 import { Input } from "./ui/input";
 import { Button } from "./ui/button";
@@ -25,7 +25,6 @@ import { calculateCII } from "../utils/calculateCII";
 import { resolveScopedTeamMembers } from "@/utils/reportTeamScope";
 import { effectiveParticipationStatusForReportActions } from "@/utils/studentJoinApplication";
 import { resolveAttendanceSubmitError } from "@/utils/attendanceSubmitError";
-import Section1AnalyticsPanel from "@/components/analytics/Section1AnalyticsPanel";
 import { fetchSection1Analytics } from "@/utils/section1Analytics";
 import {
     participationAttendanceVerificationRequested,
@@ -1111,17 +1110,17 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                             className={clsx(
                                                 "flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold transition-all",
                                                 isCurrent &&
-                                                    "bg-indigo-600 text-white shadow-md shadow-indigo-200 ring-4 ring-indigo-50",
+                                                    "bg-indigo-600 text-white shadow-sm",
                                                 isComplete &&
                                                     !isCurrent &&
                                                     "bg-emerald-500 text-white",
                                                 !isCurrent &&
                                                     !isComplete &&
-                                                    "bg-slate-100 text-slate-400 ring-1 ring-slate-200",
+                                                    "bg-slate-200 text-white",
                                             )}
                                         >
                                             {isComplete && !isCurrent ? (
-                                                <CheckCircle2 className="h-4 w-4" />
+                                                <Check className="h-4 w-4" strokeWidth={2.5} />
                                             ) : (
                                                 s.id
                                             )}
@@ -1160,44 +1159,41 @@ export default function Section1Participation({ projectData }: { projectData?: a
                     {internalStep === 1 && (
                         <div className="space-y-6">
                             {/* ── Institutional purpose (orientation) ── */}
-                            <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-                                <div className="h-1 bg-gradient-to-r from-slate-700 via-slate-500 to-slate-400" aria-hidden />
-                                <div className="p-6 md:p-8">
-                                    <div className="flex flex-col sm:flex-row sm:items-start gap-6">
-                                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-700">
-                                            <Shield className="h-5 w-5" />
+                            <div className="rounded-2xl border border-indigo-100/80 bg-indigo-50/50 p-5 sm:p-6">
+                                <div className="flex flex-col gap-5 sm:flex-row sm:items-start">
+                                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-sm">
+                                        <Sparkles className="h-5 w-5" />
+                                    </div>
+                                    <div className="min-w-0 flex-1 space-y-4">
+                                        <div>
+                                            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-indigo-500">
+                                                Institutional purpose
+                                            </p>
+                                            <h3 className="mt-1.5 text-lg font-semibold tracking-tight text-slate-900 sm:text-xl">
+                                                Establish accountability
+                                            </h3>
+                                            <p className="mt-2 max-w-3xl text-[13px] leading-relaxed text-slate-600">
+                                                This section documents verified participation and academic alignment so your community engagement record meets institutional audit expectations.
+                                            </p>
                                         </div>
-                                        <div className="min-w-0 flex-1 space-y-4">
-                                            <div>
-                                                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">
-                                                    Institutional purpose
-                                                </p>
-                                                <h3 className="mt-2 text-lg md:text-xl font-semibold text-slate-900 tracking-tight">
-                                                    Establish accountability
-                                                </h3>
-                                                <p className="mt-3 text-[13px] text-slate-600 leading-relaxed max-w-3xl">
-                                                    This section documents verified participation and academic alignment so your community engagement record meets institutional audit expectations.
-                                                </p>
-                                            </div>
-                                            <ul className="grid gap-4 sm:grid-cols-2">
-                                                {[
-                                                    "Verified participation via audit-ready logs",
-                                                    "Academic linkage to official student records",
-                                                    "Attendance integrity through HEC-compliant tracking",
-                                                    "Individual accountability for community hours"
-                                                ].map((p, i) => (
-                                                    <li
-                                                        key={i}
-                                                        className="flex gap-3 rounded-xl border border-slate-100 bg-slate-50/60 px-4 py-3 text-[13px] text-slate-700 leading-relaxed shadow-sm"
-                                                    >
-                                                        <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-white text-[10px] font-semibold text-slate-600 ring-1 ring-slate-200">
-                                                            {i + 1}
-                                                        </span>
-                                                        <span>{p}</span>
-                                                    </li>
-                                                ))}
-                                            </ul>
-                                        </div>
+                                        <ul className="grid gap-x-6 gap-y-2.5 sm:grid-cols-2">
+                                            {[
+                                                "Verified participation via audit-ready logs",
+                                                "Academic linkage to official student records",
+                                                "Attendance integrity through HEC-compliant tracking",
+                                                "Individual accountability for community hours",
+                                            ].map((p, i) => (
+                                                <li
+                                                    key={i}
+                                                    className="flex gap-2.5 text-[13px] leading-relaxed text-slate-700"
+                                                >
+                                                    <span className="mt-0.5 shrink-0 text-xs font-bold text-indigo-600">
+                                                        {i + 1}
+                                                    </span>
+                                                    <span>{p}</span>
+                                                </li>
+                                            ))}
+                                        </ul>
                                     </div>
                                 </div>
                             </div>
@@ -1447,153 +1443,65 @@ export default function Section1Participation({ projectData }: { projectData?: a
                             requiredHoursPerStudent > 0
                                 ? Math.min(100, Math.round((loggedEff / requiredHoursPerStudent) * 100))
                                 : 0;
-                        const teamProgressPct =
-                            projectGoal > 0
-                                ? Math.min(100, Math.round((collectiveProjectHours / projectGoal) * 100))
-                                : 0;
                         const filteredLogCount = participantLogs.length;
 
                         return (
                             <div className="space-y-6">
-
-                                <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                                    <div className="min-w-0">
-                                        <p className="text-xs font-medium text-indigo-600">Step 2</p>
-                                        <h3 className="mt-0.5 text-xl font-semibold text-slate-900">
-                                            Attendance logging
-                                        </h3>
-                                        <p className="mt-1 text-sm text-slate-500">
-                                            Record and verify your engagement hours for HEC audit trails.
-                                        </p>
-                                    </div>
-                                    <div className="flex shrink-0 items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3.5 py-2.5 sm:max-w-xs">
-                                        <Zap className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
-                                        <p className="text-xs leading-relaxed text-amber-800">
-                                            Each student must meet the required hour goal before submission.
-                                        </p>
+                                {/* Institutional purpose — matches design */}
+                                <div className="rounded-2xl border border-indigo-100/80 bg-indigo-50/50 p-5 sm:p-6">
+                                    <div className="flex flex-col gap-5 sm:flex-row sm:items-start">
+                                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-sm">
+                                            <Sparkles className="h-5 w-5" />
+                                        </div>
+                                        <div className="min-w-0 flex-1 space-y-4">
+                                            <div>
+                                                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-indigo-500">
+                                                    Institutional purpose
+                                                </p>
+                                                <h3 className="mt-1.5 text-lg font-semibold tracking-tight text-slate-900 sm:text-xl">
+                                                    Establish accountability
+                                                </h3>
+                                                <p className="mt-2 max-w-3xl text-[13px] leading-relaxed text-slate-600">
+                                                    This section documents verified participation and academic alignment so your community engagement record meets institutional audit expectations.
+                                                </p>
+                                            </div>
+                                            <ul className="grid gap-x-6 gap-y-2.5 sm:grid-cols-2">
+                                                {[
+                                                    "Verified participation via audit-ready logs",
+                                                    "Academic linkage to official student records",
+                                                    "Attendance integrity through HEC-compliant tracking",
+                                                    "Individual accountability for community hours",
+                                                ].map((p, i) => (
+                                                    <li
+                                                        key={i}
+                                                        className="flex gap-2.5 text-[13px] leading-relaxed text-slate-700"
+                                                    >
+                                                        <span className="mt-0.5 shrink-0 text-xs font-bold text-indigo-600">
+                                                            {i + 1}
+                                                        </span>
+                                                        <span>{p}</span>
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        </div>
                                     </div>
                                 </div>
 
-                                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                                    {[
-                                        {
-                                            label: "Project goal",
-                                            value: projectGoal,
-                                            suffix: "hrs",
-                                            icon: Shield,
-                                            progress: null as number | null,
-                                        },
-                                        {
-                                            label: "Team hours logged",
-                                            value: collectiveProjectHours,
-                                            suffix: "hrs",
-                                            icon: Users,
-                                            progress: teamProgressPct,
-                                        },
-                                        {
-                                            label: "Team progress",
-                                            value: `${teamProgressPct}%`,
-                                            suffix: null,
-                                            icon: Activity,
-                                            progress: teamProgressPct,
-                                        },
-                                    ].map((stat, i) => (
-                                        <div
-                                            key={i}
-                                            className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
-                                        >
-                                            <div className="flex items-center gap-3">
-                                                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-50 text-slate-600 ring-1 ring-slate-100">
-                                                    <stat.icon className="h-4 w-4" />
-                                                </div>
-                                                <div className="min-w-0 flex-1">
-                                                    <p className="text-xs text-slate-500">{stat.label}</p>
-                                                    <p className="text-xl font-bold text-slate-900">
-                                                        {stat.value}
-                                                        {stat.suffix ? (
-                                                            <span className="ml-1 text-xs font-medium text-slate-400">
-                                                                {stat.suffix}
-                                                            </span>
-                                                        ) : null}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                            {stat.progress != null ? (
-                                                <div className="mt-3">
-                                                    <div className="h-1.5 overflow-hidden rounded-full bg-slate-100">
-                                                        <div
-                                                            className="h-full rounded-full bg-indigo-500 transition-all"
-                                                            style={{ width: `${stat.progress}%` }}
-                                                        />
-                                                    </div>
-                                                </div>
-                                            ) : null}
-                                        </div>
-                                    ))}
+                                <div className="space-y-1">
+                                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-indigo-600">
+                                        Step 2 of 4
+                                    </p>
+                                    <h3 className="text-xl font-semibold text-slate-900">
+                                        Attendance logging
+                                    </h3>
+                                    <p className="text-sm text-slate-500">
+                                        Log each engagement session with a verified time, location, and activity summary.
+                                    </p>
                                 </div>
 
-                                {selectedParticipantId ? (
-                                    <div className="rounded-xl border border-indigo-100 bg-indigo-50/40 p-4 sm:p-5">
-                                        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                                            <div className="flex items-center gap-3">
-                                                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-indigo-600 text-white text-sm font-semibold">
-                                                    {selectedStudentName.charAt(0).toUpperCase()}
-                                                </div>
-                                                <div>
-                                                    <p className="text-xs text-slate-500">Personal tracking</p>
-                                                    <p className="text-sm font-semibold text-slate-900">
-                                                        {selectedStudentName}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                            <div className="flex items-center gap-6 text-center">
-                                                <div>
-                                                    <p className="text-xs text-slate-500">Logged</p>
-                                                    <p className="text-lg font-bold text-indigo-600">
-                                                        {loggedRounded}{" "}
-                                                        <span className="text-xs font-medium text-slate-400">hrs</span>
-                                                    </p>
-                                                </div>
-                                                <div>
-                                                    <p className="text-xs text-slate-500">Remaining</p>
-                                                    <p className="text-lg font-bold text-amber-600">
-                                                        {remainingHours}{" "}
-                                                        <span className="text-xs font-medium text-slate-400">hrs</span>
-                                                    </p>
-                                                </div>
-                                                <div>
-                                                    <p className="text-xs text-slate-500">Goal</p>
-                                                    <p className="text-lg font-bold text-slate-700">
-                                                        {requiredHoursPerStudent}{" "}
-                                                        <span className="text-xs font-medium text-slate-400">hrs</span>
-                                                    </p>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div className="mt-4">
-                                            <div className="mb-1 flex justify-between text-xs text-slate-500">
-                                                <span>Individual progress</span>
-                                                <span className="font-medium text-slate-700">
-                                                    {personalProgressPct}%
-                                                </span>
-                                            </div>
-                                            <div className="h-2 overflow-hidden rounded-full bg-white ring-1 ring-indigo-100">
-                                                <div
-                                                    className={clsx(
-                                                        "h-full rounded-full transition-all",
-                                                        personalProgressPct >= 100
-                                                            ? "bg-emerald-500"
-                                                            : "bg-indigo-500",
-                                                    )}
-                                                    style={{ width: `${personalProgressPct}%` }}
-                                                />
-                                            </div>
-                                        </div>
-                                    </div>
-                                ) : null}
-
-                                <div className="grid min-w-0 grid-cols-1 gap-6 xl:grid-cols-[minmax(0,22rem)_minmax(0,1fr)] xl:items-start">
-                                    <div className="min-w-0 space-y-4">
+                                <div className="grid min-w-0 grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] lg:items-start">
+                                    {/* Left: form */}
+                                    <div className="min-w-0 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
                                         <AttendanceForm
                                             verifiedUsers={rawParticipants}
                                             onSuccess={() => loadAllEntries()}
@@ -1605,8 +1513,8 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                             allowManualUnlock={!isAttendanceVerificationRequested}
                                         />
 
-                                        {!isSubmittedReport && !isParticipationUnlocked && (
-                                            <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                                        {!isSubmittedReport && !isParticipationUnlocked ? (
+                                            <div className="mt-5 border-t border-slate-100 pt-4">
                                                 {isAttendanceVerificationRequested ? (
                                                     <div className="space-y-1.5">
                                                         <p className="text-xs font-semibold text-emerald-700">
@@ -1620,44 +1528,28 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                                         </p>
                                                     </div>
                                                 ) : (
-                                                    <div className="rounded-lg border border-indigo-100 bg-indigo-50/70 px-3 py-2.5 text-xs leading-relaxed text-indigo-900">
-                                                        <p className="font-semibold text-indigo-800">
-                                                            Verify attendance (one time) — available on Step 3
-                                                        </p>
-                                                        <p className="mt-1.5">{ATTENDANCE_VERIFICATION_INFO.step2Hint}</p>
-                                                    </div>
+                                                    <p className="text-xs leading-relaxed text-slate-500">
+                                                        {ATTENDANCE_VERIFICATION_INFO.step2Hint}
+                                                    </p>
                                                 )}
                                             </div>
-                                        )}
-
-                                        <div className="rounded-xl border border-slate-200 bg-slate-900 px-4 py-3.5 text-white">
-                                            <p className="text-xs font-semibold">How approval works</p>
-                                            <p className="mt-1.5 text-xs leading-relaxed text-slate-300">
-                                                After you take the oath and submit for verification in Step 3,
-                                                your chosen Faculty or Partner reviewer will approve each session.
-                                                Approved hours count toward your goal.
-                                            </p>
-                                        </div>
+                                        ) : null}
                                     </div>
 
+                                    {/* Right: logged sessions + hours progress */}
                                     <div className="min-w-0 space-y-4">
-                                        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-                                            <div className="flex flex-col gap-2 border-b border-slate-100 px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between">
-                                                <div className="min-w-0">
-                                                    <h4 className="flex items-center gap-2 text-sm font-semibold text-slate-900">
-                                                        <Clock className="h-4 w-4 text-indigo-600" />
-                                                        Logged sessions
-                                                    </h4>
-                                                    <p className="mt-0.5 text-xs text-slate-500">
-                                                        {selectedParticipantId
-                                                            ? `Showing entries for ${selectedStudentName}`
-                                                            : "Showing all team members"}
-                                                    </p>
-                                                </div>
-                                                <span className="w-fit shrink-0 rounded-full bg-indigo-50 px-3 py-1 text-xs font-medium text-indigo-700 ring-1 ring-indigo-100">
+                                        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                                            <div className="flex items-baseline justify-between gap-3 border-b border-slate-100 px-5 py-4">
+                                                <h4 className="text-base font-semibold text-slate-900">
+                                                    Logged sessions
+                                                </h4>
+                                                <p className="shrink-0 text-xs text-slate-400">
                                                     {filteredLogCount}{" "}
-                                                    {filteredLogCount === 1 ? "entry" : "entries"}
-                                                </span>
+                                                    {filteredLogCount === 1 ? "record" : "records"}
+                                                    {selectedParticipantId
+                                                        ? ` · filtered by ${selectedStudentName}`
+                                                        : ""}
+                                                </p>
                                             </div>
                                             <AttendanceSummaryTable
                                                 embedded
@@ -1674,6 +1566,39 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                                 isLocked={isAttendanceFormLocked}
                                             />
                                         </div>
+
+                                        {selectedParticipantId ? (
+                                            <div className="rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
+                                                <div className="mb-2.5 flex items-center justify-between gap-3">
+                                                    <p className="text-xs text-slate-500">
+                                                        Hours logged toward {requiredHoursPerStudent}-hour minimum
+                                                    </p>
+                                                    <p className="shrink-0 text-sm font-semibold text-slate-900">
+                                                        {loggedRounded} / {requiredHoursPerStudent} hrs
+                                                    </p>
+                                                </div>
+                                                <div className="h-2.5 overflow-hidden rounded-full bg-slate-100">
+                                                    <div
+                                                        className={clsx(
+                                                            "h-full rounded-full transition-all",
+                                                            personalProgressPct >= 100
+                                                                ? "bg-emerald-500"
+                                                                : "bg-indigo-600",
+                                                        )}
+                                                        style={{ width: `${personalProgressPct}%` }}
+                                                    />
+                                                </div>
+                                                {remainingHours > 0 ? (
+                                                    <p className="mt-2 text-[11px] text-slate-400">
+                                                        {remainingHours} hrs remaining
+                                                    </p>
+                                                ) : (
+                                                    <p className="mt-2 text-[11px] font-medium text-emerald-600">
+                                                        Minimum hours met
+                                                    </p>
+                                                )}
+                                            </div>
+                                        ) : null}
                                     </div>
                                 </div>
                             </div>
@@ -2041,16 +1966,6 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                         report={data}
                                     />
 
-                                    {projectIdFromUrl ? (
-                                        <Section1AnalyticsPanel
-                                            apiPath={`/api/v1/student/projects/${encodeURIComponent(projectIdFromUrl)}/section1-analytics`}
-                                            title="Participation & attendance"
-                                            description="Read-only analytics from CIEL (your engagement metrics above are unchanged)."
-                                            className="mt-8"
-                                        />
-                                    ) : null}
-
-
                                 </div>
 
                             ) : (
@@ -2098,7 +2013,7 @@ export default function Section1Participation({ projectData }: { projectData?: a
                         className="order-2 h-10 rounded-lg border-slate-200 px-5 text-sm font-medium text-slate-700 hover:bg-slate-50 sm:order-1 disabled:opacity-40"
                     >
                         <ChevronLeft className="mr-1.5 h-4 w-4" />
-                        Back
+                        Previous step
                     </Button>
 
                     <div className="order-1 flex flex-col gap-2 sm:order-2 sm:flex-row sm:items-center sm:gap-2">
@@ -2109,7 +2024,7 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                 className="h-10 rounded-lg border-slate-200 bg-white px-5 text-sm font-medium text-slate-700 hover:bg-slate-50"
                             >
                                 <Save className="mr-1.5 h-4 w-4 text-slate-400" />
-                                Save draft
+                                Save section progress
                             </Button>
                         ) : null}
 
@@ -2147,7 +2062,7 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                             : "bg-indigo-600 hover:bg-indigo-700 shadow-sm",
                                     )}
                                 >
-                                    {internalStep === 3 ? "Skip & continue" : "Continue"}
+                                    {internalStep === 3 ? "Skip & continue" : "Next step"}
                                     <ChevronRight className="ml-1.5 h-4 w-4" />
                                 </Button>
                             </>

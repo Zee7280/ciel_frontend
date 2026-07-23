@@ -1,11 +1,8 @@
-import React, { useMemo, useEffect, useState } from "react";
-import { generateAISummary } from "../utils/aiSummarizer";
-import { toast } from "sonner";
-import { Target, Info, Trash2, AlertCircle, CheckCircle2, Lock, X, Sparkles, Plus, Layers } from "lucide-react";
+import React, { useMemo, useEffect } from "react";
+import { Target, Info, Trash2, AlertCircle, CheckCircle2, Lock, Plus, Layers } from "lucide-react";
 import { Label } from "./ui/label";
 import { Textarea } from "./ui/textarea";
 import { useReportForm } from "../context/ReportContext";
-import { useDebounce } from "@/hooks/useDebounce";
 import { FieldError } from "./ui/FieldError";
 import { sdgData } from "@/utils/sdgData";
 import clsx from "clsx";
@@ -36,7 +33,37 @@ const ALL_SDGS = [
     { num: 17, color: "#19486A", name: "Partnerships for the Goals" },
 ];
 
-const dropdownClass = "w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-report-primary-border focus:ring-8 focus:ring-report-primary-soft/50 outline-none font-medium bg-slate-50 text-slate-800 text-sm transition-all";
+const dropdownClass =
+    "h-11 w-full appearance-none rounded-lg border border-slate-200 bg-white px-3 pr-9 text-sm font-medium text-slate-800 shadow-sm outline-none transition-colors focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100 disabled:opacity-50";
+
+const fieldLabelClass =
+    "text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500";
+
+function WordCountBar({ count, max = 200 }: { count: number; max?: number }) {
+    const ok = count >= 100 && count <= max;
+    const over = count > max;
+    return (
+        <div className="flex items-center justify-end gap-2.5">
+            <div className="h-1.5 w-16 overflow-hidden rounded-full bg-slate-100">
+                <div
+                    className={clsx(
+                        "h-full rounded-full transition-all",
+                        count < 100 ? "bg-amber-400" : over ? "bg-red-500" : "bg-emerald-500",
+                    )}
+                    style={{ width: `${Math.min((count / max) * 100, 100)}%` }}
+                />
+            </div>
+            <span
+                className={clsx(
+                    "text-[11px] tabular-nums",
+                    ok ? "text-emerald-600" : over ? "text-red-500" : "text-slate-400",
+                )}
+            >
+                {count} / {max} words
+            </span>
+        </div>
+    );
+}
 
 export default function Section3SDGMapping({ projectData }: Section3Props) {
     const { data, updateSection, getFieldError, validationErrors } = useReportForm();
@@ -105,830 +132,634 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
     const studentWordCount = (student_contribution_intent_statement || "").trim().split(/\s+/).filter((w: string) => w).length;
 
     return (
-        <div className="space-y-5 pb-10">
+        <div className="mx-auto max-w-4xl space-y-8 pb-10">
 
             {/* ── Section Header ───────────────────────────────────────── */}
-            <div className="space-y-6">
-
-                {/* Header */}
-                <div className="flex items-center gap-4">
-
-                    <div className="w-12 h-12 rounded-xl bg-report-primary text-white flex items-center justify-center shadow-sm">
-                        <Target className="w-6 h-6" />
+            <div className="space-y-5">
+                <div className="flex items-center gap-3.5">
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-indigo-600 text-white shadow-sm">
+                        <Target className="h-5 w-5" />
                     </div>
-
                     <div>
-                        <h2 className="text-lg font-semibold text-slate-900">
-                            Section 3 — SDG Contribution Mapping
+                        <h2 className="text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl">
+                            <span className="text-indigo-600">SECTION 3:</span> SDG contribution mapping
                         </h2>
-                        <p className="text-sm text-slate-500">
-                            Sustainability Alignment & Intent
-                        </p>
                     </div>
-
                 </div>
 
-
-                {/* Purpose Card */}
-                <div className="p-6 bg-report-primary-soft border border-report-primary-border rounded-2xl relative overflow-hidden">
-
-                    <div className="flex items-start gap-4">
-
-                        <div className="w-9 h-9 rounded-lg bg-white flex items-center justify-center border border-report-primary-border shadow-sm shrink-0">
-                            <Info className="w-4 h-4 text-report-primary" />
+                <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-5 sm:p-6">
+                    <div className="flex items-start gap-3">
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-indigo-600">
+                            <Target className="h-4 w-4" />
                         </div>
-
-                        <div className="space-y-4">
-
+                        <div className="min-w-0 flex-1 space-y-3">
                             <div>
-                                <h3 className="text-sm font-semibold text-report-primary uppercase tracking-wide mb-1">
-                                    Purpose of This Section
+                                <h3 className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500">
+                                    Purpose of this section
                                 </h3>
-
-                                <p className="text-sm text-slate-600 leading-relaxed max-w-2xl">
-                                    This section establishes the technical and moral alignment of your project with the Global Goals.
-                                    It provides a structured framework for:
+                                <p className="mt-1.5 text-sm leading-relaxed text-slate-600">
+                                    This section establishes technical and moral alignment of your project with
+                                    the Global Goals. It provides a structured framework for:
                                 </p>
                             </div>
-
-
-                            {/* Bullet Lists */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-
-                                <ul className="space-y-2 text-sm text-slate-600">
-
-                                    <li className="flex items-center gap-2">
-                                        <div className="w-1.5 h-1.5 rounded-full bg-report-primary" />
-                                        Reviewing opportunity-level SDGs
-                                    </li>
-
-                                    <li className="flex items-center gap-2">
-                                        <div className="w-1.5 h-1.5 rounded-full bg-report-primary" />
-                                        Selecting a project-specific Primary SDG
-                                    </li>
-
-                                    <li className="flex items-center gap-2">
-                                        <div className="w-1.5 h-1.5 rounded-full bg-report-primary" />
-                                        Defining the contribution pathway
-                                    </li>
-
-                                </ul>
-
-
-                                <ul className="space-y-2 text-sm text-slate-600">
-
-                                    <li className="flex items-center gap-2">
-                                        <div className="w-1.5 h-1.5 rounded-full bg-report-primary" />
-                                        Mapping Secondary Goal alignments
-                                    </li>
-
-                                    <li className="flex items-center gap-2">
-                                        <div className="w-1.5 h-1.5 rounded-full bg-report-primary" />
-                                        Standardizing UN indicator reporting
-                                    </li>
-
-                                    <li className="flex items-center gap-2">
-                                        <div className="w-1.5 h-1.5 rounded-full bg-report-primary" />
-                                        Synthesizing your alignment logic
-                                    </li>
-
-                                </ul>
-
+                            <div className="grid grid-cols-1 gap-x-8 gap-y-2 sm:grid-cols-2">
+                                {[
+                                    "Reviewing opportunity-level SDGs",
+                                    "Selecting a project-specific primary SDG",
+                                    "Defining the contribution pathway",
+                                    "Mapping secondary goal alignments",
+                                    "Standardizing UN indicator reporting",
+                                    "Synthesizing your alignment logic",
+                                ].map((item) => (
+                                    <div
+                                        key={item}
+                                        className="flex items-center gap-2 text-sm text-slate-600"
+                                    >
+                                        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-indigo-500" />
+                                        {item}
+                                    </div>
+                                ))}
                             </div>
-
                         </div>
-
                     </div>
-
                 </div>
 
-
-                {/* Validation Errors */}
                 {hasErrors && (
-                    <div className="bg-red-50 border border-red-200 rounded-xl p-5 flex items-start gap-3">
-
-                        <AlertCircle className="w-5 h-5 text-red-600 mt-0.5 shrink-0" />
-
+                    <div className="flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-4">
+                        <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-red-600" />
                         <div>
-                            <h4 className="text-sm font-semibold text-red-800">
-                                Action Required: Validation Errors
-                            </h4>
-
-                            <ul className="mt-2 space-y-1">
-                                {sectionErrors.slice(0, 5).map((error: any, idx: number) => (
+                            <h4 className="text-sm font-semibold text-red-800">Validation errors</h4>
+                            <ul className="mt-1.5 space-y-1">
+                                {sectionErrors.slice(0, 5).map((error: { message?: string }, idx: number) => (
                                     <li key={idx} className="text-sm text-red-700">
                                         • {error.message}
                                     </li>
                                 ))}
                             </ul>
-
                         </div>
                     </div>
                 )}
-
             </div>
 
-            {/* ═══════════════════════════════════════════════════════════ */}
-            {/* 3.1 — Opportunity's Registered SDGs (Read-Only)          */}
-            {/* ═══════════════════════════════════════════════════════════ */}
-            <div className="space-y-6">
-
-                {/* Section Header */}
-                <div className="flex items-center justify-between">
-
-                    <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center text-[11px] font-bold">
-                            3.1
+            {/* ── 1. Opportunity's Registered SDGs ─────────────────────── */}
+            <section className="space-y-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0 space-y-1">
+                        <div className="flex items-center gap-2.5">
+                            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-900 text-[11px] font-bold text-white">
+                                1
+                            </span>
+                            <h3 className="text-base font-semibold text-slate-900">
+                                Opportunity&apos;s registered SDGs
+                            </h3>
                         </div>
-
-                        <h3 className="text-base font-semibold text-slate-900">
-                            Opportunity's Registered SDGs
-                        </h3>
+                        <p className="pl-9 text-sm text-slate-500">
+                            These SDGs were selected when the opportunity was created. You cannot change them.
+                        </p>
                     </div>
-
-                    <span className="flex items-center gap-1.5 px-3 py-1 rounded-md bg-slate-100 text-slate-500 text-[10px] font-semibold uppercase tracking-wide border border-slate-200">
-                        <Lock className="w-3 h-3" />
-                        Locked · From Admin
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                        <Lock className="h-3 w-3" />
+                        Locked · from admin
                     </span>
-
                 </div>
 
+                <div className="space-y-3">
+                    {oppPrimaryNum > 0 &&
+                        (() => {
+                            const sdg = ALL_SDGS.find((s) => s.num === oppPrimaryNum);
+                            const sdgRecord = sdgData.find((s) => s.number === oppPrimaryNum);
+                            const targetId = oppPrimaryRow?.targetId || "";
+                            const indicatorId = oppPrimaryRow?.indicatorId || "";
+                            const targetDesc =
+                                sdgRecord?.targets?.find((t) => t.id === targetId)?.description || "";
+                            const indicatorDesc =
+                                sdgRecord?.targets
+                                    ?.flatMap((t) => t.indicators || [])
+                                    .find((i) => i.id === indicatorId)?.description || "";
 
-                {/* Description */}
-                <p className="text-sm text-slate-500">
-                    These SDGs were selected when the opportunity was created. You cannot change them.
-                </p>
+                            if (!sdg) return null;
 
-
-                {/* Detail cards for opportunity SDGs */}
-                <div className="space-y-4">
-
-                    {/* Primary SDG */}
-                    {oppPrimaryNum > 0 && (() => {
-
-                        const sdg = ALL_SDGS.find(s => s.num === oppPrimaryNum);
-                        const sdgRecord = sdgData.find(s => s.number === oppPrimaryNum);
-
-                        const targetId = oppPrimaryRow?.targetId || "";
-                        const indicatorId = oppPrimaryRow?.indicatorId || "";
-
-                        const targetDesc =
-                            sdgRecord?.targets?.find(t => t.id === targetId)?.description || "";
-
-                        const indicatorDesc =
-                            sdgRecord?.targets
-                                ?.flatMap(t => t.indicators || [])
-                                .find(i => i.id === indicatorId)?.description || "";
-
-                        if (!sdg) return null;
-
-                        return (
-
-                            <div
-                                className="relative overflow-hidden flex flex-col md:flex-row items-stretch gap-6 p-6 rounded-2xl border bg-white shadow-sm hover:shadow-md transition duration-300"
-                                style={{ borderColor: sdg.color + "20" }}
-                            >
-
-                                {/* Background glow */}
-                                <div
-                                    className="absolute -top-24 -right-24 w-64 h-64 opacity-[0.03] pointer-events-none transition-opacity group-hover:opacity-[0.05]"
-                                    style={{
-                                        backgroundColor: sdg.color,
-                                        borderRadius: "50%",
-                                        filter: "blur(60px)"
-                                    }}
-                                />
-
-                                {/* SDG Number Side */}
-                                <div
-                                    className="w-16 h-16 md:w-20 md:h-auto rounded-xl flex items-center justify-center report-h3 !text-2xl font-black"
-                                    style={{ backgroundColor: sdg.color, boxShadow: `inset 0 2px 4px rgba(0,0,0,0.1)` }}
-                                >
-                                    {sdg.num}
-                                </div>
-
-                                {/* Content */}
-                                <div className="flex-1 w-full space-y-4">
-
-                                    <div className="flex items-start justify-between flex-wrap gap-3">
-                                        <div>
-                                            <p className="text-xs font-bold uppercase tracking-wider mb-1" style={{ color: sdg.color }}>
-                                                Primary Alignment
-                                            </p>
-                                            <h4 className="text-lg font-bold text-slate-900 leading-tight">
-                                                SDG {sdg.num}: {sdg.name}
-                                            </h4>
+                            return (
+                                <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+                                    <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-start">
+                                        <div
+                                            className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg text-xl font-bold text-white"
+                                            style={{ backgroundColor: sdg.color }}
+                                        >
+                                            {sdg.num}
                                         </div>
-
-                                        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-600 text-[10px] font-bold border border-emerald-100">
-                                            <CheckCircle2 className="w-3 h-3" />
-                                            VERIFIED
+                                        <div className="min-w-0 flex-1 space-y-3">
+                                            <div className="flex flex-wrap items-start justify-between gap-2">
+                                                <div>
+                                                    <p
+                                                        className="text-[10px] font-bold uppercase tracking-[0.14em]"
+                                                        style={{ color: sdg.color }}
+                                                    >
+                                                        Primary alignment
+                                                    </p>
+                                                    <h4 className="mt-0.5 text-base font-semibold text-slate-900">
+                                                        SDG {sdg.num}: {sdg.name}
+                                                    </h4>
+                                                </div>
+                                                <span className="inline-flex items-center gap-1 rounded-full border border-emerald-100 bg-emerald-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-emerald-700">
+                                                    <CheckCircle2 className="h-3 w-3" />
+                                                    Verified
+                                                </span>
+                                            </div>
+                                            <div className="space-y-2 border-t border-slate-100 pt-3">
+                                                {targetId ? (
+                                                    <p className="text-sm text-slate-600">
+                                                        <span className="font-semibold text-slate-800">
+                                                            TARGET {targetId}:
+                                                        </span>{" "}
+                                                        {targetDesc || "Registered target"}
+                                                    </p>
+                                                ) : null}
+                                                {indicatorId ? (
+                                                    <p className="text-sm text-slate-600">
+                                                        <span className="font-semibold text-slate-800">
+                                                            INDICATOR {indicatorId}:
+                                                        </span>{" "}
+                                                        {indicatorDesc || "Registered indicator"}
+                                                    </p>
+                                                ) : null}
+                                            </div>
                                         </div>
                                     </div>
-
-                                    <div className="grid grid-cols-1 gap-4 pt-4 border-t border-slate-100">
-
-                                        {targetId && (
-                                            <div className="flex gap-3">
-                                                <div className="w-8 h-8 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center shrink-0">
-                                                    <Target className="w-4 h-4 text-slate-400" />
-                                                </div>
-                                                <div>
-                                                    <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wide">Target {targetId}</p>
-                                                    <p className="text-sm text-slate-600 leading-snug">{targetDesc || "No description provided."}</p>
-                                                </div>
-                                            </div>
-                                        )}
-
-                                        {indicatorId && (
-                                            <div className="flex gap-3">
-                                                <div className="w-8 h-8 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center shrink-0">
-                                                    <Layers className="w-4 h-4 text-slate-400" />
-                                                </div>
-                                                <div>
-                                                    <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wide">Indicator {indicatorId}</p>
-                                                    <p className="text-sm text-slate-600 leading-snug">{indicatorDesc || "No description provided."}</p>
-                                                </div>
-                                            </div>
-                                        )}
-
-                                    </div>
-
                                 </div>
+                            );
+                        })()}
 
-                            </div>
-
-                        );
-
-                    })()}
-
-
-                    {/* Secondary SDGs */}
                     {oppSecondaries.map((row, i) => {
                         const num = row.goalNumber;
-
-                        const sdg = ALL_SDGS.find(s => s.num === num);
-                        const sdgRecord = sdgData.find(s => s.number === num);
+                        const sdg = ALL_SDGS.find((s) => s.num === num);
+                        const sdgRecord = sdgData.find((s) => s.number === num);
                         const secTargetId = row.targetId;
                         const secIndicatorId = row.indicatorId;
-
                         const secTargetDesc =
-                            sdgRecord?.targets?.find(t => t.id === secTargetId)?.description || "";
-
+                            sdgRecord?.targets?.find((t) => t.id === secTargetId)?.description || "";
                         const secIndicatorDesc =
                             sdgRecord?.targets
-                                ?.flatMap(t => t.indicators || [])
-                                .find(ind => ind.id === secIndicatorId)?.description || "";
+                                ?.flatMap((t) => t.indicators || [])
+                                .find((ind) => ind.id === secIndicatorId)?.description || "";
 
                         if (!sdg) return null;
 
                         return (
-
                             <div
                                 key={`${num}-${row.targetId}-${i}`}
-                                className="relative overflow-hidden flex flex-col md:flex-row items-center gap-4 p-5 rounded-xl border bg-slate-50/50 hover:bg-white border-slate-200 transition-all duration-300"
+                                className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-slate-50/60 p-4 sm:flex-row sm:items-center"
                             >
-                                {/* SDG Number Side */}
                                 <div
-                                    className="w-12 h-12 rounded-lg flex items-center justify-center text-lg font-bold text-white shadow-md shrink-0"
+                                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-base font-bold text-white"
                                     style={{ backgroundColor: sdg.color }}
                                 >
                                     {sdg.num}
                                 </div>
-
-                                {/* Content */}
-                                <div className="flex-1 w-full">
-                                    <div className="flex items-center justify-between mb-1">
-                                        <h4 className="text-sm font-bold text-slate-800">
+                                <div className="min-w-0 flex-1">
+                                    <div className="flex flex-wrap items-center justify-between gap-2">
+                                        <h4 className="text-sm font-semibold text-slate-800">
                                             SDG {sdg.num}: {sdg.name}
                                         </h4>
-                                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                                            Secondary Alignment
+                                        <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                                            Secondary
                                         </span>
                                     </div>
-
-                                    <div className="flex flex-wrap gap-4 text-xs text-slate-500">
-                                        {secTargetId && (
-                                            <span className="flex items-center gap-1">
-                                                <span className="font-bold text-slate-700">Target {secTargetId}:</span> {secTargetDesc || "Registered Target"}
+                                    <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
+                                        {secTargetId ? (
+                                            <span>
+                                                <span className="font-semibold text-slate-700">
+                                                    Target {secTargetId}:
+                                                </span>{" "}
+                                                {secTargetDesc || "Registered"}
                                             </span>
-                                        )}
-                                        {secIndicatorId && (
-                                            <span className="flex items-center gap-1 pl-4 border-l border-slate-200">
-                                                <span className="font-bold text-slate-700">Indicator {secIndicatorId}:</span> {secIndicatorDesc || "Registered Indicator"}
+                                        ) : null}
+                                        {secIndicatorId ? (
+                                            <span>
+                                                <span className="font-semibold text-slate-700">
+                                                    Indicator {secIndicatorId}:
+                                                </span>{" "}
+                                                {secIndicatorDesc || "Registered"}
                                             </span>
-                                        )}
+                                        ) : null}
                                     </div>
                                 </div>
                             </div>
-
                         );
-
                     })}
 
-
-                    {/* No SDGs Warning */}
                     {oppPrimaryNum === 0 && (
-                        <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl flex items-center gap-3">
-                            <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
-
+                        <div className="flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
+                            <AlertCircle className="h-4 w-4 shrink-0 text-amber-600" />
                             <p className="text-sm text-amber-800">
                                 No SDGs registered on this opportunity yet.
                             </p>
                         </div>
                     )}
+                </div>
 
+                <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                        <Label className="text-sm font-semibold text-slate-900">
+                            3.1.1 Contribution logic statement
+                        </Label>
+                        <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                            Required
+                        </span>
+                    </div>
+                    <p className="text-sm leading-relaxed text-slate-500">
+                        Explain the &ldquo;pathway to change&rdquo; — how do your activities directly lead to
+                        the selected SDG target? Consider who benefits and what specific shift occurs.
+                    </p>
+                    <Textarea
+                        placeholder="Describe the planned contribution pathway…"
+                        className={clsx(
+                            "min-h-[140px] resize-none rounded-xl border border-slate-200 bg-white p-4 text-sm leading-relaxed text-slate-800 shadow-sm placeholder:text-slate-400 focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100",
+                            getFieldError("contribution_intent_statement") && "border-red-300",
+                        )}
+                        value={contribution_intent_statement || ""}
+                        onChange={(e) =>
+                            updateSection("section3", {
+                                contribution_intent_statement: e.target.value,
+                            })
+                        }
+                    />
+                    <WordCountBar count={primaryWordCount} />
+                    <FieldError message={getFieldError("contribution_intent_statement")} />
+                </div>
+            </section>
 
-                    <div className="pt-8 border-t border-slate-100 space-y-4">
-
-                        <div className="flex items-center justify-between">
-                            <Label className="text-sm font-semibold text-slate-900">
-                                3.1.1 Contribution Logic Statement
-                            </Label>
-                            <span className="px-2 py-0.5 rounded bg-slate-100 text-[10px] font-bold text-slate-500 tracking-wider uppercase">
-                                Required
+            {/* ── 2. Optional Student SDG Mapping ──────────────────────── */}
+            <section className="space-y-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0 space-y-1">
+                        <div className="flex items-center gap-2.5">
+                            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-900 text-[11px] font-bold text-white">
+                                2
                             </span>
-                        </div>
-
-                        <p className="text-xs text-slate-500 leading-relaxed">
-                            Explain the "Pathway to Change" — how do your activities directly lead to the selected SDG Target? Consider who benefits and what specific shift occurs.
-                        </p>
-
-                        <div className="relative">
-                            <Textarea
-                                placeholder="Describe the planned contribution pathway..."
-                                className={clsx(
-                                    "min-h-[160px] rounded-xl border border-slate-200 bg-slate-50/30 p-4 text-sm focus:bg-white transition-all focus:ring-8 focus:ring-report-primary-soft/50 focus:border-report-primary-border",
-                                    getFieldError('contribution_intent_statement') && "border-red-300"
-                                )}
-                                value={contribution_intent_statement || ''}
-                                onChange={(e) => updateSection('section3', { contribution_intent_statement: e.target.value })}
-                            />
-
-                            <div className="absolute bottom-4 right-4 flex items-center gap-3 bg-white/80 backdrop-blur px-3 py-1.5 rounded-lg border border-slate-200 shadow-sm">
-                                <div className="h-1.5 w-16 bg-slate-100 rounded-full overflow-hidden">
-                                    <div
-                                        className={clsx(
-                                            "h-full transition-all",
-                                            primaryWordCount < 100 ? "bg-amber-400"
-                                                : primaryWordCount > 200 ? "bg-red-500"
-                                                    : "bg-emerald-500"
-                                        )}
-                                        style={{ width: `${Math.min((primaryWordCount / 200) * 100, 100)}%` }}
-                                    />
-                                </div>
-
-                                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-tight">
-                                    {primaryWordCount} / 200 Words
-                                </span>
-                            </div>
-                        </div>
-
-                        <FieldError message={getFieldError('contribution_intent_statement')} />
-
-                    </div>
-                </div>
-
-            </div>
-
-            {/* ═══════════════════════════════════════════════════════════ */}
-            {/* 3.2 — Student SDG Mapping (Implementation)              */}
-            {/* ═══════════════════════════════════════════════════════════ */}
-            <div className="space-y-6">
-
-                {/* Section Header */}
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center text-[11px] font-bold">
-                            3.2
-                        </div>
-                        <div className="space-y-1">
                             <h3 className="text-base font-semibold text-slate-900">
-                                Optional Student SDG Mapping
+                                Optional student SDG mapping
                             </h3>
-                            <p className="text-sm text-slate-500 leading-relaxed">
-                                If you wish to align your project with additional SDGs, you may select up to two.
-                                Please briefly explain how your activities contribute to achieving each selected SDG.
-                            </p>
                         </div>
+                        <p className="pl-9 text-sm leading-relaxed text-slate-500">
+                            If you wish to align your project with additional SDGs, you may select up to two.
+                            Please briefly explain how your activities contribute to achieving each selected
+                            SDG.
+                        </p>
                     </div>
+                    <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                        Optional
+                    </span>
                 </div>
 
-                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden p-6 space-y-8">
-
-                    {/* Warning Card */}
-                    <div className="p-4 bg-amber-50 rounded-xl border border-amber-200 flex items-start gap-3">
-                        <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
-                        <div className="space-y-1">
-                            <p className="text-sm font-semibold text-amber-900">Important Selection Guidance</p>
-                            <p className="text-sm text-amber-800 leading-relaxed">
-                                The SDG, Target, and Indicator selected here will be directly linked to your project's accountability profile. Ensure these align with your planned activities in Section 4.
+                <div className="space-y-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+                    <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3.5">
+                        <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+                        <div>
+                            <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-amber-800">
+                                Important selection guidance
+                            </p>
+                            <p className="mt-1 text-sm leading-relaxed text-amber-900/90">
+                                The SDG, target, and indicator selected here will be linked to your project&apos;s
+                                accountability profile. Ensure they align with your planned activities in
+                                Section 4.
                             </p>
                         </div>
                     </div>
 
-
-                    {/* C1 C2 C3 Row */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-
-                        {/* Primary SDG */}
-                        <div>
-                            <label className="block text-sm font-semibold text-slate-800 mb-2">
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                        <div className="space-y-1.5">
+                            <label className={fieldLabelClass}>
                                 C1. Select Primary SDG <span className="text-red-500">*</span>
                             </label>
-
-                            <select
-                                className={dropdownClass}
-                                value={studentPrimaryId}
-                                onChange={(e) => {
-                                    updateSection('section3', {
-                                        primary_sdg: {
-                                            ...data.section3.primary_sdg,
-                                            goal_number: e.target.value,
-                                            target_id: '',
-                                            indicator_id: ''
-                                        }
-                                    });
-                                }}
-                            >
-                                <option value="">Select SDG...</option>
-                                {sdgData.map(s => (
-                                    <option key={s.id} value={s.id}>
-                                        SDG {s.number} — {s.title}
-                                    </option>
-                                ))}
-                            </select>
-
-                            <FieldError message={getFieldError('primary_sdg')} />
+                            <div className="relative">
+                                <select
+                                    className={dropdownClass}
+                                    value={studentPrimaryId}
+                                    onChange={(e) => {
+                                        updateSection("section3", {
+                                            primary_sdg: {
+                                                ...data.section3.primary_sdg,
+                                                goal_number: e.target.value,
+                                                target_id: "",
+                                                indicator_id: "",
+                                            },
+                                        });
+                                    }}
+                                >
+                                    <option value="">Select SDG...</option>
+                                    {sdgData.map((s) => (
+                                        <option key={s.id} value={s.id}>
+                                            SDG {s.number} — {s.title}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                            <FieldError message={getFieldError("primary_sdg")} />
                         </div>
 
-
-                        {/* Target */}
-                        <div className={!studentPrimaryId ? "opacity-50 pointer-events-none" : ""}>
-                            <label className="block text-sm font-semibold text-slate-800 mb-2">
-                                C2. Select SDG Target
-                            </label>
-
+                        <div
+                            className={clsx(
+                                "space-y-1.5",
+                                !studentPrimaryId && "pointer-events-none opacity-50",
+                            )}
+                        >
+                            <label className={fieldLabelClass}>C2. Select SDG Target</label>
                             <select
                                 className={dropdownClass}
                                 value={studentTargetId}
                                 onChange={(e) => {
-                                    updateSection('section3', {
+                                    updateSection("section3", {
                                         primary_sdg: {
                                             ...data.section3.primary_sdg,
                                             target_id: e.target.value,
-                                            indicator_id: ''
-                                        }
+                                            indicator_id: "",
+                                        },
                                     });
                                 }}
                             >
-                                <option value="">Select Target...</option>
-                                {availableTargets.map(t => (
+                                <option value="">Select target...</option>
+                                {availableTargets.map((t) => (
                                     <option key={t.id} value={t.id}>
                                         Target {t.id} — {t.description}
                                     </option>
                                 ))}
                             </select>
-
-                            <FieldError message={getFieldError('target_code')} />
+                            <FieldError message={getFieldError("target_code")} />
                         </div>
 
-
-                        {/* Indicator */}
-                        <div className={!studentTargetId ? "opacity-50 pointer-events-none" : ""}>
-                            <label className="block text-sm font-semibold text-slate-800 mb-2">
-                                C3. SDG Indicator
-                            </label>
-
+                        <div
+                            className={clsx(
+                                "space-y-1.5",
+                                !studentTargetId && "pointer-events-none opacity-50",
+                            )}
+                        >
+                            <label className={fieldLabelClass}>C3. SDG Indicator</label>
                             <select
                                 className={dropdownClass}
                                 value={studentIndicatorId}
                                 onChange={(e) => {
-                                    updateSection('section3', {
+                                    updateSection("section3", {
                                         primary_sdg: {
                                             ...data.section3.primary_sdg,
-                                            indicator_id: e.target.value
-                                        }
+                                            indicator_id: e.target.value,
+                                        },
                                     });
                                 }}
                             >
-                                <option value="">Select Indicator...</option>
-                                {availableIndicators.map(ind => (
+                                <option value="">Select indicator...</option>
+                                {availableIndicators.map((ind) => (
                                     <option key={ind.id} value={ind.id}>
                                         Indicator {ind.id} — {ind.description}
                                     </option>
                                 ))}
                             </select>
-
-                            <p className="text-xs text-slate-500 mt-2">
+                            <p className="text-[11px] text-slate-400">
                                 Selecting an indicator improves reporting quality.
                             </p>
                         </div>
-
                     </div>
 
-
-                    {/* Contribution Statement */}
-                    <div className="pt-8 border-t border-slate-100 space-y-4">
-
-                        <div className="flex items-center justify-between">
+                    <div className="space-y-3 border-t border-slate-100 pt-6">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
                             <Label className="text-sm font-semibold text-slate-900">
-                                3.2.1 Contribution Logic Statement
+                                3.2.1 Contribution logic statement
                             </Label>
-                            <span className="px-2 py-0.5 rounded bg-slate-100 text-[10px] font-bold text-slate-500 tracking-wider uppercase">
+                            <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
                                 Required
                             </span>
                         </div>
-
-                        <p className="text-xs text-slate-500 leading-relaxed">
-                            Explain the "Pathway to Change" — how do your activities directly lead to the selected SDG Target? Consider who benefits and what specific shift occurs.
+                        <p className="text-sm leading-relaxed text-slate-500">
+                            Explain the &ldquo;pathway to change&rdquo; — how do your activities directly lead
+                            to the selected SDG target? Consider who benefits and what specific shift occurs.
                         </p>
-
-                        <div className="relative">
-                            <Textarea
-                                placeholder="Describe the planned contribution pathway..."
-                                className={clsx(
-                                    "min-h-[160px] rounded-xl border border-slate-200 bg-slate-50/30 p-4 text-sm focus:bg-white transition-all focus:ring-8 focus:ring-report-primary-soft/50 focus:border-report-primary-border",
-                                    getFieldError('student_contribution_intent_statement') && "border-red-300"
-                                )}
-                                value={student_contribution_intent_statement || ''}
-                                onChange={(e) => updateSection('section3', { student_contribution_intent_statement: e.target.value })}
-                            />
-
-                            <div className="absolute bottom-4 right-4 flex items-center gap-3 bg-white/80 backdrop-blur px-3 py-1.5 rounded-lg border border-slate-200 shadow-sm">
-                                <div className="h-1.5 w-16 bg-slate-100 rounded-full overflow-hidden">
-                                    <div
-                                        className={clsx(
-                                            "h-full transition-all",
-                                            studentWordCount < 100 ? "bg-amber-400"
-                                                : studentWordCount > 200 ? "bg-red-500"
-                                                    : "bg-emerald-500"
-                                        )}
-                                        style={{ width: `${Math.min((studentWordCount / 200) * 100, 100)}%` }}
-                                    />
-                                </div>
-
-                                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-tight">
-                                    {studentWordCount} / 200 Words
-                                </span>
-                            </div>
-                        </div>
-
-                        <FieldError message={getFieldError('student_contribution_intent_statement')} />
-
+                        <Textarea
+                            placeholder="Describe the planned contribution pathway…"
+                            className={clsx(
+                                "min-h-[140px] resize-none rounded-xl border border-slate-200 bg-white p-4 text-sm leading-relaxed text-slate-800 shadow-sm placeholder:text-slate-400 focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100",
+                                getFieldError("student_contribution_intent_statement") &&
+                                    "border-red-300",
+                            )}
+                            value={student_contribution_intent_statement || ""}
+                            onChange={(e) =>
+                                updateSection("section3", {
+                                    student_contribution_intent_statement: e.target.value,
+                                })
+                            }
+                        />
+                        <WordCountBar count={studentWordCount} />
+                        <FieldError message={getFieldError("student_contribution_intent_statement")} />
                     </div>
 
-
-                    {/* Secondary SDGs */}
-                    <div className="pt-8 border-t border-slate-100 space-y-6">
-
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <Label className="text-sm font-semibold text-slate-900">
-                                    3.2.2 Secondary SDG Mapping (Optional)
-                                </Label>
-                                <p className="text-xs text-slate-500 mt-1">
-                                    Map additional goals impacted by this project.
-                                </p>
-                            </div>
+                    {/* 3.2.2 Secondary */}
+                    <div className="space-y-4 border-t border-slate-100 pt-6">
+                        <div>
+                            <Label className="text-sm font-semibold text-slate-900">
+                                3.2.2 Secondary SDG mapping (optional)
+                            </Label>
+                            <p className="mt-1 text-sm text-slate-500">
+                                Map additional goals impacted by this project — up to two.
+                            </p>
                         </div>
 
-
-                        {(secondary_sdgs || []).map((sdg: any, index: number) => {
-
+                        {(secondary_sdgs || []).map((sdg: {
+                            goal_number?: string | number | null;
+                            target_id?: string;
+                            indicator_id?: string;
+                            justification_text?: string;
+                        }, index: number) => {
                             const sdgId = sdg.goal_number?.toString() || "";
-                            const sdgRecord = sdgData.find(s => s.id === sdgId);
+                            const sdgRecord = sdgData.find((s) => s.id === sdgId);
                             const secTargets = sdgRecord?.targets || [];
                             const secTargetId = sdg.target_id || "";
-                            const secIndicators = secTargets.find(t => t.id === secTargetId)?.indicators || [];
-
-                            const justWords = (sdg.justification_text || "").trim().split(/\s+/).filter((w: string) => w).length;
+                            const secIndicators =
+                                secTargets.find((t) => t.id === secTargetId)?.indicators || [];
+                            const justWords = (sdg.justification_text || "")
+                                .trim()
+                                .split(/\s+/)
+                                .filter((w: string) => w).length;
 
                             return (
-
-                                <div key={index} className="relative group p-6 rounded-2xl border border-slate-200 bg-white shadow-sm hover:shadow-md transition-all duration-300 space-y-5">
-
-                                    <div className="flex justify-between items-center mb-2">
-                                        <div className="flex items-center gap-2">
-                                            <div className="w-2 h-2 rounded-full bg-report-primary" />
-                                            <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
-                                                Secondary SDG Alignment #{index + 1}
-                                            </span>
-                                        </div>
-
+                                <div
+                                    key={index}
+                                    className="space-y-4 rounded-xl border border-slate-200 bg-slate-50/40 p-5"
+                                >
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                                            Secondary SDG alignment #{index + 1}
+                                        </span>
                                         <button
                                             type="button"
                                             onClick={() => handleRemoveSecondary(index)}
-                                            className="w-8 h-8 rounded-full flex items-center justify-center text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors"
+                                            className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-300 transition-colors hover:bg-red-50 hover:text-red-500"
+                                            aria-label="Remove secondary SDG"
                                         >
-                                            <Trash2 className="w-4 h-4" />
+                                            <Trash2 className="h-4 w-4" />
                                         </button>
                                     </div>
 
+                                    <select
+                                        className={dropdownClass}
+                                        value={sdgId}
+                                        onChange={(e) =>
+                                            updateSecondary(index, {
+                                                goal_number: e.target.value,
+                                                target_id: "",
+                                                indicator_id: "",
+                                            })
+                                        }
+                                    >
+                                        <option value="">Choose SDG goal...</option>
+                                        {sdgData
+                                            .filter((s) => s.id !== studentPrimaryId)
+                                            .map((s) => (
+                                                <option key={s.id} value={s.id}>
+                                                    SDG {s.number} — {s.title}
+                                                </option>
+                                            ))}
+                                    </select>
 
-                                    {/* SDG Goal Selector */}
-                                    <div className="space-y-2">
-                                        <select
-                                            className={dropdownClass}
-                                            value={sdgId}
-                                            onChange={(e) =>
-                                                updateSecondary(index, {
-                                                    goal_number: e.target.value,
-                                                    target_id: '',
-                                                    indicator_id: ''
-                                                })
-                                            }
-                                        >
-                                            <option value="">Choose SDG Goal...</option>
-
-                                            {sdgData
-                                                .filter(s => s.id !== studentPrimaryId)
-                                                .map(s => (
-                                                    <option key={s.id} value={s.id}>
-                                                        SDG {s.number} — {s.title}
-                                                    </option>
-                                                ))}
-                                        </select>
-                                    </div>
-
-
-                                    {sdgRecord && (
-                                        <div className="animate-in fade-in slide-in-from-top-2 duration-300 space-y-5">
-                                            <div className="grid md:grid-cols-2 gap-4">
-
-                                                {/* Target */}
+                                    {sdgRecord ? (
+                                        <div className="space-y-4">
+                                            <div className="grid gap-4 md:grid-cols-2">
                                                 <div className="space-y-1.5">
-                                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide ml-1">UN Target</p>
+                                                    <p className={fieldLabelClass}>UN Target</p>
                                                     <select
                                                         className={dropdownClass}
                                                         value={secTargetId}
                                                         onChange={(e) =>
                                                             updateSecondary(index, {
                                                                 target_id: e.target.value,
-                                                                indicator_id: ''
+                                                                indicator_id: "",
                                                             })
                                                         }
                                                     >
-                                                        <option value="">Select Target...</option>
-
-                                                        {secTargets.map(t => (
+                                                        <option value="">Select target...</option>
+                                                        {secTargets.map((t) => (
                                                             <option key={t.id} value={t.id}>
                                                                 Target {t.id} — {t.description}
                                                             </option>
                                                         ))}
                                                     </select>
                                                 </div>
-
-
-                                                {/* Indicator */}
                                                 <div className="space-y-1.5">
-                                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide ml-1">UN Indicator</p>
+                                                    <p className={fieldLabelClass}>UN Indicator</p>
                                                     <select
                                                         className={dropdownClass}
                                                         value={sdg.indicator_id || ""}
                                                         onChange={(e) =>
                                                             updateSecondary(index, {
-                                                                indicator_id: e.target.value
+                                                                indicator_id: e.target.value,
                                                             })
                                                         }
                                                     >
-                                                        <option value="">Select Indicator...</option>
-
-                                                        {secIndicators.map(ind => (
+                                                        <option value="">Select indicator...</option>
+                                                        {secIndicators.map((ind) => (
                                                             <option key={ind.id} value={ind.id}>
                                                                 Indicator {ind.id} — {ind.description}
                                                             </option>
                                                         ))}
                                                     </select>
                                                 </div>
-
                                             </div>
-
-
-                                            {/* Justification */}
                                             <div className="space-y-2">
                                                 <div className="flex items-center justify-between">
-                                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide ml-1">Alignment Justification</p>
-                                                    <span className="text-[10px] font-bold text-slate-400">
-                                                        {justWords} / 200 Words
+                                                    <p className={fieldLabelClass}>
+                                                        Alignment justification
+                                                    </p>
+                                                    <span className="text-[11px] text-slate-400">
+                                                        {justWords} / 200 words
                                                     </span>
                                                 </div>
                                                 <Textarea
-                                                    className="w-full min-h-[100px] p-4 rounded-xl border border-slate-200 text-sm resize-none bg-slate-50/30 focus:bg-white focus:ring-8 focus:ring-report-primary-soft/50 transition-all"
-                                                    placeholder="Briefly explain how this project supports this secondary goal..."
-                                                    value={sdg.justification_text || ''}
+                                                    className="min-h-[100px] w-full resize-none rounded-xl border border-slate-200 bg-white p-4 text-sm leading-relaxed text-slate-800 shadow-sm placeholder:text-slate-400 focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100"
+                                                    placeholder="Briefly explain how this project supports this secondary goal…"
+                                                    value={sdg.justification_text || ""}
                                                     onChange={(e) =>
-                                                        updateSection('section3', {
-                                                            secondary_sdgs: (secondary_sdgs || []).map((s, i) =>
-                                                                i === index
-                                                                    ? { ...s, justification_text: e.target.value }
-                                                                    : s
-                                                            )
+                                                        updateSection("section3", {
+                                                            secondary_sdgs: (secondary_sdgs || []).map(
+                                                                (s, i) =>
+                                                                    i === index
+                                                                        ? {
+                                                                              ...s,
+                                                                              justification_text:
+                                                                                  e.target.value,
+                                                                          }
+                                                                        : s,
+                                                            ),
                                                         })
                                                     }
                                                 />
                                             </div>
                                         </div>
-                                    )}
-
+                                    ) : null}
                                 </div>
-
                             );
-
                         })}
 
-
-                        {/* Add Secondary */}
-                        {secondary_sdgs.length < 2 && (
-
+                        {secondary_sdgs.length < 2 ? (
                             <button
                                 type="button"
                                 onClick={() => {
-                                    updateSection('section3', {
+                                    updateSection("section3", {
                                         secondary_sdgs: [
                                             ...(secondary_sdgs || []),
                                             {
                                                 goal_number: null,
-                                                target_id: '',
-                                                indicator_id: '',
-                                                justification_text: '',
-                                                status: 'provisional'
-                                            }
-                                        ]
+                                                target_id: "",
+                                                indicator_id: "",
+                                                justification_text: "",
+                                                status: "provisional",
+                                            },
+                                        ],
                                     });
                                 }}
-                                className="w-full flex items-center justify-center gap-2 px-6 py-5 rounded-2xl border-2 border-dashed border-slate-200 text-slate-400 hover:border-report-primary hover:text-report-primary hover:bg-report-primary-soft/30 transition-all duration-300 group"
+                                className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-200 px-6 py-5 text-sm font-medium text-slate-500 transition-colors hover:border-indigo-300 hover:bg-indigo-50/40 hover:text-indigo-700"
                             >
-                                <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center border border-slate-100 group-hover:bg-white group-hover:border-report-primary-border transition-colors">
-                                    <Plus className="w-4 h-4" />
-                                </div>
-                                <span className="text-sm font-semibold tracking-wide">Add Secondary SDG Alignment</span>
+                                <Plus className="h-4 w-4" />
+                                Add secondary SDG alignment
                             </button>
-
-                        )}
-
+                        ) : null}
                     </div>
-
                 </div>
-            </div>
+            </section>
 
             {/* ── Preliminary Summary ──────────────────────────────────── */}
-            <div className="pt-12 border-t border-slate-200">
-
-                <div className="bg-white border-2 border-slate-100 rounded-2xl p-8 relative overflow-hidden shadow-sm hover:shadow-md transition-shadow">
-
-                    {/* Background Detail */}
-                    <div className="absolute top-0 right-0 p-8 opacity-[0.03] pointer-events-none group-hove:opacity-[0.05]">
-                        <Sparkles className="w-32 h-32 text-report-primary" />
-                    </div>
-
-                    <div className="relative space-y-6">
-
-                        {/* Header */}
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                                <div className="w-1.5 h-6 bg-report-primary rounded-full" />
-                                <h3 className="report-h3 !text-lg">
-                                    Preliminary SDG Alignment Statement
-                                </h3>
-                            </div>
-
-                            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-50 border border-slate-200 text-[10px] font-bold text-slate-500 uppercase tracking-widest leading-none">
-                                <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                                System Synthesis
-                            </div>
-                        </div>
-
-                        {/* Summary Content */}
-                        <div className="p-6 rounded-xl bg-slate-50 border border-slate-100">
-                            <p className="report-ai-text !text-base">
-                                "{data.section3.summary_text}"
-                            </p>
-                        </div>
-
-                        {/* Meta Tags */}
-                        <div className="flex flex-wrap gap-3">
-                            {[
-                                { label: "Standardized Formatting", icon: CheckCircle2 },
-                                { label: "No Performance Claims", icon: Info },
-                                { label: "Structural Validation Only", icon: Layers }
-                            ].map((tag, idx) => (
-                                <div key={idx} className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-[10px] font-bold text-slate-500 uppercase tracking-wide">
-                                    <tag.icon className="w-3 h-3 text-report-primary" />
-                                    {tag.label}
-                                </div>
-                            ))}
-                        </div>
-
-                        <p className="text-[11px] text-slate-500 leading-relaxed max-w-2xl">
-                            <strong>Note:</strong> This statement is programmatically generated based on your selections above. It will be finalized and combined with measurable impact data once Sections 4 and 5 are completed.
-                        </p>
-
-                    </div>
-
+            <section className="space-y-4 border-t border-slate-200 pt-8">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                    <h3 className="text-base font-semibold text-slate-900">
+                        Preliminary SDG alignment statement
+                    </h3>
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                        System synthesis
+                    </span>
                 </div>
-
-            </div>
+                <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+                    <p className="text-sm leading-relaxed text-slate-700">
+                        {data.section3.summary_text}
+                    </p>
+                    <div className="mt-4 flex flex-wrap gap-2 border-t border-slate-100 pt-4">
+                        {[
+                            { label: "Standardized formatting", icon: CheckCircle2 },
+                            { label: "No performance claims", icon: Info },
+                            { label: "Structural validation only", icon: Layers },
+                        ].map((tag) => (
+                            <span
+                                key={tag.label}
+                                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500"
+                            >
+                                <tag.icon className="h-3 w-3 text-indigo-500" />
+                                {tag.label}
+                            </span>
+                        ))}
+                    </div>
+                    <p className="mt-3 text-xs leading-relaxed text-slate-400">
+                        This statement is generated from your selections above and will be finalized with
+                        measurable impact data once Sections 4 and 5 are completed.
+                    </p>
+                </div>
+            </section>
         </div>
     );
 }

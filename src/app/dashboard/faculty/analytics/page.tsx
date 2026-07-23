@@ -20,6 +20,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/app
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, PieChart, Pie, Cell, Legend } from "recharts";
 import { authenticatedFetch, resolveSameOriginApiPath } from "@/utils/api";
 import AnalyticsHub from "@/components/analytics/AnalyticsHub";
+import UnifiedAnalyticsOverview from "@/components/analytics/UnifiedAnalyticsOverview";
 import {
     CIEL_FACULTY_DASHBOARD_VIEW_EVENT,
     readFacultyDashboardViewPreference,
@@ -260,34 +261,6 @@ export default function FacultyAnalyticsPage() {
     const inputCls =
         "mt-1 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500";
 
-    if (loading && !data) {
-        return (
-            <div className="mx-auto max-w-7xl space-y-6 p-0 pb-20 sm:p-4">
-                <div className="flex min-h-[200px] items-center justify-center gap-2 text-slate-600">
-                    <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
-                    <span className="text-sm font-medium">Loading analytics…</span>
-                </div>
-            </div>
-        );
-    }
-
-    if (error) {
-        return (
-            <div className="mx-auto max-w-7xl space-y-6 p-0 pb-20 sm:p-4">
-                <Link
-                    href="/dashboard/faculty"
-                    className="mb-3 inline-flex items-center gap-1 text-sm font-bold text-indigo-600 hover:text-indigo-700"
-                >
-                    <ArrowLeft className="h-4 w-4" />
-                    Faculty dashboard
-                </Link>
-                <Card>
-                    <CardContent className="p-6 text-sm text-red-600">{error}</CardContent>
-                </Card>
-            </div>
-        );
-    }
-
     return (
         <div className="mx-auto max-w-7xl space-y-6 p-0 pb-20 sm:p-4">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -312,6 +285,21 @@ export default function FacultyAnalyticsPage() {
                     </p>
                 </div>
             </div>
+
+            {error ? (
+                <Card className="border-rose-200 bg-rose-50/70">
+                    <CardContent className="p-4 text-sm text-rose-700">
+                        Engagement overview could not be loaded ({error}). Report analytics below still work independently.
+                    </CardContent>
+                </Card>
+            ) : null}
+
+            {loading && !data ? (
+                <div className="flex min-h-[120px] items-center justify-center gap-2 text-slate-600">
+                    <Loader2 className="h-6 w-6 animate-spin text-indigo-600" />
+                    <span className="text-sm font-medium">Loading engagement overview…</span>
+                </div>
+            ) : null}
 
             <Card className="border-slate-200 shadow-sm">
                 <CardHeader className="pb-4">
@@ -478,6 +466,8 @@ export default function FacultyAnalyticsPage() {
             ) : null}
 
             <>
+                {data ? (
+                    <>
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
                     {[
                         {
@@ -653,8 +643,25 @@ export default function FacultyAnalyticsPage() {
                         </CardContent>
                     </Card>
                 </div>
+                    </>
+                ) : null}
 
                 <div className="mt-10 border-t border-slate-200 pt-10">
+                    <UnifiedAnalyticsOverview
+                        apiPath="/api/v1/faculty/analytics/overview"
+                        query={{
+                            project_id: appliedFilters.project_id || undefined,
+                            scope: appliedFilters.project_id ? "project" : "aggregate",
+                        }}
+                        title="Report overview"
+                    />
+                </div>
+
+                <div className="mt-10 border-t border-slate-200 pt-10">
+                    <h2 className="mb-2 text-lg font-bold text-slate-900">Report analytics by section</h2>
+                    <p className="mb-4 text-sm text-slate-500">
+                        Drill into Sections 1–10 for the same faculty/university scope.
+                    </p>
                     <AnalyticsHub
                         views={[
                             {
@@ -674,7 +681,7 @@ export default function FacultyAnalyticsPage() {
                                 },
                             },
                         ]}
-                        hideOnError
+                        hideOnError={false}
                     />
                 </div>
             </>
