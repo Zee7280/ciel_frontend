@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useState, useEffect, useLayoutEffect, useCallback } from "react";
-import { LayoutDashboard, Users, Settings, PieChart, LogOut, FileText, Building2, CheckCircle, Briefcase, FileBarChart, ShieldAlert, BarChart3, History, Bell, User, MessageSquare, Plus, CreditCard, ClipboardList, CalendarClock, LifeBuoy, Link2, GraduationCap, Globe2, PlayCircle, Mail, Archive, type LucideProps } from "lucide-react";
+import { useState, useEffect, useLayoutEffect, useCallback, type ComponentType } from "react";
+import { LayoutDashboard, Users, Settings, PieChart, LogOut, FileText, Building2, CheckCircle, Briefcase, FileBarChart, ShieldAlert, BarChart3, History, Bell, User, MessageSquare, Plus, CreditCard, ClipboardList, CalendarClock, LifeBuoy, Link2, GraduationCap, Globe2, PlayCircle, Mail, Archive, LayoutGrid, Clock, ChevronsLeft, ChevronsRight, Compass, HelpCircle, type LucideProps } from "lucide-react";
 import clsx from "clsx";
 import { authenticatedFetch, isTokenValid } from "@/utils/api";
 import {
@@ -18,6 +18,60 @@ import {
 } from "@/utils/dashboardNavRole";
 import { clearFacultyScopeSession } from "@/utils/facultyScopeSession";
 import { CIEL_NOTIFICATIONS_UNREAD_EVENT, type CielNotificationsUnreadEventDetail } from "@/utils/cielNotificationsUnread";
+import { readStoredCurrentUser } from "@/utils/currentUser";
+import {
+    CIEL_IMPACT_SUMMARY_CACHE_EVENT,
+    clearImpactSummaryCache,
+    fetchImpactSummary,
+    readImpactSummaryCache,
+    type CielImpactSummary,
+} from "@/utils/cielImpactSummary";
+import { CIEL_PATHS } from "@/utils/cielPaths";
+import CIIMiniCard from "@/components/ciel/CIIMiniCard";
+import PathsBottomSheet from "@/components/ciel/PathsBottomSheet";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+
+const SIDEBAR_COLLAPSED_KEY = "ciel_sidebar_collapsed";
+
+function StudentNavRow({
+    href,
+    label,
+    icon: Icon,
+    emoji,
+    active,
+    needsAction,
+    countPill,
+    collapsed,
+}: {
+    href: string;
+    label: string;
+    icon?: ComponentType<LucideProps>;
+    emoji?: string;
+    active: boolean;
+    needsAction?: boolean;
+    countPill?: number;
+    collapsed: boolean;
+}) {
+    return (
+        <Link
+            href={href}
+            className={clsx(
+                "ciel-transition relative flex items-center gap-3 rounded-ciel-sm px-3 py-2.5 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ciel-green",
+                active ? "bg-ciel-green/15 text-white" : "text-white/60 hover:bg-white/5 hover:text-white",
+                collapsed && "justify-center px-0",
+            )}
+            title={collapsed ? label : undefined}
+        >
+            {active && <span className="absolute inset-y-1 left-0 w-[3px] rounded-full bg-ciel-green" aria-hidden />}
+            {emoji ? <span className="text-base leading-none" aria-hidden>{emoji}</span> : Icon ? <Icon className="h-4 w-4 shrink-0" /> : null}
+            {!collapsed && <span className="flex-1 truncate">{label}</span>}
+            {!collapsed && needsAction && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-ciel-amber" aria-label="Needs action" />}
+            {!collapsed && !!countPill && countPill > 0 && (
+                <span className="shrink-0 rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-bold text-white">{countPill > 99 ? "99+" : countPill}</span>
+            )}
+        </Link>
+    );
+}
 
 export default function Sidebar() {
     const pathname = usePathname();
@@ -30,6 +84,7 @@ export default function Sidebar() {
         localStorage.removeItem("ciel_user");
         localStorage.removeItem("ciel_token");
         clearStudentDashboardCache();
+        clearImpactSummaryCache();
         clearFacultyScopeSession();
         router.push("/login");
     };
@@ -175,6 +230,78 @@ export default function Sidebar() {
         return () => window.removeEventListener(CIEL_STUDENT_DASHBOARD_CACHE_EVENT, syncBadge);
     }, [isStudent]);
 
+    // ---- Student-only: collapse, impact summary, opportunities count, avatar ----
+
+    const [collapsed, setCollapsed] = useState(false);
+    useEffect(() => {
+        if (!isStudent) return;
+        try {
+            setCollapsed(localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "1");
+        } catch {
+            /* ignore */
+        }
+    }, [isStudent]);
+
+    const toggleCollapsed = useCallback(() => {
+        setCollapsed((prev) => {
+            const next = !prev;
+            try {
+                localStorage.setItem(SIDEBAR_COLLAPSED_KEY, next ? "1" : "0");
+            } catch {
+                /* ignore */
+            }
+            return next;
+        });
+    }, []);
+
+    /** Drives `main`'s `lg:ml-[var(--ciel-sidebar-width)]` offset in `dashboard/layout.tsx` without a client layout. */
+    useEffect(() => {
+        if (!isStudent) return;
+        document.documentElement.style.setProperty("--ciel-sidebar-width", collapsed ? "72px" : "16rem");
+        return () => {
+            document.documentElement.style.setProperty("--ciel-sidebar-width", "16rem");
+        };
+    }, [isStudent, collapsed]);
+
+    const [impactSummary, setImpactSummary] = useState<CielImpactSummary | null>(() => readImpactSummaryCache());
+    useEffect(() => {
+        if (!isStudent) return;
+        fetchImpactSummary({ redirectToLogin: false }).then((data) => {
+            if (data) setImpactSummary(data);
+        });
+        const syncFromCache = () => setImpactSummary(readImpactSummaryCache());
+        window.addEventListener(CIEL_IMPACT_SUMMARY_CACHE_EVENT, syncFromCache);
+        return () => window.removeEventListener(CIEL_IMPACT_SUMMARY_CACHE_EVENT, syncFromCache);
+    }, [isStudent]);
+
+    const [recommendedCount, setRecommendedCount] = useState(0);
+    useEffect(() => {
+        if (!isStudent) return;
+        authenticatedFetch("/api/v1/students/opportunities/recommended", {}, { redirectToLogin: false })
+            .then((res) => (res?.ok ? res.json() : null))
+            .then((result) => {
+                const list = Array.isArray(result?.data) ? result.data : [];
+                setRecommendedCount(list.length);
+            })
+            .catch(() => setRecommendedCount(0));
+    }, [isStudent]);
+
+    const [displayName, setDisplayName] = useState("");
+    const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+    useEffect(() => {
+        if (!isStudent) return;
+        const sync = () => {
+            const user = readStoredCurrentUser();
+            setDisplayName(typeof user?.name === "string" ? user.name : "");
+            setAvatarUrl(typeof user?.avatar === "string" ? user.avatar : null);
+        };
+        sync();
+        window.addEventListener("ciel_user_updated", sync);
+        return () => window.removeEventListener("ciel_user_updated", sync);
+    }, [isStudent]);
+
+    const [mobilePathsSheetOpen, setMobilePathsSheetOpen] = useState(false);
+
     // Helper icons import
     function FolderOpen(props: LucideProps) { return <FileText {...props} /> }
     function Globe(props: LucideProps) { return <Building2 {...props} /> }
@@ -216,7 +343,7 @@ export default function Sidebar() {
             { label: "Platform tutorial", href: "/dashboard/partner/tutorials", icon: PlayCircle },
             { label: "Help & Support", href: "/dashboard/partner/help", icon: LifeBuoy },
         ] : []),
-        // Faculty 
+        // Faculty
         ...(isFaculty ? [
             // { label: "My Courses", href: "/dashboard/faculty/courses", icon: BookOpen },
             { label: "My Profile", href: "/dashboard/faculty/profile", icon: User },
@@ -247,6 +374,7 @@ export default function Sidebar() {
             { label: "Student Reports", href: "/dashboard/admin/reports/verify", icon: FileText },
             { label: "CIEL Master", href: "/dashboard/admin/master-analytics", icon: Globe2 },
             { label: "Analytics", href: "/dashboard/admin/analytics", icon: BarChart3 },
+            { label: "All-Fields Console", href: "/dashboard/admin/all-fields-console", icon: LayoutGrid },
             { label: "Impact", href: "/dashboard/admin/impact", icon: FileBarChart },
             { label: "Messages", href: "/dashboard/admin/messages", icon: MessageSquare },
             { label: "Notifications", href: "/dashboard/admin/notifications", icon: Bell },
@@ -280,110 +408,265 @@ export default function Sidebar() {
         return false;
     };
 
+    // ---- Student nav model: Dashboard, MY PATHS, RECORD ----
+    const recordLinks = [
+        { label: "My Hours", href: "/dashboard/student/paths/community-service?tab=log-hours", icon: Clock },
+        { label: "Opportunities", href: "/dashboard/student/browse", icon: Compass, countPill: recommendedCount },
+        { label: "Reports & Certificates", href: "/dashboard/student/paths/community-service?tab=reports", icon: FileBarChart },
+    ];
+
+    const studentIsActive = (href: string) => {
+        const [hrefPath] = href.split("?");
+        return pathname === hrefPath || pathname.startsWith(`${hrefPath}/`);
+    };
+
     return (
         <>
-        <aside className="fixed left-0 top-0 z-40 hidden h-screen max-h-[100dvh] w-64 flex-col bg-slate-900 text-white lg:flex">
-            <div className="flex h-24 shrink-0 items-center px-4 border-b border-slate-800">
-                <Link href="/" className="flex items-center gap-3">
+        <aside
+            className={clsx(
+                "fixed left-0 top-0 z-40 hidden h-screen max-h-[100dvh] flex-col bg-ciel-navy text-white lg:flex ciel-transition",
+                isStudent && collapsed ? "w-[72px]" : "w-64",
+            )}
+        >
+            <div className="flex h-24 shrink-0 items-center justify-between px-4 border-b border-white/10">
+                <Link href="/" className="flex items-center gap-3 min-w-0">
                     <div className="relative flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white/5 p-1">
                         <img src="/iel-pk-logo.png" alt="IEL PK" className="h-11 w-11 object-contain" width={44} height={44} />
                     </div>
-                    <div className="flex flex-col ml-1">
-                        <span className="text-xs font-bold tracking-tight text-white leading-tight">
-                            Community Impact <br /> Education Lab
-                        </span>
-                        <span className="text-[8px] text-[#4285F4] font-[family-name:var(--font-dancing)] tracking-wide mt-0.5">
-                            Youth Empowered Community Impact
-                        </span>
-                    </div>
+                    {(!isStudent || !collapsed) && (
+                        <div className="flex flex-col ml-1 min-w-0">
+                            <span className="text-xs font-bold tracking-tight text-white leading-tight">
+                                Community Impact <br /> Education Lab
+                            </span>
+                            <span className="text-[8px] text-[#4285F4] font-[family-name:var(--font-dancing)] tracking-wide mt-0.5">
+                                Youth Empowered Community Impact
+                            </span>
+                        </div>
+                    )}
                 </Link>
+                {isStudent && (
+                    <button
+                        type="button"
+                        onClick={toggleCollapsed}
+                        aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+                        className="ciel-transition flex h-8 w-8 shrink-0 items-center justify-center rounded-ciel-xs text-white/50 hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ciel-green"
+                    >
+                        {collapsed ? <ChevronsRight className="h-4 w-4" /> : <ChevronsLeft className="h-4 w-4" />}
+                    </button>
+                )}
             </div>
 
             <div className="min-h-0 flex-1 space-y-2 overflow-y-auto px-4 py-6 custom-scrollbar overscroll-contain">
-                {links.map((link) => {
-                    const isActive = isLinkActive(link.href);
-                    return (
-                        <Link
-                            key={link.href}
-                            href={link.href}
-                            className={clsx(
-                                "flex items-center justify-between px-4 py-3 rounded-xl transition-all font-medium text-sm w-full group",
-                                isActive ? "bg-blue-600 text-white shadow-lg shadow-blue-900/50" : "text-slate-400 hover:text-white hover:bg-slate-800"
-                            )}
-                        >
-                            <div className="flex items-center gap-3">
-                                <link.icon className="w-5 h-5" />
-                                {link.label}
-                            </div>
-                            {link.label === "Messages" && unreadCount > 0 && (
-                                <span className="bg-slate-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm animate-pulse">
-                                    {unreadCount > 99 ? "99+" : unreadCount}
-                                </span>
-                            )}
-                            {link.label === "Notifications" && notificationUnreadCount > 0 && (
-                                <span className="bg-rose-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm">
-                                    {notificationUnreadCount > 99 ? "99+" : notificationUnreadCount}
-                                </span>
-                            )}
-                            {link.label === "Impact History" && impactHistoryBadge > 0 && (
-                                <span className="rounded-full bg-amber-500/90 px-2 py-0.5 text-[10px] font-bold text-white shadow-sm">
-                                    {impactHistoryBadge > 99 ? "99+" : impactHistoryBadge}
-                                </span>
-                            )}
-                        </Link>
-                    )
-                })}
+                {isStudent ? (
+                    <>
+                        <StudentNavRow href={dashboardLink.href} label="Dashboard" icon={LayoutDashboard} active={pathname === dashboardLink.href} collapsed={collapsed} />
+
+                        {!collapsed && <p className="pt-4 pb-1 px-3 text-[10px] font-bold uppercase tracking-widest text-white/30">My Paths</p>}
+                        {collapsed && <div className="pt-3" />}
+                        {CIEL_PATHS.map((path) => (
+                            <StudentNavRow
+                                key={path.key}
+                                href={path.href}
+                                label={path.label}
+                                emoji={path.emoji}
+                                active={studentIsActive(path.href)}
+                                needsAction={impactSummary?.pathsStatus?.[path.key]?.needsAction}
+                                collapsed={collapsed}
+                            />
+                        ))}
+
+                        {!collapsed && <p className="pt-4 pb-1 px-3 text-[10px] font-bold uppercase tracking-widest text-white/30">Record</p>}
+                        {collapsed && <div className="pt-3" />}
+                        {recordLinks.map((link) => (
+                            <StudentNavRow
+                                key={link.href}
+                                href={link.href}
+                                label={link.label}
+                                icon={link.icon}
+                                active={studentIsActive(link.href)}
+                                countPill={link.countPill}
+                                collapsed={collapsed}
+                            />
+                        ))}
+                    </>
+                ) : (
+                    links.map((link) => {
+                        const isActive = isLinkActive(link.href);
+                        return (
+                            <Link
+                                key={link.href}
+                                href={link.href}
+                                className={clsx(
+                                    "flex items-center justify-between px-4 py-3 rounded-xl transition-all font-medium text-sm w-full group",
+                                    isActive ? "bg-blue-600 text-white shadow-lg shadow-blue-900/50" : "text-slate-400 hover:text-white hover:bg-slate-800"
+                                )}
+                            >
+                                <div className="flex items-center gap-3">
+                                    <link.icon className="w-5 h-5" />
+                                    {link.label}
+                                </div>
+                                {link.label === "Messages" && unreadCount > 0 && (
+                                    <span className="bg-slate-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm animate-pulse">
+                                        {unreadCount > 99 ? "99+" : unreadCount}
+                                    </span>
+                                )}
+                                {link.label === "Notifications" && notificationUnreadCount > 0 && (
+                                    <span className="bg-rose-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm">
+                                        {notificationUnreadCount > 99 ? "99+" : notificationUnreadCount}
+                                    </span>
+                                )}
+                                {link.label === "Impact History" && impactHistoryBadge > 0 && (
+                                    <span className="rounded-full bg-amber-500/90 px-2 py-0.5 text-[10px] font-bold text-white shadow-sm">
+                                        {impactHistoryBadge > 99 ? "99+" : impactHistoryBadge}
+                                    </span>
+                                )}
+                            </Link>
+                        )
+                    })
+                )}
             </div>
 
-            <div className="shrink-0 border-t border-slate-800 p-4">
-                <button
-                    onClick={handleLogout}
-                    className="flex items-center gap-3 px-4 py-3 w-full rounded-xl text-[#4285F4] hover:bg-slate-500/10 hover:text-[#4285F4] transition-colors text-sm font-medium"
-                >
-                    <LogOut className="w-5 h-5" />
-                    Sign Out
-                </button>
-            </div>
+            {isStudent ? (
+                <div className="shrink-0 border-t border-white/10 p-3 space-y-3">
+                    {!collapsed && <CIIMiniCard score={impactSummary?.compositeScore ?? 0} />}
+                    {collapsed && <CIIMiniCard score={impactSummary?.compositeScore ?? 0} collapsed />}
+
+                    <Link
+                        href="/dashboard/student/profile"
+                        className={clsx(
+                            "ciel-transition flex items-center gap-3 rounded-ciel-sm px-2 py-2 hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ciel-green",
+                            collapsed && "justify-center px-0",
+                        )}
+                        title={collapsed ? "My profile" : undefined}
+                    >
+                        <Avatar className="h-9 w-9 border border-white/10">
+                            {avatarUrl ? <AvatarImage src={avatarUrl} alt={displayName || "Profile"} /> : null}
+                            <AvatarFallback className="bg-white/10 text-xs font-bold text-white">
+                                {(displayName || "S").slice(0, 1).toUpperCase()}
+                            </AvatarFallback>
+                        </Avatar>
+                        {!collapsed && <span className="truncate text-sm font-semibold text-white">{displayName || "My profile"}</span>}
+                    </Link>
+
+                    <StudentNavRow href="/dashboard/student/settings" label="Settings" icon={Settings} active={studentIsActive("/dashboard/student/settings")} collapsed={collapsed} />
+                    <StudentNavRow href="/dashboard/student/help" label="Help" icon={HelpCircle} active={studentIsActive("/dashboard/student/help")} collapsed={collapsed} />
+
+                    <button
+                        onClick={handleLogout}
+                        className={clsx(
+                            "flex items-center gap-3 px-3 py-2.5 w-full rounded-ciel-sm text-white/60 hover:bg-white/5 hover:text-white ciel-transition text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ciel-green",
+                            collapsed && "justify-center px-0",
+                        )}
+                    >
+                        <LogOut className="w-4 h-4 shrink-0" />
+                        {!collapsed && "Sign out"}
+                    </button>
+                </div>
+            ) : (
+                <div className="shrink-0 border-t border-slate-800 p-4">
+                    <button
+                        onClick={handleLogout}
+                        className="flex items-center gap-3 px-4 py-3 w-full rounded-xl text-[#4285F4] hover:bg-slate-500/10 hover:text-[#4285F4] transition-colors text-sm font-medium"
+                    >
+                        <LogOut className="w-5 h-5" />
+                        Sign Out
+                    </button>
+                </div>
+            )}
         </aside>
 
-        <nav
-            className="fixed inset-x-0 bottom-0 z-50 border-t border-slate-200 bg-white/95 px-3 py-2 shadow-[0_-12px_30px_-20px_rgba(15,23,42,0.45)] backdrop-blur lg:hidden"
-            aria-label="Dashboard navigation"
-        >
-            <div className="flex gap-2 overflow-x-auto pb-1">
-                {links.map((link) => {
-                    const isActive = isLinkActive(link.href);
-                    return (
-                        <Link
-                            key={link.href}
-                            href={link.href}
-                            className={clsx(
-                                "relative flex min-w-[4.75rem] flex-col items-center justify-center gap-1 rounded-2xl px-3 py-2 text-[10px] font-bold transition-colors",
-                                isActive ? "bg-blue-600 text-white shadow-sm" : "text-slate-500 hover:bg-slate-100 hover:text-slate-900",
-                            )}
-                        >
-                            <link.icon className="h-5 w-5" />
-                            <span className="line-clamp-1 max-w-[4.5rem] text-center leading-tight">{link.label}</span>
-                            {link.label === "Messages" && unreadCount > 0 && (
-                                <span className="absolute right-2 top-1 rounded-full bg-slate-900 px-1.5 py-0.5 text-[9px] font-bold leading-none text-white">
-                                    {unreadCount > 99 ? "99+" : unreadCount}
-                                </span>
-                            )}
-                            {link.label === "Notifications" && notificationUnreadCount > 0 && (
-                                <span className="absolute right-2 top-1 rounded-full bg-rose-600 px-1.5 py-0.5 text-[9px] font-bold leading-none text-white">
-                                    {notificationUnreadCount > 99 ? "99+" : notificationUnreadCount}
-                                </span>
-                            )}
-                            {link.label === "Impact History" && impactHistoryBadge > 0 && (
-                                <span className="absolute right-2 top-1 rounded-full bg-amber-500 px-1.5 py-0.5 text-[9px] font-bold leading-none text-white">
-                                    {impactHistoryBadge > 99 ? "99+" : impactHistoryBadge}
-                                </span>
-                            )}
-                        </Link>
-                    );
-                })}
-            </div>
-        </nav>
+        {isStudent ? (
+            <>
+                <nav
+                    className="fixed inset-x-0 bottom-0 z-50 border-t border-ciel-border bg-white/95 px-3 py-2 shadow-[0_-12px_30px_-20px_rgba(15,23,42,0.45)] backdrop-blur lg:hidden"
+                    aria-label="Dashboard navigation"
+                >
+                    <div className="flex items-stretch justify-between gap-1">
+                        {[
+                            { label: "Dashboard", href: "/dashboard/student", icon: LayoutDashboard },
+                            { label: "My Hours", href: "/dashboard/student/paths/community-service?tab=log-hours", icon: Clock },
+                            { label: "Paths", href: "#paths", icon: Compass, isPathsTrigger: true },
+                            { label: "Opportunities", href: "/dashboard/student/browse", icon: Briefcase, countPill: recommendedCount },
+                            { label: "Profile", href: "/dashboard/student/profile", icon: User },
+                        ].map((item) => {
+                            const active = !item.isPathsTrigger && studentIsActive(item.href);
+                            const commonClass = clsx(
+                                "relative flex flex-1 flex-col items-center justify-center gap-1 rounded-ciel-md px-2 py-2 text-[10px] font-bold ciel-transition",
+                                active ? "bg-ciel-green-soft text-ciel-green-deep" : "text-ciel-text-mid hover:bg-ciel-page",
+                            );
+                            if (item.isPathsTrigger) {
+                                return (
+                                    <button
+                                        key={item.label}
+                                        type="button"
+                                        onClick={() => setMobilePathsSheetOpen(true)}
+                                        className={commonClass}
+                                    >
+                                        <item.icon className="h-5 w-5" />
+                                        <span>{item.label}</span>
+                                    </button>
+                                );
+                            }
+                            return (
+                                <Link key={item.label} href={item.href} className={commonClass}>
+                                    <item.icon className="h-5 w-5" />
+                                    <span>{item.label}</span>
+                                    {!!item.countPill && item.countPill > 0 && (
+                                        <span className="absolute right-1 top-1 rounded-full bg-ciel-amber px-1.5 py-0.5 text-[9px] font-bold leading-none text-white">
+                                            {item.countPill > 99 ? "99+" : item.countPill}
+                                        </span>
+                                    )}
+                                </Link>
+                            );
+                        })}
+                    </div>
+                </nav>
+                <PathsBottomSheet
+                    open={mobilePathsSheetOpen}
+                    onClose={() => setMobilePathsSheetOpen(false)}
+                    pathsStatus={impactSummary?.pathsStatus}
+                />
+            </>
+        ) : (
+            <nav
+                className="fixed inset-x-0 bottom-0 z-50 border-t border-slate-200 bg-white/95 px-3 py-2 shadow-[0_-12px_30px_-20px_rgba(15,23,42,0.45)] backdrop-blur lg:hidden"
+                aria-label="Dashboard navigation"
+            >
+                <div className="flex gap-2 overflow-x-auto pb-1">
+                    {links.map((link) => {
+                        const isActive = isLinkActive(link.href);
+                        return (
+                            <Link
+                                key={link.href}
+                                href={link.href}
+                                className={clsx(
+                                    "relative flex min-w-[4.75rem] flex-col items-center justify-center gap-1 rounded-2xl px-3 py-2 text-[10px] font-bold transition-colors",
+                                    isActive ? "bg-blue-600 text-white shadow-sm" : "text-slate-500 hover:bg-slate-100 hover:text-slate-900",
+                                )}
+                            >
+                                <link.icon className="h-5 w-5" />
+                                <span className="line-clamp-1 max-w-[4.5rem] text-center leading-tight">{link.label}</span>
+                                {link.label === "Messages" && unreadCount > 0 && (
+                                    <span className="absolute right-2 top-1 rounded-full bg-slate-900 px-1.5 py-0.5 text-[9px] font-bold leading-none text-white">
+                                        {unreadCount > 99 ? "99+" : unreadCount}
+                                    </span>
+                                )}
+                                {link.label === "Notifications" && notificationUnreadCount > 0 && (
+                                    <span className="absolute right-2 top-1 rounded-full bg-rose-600 px-1.5 py-0.5 text-[9px] font-bold leading-none text-white">
+                                        {notificationUnreadCount > 99 ? "99+" : notificationUnreadCount}
+                                    </span>
+                                )}
+                                {link.label === "Impact History" && impactHistoryBadge > 0 && (
+                                    <span className="absolute right-2 top-1 rounded-full bg-amber-500 px-1.5 py-0.5 text-[9px] font-bold leading-none text-white">
+                                        {impactHistoryBadge > 99 ? "99+" : impactHistoryBadge}
+                                    </span>
+                                )}
+                            </Link>
+                        );
+                    })}
+                </div>
+            </nav>
+        )}
         </>
     );
 }

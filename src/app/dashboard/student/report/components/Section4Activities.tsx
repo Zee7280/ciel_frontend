@@ -6,8 +6,8 @@ import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import { FieldError } from './ui/FieldError';
 import {
-    Plus, Trash2, Globe, Target, Info, Layers, Users, MapPin, BarChart3,
-    ChevronDown, ChevronUp, PlusCircle, Truck
+    Plus, Trash2, Globe, Target, Info, Layers, Users,
+    ChevronDown, ChevronUp, PlusCircle
 } from 'lucide-react';
 import clsx from 'clsx';
 import {
@@ -26,6 +26,12 @@ const textareaClasses =
     "min-h-[100px] w-full min-w-0 resize-y rounded-xl border border-slate-200 bg-white p-4 text-sm font-medium leading-relaxed text-slate-800 shadow-sm outline-none transition-colors placeholder:text-slate-400 focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100";
 const fieldLabel =
     "text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500";
+const badgeMandatory =
+    "shrink-0 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700";
+const badgeRequired =
+    "shrink-0 rounded-full border border-rose-200 bg-rose-50 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-rose-600";
+const badgeNeutral =
+    "shrink-0 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500";
 
 function wordCount(text: string): number {
     return (text || "").trim().split(/\s+/).filter(Boolean).length;
@@ -143,8 +149,10 @@ export default function Section4Activities() {
 
     const partnersCount = Array.isArray(section7?.partners) ? section7.partners.length : 0;
 
+    const implementationWords = wordCount(section4.project_summary?.project_implementation_explanation || '');
+
     return (
-        <div className="mx-auto max-w-4xl space-y-8 pb-10">
+        <div className="mx-auto max-w-6xl space-y-8 pb-10">
             {/* Header */}
             <div className="space-y-5">
                 <div className="flex items-center gap-3.5">
@@ -196,6 +204,7 @@ export default function Section4Activities() {
                             4.1
                         </span>
                         <h3 className="text-base font-semibold text-slate-900">Activity blocks</h3>
+                        <span className={badgeMandatory}>Mandatory</span>
                     </div>
                     <Button
                         type="button"
@@ -279,6 +288,7 @@ export default function Section4Activities() {
                                 </select>
                                 <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                             </div>
+                            <FieldError message={getFieldError('section4.project_summary.counting_method')} />
                         </div>
                     </div>
 
@@ -307,6 +317,33 @@ export default function Section4Activities() {
                                 onChange={e => updateProjectSummary('project_implementation_explanation', e.target.value)}
                                 className={textareaClasses}
                             />
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                                <div className="h-1.5 w-40 overflow-hidden rounded-full bg-slate-100 sm:w-48">
+                                    <div
+                                        className={clsx(
+                                            "h-full rounded-full transition-all",
+                                            implementationWords < 50
+                                                ? "bg-amber-400"
+                                                : implementationWords > 100
+                                                  ? "bg-red-500"
+                                                  : "bg-emerald-500",
+                                        )}
+                                        style={{ width: `${Math.min((implementationWords / 100) * 100, 100)}%` }}
+                                    />
+                                </div>
+                                <p
+                                    className={clsx(
+                                        "text-[11px] tabular-nums",
+                                        implementationWords >= 50 && implementationWords <= 100
+                                            ? "text-emerald-600"
+                                            : implementationWords > 100
+                                              ? "text-red-500"
+                                              : "text-slate-400",
+                                    )}
+                                >
+                                    {implementationWords} / 100 words
+                                </p>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -319,6 +356,7 @@ export default function Section4Activities() {
                         4.7
                     </span>
                     <h3 className="text-base font-semibold text-slate-900">Implementation scale summary</h3>
+                    <span className={clsx(badgeNeutral, "ml-auto")}>Auto-calculated</span>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
@@ -348,6 +386,8 @@ export default function Section4Activities() {
 function ActivityBlockComponent({ activity, index, updateActivity, removeActivity, getFieldError }: any) {
     const [isExpanded, setIsExpanded] = React.useState(true);
     const descWords = wordCount(activity.description);
+    const deliveryWords = wordCount(activity.delivery_explanation);
+    const beneficiaryDescWords = wordCount(activity.beneficiary_description);
 
     const update = (fieldOrUpdates: string | Record<string, any>, val?: any) => {
         if (typeof fieldOrUpdates === 'string') {
@@ -478,6 +518,7 @@ function ActivityBlockComponent({ activity, index, updateActivity, removeActivit
                                 </select>
                                 <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                             </div>
+                            <FieldError message={getFieldError(`section4.activity_blocks.${index}.primary_category`)} />
                         </div>
                         {activity.primary_category ? (
                             <div className="space-y-1.5">
@@ -495,6 +536,7 @@ function ActivityBlockComponent({ activity, index, updateActivity, removeActivit
                                     </select>
                                     <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                                 </div>
+                                <FieldError message={getFieldError(`section4.activity_blocks.${index}.sub_category`)} />
                             </div>
                         ) : null}
                     </div>
@@ -512,9 +554,28 @@ function ActivityBlockComponent({ activity, index, updateActivity, removeActivit
                     ) : null}
 
                     <div className="space-y-1.5">
-                        <div className="flex items-center justify-between gap-2">
-                            <Label className={fieldLabel}>Activity description</Label>
-                            <span
+                        <Label className={fieldLabel}>Activity description</Label>
+                        <Textarea
+                            placeholder="Describe what was done and the role of those involved…"
+                            value={activity.description}
+                            onChange={e => update('description', e.target.value)}
+                            className={textareaClasses}
+                        />
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div className="h-1.5 w-40 overflow-hidden rounded-full bg-slate-100 sm:w-48">
+                                <div
+                                    className={clsx(
+                                        "h-full rounded-full transition-all",
+                                        descWords < 50
+                                            ? "bg-amber-400"
+                                            : descWords > 100
+                                              ? "bg-red-500"
+                                              : "bg-emerald-500",
+                                    )}
+                                    style={{ width: `${Math.min((descWords / 100) * 100, 100)}%` }}
+                                />
+                            </div>
+                            <p
                                 className={clsx(
                                     "text-[11px] tabular-nums",
                                     descWords >= 50 && descWords <= 100
@@ -525,24 +586,19 @@ function ActivityBlockComponent({ activity, index, updateActivity, removeActivit
                                 )}
                             >
                                 {descWords} / 100 words · 50–100 required
-                            </span>
+                            </p>
                         </div>
-                        <Textarea
-                            placeholder="Describe what was done and the role of those involved…"
-                            value={activity.description}
-                            onChange={e => update('description', e.target.value)}
-                            className={textareaClasses}
-                        />
                         <FieldError message={getFieldError(`section4.activity_blocks.${index}.description`)} />
                     </div>
 
                     {/* 4.2 Delivery */}
                     <div className="space-y-4 border-t border-slate-100 pt-5">
-                        <div className="flex items-center gap-2.5">
-                            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-600 text-white">
-                                <Truck className="h-3.5 w-3.5" />
-                            </div>
-                            <h5 className="text-sm font-semibold text-slate-900">4.2 Delivery execution</h5>
+                        <div className="flex flex-wrap items-center gap-2.5">
+                            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-900 text-[11px] font-bold text-white">
+                                4.2
+                            </span>
+                            <h5 className="text-sm font-semibold text-slate-900">Delivery execution</h5>
+                            <span className={clsx(badgeMandatory, "ml-auto")}>Mandatory</span>
                         </div>
 
                         <div className="space-y-1.5">
@@ -558,6 +614,7 @@ function ActivityBlockComponent({ activity, index, updateActivity, removeActivit
                                 </select>
                                 <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                             </div>
+                            <FieldError message={getFieldError(`section4.activity_blocks.${index}.delivery_mode`)} />
                         </div>
 
                         <div className="space-y-2">
@@ -579,6 +636,7 @@ function ActivityBlockComponent({ activity, index, updateActivity, removeActivit
                                     onChange={e => update('sessions_count', e.target.value)}
                                     className={inputClasses}
                                 />
+                                <FieldError message={getFieldError(`section4.activity_blocks.${index}.sessions_count`)} />
                             </div>
                             <div className="space-y-1.5">
                                 <Label className={fieldLabel}>Delivery explanation</Label>
@@ -588,6 +646,33 @@ function ActivityBlockComponent({ activity, index, updateActivity, removeActivit
                                     onChange={e => update('delivery_explanation', e.target.value)}
                                     className={clsx(textareaClasses, "min-h-[88px]")}
                                 />
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                    <div className="h-1.5 w-40 overflow-hidden rounded-full bg-slate-100 sm:w-48">
+                                        <div
+                                            className={clsx(
+                                                "h-full rounded-full transition-all",
+                                                deliveryWords < 30
+                                                    ? "bg-amber-400"
+                                                    : deliveryWords > 80
+                                                      ? "bg-red-500"
+                                                      : "bg-emerald-500",
+                                            )}
+                                            style={{ width: `${Math.min((deliveryWords / 80) * 100, 100)}%` }}
+                                        />
+                                    </div>
+                                    <p
+                                        className={clsx(
+                                            "text-[11px] tabular-nums",
+                                            deliveryWords >= 30 && deliveryWords <= 80
+                                                ? "text-emerald-600"
+                                                : deliveryWords > 80
+                                                  ? "text-red-500"
+                                                  : "text-slate-400",
+                                        )}
+                                    >
+                                        {deliveryWords} words · 30–80 suggested
+                                    </p>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -596,10 +681,11 @@ function ActivityBlockComponent({ activity, index, updateActivity, removeActivit
                     <div className="space-y-4 border-t border-slate-100 pt-5">
                         <div className="flex flex-wrap items-center justify-between gap-3">
                             <div className="flex items-center gap-2.5">
-                                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-600 text-white">
-                                    <BarChart3 className="h-3.5 w-3.5" />
-                                </div>
-                                <h5 className="text-sm font-semibold text-slate-900">4.3 Measurable outputs</h5>
+                                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-900 text-[11px] font-bold text-white">
+                                    4.3
+                                </span>
+                                <h5 className="text-sm font-semibold text-slate-900">Measurable outputs</h5>
+                                <span className={badgeRequired}>Required</span>
                             </div>
                             <Button
                                 type="button"
@@ -699,15 +785,17 @@ function ActivityBlockComponent({ activity, index, updateActivity, removeActivit
                                 </div>
                             ))}
                         </div>
+                        <FieldError message={getFieldError(`section4.activity_blocks.${index}.outputs`)} />
                     </div>
 
                     {/* 4.4 Beneficiaries */}
                     <div className="space-y-4 border-t border-slate-100 pt-5">
-                        <div className="flex items-center gap-2.5">
-                            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-600 text-white">
-                                <Users className="h-3.5 w-3.5" />
-                            </div>
-                            <h5 className="text-sm font-semibold text-slate-900">4.4 Beneficiary reach</h5>
+                        <div className="flex flex-wrap items-center gap-2.5">
+                            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-900 text-[11px] font-bold text-white">
+                                4.4
+                            </span>
+                            <h5 className="text-sm font-semibold text-slate-900">Beneficiary reach</h5>
+                            <span className={clsx(badgeRequired, "ml-auto")}>Required</span>
                         </div>
 
                         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -750,6 +838,7 @@ function ActivityBlockComponent({ activity, index, updateActivity, removeActivit
                                             onChange={e => update('beneficiaries_reached', e.target.value)}
                                             className={inputClasses}
                                         />
+                                        <FieldError message={getFieldError(`section4.activity_blocks.${index}.beneficiaries_reached`)} />
                                     </div>
                                     <div className="space-y-1.5">
                                         <Label className={fieldLabel}>Overlap with other activities</Label>
@@ -796,6 +885,33 @@ function ActivityBlockComponent({ activity, index, updateActivity, removeActivit
                                         onChange={e => update('beneficiary_description', e.target.value)}
                                         className={clsx(textareaClasses, "min-h-[88px]")}
                                     />
+                                    <div className="flex flex-wrap items-center justify-between gap-2">
+                                        <div className="h-1.5 w-40 overflow-hidden rounded-full bg-slate-100 sm:w-48">
+                                            <div
+                                                className={clsx(
+                                                    "h-full rounded-full transition-all",
+                                                    beneficiaryDescWords < 30
+                                                        ? "bg-amber-400"
+                                                        : beneficiaryDescWords > 80
+                                                          ? "bg-red-500"
+                                                          : "bg-emerald-500",
+                                                )}
+                                                style={{ width: `${Math.min((beneficiaryDescWords / 80) * 100, 100)}%` }}
+                                            />
+                                        </div>
+                                        <p
+                                            className={clsx(
+                                                "text-[11px] tabular-nums",
+                                                beneficiaryDescWords >= 30 && beneficiaryDescWords <= 80
+                                                    ? "text-emerald-600"
+                                                    : beneficiaryDescWords > 80
+                                                      ? "text-red-500"
+                                                      : "text-slate-400",
+                                            )}
+                                        >
+                                            {beneficiaryDescWords} words · 30–80 suggested
+                                        </p>
+                                    </div>
                                 </div>
                             </div>
                         ) : null}
@@ -803,11 +919,12 @@ function ActivityBlockComponent({ activity, index, updateActivity, removeActivit
 
                     {/* 4.5 Location */}
                     <div className="space-y-4 border-t border-slate-100 pt-5">
-                        <div className="flex items-center gap-2.5">
-                            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-600 text-white">
-                                <MapPin className="h-3.5 w-3.5" />
-                            </div>
-                            <h5 className="text-sm font-semibold text-slate-900">4.5 Where it happened</h5>
+                        <div className="flex flex-wrap items-center gap-2.5">
+                            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-900 text-[11px] font-bold text-white">
+                                4.5
+                            </span>
+                            <h5 className="text-sm font-semibold text-slate-900">Where it happened</h5>
+                            <span className={clsx(badgeMandatory, "ml-auto")}>Mandatory</span>
                         </div>
 
                         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -829,6 +946,7 @@ function ActivityBlockComponent({ activity, index, updateActivity, removeActivit
                                 <p className="text-[11px] text-slate-400">
                                     Choose the broadest area where this activity took place.
                                 </p>
+                                <FieldError message={getFieldError(`section4.activity_blocks.${index}.geographic_reach`)} />
                             </div>
                             {GEOGRAPHIC_SUB_CATEGORIES[activity.geographic_reach] ? (
                                 <div className="space-y-1.5">

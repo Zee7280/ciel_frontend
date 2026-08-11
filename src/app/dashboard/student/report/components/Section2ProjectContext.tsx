@@ -343,7 +343,7 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
         "shrink-0 rounded-full border border-rose-200 bg-rose-50 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-rose-600";
 
     return (
-        <div className="mx-auto max-w-4xl space-y-8 pb-8">
+        <div className="mx-auto max-w-6xl space-y-8 pb-8">
 
             {/* ── Section Header ─────────────────────────────────────────── */}
             <div className="space-y-5">

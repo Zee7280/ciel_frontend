@@ -244,7 +244,7 @@ export interface ReportData {
             sources: string[];       // multi-select
             source_other?: string;
             purpose: string;
-            verification: string[];  // 6.2.6 multi-select
+            verification: string[];  // 6.2.5 multi-select
         }>;
         evidence_files: File[];
         summary_text?: string;

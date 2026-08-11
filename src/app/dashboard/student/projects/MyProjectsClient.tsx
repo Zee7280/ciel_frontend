@@ -59,6 +59,7 @@ import {
     Share2,
 } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "../report/components/ui/dialog";
+import { ScoringLevelsButton, ScoringLevelsDialog } from "@/components/scoring/ScoringLevelsDialog";
 
 interface TeamMember {
     name: string;
@@ -462,6 +463,9 @@ export default function MyProjectsPage() {
     const [liveApplyModalProject, setLiveApplyModalProject] = useState<OpportunityPromptProject | null>(null);
     const [showLiveApplyModal, setShowLiveApplyModal] = useState(false);
     const [seenLiveApplyModalIds, setSeenLiveApplyModalIds] = useState<string[]>([]);
+    const [isScoringLevelsOpen, setIsScoringLevelsOpen] = useState(false);
+
+    const openScoringLevels = () => setIsScoringLevelsOpen(true);
 
     useEffect(() => {
         const fetchProjects = async () => {
@@ -786,13 +790,20 @@ export default function MyProjectsPage() {
 
     return (
         <div className="space-y-4 bg-slate-50/90 px-4 py-4 sm:px-6 sm:py-5 lg:px-8">
-            <header className="border-b border-slate-200/70 pb-3">
-                <h1 className="text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">My Projects</h1>
-                <p className="mt-1 max-w-2xl text-sm leading-snug text-slate-500">
-                    <span className="font-medium text-slate-600">Manage all your projects here</span>
-                    <span className="text-slate-400"> · </span>
-                    Track, update, and manage the full lifecycle of all your projects.
-                </p>
+            <header className="flex flex-col gap-3 border-b border-slate-200/70 pb-3 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                    <h1 className="text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">My Projects</h1>
+                    <p className="mt-1 max-w-2xl text-sm leading-snug text-slate-500">
+                        <span className="font-medium text-slate-600">Manage all your projects here</span>
+                        <span className="text-slate-400"> · </span>
+                        Track, update, and manage the full lifecycle of all your projects.
+                    </p>
+                </div>
+                <ScoringLevelsButton
+                    size="default"
+                    className="h-9 w-fit shrink-0 gap-1.5 rounded-xl border-amber-200/90 bg-amber-50/40 px-3 text-sm font-medium text-amber-900 hover:bg-amber-50"
+                    onClick={openScoringLevels}
+                />
             </header>
 
             {!isLoading && projects.length > 0 ? (
@@ -1282,6 +1293,10 @@ export default function MyProjectsPage() {
                                             >
                                                 <Eye className="h-4 w-4" /> View details
                                             </Button>
+                                            <ScoringLevelsButton
+                                                size="default"
+                                                onClick={openScoringLevels}
+                                            />
                                         </div>
                                     </div>
 
@@ -1295,6 +1310,8 @@ export default function MyProjectsPage() {
                     )}
                 </div>
             )}
+
+            <ScoringLevelsDialog open={isScoringLevelsOpen} onOpenChange={setIsScoringLevelsOpen} />
 
             <OpportunityLiveApplyModal
                 project={liveApplyModalProject}
@@ -1912,6 +1929,7 @@ export default function MyProjectsPage() {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
         </div>
     );
 }

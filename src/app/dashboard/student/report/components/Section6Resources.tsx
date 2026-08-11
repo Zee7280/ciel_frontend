@@ -97,6 +97,8 @@ const textareaClasses =
     "min-h-[110px] w-full min-w-0 resize-y rounded-xl border border-slate-200 bg-white p-4 text-sm font-medium leading-relaxed text-slate-800 shadow-sm outline-none transition-colors placeholder:text-slate-400 focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100";
 const fieldLabel =
     "text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500";
+const badgeRequired =
+    "shrink-0 rounded-full border border-rose-200 bg-rose-50 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-rose-600";
 
 function CheckGrid({
     options,
@@ -259,7 +261,7 @@ function ResourceCard({
 
             <div className="space-y-1.5">
                 <Label className={fieldLabel}>
-                    6.2.1 Resource type <span className="normal-case text-red-500">· required</span>
+                    6.2.1 Resource type
                 </Label>
                 <div className="relative">
                     <select
@@ -280,16 +282,34 @@ function ResourceCard({
                             onChange={e => onUpdate("type_other", e.target.value)}
                             className={textareaClasses}
                         />
-                        <div className="flex items-center justify-between gap-2 text-[11px]">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div className="h-1.5 w-40 overflow-hidden rounded-full bg-slate-100 sm:w-48">
+                                <div
+                                    className={clsx(
+                                        "h-full rounded-full transition-all",
+                                        countWords(res.type_other || "") < 50
+                                            ? "bg-amber-400"
+                                            : countWords(res.type_other || "") > 200
+                                              ? "bg-red-500"
+                                              : "bg-emerald-500",
+                                    )}
+                                    style={{
+                                        width: `${Math.min((countWords(res.type_other || "") / 200) * 100, 100)}%`,
+                                    }}
+                                />
+                            </div>
                             <span className={clsx(
+                                "text-[11px] tabular-nums",
                                 countWords(res.type_other || "") >= 50 && countWords(res.type_other || "") <= 200
                                     ? "text-emerald-600"
-                                    : "text-amber-600",
+                                    : countWords(res.type_other || "") > 200
+                                      ? "text-red-500"
+                                      : "text-amber-600",
                             )}>
                                 {countWords(res.type_other || "")} / 200 words (min 50)
                             </span>
-                            <FieldError message={getFieldError(`resources.${idx}.type_other`)} />
                         </div>
+                        <FieldError message={getFieldError(`resources.${idx}.type_other`)} />
                     </div>
                 ) : null}
             </div>
@@ -330,16 +350,34 @@ function ResourceCard({
                         onChange={e => onUpdate("unit_other", e.target.value)}
                         className={textareaClasses}
                     />
-                    <div className="flex items-center justify-between gap-2 text-[11px]">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="h-1.5 w-40 overflow-hidden rounded-full bg-slate-100 sm:w-48">
+                            <div
+                                className={clsx(
+                                    "h-full rounded-full transition-all",
+                                    countWords(res.unit_other || "") < 50
+                                        ? "bg-amber-400"
+                                        : countWords(res.unit_other || "") > 200
+                                          ? "bg-red-500"
+                                          : "bg-emerald-500",
+                                )}
+                                style={{
+                                    width: `${Math.min((countWords(res.unit_other || "") / 200) * 100, 100)}%`,
+                                }}
+                            />
+                        </div>
                         <span className={clsx(
+                            "text-[11px] tabular-nums",
                             countWords(res.unit_other || "") >= 50 && countWords(res.unit_other || "") <= 200
                                 ? "text-emerald-600"
-                                : "text-amber-600",
+                                : countWords(res.unit_other || "") > 200
+                                  ? "text-red-500"
+                                  : "text-amber-600",
                         )}>
                             {countWords(res.unit_other || "")} / 200 words (min 50)
                         </span>
-                        <FieldError message={getFieldError(`resources.${idx}.unit_other`)} />
                     </div>
+                    <FieldError message={getFieldError(`resources.${idx}.unit_other`)} />
                 </div>
             ) : null}
 
@@ -355,36 +393,70 @@ function ResourceCard({
                             onChange={e => onUpdate("source_other", e.target.value)}
                             className={textareaClasses}
                         />
-                        <div className="flex items-center justify-between gap-2 text-[11px]">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div className="h-1.5 w-40 overflow-hidden rounded-full bg-slate-100 sm:w-48">
+                                <div
+                                    className={clsx(
+                                        "h-full rounded-full transition-all",
+                                        countWords(res.source_other || "") < 50
+                                            ? "bg-amber-400"
+                                            : countWords(res.source_other || "") > 200
+                                              ? "bg-red-500"
+                                              : "bg-emerald-500",
+                                    )}
+                                    style={{
+                                        width: `${Math.min((countWords(res.source_other || "") / 200) * 100, 100)}%`,
+                                    }}
+                                />
+                            </div>
                             <span className={clsx(
+                                "text-[11px] tabular-nums",
                                 countWords(res.source_other || "") >= 50 && countWords(res.source_other || "") <= 200
                                     ? "text-emerald-600"
-                                    : "text-amber-600",
+                                    : countWords(res.source_other || "") > 200
+                                      ? "text-red-500"
+                                      : "text-amber-600",
                             )}>
                                 {countWords(res.source_other || "")} / 200 words (min 50)
                             </span>
-                            <FieldError message={getFieldError(`resources.${idx}.source_other`)} />
                         </div>
+                        <FieldError message={getFieldError(`resources.${idx}.source_other`)} />
                     </div>
                 ) : null}
             </div>
 
             <div className="space-y-2">
-                <Label className={fieldLabel}>6.2.6 Verification status</Label>
+                <Label className={fieldLabel}>6.2.5 Verification status</Label>
                 <p className="text-xs text-slate-500">Select all that apply</p>
                 <CheckGrid options={verificationOptions} selected={verifications} onToggle={toggleVerification} />
             </div>
 
             <div className="space-y-1.5">
-                <Label className={fieldLabel}>6.2.5 Purpose of resource</Label>
+                <Label className={fieldLabel}>6.2.6 Purpose of resource</Label>
                 <Textarea
                     placeholder="Explain what exactly this resource enabled (e.g. 'Used to purchase hygiene kits for 45 participants')"
                     value={res.purpose}
                     onChange={e => onUpdate("purpose", e.target.value)}
                     className={clsx(textareaClasses, "min-h-[120px]")}
                 />
-                <div className="flex flex-wrap items-center justify-between gap-2 text-[11px]">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="h-1.5 w-40 overflow-hidden rounded-full bg-slate-100 sm:w-48">
+                        <div
+                            className={clsx(
+                                "h-full rounded-full transition-all",
+                                purposeWords < 50
+                                    ? "bg-amber-400"
+                                    : purposeWords > 200
+                                      ? "bg-red-500"
+                                      : "bg-emerald-500",
+                            )}
+                            style={{
+                                width: `${Math.min((purposeWords / 200) * 100, 100)}%`,
+                            }}
+                        />
+                    </div>
                     <span className={clsx(
+                        "text-[11px] tabular-nums",
                         purposeWords >= 50 && purposeWords <= 200
                             ? "text-emerald-600"
                             : purposeWords > 200
@@ -393,8 +465,8 @@ function ResourceCard({
                     )}>
                         {purposeWords} / 200 words · min 50
                     </span>
-                    <FieldError message={getFieldError(`resources.${idx}.purpose`)} />
                 </div>
+                <FieldError message={getFieldError(`resources.${idx}.purpose`)} />
             </div>
         </div>
     );
@@ -475,16 +547,33 @@ export default function Section6Resources({ projectData }: { projectData?: unkno
     const uniqueSources = new Set(resources.flatMap(r => r.sources || [])).size;
 
     return (
-        <div className="mx-auto max-w-4xl space-y-8 pb-10">
+        <div className="mx-auto max-w-6xl space-y-8 pb-10">
             {/* Header */}
-            <div className="flex items-center gap-3.5">
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-indigo-600 text-white shadow-sm">
-                    <Package className="h-5 w-5" />
+            <div className="space-y-5">
+                <div className="flex items-center gap-3.5">
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-indigo-600 text-white shadow-sm">
+                        <Package className="h-5 w-5" />
+                    </div>
+                    <div>
+                        <h2 className="text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl">
+                            <span className="text-indigo-600">SECTION 6:</span> Resources &amp; implementation support
+                        </h2>
+                    </div>
                 </div>
-                <div>
-                    <h2 className="text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl">
-                        <span className="text-indigo-600">SECTION 6:</span> Resources &amp; implementation support
-                    </h2>
+
+                <div className="rounded-xl border border-indigo-100 bg-indigo-50/70 px-4 py-3.5 sm:px-5">
+                    <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-indigo-600">
+                        Purpose of this section
+                    </p>
+                    <p className="mt-1.5 text-sm leading-relaxed text-slate-700">
+                        This section records the{" "}
+                        <span className="font-semibold text-slate-900">
+                            resources and implementation support
+                        </span>{" "}
+                        that made your activities possible. List each resource type, amount, and
+                        source, explain what it enabled, and note how it was verified (evidence,
+                        partner confirmation, or official documentation).
+                    </p>
                 </div>
             </div>
 
@@ -619,14 +708,17 @@ export default function Section6Resources({ projectData }: { projectData?: unkno
                                     Step 2 — Resource contribution details
                                 </h3>
                             </div>
-                            <Button
-                                type="button"
-                                onClick={addResource}
-                                className="h-10 shrink-0 rounded-lg bg-indigo-600 px-4 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700"
-                            >
-                                <Plus className="mr-1.5 h-4 w-4" />
-                                Add resource entry
-                            </Button>
+                            <div className="ml-auto flex shrink-0 items-center gap-3">
+                                <span className={badgeRequired}>Required</span>
+                                <Button
+                                    type="button"
+                                    onClick={addResource}
+                                    className="h-10 shrink-0 rounded-lg bg-indigo-600 px-4 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700"
+                                >
+                                    <Plus className="mr-1.5 h-4 w-4" />
+                                    Add resource entry
+                                </Button>
+                            </div>
                         </div>
 
                         {resources.length === 0 ? (

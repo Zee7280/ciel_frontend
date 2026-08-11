@@ -111,7 +111,7 @@ export default function SearchableSelect({
     };
 
     return (
-        <div ref={containerRef} className="relative">
+        <div ref={containerRef} className="relative z-20">
             <button
                 type="button"
                 onClick={() => (isOpen ? setIsOpen(false) : openDropdown())}
@@ -120,7 +120,7 @@ export default function SearchableSelect({
                 aria-haspopup="listbox"
                 aria-expanded={isOpen}
                 className={clsx(
-                    "w-full cursor-pointer px-5 py-4 pr-12 rounded-2xl border-2 bg-slate-50/50 focus:bg-white outline-none transition-all font-bold text-left disabled:cursor-not-allowed disabled:opacity-60",
+                    "w-full cursor-pointer truncate whitespace-nowrap px-5 py-4 pr-12 rounded-2xl border-2 bg-slate-50/50 focus:bg-white outline-none transition-all font-bold text-left disabled:cursor-not-allowed disabled:opacity-60",
                     value ? "text-slate-800" : "text-slate-300",
                     hasError ? "border-red-500 focus:border-red-500" : "border-slate-100 focus:border-emerald-600",
                     isOpen && "hidden",

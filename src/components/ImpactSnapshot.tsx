@@ -1,16 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { GraduationCap, Clock, Globe2, Handshake, TrendingUp, Building2 } from "lucide-react";
 
 interface Stat {
-    icon: React.ElementType;
     value: number;
     suffix: string;
     label: string;
-    sub: string;
-    color: string;
-    iconBg: string;
 }
 
 type PlatformStatsData = {
@@ -23,6 +18,8 @@ type PlatformStatsData = {
     universities?: unknown;
     impact_hours?: unknown;
     sdgs_impacted?: unknown;
+    verified_records?: unknown;
+    people_reached?: unknown;
 };
 
 type PlatformStatsResponse = {
@@ -31,60 +28,12 @@ type PlatformStatsResponse = {
 };
 
 const defaultStats: Stat[] = [
-    {
-        icon: GraduationCap,
-        value: 1200,
-        suffix: "+",
-        label: "Students Enrolled",
-        sub: "Verified participants",
-        color: "text-[#4285F4]",
-        iconBg: "bg-slate-50",
-    },
-    {
-        icon: Clock,
-        value: 18000,
-        suffix: "+",
-        label: "Engagement Hours",
-        sub: "Logged & verified",
-        color: "text-[#4285F4]",
-        iconBg: "bg-slate-50",
-    },
-    {
-        icon: Globe2,
-        value: 10,
-        suffix: "",
-        label: "SDGs Covered",
-        sub: "Across all projects",
-        color: "text-[#4285F4]",
-        iconBg: "bg-slate-50",
-    },
-    {
-        icon: Handshake,
-        value: 85,
-        suffix: "+",
-        label: "Active Projects",
-        sub: "Community-led",
-        color: "text-[#4285F4]",
-        iconBg: "bg-slate-50",
-    },
-    {
-        icon: TrendingUp,
-        value: 72,
-        suffix: "",
-        label: "Avg CII Score",
-        sub: "Community Impact Index",
-        color: "text-[#4285F4]",
-        iconBg: "bg-slate-50",
-    },
-    {
-        icon: Building2,
-        value: 24,
-        suffix: "+",
-        label: "Partner Universities",
-        sub: "Approved institutions",
-        color: "text-[#4285F4]",
-        iconBg: "bg-slate-50",
-    },
+    { value: 539, suffix: "+", label: "Students enrolled" },
+    { value: 1840, suffix: "+", label: "Verified hours" },
+    { value: 247, suffix: "+", label: "Verified records" },
+    { value: 8400, suffix: "+", label: "People reached" },
+    { value: 12, suffix: "+", label: "Universities" },
+    { value: 9, suffix: "+", label: "SDGs advanced" },
 ];
 
 function normalizeCount(value: unknown, fallback: number): number {
@@ -95,19 +44,19 @@ function normalizeCount(value: unknown, fallback: number): number {
 function buildStats(data?: PlatformStatsData): Stat[] {
     return defaultStats.map((stat) => {
         switch (stat.label) {
-            case "Students Enrolled":
-                // Sub-label is "Verified participants" — prefer live contributor count over total signups.
+            case "Students enrolled":
+                // Prefer live contributor count over total signups.
                 return { ...stat, value: normalizeCount(data?.contributors ?? data?.students_enrolled, stat.value) };
-            case "Engagement Hours":
+            case "Verified hours":
                 return { ...stat, value: normalizeCount(data?.engagement_hours ?? data?.impact_hours, stat.value) };
-            case "SDGs Covered":
-                return { ...stat, value: normalizeCount(data?.sdgs_covered ?? data?.sdgs_impacted, stat.value) };
-            case "Active Projects":
-                return { ...stat, value: normalizeCount(data?.active_projects, stat.value) };
-            case "Avg CII Score":
-                return { ...stat, value: normalizeCount(data?.avg_cii_score, stat.value) };
-            case "Partner Universities":
+            case "Verified records":
+                return { ...stat, value: normalizeCount(data?.verified_records, stat.value) };
+            case "People reached":
+                return { ...stat, value: normalizeCount(data?.people_reached, stat.value) };
+            case "Universities":
                 return { ...stat, value: normalizeCount(data?.universities, stat.value) };
+            case "SDGs advanced":
+                return { ...stat, value: normalizeCount(data?.sdgs_covered ?? data?.sdgs_impacted, stat.value) };
             default:
                 return stat;
         }
@@ -177,69 +126,50 @@ export default function ImpactSnapshot() {
     }, []);
 
     return (
-        <section id="platform-impact" className="py-24 px-6 bg-slate-50/50 relative overflow-hidden">
-            {/* Radial glow */}
-            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(66,133,244,0.04)_0%,transparent_70%)] pointer-events-none" />
-            {/* Dot grid */}
-            <div className="absolute inset-0 bg-[radial-gradient(rgba(0,0,0,0.02)_1px,transparent_1px)] bg-[size:28px_28px] pointer-events-none" />
+        <section id="platform-impact" className="relative overflow-hidden bg-ciel-navy py-24 px-6">
+            {/* Soft glow */}
+            <div className="pointer-events-none absolute left-1/2 top-0 -z-0 h-[500px] w-[900px] -translate-x-1/2 bg-ciel-green/5 blur-[140px]" />
 
-            <div className="max-w-7xl mx-auto relative z-10">
+            <div className="relative z-10 max-w-6xl mx-auto">
                 {/* Header */}
-                <div className="text-center mb-16">
-                    <div className="inline-flex items-center gap-2 px-4 py-2 bg-slate-100 rounded-full text-slate-500 text-[10px] font-black uppercase tracking-widest mb-6">
-                        <span className="w-1.5 h-1.5 rounded-full bg-[#34A853] animate-pulse" />
-                        Live Impact
-                    </div>
+                <div className="text-center mb-14">
+                    <p className="text-xs font-black uppercase tracking-widest text-ciel-green mb-4">
+                        Live impact
+                    </p>
 
-                    <div className="relative inline-block mb-4">
-                        <h2 className="text-3xl md:text-4xl lg:text-[42px] font-black text-slate-900 tracking-tight leading-tight">
-                            Real Numbers.{" "}
-                            <span className="bg-gradient-to-r from-[#3A72AA] to-[#34A853] bg-clip-text text-transparent">
-                                Real Impact.
-                            </span>
-                        </h2>
-                        {/* Wavy Underline (Yellow) */}
-                        <svg className="absolute -bottom-3 left-0 w-full h-3 text-[#FBBC05]/40" preserveAspectRatio="none" viewBox="0 0 100 10" fill="none">
-                            <path d="M0 5Q 25 0 50 5 Q 75 10 100 5" stroke="currentColor" strokeWidth="4" />
-                        </svg>
-                    </div>
+                    <h2 className="text-3xl md:text-4xl lg:text-[42px] font-black text-white tracking-tight leading-tight">
+                        Real numbers. Every one verified.
+                    </h2>
 
-                    <p className="text-base md:text-lg text-slate-500 font-medium max-w-xl mx-auto mt-6">
-                        CIEL is already changing lives across Pakistan — and growing every day.
+                    <p className="text-base md:text-lg text-white/60 font-medium max-w-xl mx-auto mt-5">
+                        Not estimates — each figure traces to attendance evidence, faculty sign-off, and partner confirmation.
                     </p>
                 </div>
 
                 {/* Stats grid */}
-                <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4 md:gap-6">
-                    {stats.map((stat, i) => {
-                        const Icon = stat.icon;
-                        return (
-                            <div
-                                key={i}
-                                className="group relative flex flex-col items-center text-center p-8 rounded-[2.5rem] bg-white border border-slate-100 shadow-sm hover:shadow-xl hover:-translate-y-2 transition-all duration-500"
-                            >
-                                {/* Icon */}
-                                <div className={`w-14 h-14 rounded-2xl ${stat.iconBg} flex items-center justify-center mb-5 group-hover:scale-110 transition-transform duration-300 shadow-sm`}>
-                                    <Icon className={`w-7 h-7 ${stat.color}`} strokeWidth={1.5} />
-                                </div>
-
-                                {/* Counter */}
-                                <div className={`text-3xl md:text-4xl font-black ${stat.color} tabular-nums mb-2 tracking-tighter`}>
-                                    <AnimatedCounter target={stat.value} suffix={stat.suffix} />
-                                </div>
-
-                                {/* Label */}
-                                <p className="text-slate-900 font-black text-sm tracking-tight leading-snug mb-1">{stat.label}</p>
-                                <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">{stat.sub}</p>
-
-                                {/* Bottom accent bar */}
-                                <div className={`absolute bottom-0 left-10 right-10 h-1 ${stat.iconBg} opacity-0 group-hover:opacity-100 rounded-full transition-all duration-500`} />
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                    {stats.map((stat) => (
+                        <div
+                            key={stat.label}
+                            className="flex flex-col items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-4 py-7 text-center"
+                        >
+                            <div className="text-3xl font-black text-ciel-green tabular-nums tracking-tight">
+                                <AnimatedCounter target={stat.value} suffix={stat.suffix} />
                             </div>
-                        );
-                    })}
+                            <p className="mt-2 text-sm font-bold text-white">{stat.label}</p>
+                        </div>
+                    ))}
                 </div>
 
-                {/* Live badge */}
+                {/* Community Dividend callout */}
+                <div className="mt-6 rounded-2xl border border-ciel-green/30 bg-ciel-green/5 px-6 py-5 text-center sm:px-10">
+                    <p className="text-sm md:text-base leading-relaxed text-white/85">
+                        <span aria-hidden>💝 </span>
+                        <span className="font-bold text-white">The Community Dividend:</span>{" "}
+                        for every external rupee invested, communities and students contribute{" "}
+                        <span className="font-bold text-white">PKR 4.2</span> of their own effort — labour, cash, and in-kind. Communities aren&apos;t recipients on CIEL. They&apos;re the majority investor.
+                    </p>
+                </div>
             </div>
         </section>
     );

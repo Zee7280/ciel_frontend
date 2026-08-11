@@ -1,11 +1,11 @@
-import React, { useEffect, useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
     ShieldCheck, Camera, FileUp, Globe, FileText, Lock, CheckCircle2,
-    Info, AlertCircle, Activity, Image as ImageIcon, Users, BookOpen, Trash2,
+    Info, AlertCircle, Activity, Image as ImageIcon, Users, BookOpen, Trash2, Upload,
 } from "lucide-react";
 import { Label } from "./ui/label";
-import { FileUpload } from "./ui/file-upload";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog";
 import { useReportForm } from "../context/ReportContext";
 import { FieldError } from "./ui/FieldError";
 import clsx from "clsx";
@@ -63,6 +63,14 @@ const textareaClasses =
     "min-h-[140px] w-full min-w-0 resize-y rounded-xl border border-slate-200 bg-white p-4 text-sm font-medium leading-relaxed text-slate-800 shadow-sm outline-none transition-colors placeholder:text-slate-400 focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100";
 const fieldLabel =
     "text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500";
+
+type StepStatus = "mandatory" | "required" | "optional";
+
+const statusBadgeClasses: Record<StepStatus, string> = {
+    mandatory: "border-amber-200 bg-amber-50 text-amber-700",
+    required: "border-rose-200 bg-rose-50 text-rose-600",
+    optional: "border-slate-200 bg-slate-50 text-slate-500",
+};
 
 type EvidenceFileItem = File | {
     file?: File;
@@ -142,10 +150,45 @@ const getFileType = (file: EvidenceFileItem) => {
     return file?.type || file?.mimeType || file?.mimetype || file?.file?.type || "";
 };
 
+/** Resolves the raw `File`/`Blob` backing an evidence item, if any (covers both native File
+ *  selections and the `{ file, name, ... }` records produced by `toEvidenceFileItem`). */
+const getNativeFile = (file: EvidenceFileItem): File | Blob | undefined => {
+    if (isNativeFile(file)) return file;
+    if (isEvidenceFileRecord(file) && file.file instanceof File) return file.file;
+    return undefined;
+};
+
+function useEvidencePreviewUrl(file: EvidenceFileItem, isImage: boolean): string | null {
+    const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
+    useEffect(() => {
+        if (!isImage) {
+            setPreviewUrl(null);
+            return;
+        }
+        const nativeFile = getNativeFile(file);
+        if (nativeFile) {
+            const url = URL.createObjectURL(nativeFile);
+            setPreviewUrl(url);
+            return () => URL.revokeObjectURL(url);
+        }
+        if (typeof file === "string") {
+            setPreviewUrl(file);
+            return;
+        }
+        if (isEvidenceFileRecord(file) && (file.url || file.path)) {
+            setPreviewUrl(file.url || file.path || null);
+            return;
+        }
+        setPreviewUrl(null);
+    }, [file, isImage]);
+
+    return previewUrl;
+}
+
 function EvidenceFilePreview({ file, name }: { file: EvidenceFileItem; name: string }) {
-    const directUrl = typeof file === "string" ? file : isEvidenceFileRecord(file) ? file?.url || file?.path : undefined;
     const isImage = getFileType(file).startsWith("image/") || /\.(jpg|jpeg|png|gif|webp|heic|heif)$/i.test(name);
-    const previewUrl = isImage ? directUrl : null;
+    const previewUrl = useEvidencePreviewUrl(file, isImage);
 
     if (isImage && previewUrl) {
         return (
@@ -158,6 +201,54 @@ function EvidenceFilePreview({ file, name }: { file: EvidenceFileItem; name: str
     return (
         <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-indigo-50 text-indigo-600">
             <ImageIcon className="h-4 w-4" />
+        </div>
+    );
+}
+
+function EvidenceFullFilePreview({ file, name }: { file: EvidenceFileItem; name: string }) {
+    const isImage = getFileType(file).startsWith("image/") || /\.(jpg|jpeg|png|gif|webp|heic|heif)$/i.test(name);
+    const previewUrl = useEvidencePreviewUrl(file, isImage);
+
+    if (isImage && previewUrl) {
+        return (
+            <img src={previewUrl} alt={name} className="max-h-[70vh] max-w-full rounded-lg object-contain" />
+        );
+    }
+
+    return (
+        <div className="flex flex-col items-center justify-center space-y-4 p-12 text-slate-400">
+            <FileText className="h-16 w-16 text-slate-200" />
+            <p className="text-sm font-semibold">Preview not available for this file type</p>
+            <p className="text-xs text-slate-400">({name})</p>
+        </div>
+    );
+}
+
+function EvidenceDropzone({
+    label,
+    hint,
+    multiple = true,
+    accept,
+    onChange,
+}: {
+    label: string;
+    hint?: string;
+    multiple?: boolean;
+    accept?: string;
+    onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+}) {
+    return (
+        <div className="relative rounded-xl border-2 border-dashed border-slate-200 bg-slate-50/50 px-6 py-10 text-center transition-colors hover:border-indigo-300 hover:bg-indigo-50/30">
+            <Upload className="mx-auto h-8 w-8 text-slate-300" />
+            <p className="mt-3 text-sm font-medium text-slate-600">{label}</p>
+            {hint ? <p className="mt-1 text-xs text-slate-400">{hint}</p> : null}
+            <input
+                type="file"
+                multiple={multiple}
+                accept={accept}
+                className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                onChange={onChange}
+            />
         </div>
     );
 }
@@ -186,13 +277,23 @@ function classifyVerification(filesCount: number, typesCount: number, partnerAss
     };
 }
 
-function StepHeader({ n, title }: { n: string; title: string }) {
+function StepHeader({ n, title, status }: { n: string; title: string; status?: StepStatus }) {
     return (
-        <div className="flex items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2.5">
             <span className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-900 text-[11px] font-bold text-white">
                 {n}
             </span>
             <h3 className="text-base font-semibold text-slate-900">{title}</h3>
+            {status ? (
+                <span
+                    className={clsx(
+                        "ml-auto shrink-0 rounded-full border px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
+                        statusBadgeClasses[status],
+                    )}
+                >
+                    {status}
+                </span>
+            ) : null}
         </div>
     );
 }
@@ -200,6 +301,7 @@ function StepHeader({ n, title }: { n: string; title: string }) {
 // ─── Main Component ────────────────────────────────────────────────────────────
 export default function Section8Evidence() {
     const { data, updateSection, getFieldError } = useReportForm();
+    const [previewFile, setPreviewFile] = useState<{ file: EvidenceFileItem; name: string } | null>(null);
     const section8 = data.section8 || {};
     const {
         evidence_types = [],
@@ -275,7 +377,7 @@ export default function Section8Evidence() {
     }, [autoNarrative, section8.summary_text, updateSection]);
 
     return (
-        <div className="space-y-8 pb-10">
+        <div className="mx-auto max-w-6xl space-y-8 pb-10">
             {/* Header */}
             <div className="space-y-4">
                 <div className="flex items-center gap-3.5">
@@ -305,7 +407,7 @@ export default function Section8Evidence() {
 
             {/* 8.1 Upload evidence */}
             <section className="space-y-4">
-                <StepHeader n="8.1" title="Step 1 — Upload evidence (mandatory)" />
+                <StepHeader n="8.1" title="Step 1 — Upload evidence" status="mandatory" />
 
                 <div className="space-y-5 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
                     <div>
@@ -381,8 +483,9 @@ export default function Section8Evidence() {
                                 </div>
                             </div>
 
-                            <FileUpload
-                                label={`Drag & drop files or click to browse (max ${MAX_REPORT_UPLOAD_LABEL} per file)`}
+                            <EvidenceDropzone
+                                label="Drag & drop files here, or click to browse"
+                                hint={`Images, PDF, Word, Video — max ${MAX_REPORT_UPLOAD_LABEL} per file`}
                                 multiple
                                 accept={REPORT_ATTACHMENT_ACCEPT}
                                 onChange={(e) => {
@@ -412,7 +515,10 @@ export default function Section8Evidence() {
                                                     key={`${fileName}-${fIdx}`}
                                                     className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 p-3"
                                                 >
-                                                    <div className="flex items-center gap-3 overflow-hidden">
+                                                    <div
+                                                        className="flex min-w-0 flex-1 cursor-pointer items-center gap-3 overflow-hidden"
+                                                        onClick={() => setPreviewFile({ file, name: fileName })}
+                                                    >
                                                         <EvidenceFilePreview file={file} name={fileName} />
                                                         <div className="overflow-hidden">
                                                             <p className="truncate text-sm font-semibold text-slate-700">
@@ -429,7 +535,7 @@ export default function Section8Evidence() {
                                                             const kept = evidence_files.filter((_: EvidenceFileItem, i: number) => i !== fIdx);
                                                             update("evidence_files", kept);
                                                         }}
-                                                        className="flex h-7 w-7 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-400 transition hover:bg-red-50 hover:text-red-500"
+                                                        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-400 transition hover:bg-red-50 hover:text-red-500"
                                                     >
                                                         <Trash2 className="h-3.5 w-3.5" />
                                                     </button>
@@ -461,7 +567,7 @@ export default function Section8Evidence() {
 
             {/* 8.2 Classify */}
             <section className="space-y-4">
-                <StepHeader n="8.2" title="Step 2 — Classify the evidence (required)" />
+                <StepHeader n="8.2" title="Step 2 — Classify the evidence" status="required" />
 
                 <div className="space-y-5 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
                     <div>
@@ -565,7 +671,7 @@ export default function Section8Evidence() {
                             className={clsx(
                                 "text-xs font-medium",
                                 wordCount >= 100 && wordCount <= 200
-                                    ? "text-indigo-600"
+                                    ? "text-emerald-600"
                                     : wordCount > 200
                                         ? "text-red-500"
                                         : "text-amber-600",
@@ -574,7 +680,7 @@ export default function Section8Evidence() {
                             {wordCount} / 200 words (min 100)
                         </span>
                         {wordCount >= 100 && wordCount <= 200 && (
-                            <span className="flex items-center gap-1 text-xs font-semibold text-indigo-600">
+                            <span className="flex items-center gap-1 text-xs font-semibold text-emerald-600">
                                 <CheckCircle2 className="h-3 w-3" /> Valid length
                             </span>
                         )}
@@ -675,7 +781,7 @@ export default function Section8Evidence() {
 
             {/* 8.6 Partner verification */}
             <section className="space-y-4">
-                <StepHeader n="8.6" title="Step 6 — Partner verification (optional)" />
+                <StepHeader n="8.6" title="Step 6 — Partner verification" status="optional" />
 
                 <div className="space-y-5 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
                     <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
@@ -737,8 +843,9 @@ export default function Section8Evidence() {
                                 </div>
                             </div>
 
-                            <FileUpload
-                                label={`Upload partner verification (max ${MAX_REPORT_UPLOAD_LABEL} per file)`}
+                            <EvidenceDropzone
+                                label="Drag & drop files here, or click to browse"
+                                hint={`Partner verification documents — max ${MAX_REPORT_UPLOAD_LABEL} per file`}
                                 multiple
                                 accept={REPORT_ATTACHMENT_ACCEPT}
                                 onChange={(e) => {
@@ -766,10 +873,11 @@ export default function Section8Evidence() {
                                                     key={`${fileName}-${fIdx}`}
                                                     className="flex items-center justify-between rounded-lg border border-indigo-100 bg-indigo-50/70 p-3"
                                                 >
-                                                    <div className="flex items-center gap-3 overflow-hidden">
-                                                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-white text-indigo-600">
-                                                            <FileText className="h-4 w-4" />
-                                                        </div>
+                                                    <div
+                                                        className="flex min-w-0 flex-1 cursor-pointer items-center gap-3 overflow-hidden"
+                                                        onClick={() => setPreviewFile({ file, name: fileName })}
+                                                    >
+                                                        <EvidenceFilePreview file={file} name={fileName} />
                                                         <div className="overflow-hidden">
                                                             <p className="truncate text-sm font-semibold text-indigo-900">
                                                                 {fileName}
@@ -785,7 +893,7 @@ export default function Section8Evidence() {
                                                             const kept = partner_verification_files.filter((_: EvidenceFileItem, i: number) => i !== fIdx);
                                                             update("partner_verification_files", kept);
                                                         }}
-                                                        className="flex h-7 w-7 items-center justify-center rounded-md border border-indigo-100 bg-white text-slate-400 hover:bg-red-50 hover:text-red-500"
+                                                        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-indigo-100 bg-white text-slate-400 hover:bg-red-50 hover:text-red-500"
                                                     >
                                                         <Trash2 className="h-3.5 w-3.5" />
                                                     </button>
@@ -804,8 +912,8 @@ export default function Section8Evidence() {
             <section className="space-y-4 border-t border-slate-200 pt-8">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="flex items-center gap-2.5">
-                        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-600 text-white">
-                            <ShieldCheck className="h-4 w-4" />
+                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-sm">
+                            <ShieldCheck className="h-5 w-5" />
                         </div>
                         <h3 className="text-base font-semibold text-slate-900">
                             System-generated evidence status
@@ -874,8 +982,8 @@ export default function Section8Evidence() {
             <section className="space-y-4 border-t border-slate-200 pt-8">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="flex items-center gap-2.5">
-                        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-600 text-white">
-                            <ShieldCheck className="h-4 w-4" />
+                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-sm">
+                            <ShieldCheck className="h-5 w-5" />
                         </div>
                         <h3 className="text-base font-semibold text-slate-900">Evidence summary</h3>
                     </div>
@@ -893,6 +1001,21 @@ export default function Section8Evidence() {
                     </p>
                 </div>
             </section>
+
+            <Dialog open={!!previewFile} onOpenChange={(open) => !open && setPreviewFile(null)}>
+                <DialogContent className="flex max-w-4xl flex-col items-center bg-white p-6">
+                    <DialogHeader className="mb-4 flex w-full flex-col items-start justify-start">
+                        <DialogTitle className="w-full truncate break-all pr-8 text-sm font-bold text-slate-800">
+                            {previewFile?.name}
+                        </DialogTitle>
+                    </DialogHeader>
+                    <div className="flex max-h-[80vh] w-full items-center justify-center overflow-auto rounded-xl border border-slate-100 bg-slate-50 p-2">
+                        {previewFile ? (
+                            <EvidenceFullFilePreview file={previewFile.file} name={previewFile.name} />
+                        ) : null}
+                    </div>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

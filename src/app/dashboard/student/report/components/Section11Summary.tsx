@@ -339,7 +339,7 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
     ];
 
     const surfaceCard =
-        "rounded-2xl border border-slate-200/80 bg-white shadow-sm";
+        "rounded-xl border border-slate-200/80 bg-white shadow-sm";
     const surfaceHeaderRow = "border-b border-slate-100 bg-slate-50/70";
 
     return (
@@ -348,22 +348,19 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
             <div className="space-y-4 md:space-y-5">
                 <div
                     className={clsx(
-                        "flex flex-col lg:flex-row lg:items-stretch lg:justify-between gap-5 md:gap-6 p-5 md:p-6 bg-gradient-to-br from-white via-slate-50/50 to-white",
+                        "flex flex-col lg:flex-row lg:items-stretch lg:justify-between gap-5 md:gap-6 p-5 md:p-6",
                         surfaceCard,
                     )}
                 >
-                    <div className="flex items-start gap-4 min-w-0 flex-1">
-                        <div className="w-12 h-12 md:w-14 md:h-14 shrink-0 rounded-xl md:rounded-2xl bg-report-primary text-white flex items-center justify-center shadow-md shadow-report-primary-shadow ring-4 ring-report-primary-soft">
-                            <BarChart3 className="w-6 h-6 md:w-7 md:h-7" />
+                    <div className="flex items-center gap-3.5 min-w-0 flex-1">
+                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-indigo-600 text-white shadow-sm">
+                            <BarChart3 className="h-5 w-5" />
                         </div>
-                        <div className="min-w-0 space-y-1.5 pt-0.5">
-                            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-report-primary">
-                                Section 11 — Intelligence
-                            </p>
-                            <h2 className="report-h2 text-slate-900 !text-xl md:!text-2xl lg:!text-3xl">
-                                Institutional impact dashboard
+                        <div className="min-w-0">
+                            <h2 className="text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl">
+                                <span className="text-indigo-600">SECTION 11:</span> Institutional impact dashboard
                             </h2>
-                            <p className="report-label text-slate-500 normal-case tracking-wide font-semibold">
+                            <p className="mt-0.5 text-sm text-slate-500">
                                 Final preview, compliance signals, and submission readiness
                             </p>
                         </div>
@@ -384,17 +381,17 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                             key={i}
                             title={stat.tooltip}
                             className={clsx(
-                                "group relative overflow-hidden rounded-2xl border bg-white p-6 flex flex-col gap-4 shadow-sm transition-all duration-300",
+                                "group relative overflow-hidden rounded-xl border bg-white p-6 flex flex-col gap-4 shadow-sm transition-colors duration-200",
                                 showVerifiedImpactScores
-                                    ? "border-slate-200/80 hover:border-[#0F8F83]/30 hover:shadow-md"
+                                    ? "border-slate-200/80 hover:border-indigo-300"
                                     : "border-slate-200/60 bg-slate-50/40",
                             )}
                         >
                             <div
                                 className={clsx(
-                                    "w-10 h-10 rounded-xl flex items-center justify-center transition-transform",
+                                    "w-10 h-10 rounded-lg flex items-center justify-center",
                                     showVerifiedImpactScores
-                                        ? "bg-report-primary-soft text-report-primary group-hover:scale-105"
+                                        ? "bg-indigo-50 text-indigo-600"
                                         : "bg-slate-100 text-slate-400",
                                 )}
                             >
@@ -402,17 +399,17 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                             </div>
                             <div className="space-y-1.5">
                                 {showVerifiedImpactScores ? (
-                                    <p className="report-h3 !text-xl md:!text-2xl font-black tracking-tight text-slate-900">
+                                    <p className="text-xl md:text-2xl font-semibold tracking-tight text-slate-900">
                                         {stat.display}
                                         {stat.suffix ? (
-                                            <span className="text-[10px] md:text-xs font-bold text-slate-400 ml-1.5 uppercase tracking-widest align-middle">
+                                            <span className="text-[10px] md:text-xs font-semibold text-slate-500 ml-1.5 uppercase tracking-wide align-middle">
                                                 {stat.suffix}
                                             </span>
                                         ) : null}
                                     </p>
                                 ) : (
                                     <div className="flex flex-col gap-1">
-                                        <span className="inline-flex items-center gap-2 text-sm font-bold text-slate-400">
+                                        <span className="inline-flex items-center gap-2 text-sm font-semibold text-slate-400">
                                             <Lock className="w-3.5 h-3.5" />
                                             Locked
                                         </span>
@@ -421,7 +418,7 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                                         </span>
                                     </div>
                                 )}
-                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
                                     {stat.label}
                                 </p>
                             </div>
@@ -453,10 +450,10 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                                     <AlertTriangle className="w-4 h-4" />
                                 </div>
                                 <div className="min-w-0 space-y-1">
-                                    <p className="text-[10px] font-black text-rose-700 uppercase tracking-widest">
+                                    <p className="text-[10px] font-semibold text-rose-700 uppercase tracking-[0.14em]">
                                         Revision required
                                     </p>
-                                    <h3 className="text-sm font-black text-slate-900 tracking-tight">
+                                    <h3 className="text-sm font-semibold text-slate-900 tracking-tight">
                                         Admin returned your report for updates
                                     </h3>
                                 </div>
@@ -469,7 +466,7 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                             </p>
                             {revisionFeedback ? (
                                 <div className="rounded-xl border border-indigo-200 bg-indigo-50/70 p-4">
-                                    <p className="text-[10px] font-black uppercase tracking-widest text-indigo-900 mb-2 flex items-center gap-2">
+                                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-indigo-900 mb-2 flex items-center gap-2">
                                         <MessageSquareQuote className="w-3.5 h-3.5" /> Reviewer feedback
                                     </p>
                                     <p className="text-xs font-medium text-indigo-950/90 leading-relaxed whitespace-pre-wrap">
@@ -500,14 +497,14 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                         >
                             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4 w-full min-w-0">
                                 <div className="flex items-center gap-3 min-w-0">
-                                    <div className="w-9 h-9 shrink-0 rounded-xl bg-report-primary text-white flex items-center justify-center shadow-sm shadow-report-primary-shadow">
+                                    <div className="w-9 h-9 shrink-0 rounded-lg bg-indigo-600 text-white flex items-center justify-center shadow-sm">
                                         <Quote className="w-4 h-4" />
                                     </div>
                                     <div className="min-w-0">
-                                        <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                                        <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-[0.14em]">
                                             {data.section11?.is_ai_generated ? "AI-Generated" : "System-Generated"}
                                         </p>
-                                        <h3 className="text-sm font-black text-slate-900 tracking-tight">
+                                        <h3 className="text-sm font-semibold text-slate-900 tracking-tight">
                                             Executive audit summary
                                         </h3>
                                         <p className="text-[10px] font-semibold text-slate-500 leading-snug mt-0.5">
@@ -518,7 +515,7 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                                 <button
                                     type="button"
                                     onClick={openRedFlagsModal}
-                                    className="inline-flex items-center justify-center gap-2 self-stretch sm:self-center rounded-xl border-2 border-amber-200 bg-amber-50/70 px-4 py-2.5 text-[10px] font-black uppercase tracking-widest text-amber-950 transition-all duration-200 hover:bg-amber-50 hover:border-amber-300 active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:ring-offset-2 shrink-0"
+                                    className="inline-flex items-center justify-center gap-2 self-stretch sm:self-center rounded-lg border border-amber-200 bg-amber-50/70 px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wide text-amber-900 transition-colors hover:bg-amber-100 hover:border-amber-300 focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:ring-offset-2 shrink-0"
                                 >
                                     <Flag className="w-3.5 h-3.5 shrink-0" />
                                     Section-wise red flags
@@ -532,28 +529,28 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                                 section11DashboardView.highlights.recommendedAction) ? (
                                 <div className="flex flex-wrap gap-2 relative z-10">
                                     {section11DashboardView.highlights.finalScore ? (
-                                        <span className="inline-flex items-center rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-slate-700">
+                                        <span className="inline-flex items-center rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-700">
                                             Score: {section11DashboardView.highlights.finalScore}
                                         </span>
                                     ) : null}
                                     {section11DashboardView.highlights.band ? (
-                                        <span className="inline-flex items-center rounded-lg border border-report-primary-border bg-report-primary-soft px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-report-primary">
+                                        <span className="inline-flex items-center rounded-lg border border-indigo-100 bg-indigo-50 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-indigo-600">
                                             {section11DashboardView.highlights.band}
                                         </span>
                                     ) : null}
                                     {section11DashboardView.highlights.recommendedAction ? (
-                                        <span className="inline-flex items-center rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-amber-950">
+                                        <span className="inline-flex items-center rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-amber-900">
                                             {section11DashboardView.highlights.recommendedAction}
                                         </span>
                                     ) : null}
                                 </div>
                             ) : null}
-                            <span className="absolute top-4 left-3 md:left-5 text-6xl md:text-7xl font-serif text-slate-100 select-none leading-none pointer-events-none">
+                            <span className="absolute top-4 left-3 md:left-5 text-6xl md:text-7xl text-slate-100 select-none leading-none pointer-events-none">
                                 “
                             </span>
                             <div className="space-y-4 md:space-y-5 relative">
                                 {executiveSummary.split("\n\n").map((paragraph: string, idx: number) => (
-                                    <p key={idx} className="report-ai-text !text-base md:!text-lg">
+                                    <p key={idx} className="text-base md:text-lg leading-relaxed text-slate-700">
                                         {paragraph.trim()}
                                     </p>
                                 ))}
@@ -563,7 +560,7 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                                     <button
                                         type="button"
                                         onClick={() => setShowFullAuditNarrative((open) => !open)}
-                                        className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left text-[10px] font-black uppercase tracking-widest text-slate-600 hover:bg-slate-100/80 transition-colors"
+                                        className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-wide text-slate-600 hover:bg-slate-100/80 transition-colors"
                                     >
                                         <span>
                                             {showFullAuditNarrative
@@ -590,14 +587,14 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                                     ) : null}
                                 </div>
                             ) : null}
-                            <span className="absolute bottom-2 right-3 md:right-6 text-6xl md:text-7xl font-serif text-slate-100 select-none rotate-180 leading-none pointer-events-none">
+                            <span className="absolute bottom-2 right-3 md:right-6 text-6xl md:text-7xl text-slate-100 select-none rotate-180 leading-none pointer-events-none">
                                 “
                             </span>
                             <div className="flex flex-wrap items-center gap-2.5 pt-5 border-t border-slate-100">
-                                <span className="inline-flex items-center gap-1.5 text-[9px] font-black text-report-primary bg-report-primary-soft px-3 py-1.5 rounded-lg border border-report-primary-border uppercase tracking-widest">
+                                <span className="inline-flex items-center gap-1.5 rounded-full border border-indigo-100 bg-indigo-50 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-indigo-700">
                                     <ShieldCheck className="w-3 h-3 shrink-0" /> Integrity Verified
                                 </span>
-                                <span className="inline-flex items-center gap-1.5 text-[9px] font-black text-report-primary bg-report-primary-soft px-3 py-1.5 rounded-lg border border-report-primary-border uppercase tracking-widest">
+                                <span className="inline-flex items-center gap-1.5 rounded-full border border-indigo-100 bg-indigo-50 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-indigo-700">
                                     <TrendingUp className="w-3 h-3 shrink-0" /> Growth Documented
                                 </span>
                             </div>
@@ -623,14 +620,14 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                         )}
                     >
                         <div className="flex items-start gap-3 min-w-0">
-                            <div className="w-9 h-9 shrink-0 rounded-xl bg-slate-200 text-slate-600 flex items-center justify-center">
+                            <div className="w-9 h-9 shrink-0 rounded-lg bg-slate-200 text-slate-600 flex items-center justify-center">
                                 <Lock className="w-4 h-4" />
                             </div>
                             <div className="min-w-0 space-y-1">
-                                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                                <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-[0.14em]">
                                     Post-approval only
                                 </p>
-                                <h3 className="text-sm font-black text-slate-900 tracking-tight">
+                                <h3 className="text-sm font-semibold text-slate-900 tracking-tight">
                                     Audit narrative and CII breakdown
                                 </h3>
                             </div>
@@ -648,10 +645,10 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
 
             <div className="space-y-5 md:space-y-6">
                 <div className="flex items-center gap-3">
-                    <div className="w-1 h-6 rounded-full bg-[#0F8F83] shrink-0" />
+                    <div className="w-1 h-6 rounded-full bg-indigo-600 shrink-0" />
                     <div className="min-w-0">
-                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#0F8F83]">Compliance</p>
-                        <h3 className="text-base font-black text-slate-900 uppercase tracking-widest">
+                        <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-indigo-600">Compliance</p>
+                        <h3 className="text-base font-semibold text-slate-900">
                             Institutional compliance matrix
                         </h3>
                     </div>
@@ -661,34 +658,34 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                         <div
                             key={idx}
                             className={clsx(
-                                "group flex flex-col gap-6 p-6 md:p-7 rounded-2xl border border-slate-200/80 bg-white shadow-sm transition-all duration-300 hover:shadow-md hover:border-[#0F8F83]/20",
-                                item.check ? "ring-2 ring-[#0F8F83]/20" : "",
+                                "group flex flex-col gap-6 p-6 md:p-7 rounded-xl border border-slate-200/80 bg-white shadow-sm transition-colors duration-200 hover:border-indigo-300",
+                                item.check ? "ring-2 ring-indigo-100" : "",
                             )}
                         >
                             <div
                                 className={clsx(
-                                    "w-10 h-10 rounded-xl flex items-center justify-center transition-all",
-                                    item.check ? "bg-report-primary-soft text-report-primary" : "bg-slate-50 text-slate-300 group-hover:bg-slate-100",
+                                    "w-10 h-10 rounded-lg flex items-center justify-center",
+                                    item.check ? "bg-indigo-50 text-indigo-600" : "bg-slate-50 text-slate-300 group-hover:bg-slate-100",
                                 )}
                             >
                                 <item.icon className="w-5 h-5" />
                             </div>
                             <div className="flex-1 space-y-1.5">
-                                <p className="text-sm font-black text-slate-900 leading-tight">{item.label}</p>
+                                <p className="text-sm font-semibold text-slate-900 leading-tight">{item.label}</p>
                                 <p className="text-[11px] font-medium text-slate-500 leading-relaxed">{item.desc}</p>
                             </div>
                             <div className="flex items-center justify-between pt-4 border-t border-slate-100">
                                 <span
                                     className={clsx(
-                                        "text-[9px] font-black px-3 py-1.5 rounded-lg border uppercase tracking-widest",
+                                        "rounded-full border px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
                                         item.check
-                                            ? "bg-report-primary-soft text-report-primary border-report-primary-border"
+                                            ? "bg-indigo-50 text-indigo-600 border-indigo-100"
                                             : "bg-slate-50 text-slate-500 border-slate-100",
                                     )}
                                 >
                                     {item.status}
                                 </span>
-                                {item.check && <CheckCircle className="w-4 h-4 text-report-primary shrink-0" />}
+                                {item.check && <CheckCircle className="w-4 h-4 text-indigo-600 shrink-0" />}
                             </div>
                         </div>
                     ))}
@@ -702,15 +699,15 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                     surfaceCard,
                 )}
             >
-                <div className="absolute right-0 top-0 w-40 h-40 bg-report-primary/5 rounded-full -mr-20 -mt-20 blur-3xl pointer-events-none" />
-                
+                <div className="absolute right-0 top-0 w-40 h-40 bg-indigo-600/5 rounded-full -mr-20 -mt-20 blur-3xl pointer-events-none" />
+
                 {needsAdminRevision ? (
                     <>
-                        <div className="w-16 h-16 bg-rose-50 rounded-2xl flex items-center justify-center border border-rose-100">
+                        <div className="w-16 h-16 bg-rose-50 rounded-xl flex items-center justify-center border border-rose-100">
                             <AlertTriangle className="w-7 h-7 text-rose-600" />
                         </div>
                         <div className="max-w-lg space-y-4">
-                            <h3 className="text-lg font-black text-slate-900">Resubmit after revision</h3>
+                            <h3 className="text-lg font-semibold text-slate-900">Resubmit after revision</h3>
                             <p className="text-sm font-medium text-slate-500 leading-relaxed">
                                 Update the required sections (use the steps above), save your changes, then resubmit for
                                 admin review. You do not need to pay the reporting fee again unless the payment team asks
@@ -724,7 +721,7 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                                         const el = document.getElementById("report-section11-revision-feedback");
                                         el?.scrollIntoView({ behavior: "smooth", block: "start" });
                                     }}
-                                    className="border-2 border-slate-200 rounded-xl text-xs font-black uppercase tracking-widest h-12 px-6"
+                                    className="rounded-xl border border-slate-200 text-sm font-semibold h-12 px-6"
                                 >
                                     View feedback
                                 </Button>
@@ -743,7 +740,7 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                                         footerSubmitBtn?.click();
                                     }}
                                     disabled={!areAllSectionsComplete}
-                                    className="bg-report-primary hover:bg-[#0049A3] text-white rounded-xl text-xs font-black uppercase tracking-widest h-12 px-8 shadow-md shadow-report-primary-shadow disabled:opacity-50"
+                                    className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold h-12 px-8 disabled:opacity-50"
                                 >
                                     {areAllSectionsComplete ? "Resubmit report" : "Complete all sections first"}
                                 </Button>
@@ -752,11 +749,11 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                     </>
                 ) : showVerifiedImpactScores ? (
                     <>
-                        <div className="w-16 h-16 bg-green-100 rounded-2xl flex items-center justify-center shadow-sm">
-                            <CheckCircle className="w-7 h-7 text-green-600" />
+                        <div className="w-16 h-16 bg-emerald-50 rounded-xl flex items-center justify-center shadow-sm">
+                            <CheckCircle className="w-7 h-7 text-emerald-600" />
                         </div>
                         <div className="w-full max-w-3xl space-y-5 px-0 sm:px-1">
-                            <h3 className="text-lg font-black text-slate-900">Report Approved & Impact Verified</h3>
+                            <h3 className="text-lg font-semibold text-slate-900">Report approved & impact verified</h3>
                             <p className="text-sm font-medium text-slate-400 leading-relaxed">
                                 Congratulations! Your social impact has been verified by CIEL Admin. You can now download your official CII.
                             </p>
@@ -772,7 +769,7 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                             <div className="grid w-full grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-3">
                                 <Button
                                     onClick={() => setShowPreview(true)}
-                                    className="bg-report-primary hover:bg-[#0049A3] active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-report-primary focus-visible:ring-offset-2 text-white rounded-xl text-[11px] font-black uppercase tracking-wide transition-all duration-200 shadow-md shadow-report-primary-shadow w-full min-h-12 px-3 py-3 whitespace-normal leading-snug sm:text-xs sm:tracking-widest"
+                                    className="bg-indigo-600 hover:bg-indigo-700 focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-2 text-white rounded-xl text-xs font-semibold transition-colors w-full min-h-12 px-3 py-3 whitespace-normal leading-snug"
                                 >
                                     <span className="inline-flex items-center justify-center gap-2">
                                         <Eye className="h-4 w-4 shrink-0" aria-hidden />
@@ -782,7 +779,7 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                                 <Button
                                     variant="outline"
                                     onClick={() => setShowCertificate(true)}
-                                    className="border-2 border-slate-200 text-slate-900 rounded-xl text-[11px] font-black uppercase tracking-wide transition-all duration-200 hover:bg-slate-50 hover:border-slate-300 active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 w-full min-h-12 px-3 py-3 whitespace-normal leading-snug sm:text-xs sm:tracking-widest"
+                                    className="border border-slate-200 text-slate-900 rounded-xl text-xs font-semibold transition-colors hover:bg-slate-50 hover:border-slate-300 focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 w-full min-h-12 px-3 py-3 whitespace-normal leading-snug"
                                 >
                                     <span className="inline-flex items-center justify-center gap-2">
                                         <Download className="h-4 w-4 shrink-0" aria-hidden />
@@ -793,7 +790,7 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                                     type="button"
                                     variant="outline"
                                     onClick={openRedFlagsModal}
-                                    className="border-2 border-amber-200 bg-amber-50/60 text-amber-950 rounded-xl text-[11px] font-black uppercase tracking-wide transition-all duration-200 hover:bg-amber-50 hover:border-amber-300 active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:ring-offset-2 w-full min-h-12 px-3 py-3 whitespace-normal leading-snug sm:text-xs sm:tracking-widest"
+                                    className="border border-amber-200 bg-amber-50/60 text-amber-900 rounded-xl text-xs font-semibold transition-colors hover:bg-amber-50 hover:border-amber-300 focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:ring-offset-2 w-full min-h-12 px-3 py-3 whitespace-normal leading-snug"
                                 >
                                     <span className="inline-flex items-center justify-center gap-2">
                                         <Flag className="h-4 w-4 shrink-0" aria-hidden />
@@ -806,11 +803,11 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                 ) : inPostSubmitLifecycle ? (
                     !feeOrSlipRecorded && paymentHref ? (
                         <>
-                            <div className="w-16 h-16 bg-amber-50 rounded-2xl flex items-center justify-center border border-amber-100">
+                            <div className="w-16 h-16 bg-amber-50 rounded-xl flex items-center justify-center border border-amber-100">
                                 <CreditCard className="w-7 h-7 text-amber-600" />
                             </div>
                             <div className="max-w-md space-y-4">
-                                <h3 className="text-lg font-black text-slate-900">Reporting fee required</h3>
+                                <h3 className="text-lg font-semibold text-slate-900">Reporting fee required</h3>
                                 <p className="text-sm font-medium text-slate-500 leading-relaxed">
                                     Your report is submitted. Complete the reporting fee and upload proof on the payment
                                     screen so your submission can move forward to verification.
@@ -818,7 +815,7 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                                 <Button
                                     type="button"
                                     onClick={() => router.push(paymentHref)}
-                                    className="bg-report-primary hover:bg-[#0049A3] active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-report-primary focus-visible:ring-offset-2 text-white px-8 h-12 rounded-xl text-xs font-black uppercase tracking-widest transition-all duration-200 shadow-md shadow-report-primary-shadow w-full sm:w-auto"
+                                    className="bg-indigo-600 hover:bg-indigo-700 focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-2 text-white px-8 h-12 rounded-xl text-sm font-semibold transition-colors w-full sm:w-auto"
                                 >
                                     <span className="inline-flex items-center gap-2">
                                         <CreditCard className="w-4 h-4 shrink-0" />
@@ -829,11 +826,11 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                         </>
                     ) : paymentSlipInReview && paymentHref ? (
                         <>
-                            <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center">
+                            <div className="w-16 h-16 bg-slate-100 rounded-xl flex items-center justify-center">
                                 <Clock className="w-7 h-7 text-slate-400" />
                             </div>
                             <div className="max-w-md space-y-4">
-                                <h3 className="text-lg font-black text-slate-900">Payment proof under review</h3>
+                                <h3 className="text-lg font-semibold text-slate-900">Payment proof under review</h3>
                                 <p className="text-sm font-medium text-slate-400 leading-relaxed">
                                     Your fee proof was received and is being verified. You will be notified when it is
                                     cleared.
@@ -842,7 +839,7 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                                     type="button"
                                     variant="outline"
                                     onClick={() => router.push(paymentHref)}
-                                    className="border-2 border-slate-200 text-slate-900 px-8 h-12 rounded-xl text-xs font-black uppercase tracking-widest transition-all duration-200 hover:bg-slate-50 hover:border-slate-300 active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 w-full sm:w-auto"
+                                    className="border border-slate-200 text-slate-900 px-8 h-12 rounded-xl text-sm font-semibold transition-colors hover:bg-slate-50 hover:border-slate-300 focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 w-full sm:w-auto"
                                 >
                                     View payment details
                                 </Button>
@@ -850,11 +847,11 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                         </>
                     ) : awaitingPartnerAfterPayment ? (
                         <>
-                            <div className="w-16 h-16 bg-indigo-50 rounded-2xl flex items-center justify-center border border-indigo-100">
+                            <div className="w-16 h-16 bg-indigo-50 rounded-xl flex items-center justify-center border border-indigo-100">
                                 <Clock className="w-7 h-7 text-indigo-600" />
                             </div>
                             <div className="max-w-md space-y-3">
-                                <h3 className="text-lg font-black text-slate-900">Partner review in progress</h3>
+                                <h3 className="text-lg font-semibold text-slate-900">Partner review in progress</h3>
                                 <p className="text-sm font-medium text-slate-500 leading-relaxed">
                                     Your reporting fee is recorded. Your NGO or partner organisation is reviewing the
                                     report before CIEL admin final approval.
@@ -863,11 +860,11 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                         </>
                     ) : (
                         <>
-                            <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center">
+                            <div className="w-16 h-16 bg-slate-100 rounded-xl flex items-center justify-center">
                                 <ShieldAlert className="w-7 h-7 text-slate-400" />
                             </div>
                             <div className="max-w-md space-y-3">
-                                <h3 className="text-lg font-black text-slate-900">Report Locked Pending Admin Approval</h3>
+                                <h3 className="text-lg font-semibold text-slate-900">Report locked pending admin approval</h3>
                                 <p className="text-sm font-medium text-slate-400 leading-relaxed">
                                     Your report and fee are on file. The CII index, report preview, and certificate unlock
                                     after partner review (if required) and CIEL Admin final approval.
@@ -877,39 +874,39 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                     )
                 ) : !isEligibleForSubmission ? (
                     <>
-                        <div className="w-16 h-16 bg-amber-50 rounded-3xl flex items-center justify-center shadow-inner">
+                        <div className="w-16 h-16 bg-amber-50 rounded-xl flex items-center justify-center shadow-inner">
                             <Clock className="w-8 h-8 text-amber-500 animate-pulse" />
                         </div>
                         <div className="flex-1 space-y-6">
                             <div>
-                                <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight mb-2">Report In Progress</h3>
-                                <p className="text-sm font-bold text-slate-400">
-                                    You are currently in <span className="text-amber-600">Progress Mode</span>. Complete the following criteria:
+                                <h3 className="text-xl font-semibold text-slate-900 tracking-tight mb-2">Report in progress</h3>
+                                <p className="text-sm font-semibold text-slate-400">
+                                    You are currently in <span className="text-amber-600">progress mode</span>. Complete the following criteria:
                                 </p>
                             </div>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                <div className={clsx("p-5 rounded-2xl border-2 flex items-center gap-4 transition-all", verifiedHours >= (data.required_hours || 16) ? "bg-slate-50 border-slate-100 text-slate-700" : "bg-slate-50 border-slate-100 text-slate-400")}>
+                                <div className={clsx("p-5 rounded-xl border flex items-center gap-4", verifiedHours >= (data.required_hours || 16) ? "bg-slate-50 border-slate-100 text-slate-700" : "bg-slate-50 border-slate-100 text-slate-400")}>
                                     <div className={clsx("w-8 h-8 rounded-full flex items-center justify-center shrink-0", verifiedHours >= (data.required_hours || 16) ? "bg-emerald-500 text-white" : "bg-slate-200 text-slate-400")}>
                                         {verifiedHours >= (data.required_hours || 16) ? <CheckCircle className="w-5 h-5" /> : "1"}
                                     </div>
                                     <div className="space-y-0.5 text-left">
-                                        <p className="text-[10px] font-black uppercase tracking-widest leading-none">Min. Hours Met</p>
-                                        <p className="text-xs font-bold">{verifiedHours} / {data.required_hours || 16} Hours</p>
+                                        <p className="text-[10px] font-semibold uppercase tracking-[0.14em] leading-none">Min. hours met</p>
+                                        <p className="text-xs font-semibold">{verifiedHours} / {data.required_hours || 16} Hours</p>
                                     </div>
                                 </div>
-                                <div className={clsx("p-5 rounded-2xl border-2 flex items-center gap-4 transition-all", areAllSectionsComplete ? "bg-slate-50 border-slate-100 text-slate-700" : "bg-slate-50 border-slate-100 text-slate-400")}>
+                                <div className={clsx("p-5 rounded-xl border flex items-center gap-4", areAllSectionsComplete ? "bg-slate-50 border-slate-100 text-slate-700" : "bg-slate-50 border-slate-100 text-slate-400")}>
                                     <div className={clsx("w-8 h-8 rounded-full flex items-center justify-center shrink-0", areAllSectionsComplete ? "bg-emerald-500 text-white" : "bg-slate-200 text-slate-400")}>
                                         {areAllSectionsComplete ? <CheckCircle className="w-5 h-5" /> : "2"}
                                     </div>
                                     <div className="space-y-0.5 text-left">
-                                        <p className="text-[10px] font-black uppercase tracking-widest leading-none">Mandatory Sections</p>
-                                        <p className="text-xs font-bold">{areAllSectionsComplete ? "Complete" : "In Progress"}</p>
+                                        <p className="text-[10px] font-semibold uppercase tracking-[0.14em] leading-none">Mandatory sections</p>
+                                        <p className="text-xs font-semibold">{areAllSectionsComplete ? "Complete" : "In progress"}</p>
                                     </div>
                                 </div>
                             </div>
-                            <div className="p-5 bg-amber-50/50 border border-amber-100 rounded-2xl flex items-start gap-4">
+                            <div className="p-5 bg-amber-50/50 border border-amber-100 rounded-xl flex items-start gap-4">
                                 <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
-                                <p className="text-xs font-bold text-amber-700 leading-relaxed text-left">
+                                <p className="text-xs font-semibold text-amber-700 leading-relaxed text-left">
                                     Final submission and <strong>Section 10 (Sustainability)</strong> will remain locked until all{" "}
                                     {data.required_hours || 16} hours are verified.
                                 </p>
@@ -918,36 +915,36 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                     </>
                 ) : isEligibleForSubmission && !areAllSectionsComplete ? (
                     <>
-                        <div className="w-16 h-16 bg-amber-50 rounded-3xl flex items-center justify-center shadow-inner">
+                        <div className="w-16 h-16 bg-amber-50 rounded-xl flex items-center justify-center shadow-inner">
                             <AlertTriangle className="w-8 h-8 text-amber-500" />
                         </div>
                         <div className="flex-1 space-y-6 max-w-lg">
                             <div>
-                                <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight mb-2">Hours met — finish all sections</h3>
-                                <p className="text-sm font-bold text-slate-400">
+                                <h3 className="text-xl font-semibold text-slate-900 tracking-tight mb-2">Hours met — finish all sections</h3>
+                                <p className="text-sm font-semibold text-slate-400">
                                     Use the steps above to complete and validate sections 1–10. Submit appears only when every section is complete.
                                 </p>
                             </div>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                <div className="p-5 rounded-2xl border-2 flex items-center gap-4 bg-slate-50 border-slate-100 text-slate-700">
+                                <div className="p-5 rounded-xl border flex items-center gap-4 bg-slate-50 border-slate-100 text-slate-700">
                                     <div className="w-8 h-8 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0">
                                         <CheckCircle className="w-5 h-5" />
                                     </div>
                                     <div className="space-y-0.5 text-left">
-                                        <p className="text-[10px] font-black uppercase tracking-widest leading-none">Min. Hours Met</p>
-                                        <p className="text-xs font-bold">{verifiedHours} / {data.required_hours || 16} Hours</p>
+                                        <p className="text-[10px] font-semibold uppercase tracking-[0.14em] leading-none">Min. hours met</p>
+                                        <p className="text-xs font-semibold">{verifiedHours} / {data.required_hours || 16} Hours</p>
                                     </div>
                                 </div>
-                                <div className="p-5 rounded-2xl border-2 border-amber-100 bg-amber-50/50 flex flex-col gap-3 text-left">
+                                <div className="p-5 rounded-xl border border-amber-100 bg-amber-50/50 flex flex-col gap-3 text-left">
                                     <div className="flex items-center gap-4">
-                                        <div className="w-8 h-8 rounded-full bg-amber-200 text-amber-700 flex items-center justify-center shrink-0 font-bold text-sm">
+                                        <div className="w-8 h-8 rounded-full bg-amber-200 text-amber-700 flex items-center justify-center shrink-0 font-semibold text-sm">
                                             !
                                         </div>
                                         <div className="space-y-0.5 min-w-0">
-                                            <p className="text-[10px] font-black uppercase tracking-widest leading-none text-amber-900">
+                                            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] leading-none text-amber-900">
                                                 Sections 1–10
                                             </p>
-                                            <p className="text-xs font-bold text-amber-800">
+                                            <p className="text-xs font-semibold text-amber-800">
                                                 Fix the items below, then return to this step to submit.
                                             </p>
                                         </div>
@@ -956,7 +953,7 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                                         <ul className="max-h-48 overflow-y-auto space-y-2.5 pl-1 border-t border-amber-100/80 pt-3 text-[11px] text-amber-950">
                                             {incompleteSectionsSummary.map((block) => (
                                                 <li key={block.section} className="rounded-lg bg-white/70 px-2.5 py-2 border border-amber-100/90">
-                                                    <span className="font-black text-amber-900">
+                                                    <span className="font-semibold text-amber-900">
                                                         Step {block.section} — {block.label}
                                                     </span>
                                                     <ul className="mt-1 ml-3 list-disc text-amber-900/85 font-medium space-y-0.5">
@@ -974,12 +971,12 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                     </>
                 ) : (
                     <>
-                        <div className="w-16 h-16 bg-blue-100 rounded-2xl flex items-center justify-center animate-bounce shadow-lg shadow-blue-100">
-                            <ShieldCheck className="w-8 h-8 text-blue-600" />
+                        <div className="w-16 h-16 bg-indigo-50 rounded-xl flex items-center justify-center">
+                            <ShieldCheck className="w-8 h-8 text-indigo-600" />
                         </div>
                         <div className="max-w-md space-y-4">
-                            <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">Ready for Final Submission</h3>
-                            <p className="text-sm font-bold text-slate-400 leading-relaxed">
+                            <h3 className="text-xl font-semibold text-slate-900 tracking-tight">Ready for final submission</h3>
+                            <p className="text-sm font-semibold text-slate-400 leading-relaxed">
                                 All sections are complete and hour requirements are met. Review and submit when ready.
                             </p>
                             <Button
@@ -993,9 +990,9 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                                     );
                                     if (footerSubmitBtn) footerSubmitBtn.click();
                                 }}
-                                className="bg-slate-900 hover:bg-slate-800 text-white px-10 h-12 rounded-xl w-full text-xs font-black uppercase tracking-widest transition-all shadow-md shadow-report-primary-shadow flex items-center justify-center gap-3"
+                                className="bg-indigo-600 hover:bg-indigo-700 text-white px-10 h-12 rounded-xl w-full text-sm font-semibold transition-colors flex items-center justify-center gap-3"
                             >
-                                <Lock className="w-4 h-4" /> Submit Final Report
+                                <Lock className="w-4 h-4" /> Submit final report
                             </Button>
                         </div>
                     </>
@@ -1084,27 +1081,27 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
 
             {showPreview && (
                 <div className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-md flex items-center justify-center overflow-y-auto p-4 md:p-8 animate-in fade-in duration-300 print:p-0 print:bg-white print:backdrop-blur-none transition-all print-active-modal">
-                    <div className="relative w-full max-w-5xl bg-white rounded-[2rem] shadow-2xl animate-in zoom-in-95 duration-300 print:shadow-none print:rounded-none print:max-w-none print:w-full print:p-0 print:m-0 print-scroll-auto">
+                    <div className="relative w-full max-w-5xl bg-white rounded-xl shadow-2xl animate-in zoom-in-95 duration-300 print:shadow-none print:rounded-none print:max-w-none print:w-full print:p-0 print:m-0 print-scroll-auto">
                         {/* Modal Header */}
-                        <div className="flex items-center justify-between px-8 py-6 border-b border-slate-100 sticky top-0 bg-white/95 backdrop-blur-xl rounded-t-[2rem] z-[110] print-no-ui">
+                        <div className="flex items-center justify-between px-8 py-6 border-b border-slate-100 sticky top-0 bg-white/95 backdrop-blur-xl rounded-t-xl z-[110] print-no-ui">
                             <div className="flex items-center gap-4">
                                 <button
                                     type="button"
                                     onClick={handlePrint}
-                                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-900 text-white shadow-lg transition hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2"
+                                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-slate-900 text-white transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2"
                                     aria-label="Save dossier as PDF — opens print dialog"
                                     title="Save as PDF"
                                 >
                                     <Download className="w-5 h-5" aria-hidden />
                                 </button>
                                 <div>
-                                    <h3 className="text-sm font-black text-slate-900 uppercase tracking-tight">Official Project Dossier</h3>
-                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Institutional Impact Verification</p>
+                                    <h3 className="text-sm font-semibold text-slate-900 tracking-tight">Official project dossier</h3>
+                                    <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-[0.14em]">Institutional impact verification</p>
                                 </div>
                             </div>
                             <div className="flex items-center gap-3">
-                                <Button onClick={handlePrint} className="bg-slate-900 hover:bg-slate-800 text-white h-10 px-6 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2"><Printer className="w-3.5 h-3.5" /> Print / Save PDF</Button>
-                                <button onClick={() => setShowPreview(false)} className="w-10 h-10 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-900 transition-all flex items-center justify-center"><X className="w-5 h-5" /></button>
+                                <Button onClick={handlePrint} className="bg-slate-900 hover:bg-slate-800 text-white h-10 px-6 rounded-lg text-xs font-semibold transition-colors flex items-center gap-2"><Printer className="w-3.5 h-3.5" /> Print / Save PDF</Button>
+                                <button onClick={() => setShowPreview(false)} className="w-10 h-10 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-900 transition-colors flex items-center justify-center"><X className="w-5 h-5" /></button>
                             </div>
                         </div>
                         <div id="print-area" className="px-6 py-10 md:px-12 md:py-16 overflow-y-auto max-h-[85vh] print:max-h-none print:px-0 print:py-0 print-scroll-auto">
@@ -1118,23 +1115,23 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                 typeof document !== "undefined" &&
                 createPortal(
                     <div className="cii-certificate-print-root fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-md flex items-center justify-center overflow-y-auto p-4 md:p-8 animate-in fade-in duration-300 print:p-0 print:bg-white print:backdrop-blur-none print-active-modal">
-                        <div className="relative w-full max-w-7xl bg-white rounded-[2rem] shadow-2xl animate-in zoom-in-95 duration-300 print:shadow-none print:rounded-none print:max-w-none print:w-full print:p-0 print:m-0 print-scroll-auto">
+                        <div className="relative w-full max-w-7xl bg-white rounded-xl shadow-2xl animate-in zoom-in-95 duration-300 print:shadow-none print:rounded-none print:max-w-none print:w-full print:p-0 print:m-0 print-scroll-auto">
                             {/* Modal Header */}
-                            <div className="flex items-center justify-between px-8 py-6 border-b border-slate-100 sticky top-0 bg-white/95 backdrop-blur-xl rounded-t-[2rem] z-[110] print-no-ui">
+                            <div className="flex items-center justify-between px-8 py-6 border-b border-slate-100 sticky top-0 bg-white/95 backdrop-blur-xl rounded-t-xl z-[110] print-no-ui">
                                 <div className="flex items-center gap-4">
-                                    <div className="w-10 h-10 rounded-xl bg-report-primary text-white flex items-center justify-center shadow-lg">
+                                    <div className="w-10 h-10 rounded-lg bg-indigo-600 text-white flex items-center justify-center">
                                         <Award className="w-5 h-5" />
                                     </div>
                                     <div>
-                                        <h3 className="text-sm font-black text-slate-900 uppercase tracking-tight">CII Certificate</h3>
-                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Certificate of Institutional Impact</p>
+                                        <h3 className="text-sm font-semibold text-slate-900 tracking-tight">CII certificate</h3>
+                                        <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-[0.14em]">Certificate of institutional impact</p>
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-3">
                                     <button
                                         type="button"
                                         onClick={handlePrint}
-                                        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-900 text-white shadow-lg transition hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2"
+                                        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-slate-900 text-white transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2"
                                         aria-label="Save certificate as PDF — opens print dialog"
                                         title="Save as PDF"
                                     >
@@ -1142,14 +1139,14 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                                     </button>
                                     <Button
                                         onClick={handlePrint}
-                                        className="bg-report-primary hover:opacity-90 text-white h-10 px-6 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 shadow-lg shadow-report-primary-shadow"
+                                        className="bg-indigo-600 hover:bg-indigo-700 text-white h-10 px-6 rounded-lg text-xs font-semibold transition-colors flex items-center gap-2"
                                     >
                                         <Printer className="w-3.5 h-3.5" /> Print / Save PDF
                                     </Button>
                                     <button
                                         type="button"
                                         onClick={() => setShowCertificate(false)}
-                                        className="w-10 h-10 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-900 transition-all flex items-center justify-center"
+                                        className="w-10 h-10 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-900 transition-colors flex items-center justify-center"
                                     >
                                         <X className="w-5 h-5" />
                                     </button>

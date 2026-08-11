@@ -72,33 +72,72 @@ const competencies = [
 const textareaClasses =
     "min-h-[140px] w-full min-w-0 resize-y rounded-xl border border-slate-200 bg-white p-4 text-sm font-medium leading-relaxed text-slate-800 shadow-sm outline-none transition-colors placeholder:text-slate-400 focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100";
 const fieldLabel =
-    "text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500";
+    "text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500";
 
-function StepHeader({ n, title }: { n: string; title: string }) {
+const badgeMandatory =
+    "ml-auto shrink-0 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700";
+const badgeRequired =
+    "ml-auto shrink-0 rounded-full border border-rose-200 bg-rose-50 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-rose-600";
+const badgeOptional =
+    "ml-auto shrink-0 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500";
+
+function StepHeader({
+    n,
+    title,
+    status,
+}: {
+    n: string;
+    title: string;
+    status?: "mandatory" | "required" | "optional";
+}) {
     return (
         <div className="flex items-center gap-2.5">
             <span className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-900 text-[11px] font-bold text-white">
                 {n}
             </span>
             <h3 className="text-base font-semibold text-slate-900">{title}</h3>
+            {status === "mandatory" ? (
+                <span className={badgeMandatory}>Mandatory</span>
+            ) : status === "required" ? (
+                <span className={badgeRequired}>Required</span>
+            ) : status === "optional" ? (
+                <span className={badgeOptional}>Optional</span>
+            ) : null}
         </div>
     );
 }
 
 function WordCount({ count }: { count: number }) {
     return (
-        <span
-            className={clsx(
-                "text-xs font-medium",
-                count >= 100 && count <= 200
-                    ? "text-indigo-600"
-                    : count > 200
-                        ? "text-red-500"
-                        : "text-amber-600",
-            )}
-        >
-            {count} / 200 words (min 100)
-        </span>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="h-1.5 w-40 overflow-hidden rounded-full bg-slate-100 sm:w-48">
+                <div
+                    className={clsx(
+                        "h-full rounded-full transition-all",
+                        count < 100
+                            ? "bg-amber-400"
+                            : count > 200
+                                ? "bg-red-500"
+                                : "bg-emerald-500",
+                    )}
+                    style={{
+                        width: `${Math.min((count / 200) * 100, 100)}%`,
+                    }}
+                />
+            </div>
+            <p
+                className={clsx(
+                    "text-[11px] tabular-nums",
+                    count >= 100 && count <= 200
+                        ? "text-emerald-600"
+                        : count > 200
+                            ? "text-red-500"
+                            : "text-slate-400",
+                )}
+            >
+                {count} / 200 words (min 100)
+            </p>
+        </div>
     );
 }
 
@@ -157,7 +196,7 @@ export default function Section9Reflection() {
     }, [autoNarrative, section9.summary_text, updateSection]);
 
     return (
-        <div className="space-y-8 pb-10">
+        <div className="mx-auto max-w-6xl space-y-8 pb-10">
             {/* Header */}
             <div className="space-y-4">
                 <div className="flex items-center gap-3.5">
@@ -186,7 +225,7 @@ export default function Section9Reflection() {
 
             {/* 9.0 Academic integration */}
             <section className="space-y-4">
-                <StepHeader n="9.0" title="Step 1 — Academic integration level (mandatory)" />
+                <StepHeader n="9.0" title="Step 1 — Academic integration level" status="mandatory" />
 
                 <div className="space-y-5 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
                     <Label className={fieldLabel}>
@@ -220,11 +259,11 @@ export default function Section9Reflection() {
 
             {/* 9.1 Personal learning */}
             <section className="space-y-4">
-                <StepHeader n="9.1" title="Step 2 — Personal learning reflection" />
+                <StepHeader n="9.1" title="Step 2 — Personal learning reflection" status="mandatory" />
 
                 <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
                     <div>
-                        <Label className={fieldLabel}>Personal learning reflection (mandatory)</Label>
+                        <Label className={fieldLabel}>Personal learning reflection</Label>
                         <p className="mt-1.5 text-sm leading-relaxed text-slate-500">
                             Reflect on new skills, community insights, perspective changes, and challenges.
                             Focus on learning, not just repeating activities.
@@ -245,12 +284,12 @@ export default function Section9Reflection() {
 
             {/* 9.2 Academic application */}
             <section className="space-y-4">
-                <StepHeader n="9.2" title="Step 3 — Academic application" />
+                <StepHeader n="9.2" title="Step 3 — Academic application" status="mandatory" />
 
                 <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
                     <div>
                         <Label className={fieldLabel}>
-                            Academic application &amp; discipline contribution (mandatory)
+                            Academic application &amp; discipline contribution
                         </Label>
                         <p className="mt-1.5 text-sm leading-relaxed text-slate-500">
                             Explain how your field of study helped you understand the problem, design the
@@ -394,7 +433,7 @@ export default function Section9Reflection() {
                     </div>
 
                     <div className="flex items-center justify-between rounded-xl border border-indigo-100 bg-indigo-50/70 px-4 py-3.5 sm:px-5">
-                        <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-indigo-700">
+                        <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-indigo-700">
                             Average competency score
                         </p>
                         <p className="text-sm font-semibold text-indigo-900">
@@ -408,14 +447,14 @@ export default function Section9Reflection() {
             <section className="space-y-4 border-t border-slate-200 pt-8">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="flex items-center gap-2.5">
-                        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-600 text-white">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-600 text-white">
                             <BrainCircuit className="h-4 w-4" />
                         </div>
                         <h3 className="text-base font-semibold text-slate-900">
                             System-generated academic summary
                         </h3>
                     </div>
-                    <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                    <span className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
                         Read-only
                     </span>
                 </div>
@@ -455,14 +494,14 @@ export default function Section9Reflection() {
             <section className="space-y-4 border-t border-slate-200 pt-8">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="flex items-center gap-2.5">
-                        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-600 text-white">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-600 text-white">
                             <BrainCircuit className="h-4 w-4" />
                         </div>
                         <h3 className="text-base font-semibold text-slate-900">
                             Academic reflection summary
                         </h3>
                     </div>
-                    <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                    <span className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
                         Auto-generated
                     </span>
                 </div>

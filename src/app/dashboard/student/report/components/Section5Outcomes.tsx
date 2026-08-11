@@ -7,6 +7,7 @@ import { Label } from "./ui/label";
 import { Input } from "./ui/input";
 import { Textarea } from "./ui/textarea";
 import { Button } from "./ui/button";
+import { FieldError } from "./ui/FieldError";
 import { useReportForm } from "../context/ReportContext";
 import clsx from "clsx";
 
@@ -157,6 +158,8 @@ const textareaClasses =
     "min-h-[110px] w-full min-w-0 resize-y rounded-xl border border-slate-200 bg-white p-4 text-sm font-medium leading-relaxed text-slate-800 shadow-sm outline-none transition-colors placeholder:text-slate-400 focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100";
 const fieldLabel =
     "text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500";
+const badgeMandatory =
+    "shrink-0 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700";
 
 function wordCount(text: string): number {
     return (text || "").trim().split(/\s+/).filter(Boolean).length;
@@ -423,19 +426,7 @@ function OutcomeCard({
                 </div>
 
                 <div className="space-y-1.5">
-                    <div className="flex items-center justify-between gap-2">
-                        <Label className={fieldLabel}>Measurement explanation</Label>
-                        <span
-                            className={clsx(
-                                "text-[11px] tabular-nums",
-                                explanationWords >= 50 && explanationWords <= 100
-                                    ? "text-emerald-600"
-                                    : "text-amber-600",
-                            )}
-                        >
-                            {explanationWords} / 50–100 words
-                        </span>
-                    </div>
+                    <Label className={fieldLabel}>Measurement explanation</Label>
                     <Textarea
                         placeholder="Explain how your numbers come from Section 4 and what data supports this..."
                         value={outcome.measurement_explanation}
@@ -446,11 +437,38 @@ function OutcomeCard({
                                 "border-red-300",
                         )}
                     />
-                    {getFieldError(`measurable_outcomes.${index}.measurement_explanation`) ? (
-                        <p className="text-xs text-red-600">
-                            {getFieldError(`measurable_outcomes.${index}.measurement_explanation`)}
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="h-1.5 w-40 overflow-hidden rounded-full bg-slate-100 sm:w-48">
+                            <div
+                                className={clsx(
+                                    "h-full rounded-full transition-all",
+                                    explanationWords < 50
+                                        ? "bg-amber-400"
+                                        : explanationWords > 100
+                                          ? "bg-red-500"
+                                          : "bg-emerald-500",
+                                )}
+                                style={{
+                                    width: `${Math.min((explanationWords / 100) * 100, 100)}%`,
+                                }}
+                            />
+                        </div>
+                        <p
+                            className={clsx(
+                                "text-[11px] tabular-nums",
+                                explanationWords >= 50 && explanationWords <= 100
+                                    ? "text-emerald-600"
+                                    : explanationWords > 100
+                                      ? "text-red-500"
+                                      : "text-slate-400",
+                            )}
+                        >
+                            {explanationWords} / 50–100 words
                         </p>
-                    ) : null}
+                    </div>
+                    <FieldError
+                        message={getFieldError(`measurable_outcomes.${index}.measurement_explanation`)}
+                    />
                 </div>
             </div>
         </div>
@@ -510,7 +528,7 @@ export default function Section5Outcomes() {
     const challengeWords = wordCount(section5.challenges);
 
     return (
-        <div className="mx-auto max-w-4xl space-y-8 pb-10">
+        <div className="mx-auto max-w-6xl space-y-8 pb-10">
             {/* Header */}
             <div className="space-y-5">
                 <div className="flex items-center gap-3.5">
@@ -529,7 +547,7 @@ export default function Section5Outcomes() {
 
                 <div className="flex flex-wrap gap-4 text-[11px] text-slate-500">
                     <span className="inline-flex items-center gap-1.5">
-                        <span className="h-2 w-2 rounded-full bg-red-500" />
+                        <span className="h-2 w-2 rounded-full bg-rose-500" />
                         Required field
                     </span>
                     <span className="inline-flex items-center gap-1.5">
@@ -563,11 +581,12 @@ export default function Section5Outcomes() {
 
             {/* 5.1 Observed Change */}
             <section className="space-y-4">
-                <div className="flex items-center gap-2.5">
+                <div className="flex flex-wrap items-center gap-2.5">
                     <span className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-900 text-[11px] font-bold text-white">
                         5.1
                     </span>
                     <h3 className="text-base font-semibold text-slate-900">Observed change (narrative)</h3>
+                    <span className={clsx(badgeMandatory, "ml-auto")}>Mandatory · 100–200 words</span>
                 </div>
 
                 <div className="space-y-5 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
@@ -626,19 +645,34 @@ export default function Section5Outcomes() {
                             value={section5.observed_change}
                             onChange={e => update("observed_change", e.target.value)}
                         />
-                        <div className="flex items-center justify-between text-[11px]">
-                            <span className="text-slate-400">{observedWords} words</span>
-                            <span
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div className="h-1.5 w-40 overflow-hidden rounded-full bg-slate-100 sm:w-48">
+                                <div
+                                    className={clsx(
+                                        "h-full rounded-full transition-all",
+                                        observedWords < 100
+                                            ? "bg-amber-400"
+                                            : observedWords > 200
+                                              ? "bg-red-500"
+                                              : "bg-emerald-500",
+                                    )}
+                                    style={{
+                                        width: `${Math.min((observedWords / 200) * 100, 100)}%`,
+                                    }}
+                                />
+                            </div>
+                            <p
                                 className={clsx(
-                                    "font-medium",
+                                    "text-[11px] tabular-nums",
                                     observedWords >= 100 && observedWords <= 200
                                         ? "text-emerald-600"
-                                        : "text-amber-600",
+                                        : observedWords > 200
+                                          ? "text-red-500"
+                                          : "text-slate-400",
                                 )}
                             >
-                                Target: 100–200 words
-                                {observedWords < 100 ? " — below target" : observedWords > 200 ? " — over limit" : ""}
-                            </span>
+                                {observedWords} / 200 words
+                            </p>
                         </div>
                     </div>
                 </div>
@@ -652,6 +686,7 @@ export default function Section5Outcomes() {
                             5.2
                         </span>
                         <h3 className="text-base font-semibold text-slate-900">Measurable outcomes</h3>
+                        <span className={badgeMandatory}>Mandatory</span>
                     </div>
                     <Button
                         type="button"
@@ -681,11 +716,12 @@ export default function Section5Outcomes() {
 
             {/* 5.3 Challenges */}
             <section className="space-y-4 border-t border-slate-200 pt-8">
-                <div className="flex items-center gap-2.5">
+                <div className="flex flex-wrap items-center gap-2.5">
                     <span className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-900 text-[11px] font-bold text-white">
                         5.3
                     </span>
                     <h3 className="text-base font-semibold text-slate-900">Challenges &amp; limitations</h3>
+                    <span className={clsx(badgeMandatory, "ml-auto")}>Mandatory · 100–200 words</span>
                 </div>
 
                 <div className="space-y-5 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
@@ -722,9 +758,34 @@ export default function Section5Outcomes() {
                             value={section5.challenges}
                             onChange={e => update("challenges", e.target.value)}
                         />
-                        <div className="flex items-center justify-between text-[11px]">
-                            <span className="text-slate-400">{challengeWords} words</span>
-                            <span className="font-medium text-slate-500">Target: 100–200 words</span>
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div className="h-1.5 w-40 overflow-hidden rounded-full bg-slate-100 sm:w-48">
+                                <div
+                                    className={clsx(
+                                        "h-full rounded-full transition-all",
+                                        challengeWords < 100
+                                            ? "bg-amber-400"
+                                            : challengeWords > 200
+                                              ? "bg-red-500"
+                                              : "bg-emerald-500",
+                                    )}
+                                    style={{
+                                        width: `${Math.min((challengeWords / 200) * 100, 100)}%`,
+                                    }}
+                                />
+                            </div>
+                            <p
+                                className={clsx(
+                                    "text-[11px] tabular-nums",
+                                    challengeWords >= 100 && challengeWords <= 200
+                                        ? "text-emerald-600"
+                                        : challengeWords > 200
+                                          ? "text-red-500"
+                                          : "text-slate-400",
+                                )}
+                            >
+                                {challengeWords} / 200 words
+                            </p>
                         </div>
                     </div>
                 </div>
@@ -741,3 +802,6 @@ export default function Section5Outcomes() {
         </div>
     );
 }
+
+
+

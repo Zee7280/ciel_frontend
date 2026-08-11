@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>CIEL PK — How Your Community Impact Score Works</title>
+<style>
+  :root{
+    --ink:#211c30; --sub:#6b6580; --muted:#a29cb5;
+    --line:#e8e5f2; --line-strong:#d5d0e6;
+    --page:#f7f6fc; --card:#ffffff;
+    --gold:#b8860b; --cream:#fbf7ec;
+    --radius:16px;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:'Segoe UI',-apple-system,BlinkMacSystemFont,Helvetica,Arial,sans-serif;background:var(--page);color:var(--ink);}
+  .wrap{max-width:960px;margin:0 auto;padding:36px 28px 80px;}
+
+  .hero{text-align:center;margin-bottom:30px;}
+  .hero .k{font-size:11px;font-weight:700;letter-spacing:.5px;color:var(--gold);text-transform:uppercase;margin-bottom:8px;}
+  .hero h1{font-size:27px;margin:0 0 8px;}
+  .hero p{font-size:14px;color:var(--sub);max-width:580px;margin:0 auto;line-height:1.6;}
+
+  .card{background:#fff;border:1px solid var(--line);border-radius:var(--radius);padding:22px 24px;margin-bottom:20px;}
+  .card h2{font-size:15px;margin:0 0 10px;}
+  .card p{font-size:13px;color:#3a3550;line-height:1.65;margin:0 0 10px;}
+  .card p:last-child{margin-bottom:0;}
+
+  .checker{background:linear-gradient(135deg,#1e1a33,#3b2c63 60%,#4a2f5e);color:#fff;border-radius:var(--radius);padding:28px 28px 24px;margin-bottom:26px;position:relative;overflow:hidden;}
+  .checker h2{font-size:16px;margin:0 0 4px;color:#fff;}
+  .checker .sub{font-size:12.5px;color:#c9c1e8;margin-bottom:20px;}
+  .checker-row{display:flex;align-items:center;gap:16px;flex-wrap:wrap;}
+  .checker input[type=range]{flex:1;min-width:200px;accent-color:#f2c14e;height:6px;}
+  .checker input[type=number]{width:80px;padding:9px 10px;border-radius:9px;border:none;font-size:15px;font-weight:700;text-align:center;}
+  .score-result{display:flex;align-items:center;gap:18px;margin-top:22px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:18px 20px;flex-wrap:wrap;}
+  .score-badge-wrap{flex-shrink:0;width:88px;height:88px;animation:pop .35s ease;}
+  @keyframes pop{0%{transform:scale(.7);opacity:0;}60%{transform:scale(1.08);opacity:1;}100%{transform:scale(1);}}
+  .score-info{flex:1;min-width:180px;}
+  .score-info .t{font-size:17px;font-weight:800;}
+  .score-info .r{font-size:12px;color:#c9c1e8;margin-top:2px;font-weight:700;letter-spacing:.2px;}
+  .score-info .spark{font-size:12.5px;color:#f2e8c9;margin-top:8px;line-height:1.55;}
+  .score-info .a{font-size:11.5px;color:#b3a8dd;margin-top:8px;line-height:1.5;font-style:italic;}
+  .next-hint{margin-top:14px;font-size:12px;color:#f2c14e;font-weight:700;background:rgba(242,193,78,.12);border:1px solid rgba(242,193,78,.35);border-radius:9px;padding:9px 12px;}
+
+  .ladder{display:flex;flex-direction:column;gap:12px;}
+  .rung{display:flex;align-items:center;gap:20px;background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px 20px;transition:transform .15s, box-shadow .15s;}
+  .rung:hover{transform:translateY(-2px);box-shadow:0 8px 20px rgba(90,70,150,.1);border-color:var(--ring);}
+  .medal-slot{width:72px;height:72px;flex-shrink:0;}
+  .rung-body{flex:1;min-width:0;}
+  .rung-top{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;}
+  .rung-level{font-size:11px;font-weight:800;letter-spacing:.3px;color:var(--ring);text-transform:uppercase;}
+  .rung-range{font-size:11px;color:var(--muted);font-weight:700;}
+  .rung-title{font-size:15.5px;font-weight:800;margin:2px 0 5px;}
+  .rung-spark{font-size:12.5px;color:#3a3550;line-height:1.5;margin-bottom:4px;}
+  .rung-appreciation{font-size:11px;color:var(--muted);line-height:1.5;font-style:italic;}
+  .rung-bar{width:120px;flex-shrink:0;}
+  .bar-track{height:8px;border-radius:20px;background:var(--line);position:relative;overflow:hidden;}
+  .bar-fill{position:absolute;top:0;bottom:0;background:var(--ring);border-radius:20px;transition:width .4s;}
+  .bar-label{font-size:10px;color:var(--muted);text-align:center;margin-top:5px;font-weight:700;}
+
+  .rule-box{background:var(--cream);border:1.5px dashed var(--gold);border-radius:var(--radius);padding:20px 22px;margin-top:24px;}
+  .rule-box h3{font-size:13.5px;margin:0 0 8px;color:#5c4300;}
+  .rule-box p{font-size:12.5px;color:#4a3d1f;line-height:1.6;margin:0 0 10px;}
+  .rule-examples{display:flex;gap:14px;flex-wrap:wrap;}
+  .rule-ex{background:#fff;border:1px solid #e8dcb8;border-radius:10px;padding:10px 14px;font-size:12px;color:#4a3d1f;font-weight:600;}
+  .rule-ex b{color:var(--gold);}
+
+  .footnote{font-size:11.5px;color:var(--muted);text-align:center;margin-top:26px;line-height:1.6;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="hero">
+    <div class="k">CIEL PK · Community Impact Education Lab, Pakistan</div>
+    <h1>How your Community Impact Score works</h1>
+    <p>Every report you submit gets scored out of 100 — that score is your <b>Community Impact Index (CII)</b>. It's what decides which badge and certificate lands in your name. Slide the score below and watch your badge change.</p>
+  </div>
+
+  <div class="checker">
+    <h2>🎮 Score simulator — see your badge appear live</h2>
+    <div class="sub">Drag the slider or type a number. Try 47, then 48, and watch what happens.</div>
+    <div class="checker-row">
+      <input type="range" id="scoreSlider" min="0" max="100" value="70" oninput="syncScore(this.value)">
+      <input type="number" id="scoreInput" min="0" max="100" value="70" oninput="syncScore(this.value)">
+    </div>
+    <div class="score-result">
+      <div class="score-badge-wrap" id="resultBadgeWrap"></div>
+      <div class="score-info">
+        <div class="t" id="resultTitle"></div>
+        <div class="r" id="resultRange"></div>
+        <div class="spark" id="resultSpark"></div>
+        <div class="a" id="resultAppreciation"></div>
+      </div>
+    </div>
+    <div class="next-hint" id="nextHint"></div>
+  </div>
+
+  <div class="card">
+    <h2>So what actually moves this number?</h2>
+    <p>Your CII isn't just "did you finish the form." It's built from what you can actually back up — hours a supervisor verified, outcomes with real before-and-after numbers, evidence that holds up, and reflection that shows you actually thought about what you did. A short report with strong proof will beat a long report full of vague claims, every time.</p>
+  </div>
+
+  <div class="ladder" id="ladder"></div>
+
+  <div class="rule-box">
+    <h3>⚖️ The boundary rule — no grey areas</h3>
+    <p>Every score is checked from the top level down. Land exactly on a cutoff between two levels? You always get the <b>higher</b> one. No rounding against you, ever.</p>
+    <div class="rule-examples">
+      <div class="rule-ex">CII <b>58.0</b> → Level 3, not Level 2</div>
+      <div class="rule-ex">CII <b>75.0</b> → Level 5, not Level 4</div>
+    </div>
+  </div>
+
+  <div class="footnote">Badges and certificates are generated automatically once your report is reviewed and finalized. Check your dashboard any time to see your current CII and how far you are from your next badge.</div>
+
+</div>
+
+<script>
+const levels = [
+  { level: 7, min: 92, max: 100, title: "Transformative Impact Contributor", ring: "#2f5233", icon: "🌍",
+    spark: "This is the summit. You didn't just help — you changed what's possible for the people around you.",
+    text: "Recognized for creating measurable, sustained, and transformative community impact." },
+  { level: 6, min: 84, max: 91, title: "Distinguished Impact Contributor", ring: "#4b3a72", icon: "🔥",
+    spark: "Deep, evidenced, sustained impact — the kind that gets noticed by universities and communities alike.",
+    text: "Recognized for demonstrating exceptional depth, evidence, and commitment to meaningful impact." },
+  { level: 5, min: 75, max: 83, title: "Strong Impact Contributor", ring: "#1b3a5c", icon: "🛡️",
+    spark: "Solid, proven, and backed by real evidence. You're operating like a pro at this point.",
+    text: "Recognized for delivering strong, evidence-backed contribution with clear community value." },
+  { level: 4, min: 67, max: 74, title: "Developing Impact Contributor", ring: "#0e5f6b", icon: "📈",
+    spark: "You've got real momentum going. A few more strong, well-documented entries and the next badge is yours.",
+    text: "Recognized for meaningful participation and a developing contribution toward verified community impact." },
+  { level: 3, min: 58, max: 66, title: "Emerging Community Contributor", ring: "#2f6b3a", icon: "🤝",
+    spark: "You've gone from thinking about helping to actually doing it — that's the hardest step, and it's done.",
+    text: "Recognized for taking active steps toward community engagement and meaningful social contribution." },
+  { level: 2, min: 48, max: 57, title: "Foundation Stage Contributor", ring: "#a1790f", icon: "🌱",
+    spark: "Everyone's story starts here. You've planted the seed — now it's just about growing it.",
+    text: "Recognized for beginning the journey of community contribution with foundational effort and verified participation." },
+  { level: 1, min: 0, max: 47, title: "Participation Acknowledgement", ring: "#8b4a3a", icon: "🎖️",
+    spark: "You showed up — step one of every great story. Log more sessions and evidence to climb from here.",
+    text: "Acknowledged for engagement with the CIEL PK community service journey; further completion encouraged to reach certification standard." },
+];
+
+function splitTitle(title){
+  const words = title.split(" ");
+  if(words.length <= 1) return [title, ""];
+  return [words.slice(0, -1).join(" "), words[words.length - 1]];
+}
+
+function leaf(cx, cy, rot, scale, color){
+  return `<ellipse cx="${cx}" cy="${cy}" rx="${9*scale}" ry="${4*scale}" fill="${color}" transform="rotate(${rot} ${cx} ${cy})" opacity="0.9"/>`;
+}
+function ivyCluster(sideSign, color){
+  const pts = [
+    {x:34,y:150,r:-40*sideSign,s:1.1},
+    {x:30,y:132,r:-15*sideSign,s:.95},
+    {x:32,y:113,r:20*sideSign,s:1},
+    {x:40,y:96,r:55*sideSign,s:.9},
+    {x:52,y:82,r:80*sideSign,s:.8},
+  ];
+  return pts.map(p => leaf(sideSign>0?p.x:220-p.x, p.y, p.r, p.s, color)).join("");
+}
+function star(cx, cy, r, color){
+  const pts = [];
+  for(let i=0;i<10;i++){
+    const ang = (Math.PI/5)*i - Math.PI/2;
+    const rad = i%2===0 ? r : r*0.42;
+    pts.push(`${cx + rad*Math.cos(ang)},${cy + rad*Math.sin(ang)}`);
+  }
+  return `<polygon points="${pts.join(' ')}" fill="${color}"/>`;
+}
+
+function badgeSVG(l){
+  const [line1, line2] = splitTitle(l.title);
+  const ivyColor = "#3f6b3a";
+  const burst = Array.from({length:16}).map((_,i)=>{
+    const ang = (Math.PI*2/16)*i;
+    const x1 = 110 + 30*Math.cos(ang), y1 = 78 + 30*Math.sin(ang);
+    const x2 = 110 + 40*Math.cos(ang), y2 = 78 + 40*Math.sin(ang);
+    return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#d8c27a" stroke-width="2" opacity="0.7"/>`;
+  }).join("");
+  return `
+  <svg viewBox="0 0 220 220" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="110" cy="110" r="104" fill="none" stroke="#cbb26a" stroke-width="2.5"/>
+    <circle cx="110" cy="110" r="98" fill="${"#fbf7ec"}" stroke="${l.ring}" stroke-width="7"/>
+    ${ivyCluster(1, ivyColor)}
+    ${ivyCluster(-1, ivyColor)}
+    ${star(110, 34, 10, "#cbb26a")}
+    ${burst}
+    <circle cx="110" cy="78" r="27" fill="${l.ring}" stroke="#fff" stroke-width="2.5"/>
+    <text x="110" y="88" text-anchor="middle" font-size="26" font-family="Segoe UI Emoji, Segoe UI, sans-serif">${l.icon}</text>
+    <rect x="32" y="118" width="156" height="44" rx="4" fill="#fff" stroke="${l.ring}" stroke-width="2"/>
+    <text x="110" y="136" text-anchor="middle" font-size="13" font-weight="700" fill="${l.ring}" font-family="Georgia, 'Times New Roman', serif">${line1.toUpperCase()}</text>
+    <text x="110" y="153" text-anchor="middle" font-size="13" font-weight="700" fill="${l.ring}" font-family="Georgia, 'Times New Roman', serif">${line2.toUpperCase()}</text>
+    <rect x="55" y="168" width="110" height="21" rx="10.5" fill="${l.ring}"/>
+    <text x="110" y="182.5" text-anchor="middle" font-size="10.5" font-weight="700" fill="#fff" font-family="Segoe UI, sans-serif">LEVEL ${l.level} | ${l.min}-${l.max===100?'100':l.max}</text>
+    ${star(96,197,3.5,l.ring)}${star(110,199,4,l.ring)}${star(124,197,3.5,l.ring)}
+    <text x="110" y="212" text-anchor="middle" font-size="12" font-weight="800" fill="${l.ring}" letter-spacing="2" font-family="Georgia, serif">CIEL PK</text>
+  </svg>`;
+}
+
+const ladder = document.getElementById('ladder');
+levels.forEach(l=>{
+  const row = document.createElement('div');
+  row.className = 'rung';
+  row.style.setProperty('--ring', l.ring);
+  row.innerHTML = `
+    <div class="medal-slot">${badgeSVG(l)}</div>
+    <div class="rung-body">
+      <div class="rung-top"><span class="rung-level">Level ${l.level}</span><span class="rung-range">CII ${l.min}–${l.max === 100 ? '100+' : l.max}</span></div>
+      <div class="rung-title" style="color:${l.ring};">${l.title}</div>
+      <div class="rung-spark">${l.spark}</div>
+      <div class="rung-appreciation">"${l.text}"</div>
+    </div>
+    <div class="rung-bar">
+      <div class="bar-track"><div class="bar-fill" style="left:${l.min}%;width:${(Math.min(l.max,100)-l.min)}%;"></div></div>
+      <div class="bar-label">0 ————— 100</div>
+    </div>`;
+  ladder.appendChild(row);
+});
+
+function findLevel(score){
+  for(const l of levels){
+    if(score >= l.min && (l.max===100 ? score<=100 : score <= l.max)) return l;
+  }
+  return levels[levels.length-1];
+}
+function syncScore(val){
+  val = Math.max(0, Math.min(100, Math.round(val)));
+  document.getElementById('scoreSlider').value = val;
+  document.getElementById('scoreInput').value = val;
+  const l = findLevel(val);
+  const wrap = document.getElementById('resultBadgeWrap');
+  wrap.innerHTML = badgeSVG(l);
+  wrap.style.animation = 'none';
+  void wrap.offsetWidth;
+  wrap.style.animation = 'pop .35s ease';
+  document.getElementById('resultTitle').textContent = l.title;
+  document.getElementById('resultRange').textContent = 'Level ' + l.level + ' · CII ' + l.min + '–' + (l.max===100?'100+':l.max);
+  document.getElementById('resultSpark').textContent = l.spark;
+  document.getElementById('resultAppreciation').textContent = 'Certificate line: "' + l.text + '"';
+
+  const hint = document.getElementById('nextHint');
+  const idx = levels.findIndex(x=>x.level===l.level);
+  const next = levels[idx-1];
+  if(next){
+    const gap = next.min - val;
+    hint.textContent = '🚀 Just ' + gap + ' more point' + (gap===1?'':'s') + ' to reach ' + next.title + ' (Level ' + next.level + ')!';
+  } else {
+    hint.textContent = '🏆 You have reached the highest level — Transformative Impact Contributor!';
+  }
+}
+syncScore(70);
+</script>
+</body>
+</html>

@@ -1,6 +1,6 @@
 import {
     Handshake, Plus, Trash2, ShieldCheck, Info,
-    Users2, CheckCircle2, Activity, Globe, ChevronDown, Upload,
+    Users2, CheckCircle2, Activity, Globe, ChevronDown, Upload, FileText,
 } from "lucide-react";
 import { Label } from "./ui/label";
 import { Button } from "./ui/button";
@@ -8,11 +8,16 @@ import { Textarea } from "./ui/textarea";
 import { Input } from "./ui/input";
 import { useReportForm } from "../context/ReportContext";
 import { FieldError } from "./ui/FieldError";
-import React, { useMemo, useEffect } from "react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog";
+import React, { useMemo, useEffect, useState } from "react";
 import clsx from "clsx";
 import { toast } from "sonner";
 import { MAX_REPORT_UPLOAD_LABEL, splitReportFilesByImageSize } from "../utils/fileUploadLimits";
 import { REPORT_ATTACHMENT_ACCEPT } from "@/utils/reportAttachmentAccept";
+
+function countWords(str: string): number {
+    return (str || "").trim().split(/\s+/).filter(w => w.length > 0).length;
+}
 
 const partnerTypes = [
     "NGO",
@@ -94,6 +99,12 @@ const textareaClasses =
     "min-h-[96px] w-full min-w-0 resize-y rounded-xl border border-slate-200 bg-white p-4 text-sm font-medium leading-relaxed text-slate-800 shadow-sm outline-none transition-colors placeholder:text-slate-400 focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100";
 const fieldLabel =
     "text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500";
+const badgeMandatory =
+    "shrink-0 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700";
+const badgeRequired =
+    "shrink-0 rounded-full border border-rose-200 bg-rose-50 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-rose-600";
+const badgeOptional =
+    "shrink-0 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500";
 
 function classifyEngagement(partnerCount: number, verifiedCount: number, formalCount: number): {
     label: string; color: string; desc: string;
@@ -115,7 +126,7 @@ function classifyEngagement(partnerCount: number, verifiedCount: number, formalC
     if (partnerCount >= 2 || verifiedCount >= 2) {
         return {
             label: "Collaborative Engagement",
-            color: "border-blue-200 bg-blue-50 text-blue-800",
+            color: "border-indigo-200 bg-indigo-50 text-indigo-800",
             desc: "Multiple partners, shared roles, verified outputs",
         };
     }
@@ -165,6 +176,75 @@ function CheckGrid({
                     </button>
                 );
             })}
+        </div>
+    );
+}
+
+function FilePreview({ file }: { file: any }) {
+    const isImage = file?.type?.startsWith("image/") || file?.name?.match(/\.(jpg|jpeg|png|gif|webp|heic|heif)$/i);
+    const [previewUrl, setPreviewUrl] = React.useState<string | null>(null);
+
+    useEffect(() => {
+        if (isImage) {
+            if (file instanceof File || file instanceof Blob) {
+                const url = URL.createObjectURL(file);
+                setPreviewUrl(url);
+                return () => URL.revokeObjectURL(url);
+            } else if (typeof file === "string") {
+                setPreviewUrl(file);
+            } else if (file?.url) {
+                setPreviewUrl(file.url);
+            }
+        }
+    }, [file, isImage]);
+
+    if (isImage && previewUrl) {
+        return (
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-slate-100">
+                <img src={previewUrl} alt={file?.name || "Preview"} className="h-full w-full object-cover" />
+            </div>
+        );
+    }
+
+    return (
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-indigo-100 bg-indigo-50 text-indigo-600">
+            <FileText className="h-5 w-5" />
+        </div>
+    );
+}
+
+function FullFilePreview({ file }: { file: any }) {
+    const isImage = file?.type?.startsWith("image/") || file?.name?.match(/\.(jpg|jpeg|png|gif|webp|heic|heif)$/i);
+    const [previewUrl, setPreviewUrl] = React.useState<string | null>(null);
+
+    useEffect(() => {
+        if (!file) return;
+        if (isImage) {
+            if (file instanceof File || file instanceof Blob) {
+                const url = URL.createObjectURL(file);
+                setPreviewUrl(url);
+                return () => URL.revokeObjectURL(url);
+            } else if (typeof file === "string") {
+                setPreviewUrl(file);
+            } else if (file?.url) {
+                setPreviewUrl(file.url);
+            }
+        }
+    }, [file, isImage]);
+
+    if (!file) return null;
+
+    if (isImage && previewUrl) {
+        return (
+            <img src={previewUrl} alt={file?.name || "Preview"} className="max-h-[70vh] max-w-full rounded-lg object-contain" />
+        );
+    }
+
+    return (
+        <div className="flex flex-col items-center justify-center space-y-4 p-12 text-slate-400">
+            <FileText className="h-16 w-16 text-slate-200" />
+            <p className="text-sm font-semibold">Preview not available for this file type</p>
+            <p className="text-xs text-slate-400">({file?.name})</p>
         </div>
     );
 }
@@ -226,9 +306,10 @@ function PartnerCard({
             </div>
 
             <div className="space-y-1.5">
-                <Label className={fieldLabel}>
-                    Partner name <span className="normal-case text-red-500">· required</span>
-                </Label>
+                <div className="flex items-center justify-between gap-2">
+                    <Label className={fieldLabel}>Partner name</Label>
+                    <span className={badgeRequired}>Required</span>
+                </div>
                 <Input
                     type="text"
                     placeholder="e.g. XYZ Welfare Trust, District Health Office…"
@@ -276,7 +357,10 @@ function PartnerCard({
             </div>
 
             <div className="space-y-1.5">
-                <Label className={fieldLabel}>Partner type</Label>
+                <div className="flex items-center justify-between gap-2">
+                    <Label className={fieldLabel}>Partner type</Label>
+                    <span className={badgeRequired}>Required</span>
+                </div>
                 <div className="relative">
                     <select
                         value={p.type}
@@ -289,26 +373,61 @@ function PartnerCard({
                     <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                 </div>
                 {p.type === "Others (please specify)" ? (
-                    <Textarea
-                        placeholder="Specify partner type (100–200 words)…"
-                        value={p.type_other || ""}
-                        onChange={e => onUpdate("type_other", e.target.value)}
-                        className={textareaClasses}
-                    />
+                    <div className="space-y-1.5 pt-1">
+                        <Textarea
+                            placeholder="Specify partner type (100–200 words)…"
+                            value={p.type_other || ""}
+                            onChange={e => onUpdate("type_other", e.target.value)}
+                            className={textareaClasses}
+                        />
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div className="h-1.5 w-40 overflow-hidden rounded-full bg-slate-100 sm:w-48">
+                                <div
+                                    className={clsx(
+                                        "h-full rounded-full transition-all",
+                                        countWords(p.type_other || "") < 100
+                                            ? "bg-amber-400"
+                                            : countWords(p.type_other || "") > 200
+                                              ? "bg-red-500"
+                                              : "bg-emerald-500",
+                                    )}
+                                    style={{
+                                        width: `${Math.min((countWords(p.type_other || "") / 200) * 100, 100)}%`,
+                                    }}
+                                />
+                            </div>
+                            <span className={clsx(
+                                "text-[11px] tabular-nums",
+                                countWords(p.type_other || "") >= 100 && countWords(p.type_other || "") <= 200
+                                    ? "text-emerald-600"
+                                    : countWords(p.type_other || "") > 200
+                                      ? "text-red-500"
+                                      : "text-slate-400",
+                            )}>
+                                {countWords(p.type_other || "")} / 200 words · min 100
+                            </span>
+                        </div>
+                    </div>
                 ) : null}
                 <FieldError message={getFieldError(`partners.${idx}.type`)} />
             </div>
 
             <div className="space-y-2">
-                <Label className={fieldLabel}>Role in project</Label>
-                <p className="text-xs text-slate-500">Select all that apply · at least one required</p>
+                <div className="flex items-center justify-between gap-2">
+                    <Label className={fieldLabel}>Role in project</Label>
+                    <span className={badgeRequired}>Required</span>
+                </div>
+                <p className="text-xs text-slate-500">Select all that apply</p>
                 <CheckGrid options={roleOptions} selected={roles} onToggle={toggleRole} />
                 <FieldError message={getFieldError(`partners.${idx}.role`)} />
             </div>
 
             <div className="space-y-2">
-                <Label className={fieldLabel}>Contribution type</Label>
-                <p className="text-xs text-slate-500">Select all that apply · at least one required</p>
+                <div className="flex items-center justify-between gap-2">
+                    <Label className={fieldLabel}>Contribution type</Label>
+                    <span className={badgeRequired}>Required</span>
+                </div>
+                <p className="text-xs text-slate-500">Select all that apply</p>
                 <CheckGrid options={contributionOptions} selected={contribution} onToggle={toggleContribution} />
                 <FieldError message={getFieldError(`partners.${idx}.contribution`)} />
             </div>
@@ -346,6 +465,8 @@ function PartnerCard({
 export default function Section7Partnerships() {
     const { data, updateSection, getFieldError } = useReportForm();
     const { has_partners, partners, formalization_status, formalization_files } = data.section7;
+
+    const [previewFile, setPreviewFile] = useState<any>(null);
 
     const update = (field: string, val: any) => updateSection("section7", { [field]: val });
 
@@ -430,7 +551,7 @@ export default function Section7Partnerships() {
     }, [autoNarrative, data.section7.summary_text, updateSection]);
 
     return (
-        <div className="mx-auto max-w-4xl space-y-8 pb-10">
+        <div className="mx-auto max-w-6xl space-y-8 pb-10">
             {/* Header */}
             <div className="space-y-5">
                 <div className="flex items-center gap-3.5">
@@ -471,6 +592,7 @@ export default function Section7Partnerships() {
                     <h3 className="text-base font-semibold text-slate-900">
                         Step 1 — Partnership confirmation
                     </h3>
+                    <span className={clsx(badgeMandatory, "ml-auto")}>Mandatory</span>
                 </div>
 
                 <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
@@ -544,14 +666,17 @@ export default function Section7Partnerships() {
                                     Step 2 — Enter partner details
                                 </h3>
                             </div>
-                            <Button
-                                type="button"
-                                onClick={addPartner}
-                                className="h-10 shrink-0 rounded-lg bg-indigo-600 px-4 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700"
-                            >
-                                <Plus className="mr-1.5 h-4 w-4" />
-                                Add partner
-                            </Button>
+                            <div className="flex items-center gap-3">
+                                <span className={badgeMandatory}>Mandatory</span>
+                                <Button
+                                    type="button"
+                                    onClick={addPartner}
+                                    className="h-10 shrink-0 rounded-lg bg-indigo-600 px-4 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700"
+                                >
+                                    <Plus className="mr-1.5 h-4 w-4" />
+                                    Add partner
+                                </Button>
+                            </div>
                         </div>
 
                         {partners.length === 0 ? (
@@ -592,6 +717,7 @@ export default function Section7Partnerships() {
                             <h3 className="text-base font-semibold text-slate-900">
                                 Step 3 — Formalization status
                             </h3>
+                            <span className={clsx(badgeOptional, "ml-auto")}>Optional</span>
                         </div>
 
                         <div className="space-y-5 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
@@ -662,9 +788,45 @@ export default function Section7Partnerships() {
                             </div>
 
                             {formalization_files && formalization_files.length > 0 ? (
-                                <p className="text-xs text-slate-500">
-                                    {formalization_files.length} file{formalization_files.length === 1 ? "" : "s"} attached
-                                </p>
+                                <div className="space-y-3">
+                                    <Label className={fieldLabel}>
+                                        Selected files ({formalization_files.length})
+                                    </Label>
+                                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                                        {formalization_files.map((file, fIdx) => (
+                                            <div
+                                                key={fIdx}
+                                                className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5"
+                                            >
+                                                <div
+                                                    className="flex min-w-0 flex-1 cursor-pointer items-center gap-3"
+                                                    onClick={() => setPreviewFile(file)}
+                                                >
+                                                    <FilePreview file={file} />
+                                                    <div className="min-w-0">
+                                                        <p className="truncate text-sm font-medium text-slate-700">
+                                                            {file.name}
+                                                        </p>
+                                                        <p className="text-xs text-slate-400">
+                                                            {file.size ? (file.size / (1024 * 1024)).toFixed(2) : 0} MB
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        const kept = formalization_files.filter((_, i) => i !== fIdx);
+                                                        update("formalization_files", kept);
+                                                    }}
+                                                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-400 transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-500"
+                                                    aria-label="Remove file"
+                                                >
+                                                    <Trash2 className="h-3.5 w-3.5" />
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
                             ) : null}
                         </div>
                     </section>
@@ -711,7 +873,7 @@ export default function Section7Partnerships() {
                     <div className="grid grid-cols-3 gap-3 rounded-xl border border-slate-200 bg-white p-4 text-center shadow-sm">
                         {[
                             { label: "Fully verified", val: fullyVerified, color: "text-emerald-600" },
-                            { label: "Partially verified", val: partiallyVerified, color: "text-blue-600" },
+                            { label: "Partially verified", val: partiallyVerified, color: "text-indigo-600" },
                             { label: "Self-reported", val: selfReportedPartners.length, color: "text-amber-600" },
                         ].map(({ label, val, color }) => (
                             <div key={label}>
@@ -739,6 +901,19 @@ export default function Section7Partnerships() {
                     </div>
                 </div>
             </section>
+
+            <Dialog open={!!previewFile} onOpenChange={(open) => !open && setPreviewFile(null)}>
+                <DialogContent className="flex max-w-4xl flex-col items-center bg-white p-6">
+                    <DialogHeader className="mb-4 flex w-full flex-col items-start justify-start">
+                        <DialogTitle className="w-full truncate break-all pr-8 text-sm font-bold text-slate-800">
+                            {previewFile?.name}
+                        </DialogTitle>
+                    </DialogHeader>
+                    <div className="flex max-h-[80vh] w-full items-center justify-center overflow-auto rounded-xl border border-slate-100 bg-slate-50 p-2">
+                        <FullFilePreview file={previewFile} />
+                    </div>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

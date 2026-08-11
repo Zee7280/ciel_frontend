@@ -41,6 +41,7 @@ import Link from "next/link";
 import { toast } from "sonner";
 import ApplicationDialog from "./components/ApplicationDialog";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "../report/components/ui/dialog";
+import { ScoringLevelsButton, ScoringLevelsDialog } from "@/components/scoring/ScoringLevelsDialog";
 
 interface TeamMember {
     name: string;
@@ -261,6 +262,7 @@ export default function StudentBrowseOpportunitiesPage() {
     // Team Dialog
     const [selectedTeamOpp, setSelectedTeamOpp] = useState<BrowseOpportunity | null>(null);
     const [isTeamDialogOpen, setIsTeamDialogOpen] = useState(false);
+    const [isScoringLevelsOpen, setIsScoringLevelsOpen] = useState(false);
 
     // Filters & View State
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
@@ -400,11 +402,18 @@ export default function StudentBrowseOpportunitiesPage() {
 
     return (
         <div className="max-w-7xl mx-auto space-y-8 pb-20">
-            <header className="space-y-1">
-                <h1 className="text-3xl font-semibold tracking-tight text-slate-900">Browse Opportunities</h1>
-                <p className="text-sm text-slate-500 max-w-2xl leading-relaxed">
-                    Discover and apply to volunteer projects from our partners.
-                </p>
+            <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                <div className="space-y-1">
+                    <h1 className="text-3xl font-semibold tracking-tight text-slate-900">Browse Opportunities</h1>
+                    <p className="text-sm text-slate-500 max-w-2xl leading-relaxed">
+                        Discover and apply to volunteer projects from our partners.
+                    </p>
+                </div>
+                <ScoringLevelsButton
+                    size="default"
+                    className="h-9 w-fit shrink-0 gap-1.5 border-amber-200/90 bg-amber-50/50 px-3 text-sm font-medium text-amber-900 hover:bg-amber-50"
+                    onClick={() => setIsScoringLevelsOpen(true)}
+                />
             </header>
 
             <section
@@ -624,7 +633,7 @@ export default function StudentBrowseOpportunitiesPage() {
                                 </div>
 
                                 <div className="flex items-center justify-between gap-2 rounded-b-xl border-t border-slate-100 bg-white px-5 py-4">
-                                    <div className="flex min-w-0 items-center gap-2">
+                                    <div className="flex min-w-0 flex-wrap items-center gap-2">
                                         <Link href={`/dashboard/student/browse/${op.id}`} className="text-sm font-medium text-slate-600 underline-offset-4 hover:text-slate-900 hover:underline">
                                             View details
                                         </Link>
@@ -637,6 +646,7 @@ export default function StudentBrowseOpportunitiesPage() {
                                         >
                                             <Share2 className="h-4 w-4" />
                                         </button>
+                                        <ScoringLevelsButton onClick={() => setIsScoringLevelsOpen(true)} />
                                     </div>
                                     {op.applyLocked ? (
                                         <div className="flex items-center gap-2">
@@ -752,7 +762,7 @@ export default function StudentBrowseOpportunitiesPage() {
                                 </div>
 
                                 <div className="mt-2 flex w-full flex-wrap items-center gap-3 md:mt-0 md:w-auto">
-                                    <div className="flex flex-1 items-center gap-2 md:flex-none">
+                                    <div className="flex flex-1 flex-wrap items-center gap-2 md:flex-none">
                                         <Link href={`/dashboard/student/browse/${op.id}`} className="min-w-0 flex-1 md:flex-none">
                                             <Button variant="outline" className="w-full border-slate-200 font-medium">Details</Button>
                                         </Link>
@@ -765,6 +775,11 @@ export default function StudentBrowseOpportunitiesPage() {
                                         >
                                             <Share2 className="h-4 w-4" />
                                         </button>
+                                        <ScoringLevelsButton
+                                            size="default"
+                                            className="h-9 gap-1.5 border-amber-200/90 bg-amber-50/50 px-3 text-sm font-medium text-amber-900 hover:bg-amber-50"
+                                            onClick={() => setIsScoringLevelsOpen(true)}
+                                        />
                                     </div>
                                     {op.applyLocked ? (
                                         <div className="flex items-center gap-2 flex-1 md:flex-none justify-end">
@@ -969,6 +984,8 @@ export default function StudentBrowseOpportunitiesPage() {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+            <ScoringLevelsDialog open={isScoringLevelsOpen} onOpenChange={setIsScoringLevelsOpen} />
 
         </div>
     );

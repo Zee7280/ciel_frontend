@@ -17,6 +17,12 @@ export default function AdminAnalyticsPage() {
                 </div>
                 <div className="flex flex-wrap gap-1.5">
                     <Link
+                        href="/dashboard/admin/all-fields-console"
+                        className="border border-indigo-300 bg-indigo-50 px-2.5 py-1.5 text-[11px] font-semibold text-indigo-800 hover:bg-indigo-100"
+                    >
+                        All-Fields Console
+                    </Link>
+                    <Link
                         href="/dashboard/admin/master-analytics"
                         className="border border-slate-300 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-50"
                     >

@@ -1,759 +1,279 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
-import {
-    BookOpen,
-    Star,
-    Trophy,
-    Clock,
-    Loader2,
-    TrendingUp,
-    Award,
-    AlertCircle,
-    Timer,
-    ChevronRight,
-    FolderKanban,
-    Bell,
-    Wallet,
-    FileCheck,
-    UserCircle,
-    ShieldCheck,
-    Users,
-} from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Button } from "./report/components/ui/button";
-import type {
-    ActiveProject,
-    DashboardData,
-    DashboardNotificationCategory,
-    DashboardNotificationsPreview,
-    DashboardOverview,
-    DashboardStats,
-} from "./types";
-import {
-    fetchStudentDashboardData,
-    persistStudentDashboardCache,
-    readStudentDashboardCache,
-} from "@/utils/student-dashboard-fetch";
+import { ArrowRight, Award, Clock, Compass, ListChecks, CheckCircle2, Circle } from "lucide-react";
+import clsx from "clsx";
+import { fetchStudentDashboardData } from "@/utils/student-dashboard-fetch";
+import { fetchImpactSummary, readImpactSummaryCache, type CielImpactSummary } from "@/utils/cielImpactSummary";
+import { readStoredCurrentUser } from "@/utils/currentUser";
 import { authenticatedFetch } from "@/utils/api";
-import Section1AnalyticsPanel from "@/components/analytics/Section1AnalyticsPanel";
-import StudentProgressTracker from "./components/StudentProgressTracker";
-import PendingActionCards from "@/components/dashboard/PendingActionCards";
-import { CepExperienceFeedbackPrompt } from "@/components/feedback/CepExperienceFeedbackPrompt";
-import { studentEligibleForCepExperienceFeedback } from "@/utils/cepFeedbackEligibility";
-import {
-    dismissLiveApplyPrompt,
-    findLiveApplyPromptProject,
-    isLiveApplyPromptDismissed,
-    OpportunityLiveApplyBanner,
-    OpportunityLiveApplyModal,
-    type OpportunityPromptProject,
-    readStoredStudentId,
-} from "@/app/dashboard/student/components/OpportunityLifecyclePrompts";
+import type { DashboardData } from "@/app/dashboard/student/types";
+import { CIEL_PATHS, pathStateLabel } from "@/utils/cielPaths";
+import ImpactDonut from "@/components/ciel/ImpactDonut";
+import RubricMicroStrip from "@/components/ciel/RubricMicroStrip";
+import StatTile from "@/components/ciel/StatTile";
+import ProgressBar from "@/components/ciel/ProgressBar";
+import EmptyState from "@/components/ciel/EmptyState";
+import { DashboardSkeleton } from "@/components/ciel/Skeleton";
 
-/** Shown when login prefetch did not populate cache yet — same UI, zeros / empty lists. */
-const EMPTY_STUDENT_DASHBOARD: DashboardData = {
-    stats: { activeCourses: 0, impactPoints: 0, projectsCompleted: 0, hoursVolunteered: 0 },
-    activeProjects: [],
-    deadlines: [],
-};
-
-function normStatus(s: string) {
-    return s.toLowerCase();
+interface RecommendedOpportunity {
+    id: string;
+    title: string;
+    organization_name?: string;
+    organization?: string;
 }
 
-function normReportStatus(p: ActiveProject) {
-    return (p.report_status || "").trim().toLowerCase();
+function greeting(): string {
+    const hour = new Date().getHours();
+    if (hour < 12) return "Good morning";
+    if (hour < 17) return "Good afternoon";
+    return "Good evening";
 }
 
-function deriveOverview(stats: DashboardStats, projects: ActiveProject[]): DashboardOverview {
-    const pending = projects.filter((p) => /pending|approval|awaiting/i.test(p.status));
-    const review = projects.filter((p) => /review|submitted/i.test(p.status));
-    const active = projects.filter((p) => {
-        const st = normStatus(p.status);
-        return st.includes("progress") || st.includes("active") || (!st.includes("complete") && !st.includes("verified"));
-    });
+const CERT_LADDER = [
+    { key: "account", label: "Account verified" },
+    { key: "hours_logged", label: "First hours logged" },
+    { key: "hours_verified", label: "First hours verified" },
+    { key: "report_drafted", label: "Report drafted" },
+    { key: "report_submitted", label: "Report submitted" },
+    { key: "report_verified", label: "Report verified" },
+    { key: "certificate_issued", label: "Certificate issued" },
+];
 
-    const pendingPaymentProjects = projects.filter((p) => normReportStatus(p) === "pending_payment");
-    const paymentsUnderReviewProjects = projects.filter((p) => normReportStatus(p) === "payment_under_review");
-
-    return {
-        activeProjectsCount: active.length || projects.length,
-        pendingApprovalsCount: pending.length,
-        pendingApprovalsSample: pending.slice(0, 2).map((p) => ({ id: p.id, title: p.title })),
-        reportsUnderReviewCount: review.length,
-        reportsUnderReviewSample: review.slice(0, 2).map((p) => ({ id: p.id, title: p.title })),
-        totalVerifiedHours: stats.hoursVolunteered,
-        hoursActivityBars: [40, 55, 35, 60, 45, 50, 48],
-        completedCount: stats.projectsCompleted,
-        completedSample: projects[0]
-            ? { id: projects[0].id, title: projects[0].title }
-            : undefined,
-        completedActivityBars: [30, 40, 35, 50, 45, 55, 50],
-        impactHistoryBadgeCount: 0,
-        pendingPaymentsCount: pendingPaymentProjects.length,
-        paymentsUnderReviewCount: paymentsUnderReviewProjects.length,
-        pendingPaymentsSample: pendingPaymentProjects.slice(0, 2).map((p) => ({
-            id: p.id,
-            title: p.title,
-        })),
+function certificateStepIndex(dashboard: DashboardData | null, summary: CielImpactSummary | null): number {
+    if (!dashboard || !summary) return 1;
+    const reportStatuses = dashboard.activeProjects.map((p) => p.report_status).filter(Boolean) as string[];
+    const rank = (status: string) => {
+        if (status === "paid") return 6;
+        if (status === "verified") return 5;
+        if (["submitted", "partner_verified", "payment_pending", "payment_under_review"].includes(status)) return 4;
+        return 3; // draft
     };
+    const bestReportRank = reportStatuses.length ? Math.max(...reportStatuses.map(rank)) : -1;
+
+    if (bestReportRank >= 0) return bestReportRank;
+    if (summary.verifiedHours > 0) return 2;
+    if (summary.verifiedHours + summary.pendingHours > 0) return 1;
+    return 0;
 }
 
-function mergeStudentOverview(data: DashboardData): DashboardOverview {
-    const derived = deriveOverview(data.stats, data.activeProjects);
-    const o = data.overview;
-    if (!o) return derived;
-    return {
-        ...derived,
-        ...o,
-        pendingPaymentsCount: o.pendingPaymentsCount != null ? o.pendingPaymentsCount : derived.pendingPaymentsCount,
-        paymentsUnderReviewCount:
-            o.paymentsUnderReviewCount != null ? o.paymentsUnderReviewCount : derived.paymentsUnderReviewCount,
-        pendingPaymentsSample:
-            o.pendingPaymentsSample !== undefined ? o.pendingPaymentsSample : derived.pendingPaymentsSample,
-    };
-}
-
-function formatParticipationType(t?: string): string | null {
-    if (!t) return null;
-    const x = t.trim().toLowerCase();
-    if (x === "team") return "Team";
-    if (x === "individual") return "Individual";
-    return t;
-}
-
-function projectHasAnalyticsFields(p: ActiveProject): boolean {
-    return (
-        p.required_hours_per_student != null ||
-        !!p.participation_type ||
-        p.academic_integration_type != null ||
-        p.team_size != null
-    );
-}
-
-function notificationCategoryLabel(c?: DashboardNotificationCategory | string) {
-    if (!c) return null;
-    const labels: Record<string, string> = {
-        deadline: "Deadline",
-        pipeline: "Approval",
-        approval: "Approval",
-        report: "Report",
-        payment: "Payment",
-    };
-    return labels[c] ?? c;
-}
-
-function MiniBars({ values, barClass }: { values: number[]; barClass: string }) {
-    const max = Math.max(1, ...values);
-    return (
-        <div className="flex h-10 items-end gap-1">
-            {values.map((v, i) => (
-                <div
-                    key={i}
-                    className={`w-1.5 rounded-t ${barClass}`}
-                    style={{ height: `${Math.max(8, (v / max) * 100)}%` }}
-                />
-            ))}
-        </div>
-    );
-}
-
-function DeadlineIcon({ type }: { type: string }) {
-    if (type === "urgent") return <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-500" />;
-    if (type === "warning") return <Timer className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />;
-    return <Clock className="mt-0.5 h-4 w-4 shrink-0 text-blue-500" />;
-}
-
-export default function StudentDashboard() {
-    const [data, setData] = useState<DashboardData>(EMPTY_STUDENT_DASHBOARD);
-    const [isLoading, setIsLoading] = useState(true);
-    const [liveApplyProject, setLiveApplyProject] = useState<OpportunityPromptProject | null>(null);
-    const [showLiveApplyModal, setShowLiveApplyModal] = useState(false);
+export default function StudentDashboardPage() {
+    const [loading, setLoading] = useState(true);
+    const [dashboard, setDashboard] = useState<DashboardData | null>(null);
+    const [summary, setSummary] = useState<CielImpactSummary | null>(() => readImpactSummaryCache());
+    const [opportunities, setOpportunities] = useState<RecommendedOpportunity[]>([]);
+    const [name, setName] = useState("");
 
     useEffect(() => {
-        let cancelled = false;
+        const user = readStoredCurrentUser();
+        setName(typeof user?.name === "string" ? user.name.split(" ")[0] : "");
 
-        const load = async () => {
-            let cached: DashboardData | null = null;
-            try {
-                cached = readStudentDashboardCache();
-                if (cached) {
-                    setData(cached);
-                    setIsLoading(false);
-                }
-            } catch (error) {
-                console.error("Failed to load dashboard cache:", error);
-            }
-
-            try {
-                const fresh = await fetchStudentDashboardData({ redirectToLogin: true });
-                if (cancelled) return;
-                if (fresh) {
-                    setData(fresh);
-                    persistStudentDashboardCache(fresh);
-                }
-            } catch (error) {
-                console.error("Failed to fetch student dashboard:", error);
-            } finally {
-                if (!cancelled && !cached) setIsLoading(false);
-            }
-        };
-
-        void load();
-        return () => {
-            cancelled = true;
-        };
+        Promise.all([
+            fetchStudentDashboardData({ redirectToLogin: false }),
+            fetchImpactSummary({ redirectToLogin: false }),
+            authenticatedFetch("/api/v1/students/opportunities/recommended", {}, { redirectToLogin: false })
+                .then((res) => (res?.ok ? res.json() : null))
+                .then((result) => (Array.isArray(result?.data) ? result.data.slice(0, 3) : [])),
+        ]).then(([dashboardData, summaryData, opps]) => {
+            setDashboard(dashboardData);
+            if (summaryData) setSummary(summaryData);
+            setOpportunities(opps);
+            setLoading(false);
+        });
     }, []);
 
-    useEffect(() => {
-        let cancelled = false;
-
-        const loadLiveApplyReminder = async () => {
-            const studentId = readStoredStudentId();
-            try {
-                const res = await authenticatedFetch(`/api/v1/student/projects`, {
-                    method: "POST",
-                    body: JSON.stringify({ studentId }),
-                });
-                if (!res?.ok || cancelled) return;
-                const json = await res.json();
-                const rows = Array.isArray(json?.data) ? (json.data as Record<string, unknown>[]) : [];
-                const project = findLiveApplyPromptProject(rows, studentId);
-                if (!project || isLiveApplyPromptDismissed(project.id) || cancelled) return;
-                setLiveApplyProject(project);
-                setShowLiveApplyModal(true);
-            } catch (error) {
-                console.error("Failed to fetch live opportunity reminder:", error);
-            }
-        };
-
-        void loadLiveApplyReminder();
-        return () => {
-            cancelled = true;
-        };
-    }, []);
-
-    const overview = useMemo(() => mergeStudentOverview(data), [data]);
-    const cepFeedbackEligible = useMemo(
-        () => studentEligibleForCepExperienceFeedback(data.activeProjects ?? []),
-        [data.activeProjects],
-    );
-
-    if (isLoading) {
-        return (
-            <div className="flex min-h-[400px] items-center justify-center">
-                <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-            </div>
+    const needsYouNow = useMemo(() => {
+        if (!dashboard) return [];
+        const items: Array<{ id: string; title: string; detail: string; href: string; tone?: string }> = [];
+        dashboard.notificationsPreview?.active.slice(0, 2).forEach((n) =>
+            items.push({ id: n.id, title: n.title, detail: n.detail, href: "/dashboard/student/paths/community-service?tab=log-hours", tone: n.tone }),
         );
-    }
+        dashboard.pendingSummary?.items.slice(0, 2).forEach((n) =>
+            items.push({ id: n.key, title: n.title, detail: n.description ?? `${n.count} pending`, href: n.href, tone: n.tone }),
+        );
+        if (summary?.pathsStatus.communityService.needsAction) {
+            items.push({ id: "cs-verify", title: "Send logged hours for verification", detail: "You have hours waiting to be sent to a supervisor.", href: "/dashboard/student/paths/community-service?tab=log-hours" });
+        }
+        if (summary?.pathsStatus.startupBusiness.needsAction) {
+            items.push({ id: "sb-visible", title: "Your venture is ready to publish", detail: "You've reached the completeness threshold — make it visible.", href: "/dashboard/student/paths/startup-business" });
+        }
+        return items.slice(0, 4);
+    }, [dashboard, summary]);
 
-    const { stats, activeProjects, deadlines } = data;
-    const notificationsPreview: DashboardNotificationsPreview | undefined = data.notificationsPreview;
+    if (loading) return <DashboardSkeleton />;
 
-    const statItems = [
-        { label: "Active Courses", value: stats.activeCourses.toString(), icon: BookOpen, iconBg: "bg-blue-50", iconText: "text-blue-600" },
-        { label: "Impact Points", value: stats.impactPoints.toLocaleString(), icon: Star, iconBg: "bg-amber-50", iconText: "text-amber-600" },
-        { label: "Projects Completed", value: stats.projectsCompleted.toString(), icon: Trophy, iconBg: "bg-emerald-50", iconText: "text-emerald-600" },
-        { label: "Hours Volunteered", value: stats.hoursVolunteered.toString(), icon: Clock, iconBg: "bg-violet-50", iconText: "text-violet-600" },
-    ];
-
-    const continueReport = data.quickActions?.continueReport;
-    const viewPayment = data.quickActions?.viewPayment;
-    const viewReportResults = data.quickActions?.viewReportResults;
-    const firstProjectForTracker = activeProjects[0]?.id;
-    const pendingPay = overview.pendingPaymentsCount ?? 0;
-    const payReview = overview.paymentsUnderReviewCount ?? 0;
-
-    const dismissLiveApplyReminder = () => {
-        if (liveApplyProject) dismissLiveApplyPrompt(liveApplyProject.id);
-        setShowLiveApplyModal(false);
-        setLiveApplyProject(null);
-    };
+    const certStep = certificateStepIndex(dashboard, summary);
 
     return (
-        <div className="space-y-8">
-            {liveApplyProject ? (
-                <OpportunityLiveApplyBanner project={liveApplyProject} onDismiss={dismissLiveApplyReminder} />
-            ) : null}
-
+        <div className="mx-auto max-w-[1440px] space-y-8">
             <div>
-                <h2 className="text-lg font-bold tracking-tight text-slate-800">Overview</h2>
-                <p className="text-sm text-slate-500">Your projects, deadlines, and actions at a glance.</p>
+                <h1 className="text-2xl font-black text-ciel-text">{greeting()}{name ? `, ${name}` : ""}.</h1>
+                <p className="mt-1 text-sm text-ciel-text-mid">Here&apos;s where your impact stands today.</p>
             </div>
 
-            <PendingActionCards summary={data.pendingSummary} emptyMessage="You are all caught up on approvals, reports, payments, and deadlines." />
-
-            {/* Summary stats — `data.stats` from dashboard API; placed high so metrics stay above the fold */}
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-                {statItems.map((stat, index) => (
-                    <div
-                        key={index}
-                        className="flex items-center gap-4 rounded-2xl border border-slate-100 bg-white p-5 shadow-[0_4px_20px_-10px_rgba(0,0,0,0.05)]"
-                    >
-                        <div className={`flex h-12 w-12 items-center justify-center rounded-xl ${stat.iconBg} ${stat.iconText}`}>
-                            <stat.icon className="h-6 w-6" />
-                        </div>
-                        <div>
-                            <h3 className="text-2xl font-bold text-slate-800">{stat.value}</h3>
-                            <p className="text-sm font-medium text-slate-500">{stat.label}</p>
+            {/* Hero */}
+            <div className="rounded-ciel-xl border border-ciel-border bg-white p-5 sm:p-7">
+                <div className="flex flex-wrap items-center justify-between gap-8">
+                    <ImpactDonut score={summary?.compositeScore ?? 0} />
+                    <div className="flex-1 min-w-[240px]">
+                        <p className="text-xs font-bold uppercase tracking-widest text-ciel-text-soft">Rubric breakdown</p>
+                        <div className="mt-2">
+                            <RubricMicroStrip scores={summary?.rubric ?? {}} />
                         </div>
                     </div>
-                ))}
-            </div>
-
-            <div className="grid grid-cols-1 gap-6 lg:grid-cols-3 lg:gap-8">
-                <div className="space-y-6 lg:col-span-2">
-                    <div className="rounded-3xl border border-slate-200/80 bg-white p-6 shadow-sm">
-                        <div className="mb-4 flex items-center justify-between gap-2">
-                            <h3 className="text-sm font-black uppercase tracking-wider text-slate-400">Active Projects</h3>
-                            <FolderKanban className="h-5 w-5 text-slate-300" />
-                        </div>
-
-                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                            <div className="rounded-2xl border border-slate-100 bg-slate-50/80 p-4">
-                                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Active</p>
-                                <p className="mt-1 text-3xl font-black text-slate-900">{overview.activeProjectsCount}</p>
-                            </div>
-                            <div className="rounded-2xl border border-amber-100 bg-amber-50/50 p-4">
-                                <p className="text-[10px] font-bold uppercase tracking-widest text-amber-700/80">Pending approvals</p>
-                                <p className="mt-1 text-3xl font-black text-slate-900">{overview.pendingApprovalsCount}</p>
-                                <ul className="mt-2 space-y-1 text-xs font-medium text-slate-600">
-                                    {overview.pendingApprovalsSample.map((row) => (
-                                        <li key={row.id} className="line-clamp-2">
-                                            {row.title}
-                                            {row.hint ? <span className="text-slate-400"> — {row.hint}</span> : null}
-                                        </li>
-                                    ))}
-                                </ul>
-                            </div>
-                            <div className="rounded-2xl border border-violet-100 bg-violet-50/40 p-4">
-                                <p className="text-[10px] font-bold uppercase tracking-widest text-violet-700/80">Reports under review</p>
-                                <p className="mt-1 text-3xl font-black text-slate-900">{overview.reportsUnderReviewCount}</p>
-                                <ul className="mt-2 space-y-1 text-xs font-medium text-slate-600">
-                                    {overview.reportsUnderReviewSample.map((row) => (
-                                        <li key={row.id} className="line-clamp-2">
-                                            {row.title}
-                                            {row.hint ? <span className="text-slate-400"> — {row.hint}</span> : null}
-                                        </li>
-                                    ))}
-                                </ul>
-                            </div>
-                            <div className="rounded-2xl border border-rose-100 bg-rose-50/50 p-4">
-                                <p className="text-[10px] font-bold uppercase tracking-widest text-rose-800/80">Reporting fee due</p>
-                                <p className="mt-1 text-3xl font-black text-slate-900">{pendingPay}</p>
-                                <p className="mt-1 text-xs font-medium text-rose-800/90">
-                                    {payReview > 0 ? `${payReview} payment slip${payReview === 1 ? "" : "s"} with admin` : "No slips in admin review"}
-                                </p>
-                                <ul className="mt-2 space-y-1 text-xs font-medium text-slate-600">
-                                    {(overview.pendingPaymentsSample ?? []).map((row) => (
-                                        <li key={row.id} className="line-clamp-2">
-                                            {row.title}
-                                            {row.hint ? <span className="text-slate-400"> — {row.hint}</span> : null}
-                                        </li>
-                                    ))}
-                                </ul>
-                            </div>
-                        </div>
-
-                        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-                            <div className="flex items-center justify-between gap-4 rounded-2xl border border-slate-100 bg-white p-4">
-                                <div>
-                                    <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Total verified hours</p>
-                                    <p className="mt-1 text-2xl font-black text-slate-900">{overview.totalVerifiedHours}h</p>
-                                </div>
-                                <MiniBars values={overview.hoursActivityBars} barClass="bg-blue-500/80" />
-                            </div>
-                            <div className="flex items-center justify-between gap-4 rounded-2xl border border-slate-100 bg-white p-4">
-                                <div className="min-w-0 flex-1">
-                                    <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Completed</p>
-                                    <p className="mt-1 text-2xl font-black text-slate-900">{overview.completedCount}</p>
-                                    {overview.completedSample ? (
-                                        <p className="mt-1 truncate text-xs font-medium text-slate-600">{overview.completedSample.title}</p>
-                                    ) : null}
-                                </div>
-                                <MiniBars values={overview.completedActivityBars} barClass="bg-emerald-500/80" />
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="rounded-3xl border border-slate-200/80 bg-white p-6 shadow-sm">
-                        <h3 className="mb-4 text-sm font-black uppercase tracking-wider text-slate-400">Quick actions</h3>
-                        <div className="flex flex-col gap-4 md:flex-row md:items-stretch">
-                            {continueReport ? (
-                                <Link
-                                    href={`/dashboard/student/report?projectId=${continueReport.projectId}`}
-                                    className="flex flex-1 flex-col justify-center rounded-2xl bg-blue-600 px-6 py-5 text-white shadow-lg shadow-blue-200/50 transition hover:bg-blue-700"
-                                >
-                                    <span className="text-xs font-bold uppercase tracking-widest text-white/80">Continue report</span>
-                                    <span className="mt-1 text-lg font-black">{continueReport.title}</span>
-                                    <span className="text-sm font-medium text-white/90">{continueReport.subtitle}</span>
-                                </Link>
-                            ) : (
-                                <Link
-                                    href="/dashboard/student/projects"
-                                    className="flex flex-1 flex-col justify-center rounded-2xl border-2 border-dashed border-slate-200 px-6 py-5 text-slate-600 transition hover:border-blue-300 hover:bg-blue-50/50"
-                                >
-                                    <span className="text-xs font-bold uppercase tracking-widest text-slate-400">Continue report</span>
-                                    <span className="mt-1 text-sm font-bold">No in-progress report linked — open My Projects</span>
-                                </Link>
-                            )}
-                            <div className="flex flex-1 flex-col justify-between gap-3 rounded-2xl border border-slate-100 bg-slate-50/80 p-5">
-                                <div>
-                                    <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Browse opportunities</p>
-                                    <p className="mt-1 text-sm font-semibold text-slate-700">Find placements or start your own opportunity.</p>
-                                </div>
-                                <div className="flex flex-wrap gap-2">
-                                    <Link href="/dashboard/student/browse">
-                                        <Button size="sm" variant="outline" className="font-bold">
-                                            Browse
-                                        </Button>
-                                    </Link>
-                                    <Link href="/dashboard/student/create-opportunity">
-                                        <Button size="sm" className="bg-slate-900 font-bold hover:bg-slate-800">
-                                            Create opportunity
-                                        </Button>
-                                    </Link>
-                                </div>
-                            </div>
-                        </div>
-                        <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-stretch">
-                            {viewPayment ? (
-                                <Link
-                                    href={`/dashboard/student/payment?projectId=${encodeURIComponent(viewPayment.projectId)}`}
-                                    className="inline-flex flex-1 min-w-[10rem] items-center justify-center gap-2 rounded-2xl bg-rose-600 px-4 py-3.5 text-sm font-black text-white shadow-md shadow-rose-200/50 transition hover:bg-rose-700"
-                                >
-                                    <Wallet className="h-4 w-4 shrink-0" />
-                                    <span className="text-center leading-tight">
-                                        Complete payment
-                                        <span className="mt-0.5 block text-xs font-semibold text-white/90">{viewPayment.title}</span>
-                                    </span>
-                                </Link>
-                            ) : null}
-                            {viewReportResults ? (
-                                <Link
-                                    href={`/dashboard/student/report?projectId=${encodeURIComponent(viewReportResults.projectId)}`}
-                                    className="inline-flex flex-1 min-w-[10rem] items-center justify-center gap-2 rounded-2xl border-2 border-slate-900 bg-white px-4 py-3.5 text-sm font-black text-slate-900 shadow-sm transition hover:bg-slate-50"
-                                >
-                                    <FileCheck className="h-4 w-4 shrink-0" />
-                                    <span className="text-center leading-tight">
-                                        View results
-                                        <span className="mt-0.5 block text-xs font-semibold text-slate-600">{viewReportResults.title}</span>
-                                    </span>
-                                </Link>
-                            ) : null}
-                            <Link
-                                href="/dashboard/student/notifications"
-                                className="inline-flex flex-1 min-w-[10rem] items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3.5 text-sm font-bold text-slate-800 shadow-sm transition hover:border-slate-300 hover:bg-slate-50"
-                            >
-                                <Bell className="h-4 w-4 shrink-0 text-slate-500" />
-                                View notifications
-                            </Link>
-                        </div>
-                        <Link
-                            href="/dashboard/student/projects"
-                            className="mt-4 inline-flex items-center gap-1 text-sm font-bold text-blue-600 hover:text-blue-700"
-                        >
-                            Go to My Projects <ChevronRight className="h-4 w-4" />
-                        </Link>
+                    <div className="flex gap-3">
+                        <StatTile label="Verified hours" value={String(Math.round(summary?.verifiedHours ?? 0))} icon={Clock} />
+                        <StatTile label="Active engagements" value={String(summary?.activeEngagements ?? 0)} icon={ListChecks} />
                     </div>
                 </div>
+            </div>
 
-                <div className="space-y-6">
-                    {data.student_analytics ? (
-                        <div className="rounded-3xl border border-slate-200/80 bg-white p-6 shadow-sm">
-                            <div className="mb-4 flex items-center justify-between gap-2">
-                                <h3 className="text-sm font-black uppercase tracking-wider text-slate-400">Your account</h3>
-                                <UserCircle className="h-5 w-5 text-slate-300" />
-                            </div>
-                            <div className="space-y-4">
+            {/* Needs you now */}
+            <div>
+                <h2 className="text-sm font-bold uppercase tracking-widest text-ciel-text-soft">Needs you now</h2>
+                {!needsYouNow.length ? (
+                    <div className="mt-3">
+                        <EmptyState emoji="✅" heading="You're all caught up" line="Nothing needs your attention right now." />
+                    </div>
+                ) : (
+                    <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        {needsYouNow.map((item) => (
+                            <Link
+                                key={item.id}
+                                href={item.href}
+                                className="ciel-transition flex items-center justify-between gap-3 rounded-ciel-lg border border-ciel-border bg-white p-4 hover:border-ciel-green/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ciel-green"
+                            >
                                 <div>
-                                    <div className="flex items-center justify-between gap-2 text-xs font-bold text-slate-500">
-                                        <span>Profile completion</span>
-                                        <span className="text-slate-800">
-                                            {data.student_analytics.profile_completion_percent}%
-                                        </span>
+                                    <p className="text-sm font-bold text-ciel-text">{item.title}</p>
+                                    <p className="mt-0.5 text-xs text-ciel-text-soft">{item.detail}</p>
+                                </div>
+                                <ArrowRight className="h-4 w-4 shrink-0 text-ciel-text-soft" />
+                            </Link>
+                        ))}
+                    </div>
+                )}
+            </div>
+
+            {/* Your paths */}
+            <div>
+                <h2 className="text-sm font-bold uppercase tracking-widest text-ciel-text-soft">Your paths</h2>
+                <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    {CIEL_PATHS.map((path) => {
+                        const status = summary?.pathsStatus[path.key];
+                        const state = status?.state ?? "not_started";
+                        return (
+                            <Link
+                                key={path.key}
+                                href={path.href}
+                                className="ciel-transition rounded-ciel-lg border border-ciel-border bg-white p-4 sm:p-5 hover:border-ciel-green/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ciel-green"
+                            >
+                                <div className="flex items-start justify-between gap-3">
+                                    <div className="flex items-center gap-3">
+                                        <span className="text-xl" aria-hidden>{path.emoji}</span>
+                                        <span className="text-sm font-bold text-ciel-text">{path.label}</span>
                                     </div>
-                                    <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100">
-                                        <div
-                                            className="h-full rounded-full bg-blue-600 transition-[width]"
-                                            style={{
-                                                width: `${Math.min(100, Math.max(0, data.student_analytics.profile_completion_percent))}%`,
-                                            }}
-                                        />
-                                    </div>
-                                    <p className="mt-1 text-[11px] text-slate-400">
-                                        {data.student_analytics.completed_required_fields} of{" "}
-                                        {data.student_analytics.total_required_fields} required fields
+                                    <span
+                                        className={clsx(
+                                            "shrink-0 rounded-ciel-xs px-2 py-1 text-[10px] font-bold uppercase tracking-wide",
+                                            state === "complete" && "bg-ciel-green-soft text-ciel-green-deep",
+                                            state === "active" && "bg-ciel-indigo-soft text-ciel-indigo",
+                                            state === "not_started" && "bg-ciel-page text-ciel-text-soft",
+                                        )}
+                                    >
+                                        {pathStateLabel(state)}
+                                    </span>
+                                </div>
+                                <p className="mt-2 text-xs text-ciel-text-soft">{status?.detail ?? "Not started"}</p>
+                                {state === "active" && <ProgressBar value={status?.progress ?? 0} className="mt-3" />}
+                            </Link>
+                        );
+                    })}
+                </div>
+            </div>
+
+            {/* Opportunities */}
+            <div>
+                <div className="flex items-center justify-between">
+                    <h2 className="text-sm font-bold uppercase tracking-widest text-ciel-text-soft">Recommended for you</h2>
+                    <Link href="/dashboard/student/browse" className="text-xs font-bold text-ciel-green-deep hover:underline">See all</Link>
+                </div>
+                {!opportunities.length ? (
+                    <div className="mt-3">
+                        <EmptyState emoji="🧭" heading="No recommendations yet" line="Browse the opportunity board to find your next engagement." actionLabel="Browse opportunities" href="/dashboard/student/browse" />
+                    </div>
+                ) : (
+                    <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                        {opportunities.map((opp) => (
+                            <Link
+                                key={opp.id}
+                                href={`/dashboard/student/browse/${opp.id}`}
+                                className="ciel-transition rounded-ciel-lg border border-ciel-border bg-white p-4 hover:border-ciel-green/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ciel-green"
+                            >
+                                <Compass className="h-4 w-4 text-ciel-green-deep" />
+                                <p className="mt-2 text-sm font-bold text-ciel-text">{opp.title}</p>
+                                <p className="mt-0.5 text-xs text-ciel-text-soft">{opp.organization_name || opp.organization || "CIEL partner"}</p>
+                            </Link>
+                        ))}
+                    </div>
+                )}
+            </div>
+
+            {/* Recent activity */}
+            <div>
+                <h2 className="text-sm font-bold uppercase tracking-widest text-ciel-text-soft">Recent activity</h2>
+                {!dashboard?.activeProjects.length ? (
+                    <div className="mt-3">
+                        <EmptyState emoji="🗓️" heading="No activity yet" line="Your logged hours, reports, and path updates will appear here." />
+                    </div>
+                ) : (
+                    <ol className="mt-3 space-y-3">
+                        {dashboard.activeProjects.slice(0, 5).map((project) => (
+                            <li key={project.id} className="flex items-start gap-3 rounded-ciel-lg border border-ciel-border bg-white p-4">
+                                <span className="mt-0.5 h-2 w-2 shrink-0 rounded-full bg-ciel-green" aria-hidden />
+                                <div>
+                                    <p className="text-sm font-semibold text-ciel-text">{project.title}</p>
+                                    <p className="mt-0.5 text-xs text-ciel-text-soft">
+                                        <span className="rounded-ciel-xs bg-ciel-indigo-soft px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-ciel-indigo">Community Service</span>
+                                        {" · "}{new Date(project.assignedAt).toLocaleDateString()} · {project.status}
                                     </p>
                                 </div>
-                                <div className="flex items-center justify-between gap-3 rounded-2xl border border-slate-100 bg-slate-50/80 px-4 py-3">
-                                    <div className="flex items-center gap-2 min-w-0">
-                                        <ShieldCheck
-                                            className={`h-5 w-5 shrink-0 ${
-                                                data.student_analytics.verified ? "text-emerald-600" : "text-amber-500"
-                                            }`}
-                                        />
-                                        <div className="min-w-0">
-                                            <p className="text-xs font-black text-slate-800">Verification</p>
-                                            <p className="text-[11px] font-medium text-slate-500">
-                                                {data.student_analytics.verified
-                                                    ? "Profile and identity verified"
-                                                    : "Complete verification to unlock all flows"}
-                                            </p>
-                                        </div>
-                                    </div>
-                                </div>
-                                {data.student_analytics.profile_completion_percent < 100 || !data.student_analytics.verified ? (
-                                    <Link
-                                        href="/dashboard/student/profile"
-                                        className="inline-flex w-full items-center justify-center rounded-xl border border-blue-200 bg-blue-50/80 py-2.5 text-sm font-bold text-blue-700 transition hover:bg-blue-100"
-                                    >
-                                        Update profile
-                                    </Link>
-                                ) : null}
-                            </div>
-                        </div>
-                    ) : null}
-
-                    <div className="rounded-3xl border border-slate-200/80 bg-white p-6 shadow-sm">
-                        <h3 className="mb-4 text-sm font-black uppercase tracking-wider text-slate-400">Upcoming deadlines</h3>
-                        {deadlines.length > 0 ? (
-                            <ul className="space-y-4">
-                                {deadlines.map((deadline) => (
-                                    <li key={deadline.id} className="flex gap-3">
-                                        <DeadlineIcon type={deadline.type} />
-                                        <div className="min-w-0">
-                                            <p className="text-sm font-bold text-slate-800">{deadline.title}</p>
-                                            <p className="text-xs text-slate-500">
-                                                {new Date(deadline.date).toLocaleDateString(undefined, {
-                                                    month: "short",
-                                                    day: "numeric",
-                                                    year: "numeric",
-                                                })}
-                                            </p>
-                                        </div>
-                                    </li>
-                                ))}
-                            </ul>
-                        ) : (
-                            <p className="text-sm text-slate-500">No upcoming deadlines.</p>
-                        )}
-                        <Link
-                            href="/dashboard/student/projects"
-                            className="mt-4 inline-flex items-center gap-1 text-sm font-bold text-blue-600 hover:text-blue-700"
-                        >
-                            View all deadlines <ChevronRight className="h-4 w-4" />
-                        </Link>
-                    </div>
-
-                    <div className="rounded-3xl border border-slate-200/80 bg-white p-6 shadow-sm">
-                        <h3 className="mb-4 text-sm font-black uppercase tracking-wider text-slate-400">Notifications snapshot</h3>
-                        {notificationsPreview ? (
-                            <ul className="space-y-4 text-sm">
-                                <li>
-                                    <span className="font-black text-slate-900">{notificationsPreview.active.length} Active</span>
-                                    {notificationsPreview.active[0] ? (
-                                        <p className="mt-1 text-slate-600">
-                                            {notificationsPreview.active[0].category ? (
-                                                <span className="mb-1 mr-2 inline-block rounded-md bg-slate-200/80 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-700">
-                                                    {notificationCategoryLabel(notificationsPreview.active[0].category)}
-                                                </span>
-                                            ) : null}
-                                            <span className="font-semibold text-slate-800">{notificationsPreview.active[0].title}</span>
-                                            <span className="text-slate-500"> ({notificationsPreview.active[0].detail})</span>
-                                        </p>
-                                    ) : (
-                                        <p className="mt-1 text-slate-500">None right now.</p>
-                                    )}
-                                </li>
-                                <li>
-                                    <span className="font-black text-slate-900">{notificationsPreview.pending.length} Pending</span>
-                                    {notificationsPreview.pending[0] ? (
-                                        <p className="mt-1 text-slate-600">
-                                            {notificationsPreview.pending[0].category ? (
-                                                <span className="mb-1 mr-2 inline-block rounded-md bg-slate-200/80 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-700">
-                                                    {notificationCategoryLabel(notificationsPreview.pending[0].category)}
-                                                </span>
-                                            ) : null}
-                                            <span className="font-semibold text-slate-800">{notificationsPreview.pending[0].title}</span>
-                                            <span className="text-slate-500"> ({notificationsPreview.pending[0].detail})</span>
-                                        </p>
-                                    ) : (
-                                        <p className="mt-1 text-slate-500">None right now.</p>
-                                    )}
-                                </li>
-                                <li>
-                                    <span className="font-black text-slate-900">{notificationsPreview.underReview.length} Under review</span>
-                                    {notificationsPreview.underReview[0] ? (
-                                        <p className="mt-1 text-slate-600">
-                                            {notificationsPreview.underReview[0].category ? (
-                                                <span className="mb-1 mr-2 inline-block rounded-md bg-slate-200/80 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-700">
-                                                    {notificationCategoryLabel(notificationsPreview.underReview[0].category)}
-                                                </span>
-                                            ) : null}
-                                            <span className="font-semibold text-slate-800">{notificationsPreview.underReview[0].title}</span>
-                                            <span className="text-slate-500"> ({notificationsPreview.underReview[0].detail})</span>
-                                        </p>
-                                    ) : (
-                                        <p className="mt-1 text-slate-500">None right now.</p>
-                                    )}
-                                </li>
-                            </ul>
-                        ) : (
-                            <p className="text-sm text-slate-500">Notification groups will appear here when the API includes them.</p>
-                        )}
-                        <Link
-                            href="/dashboard/student/notifications"
-                            className="mt-4 inline-flex items-center gap-1 text-sm font-bold text-blue-600 hover:text-blue-700"
-                        >
-                            View all notifications <ChevronRight className="h-4 w-4" />
-                        </Link>
-                    </div>
-                </div>
+                            </li>
+                        ))}
+                    </ol>
+                )}
             </div>
 
-            {firstProjectForTracker ? <StudentProgressTracker projectId={firstProjectForTracker} /> : null}
-
-            <div className="flex flex-col items-stretch justify-between gap-4 rounded-2xl bg-blue-600 p-5 text-white shadow-lg shadow-blue-100 sm:p-6 md:flex-row md:items-center">
-                <div className="flex min-w-0 items-start gap-4 sm:items-center">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/20">
-                        <TrendingUp className="h-6 w-6" />
-                    </div>
-                    <div className="min-w-0">
-                        <h3 className="text-lg font-bold">Verified Impact Tracking (Section 1)</h3>
-                        <p className="text-sm opacity-80">
-                            Authenticate your identity and log attendance directly within your Project Report.
-                        </p>
-                    </div>
-                </div>
-                <Link href="/dashboard/student/projects">
-                    <Button className="h-11 w-full bg-white px-8 font-bold text-blue-600 hover:bg-blue-50 sm:w-auto">Go to Project Reports</Button>
-                </Link>
-            </div>
-
-            {activeProjects.some(
-                (p) =>
-                    p.status?.toLowerCase() === "verified" ||
-                    p.status?.toLowerCase() === "approved" ||
-                    p.progress >= 80,
-            ) && (
-                <div className="group relative animate-in overflow-hidden rounded-[2.5rem] border-2 border-slate-900 bg-white p-8 shadow-2xl shadow-slate-200/50 fade-in slide-in-from-top-4 duration-700">
-                    <div className="absolute -right-16 -top-16 scale-150 rounded-full bg-slate-900 p-12 opacity-5 transition-transform duration-700 group-hover:scale-[1.6]" />
-                    <div className="relative z-10 flex flex-col items-center justify-between gap-8 text-center md:flex-row md:text-left">
-                        <div className="flex flex-col items-center gap-6 md:flex-row">
-                            <div className="flex h-16 w-16 rotate-3 items-center justify-center rounded-2xl bg-slate-900 text-white shadow-xl transition-transform duration-500 group-hover:rotate-0">
-                                <Award className="h-8 w-8" />
-                            </div>
-                            <div>
-                                <h3 className="text-xl font-black uppercase tracking-tight text-slate-900">Official Digital Credentials</h3>
-                                <p className="mt-1 text-sm font-bold text-slate-400">
-                                    Your social impact has been institutionally verified. Download your CII certificate.
-                                </p>
-                            </div>
-                        </div>
-                        <div className="flex flex-wrap justify-center gap-3">
-                            <Link href="/dashboard/student/report">
-                                <Button className="flex h-12 items-center gap-2 rounded-xl bg-slate-900 px-8 text-xs font-black uppercase tracking-widest text-white shadow-lg transition-all hover:bg-slate-800">
-                                    <Star className="h-4 w-4 text-amber-400" /> View CII & Dossier
-                                </Button>
-                            </Link>
-                        </div>
-                    </div>
-                </div>
-            )}
-
+            {/* Certificate ladder */}
             <div>
-                <h2 className="mb-4 text-lg font-bold text-slate-800">My Projects</h2>
-                <div className="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm">
-                    {activeProjects.length > 0 ? (
-                        activeProjects.map((project) => (
-                            <div
-                                key={project.id}
-                                className="group flex flex-col items-stretch justify-between gap-4 border-b border-slate-50 p-4 transition-colors last:border-none hover:bg-slate-50 sm:flex-row sm:items-center sm:p-6"
-                            >
-                                <div className="flex min-w-0 items-center gap-4">
-                                    <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-blue-50 text-sm font-bold text-blue-600">
-                                        {project.title.substring(0, 2).toUpperCase()}
-                                    </div>
-                                    <div className="min-w-0">
-                                        <h4 className="truncate font-bold text-slate-800 transition-colors group-hover:text-blue-600">{project.title}</h4>
-                                        <p className="text-xs text-slate-500">
-                                            {project.category} • {project.status}
-                                            {project.report_status ? (
-                                                <span className="text-slate-400"> • Report: {project.report_status}</span>
-                                            ) : null}
-                                        </p>
-                                        {projectHasAnalyticsFields(project) ? (
-                                            <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[11px] text-slate-500">
-                                                {project.required_hours_per_student != null ? (
-                                                    <span className="font-semibold text-slate-600">
-                                                        Required:{" "}
-                                                        <span className="font-black text-slate-800">
-                                                            {project.required_hours_per_student}h
-                                                        </span>
-                                                    </span>
-                                                ) : null}
-                                                {formatParticipationType(project.participation_type) ? (
-                                                    <span>{formatParticipationType(project.participation_type)}</span>
-                                                ) : null}
-                                                {project.academic_integration_type ? (
-                                                    <span className="max-w-[220px] truncate" title={project.academic_integration_type}>
-                                                        {project.academic_integration_type}
-                                                    </span>
-                                                ) : null}
-                                                {project.team_size != null && project.participation_type === "team" ? (
-                                                    <span className="inline-flex items-center gap-1 font-medium text-slate-600">
-                                                        <Users className="h-3.5 w-3.5 shrink-0 opacity-70" />
-                                                        Team {project.team_size}
-                                                    </span>
-                                                ) : null}
-                                            </div>
-                                        ) : null}
-                                    </div>
+                <h2 className="text-sm font-bold uppercase tracking-widest text-ciel-text-soft">Certificate progress</h2>
+                <div className="mt-3 overflow-x-auto rounded-ciel-lg border border-ciel-border bg-white p-5">
+                    <div className="flex min-w-[640px] items-center">
+                        {CERT_LADDER.map((step, i) => (
+                            <div key={step.key} className="flex flex-1 flex-col items-center gap-2">
+                                <div className="flex w-full items-center">
+                                    <div className={clsx("h-px flex-1", i === 0 ? "bg-transparent" : i <= certStep ? "bg-ciel-green" : "bg-ciel-border")} />
+                                    <span
+                                        className={clsx(
+                                            "flex h-8 w-8 shrink-0 items-center justify-center rounded-full",
+                                            i <= certStep ? "bg-ciel-green text-white" : i === certStep + 1 ? "bg-ciel-amber-soft text-ciel-amber" : "bg-ciel-page text-ciel-text-soft",
+                                        )}
+                                    >
+                                        {i <= certStep ? <CheckCircle2 className="h-4 w-4" /> : <Circle className="h-4 w-4" />}
+                                    </span>
+                                    <div className={clsx("h-px flex-1", i === CERT_LADDER.length - 1 ? "bg-transparent" : i < certStep ? "bg-ciel-green" : "bg-ciel-border")} />
                                 </div>
-                                <div className="flex items-center gap-3 sm:justify-end">
-                                    <Link href={`/dashboard/student/report?projectId=${project.id}`} className="w-full sm:w-auto">
-                                        <Button
-                                            size="sm"
-                                            variant={
-                                                project.status?.toLowerCase() === "verified" || project.progress >= 80 ? "default" : "outline"
-                                            }
-                                            className={`w-full sm:w-auto ${
-                                                project.status?.toLowerCase() === "verified" || project.progress >= 80
-                                                    ? "border-none bg-green-600 text-white shadow-md shadow-green-100 hover:bg-green-700"
-                                                    : ""
-                                            }`}
-                                        >
-                                            {project.status?.toLowerCase() === "verified" || project.progress >= 80
-                                                ? "Get CII Certificate"
-                                                : "Edit Report"}
-                                        </Button>
-                                    </Link>
-                                </div>
+                                <span className="max-w-[6.5rem] text-center text-[10px] font-bold text-ciel-text-mid">{step.label}</span>
                             </div>
-                        ))
-                    ) : (
-                        <div className="p-8 text-center text-slate-500">No active projects found.</div>
+                        ))}
+                    </div>
+                    {certStep >= CERT_LADDER.length - 1 && (
+                        <p className="mt-4 flex items-center justify-center gap-2 text-xs font-bold text-ciel-green-deep">
+                            <Award className="h-4 w-4" /> Certificate earned — download it from Reports &amp; Certificates.
+                        </p>
                     )}
                 </div>
             </div>
-
-            {firstProjectForTracker ? (
-                <Section1AnalyticsPanel
-                    apiPath={`/api/v1/student/projects/${encodeURIComponent(firstProjectForTracker)}/section1-analytics`}
-                    title="Participation & attendance"
-                    description="Read-only metrics from CIEL for your active project. Full detail also appears in your report."
-                    className="mt-8"
-                />
-            ) : null}
-
-            <CepExperienceFeedbackPrompt eligibilityReady={cepFeedbackEligible} />
-            <OpportunityLiveApplyModal
-                project={liveApplyProject}
-                open={showLiveApplyModal}
-                onClose={() => setShowLiveApplyModal(false)}
-            />
         </div>
     );
 }

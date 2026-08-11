@@ -1,139 +1,93 @@
 "use client";
 
 import Link from "next/link";
-import { GraduationCap, Building2, Handshake, Briefcase, ChevronRight } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 
 const segments = [
     {
-        emoji: "👨‍🎓",
-        icon: GraduationCap,
+        emoji: "🧑‍🎓",
         label: "Students",
-        headline: "Build a Verified Impact Portfolio",
-        bullets: [
-            "Track hours & document every session",
-            "Earn HEC-recognized certificates",
-            "Measure your community impact score",
-        ],
+        description: "A verified portfolio across all four paths — hours, certificates, competency growth, and a CII score employers trust.",
+        cta: "Start free",
         href: "/signup?role=student",
-        accent: "bg-amber-400",
-        badge: "bg-amber-50 text-amber-700 border-amber-100",
-        dot: "bg-amber-400",
+        border: "border-l-emerald-500",
     },
     {
-        emoji: "🏫",
-        icon: Building2,
+        emoji: "👩‍🏫",
+        label: "Faculty",
+        description: "One approvals inbox, automatic reminders, and supervision analytics citable in promotion cases.",
+        cta: "See the faculty hub",
+        href: "/signup?role=faculty",
+        border: "border-l-blue-500",
+    },
+    {
+        emoji: "🏛️",
         label: "Universities",
-        headline: "Meet HEC Requirements Effortlessly",
-        bullets: [
-            "Monitor all student engagements live",
-            "Auto-generate institutional reports",
-            "Full audit trail for accreditation",
-        ],
+        description: "HEC reports auto-generated, THE Impact Rankings evidence, and a league position worth competing for.",
+        cta: "Institutional demo",
         href: "/signup?role=university",
-        accent: "bg-blue-500",
-        badge: "bg-blue-50 text-blue-700 border-blue-100",
-        dot: "bg-blue-500",
+        border: "border-l-violet-500",
     },
     {
         emoji: "🤝",
-        icon: Handshake,
-        label: "Partners (NGOs / Govt)",
-        headline: "Collaborate With Verified Students",
-        bullets: [
-            "Post real community challenges",
-            "Verify project outcomes",
-            "Track beneficiary impact data",
-        ],
+        label: "Partners (NGO / Govt)",
+        description: "Post real needs, receive supervised student teams, verify with one tap — 46% of partners come back.",
+        cta: "Partner with us",
         href: "/signup?role=ngo",
-        accent: "bg-[#12A07B]",
-        badge: "bg-emerald-50 text-emerald-700 border-emerald-100",
-        dot: "bg-[#12A07B]",
+        border: "border-l-amber-500",
     },
     {
         emoji: "🏢",
-        icon: Briefcase,
         label: "Corporates (CSR)",
-        headline: "Prove Your SDG Impact",
-        bullets: [
-            "Measure real SDG contributions",
-            "Generate ESG-ready reports",
-            "Verified community outcome data",
-        ],
+        description: "ESG-ready, verified line-items showing exactly where CSR money lands — no impact-washing possible.",
+        cta: "Sponsor verified impact",
         href: "/signup?role=corporate",
-        accent: "bg-orange-500",
-        badge: "bg-orange-50 text-orange-700 border-orange-100",
-        dot: "bg-orange-500",
+        border: "border-l-pink-500",
+    },
+    {
+        emoji: "💼",
+        label: "Investors",
+        description: "Subscribe to the venture marketplace: faculty-gated student startups with verified traction and honest stages.",
+        cta: "Browse the marketplace",
+        href: "/projects",
+        border: "border-l-teal-500",
     },
 ];
 
 export default function WhoIsItFor() {
     return (
-        <section className="pt-10 pb-24 px-6 md:pt-12 bg-white relative overflow-hidden text-center">
-            <div className="absolute inset-0 bg-[linear-gradient(rgba(0,0,0,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(0,0,0,0.02)_1px,transparent_1px)] bg-[size:60px_60px] pointer-events-none" />
-
-            <div className="max-w-7xl mx-auto relative z-10">
-                <div className="text-center mb-16">
-                    <div className="inline-flex items-center gap-2 px-4 py-2 bg-slate-100 rounded-full text-slate-500 text-xs font-black uppercase tracking-widest mb-6">
-                        <span className="w-1.5 h-1.5 rounded-full bg-slate-500 animate-pulse" />
-                        Built for you
-                    </div>
-
-                    <div className="relative inline-block mb-4">
-                        <h2 className="text-3xl md:text-4xl lg:text-[42px] font-black text-slate-900 tracking-tight leading-tight">
-                            Who Is CIEL{" "}
-                            <span className="text-[#3A72AA]">Designed For?</span>
-                        </h2>
-                        <svg
-                            className="absolute -bottom-3 left-0 w-full h-3 text-[#3A72AA]/30"
-                            preserveAspectRatio="none"
-                            viewBox="0 0 100 10"
-                            fill="none"
-                            aria-hidden
-                        >
-                            <path d="M0 5Q 25 0 50 5 Q 75 10 100 5" stroke="currentColor" strokeWidth="4" />
-                        </svg>
-                    </div>
-
-                    <p className="text-base md:text-lg text-slate-500 font-medium max-w-xl mx-auto mt-6">
-                        One platform, four stakeholders — all connected around verified community impact.
+        <section className="py-20 px-6 bg-white">
+            <div className="max-w-6xl mx-auto">
+                <div className="text-center mb-12">
+                    <p className="text-xs font-black uppercase tracking-widest text-emerald-600 mb-3">
+                        Built for everyone in the loop
+                    </p>
+                    <h2 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight">
+                        Who is CIEL designed for?
+                    </h2>
+                    <p className="text-base text-slate-500 font-medium max-w-xl mx-auto mt-3">
+                        Six stakeholders, one verified dataset — each gets exactly the slice they need.
                     </p>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                     {segments.map((seg) => (
                         <div
                             key={seg.label}
-                            className="group relative rounded-[2.5rem] p-10 bg-white border-2 border-slate-100 hover:shadow-2xl hover:-translate-y-2 transition-all duration-500 overflow-hidden text-left"
+                            className={`rounded-2xl border border-slate-200 border-l-4 ${seg.border} bg-white p-6 transition-shadow duration-300 hover:shadow-lg hover:shadow-slate-200/60`}
                         >
-                            <div className={`absolute top-0 left-0 right-0 h-1.5 ${seg.accent} rounded-t-[2.5rem]`} />
-
-                            <div className="mb-8">
-                                <div
-                                    className={`inline-flex items-center gap-2 px-4 py-2 rounded-full border ${seg.badge} text-[10px] font-black uppercase tracking-widest`}
-                                >
-                                    <span className="text-lg">{seg.emoji}</span>
-                                    {seg.label}
-                                </div>
-                            </div>
-
-                            <h3 className="text-lg md:text-xl font-black text-slate-900 leading-snug mb-6 tracking-tight">
-                                {seg.headline}
+                            <span className="text-2xl" aria-hidden>{seg.emoji}</span>
+                            <h3 className="mt-3 text-lg font-black text-slate-900 tracking-tight">
+                                {seg.label}
                             </h3>
-
-                            <ul className="space-y-4">
-                                {seg.bullets.map((bullet) => (
-                                    <li key={bullet} className="flex items-start gap-3">
-                                        <div className={`w-2 h-2 rounded-full mt-2 shrink-0 ${seg.dot}`} />
-                                        <span className="text-[15px] font-bold text-slate-600 leading-relaxed">{bullet}</span>
-                                    </li>
-                                ))}
-                            </ul>
-
+                            <p className="mt-2 text-sm text-slate-500 leading-relaxed">
+                                {seg.description}
+                            </p>
                             <Link
                                 href={seg.href}
-                                className="mt-10 flex items-center gap-2 text-[11px] font-black uppercase tracking-widest text-slate-900 opacity-70 group-hover:opacity-100 transition-all duration-300 translate-x-[-8px] group-hover:translate-x-0"
+                                className="mt-4 inline-flex items-center gap-1.5 text-sm font-bold text-emerald-600 hover:text-emerald-700 transition-colors"
                             >
-                                Get started <ChevronRight className="w-4 h-4" />
+                                {seg.cta} <ArrowRight className="w-3.5 h-3.5" />
                             </Link>
                         </div>
                     ))}

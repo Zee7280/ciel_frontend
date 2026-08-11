@@ -44,15 +44,32 @@ const policyOptions = [
 const textareaClasses =
     "min-h-[140px] w-full min-w-0 resize-y rounded-xl border border-slate-200 bg-white p-4 text-sm font-medium leading-relaxed text-slate-800 shadow-sm outline-none transition-colors placeholder:text-slate-400 focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100";
 const fieldLabel =
-    "text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500";
+    "text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500";
+const badgeMandatory =
+    "shrink-0 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700";
+const badgeRequired =
+    "shrink-0 rounded-full border border-rose-200 bg-rose-50 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-rose-600";
 
-function StepHeader({ n, title }: { n: string; title: string }) {
+function StepHeader({
+    n,
+    title,
+    status,
+}: {
+    n: string;
+    title: string;
+    status?: "mandatory" | "required";
+}) {
     return (
         <div className="flex items-center gap-2.5">
             <span className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-900 text-[11px] font-bold text-white">
                 {n}
             </span>
             <h3 className="text-base font-semibold text-slate-900">{title}</h3>
+            {status ? (
+                <span className={clsx(status === "mandatory" ? badgeMandatory : badgeRequired, "ml-auto")}>
+                    {status === "mandatory" ? "Mandatory" : "Required"}
+                </span>
+            ) : null}
         </div>
     );
 }
@@ -132,8 +149,8 @@ export default function Section10Sustainability() {
         if (score >= 4) {
             return {
                 label: "Moderate Strength",
-                color: "text-blue-800",
-                bg: "border-blue-200 bg-blue-50 text-blue-800",
+                color: "text-indigo-600",
+                bg: "border-indigo-200 bg-indigo-50 text-indigo-600",
             };
         }
         return {
@@ -179,8 +196,8 @@ export default function Section10Sustainability() {
         <div className="relative">
             {!isEligibleForSubmission && (
                 <div className="absolute inset-0 z-50 flex flex-col items-center justify-start rounded-2xl bg-slate-50/60 p-8 pt-24 text-center backdrop-blur-[2px]">
-                    <div className="max-w-md space-y-5 rounded-2xl border border-slate-200 bg-white p-8 shadow-xl">
-                        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-amber-50 text-amber-500">
+                    <div className="max-w-md space-y-5 rounded-xl border border-slate-200 bg-white p-8 shadow-xl">
+                        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-amber-50 text-amber-500">
                             <Lock className="h-8 w-8" />
                         </div>
                         <div className="space-y-2">
@@ -210,7 +227,7 @@ export default function Section10Sustainability() {
 
             <div
                 className={clsx(
-                    "space-y-8 pb-10 transition-all duration-500",
+                    "mx-auto max-w-6xl space-y-8 pb-10 transition-all duration-500",
                     !isEligibleForSubmission && "pointer-events-none opacity-40 blur-[1px] grayscale",
                 )}
             >
@@ -243,7 +260,7 @@ export default function Section10Sustainability() {
 
                 {/* 10.1 Continuation status */}
                 <section className="space-y-4">
-                    <StepHeader n="10.1" title="Step 1 — Continuation status (required)" />
+                    <StepHeader n="10.1" title="Step 1 — Continuation status" status="required" />
 
                     <div className="space-y-5 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
                         <Label className={fieldLabel}>
@@ -292,7 +309,7 @@ export default function Section10Sustainability() {
                 {/* 10.2 Explanation */}
                 {continuation_status ? (
                     <section className="space-y-4">
-                        <StepHeader n="10.2" title="Step 2 — Explanation of continuation" />
+                        <StepHeader n="10.2" title="Step 2 — Explanation of continuation" status="mandatory" />
 
                         <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
                             <div>
@@ -313,18 +330,35 @@ export default function Section10Sustainability() {
                                 )}
                             />
 
-                            <span
-                                className={clsx(
-                                    "text-xs font-medium",
-                                    cdWords >= minWords && cdWords <= maxWords
-                                        ? "text-indigo-600"
-                                        : cdWords > maxWords
-                                            ? "text-red-500"
-                                            : "text-amber-600",
-                                )}
-                            >
-                                {cdWords} / {maxWords} words (min {minWords})
-                            </span>
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                                <div className="h-1.5 w-40 overflow-hidden rounded-full bg-slate-100 sm:w-48">
+                                    <div
+                                        className={clsx(
+                                            "h-full rounded-full transition-all",
+                                            cdWords < minWords
+                                                ? "bg-amber-400"
+                                                : cdWords > maxWords
+                                                    ? "bg-red-500"
+                                                    : "bg-emerald-500",
+                                        )}
+                                        style={{
+                                            width: `${Math.min((cdWords / maxWords) * 100, 100)}%`,
+                                        }}
+                                    />
+                                </div>
+                                <p
+                                    className={clsx(
+                                        "text-[11px] tabular-nums",
+                                        cdWords >= minWords && cdWords <= maxWords
+                                            ? "text-emerald-600"
+                                            : cdWords > maxWords
+                                                ? "text-red-500"
+                                                : "text-slate-400",
+                                    )}
+                                >
+                                    {cdWords} / {maxWords} words (min {minWords})
+                                </p>
+                            </div>
 
                             <FieldError message={getFieldError("section10.continuation_details")} />
                         </div>
@@ -333,7 +367,7 @@ export default function Section10Sustainability() {
 
                 {/* 10.3 Mechanisms */}
                 <section className="space-y-4">
-                    <StepHeader n="10.3" title="Step 3 — Sustainability mechanisms" />
+                    <StepHeader n="10.3" title="Step 3 — Sustainability mechanisms" status="required" />
 
                     <div className="space-y-5 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
                         <div>
@@ -378,7 +412,7 @@ export default function Section10Sustainability() {
 
                 {/* 10.4 Scaling & influence */}
                 <section className="space-y-4">
-                    <StepHeader n="10.4" title="Step 4 — Scaling & system influence" />
+                    <StepHeader n="10.4" title="Step 4 — Scaling & system influence" status="required" />
 
                     <div className="space-y-8 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
                         <div className="space-y-4">
@@ -444,7 +478,7 @@ export default function Section10Sustainability() {
                 <section className="space-y-4 border-t border-slate-200 pt-8">
                     <div className="flex flex-wrap items-center justify-between gap-3">
                         <div className="flex items-center gap-2.5">
-                            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-600 text-white">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-600 text-white">
                                 <Leaf className="h-4 w-4" />
                             </div>
                             <h3 className="text-base font-semibold text-slate-900">
@@ -519,7 +553,7 @@ export default function Section10Sustainability() {
                 <section className="space-y-4 border-t border-slate-200 pt-8">
                     <div className="flex flex-wrap items-center justify-between gap-3">
                         <div className="flex items-center gap-2.5">
-                            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-600 text-white">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-600 text-white">
                                 <Leaf className="h-4 w-4" />
                             </div>
                             <h3 className="text-base font-semibold text-slate-900">

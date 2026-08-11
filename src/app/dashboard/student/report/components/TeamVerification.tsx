@@ -82,127 +82,108 @@ export default function TeamVerification({
     };
 
     return (
-        <div className="space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 p-6 bg-white rounded-[2rem] border border-slate-100 shadow-sm transition-all hover:shadow-md">
-                <div className="space-y-1.5">
-                    <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
-                            <Users className="w-4.5 h-4.5" />
-                        </div>
-                        <h4 className="text-lg font-bold text-slate-900 tracking-tight">Team Configuration</h4>
-                    </div>
-                    <p className="text-xs text-slate-500 font-medium">Manage project participants and verify identities for HEC compliance.</p>
-                </div>
-
-                <div className="flex items-center gap-3">
-                    {!lockAddMembers && (
-                        <Button
-                            onClick={handleAddMember}
-                            className="bg-report-primary hover:opacity-90 text-white rounded-xl h-11 px-6 font-bold text-sm transition-all flex items-center gap-2 shadow-lg shadow-indigo-100 hover:scale-[1.02] active:scale-95"
-                        >
-                            <UserPlus className="w-4 h-4" /> Add Team Member
-                        </Button>
-                    )}
-                </div>
-            </div>
-
-            <div className="bg-amber-50/50 border border-amber-100/50 rounded-2xl p-4 flex items-start gap-3 transition-colors hover:bg-amber-50">
-                <div className="w-8 h-8 rounded-lg bg-amber-100 text-amber-600 flex items-center justify-center shrink-0">
-                    <Info className="w-4 h-4" />
-                </div>
-                <div className="space-y-0.5 mt-0.5">
-                    <p className="text-[11px] text-amber-800 font-black uppercase tracking-widest leading-none">Security Note</p>
-                    <p className="text-xs text-amber-700/80 font-medium leading-relaxed">
-                        Only registered CIEL users can be added. Each member must verify their identity via OTP during this stage to be included in the final audit trail.
+        <div className="space-y-3">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                    <p className="text-sm font-semibold text-slate-900">Team configuration</p>
+                    <p className="mt-0.5 text-xs text-slate-500">
+                        Add registered CIEL users; each member verifies identity via OTP.
                     </p>
                 </div>
+                {!lockAddMembers ? (
+                    <Button
+                        type="button"
+                        onClick={handleAddMember}
+                        className="h-9 shrink-0 gap-1.5 rounded-lg bg-indigo-600 px-3 text-xs font-semibold text-white hover:bg-indigo-700"
+                    >
+                        <UserPlus className="h-3.5 w-3.5" />
+                        Add member
+                    </Button>
+                ) : null}
             </div>
 
-            <div className="grid grid-cols-1 gap-4">
+            <div className="flex gap-2.5 rounded-lg border border-amber-100 bg-amber-50/80 px-3 py-2.5">
+                <Info className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+                <p className="text-xs leading-relaxed text-amber-900">
+                    Only registered CIEL users can be added. OTP verification is required for the audit trail.
+                </p>
+            </div>
+
+            <div className="grid grid-cols-1 gap-3">
                 {members.map((member, idx) => {
                     const mayRemove = canRemoveMember ? canRemoveMember(member, idx) : !lockAddMembers;
                     return (
                     <div
                         key={idx}
                         className={clsx(
-                            "group relative rounded-[2rem] border transition-all duration-300 bg-white shadow-sm hover:shadow-xl hover:-translate-y-1",
-                            member.verified ? "border-emerald-100 bg-emerald-50/5" : "border-slate-100"
+                            "rounded-xl border bg-white transition-colors",
+                            member.verified ? "border-emerald-200" : "border-slate-200",
                         )}
                     >
-                        <div className="p-5 flex flex-col sm:flex-row items-center justify-between gap-4">
-                            <div className="flex items-center gap-5">
+                        <div className="flex flex-col gap-3 p-3.5 sm:flex-row sm:items-center sm:justify-between">
+                            <div className="flex items-center gap-3">
                                 <div className={clsx(
-                                    "w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 transition-all shadow-sm group-hover:scale-110",
-                                    member.verified ? "bg-indigo-600 text-white shadow-indigo-100" : "bg-slate-50 text-slate-400"
+                                    "flex h-10 w-10 shrink-0 items-center justify-center rounded-lg",
+                                    member.verified ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-400",
                                 )}>
-                                    {member.verified ? (
-                                        <div className="relative">
-                                            <Users className="w-7 h-7" />
-                                            <div className="absolute -bottom-1 -right-1 bg-emerald-500 rounded-full p-0.5 border-2 border-white animate-pulse">
-                                                <CheckCircle2 className="w-3 h-3 text-white" />
-                                            </div>
-                                        </div>
-                                    ) : <Users className="w-7 h-7" />}
+                                    <Users className="h-5 w-5" />
                                 </div>
-                                <div className="space-y-1 text-center sm:text-left">
-                                    <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-                                        <h4 className="text-lg font-black text-slate-900 tracking-tight">
+                                <div className="min-w-0">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <h4 className="text-sm font-semibold text-slate-900">
                                             {member.fullName || member.name || `Team Member ${idx + 1}`}
                                         </h4>
-                                        {member.verified && (
-                                            <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full border border-emerald-100/50">
-                                                <div className="bg-emerald-500 rounded-full p-0.5">
-                                                    <CheckCircle2 className="w-3 h-3 text-white" />
-                                                </div>
-                                                <span className="text-[10px] font-black uppercase tracking-widest">Identity Verified</span>
-                                            </div>
-                                        )}
+                                        {member.verified ? (
+                                            <span className="inline-flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-emerald-600">
+                                                <CheckCircle2 className="h-3 w-3" />
+                                                Verified
+                                            </span>
+                                        ) : null}
                                     </div>
-                                    <p className="text-sm font-medium text-slate-400">
-                                        {member.role || 'Active Contributor'} • {member.university || 'Pending Institution Verification'}
+                                    <p className="mt-0.5 text-xs text-slate-500">
+                                        {member.role || "Member"} · {member.university || "Pending university"}
                                     </p>
                                 </div>
                             </div>
 
-                            <div className="flex items-center gap-2.5 shrink-0">
-                                {!lockAddMembers && (
+                            <div className="flex items-center gap-2 shrink-0">
+                                {!lockAddMembers ? (
                                     <Button
+                                        type="button"
                                         variant="outline"
                                         size="sm"
                                         onClick={() => setExpandedIndex(expandedIndex === idx ? null : idx)}
                                         className={clsx(
-                                            "h-10 px-5 rounded-xl text-xs font-black uppercase tracking-widest transition-all",
-                                            expandedIndex === idx ? "bg-slate-900 text-white border-slate-900" : "border-slate-200 text-slate-600 hover:bg-slate-50"
+                                            "h-8 rounded-lg px-3 text-xs font-semibold",
+                                            expandedIndex === idx
+                                                ? "border-slate-900 bg-slate-900 text-white"
+                                                : "border-slate-200 text-slate-700",
                                         )}
                                     >
-                                        {expandedIndex === idx ? "Cancel Edit" : "Configure"}
+                                        {expandedIndex === idx ? "Close" : "Configure"}
                                     </Button>
-                                )}
-                                {mayRemove && (
+                                ) : null}
+                                {mayRemove ? (
                                     <Button
+                                        type="button"
                                         variant="outline"
                                         size="sm"
                                         onClick={() => removeMember(idx)}
-                                        className="h-10 w-10 p-0 flex items-center justify-center border-slate-100 text-slate-300 hover:text-red-500 hover:bg-red-50 hover:border-red-100 rounded-xl transition-all"
+                                        className="flex h-8 w-8 items-center justify-center rounded-lg border-slate-200 p-0 text-slate-400 hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600"
                                     >
-                                        <Trash2 className="w-4.5 h-4.5" />
+                                        <Trash2 className="h-3.5 w-3.5" />
                                     </Button>
-                                )}
+                                ) : null}
                             </div>
                         </div>
 
-                        {expandedIndex === idx && (
-                            <div className="p-8 pt-2 border-t border-slate-100/60 bg-slate-50/20">
-                                <div className="mb-6 flex items-center gap-3 px-4 py-3 bg-white rounded-2xl border border-indigo-100 shadow-sm">
-                                    <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
-                                        <Shield className="w-4 h-4" />
-                                    </div>
-                                    <div>
-                                        <p className="text-[11px] font-black text-indigo-600 uppercase tracking-widest leading-none">Institutional Security Protocol</p>
-                                        <p className="text-[10px] text-slate-500 font-medium">Please provide the registered details for official OTP authentication.</p>
-                                    </div>
+                        {expandedIndex === idx ? (
+                            <div className="space-y-3 border-t border-slate-100 bg-slate-50/50 p-3.5">
+                                <div className="flex items-center gap-2 text-xs text-slate-600">
+                                    <Shield className="h-3.5 w-3.5 text-indigo-600" />
+                                    Enter registered details for OTP verification.
                                 </div>
-                                <div className="bg-white rounded-[2rem] p-8 border border-slate-100 shadow-inner">
+                                <div className="rounded-xl border border-slate-200 bg-white p-3 sm:p-4">
                                     <IdentityVerification
                                         projectId={projectId}
                                         initialData={member}
@@ -215,31 +196,29 @@ export default function TeamVerification({
                                     />
                                 </div>
                             </div>
-                        )}
+                        ) : null}
                     </div>
                 );})}
             </div>
 
-            {members.length === 0 && (
-                <div className="py-20 text-center space-y-5 bg-white rounded-[3rem] border-2 border-dashed border-slate-100 transition-all hover:border-indigo-100 hover:bg-slate-50/50">
-                    <div className="relative flex justify-center">
-                        <div className="absolute w-20 h-20 bg-indigo-50 rounded-full blur-2xl opacity-60 animate-pulse"></div>
-                        <Users className="w-14 h-14 text-slate-200 relative z-10" />
-                    </div>
-                    <div className="space-y-1">
-                        <p className="text-sm font-black text-slate-900 uppercase tracking-widest">Individual Participation</p>
-                        <p className="text-xs text-slate-400 font-medium max-w-[280px] mx-auto leading-relaxed">No team members have been added yet. This report will be treated as an individual engagement.</p>
-                    </div>
-                    {!lockAddMembers && (
-                        <button 
+            {members.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/50 px-4 py-8 text-center">
+                    <Users className="mx-auto h-8 w-8 text-slate-300" />
+                    <p className="mt-2 text-sm font-semibold text-slate-800">Individual participation</p>
+                    <p className="mx-auto mt-1 max-w-sm text-xs text-slate-500">
+                        No teammates yet — this report stays individual until you add members.
+                    </p>
+                    {!lockAddMembers ? (
+                        <button
+                            type="button"
                             onClick={handleAddMember}
-                            className="text-[10px] font-black text-indigo-600 uppercase tracking-[0.2em] hover:text-indigo-700 transition-colors"
+                            className="mt-3 text-xs font-semibold text-indigo-600 hover:text-indigo-700"
                         >
-                            + Click to add collaborators
+                            + Add collaborators
                         </button>
-                    )}
+                    ) : null}
                 </div>
-            )}
+            ) : null}
         </div>
     );
 }

@@ -13,6 +13,29 @@
   --color-report-primary-border: #e0e7ff;
   /* indigo-100 */
   --color-report-primary-shadow: rgba(79, 70, 229, 0.1);
+
+  /* CIEL design system (signup / student sidebar / path workspaces / dashboard) */
+  --color-ciel-page: #EFEFF3;
+  --color-ciel-navy: #12303F;
+  --color-ciel-green: #4CC38A;
+  --color-ciel-green-deep: #1E9E68;
+  --color-ciel-green-soft: #DFF3E6;
+  --color-ciel-indigo: #3B55C7;
+  --color-ciel-indigo-soft: #E3EAFD;
+  --color-ciel-text: #0E1B26;
+  --color-ciel-text-mid: #5C6672;
+  --color-ciel-text-soft: #8A8F99;
+  --color-ciel-border: #E8E9EE;
+  --color-ciel-amber: #D97706;
+  --color-ciel-amber-soft: #FEF3C7;
+
+  --radius-ciel-xl: 28px;
+  --radius-ciel-lg: 20px;
+  --radius-ciel-md: 16px;
+  --radius-ciel-sm: 12px;
+  --radius-ciel-xs: 8px;
+
+  --ease-ciel: cubic-bezier(0, 0, 0.2, 1);
 }
 
 :root {
@@ -20,6 +43,7 @@
   /* slate-50 */
   --foreground: #1e293b;
   /* slate-800 */
+  --ciel-sidebar-width: 16rem;
 }
 
 body {
@@ -65,6 +89,45 @@ body {
 
   .animate-dropdown-in {
     animation: dropdownIn 0.2s ease-out forwards;
+  }
+
+  .ciel-transition {
+    transition-duration: 160ms;
+    transition-timing-function: var(--ease-ciel);
+  }
+
+  .ciel-crossfade-enter {
+    animation: cielCrossfade 160ms var(--ease-ciel) forwards;
+  }
+
+  /* Opacity-only: a `transform` here would leave the element in its own stacking
+     context after the animation fills, fighting z-index on absolutely-positioned
+     siblings (e.g. a dropdown in an earlier form field bleeding under a later row). */
+  @keyframes cielCrossfade {
+    from {
+      opacity: 0;
+    }
+
+    to {
+      opacity: 1;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+
+    .ciel-transition,
+    .ciel-crossfade-enter,
+    .animate-fade-in-up,
+    .animate-float-slow,
+    .animate-float-medium,
+    .animate-float-fast,
+    .animate-spin-slow,
+    .animate-spin-extra-slow,
+    .animate-pulse-slow,
+    .animate-dropdown-in {
+      animation: none !important;
+      transition: none !important;
+    }
   }
 
   @keyframes spin {

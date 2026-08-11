@@ -1,6 +1,8 @@
 import Navbar from "@/components/Navbar";
 import Hero from "@/components/Hero";
 import SdgStickerMarquee from "@/components/SdgStickerMarquee";
+import WhereImpactLives from "@/components/WhereImpactLives";
+import LiveProjectsShowcase from "@/components/LiveProjectsShowcase";
 import WhoIsItFor from "@/components/WhoIsItFor";
 import HowWeWork from "@/components/HowWeWork";
 import FeaturesBar from "@/components/FeaturesBar";
@@ -16,6 +18,8 @@ export default function Home() {
       <Navbar />
       <Hero />
       <SdgStickerMarquee />
+      <WhereImpactLives />
+      <LiveProjectsShowcase />
       <ImpactSnapshot />
       <WhoIsItFor />
       <HowWeWork />

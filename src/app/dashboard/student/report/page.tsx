@@ -38,6 +38,7 @@ import Section9Reflection from './components/Section9Reflection'; // New
 import Section10Sustainability from './components/Section10Sustainability'; // Renamed
 import Section11Summary from './components/Section11Summary'; // New
 import PreReportGuide from './components/PreReportGuide';
+import { ReportSectionGuideFloat } from '@/components/report/ReportSectionGuideFloat';
 
 type ProjectDetails = { title?: string } & Record<string, unknown>;
 
@@ -807,36 +808,36 @@ function ReportFormContent() {
                     ) : null}
                     {!isReadOnly && !isTeamMemberAttendanceOnly && (
                         <div className={clsx(
-                            "hidden md:flex items-center gap-2.5 px-3 py-1.5 rounded-xl border transition-all animate-in fade-in zoom-in duration-500",
+                            "hidden md:flex items-center gap-2 px-2.5 py-1.5 rounded-lg border transition-all",
                             canFinalizeSubmit
-                                ? "bg-emerald-50 border-emerald-100 text-emerald-700 shadow-sm"
+                                ? "bg-emerald-50 border-emerald-100 text-emerald-700"
                                 : "bg-amber-50 border-amber-100 text-amber-700"
                         )}>
                             <div className={clsx(
-                                "w-2.5 h-2.5 rounded-full animate-pulse",
+                                "w-2 h-2 rounded-full",
                                 canFinalizeSubmit ? "bg-emerald-500" : "bg-amber-500"
                             )} />
                             <div className="flex flex-col">
-                                <span className="text-[10px] font-black uppercase tracking-widest leading-none mb-0.5">
+                                <span className="text-[10px] font-bold uppercase tracking-wide leading-none">
                                     {canFinalizeSubmit
-                                        ? "Submission Mode Ready"
+                                        ? "Ready to submit"
                                         : canSubmitReport && !isTeamLeadForSubmit
-                                          ? "Team lead submit required"
+                                          ? "Team lead submit"
                                           : isEligibleForSubmission
                                             ? "Almost there"
-                                            : "Progress Mode"}
+                                            : "Progress mode"}
                                 </span>
-                                <span className="text-[9px] font-bold opacity-70 leading-none">
+                                <span className="mt-0.5 text-[10px] font-medium opacity-80 leading-snug">
                                     {canSubmitReport && !isTeamLeadForSubmit
-                                        ? "Team report is ready, but only your team lead can submit."
+                                        ? "Only your team lead can submit."
                                         : canSubmitReport
-                                          ? "All sections complete. You can submit from the summary step."
+                                          ? "All sections complete — submit from Summary."
                                           : isEligibleForSubmission
-                                            ? "Finish steps 1–10; then you can submit on the summary."
-                                            : `Verification in progress: ${data.section1.metrics?.total_verified_hours || 0}/${data.required_hours || 16} hours met.`}
+                                            ? "Finish steps 1–10, then submit on Summary."
+                                            : `${data.section1.metrics?.total_verified_hours || 0}/${data.required_hours || 16} hours verified`}
                                 </span>
                             </div>
-                            {canFinalizeSubmit && <CheckCircle2 className="w-4 h-4 text-emerald-500 ml-1" />}
+                            {canFinalizeSubmit && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 ml-0.5" />}
                         </div>
                     )}
                     <div className="flex items-center gap-3 sm:justify-end">
@@ -1061,6 +1062,11 @@ function ReportFormContent() {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+            <ReportSectionGuideFloat
+                sectionStep={activeStep}
+                enabled={!summaryOnlyWorkspace && !ciiVerifiedSummaryLock}
+            />
         </div>
     );
 }

@@ -1,5 +1,5 @@
 import React from "react";
-import { Users, User, UserPlus, Trash2, Shield, Info, AlertCircle, Clock, CheckCircle2, Check, Loader2, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Save, Lock, Unlock, PlusCircle, Sparkles } from "lucide-react";
+import { Users, User, Shield, AlertCircle, CheckCircle2, Check, Loader2, ChevronRight, ChevronLeft, Save, Lock } from "lucide-react";
 import { Label } from "./ui/label";
 import { Input } from "./ui/input";
 import { Button } from "./ui/button";
@@ -1061,8 +1061,8 @@ export default function Section1Participation({ projectData }: { projectData?: a
                 </div>
             ) : null}
 
-            {/* Section 1 — 4-step progress stepper */}
-            <div className="shrink-0 border-b border-slate-200 bg-white px-4 py-4 sm:px-6">
+            {/* Section 1 — compact 4-step progress */}
+            <div className="shrink-0 border-b border-slate-200 bg-white px-4 py-3 sm:px-6">
                 <nav aria-label="Section 1 progress" className="mx-auto max-w-3xl">
                     <ol className="flex items-start">
                         {steps.map((s, idx) => {
@@ -1077,13 +1077,13 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                     key={s.id}
                                     className={clsx(
                                         "relative flex flex-1 flex-col items-center",
-                                        idx < steps.length - 1 && "pr-2 sm:pr-0",
+                                        idx < steps.length - 1 && "pr-1 sm:pr-0",
                                     )}
                                 >
                                     {idx < steps.length - 1 ? (
                                         <div
                                             className={clsx(
-                                                "absolute left-[calc(50%+1rem)] right-0 top-4 hidden h-0.5 sm:block",
+                                                "absolute left-[calc(50%+0.875rem)] right-0 top-3.5 hidden h-0.5 sm:block",
                                                 isComplete ? "bg-emerald-400" : "bg-slate-200",
                                             )}
                                             aria-hidden
@@ -1098,7 +1098,7 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                             if (canNavigate) setInternalStep(s.id);
                                         }}
                                         className={clsx(
-                                            "relative z-10 flex flex-col items-center gap-1.5 transition-opacity",
+                                            "relative z-10 flex flex-col items-center gap-1 transition-opacity",
                                             isDisabled
                                                 ? "cursor-not-allowed opacity-40"
                                                 : canNavigate || isCurrent
@@ -1108,26 +1108,21 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                     >
                                         <span
                                             className={clsx(
-                                                "flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold transition-all",
-                                                isCurrent &&
-                                                    "bg-indigo-600 text-white shadow-sm",
-                                                isComplete &&
-                                                    !isCurrent &&
-                                                    "bg-emerald-500 text-white",
-                                                !isCurrent &&
-                                                    !isComplete &&
-                                                    "bg-slate-200 text-white",
+                                                "flex h-7 w-7 items-center justify-center rounded-full text-[11px] font-semibold transition-all",
+                                                isCurrent && "bg-indigo-600 text-white shadow-sm",
+                                                isComplete && !isCurrent && "bg-emerald-500 text-white",
+                                                !isCurrent && !isComplete && "bg-slate-200 text-white",
                                             )}
                                         >
                                             {isComplete && !isCurrent ? (
-                                                <Check className="h-4 w-4" strokeWidth={2.5} />
+                                                <Check className="h-3.5 w-3.5" strokeWidth={2.5} />
                                             ) : (
                                                 s.id
                                             )}
                                         </span>
                                         <span
                                             className={clsx(
-                                                "hidden max-w-[5.5rem] text-center text-[11px] font-medium leading-tight sm:block",
+                                                "hidden max-w-[5.5rem] text-center text-[10px] font-medium leading-tight sm:block",
                                                 isCurrent
                                                     ? "text-indigo-700"
                                                     : isComplete
@@ -1139,7 +1134,7 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                         </span>
                                         <span
                                             className={clsx(
-                                                "max-w-[4.5rem] text-center text-[10px] font-medium leading-tight sm:hidden",
+                                                "max-w-[4rem] text-center text-[10px] font-medium leading-tight sm:hidden",
                                                 isCurrent ? "text-indigo-700" : "text-slate-400",
                                             )}
                                         >
@@ -1154,108 +1149,61 @@ export default function Section1Participation({ projectData }: { projectData?: a
             </div>
 
             {/* Scrollable Content Workspace */}
-            <main className="min-w-0 flex-1 overflow-x-hidden px-3 py-5 sm:px-5 sm:py-6 lg:px-6">
-                <div className="mx-auto max-w-6xl min-w-0 space-y-5">
+            <main className="min-w-0 flex-1 overflow-x-hidden px-3 py-4 sm:px-5 lg:px-6">
+                <div className="mx-auto max-w-6xl min-w-0 space-y-4">
                     {internalStep === 1 && (
-                        <div className="space-y-6">
-                            {/* ── Institutional purpose (orientation) ── */}
-                            <div className="rounded-2xl border border-indigo-100/80 bg-indigo-50/50 p-5 sm:p-6">
-                                <div className="flex flex-col gap-5 sm:flex-row sm:items-start">
-                                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-sm">
-                                        <Sparkles className="h-5 w-5" />
-                                    </div>
-                                    <div className="min-w-0 flex-1 space-y-4">
-                                        <div>
-                                            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-indigo-500">
-                                                Institutional purpose
-                                            </p>
-                                            <h3 className="mt-1.5 text-lg font-semibold tracking-tight text-slate-900 sm:text-xl">
-                                                Establish accountability
-                                            </h3>
-                                            <p className="mt-2 max-w-3xl text-[13px] leading-relaxed text-slate-600">
-                                                This section documents verified participation and academic alignment so your community engagement record meets institutional audit expectations.
-                                            </p>
-                                        </div>
-                                        <ul className="grid gap-x-6 gap-y-2.5 sm:grid-cols-2">
-                                            {[
-                                                "Verified participation via audit-ready logs",
-                                                "Academic linkage to official student records",
-                                                "Attendance integrity through HEC-compliant tracking",
-                                                "Individual accountability for community hours",
-                                            ].map((p, i) => (
-                                                <li
-                                                    key={i}
-                                                    className="flex gap-2.5 text-[13px] leading-relaxed text-slate-700"
-                                                >
-                                                    <span className="mt-0.5 shrink-0 text-xs font-bold text-indigo-600">
-                                                        {i + 1}
-                                                    </span>
-                                                    <span>{p}</span>
-                                                </li>
-                                            ))}
-                                        </ul>
-                                    </div>
-                                </div>
+                        <div className="space-y-4">
+                            <div>
+                                <h3 className="text-lg font-semibold text-slate-900">Identity & team setup</h3>
+                                <p className="mt-0.5 text-sm text-slate-500">
+                                    Verify your profile, then add teammates if this is a team project.
+                                </p>
                             </div>
 
-                            <div className="space-y-1">
-                                <p className="text-xs font-medium text-indigo-600">Step 1</p>
-                                <h3 className="text-xl font-semibold text-slate-900">Identity & team setup</h3>
-                                <p className="text-sm text-slate-500">Verify your profile and team configuration to unlock attendance logging.</p>
-                            </div>
-
-                            {/* 1. Identity Verification Accordion */}
-                            <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
-                                <div className="p-6 flex items-center justify-between cursor-pointer hover:bg-slate-50 transition-all">
-                                    <div className="flex items-center gap-4">
-                                        <div className="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center shadow-sm">
-                                            <CheckCircle2 className="w-5 h-5" />
+                            {/* 1. Identity Verification */}
+                            <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+                                <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3 sm:px-5">
+                                    <div className="flex items-center gap-3">
+                                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600">
+                                            <CheckCircle2 className="h-4 w-4" />
                                         </div>
-                                        <h4 className="text-lg font-semibold text-slate-800">Identity Verification</h4>
+                                        <h4 className="text-sm font-semibold text-slate-900">Identity verification</h4>
                                     </div>
-                                    <ChevronDown className="w-5 h-5 text-slate-400" />
                                 </div>
 
-                                <div className="px-6 pb-6">
+                                <div className="px-4 py-4 sm:px-5">
                                     {(isVerified && !isEditingLead) ? (
-                                        <div className="rounded-xl border border-emerald-100 bg-white overflow-hidden shadow-sm hover:shadow-md transition-all duration-200">
+                                        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
                                             {(() => {
                                                 const leadCnicRaw = String((data.section1.team_lead as any).cnic || "").replace(/\D/g, "");
                                                 const leadCnicOk = leadCnicRaw.length === 13;
                                                 return !leadCnicOk ? (
-                                                    <div className="px-5 pt-4 pb-0">
-                                                        <p className="text-[13px] font-medium text-amber-800 bg-amber-50 border border-amber-100 rounded-xl px-4 py-3 leading-relaxed">
-                                                            CNIC is missing or incomplete for this project record. Use <span className="font-bold">Edit Academic</span> to add your 13-digit CNIC so your report meets traceability requirements.
+                                                    <div className="border-b border-amber-100 bg-amber-50 px-4 py-2.5">
+                                                        <p className="text-sm text-amber-900">
+                                                            CNIC incomplete — use <span className="font-semibold">Edit academic</span> to add your 13-digit CNIC.
                                                         </p>
                                                     </div>
                                                 ) : null;
                                             })()}
-                                            <div className="p-6 flex items-center justify-between">
-                                                <div className="flex items-center gap-4">
-                                                    <div className="w-12 h-12 rounded-full bg-indigo-600 text-white flex items-center justify-center shrink-0">
-                                                        <div className="relative">
-                                                            <User className="w-6 h-6" />
-                                                            <div className="absolute -bottom-1 -right-1 bg-emerald-500 rounded-full p-0.5 border-2 border-white">
-                                                                <CheckCircle2 className="w-2.5 h-2.5 text-white" />
-                                                            </div>
-                                                        </div>
+                                            <div className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-indigo-600 text-white">
+                                                        <User className="h-5 w-5" />
                                                     </div>
-                                                    <div className="space-y-0.5">
-                                                        <div className="flex items-center gap-2">
-                                                            <h4 className="text-base font-bold text-slate-800">
+                                                    <div className="min-w-0">
+                                                        <div className="flex flex-wrap items-center gap-2">
+                                                            <h4 className="text-sm font-semibold text-slate-900">
                                                                 {(data.section1.team_lead as any).fullName || (data.section1.team_lead as any).name || "Team Lead"}
                                                             </h4>
-                                                            <div className="flex items-center gap-1.5">
-                                                                <div className="bg-emerald-500 rounded-full p-0.5">
-                                                                    <CheckCircle2 className="w-2.5 h-2.5 text-white" />
-                                                                </div>
-                                                                <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-tight">Verified</span>
-                                                            </div>
+                                                            <span className="inline-flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-emerald-600">
+                                                                <CheckCircle2 className="h-3 w-3" />
+                                                                Verified
+                                                            </span>
                                                         </div>
-                                                        <p className="text-xs text-slate-500 font-medium">
-                                                            {(data.section1.team_lead as any).university || (data.section1.team_lead as any).universityName || "Academic Record Linked"}
+                                                        <p className="mt-0.5 truncate text-xs text-slate-500">
+                                                            {(data.section1.team_lead as any).university || (data.section1.team_lead as any).universityName || "Academic record linked"}
                                                         </p>
-                                                        <p className="text-[11px] text-slate-600 font-mono font-medium pt-1">
+                                                        <p className="mt-0.5 font-mono text-[11px] text-slate-600">
                                                             CNIC:{" "}
                                                             {String((data.section1.team_lead as any).cnic || "")
                                                                 .replace(/\D/g, "")
@@ -1266,24 +1214,26 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                                     </div>
                                                 </div>
 
-                                                <div className="flex items-center gap-3">
+                                                <div className="flex flex-wrap items-center gap-2">
                                                     <button
+                                                        type="button"
                                                         onClick={() => setIsEditingLead(true)}
-                                                        className="inline-flex items-center gap-2 h-9 px-4 border border-slate-200 text-slate-600 rounded-xl text-xs font-bold hover:bg-slate-50 hover:border-slate-300 transition-all duration-200 focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2"
+                                                        className="inline-flex h-9 items-center rounded-lg border border-slate-200 px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50"
                                                     >
-                                                        Edit Academic
+                                                        Edit academic
                                                     </button>
                                                     {!participantId && (
                                                         <button
+                                                            type="button"
                                                             onClick={async () => {
                                                                 setIsLoadingMetrics(true);
                                                                 await fetchInitialData();
                                                                 setIsLoadingMetrics(false);
                                                             }}
                                                             disabled={isLoadingMetrics}
-                                                            className="inline-flex items-center gap-2 h-9 px-4 bg-amber-50 text-amber-600 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-amber-100 hover:shadow-md transition-all duration-200 disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:ring-offset-2"
+                                                            className="inline-flex h-9 items-center rounded-lg bg-amber-50 px-3 text-xs font-semibold text-amber-800 hover:bg-amber-100 disabled:opacity-50"
                                                         >
-                                                            {isLoadingMetrics ? "Syncing..." : "Sync record"}
+                                                            {isLoadingMetrics ? "Syncing…" : "Sync record"}
                                                         </button>
                                                     )}
                                                 </div>
@@ -1323,17 +1273,17 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                 </div>
                             </div>
 
-                            {/* 2. Team Members Accordion */}
-                            <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
-                                <div className="p-6 flex items-center justify-between cursor-pointer hover:bg-slate-50 transition-all">
-                                    <div className="flex items-center gap-4">
-                                        <div className="w-9 h-9 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center shadow-sm">
-                                            <Users className="w-5 h-5 text-report-primary" />
+                            {/* 2. Team Members */}
+                            <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+                                <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3 sm:px-5">
+                                    <div className="flex items-center gap-3">
+                                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
+                                            <Users className="h-4 w-4" />
                                         </div>
-                                        <h4 className="text-lg font-semibold text-slate-800">Team Members</h4>
+                                        <h4 className="text-sm font-semibold text-slate-900">Team members</h4>
                                     </div>
-                                    <ChevronDown className="w-5 h-5 text-slate-400" />
-                                </div>                            <div className="px-6 pb-6 pt-2">
+                                </div>
+                                <div className="px-4 py-4 sm:px-5">
                                     <TeamVerification
                                         projectId={data.project_id || projectIdFromUrl || ""}
                                         members={team_members}
@@ -1416,7 +1366,8 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                 </div>
                             </div>
                         </div>
-                    )}                    {internalStep === 2 && (() => {
+                    )}
+                    {internalStep === 2 && (() => {
                         const selectedStudentName =
                             rawParticipants.find((u: { id: string }) => u.id === selectedParticipantId)
                                 ?.name || "Selected student";
@@ -1446,62 +1397,17 @@ export default function Section1Participation({ projectData }: { projectData?: a
                         const filteredLogCount = participantLogs.length;
 
                         return (
-                            <div className="space-y-6">
-                                {/* Institutional purpose — matches design */}
-                                <div className="rounded-2xl border border-indigo-100/80 bg-indigo-50/50 p-5 sm:p-6">
-                                    <div className="flex flex-col gap-5 sm:flex-row sm:items-start">
-                                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-sm">
-                                            <Sparkles className="h-5 w-5" />
-                                        </div>
-                                        <div className="min-w-0 flex-1 space-y-4">
-                                            <div>
-                                                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-indigo-500">
-                                                    Institutional purpose
-                                                </p>
-                                                <h3 className="mt-1.5 text-lg font-semibold tracking-tight text-slate-900 sm:text-xl">
-                                                    Establish accountability
-                                                </h3>
-                                                <p className="mt-2 max-w-3xl text-[13px] leading-relaxed text-slate-600">
-                                                    This section documents verified participation and academic alignment so your community engagement record meets institutional audit expectations.
-                                                </p>
-                                            </div>
-                                            <ul className="grid gap-x-6 gap-y-2.5 sm:grid-cols-2">
-                                                {[
-                                                    "Verified participation via audit-ready logs",
-                                                    "Academic linkage to official student records",
-                                                    "Attendance integrity through HEC-compliant tracking",
-                                                    "Individual accountability for community hours",
-                                                ].map((p, i) => (
-                                                    <li
-                                                        key={i}
-                                                        className="flex gap-2.5 text-[13px] leading-relaxed text-slate-700"
-                                                    >
-                                                        <span className="mt-0.5 shrink-0 text-xs font-bold text-indigo-600">
-                                                            {i + 1}
-                                                        </span>
-                                                        <span>{p}</span>
-                                                    </li>
-                                                ))}
-                                            </ul>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="space-y-1">
-                                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-indigo-600">
-                                        Step 2 of 4
-                                    </p>
-                                    <h3 className="text-xl font-semibold text-slate-900">
-                                        Attendance logging
-                                    </h3>
-                                    <p className="text-sm text-slate-500">
-                                        Log each engagement session with a verified time, location, and activity summary.
+                            <div className="space-y-4">
+                                <div>
+                                    <h3 className="text-lg font-semibold text-slate-900">Attendance logging</h3>
+                                    <p className="mt-0.5 text-sm text-slate-500">
+                                        Log each session with time, location, and a short activity summary.
                                     </p>
                                 </div>
 
-                                <div className="grid min-w-0 grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] lg:items-start">
+                                <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] lg:items-start">
                                     {/* Left: form */}
-                                    <div className="min-w-0 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+                                    <div className="min-w-0 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
                                         <AttendanceForm
                                             verifiedUsers={rawParticipants}
                                             onSuccess={() => loadAllEntries()}
@@ -1929,19 +1835,16 @@ export default function Section1Participation({ projectData }: { projectData?: a
                     {/* Metrics Dashboard (step 4) */}
                     {internalStep === 4 && (
                         <div className="space-y-6">
-
-                            <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-                                <div>
-                                    <p className="text-xs font-medium text-indigo-600">Step 4</p>
-                                    <h2 className="mt-0.5 text-xl font-semibold text-slate-900">
-                                        Metrics dashboard
-                                    </h2>
-                                    <p className="mt-1 text-sm text-slate-500">
-                                        Engagement intensity scores and HEC compliance results.
-                                    </p>
-                                </div>
+                            <div className="mx-auto max-w-2xl text-center">
+                                <p className="text-xs font-medium text-indigo-600">Step 4</p>
+                                <h2 className="mt-1 text-xl font-semibold text-slate-900">
+                                    Metrics dashboard
+                                </h2>
+                                <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-slate-500">
+                                    Engagement hours, sessions, and evidence for this record.
+                                </p>
                                 {isSubmitted ? (
-                                    <span className="inline-flex w-fit items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700 ring-1 ring-emerald-100">
+                                    <span className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700 ring-1 ring-emerald-100">
                                         <CheckCircle2 className="h-3.5 w-3.5" />
                                         Record finalized
                                     </span>
@@ -1949,40 +1852,30 @@ export default function Section1Participation({ projectData }: { projectData?: a
                             </div>
 
                             {verifiedMetrics ? (
-
                                 <div className="animate-in slide-in-from-bottom-4 duration-500">
-
                                     <EngagementOverview
-                                        metrics={{ 
-                                            ...verifiedMetrics, 
-                                            projectGoal, 
+                                        metrics={{
+                                            ...verifiedMetrics,
+                                            projectGoal,
                                             requiredHours: requiredHoursPerStudent,
                                             individual_metrics:
                                                 verifiedMetrics.individual_metrics ??
                                                 data.section1.metrics.individual_metrics,
                                         }}
-                                        isTeam={participation_type === 'team'}
+                                        isTeam={participation_type === "team"}
                                         hideIntensityHero
                                         report={data}
                                     />
-
                                 </div>
-
                             ) : (
-
-                                <div className="rounded-xl border border-slate-200 bg-white py-16 text-center shadow-sm">
-
+                                <div className="mx-auto max-w-2xl rounded-2xl border border-slate-200 bg-white py-16 text-center shadow-sm">
                                     <Loader2 className="mx-auto h-9 w-9 animate-spin text-indigo-600" />
-
                                     <p className="mt-4 text-base font-semibold text-slate-800">
                                         Generating analytics
                                     </p>
-
                                     <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-slate-500">
-                                        Calculating engagement intensity scores and verifying HEC
-                                        compliance for your submission record.
+                                        Calculating engagement scores and verifying HEC compliance.
                                     </p>
-
                                     {!isSubmitted ? (
                                         <Button
                                             variant="outline"
@@ -1992,20 +1885,16 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                             Return to review
                                         </Button>
                                     ) : null}
-
                                 </div>
-
                             )}
-
                         </div>
-
                     )}
                 </div>
             </main>
 
             {/* Sticky bottom actions */}
             <div className="mt-auto border-t border-slate-200 bg-white">
-                <div className="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+                <div className="mx-auto flex max-w-6xl flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6">
                     <Button
                         variant="outline"
                         onClick={handleBack}
