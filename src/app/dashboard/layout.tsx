@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import Sidebar from "@/components/Sidebar";
 import DashboardHeader from "@/components/DashboardHeader";
 import ProfileCompletionGate from "@/components/ProfileCompletionGate";
@@ -10,7 +11,9 @@ export default function DashboardLayout({
     return (
         <div className="min-h-screen bg-slate-50 font-sans">
             <div className="print:hidden">
-                <Sidebar />
+                <Suspense fallback={null}>
+                    <Sidebar />
+                </Suspense>
             </div>
             <div className="flex-1 flex flex-col min-h-screen">
                 <div className="print:hidden">

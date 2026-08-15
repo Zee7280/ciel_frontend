@@ -16,6 +16,8 @@ type PlatformStatsPayload = {
         sdgs_covered?: number;
         active_projects?: number;
         avg_cii_score?: number;
+        verified_records?: number;
+        people_reached?: number;
     };
 };
 
@@ -32,6 +34,8 @@ const FALLBACK: PlatformStatsPayload = {
         sdgs_covered: 10,
         active_projects: 85,
         avg_cii_score: 72,
+        verified_records: 40,
+        people_reached: 6000,
     },
 };
 
@@ -78,6 +82,8 @@ export async function GET() {
             sdgs_covered: normalizeCount(d.sdgs_covered ?? d.sdgs_impacted, FALLBACK.data.sdgs_covered ?? 0, 17),
             active_projects: normalizeCount(d.active_projects, FALLBACK.data.active_projects ?? 0),
             avg_cii_score: normalizeCount(d.avg_cii_score, FALLBACK.data.avg_cii_score ?? 0, 100),
+            verified_records: normalizeCount(d.verified_records, FALLBACK.data.verified_records ?? 0),
+            people_reached: normalizeCount(d.people_reached, FALLBACK.data.people_reached ?? 0),
         },
     };
 

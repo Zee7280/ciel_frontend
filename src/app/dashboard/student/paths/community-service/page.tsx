@@ -3,15 +3,23 @@
 import { Suspense, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Clock, FileText, Compass, ListChecks, UploadCloud, Send, Award } from "lucide-react";
+import { Clock, FileText, Compass, ListChecks, UploadCloud, Send, Award, Pencil, Trash2 } from "lucide-react";
 import clsx from "clsx";
+import { toast } from "sonner";
 import { authenticatedFetch } from "@/utils/api";
+import { getStoredCurrentUserId } from "@/utils/currentUser";
 import { fetchStudentDashboardData } from "@/utils/student-dashboard-fetch";
 import type { ActiveProject } from "@/app/dashboard/student/types";
 import PathWorkspaceShell from "@/components/ciel/PathWorkspaceShell";
 import EmptyState from "@/components/ciel/EmptyState";
 import StatusPill, { type CielHourStatus } from "@/components/ciel/StatusPill";
 import { WorkspaceSkeleton } from "@/components/ciel/Skeleton";
+
+interface CreatedOpportunity {
+    id: string;
+    title: string;
+    status?: string;
+}
 
 interface AttendanceLog {
     id: string;
@@ -93,38 +101,134 @@ function CommunityServiceContent() {
 }
 
 function EngagementsTab({ projects }: { projects: ActiveProject[] }) {
+    const [createdOpportunities, setCreatedOpportunities] = useState<CreatedOpportunity[]>([]);
+    const [createdLoading, setCreatedLoading] = useState(true);
+    const [deletingId, setDeletingId] = useState<string | null>(null);
+
+    useEffect(() => {
+        let cancelled = false;
+        authenticatedFetch(
+            "/api/v1/student/projects",
+            { method: "POST", body: JSON.stringify({ studentId: getStoredCurrentUserId() }) },
+            { redirectToLogin: false },
+        )
+            .then((res) => (res?.ok ? res.json() : null))
+            .then((result) => {
+                if (cancelled || !result?.success) return;
+                const rows = Array.isArray(result.data) ? (result.data as Record<string, unknown>[]) : [];
+                const mine = rows.filter(
+                    (r) => r.is_student_created === true || String(r.created_by_role || "").toLowerCase() === "student",
+                );
+                setCreatedOpportunities(
+                    mine.map((r) => ({
+                        id: String(r.id),
+                        title: String(r.title ?? "Untitled opportunity"),
+                        status: typeof r.status === "string" ? r.status : undefined,
+                    })),
+                );
+            })
+            .finally(() => {
+                if (!cancelled) setCreatedLoading(false);
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, []);
+
+    const handleDelete = async (id: string, title: string) => {
+        if (!window.confirm(`Delete "${title}"? This cannot be undone.`)) return;
+        setDeletingId(id);
+        try {
+            const res = await authenticatedFetch(`/api/v1/opportunities/${id}`, { method: "DELETE" }, { redirectToLogin: false });
+            if (!res?.ok) {
+                const err = await res?.json().catch(() => null);
+                throw new Error((err?.error as string) || (err?.message as string) || "Could not delete this listing");
+            }
+            setCreatedOpportunities((prev) => prev.filter((o) => o.id !== id));
+            toast.success("Listing deleted");
+        } catch (err) {
+            toast.error(err instanceof Error ? err.message : "Could not delete this listing");
+        } finally {
+            setDeletingId(null);
+        }
+    };
+
+    const createdSection =
+        !createdLoading && createdOpportunities.length > 0 ? (
+            <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                    <h3 className="text-xs font-bold uppercase tracking-widest text-ciel-text-soft">My created opportunities</h3>
+                    <Link href="/dashboard/student/projects" className="text-xs font-semibold text-ciel-green-deep hover:underline">
+                        Manage all →
+                    </Link>
+                </div>
+                <div className="space-y-2">
+                    {createdOpportunities.map((op) => (
+                        <div key={op.id} className="flex flex-wrap items-center justify-between gap-3 rounded-ciel-lg border border-ciel-border bg-white p-4">
+                            <div className="min-w-0">
+                                <p className="truncate text-sm font-bold text-ciel-text">{op.title}</p>
+                                {op.status && <p className="mt-0.5 text-xs capitalize text-ciel-text-soft">{op.status.replace(/_/g, " ")}</p>}
+                            </div>
+                            <div className="flex shrink-0 items-center gap-2">
+                                <Link
+                                    href={`/dashboard/student/create-opportunity?edit=${encodeURIComponent(op.id)}`}
+                                    className="ciel-transition inline-flex h-8 items-center gap-1.5 rounded-full border border-ciel-border px-3 text-xs font-bold text-ciel-text-mid hover:bg-slate-50 hover:text-ciel-navy"
+                                >
+                                    <Pencil className="h-3.5 w-3.5" /> Edit
+                                </Link>
+                                <button
+                                    type="button"
+                                    disabled={deletingId === op.id}
+                                    onClick={() => handleDelete(op.id, op.title)}
+                                    className="ciel-transition inline-flex h-8 items-center gap-1.5 rounded-full border border-rose-200 px-3 text-xs font-bold text-rose-700 hover:bg-rose-50 disabled:opacity-50"
+                                >
+                                    <Trash2 className="h-3.5 w-3.5" /> {deletingId === op.id ? "Deleting…" : "Delete"}
+                                </button>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        ) : null;
+
     if (!projects.length) {
         return (
-            <EmptyState
-                emoji="⛺"
-                heading="No engagements yet"
-                line="Join a community service opportunity to start logging verified hours."
-                actionLabel="Find opportunities"
-                href="/dashboard/student/browse"
-            />
+            <div className="space-y-6">
+                {createdSection}
+                <EmptyState
+                    emoji="⛺"
+                    heading="No engagements yet"
+                    line="Join a community service opportunity to start logging verified hours."
+                    actionLabel="Find opportunities"
+                    href="/dashboard/student/browse"
+                />
+            </div>
         );
     }
     return (
-        <div className="space-y-3">
-            {projects.map((project) => (
-                <div key={project.id} className="rounded-ciel-lg border border-ciel-border bg-white p-4 sm:p-5">
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div>
-                            <h3 className="text-sm font-bold text-ciel-text">{project.title}</h3>
-                            <p className="mt-0.5 text-xs text-ciel-text-soft">{project.category} · Joined {new Date(project.assignedAt).toLocaleDateString()}</p>
-                        </div>
-                        <span className="rounded-ciel-xs bg-ciel-page px-2.5 py-1 text-xs font-semibold text-ciel-text-mid capitalize">{project.status}</span>
-                    </div>
-                    {typeof project.required_hours_per_student === "number" && (
-                        <div className="mt-3">
-                            <div className="h-1.5 w-full overflow-hidden rounded-full bg-ciel-border">
-                                <div className="h-full rounded-full bg-ciel-green ciel-transition" style={{ width: `${Math.max(0, Math.min(100, project.progress))}%` }} />
+        <div className="space-y-6">
+            {createdSection}
+            <div className="space-y-3">
+                {projects.map((project) => (
+                    <div key={project.id} className="rounded-ciel-lg border border-ciel-border bg-white p-4 sm:p-5">
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div>
+                                <h3 className="text-sm font-bold text-ciel-text">{project.title}</h3>
+                                <p className="mt-0.5 text-xs text-ciel-text-soft">{project.category} · Joined {new Date(project.assignedAt).toLocaleDateString()}</p>
                             </div>
-                            <p className="mt-1 text-xs text-ciel-text-soft">{project.progress}% of {project.required_hours_per_student}h target</p>
+                            <span className="rounded-ciel-xs bg-ciel-page px-2.5 py-1 text-xs font-semibold text-ciel-text-mid capitalize">{project.status}</span>
                         </div>
-                    )}
-                </div>
-            ))}
+                        {typeof project.required_hours_per_student === "number" && (
+                            <div className="mt-3">
+                                <div className="h-1.5 w-full overflow-hidden rounded-full bg-ciel-border">
+                                    <div className="h-full rounded-full bg-ciel-green ciel-transition" style={{ width: `${Math.max(0, Math.min(100, project.progress))}%` }} />
+                                </div>
+                                <p className="mt-1 text-xs text-ciel-text-soft">{project.progress}% of {project.required_hours_per_student}h target</p>
+                            </div>
+                        )}
+                    </div>
+                ))}
+            </div>
         </div>
     );
 }
@@ -409,7 +513,8 @@ interface OpportunityCard {
     id: string;
     title: string;
     organization_name?: string;
-    organization?: string;
+    /** Backend returns the raw Organization entity here, not a string — always read .name. */
+    organization?: { name?: string } | null;
     types?: string[];
 }
 
@@ -449,7 +554,7 @@ function FindOpportunitiesTab() {
                     >
                         <Compass className="h-4 w-4 text-ciel-green-deep" />
                         <p className="mt-2 text-sm font-bold text-ciel-text">{opp.title}</p>
-                        <p className="mt-0.5 text-xs text-ciel-text-soft">{opp.organization_name || opp.organization || "CIEL partner"}</p>
+                        <p className="mt-0.5 text-xs text-ciel-text-soft">{opp.organization_name || opp.organization?.name || "CIEL partner"}</p>
                         {!!opp.types?.length && (
                             <span className="mt-2 inline-block rounded-ciel-xs bg-ciel-indigo-soft px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-ciel-indigo">
                                 {opp.types[0]}

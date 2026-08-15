@@ -33,6 +33,7 @@ import { resolveStudentProjectActionHref } from "@/utils/participationGuide";
 import { getStoredCurrentUserId } from "@/utils/currentUser";
 import { authenticatedFetch } from "@/utils/api";
 import { formatDisplayId } from "@/utils/displayIds";
+import { CIEL_PATHS } from "@/utils/cielPaths";
 import {
     findLiveApplyPromptProject,
     isLiveApplyPromptDismissed,
@@ -57,6 +58,8 @@ import {
     ChevronRight,
     FileStack,
     Share2,
+    Trash2,
+    ArrowUpRight,
 } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "../report/components/ui/dialog";
 import { ScoringLevelsButton, ScoringLevelsDialog } from "@/components/scoring/ScoringLevelsDialog";
@@ -337,6 +340,48 @@ interface Project {
     review_feedback?: string;
 }
 
+interface CourseProjectSummary {
+    course: string | null;
+    projectTitle: string | null;
+    status: "draft" | "submitted";
+    stepCompleted: number;
+}
+
+interface FypSummary {
+    projectTitle: string | null;
+    milestones: { status: "pending" | "in_progress" | "complete" }[];
+}
+
+interface VentureSummary {
+    ventureName: string | null;
+    completenessPercent: number;
+    isVisible: boolean;
+}
+
+function coursProjectStatusLabel(entry: CourseProjectSummary): string {
+    return entry.status === "submitted" ? "Submitted" : `Draft · step ${entry.stepCompleted}/4`;
+}
+
+function pathWorkspaceActionLabel(key: string, status: string, stepCompleted?: number): string {
+    if (key === "course-project") {
+        return status === "Submitted" ? "View & edit" : `Continue · step ${stepCompleted ?? 0}/4`;
+    }
+    if (status.toLowerCase().includes("complete") || status === "Submitted") {
+        return "Open workspace";
+    }
+    return "Continue";
+}
+
+function fypStatusLabel(entry: FypSummary): string {
+    const total = entry.milestones?.length || 5;
+    const complete = entry.milestones?.filter((m) => m.status === "complete").length || 0;
+    return `${complete}/${total} milestones complete`;
+}
+
+function ventureStatusLabel(entry: VentureSummary): string {
+    return `${entry.completenessPercent}% complete · ${entry.isVisible ? "Visible to investors" : "Not yet visible"}`;
+}
+
 type ProjectTab =
     | "all"
     | "in_progress"
@@ -464,8 +509,54 @@ export default function MyProjectsPage() {
     const [showLiveApplyModal, setShowLiveApplyModal] = useState(false);
     const [seenLiveApplyModalIds, setSeenLiveApplyModalIds] = useState<string[]>([]);
     const [isScoringLevelsOpen, setIsScoringLevelsOpen] = useState(false);
+    const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null);
+    const [courseProjectEntry, setCourseProjectEntry] = useState<CourseProjectSummary | null>(null);
+    const [fypEntry, setFypEntry] = useState<FypSummary | null>(null);
+    const [ventureEntry, setVentureEntry] = useState<VentureSummary | null>(null);
 
     const openScoringLevels = () => setIsScoringLevelsOpen(true);
+
+    const handleDeleteProject = async (projectId: string, title: string) => {
+        if (!window.confirm(`Delete "${title}"? This cannot be undone.`)) return;
+        setDeletingProjectId(projectId);
+        try {
+            const res = await authenticatedFetch(`/api/v1/opportunities/${projectId}`, { method: "DELETE" });
+            if (!res?.ok) {
+                const err = await res?.json().catch(() => null);
+                throw new Error(err?.error || err?.message || "Could not delete this listing");
+            }
+            setProjects((prev) => prev.filter((p) => p.id !== projectId));
+            toast.success("Listing deleted");
+        } catch (err) {
+            toast.error(err instanceof Error ? err.message : "Could not delete this listing");
+        } finally {
+            setDeletingProjectId(null);
+        }
+    };
+
+    useEffect(() => {
+        let cancelled = false;
+        const fetchPathEntry = (path: string) =>
+            authenticatedFetch(`/api/v1/paths/${path}`, {}, { redirectToLogin: false })
+                .then((res) => (res?.ok ? res.json() : null))
+                .then((result) => result?.data ?? null)
+                .catch(() => null);
+
+        Promise.all([
+            fetchPathEntry("course-project"),
+            fetchPathEntry("fyp-thesis"),
+            fetchPathEntry("startup-business"),
+        ]).then(([cp, fyp, venture]) => {
+            if (cancelled) return;
+            setCourseProjectEntry(cp);
+            setFypEntry(fyp);
+            setVentureEntry(venture);
+        });
+
+        return () => {
+            cancelled = true;
+        };
+    }, []);
 
     useEffect(() => {
         const fetchProjects = async () => {
@@ -789,14 +880,13 @@ export default function MyProjectsPage() {
     );
 
     return (
-        <div className="space-y-4 bg-slate-50/90 px-4 py-4 sm:px-6 sm:py-5 lg:px-8">
-            <header className="flex flex-col gap-3 border-b border-slate-200/70 pb-3 sm:flex-row sm:items-end sm:justify-between">
+        <div className="space-y-5 bg-ciel-page/80 px-4 py-5 sm:px-6 sm:py-6 lg:px-8">
+            <header className="flex flex-col gap-4 border-b border-ciel-border pb-4 sm:flex-row sm:items-end sm:justify-between">
                 <div>
-                    <h1 className="text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">My Projects</h1>
-                    <p className="mt-1 max-w-2xl text-sm leading-snug text-slate-500">
-                        <span className="font-medium text-slate-600">Manage all your projects here</span>
-                        <span className="text-slate-400"> · </span>
-                        Track, update, and manage the full lifecycle of all your projects.
+                    <p className="text-[11px] font-black uppercase tracking-[0.18em] text-ciel-green-deep">Student workspace</p>
+                    <h1 className="mt-1 text-xl font-black tracking-tight text-ciel-text sm:text-2xl">My Projects</h1>
+                    <p className="mt-2 max-w-2xl text-sm leading-relaxed text-ciel-text-soft">
+                        Community service listings, reports, and payments — plus quick links to your other CIEL paths.
                     </p>
                 </div>
                 <ScoringLevelsButton
@@ -806,9 +896,128 @@ export default function MyProjectsPage() {
                 />
             </header>
 
+            {(() => {
+                const otherPaths = [
+                    courseProjectEntry && {
+                        key: "course-project",
+                        emoji: "📚",
+                        label: "Course Project",
+                        title: courseProjectEntry.projectTitle || courseProjectEntry.course || "Course Project",
+                        subtitle: courseProjectEntry.course && courseProjectEntry.projectTitle ? courseProjectEntry.course : null,
+                        status: coursProjectStatusLabel(courseProjectEntry),
+                        stepCompleted: courseProjectEntry.stepCompleted,
+                        href: "/dashboard/student/paths/course-project",
+                    },
+                    fypEntry && {
+                        key: "fyp-thesis",
+                        emoji: "🎓",
+                        label: "FYP / Thesis",
+                        title: fypEntry.projectTitle || "FYP / Thesis",
+                        subtitle: null,
+                        status: fypStatusLabel(fypEntry),
+                        href: "/dashboard/student/paths/fyp-thesis",
+                    },
+                    ventureEntry && {
+                        key: "startup-business",
+                        emoji: "💼",
+                        label: "Startup / Business",
+                        title: ventureEntry.ventureName || "Startup / Business",
+                        subtitle: null,
+                        status: ventureStatusLabel(ventureEntry),
+                        href: "/dashboard/student/paths/startup-business",
+                    },
+                ].filter(Boolean) as {
+                    key: string;
+                    emoji: string;
+                    label: string;
+                    title: string;
+                    subtitle: string | null;
+                    status: string;
+                    stepCompleted?: number;
+                    href: string;
+                }[];
+
+                if (otherPaths.length > 0) {
+                    return (
+                        <section className="rounded-2xl border border-ciel-border bg-white p-5 shadow-sm sm:p-6">
+                            <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+                                <div>
+                                    <h2 className="text-base font-bold text-ciel-text">Other paths you&apos;ve worked on</h2>
+                                    <p className="mt-1 text-sm text-ciel-text-soft">
+                                        Course projects, FYP, and startups are managed in their own workspaces — not as community listings.
+                                    </p>
+                                </div>
+                            </div>
+                            <div
+                                className={`grid gap-4 ${
+                                    otherPaths.length === 1
+                                        ? "sm:grid-cols-1 lg:max-w-xl"
+                                        : otherPaths.length === 2
+                                          ? "sm:grid-cols-2"
+                                          : "sm:grid-cols-2 xl:grid-cols-3"
+                                }`}
+                            >
+                                {otherPaths.map((p) => {
+                                    const actionLabel = pathWorkspaceActionLabel(p.key, p.status, p.stepCompleted);
+                                    const submitted = p.status === "Submitted";
+                                    return (
+                                        <Link
+                                            key={p.key}
+                                            href={p.href}
+                                            className="group flex min-h-[148px] flex-col rounded-2xl border border-ciel-border bg-gradient-to-br from-white to-ciel-page/60 p-5 transition hover:border-ciel-green/50 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ciel-green"
+                                        >
+                                            <div className="flex items-start justify-between gap-3">
+                                                <span className="flex items-center gap-2 text-[11px] font-black uppercase tracking-wide text-ciel-text-soft">
+                                                    <span className="text-lg" aria-hidden>{p.emoji}</span>
+                                                    {p.label}
+                                                </span>
+                                                <span
+                                                    className={`shrink-0 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ${
+                                                        submitted
+                                                            ? "bg-ciel-green-soft text-ciel-green-deep"
+                                                            : "bg-ciel-indigo-soft text-ciel-indigo"
+                                                    }`}
+                                                >
+                                                    {submitted ? "Submitted" : "In progress"}
+                                                </span>
+                                            </div>
+                                            <span className="mt-3 line-clamp-2 text-base font-bold leading-snug text-ciel-text">{p.title}</span>
+                                            {p.subtitle ? (
+                                                <span className="mt-1 truncate text-xs font-semibold text-ciel-text-soft">{p.subtitle}</span>
+                                            ) : null}
+                                            <span className="mt-2 text-xs text-ciel-text-soft">{p.status}</span>
+                                            <span className="mt-auto inline-flex items-center gap-1 pt-4 text-sm font-bold text-ciel-green-deep group-hover:underline">
+                                                {actionLabel}
+                                                <ArrowUpRight className="h-4 w-4 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+                                            </span>
+                                        </Link>
+                                    );
+                                })}
+                            </div>
+                        </section>
+                    );
+                }
+
+                return (
+                    <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-ciel-border bg-white px-4 py-3.5 text-sm text-ciel-text-mid shadow-sm">
+                        <span className="font-semibold text-ciel-text">This page tracks community service opportunities.</span>
+                        <span className="text-ciel-text-soft">Looking for</span>
+                        {CIEL_PATHS.filter((p) => p.key !== "communityService").map((p, i, arr) => (
+                            <span key={p.key} className="flex items-center gap-2">
+                                <Link href={p.href} className="font-bold text-ciel-green-deep hover:underline">
+                                    {p.label}
+                                </Link>
+                                {i < arr.length - 1 ? <span className="text-ciel-text-soft">·</span> : null}
+                            </span>
+                        ))}
+                        <span className="text-ciel-text-soft">? Find them under My Paths in the sidebar.</span>
+                    </div>
+                );
+            })()}
+
             {!isLoading && projects.length > 0 ? (
                 <>
-                    <div className="-mx-4 border-b border-slate-200/80 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+                    <div className="-mx-4 border-b border-ciel-border px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
                         <nav
                             className="flex gap-1 overflow-x-auto pb-0"
                             aria-label="Project filters"
@@ -820,10 +1029,10 @@ export default function MyProjectsPage() {
                                         key={tab.id}
                                         type="button"
                                         onClick={() => setActiveTab(tab.id)}
-                                        className={`relative shrink-0 whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
+                                        className={`relative shrink-0 whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-semibold transition-colors ${
                                             active
-                                                ? "border-blue-600 text-blue-700"
-                                                : "border-transparent text-slate-500 hover:text-slate-800"
+                                                ? "border-ciel-green text-ciel-green-deep"
+                                                : "border-transparent text-ciel-text-soft hover:text-ciel-text"
                                         }`}
                                     >
                                         {tab.label}
@@ -1293,6 +1502,17 @@ export default function MyProjectsPage() {
                                             >
                                                 <Eye className="h-4 w-4" /> View details
                                             </Button>
+                                            {isStudentOwnedOpportunity ? (
+                                                <Button
+                                                    variant="outline"
+                                                    disabled={deletingProjectId === project.id}
+                                                    className="h-10 w-full gap-2 rounded-xl border-rose-200 text-rose-700 hover:bg-rose-50 hover:text-rose-800"
+                                                    onClick={() => handleDeleteProject(project.id, project.title || "this listing")}
+                                                >
+                                                    <Trash2 className="h-4 w-4" />
+                                                    {deletingProjectId === project.id ? "Deleting…" : "Delete"}
+                                                </Button>
+                                            ) : null}
                                             <ScoringLevelsButton
                                                 size="default"
                                                 onClick={openScoringLevels}

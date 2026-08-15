@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { Facebook, Instagram, Youtube, Twitter, Linkedin, Globe, MessageCircle } from "lucide-react";
+import { Instagram, MessageCircle } from "lucide-react";
 
 const companyLinks = [
     { label: "About Us", href: "/about" },
@@ -107,14 +107,6 @@ export default function Footer() {
                     </p>
 
                     <div className="flex items-center gap-6">
-                        {[
-                            { icon: Facebook, href: "#" },
-                            { icon: Twitter, href: "#" },
-                        ].map((social, i) => (
-                            <Link key={`s-${i}`} href={social.href} className="text-slate-400 hover:text-[#4285F4] transition-colors">
-                                <social.icon className="w-5 h-5" />
-                            </Link>
-                        ))}
                         <a
                             href="https://www.instagram.com/cielpakistan?igsh=M2ptN3FwcnBsNXdw&utm_source=qr"
                             target="_blank"
@@ -124,13 +116,6 @@ export default function Footer() {
                         >
                             <Instagram className="w-5 h-5" />
                         </a>
-                        {[{ icon: Linkedin, href: "#" }, { icon: Globe, href: "#" }, { icon: Youtube, href: "#" }].map(
-                            (social, i) => (
-                                <Link key={`e-${i}`} href={social.href} className="text-slate-400 hover:text-[#4285F4] transition-colors">
-                                    <social.icon className="w-5 h-5" />
-                                </Link>
-                            ),
-                        )}
                     </div>
                 </div>
             </div>

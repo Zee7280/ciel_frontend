@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import clsx from "clsx";
@@ -167,8 +167,15 @@ export default function WhereImpactLives() {
     const [activeKey, setActiveKey] = useState(PATHS[0].key);
     const active = PATHS.find((p) => p.key === activeKey) ?? PATHS[0];
 
+    useEffect(() => {
+        const requestedKey = new URLSearchParams(window.location.search).get("path");
+        if (requestedKey && PATHS.some((p) => p.key === requestedKey)) {
+            setActiveKey(requestedKey);
+        }
+    }, []);
+
     return (
-        <section className="py-20 px-6 bg-slate-50/60">
+        <section id="where-your-impact-lives" className="py-20 px-6 bg-slate-50/60 scroll-mt-24">
             <div className="max-w-6xl mx-auto">
                 <div className="text-center mb-12">
                     <p className="text-xs font-black uppercase tracking-widest text-emerald-600 mb-3">

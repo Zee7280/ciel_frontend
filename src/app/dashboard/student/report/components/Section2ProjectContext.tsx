@@ -211,32 +211,47 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
         return "Community Members";
     };
 
-    const generateSummary = (pCategory: string, beneficiary: string, evidenceList: string, discipline: string) => {
-        const location = locationDisplay === "—" ? "Pakistan" : locationDisplay;
-        return `This project addresses a documented gap in ${pCategory} affecting ${beneficiary} in ${location}. Baseline assessment was informed through ${evidenceList}. The project demonstrates academic alignment with ${discipline}, ensuring structured and evidence-based engagement.`;
+    /** First sentence (or a clipped lead-in) of free text, used to quote the student's own wording instead of a generic label. */
+    const firstSentence = (text: string, maxLen = 220) => {
+        const trimmed = (text || "").trim();
+        if (!trimmed) return "";
+        const match = trimmed.match(/^[^.!?]*[.!?]/);
+        const candidate = (match ? match[0] : trimmed).trim();
+        return candidate.length <= maxLen ? candidate : `${candidate.slice(0, maxLen).trim()}…`;
     };
 
+    const lowerFirst = (text: string) => {
+        const t = text.trim();
+        return t ? t.charAt(0).toLowerCase() + t.slice(1) : t;
+    };
 
+    /** Composes the baseline statement from the student's own answers — not a generic category/beneficiary guess. */
+    const generateSummary = (
+        problemStatement: string,
+        disciplineContribution: string,
+        evidenceList: string,
+        discipline: string,
+    ) => {
+        const parts: string[] = [];
 
-    const autoNarrative = useMemo(() => {
-        if (sectionData.summary_text) return sectionData.summary_text;
+        const problemLead = firstSentence(problemStatement);
+        if (problemLead) parts.push(`Before this project, ${lowerFirst(problemLead)}`);
 
-        const problem = sectionData.problem_statement ? `Problem: ${sectionData.problem_statement}` : '';
-        const discipline = sectionData.discipline ? `Discipline: ${sectionData.discipline}` : '';
-        const be = sectionData.baseline_evidence;
-        const evStr =
-            be && be.length > 0
-                ? be.includes("Other") || be.some((x) => isOtherSlotToken(x))
-                    ? formatBaselineEvidenceForDisplay(sectionData)
-                    : be.join(", ")
-                : "";
-        const evidence = evStr ? `Evidence: ${evStr}` : "";
-
-        if (problem || discipline || evidence) {
-            return [problem, discipline, evidence].filter(Boolean).join("\n");
+        if (evidenceList) {
+            parts.push(`This baseline understanding was informed through ${evidenceList}.`);
         }
-        return "";
-    }, [sectionData.summary_text, sectionData.problem_statement, sectionData.discipline, sectionData.baseline_evidence, sectionData.baseline_other_entries, sectionData.baseline_evidence_other]);
+
+        if (discipline) {
+            const contribution = disciplineContribution ? lowerFirst(firstSentence(disciplineContribution, 200)) : "";
+            parts.push(
+                contribution
+                    ? `Drawing on a background in ${discipline}, ${contribution}`
+                    : `The project draws on academic grounding in ${discipline}.`,
+            );
+        }
+
+        return parts.join(" ");
+    };
 
     // ─── Auto-generate summary when inputs are complete ───────────────────────
     React.useEffect(() => {
@@ -249,13 +264,21 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
             : evidenceArray.join(", ");
 
         if (words >= 100 && sectionData.discipline && evidenceArray.length > 0) {
+            // Still classified for the badges above the summary and for downstream analytics/AI
+            // evaluation (problem_category / primary_beneficiary are read elsewhere) — unrelated to
+            // the summary sentence itself, which now quotes the student's own answers directly.
             const pCategory = classifyProblem(sectionData.problem_statement);
             const beneficiary = detectBeneficiary(sectionData.problem_statement);
-            const summary = generateSummary(pCategory, beneficiary, evidenceSource, sectionData.discipline);
+            const summary = generateSummary(
+                sectionData.problem_statement,
+                sectionData.discipline_contribution,
+                evidenceSource,
+                sectionData.discipline,
+            );
 
             // Only auto-update if summary_text is empty or already matches a previous auto-generated summary
             // This prevents overwriting AI-generated or custom-improved summaries
-            if (!sectionData.summary_text || sectionData.summary_text.includes("This project addresses a documented gap")) {
+            if (!sectionData.summary_text || sectionData.summary_text.includes("This baseline understanding was informed through")) {
                 if (summary !== sectionData.summary_text) {
                     updateSection('section2', {
                         problem_category: pCategory,
@@ -265,7 +288,7 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
                 }
             }
         }
-    }, [sectionData.problem_statement, sectionData.discipline, sectionData.baseline_evidence, sectionData.baseline_evidence_other, sectionData.baseline_other_entries, sectionData.summary_text, updateSection]);
+    }, [sectionData.problem_statement, sectionData.discipline, sectionData.discipline_contribution, sectionData.baseline_evidence, sectionData.baseline_evidence_other, sectionData.baseline_other_entries, sectionData.summary_text, updateSection]);
 
     // ─── Word counts ─────────────────────────────────────────────────────────
     const wordCount = (sectionData.problem_statement || "").trim().split(/\s+/).filter((w) => w).length;
@@ -383,48 +406,33 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
             </div>
 
             {/* ── 2.1 Project Identity ───────────────────────────────────── */}
-            <section className="space-y-4">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div className="min-w-0 space-y-1">
-                        <div className="flex items-center gap-2.5">
-                            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-900 text-[11px] font-bold text-white">
-                                2.1
-                            </span>
-                            <h3 className="text-base font-semibold text-slate-900">Project Identity</h3>
-                        </div>
-                        <p className="pl-9 text-sm text-slate-500">
-                            Project information is displayed automatically for institutional
-                            traceability and reporting consistency.
-                        </p>
-                    </div>
-                    <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-emerald-700">
-                        <CheckCircle2 className="h-3 w-3" />
-                        Auto-filled · read-only
+            <section className="space-y-3">
+                <div className="flex items-center gap-2.5">
+                    <span className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-900 text-[11px] font-bold text-white">
+                        2.1
                     </span>
+                    <h3 className="text-base font-semibold text-slate-900">Project Identity</h3>
                 </div>
 
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <div className="flex flex-wrap items-center gap-x-6 gap-y-3 rounded-xl border border-slate-200 bg-white px-4 py-3.5 shadow-sm sm:px-5">
                     {[
                         { label: "Partner Organization", value: partner, icon: Building },
                         { label: "Location", value: locationDisplay, icon: MapPin },
                         { label: "Project Duration", value: `${startDate} – ${endDate}`, icon: Calendar },
                     ].map((item) => (
-                        <div
-                            key={item.label}
-                            className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
-                        >
-                            <div className="mb-2.5 flex items-center gap-2">
-                                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
-                                    <item.icon className="h-3.5 w-3.5" />
-                                </div>
-                                <p className={sectionLabel}>{item.label}</p>
-                            </div>
-                            <p className="text-sm font-medium leading-relaxed text-slate-800">
-                                {item.value}
-                            </p>
+                        <div key={item.label} className="flex min-w-0 items-center gap-2" title={item.label}>
+                            <item.icon className="h-3.5 w-3.5 shrink-0 text-indigo-500" />
+                            <span className="truncate text-sm font-semibold text-slate-800">{item.value}</span>
                         </div>
                     ))}
+                    <span className="ml-auto inline-flex shrink-0 items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-emerald-700">
+                        <CheckCircle2 className="h-3 w-3" />
+                        Auto-filled
+                    </span>
                 </div>
+                <p className="pl-9 text-xs text-slate-500">
+                    Displayed automatically for institutional traceability and reporting consistency — nothing to fill in.
+                </p>
             </section>
 
             {/* ── 2.2 Problem / System Need ──────────────────────────────── */}

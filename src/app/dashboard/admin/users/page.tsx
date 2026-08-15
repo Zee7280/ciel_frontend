@@ -83,12 +83,14 @@ function computeActionMenuPosition(trigger: DOMRect) {
 
 export default function AdminUsersPage() {
     const [users, setUsers] = useState<User[]>([]);
+    const [totalUsers, setTotalUsers] = useState(0);
     const [isLoading, setIsLoading] = useState(true);
 
-    // Filtering & Pagination States
+    // Filtering & Pagination States — all pushed to the server so the whole users table is never fetched at once.
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(10);
     const [searchQuery, setSearchQuery] = useState("");
+    const [debouncedSearch, setDebouncedSearch] = useState("");
     const [roleFilter, setRoleFilter] = useState("all");
 
     // Modal States
@@ -106,41 +108,24 @@ export default function AdminUsersPage() {
     const [showPasswordColumn, setShowPasswordColumn] = useState(false);
     const [revealedPasswordIds, setRevealedPasswordIds] = useState<Record<string, boolean>>({});
 
-    // Filtered & Paginated Users
-    const filteredUsers = users.filter(user => {
-        const matchesSearch = (
-            user.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            user.email?.toLowerCase().includes(searchQuery.toLowerCase())
-        );
-        const matchesRole = roleFilter === "all" || user.role === roleFilter;
-        return matchesSearch && matchesRole;
-    });
-
-    const totalPages = Math.max(1, Math.ceil(filteredUsers.length / itemsPerPage));
-    const paginatedUsers = filteredUsers.slice(
-        (currentPage - 1) * itemsPerPage,
-        currentPage * itemsPerPage
-    );
-    const rangeStart = filteredUsers.length === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1;
-    const rangeEnd = Math.min(currentPage * itemsPerPage, filteredUsers.length);
+    // Server already returns exactly the current page, filtered & searched.
+    const totalPages = Math.max(1, Math.ceil(totalUsers / itemsPerPage));
+    const rangeStart = totalUsers === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1;
+    const rangeEnd = Math.min(currentPage * itemsPerPage, totalUsers);
 
     const actionMenuUser =
-        actionMenu == null
-            ? null
-            : filteredUsers.find((u) => u.id === actionMenu.userId) ?? users.find((u) => u.id === actionMenu.userId) ?? null;
+        actionMenu == null ? null : users.find((u) => u.id === actionMenu.userId) ?? null;
+
+    // Debounce search so typing doesn't fire a request per keystroke
+    useEffect(() => {
+        const t = setTimeout(() => setDebouncedSearch(searchQuery.trim()), 350);
+        return () => clearTimeout(t);
+    }, [searchQuery]);
 
     // Reset page when filters change
     useEffect(() => {
         setCurrentPage(1);
-    }, [searchQuery, roleFilter]);
-
-    useEffect(() => {
-        setCurrentPage(1);
-    }, [itemsPerPage]);
-
-    useEffect(() => {
-        setCurrentPage((p) => (p > totalPages ? totalPages : p));
-    }, [filteredUsers.length, itemsPerPage, totalPages]);
+    }, [debouncedSearch, roleFilter, itemsPerPage]);
 
     useEffect(() => {
         if (!actionMenu) return;
@@ -170,12 +155,20 @@ export default function AdminUsersPage() {
 
     useEffect(() => {
         fetchUsers();
-    }, []);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [currentPage, itemsPerPage, debouncedSearch, roleFilter]);
 
     const fetchUsers = async () => {
         setIsLoading(true);
         try {
-            const res = await authenticatedFetch(`/api/v1/admin/users`);
+            const params = new URLSearchParams({
+                page: String(currentPage),
+                limit: String(itemsPerPage),
+            });
+            if (debouncedSearch) params.set("search", debouncedSearch);
+            if (roleFilter !== "all") params.set("role", roleFilter);
+
+            const res = await authenticatedFetch(`/api/v1/admin/users?${params.toString()}`);
             if (!res) return;
             const data = await res.json();
 
@@ -198,6 +191,7 @@ export default function AdminUsersPage() {
                 profile_missing_fields: Array.isArray(u.profile_missing_fields) ? u.profile_missing_fields : undefined,
             }));
             setUsers(mappedUsers);
+            setTotalUsers(typeof data.total === "number" ? data.total : mappedUsers.length);
         } catch (error) {
             console.error("Failed to fetch users", error);
         } finally {
@@ -306,7 +300,7 @@ export default function AdminUsersPage() {
                     <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">User Management</h1>
                     <p className="mt-1 text-sm text-slate-600">Manage registered users, roles, and account status.</p>
                     <p className="mt-2 text-xs font-medium text-slate-500">
-                        {isLoading ? "Loading…" : `${filteredUsers.length} user${filteredUsers.length === 1 ? "" : "s"} shown`}
+                        {isLoading ? "Loading…" : `${totalUsers} user${totalUsers === 1 ? "" : "s"} total`}
                         {roleFilter !== "all" ? ` · ${formatRoleLabel(roleFilter)}` : ""}
                     </p>
                 </div>
@@ -558,7 +552,7 @@ export default function AdminUsersPage() {
                             )
                         }
                     ]}
-                    data={paginatedUsers}
+                    data={users}
                     progressPending={isLoading}
                     pagination={false}
                     highlightOnHover
@@ -610,7 +604,7 @@ export default function AdminUsersPage() {
                     }}
                 />
 
-                {!isLoading && filteredUsers.length > 0 && (
+                {!isLoading && totalUsers > 0 && (
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-end gap-3 px-4 py-3 border-t border-slate-100 text-sm text-slate-600">
                         <div className="flex items-center gap-2">
                             <span className="text-slate-500">Rows per page</span>
@@ -628,7 +622,7 @@ export default function AdminUsersPage() {
                         </div>
                         <div className="flex items-center gap-4">
                             <span className="tabular-nums text-slate-700">
-                                {rangeStart}-{rangeEnd} of {filteredUsers.length}
+                                {rangeStart}-{rangeEnd} of {totalUsers}
                             </span>
                             <div className="flex items-center gap-0.5">
                                 <button

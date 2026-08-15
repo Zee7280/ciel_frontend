@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect, useLayoutEffect, useCallback, type ComponentType } from "react";
-import { LayoutDashboard, Users, Settings, PieChart, LogOut, FileText, Building2, CheckCircle, Briefcase, FileBarChart, ShieldAlert, BarChart3, History, Bell, User, MessageSquare, Plus, CreditCard, ClipboardList, CalendarClock, LifeBuoy, Link2, GraduationCap, Globe2, PlayCircle, Mail, Archive, LayoutGrid, Clock, ChevronsLeft, ChevronsRight, Compass, HelpCircle, type LucideProps } from "lucide-react";
+import { LayoutDashboard, Users, Settings, PieChart, LogOut, FileText, Building2, CheckCircle, Briefcase, FileBarChart, ShieldAlert, BarChart3, History, Bell, User, MessageSquare, Plus, CreditCard, ClipboardList, CalendarClock, LifeBuoy, Link2, GraduationCap, Globe2, PlayCircle, Mail, Archive, LayoutGrid, Clock, ChevronsLeft, ChevronsRight, Compass, HelpCircle, BookOpen, type LucideProps } from "lucide-react";
 import clsx from "clsx";
 import { authenticatedFetch, isTokenValid } from "@/utils/api";
 import {
@@ -18,7 +18,6 @@ import {
 } from "@/utils/dashboardNavRole";
 import { clearFacultyScopeSession } from "@/utils/facultyScopeSession";
 import { CIEL_NOTIFICATIONS_UNREAD_EVENT, type CielNotificationsUnreadEventDetail } from "@/utils/cielNotificationsUnread";
-import { readStoredCurrentUser } from "@/utils/currentUser";
 import {
     CIEL_IMPACT_SUMMARY_CACHE_EVENT,
     clearImpactSummaryCache,
@@ -27,9 +26,7 @@ import {
     type CielImpactSummary,
 } from "@/utils/cielImpactSummary";
 import { CIEL_PATHS } from "@/utils/cielPaths";
-import CIIMiniCard from "@/components/ciel/CIIMiniCard";
 import PathsBottomSheet from "@/components/ciel/PathsBottomSheet";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 const SIDEBAR_COLLAPSED_KEY = "ciel_sidebar_collapsed";
 
@@ -75,6 +72,7 @@ function StudentNavRow({
 
 export default function Sidebar() {
     const pathname = usePathname();
+    const searchParams = useSearchParams();
     const [unreadCount, setUnreadCount] = useState(0);
     const [impactHistoryBadge, setImpactHistoryBadge] = useState(0);
     const [notificationUnreadCount, setNotificationUnreadCount] = useState(0);
@@ -286,20 +284,6 @@ export default function Sidebar() {
             .catch(() => setRecommendedCount(0));
     }, [isStudent]);
 
-    const [displayName, setDisplayName] = useState("");
-    const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
-    useEffect(() => {
-        if (!isStudent) return;
-        const sync = () => {
-            const user = readStoredCurrentUser();
-            setDisplayName(typeof user?.name === "string" ? user.name : "");
-            setAvatarUrl(typeof user?.avatar === "string" ? user.avatar : null);
-        };
-        sync();
-        window.addEventListener("ciel_user_updated", sync);
-        return () => window.removeEventListener("ciel_user_updated", sync);
-    }, [isStudent]);
-
     const [mobilePathsSheetOpen, setMobilePathsSheetOpen] = useState(false);
 
     // Helper icons import
@@ -370,6 +354,7 @@ export default function Sidebar() {
             { label: "Applications & Reports Approvals", href: "/dashboard/admin/join-applications", icon: ClipboardList },
             { label: "Payments", href: "/dashboard/admin/payments", icon: CreditCard },
             { label: "All projects", href: "/dashboard/admin/projects", icon: Briefcase },
+            { label: "Path submissions", href: "/dashboard/admin/path-submissions", icon: BookOpen },
             { label: "Project evidence export", href: "/dashboard/admin/project-evidence", icon: Archive },
             { label: "Student Reports", href: "/dashboard/admin/reports/verify", icon: FileText },
             { label: "CIEL Master", href: "/dashboard/admin/master-analytics", icon: Globe2 },
@@ -408,15 +393,29 @@ export default function Sidebar() {
         return false;
     };
 
-    // ---- Student nav model: Dashboard, MY PATHS, RECORD ----
+    // ---- Student nav model: Dashboard, MY PATHS, RECORD, MORE ----
     const recordLinks = [
         { label: "My Hours", href: "/dashboard/student/paths/community-service?tab=log-hours", icon: Clock },
         { label: "Opportunities", href: "/dashboard/student/browse", icon: Compass, countPill: recommendedCount },
-        { label: "Reports & Certificates", href: "/dashboard/student/paths/community-service?tab=reports", icon: FileBarChart },
+    ];
+
+    const moreLinks = [
+        { label: "My Projects", href: "/dashboard/student/projects", icon: Briefcase },
+        { label: "Create Opportunity", href: "/dashboard/student/create-opportunity", icon: Plus },
+        { label: "Impact History", href: "/dashboard/student/impact", icon: PieChart, countPill: impactHistoryBadge },
+        { label: "Analytics", href: "/dashboard/student/analytics", icon: BarChart3 },
+        { label: "Payments", href: "/dashboard/student/payments", icon: CreditCard },
+        { label: "Messages", href: "/dashboard/student/messages", icon: MessageSquare, countPill: unreadCount },
+        { label: "Notifications", href: "/dashboard/student/notifications", icon: Bell, countPill: notificationUnreadCount },
+        { label: "Platform tutorial", href: "/dashboard/student/tutorials", icon: PlayCircle },
     ];
 
     const studentIsActive = (href: string) => {
-        const [hrefPath] = href.split("?");
+        const [hrefPath, hrefQuery] = href.split("?");
+        const hrefTab = hrefQuery ? new URLSearchParams(hrefQuery).get("tab") : null;
+        if (hrefTab) {
+            return pathname === hrefPath && searchParams.get("tab") === hrefTab;
+        }
         return pathname === hrefPath || pathname.startsWith(`${hrefPath}/`);
     };
 
@@ -488,6 +487,20 @@ export default function Sidebar() {
                                 collapsed={collapsed}
                             />
                         ))}
+
+                        {!collapsed && <p className="pt-4 pb-1 px-3 text-[10px] font-bold uppercase tracking-widest text-white/30">More</p>}
+                        {collapsed && <div className="pt-3" />}
+                        {moreLinks.map((link) => (
+                            <StudentNavRow
+                                key={link.href}
+                                href={link.href}
+                                label={link.label}
+                                icon={link.icon}
+                                active={studentIsActive(link.href)}
+                                countPill={link.countPill}
+                                collapsed={collapsed}
+                            />
+                        ))}
                     </>
                 ) : (
                     links.map((link) => {
@@ -528,26 +541,6 @@ export default function Sidebar() {
 
             {isStudent ? (
                 <div className="shrink-0 border-t border-white/10 p-3 space-y-3">
-                    {!collapsed && <CIIMiniCard score={impactSummary?.compositeScore ?? 0} />}
-                    {collapsed && <CIIMiniCard score={impactSummary?.compositeScore ?? 0} collapsed />}
-
-                    <Link
-                        href="/dashboard/student/profile"
-                        className={clsx(
-                            "ciel-transition flex items-center gap-3 rounded-ciel-sm px-2 py-2 hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ciel-green",
-                            collapsed && "justify-center px-0",
-                        )}
-                        title={collapsed ? "My profile" : undefined}
-                    >
-                        <Avatar className="h-9 w-9 border border-white/10">
-                            {avatarUrl ? <AvatarImage src={avatarUrl} alt={displayName || "Profile"} /> : null}
-                            <AvatarFallback className="bg-white/10 text-xs font-bold text-white">
-                                {(displayName || "S").slice(0, 1).toUpperCase()}
-                            </AvatarFallback>
-                        </Avatar>
-                        {!collapsed && <span className="truncate text-sm font-semibold text-white">{displayName || "My profile"}</span>}
-                    </Link>
-
                     <StudentNavRow href="/dashboard/student/settings" label="Settings" icon={Settings} active={studentIsActive("/dashboard/student/settings")} collapsed={collapsed} />
                     <StudentNavRow href="/dashboard/student/help" label="Help" icon={HelpCircle} active={studentIsActive("/dashboard/student/help")} collapsed={collapsed} />
 

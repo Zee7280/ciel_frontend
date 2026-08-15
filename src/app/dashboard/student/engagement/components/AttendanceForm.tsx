@@ -122,6 +122,18 @@ const labelClass =
 const fieldClass =
     "h-11 rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-900 shadow-sm transition-colors placeholder:text-slate-400 focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100";
 
+const ACTIVITY_TYPES = [
+    "Training / Workshop",
+    "Awareness Session",
+    "Research / Survey",
+    "Mentoring / Coaching",
+    "Field Visit",
+    "Resource Distribution",
+    "Technical Support",
+    "Administrative",
+    "Other",
+];
+
 export default function AttendanceForm({
     verifiedUsers,
     onSuccess,
@@ -412,7 +424,7 @@ export default function AttendanceForm({
             </div>
 
             {/* Date & Time row */}
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="space-y-1.5">
                     <Label className={labelClass}>Date of Engagement</Label>
                     <div className="relative">
@@ -430,42 +442,43 @@ export default function AttendanceForm({
                     </div>
                 </div>
                 <div className="space-y-1.5">
-                    <Label className={labelClass}>Start Time</Label>
-                    <div className="relative">
-                        <Input
-                            type="time"
-                            value={formData.startTime}
-                            onChange={(e) =>
-                                setFormData({ ...formData, startTime: e.target.value })
-                            }
-                            className={clsx(fieldClass, "pr-10")}
-                            required
-                        />
-                        <Clock className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                    </div>
-                </div>
-                <div className="space-y-1.5">
-                    <Label className={labelClass}>End Time</Label>
-                    <div className="relative">
-                        <Input
-                            type="time"
-                            value={formData.endTime}
-                            onChange={(e) =>
-                                setFormData({ ...formData, endTime: e.target.value })
-                            }
-                            className={clsx(fieldClass, "pr-10")}
-                            required
-                        />
-                        <Clock className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    <Label className={labelClass}>Time</Label>
+                    <div className="flex items-center gap-2">
+                        <div className="relative min-w-0 flex-1">
+                            <Input
+                                type="time"
+                                aria-label="Start Time"
+                                value={formData.startTime}
+                                onChange={(e) =>
+                                    setFormData({ ...formData, startTime: e.target.value })
+                                }
+                                className={clsx(fieldClass, "pr-9")}
+                                required
+                            />
+                            <Clock className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                        </div>
+                        <span className="shrink-0 text-sm font-medium text-slate-400">–</span>
+                        <div className="relative min-w-0 flex-1">
+                            <Input
+                                type="time"
+                                aria-label="End Time"
+                                value={formData.endTime}
+                                onChange={(e) =>
+                                    setFormData({ ...formData, endTime: e.target.value })
+                                }
+                                className={clsx(fieldClass, "pr-9")}
+                                required
+                            />
+                            <Clock className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                        </div>
                     </div>
                 </div>
             </div>
 
             {sessionHours != null ? (
-                <p className="text-xs text-slate-500">
-                    Session duration:{" "}
-                    <span className="font-semibold text-slate-700">{sessionHours} hrs</span>
-                </p>
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700">
+                    Session duration: {sessionHours} hrs
+                </span>
             ) : formData.startTime && formData.endTime ? (
                 <p className="text-xs text-amber-600">End time must be after start time.</p>
             ) : null}
@@ -533,31 +546,22 @@ export default function AttendanceForm({
             {/* Activity Type */}
             <div className="space-y-1.5">
                 <Label className={labelClass}>Activity Type</Label>
-                <div className="relative">
-                    <select
-                        value={formData.activityType}
-                        onChange={(e) =>
-                            setFormData({ ...formData, activityType: e.target.value })
-                        }
-                        className={clsx(fieldClass, "w-full appearance-none pr-9")}
-                    >
-                        {[
-                            "Training / Workshop",
-                            "Awareness Session",
-                            "Research / Survey",
-                            "Mentoring / Coaching",
-                            "Field Visit",
-                            "Resource Distribution",
-                            "Technical Support",
-                            "Administrative",
-                            "Other",
-                        ].map((t) => (
-                            <option key={t} value={t}>
-                                {t}
-                            </option>
-                        ))}
-                    </select>
-                    <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <div className="flex flex-wrap gap-2">
+                    {ACTIVITY_TYPES.map((t) => (
+                        <button
+                            key={t}
+                            type="button"
+                            onClick={() => setFormData({ ...formData, activityType: t })}
+                            className={clsx(
+                                "rounded-full border px-3.5 py-1.5 text-xs font-semibold transition-colors",
+                                formData.activityType === t
+                                    ? "border-indigo-300 bg-indigo-50 text-indigo-700"
+                                    : "border-slate-200 bg-slate-50 text-slate-500 hover:border-slate-300 hover:text-slate-700",
+                            )}
+                        >
+                            {t}
+                        </button>
+                    ))}
                 </div>
                 {formData.activityType === "Other" && (
                     <Input
@@ -566,7 +570,7 @@ export default function AttendanceForm({
                         onChange={(e) =>
                             setFormData({ ...formData, otherActivity: e.target.value })
                         }
-                        className={fieldClass}
+                        className={clsx(fieldClass, "mt-2")}
                         required
                     />
                 )}
@@ -636,10 +640,10 @@ export default function AttendanceForm({
                             onChange={(e) => setEvidenceFile(e.target.files?.[0] || null)}
                             className="absolute inset-0 z-10 cursor-pointer opacity-0"
                         />
-                        <div className="flex flex-col items-center gap-1.5 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50/40 px-4 py-8 text-center transition-colors hover:border-indigo-200 hover:bg-indigo-50/30">
-                            <Upload className="h-5 w-5 text-slate-400" />
-                            <span className="text-sm font-medium text-slate-600">
-                                Drop files or click to upload
+                        <div className="flex flex-col items-center gap-1.5 rounded-xl border-2 border-dashed border-slate-300 bg-slate-50/40 px-4 py-8 text-center transition-colors hover:border-indigo-300 hover:bg-indigo-50/30">
+                            <Upload className="h-5 w-5 text-indigo-500" />
+                            <span className="text-sm font-semibold text-slate-700">
+                                <span className="text-indigo-600">Snap or drop a photo</span> — one clear photo is enough
                             </span>
                             <span className="text-[11px] text-slate-400">
                                 JPG, PNG, HEIC, WebP, PDF, Word
@@ -665,7 +669,7 @@ export default function AttendanceForm({
                     type="submit"
                     disabled={isSubmitting || descriptionOverLimit || effectiveLocked}
                     className={clsx(
-                        "h-11 w-full rounded-lg text-sm font-semibold transition-all",
+                        "h-11 w-full rounded-xl text-sm font-bold transition-all",
                         effectiveLocked
                             ? "cursor-not-allowed border border-slate-200 bg-slate-100 text-slate-400 shadow-none"
                             : "bg-indigo-600 text-white shadow-sm hover:bg-indigo-700",

@@ -65,6 +65,50 @@ function WordCountBar({ count, max = 200, text }: { count: number; max?: number;
     );
 }
 
+/** Clickable colored SDG tile grid — replaces a plain goal dropdown with the same visual picker used across the app's redesigned SDG UI. */
+function SDGTileGrid({
+    selectedId,
+    disabledIds = [],
+    onSelect,
+}: {
+    selectedId: string;
+    disabledIds?: string[];
+    onSelect: (id: string) => void;
+}) {
+    return (
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(84px,1fr))] gap-2">
+            {ALL_SDGS.map((sdg) => {
+                const id = String(sdg.num);
+                const isSelected = id === selectedId;
+                const isDisabled = !isSelected && disabledIds.includes(id);
+                return (
+                    <button
+                        key={id}
+                        type="button"
+                        disabled={isDisabled}
+                        onClick={() => onSelect(isSelected ? "" : id)}
+                        style={{ backgroundColor: sdg.color }}
+                        className={clsx(
+                            "relative flex min-h-[66px] flex-col gap-0.5 rounded-lg border-2 p-2 text-left text-[11px] font-bold leading-tight text-white transition-all",
+                            isSelected
+                                ? "border-slate-900 shadow-lg"
+                                : isDisabled
+                                  ? "cursor-not-allowed border-transparent opacity-15"
+                                  : "border-transparent opacity-70 hover:-translate-y-0.5 hover:opacity-100",
+                        )}
+                    >
+                        {isSelected ? (
+                            <CheckCircle2 className="absolute right-1.5 top-1.5 h-3.5 w-3.5" />
+                        ) : null}
+                        <span className="text-base font-extrabold">{sdg.num}</span>
+                        {sdg.name}
+                    </button>
+                );
+            })}
+        </div>
+    );
+}
+
 export default function Section3SDGMapping({ projectData }: Section3Props) {
     const { data, updateSection, getFieldError, validationErrors } = useReportForm();
     const { section3 } = data;
@@ -421,105 +465,103 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                        <div className="space-y-1.5">
-                            <label className={fieldLabelClass}>
-                                C1. Select Primary SDG <span className="text-red-500">*</span>
-                            </label>
-                            <div className="relative">
-                                <select
-                                    className={dropdownClass}
-                                    value={studentPrimaryId}
-                                    onChange={(e) => {
-                                        updateSection("section3", {
-                                            primary_sdg: {
-                                                ...data.section3.primary_sdg,
-                                                goal_number: e.target.value,
-                                                target_id: "",
-                                                indicator_id: "",
-                                            },
-                                        });
-                                    }}
-                                >
-                                    <option value="">Select SDG...</option>
-                                    {sdgData.map((s) => (
-                                        <option key={s.id} value={s.id}>
-                                            SDG {s.number} — {s.title}
-                                        </option>
-                                    ))}
-                                </select>
-                                <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                            </div>
-                            <FieldError message={getFieldError("primary_sdg")} />
-                        </div>
-
-                        <div
-                            className={clsx(
-                                "space-y-1.5",
-                                !studentPrimaryId && "pointer-events-none opacity-50",
-                            )}
-                        >
-                            <label className={fieldLabelClass}>C2. Select SDG Target</label>
-                            <div className="relative">
-                                <select
-                                    className={dropdownClass}
-                                    value={studentTargetId}
-                                    onChange={(e) => {
-                                        updateSection("section3", {
-                                            primary_sdg: {
-                                                ...data.section3.primary_sdg,
-                                                target_id: e.target.value,
-                                                indicator_id: "",
-                                            },
-                                        });
-                                    }}
-                                >
-                                    <option value="">Select target...</option>
-                                    {availableTargets.map((t) => (
-                                        <option key={t.id} value={t.id}>
-                                            Target {t.id} — {t.description}
-                                        </option>
-                                    ))}
-                                </select>
-                                <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                            </div>
-                            <FieldError message={getFieldError("target_code")} />
-                        </div>
-
-                        <div
-                            className={clsx(
-                                "space-y-1.5",
-                                !studentTargetId && "pointer-events-none opacity-50",
-                            )}
-                        >
-                            <label className={fieldLabelClass}>C3. SDG Indicator</label>
-                            <div className="relative">
-                                <select
-                                    className={dropdownClass}
-                                    value={studentIndicatorId}
-                                    onChange={(e) => {
-                                        updateSection("section3", {
-                                            primary_sdg: {
-                                                ...data.section3.primary_sdg,
-                                                indicator_id: e.target.value,
-                                            },
-                                        });
-                                    }}
-                                >
-                                    <option value="">Select indicator...</option>
-                                    {availableIndicators.map((ind) => (
-                                        <option key={ind.id} value={ind.id}>
-                                            Indicator {ind.id} — {ind.description}
-                                        </option>
-                                    ))}
-                                </select>
-                                <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                            </div>
-                            <p className="text-[11px] text-slate-400">
-                                Selecting an indicator improves reporting quality.
-                            </p>
-                        </div>
+                    <div className="space-y-3">
+                        <label className={fieldLabelClass}>
+                            C1. Select Primary SDG <span className="text-red-500">*</span>
+                        </label>
+                        <SDGTileGrid
+                            selectedId={studentPrimaryId}
+                            onSelect={(id) =>
+                                updateSection("section3", {
+                                    primary_sdg: {
+                                        ...data.section3.primary_sdg,
+                                        goal_number: id,
+                                        target_id: "",
+                                        indicator_id: "",
+                                    },
+                                })
+                            }
+                        />
+                        <FieldError message={getFieldError("primary_sdg")} />
                     </div>
+
+                    {studentPrimaryId ? (
+                        <div className="overflow-hidden rounded-xl border border-slate-200">
+                            <div
+                                className="px-4 py-3 text-sm font-bold text-white"
+                                style={{
+                                    backgroundColor:
+                                        ALL_SDGS.find((s) => String(s.num) === studentPrimaryId)?.color ||
+                                        "#5b5bf0",
+                                }}
+                            >
+                                SDG {selectedSDGRecord?.number}: {selectedSDGRecord?.title}
+                            </div>
+                            <div className="grid grid-cols-1 gap-4 bg-white p-4 sm:p-5 md:grid-cols-2">
+                                <div className="space-y-1.5">
+                                    <label className={fieldLabelClass}>C2. Select SDG Target</label>
+                                    <div className="relative">
+                                        <select
+                                            className={dropdownClass}
+                                            value={studentTargetId}
+                                            onChange={(e) => {
+                                                updateSection("section3", {
+                                                    primary_sdg: {
+                                                        ...data.section3.primary_sdg,
+                                                        target_id: e.target.value,
+                                                        indicator_id: "",
+                                                    },
+                                                });
+                                            }}
+                                        >
+                                            <option value="">Select target...</option>
+                                            {availableTargets.map((t) => (
+                                                <option key={t.id} value={t.id}>
+                                                    Target {t.id} — {t.description}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                                    </div>
+                                    <FieldError message={getFieldError("target_code")} />
+                                </div>
+
+                                <div
+                                    className={clsx(
+                                        "space-y-1.5",
+                                        !studentTargetId && "pointer-events-none opacity-50",
+                                    )}
+                                >
+                                    <label className={fieldLabelClass}>C3. SDG Indicator</label>
+                                    <div className="relative">
+                                        <select
+                                            className={dropdownClass}
+                                            value={studentIndicatorId}
+                                            onChange={(e) => {
+                                                updateSection("section3", {
+                                                    primary_sdg: {
+                                                        ...data.section3.primary_sdg,
+                                                        indicator_id: e.target.value,
+                                                    },
+                                                });
+                                            }}
+                                        >
+                                            <option value="">Select indicator...</option>
+                                            {availableIndicators.map((ind) => (
+                                                <option key={ind.id} value={ind.id}>
+                                                    Indicator {ind.id} — {ind.description}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                                    </div>
+                                    <p className="text-[11px] text-slate-400">
+                                        Selecting an indicator improves reporting quality.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    ) : null}
 
                     <div className="space-y-3 border-t border-slate-100 pt-6">
                         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -554,13 +596,18 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
 
                     {/* 3.2.2 Secondary */}
                     <div className="space-y-4 border-t border-slate-100 pt-6">
-                        <div>
-                            <Label className="text-sm font-semibold text-slate-900">
-                                3.2.2 Secondary SDG mapping (optional)
-                            </Label>
-                            <p className="mt-1 text-sm text-slate-500">
-                                Map additional goals impacted by this project — up to two.
-                            </p>
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div>
+                                <Label className="text-sm font-semibold text-slate-900">
+                                    3.2.2 Secondary SDG mapping (optional)
+                                </Label>
+                                <p className="mt-1 text-sm text-slate-500">
+                                    Map additional goals impacted by this project — up to two.
+                                </p>
+                            </div>
+                            <span className="shrink-0 rounded-full bg-indigo-50 px-3 py-1 text-xs font-bold text-indigo-600">
+                                {(secondary_sdgs || []).length} of 2 added
+                            </span>
                         </div>
 
                         {(secondary_sdgs || []).map((sdg: {
@@ -579,6 +626,11 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
                                 .trim()
                                 .split(/\s+/)
                                 .filter((w: string) => w).length;
+                            const otherSelectedIds = (secondary_sdgs || [])
+                                .filter((_: unknown, i: number) => i !== index)
+                                .map((s: { goal_number?: string | number | null }) => s.goal_number?.toString())
+                                .filter((v: string | undefined): v is string => Boolean(v));
+                            const disabledIds = [studentPrimaryId, ...otherSelectedIds].filter(Boolean);
 
                             return (
                                 <div
@@ -599,32 +651,31 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
                                         </button>
                                     </div>
 
-                                    <div className="relative">
-                                        <select
-                                            className={dropdownClass}
-                                            value={sdgId}
-                                            onChange={(e) =>
-                                                updateSecondary(index, {
-                                                    goal_number: e.target.value,
-                                                    target_id: "",
-                                                    indicator_id: "",
-                                                })
-                                            }
-                                        >
-                                            <option value="">Choose SDG goal...</option>
-                                            {sdgData
-                                                .filter((s) => s.id !== studentPrimaryId)
-                                                .map((s) => (
-                                                    <option key={s.id} value={s.id}>
-                                                        SDG {s.number} — {s.title}
-                                                    </option>
-                                                ))}
-                                        </select>
-                                        <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                                    </div>
+                                    <SDGTileGrid
+                                        selectedId={sdgId}
+                                        disabledIds={disabledIds}
+                                        onSelect={(id) =>
+                                            updateSecondary(index, {
+                                                goal_number: id,
+                                                target_id: "",
+                                                indicator_id: "",
+                                            })
+                                        }
+                                    />
 
                                     {sdgRecord ? (
-                                        <div className="space-y-4">
+                                        <div className="overflow-hidden rounded-xl border border-slate-200">
+                                            <div
+                                                className="px-4 py-2.5 text-xs font-bold text-white"
+                                                style={{
+                                                    backgroundColor:
+                                                        ALL_SDGS.find((s) => String(s.num) === sdgId)?.color ||
+                                                        "#5b5bf0",
+                                                }}
+                                            >
+                                                SDG {sdgRecord.number}: {sdgRecord.title}
+                                            </div>
+                                            <div className="space-y-4 bg-white p-4 sm:p-5">
                                             <div className="grid gap-4 md:grid-cols-2">
                                                 <div className="space-y-1.5">
                                                     <p className={fieldLabelClass}>UN Target</p>
@@ -699,6 +750,7 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
                                                     count={justWords}
                                                     text={sdg.justification_text || ""}
                                                 />
+                                            </div>
                                             </div>
                                         </div>
                                     ) : null}

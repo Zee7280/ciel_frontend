@@ -36,7 +36,7 @@ import {
     pickReportStatusFromCheckRow,
     resolveStudentBrowseReportCta,
 } from "@/utils/studentBrowseReportCta";
-import { Loader2, MapPin, Calendar, Clock, Globe, CheckCircle2, LayoutGrid, List, Users, Mail, Phone, GraduationCap, Share2 } from "lucide-react";
+import { Loader2, MapPin, Calendar, Clock, Globe, CheckCircle2, LayoutGrid, List, Users, Mail, Phone, GraduationCap, Share2, SlidersHorizontal, Building2, ChevronDown, Compass } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import ApplicationDialog from "./components/ApplicationDialog";
@@ -310,7 +310,17 @@ export default function StudentBrowseOpportunitiesPage() {
     };
 
     const filterSelectClass =
-        "h-10 w-full min-w-0 px-3 text-sm rounded-lg border border-slate-200 bg-white text-slate-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-300";
+        "h-10 w-full min-w-0 appearance-none px-3 pr-9 text-sm rounded-ciel-xs border border-ciel-border bg-white text-ciel-text shadow-sm transition-colors hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-ciel-green/30 focus:border-ciel-green";
+
+    const activeFilterCount = [
+        universityFilter,
+        modeFilter,
+        oppTypeFilter,
+        sdgFilter,
+        locationFilter,
+        seatsFilter,
+        visibilityFilter,
+    ].filter((v) => v !== "all").length;
 
     const openApplicationDialog = (opportunity: BrowseOpportunity) => {
         const title = opportunity.title ?? "Opportunity";
@@ -394,89 +404,133 @@ export default function StudentBrowseOpportunitiesPage() {
     if (isLoading) {
         return (
             <div className="flex flex-col justify-center items-center h-full min-h-[480px] gap-3">
-                <Loader2 className="w-8 h-8 animate-spin text-slate-400" />
-                <p className="text-sm text-slate-500">Loading opportunities…</p>
+                <Loader2 className="w-8 h-8 animate-spin text-ciel-green" />
+                <p className="text-sm text-ciel-text-mid">Loading opportunities…</p>
             </div>
         );
     }
 
     return (
         <div className="max-w-7xl mx-auto space-y-8 pb-20">
-            <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-                <div className="space-y-1">
-                    <h1 className="text-3xl font-semibold tracking-tight text-slate-900">Browse Opportunities</h1>
-                    <p className="text-sm text-slate-500 max-w-2xl leading-relaxed">
-                        Discover and apply to volunteer projects from our partners.
-                    </p>
+            <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+                <div className="flex items-start gap-3.5">
+                    <div className="hidden h-12 w-12 shrink-0 items-center justify-center rounded-ciel-sm bg-ciel-green-soft text-ciel-green-deep sm:flex">
+                        <Compass className="h-6 w-6" />
+                    </div>
+                    <div className="space-y-1">
+                        <h1 className="text-3xl font-bold tracking-tight text-ciel-navy">Browse Opportunities</h1>
+                        <p className="text-sm text-ciel-text-mid max-w-2xl leading-relaxed">
+                            Discover and apply to volunteer projects from our partners.
+                        </p>
+                    </div>
                 </div>
                 <ScoringLevelsButton
                     size="default"
-                    className="h-9 w-fit shrink-0 gap-1.5 border-amber-200/90 bg-amber-50/50 px-3 text-sm font-medium text-amber-900 hover:bg-amber-50"
+                    className="h-9 w-fit shrink-0 gap-1.5 rounded-full border-amber-200/90 bg-amber-50/50 px-3 text-sm font-medium text-amber-900 hover:bg-amber-50"
                     onClick={() => setIsScoringLevelsOpen(true)}
                 />
             </header>
 
             <section
-                className="rounded-xl border border-slate-200 bg-white p-5 sm:p-6 shadow-sm"
+                className="rounded-ciel-lg border border-ciel-border bg-white p-5 shadow-sm sm:p-6"
                 aria-label="Filters"
             >
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
-                    <select
-                        value={universityFilter}
-                        onChange={(e) => setUniversityFilter(e.target.value)}
-                        className={filterSelectClass}
-                        title="University"
-                    >
-                        <option value="all">All universities</option>
-                        {universityOptions.map((u) => (
-                            <option key={u} value={u}>
-                                {u}
-                            </option>
-                        ))}
-                    </select>
-                    <select
-                        value={modeFilter}
-                        onChange={(e) => setModeFilter(e.target.value as "all" | ModeBucket)}
-                        className={filterSelectClass}
-                        title="Mode"
-                    >
-                        <option value="all">All modes</option>
-                        {(["on-site", "hybrid", "remote", "unspecified"] as const).map((b) => (
-                            <option key={b} value={b}>
-                                {modeMenuLabel(b)}
-                            </option>
-                        ))}
-                    </select>
-                    <select
-                        value={oppTypeFilter}
-                        onChange={(e) => setOppTypeFilter(e.target.value)}
-                        className={filterSelectClass}
-                        title="Opportunity type"
-                    >
-                        <option value="all">All types</option>
-                        {oppTypeOptions.map((t) => (
-                            <option key={t} value={t}>
-                                {t}
-                            </option>
-                        ))}
-                    </select>
-                    <select
-                        value={sdgFilter}
-                        onChange={(e) => setSdgFilter(e.target.value)}
-                        className={filterSelectClass}
-                        title="SDG"
-                    >
-                        <option value="all">All SDGs</option>
-                        {sdgOptions.map((s) => (
-                            <option key={s} value={s}>
-                                {s}
-                            </option>
-                        ))}
-                    </select>
+                <div className="mb-4 flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 text-sm font-semibold text-ciel-navy">
+                        <SlidersHorizontal className="h-4 w-4 text-ciel-text-soft" />
+                        Filters
+                        {activeFilterCount > 0 && (
+                            <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-ciel-green-soft px-1.5 text-[11px] font-bold text-ciel-green-deep">
+                                {activeFilterCount}
+                            </span>
+                        )}
+                    </div>
+                    <div className="flex rounded-ciel-xs border border-ciel-border bg-slate-50 p-1 shadow-sm">
+                        <button
+                            type="button"
+                            onClick={() => setViewMode("grid")}
+                            className={`rounded-[6px] p-2 transition-colors ${viewMode === "grid" ? "bg-white text-ciel-navy shadow-sm" : "text-ciel-text-soft hover:text-ciel-navy"}`}
+                            title="Grid view"
+                        >
+                            <LayoutGrid className="h-4 w-4" />
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setViewMode("list")}
+                            className={`rounded-[6px] p-2 transition-colors ${viewMode === "list" ? "bg-white text-ciel-navy shadow-sm" : "text-ciel-text-soft hover:text-ciel-navy"}`}
+                            title="List view"
+                        >
+                            <List className="h-4 w-4" />
+                        </button>
+                    </div>
                 </div>
 
-                <div className="mt-4 flex flex-col gap-4 lg:flex-row lg:items-stretch lg:justify-between">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 lg:flex-1 lg:max-w-3xl">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+                    <div className="relative">
+                        <select
+                            value={universityFilter}
+                            onChange={(e) => setUniversityFilter(e.target.value)}
+                            className={filterSelectClass}
+                            title="University"
+                        >
+                            <option value="all">All universities</option>
+                            {universityOptions.map((u) => (
+                                <option key={u} value={u}>
+                                    {u}
+                                </option>
+                            ))}
+                        </select>
+                        <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ciel-text-soft" />
+                    </div>
+                    <div className="relative">
+                        <select
+                            value={modeFilter}
+                            onChange={(e) => setModeFilter(e.target.value as "all" | ModeBucket)}
+                            className={filterSelectClass}
+                            title="Mode"
+                        >
+                            <option value="all">All modes</option>
+                            {(["on-site", "hybrid", "remote", "unspecified"] as const).map((b) => (
+                                <option key={b} value={b}>
+                                    {modeMenuLabel(b)}
+                                </option>
+                            ))}
+                        </select>
+                        <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ciel-text-soft" />
+                    </div>
+                    <div className="relative">
+                        <select
+                            value={oppTypeFilter}
+                            onChange={(e) => setOppTypeFilter(e.target.value)}
+                            className={filterSelectClass}
+                            title="Opportunity type"
+                        >
+                            <option value="all">All types</option>
+                            {oppTypeOptions.map((t) => (
+                                <option key={t} value={t}>
+                                    {t}
+                                </option>
+                            ))}
+                        </select>
+                        <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ciel-text-soft" />
+                    </div>
+                    <div className="relative">
+                        <select
+                            value={sdgFilter}
+                            onChange={(e) => setSdgFilter(e.target.value)}
+                            className={filterSelectClass}
+                            title="SDG"
+                        >
+                            <option value="all">All SDGs</option>
+                            {sdgOptions.map((s) => (
+                                <option key={s} value={s}>
+                                    {s}
+                                </option>
+                            ))}
+                        </select>
+                        <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ciel-text-soft" />
+                    </div>
+                    <div className="relative">
                         <select
                             value={locationFilter}
                             onChange={(e) => setLocationFilter(e.target.value)}
@@ -490,76 +544,70 @@ export default function StudentBrowseOpportunitiesPage() {
                                 </option>
                             ))}
                         </select>
-                        <select
-                            value={seatsFilter}
-                            onChange={(e) => setSeatsFilter(e.target.value as "all" | "1" | "5" | "10")}
-                            className={filterSelectClass}
-                            title="Seats available"
-                        >
-                            <option value="all">Any seats</option>
-                            <option value="1">1+ seats</option>
-                            <option value="5">5+ seats</option>
-                            <option value="10">10+ seats</option>
-                        </select>
-                        <select
-                            value={visibilityFilter}
-                            onChange={(e) => setVisibilityFilter(e.target.value as "all" | VisibilityBucket)}
-                            className={filterSelectClass}
-                            title="Visibility"
-                        >
-                            <option value="all">All visibility</option>
-                            {(["open", "restricted", "unspecified"] as const).map((b) => (
-                                <option key={b} value={b}>
-                                    {visibilityMenuLabel(b)}
-                                </option>
-                            ))}
-                        </select>
+                        <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ciel-text-soft" />
                     </div>
+                </div>
 
-                    <div className="flex flex-wrap items-center justify-end gap-2 shrink-0">
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-10 px-4 text-sm border-slate-200 text-slate-700 hover:bg-slate-50"
-                            onClick={clearListingFilters}
-                        >
-                            Clear
-                        </Button>
-                        <div className="flex rounded-lg border border-slate-200 bg-slate-50 p-1 shadow-sm">
-                            <button
-                                type="button"
-                                onClick={() => setViewMode("grid")}
-                                className={`rounded-md p-2 transition-colors ${viewMode === "grid" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-800"}`}
-                                title="Grid view"
+                <div className="mt-3 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:max-w-lg lg:flex-1">
+                        <div className="relative">
+                            <select
+                                value={seatsFilter}
+                                onChange={(e) => setSeatsFilter(e.target.value as "all" | "1" | "5" | "10")}
+                                className={filterSelectClass}
+                                title="Seats available"
                             >
-                                <LayoutGrid className="h-4 w-4" />
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => setViewMode("list")}
-                                className={`rounded-md p-2 transition-colors ${viewMode === "list" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-800"}`}
-                                title="List view"
+                                <option value="all">Any seats</option>
+                                <option value="1">1+ seats</option>
+                                <option value="5">5+ seats</option>
+                                <option value="10">10+ seats</option>
+                            </select>
+                            <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ciel-text-soft" />
+                        </div>
+                        <div className="relative">
+                            <select
+                                value={visibilityFilter}
+                                onChange={(e) => setVisibilityFilter(e.target.value as "all" | VisibilityBucket)}
+                                className={filterSelectClass}
+                                title="Visibility"
                             >
-                                <List className="h-4 w-4" />
-                            </button>
+                                <option value="all">All visibility</option>
+                                {(["open", "restricted", "unspecified"] as const).map((b) => (
+                                    <option key={b} value={b}>
+                                        {visibilityMenuLabel(b)}
+                                    </option>
+                                ))}
+                            </select>
+                            <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ciel-text-soft" />
                         </div>
                     </div>
+
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-10 shrink-0 self-start rounded-ciel-xs border-ciel-border px-4 text-sm text-ciel-text-mid hover:bg-slate-50 hover:text-ciel-navy lg:self-auto"
+                        onClick={clearListingFilters}
+                    >
+                        Clear filters
+                    </Button>
                 </div>
             </section>
 
             {filteredOpportunities.length > 0 ? (
-                <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
-                    {filteredOpportunities.length}{" "}
-                    {filteredOpportunities.length === 1 ? "opportunity" : "opportunities"}
+                <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-ciel-text-soft">
+                    <span className="text-sm font-bold text-ciel-navy">{filteredOpportunities.length}</span>
+                    {filteredOpportunities.length === 1 ? "opportunity" : "opportunities"} found
                 </p>
             ) : null}
 
             {filteredOpportunities.length === 0 ? (
-                <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/40 py-16 text-center">
-                    <Globe className="mx-auto mb-4 h-12 w-12 text-slate-300" />
-                    <h3 className="text-lg font-semibold text-slate-800">No opportunities match</h3>
-                    <p className="mt-1 text-sm text-slate-500">Try adjusting your filters or check back later.</p>
-                    <Button variant="outline" className="mt-6 border-slate-200" onClick={clearListingFilters}>
+                <div className="rounded-ciel-lg border border-dashed border-ciel-border bg-slate-50/40 py-16 text-center">
+                    <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-ciel-green-soft">
+                        <Globe className="h-8 w-8 text-ciel-green-deep" />
+                    </div>
+                    <h3 className="text-lg font-semibold text-ciel-navy">No opportunities match</h3>
+                    <p className="mt-1 text-sm text-ciel-text-mid">Try adjusting your filters or check back later.</p>
+                    <Button variant="outline" className="mt-6 rounded-full border-ciel-border" onClick={clearListingFilters}>
                         Clear filters
                     </Button>
                 </div>
@@ -579,20 +627,21 @@ export default function StudentBrowseOpportunitiesPage() {
                                 : null;
                         return viewMode === 'grid' ? (
                             // GRID VIEW CARD
-                            <div key={op.id} className="group flex h-full flex-col rounded-xl border border-slate-200 bg-white shadow-sm transition-all hover:border-slate-300 hover:shadow-md">
+                            <div key={op.id} className="group flex h-full flex-col overflow-hidden rounded-ciel-lg border border-ciel-border bg-white shadow-sm ciel-transition hover:-translate-y-0.5 hover:border-ciel-green/40 hover:shadow-lg">
+                                <div className="h-1 w-full bg-gradient-to-r from-ciel-green to-ciel-indigo opacity-70" />
                                 <div className="flex flex-1 flex-col space-y-4 p-5">
                                     <div className="flex flex-wrap items-start justify-between gap-2">
                                         <div className="flex min-w-0 flex-wrap items-center gap-2">
-                                            <Badge className="border-0 bg-slate-100 font-medium text-slate-700 hover:bg-slate-100">
+                                            <span className="rounded-full bg-ciel-green-soft px-2.5 py-1 text-xs font-semibold text-ciel-green-deep">
                                                 {op.category || "Social Impact"}
-                                            </Badge>
+                                            </span>
                                             {applyEligibility.listingRestrictionLabel ? (
                                                 <Badge className="max-w-full whitespace-normal border border-amber-200 bg-amber-50 text-left text-amber-900 shadow-none hover:bg-amber-50 leading-snug">
                                                     {applyEligibility.listingRestrictionLabel}
                                                 </Badge>
                                             ) : null}
                                         </div>
-                                        <span className="shrink-0 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                                        <span className="shrink-0 rounded-full bg-ciel-indigo-soft px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-ciel-indigo">
                                             {op.modeBucket && op.modeBucket !== "unspecified"
                                                 ? modeMenuLabel(op.modeBucket)
                                                 : op.mode || "On Site"}
@@ -600,46 +649,47 @@ export default function StudentBrowseOpportunitiesPage() {
                                     </div>
 
                                     <div>
-                                        <h3 className="line-clamp-2 text-lg font-semibold tracking-tight text-slate-900 transition-colors group-hover:text-slate-700">
+                                        <h3 className="line-clamp-2 text-lg font-semibold tracking-tight text-ciel-navy ciel-transition group-hover:text-ciel-green-deep">
                                             {op.title}
                                         </h3>
-                                        <p className="mt-1 line-clamp-1 text-sm text-slate-500">
-                                            by {op.organization_name || "Partner Organization"}
+                                        <p className="mt-1.5 flex items-center gap-1.5 line-clamp-1 text-sm text-ciel-text-mid">
+                                            <Building2 className="h-3.5 w-3.5 shrink-0 text-ciel-text-soft" />
+                                            {op.organization_name || "Partner Organization"}
                                         </p>
                                     </div>
 
-                                    <p className="line-clamp-3 text-sm leading-relaxed text-slate-500">
+                                    <p className="line-clamp-3 text-sm leading-relaxed text-ciel-text-mid">
                                         {op.description}
                                     </p>
 
-                                    <div className="space-y-2.5 border-t border-slate-100 pt-3">
-                                        <div className="flex items-center gap-2 text-xs text-slate-500">
-                                            <MapPin className="h-3.5 w-3.5 shrink-0 text-slate-400" />
-                                            {op.city || "Remote"}
+                                    <div className="grid grid-cols-2 gap-x-3 gap-y-2.5 border-t border-ciel-border pt-3.5">
+                                        <div className="flex items-center gap-1.5 text-xs text-ciel-text-mid">
+                                            <MapPin className="h-3.5 w-3.5 shrink-0 text-ciel-text-soft" />
+                                            <span className="truncate">{op.city || "Remote"}</span>
                                         </div>
-                                        <div className="flex items-center gap-2 text-xs text-slate-500">
-                                            <Calendar className="h-3.5 w-3.5 shrink-0 text-slate-400" />
-                                            {op.start_date ? new Date(op.start_date).toLocaleDateString() : "Flexible Dates"}
+                                        <div className="flex items-center gap-1.5 text-xs text-ciel-text-mid">
+                                            <Calendar className="h-3.5 w-3.5 shrink-0 text-ciel-text-soft" />
+                                            <span className="truncate">{op.start_date ? new Date(op.start_date).toLocaleDateString() : "Flexible Dates"}</span>
                                         </div>
-                                        <div className="flex items-center gap-2 text-xs text-slate-500">
-                                            <Clock className="h-3.5 w-3.5 shrink-0 text-slate-400" />
-                                            {op.hours || "0"} hours credit
+                                        <div className="flex items-center gap-1.5 text-xs text-ciel-text-mid">
+                                            <Clock className="h-3.5 w-3.5 shrink-0 text-ciel-text-soft" />
+                                            {op.hours || "0"} hrs credit
                                         </div>
-                                        <div className="flex items-center gap-2 text-xs font-semibold text-amber-700">
+                                        <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-700">
                                             <Users className="h-3.5 w-3.5 shrink-0 text-amber-600/80" />
-                                            {op.seatsRemaining ?? op.remaining_seats ?? op.volunteersNeeded ?? 0} seats remaining
+                                            {op.seatsRemaining ?? op.remaining_seats ?? op.volunteersNeeded ?? 0} seats left
                                         </div>
                                     </div>
                                 </div>
 
-                                <div className="flex items-center justify-between gap-2 rounded-b-xl border-t border-slate-100 bg-white px-5 py-4">
+                                <div className="flex items-center justify-between gap-2 border-t border-ciel-border bg-slate-50/60 px-5 py-4">
                                     <div className="flex min-w-0 flex-wrap items-center gap-2">
-                                        <Link href={`/dashboard/student/browse/${op.id}`} className="text-sm font-medium text-slate-600 underline-offset-4 hover:text-slate-900 hover:underline">
+                                        <Link href={`/dashboard/student/browse/${op.id}`} className="text-sm font-medium text-ciel-text-mid underline-offset-4 hover:text-ciel-navy hover:underline">
                                             View details
                                         </Link>
                                         <button
                                             type="button"
-                                            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-slate-200 text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-900"
+                                            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-ciel-border bg-white text-ciel-text-mid ciel-transition hover:bg-slate-50 hover:text-ciel-navy"
                                             aria-label="Copy share link"
                                             title="Copy share link"
                                             onClick={() => void copyBrowseOpportunityShareLink(op.id)}
@@ -656,7 +706,7 @@ export default function StudentBrowseOpportunitiesPage() {
                                                     <Button
                                                         size="sm"
                                                         variant="outline"
-                                                        className="h-8 border-slate-200 text-xs font-medium"
+                                                        className="h-8 rounded-full border-ciel-border text-xs font-medium"
                                                     >
                                                         {reportCta.label}
                                                     </Button>
@@ -667,19 +717,19 @@ export default function StudentBrowseOpportunitiesPage() {
                                                 ["pending", "pending_approval", "applied"].includes(
                                                     op.application_status,
                                                 )) && (
-                                                    <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-1 rounded-md border border-amber-100 italic">
+                                                    <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-1 rounded-full border border-amber-100 italic">
                                                         {joinApplicationPendingLabel(op as unknown as Record<string, unknown>)}
                                                     </span>
                                                 )}
 
                                             {/* Team Button */}
                                             {op.teamMembers && op.teamMembers.length > 0 && (
-                                                <Button size="sm" variant="outline" className="h-8 border-slate-200 text-xs font-medium" onClick={() => openTeamDialog(op)}>
+                                                <Button size="sm" variant="outline" className="h-8 rounded-full border-ciel-border text-xs font-medium" onClick={() => openTeamDialog(op)}>
                                                     <Users className="mr-1 h-3.5 w-3.5" /> Team
                                                 </Button>
                                             )}
 
-                                            <Button size="sm" variant="ghost" className="pointer-events-none text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800">
+                                            <Button size="sm" variant="ghost" className="pointer-events-none rounded-full text-ciel-green-deep hover:bg-ciel-green-soft hover:text-ciel-green-deep">
                                                 <CheckCircle2 className="mr-1 h-4 w-4" /> Applied
                                             </Button>
                                         </div>
@@ -687,7 +737,7 @@ export default function StudentBrowseOpportunitiesPage() {
                                         <div className="flex items-center gap-2 flex-wrap justify-end max-w-[min(100%,14rem)] sm:max-w-none">
                                             {op.application_status &&
                                                 isJoinApplicationRejectedStatus(op.application_status) && (
-                                                    <span className="text-[10px] font-bold text-rose-700 bg-rose-50 px-2 py-1 rounded-md border border-rose-100 italic">
+                                                    <span className="text-[10px] font-bold text-rose-700 bg-rose-50 px-2 py-1 rounded-full border border-rose-100 italic">
                                                         Application not approved
                                                     </span>
                                                 )}
@@ -695,8 +745,8 @@ export default function StudentBrowseOpportunitiesPage() {
                                                 size="sm"
                                                 className={
                                                     applyEligibility.canApply
-                                                        ? "bg-slate-900 font-medium text-white transition-colors hover:bg-slate-800"
-                                                        : "cursor-not-allowed bg-slate-200 text-slate-600 hover:bg-slate-200"
+                                                        ? "rounded-full bg-ciel-navy font-medium text-white ciel-transition hover:bg-ciel-navy/90"
+                                                        : "cursor-not-allowed rounded-full bg-slate-200 text-slate-600 hover:bg-slate-200"
                                                 }
                                                 onClick={() =>
                                                     applyEligibility.canApply &&
@@ -713,8 +763,8 @@ export default function StudentBrowseOpportunitiesPage() {
                                             size="sm"
                                             className={
                                                 applyEligibility.canApply
-                                                    ? "bg-slate-900 font-medium text-white transition-colors hover:bg-slate-800"
-                                                    : "cursor-not-allowed bg-slate-200 text-slate-600 hover:bg-slate-200"
+                                                    ? "rounded-full bg-ciel-navy font-medium text-white ciel-transition hover:bg-ciel-navy/90"
+                                                    : "cursor-not-allowed rounded-full bg-slate-200 text-slate-600 hover:bg-slate-200"
                                             }
                                             onClick={() =>
                                                 applyEligibility.canApply &&
@@ -730,33 +780,33 @@ export default function StudentBrowseOpportunitiesPage() {
                             </div>
                         ) : (
                             // LIST VIEW CARD
-                            <div key={op.id} className="group flex flex-col items-start gap-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition-all hover:border-slate-300 hover:shadow-md md:flex-row md:items-center">
+                            <div key={op.id} className="group flex flex-col items-start gap-6 rounded-ciel-lg border border-ciel-border bg-white p-5 shadow-sm ciel-transition hover:border-ciel-green/40 hover:shadow-md md:flex-row md:items-center">
                                 <div className="min-w-0 flex-1">
                                     <div className="mb-2 flex flex-wrap items-center gap-2">
-                                        <Badge className="border-0 bg-slate-100 font-medium text-slate-700 hover:bg-slate-100">
+                                        <span className="rounded-full bg-ciel-green-soft px-2.5 py-1 text-xs font-semibold text-ciel-green-deep">
                                             {op.category || "Social Impact"}
-                                        </Badge>
+                                        </span>
                                         {applyEligibility.listingRestrictionLabel ? (
                                             <Badge className="border border-amber-200 bg-amber-50 text-amber-900 shadow-none hover:bg-amber-50">
                                                 {applyEligibility.listingRestrictionLabel}
                                             </Badge>
                                         ) : null}
-                                        <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                                        <span className="rounded-full bg-ciel-indigo-soft px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-ciel-indigo">
                                             {op.modeBucket && op.modeBucket !== "unspecified"
                                                 ? modeMenuLabel(op.modeBucket)
                                                 : op.mode || "On Site"}
                                         </span>
                                     </div>
 
-                                    <h3 className="truncate text-lg font-semibold tracking-tight text-slate-900 transition-colors group-hover:text-slate-700">
+                                    <h3 className="truncate text-lg font-semibold tracking-tight text-ciel-navy ciel-transition group-hover:text-ciel-green-deep">
                                         {op.title}
                                     </h3>
 
-                                    <div className="mt-3 flex flex-wrap gap-x-6 gap-y-2 text-sm text-slate-500">
-                                        <span className="font-medium text-slate-600">by {op.organization_name || "Partner Organization"}</span>
-                                        <span className="flex items-center gap-1"><MapPin className="h-3.5 w-3.5 text-slate-400" /> {op.city || "Remote"}</span>
-                                        <span className="flex items-center gap-1"><Calendar className="h-3.5 w-3.5 text-slate-400" /> {op.start_date ? new Date(op.start_date).toLocaleDateString() : "Flexible Dates"}</span>
-                                        <span className="flex items-center gap-1"><Clock className="h-3.5 w-3.5 text-slate-400" /> {op.hours || "0"} hours</span>
+                                    <div className="mt-3 flex flex-wrap gap-x-6 gap-y-2 text-sm text-ciel-text-mid">
+                                        <span className="flex items-center gap-1.5 font-medium text-ciel-text-mid"><Building2 className="h-3.5 w-3.5 text-ciel-text-soft" /> {op.organization_name || "Partner Organization"}</span>
+                                        <span className="flex items-center gap-1"><MapPin className="h-3.5 w-3.5 text-ciel-text-soft" /> {op.city || "Remote"}</span>
+                                        <span className="flex items-center gap-1"><Calendar className="h-3.5 w-3.5 text-ciel-text-soft" /> {op.start_date ? new Date(op.start_date).toLocaleDateString() : "Flexible Dates"}</span>
+                                        <span className="flex items-center gap-1"><Clock className="h-3.5 w-3.5 text-ciel-text-soft" /> {op.hours || "0"} hours</span>
                                         <span className="flex items-center gap-1 font-semibold text-amber-700"><Users className="h-3.5 w-3.5 text-amber-600/80" /> {op.seatsRemaining ?? op.remaining_seats ?? op.volunteersNeeded ?? 0} seats left</span>
                                     </div>
                                 </div>
@@ -764,11 +814,11 @@ export default function StudentBrowseOpportunitiesPage() {
                                 <div className="mt-2 flex w-full flex-wrap items-center gap-3 md:mt-0 md:w-auto">
                                     <div className="flex flex-1 flex-wrap items-center gap-2 md:flex-none">
                                         <Link href={`/dashboard/student/browse/${op.id}`} className="min-w-0 flex-1 md:flex-none">
-                                            <Button variant="outline" className="w-full border-slate-200 font-medium">Details</Button>
+                                            <Button variant="outline" className="w-full rounded-full border-ciel-border font-medium">Details</Button>
                                         </Link>
                                         <button
                                             type="button"
-                                            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-slate-200 text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-900"
+                                            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-ciel-border text-ciel-text-mid ciel-transition hover:bg-slate-50 hover:text-ciel-navy"
                                             aria-label="Copy share link"
                                             title="Copy share link"
                                             onClick={() => void copyBrowseOpportunityShareLink(op.id)}
@@ -777,7 +827,7 @@ export default function StudentBrowseOpportunitiesPage() {
                                         </button>
                                         <ScoringLevelsButton
                                             size="default"
-                                            className="h-9 gap-1.5 border-amber-200/90 bg-amber-50/50 px-3 text-sm font-medium text-amber-900 hover:bg-amber-50"
+                                            className="h-9 gap-1.5 rounded-full border-amber-200/90 bg-amber-50/50 px-3 text-sm font-medium text-amber-900 hover:bg-amber-50"
                                             onClick={() => setIsScoringLevelsOpen(true)}
                                         />
                                     </div>
@@ -789,7 +839,7 @@ export default function StudentBrowseOpportunitiesPage() {
                                                     <Button
                                                         size="sm"
                                                         variant="outline"
-                                                        className="h-9 border-slate-200 text-xs font-medium"
+                                                        className="h-9 rounded-full border-ciel-border text-xs font-medium"
                                                     >
                                                         {reportCta.label}
                                                     </Button>
@@ -800,19 +850,19 @@ export default function StudentBrowseOpportunitiesPage() {
                                                 ["pending", "pending_approval", "applied"].includes(
                                                     op.application_status,
                                                 )) && (
-                                                    <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-3 py-1.5 rounded-md border border-amber-100 italic">
+                                                    <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-3 py-1.5 rounded-full border border-amber-100 italic">
                                                         {joinApplicationPendingLabel(op as unknown as Record<string, unknown>)}
                                                     </span>
                                                 )}
 
                                             {/* Team Button */}
                                             {op.teamMembers && op.teamMembers.length > 0 && (
-                                                <Button size="sm" variant="outline" className="h-9 border-slate-200 text-xs font-medium" onClick={() => openTeamDialog(op)}>
+                                                <Button size="sm" variant="outline" className="h-9 rounded-full border-ciel-border text-xs font-medium" onClick={() => openTeamDialog(op)}>
                                                     <Users className="mr-1 h-3.5 w-3.5" /> Team
                                                 </Button>
                                             )}
 
-                                            <Button variant="ghost" className="pointer-events-none bg-emerald-50 text-emerald-800">
+                                            <Button variant="ghost" className="pointer-events-none rounded-full bg-ciel-green-soft text-ciel-green-deep">
                                                 <CheckCircle2 className="mr-2 h-4 w-4" /> Applied
                                             </Button>
                                         </div>
@@ -820,15 +870,15 @@ export default function StudentBrowseOpportunitiesPage() {
                                         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 flex-1 md:flex-none justify-end">
                                             {op.application_status &&
                                                 isJoinApplicationRejectedStatus(op.application_status) && (
-                                                    <span className="text-[10px] font-bold text-rose-700 bg-rose-50 px-3 py-1.5 rounded-md border border-rose-100 italic text-center sm:text-left">
+                                                    <span className="text-[10px] font-bold text-rose-700 bg-rose-50 px-3 py-1.5 rounded-full border border-rose-100 italic text-center sm:text-left">
                                                         Application not approved
                                                     </span>
                                                 )}
                                             <Button
                                                 className={
                                                     applyEligibility.canApply
-                                                        ? "flex-1 bg-slate-900 font-medium text-white transition-colors hover:bg-slate-800 md:flex-none"
-                                                        : "flex-1 cursor-not-allowed bg-slate-200 text-slate-600 hover:bg-slate-200 md:flex-none"
+                                                        ? "flex-1 rounded-full bg-ciel-navy font-medium text-white ciel-transition hover:bg-ciel-navy/90 md:flex-none"
+                                                        : "flex-1 cursor-not-allowed rounded-full bg-slate-200 text-slate-600 hover:bg-slate-200 md:flex-none"
                                                 }
                                                 onClick={() =>
                                                     applyEligibility.canApply &&
@@ -844,8 +894,8 @@ export default function StudentBrowseOpportunitiesPage() {
                                         <Button
                                             className={
                                                 applyEligibility.canApply
-                                                    ? "flex-1 bg-slate-900 font-medium text-white transition-colors hover:bg-slate-800 md:flex-none"
-                                                    : "flex-1 cursor-not-allowed bg-slate-200 text-slate-600 hover:bg-slate-200 md:flex-none"
+                                                    ? "flex-1 rounded-full bg-ciel-navy font-medium text-white ciel-transition hover:bg-ciel-navy/90 md:flex-none"
+                                                    : "flex-1 cursor-not-allowed rounded-full bg-slate-200 text-slate-600 hover:bg-slate-200 md:flex-none"
                                             }
                                             onClick={() =>
                                                 applyEligibility.canApply &&

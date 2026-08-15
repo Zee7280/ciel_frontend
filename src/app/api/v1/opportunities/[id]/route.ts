@@ -29,3 +29,38 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }
 }
+
+export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
+    try {
+        const authHeader = request.headers.get("Authorization");
+        const { id } = await params;
+
+        const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/opportunities/${id}`, {
+            method: "DELETE",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": authHeader || ""
+            }
+        });
+
+        let data: Record<string, unknown> = {};
+        try {
+            data = await response.json();
+        } catch {
+            data = {};
+        }
+
+        if (!response.ok) {
+            return NextResponse.json(
+                { error: data.message || "Operation failed" },
+                { status: response.status }
+            );
+        }
+
+        return NextResponse.json(data);
+
+    } catch (error) {
+        console.error("Error in opportunities/[id] delete proxy:", error);
+        return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+    }
+}

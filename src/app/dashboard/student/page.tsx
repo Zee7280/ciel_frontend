@@ -21,7 +21,8 @@ interface RecommendedOpportunity {
     id: string;
     title: string;
     organization_name?: string;
-    organization?: string;
+    /** Backend returns the raw Organization entity here, not a string — always read .name. */
+    organization?: { name?: string } | null;
 }
 
 function greeting(): string {
@@ -212,7 +213,7 @@ export default function StudentDashboardPage() {
                             >
                                 <Compass className="h-4 w-4 text-ciel-green-deep" />
                                 <p className="mt-2 text-sm font-bold text-ciel-text">{opp.title}</p>
-                                <p className="mt-0.5 text-xs text-ciel-text-soft">{opp.organization_name || opp.organization || "CIEL partner"}</p>
+                                <p className="mt-0.5 text-xs text-ciel-text-soft">{opp.organization_name || opp.organization?.name || "CIEL partner"}</p>
                             </Link>
                         ))}
                     </div>
