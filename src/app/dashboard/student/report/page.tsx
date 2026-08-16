@@ -913,7 +913,7 @@ function ReportFormContent() {
                     {activeStep === 4 && <Section4Activities />}
                     {activeStep === 5 && <Section5Outcomes />}
                     {activeStep === 6 && <Section6Resources projectData={projectDetails} />}
-                    {activeStep === 7 && <Section7Partnerships />}
+                    {activeStep === 7 && <Section7Partnerships projectData={projectDetails} />}
                     {activeStep === 8 && <Section8Evidence />}
                     {activeStep === 9 && <Section9Reflection />}
                     {activeStep === 10 && <Section10Sustainability />}

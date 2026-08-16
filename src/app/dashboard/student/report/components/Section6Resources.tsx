@@ -1,11 +1,10 @@
 import {
     Package, Plus, Trash2, FileText, Info, AlertCircle,
-    Banknote, CheckCircle2, Activity, Users, BarChart3, Upload, ChevronDown,
+    Banknote, Activity, Users, BarChart3, Upload, ChevronDown,
 } from "lucide-react";
 import { Label } from "./ui/label";
 import { Input } from "./ui/input";
 import { Button } from "./ui/button";
-import { Textarea } from "./ui/textarea";
 import { useReportForm } from "../context/ReportContext";
 import { calculateEngagementMetrics, buildIndividualRosterFromSection1 } from "../utils/engagementMetrics";
 import {
@@ -19,10 +18,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog";
 import { toast } from "sonner";
 import { MAX_REPORT_UPLOAD_LABEL, splitReportFilesByImageSize } from "../utils/fileUploadLimits";
 import { REPORT_ATTACHMENT_ACCEPT } from "@/utils/reportAttachmentAccept";
-
-function countWords(str: string): number {
-    return (str || "").trim().split(/\s+/).filter(w => w.length > 0).length;
-}
 
 function filterOversizedImages(files: File[], input: HTMLInputElement): File[] {
     const { accepted, rejected } = splitReportFilesByImageSize(files);
@@ -51,6 +46,26 @@ const resourceTypes = [
     "International Development Support",
     "Other (Specify)",
 ];
+
+/** Emoji + a sensible default unit (from `unitOptions`) per resource type, for the tile picker. */
+const RESOURCE_TYPE_META: Record<string, { emoji: string; defaultUnit?: string }> = {
+    "Financial (Cash Funding)": { emoji: "💵", defaultUnit: "PKR" },
+    "In-kind Materials (Food / Books / Supplies / Kits)": { emoji: "📦", defaultUnit: "Kits" },
+    "Equipment / Tools (Medical, Digital, Technical)": { emoji: "🛠️", defaultUnit: "Devices" },
+    "Infrastructure Access (Venue / Lab / Clinic / Classroom)": { emoji: "🏢", defaultUnit: "Sessions" },
+    "Digital Platform / Software Access": { emoji: "💻", defaultUnit: "Licenses" },
+    "Human Resources (Trainers / Experts / Volunteers)": { emoji: "👥", defaultUnit: "Number (#)" },
+    "Transport Support": { emoji: "🚐", defaultUnit: "Number (#)" },
+    "Energy / Utility Support": { emoji: "🔌", defaultUnit: "Units" },
+    "Communication / Media Support": { emoji: "📣", defaultUnit: "Units" },
+    "Policy / Legal Support": { emoji: "⚖️", defaultUnit: "Units" },
+    "Research / Data Access": { emoji: "📊", defaultUnit: "Units" },
+    "Community Mobilization Support": { emoji: "🤝", defaultUnit: "Number (#)" },
+    "Corporate / CSR Sponsorship": { emoji: "🏭", defaultUnit: "PKR" },
+    "Government Program Support": { emoji: "🏛️", defaultUnit: "PKR" },
+    "International Development Support": { emoji: "🌐", defaultUnit: "PKR" },
+    "Other (Specify)": { emoji: "✨" },
+};
 
 const unitOptions = [
     "PKR", "USD", "Number (#)", "Hours", "Units", "Kg", "Liters",
@@ -93,8 +108,6 @@ const inputClasses =
     "h-11 w-full min-w-0 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-800 shadow-sm outline-none transition-colors placeholder:text-slate-400 focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100";
 const selectClasses =
     "h-11 w-full min-w-0 appearance-none rounded-lg border border-slate-200 bg-white px-3 pr-9 text-sm font-medium text-slate-800 shadow-sm outline-none transition-colors focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100";
-const textareaClasses =
-    "min-h-[110px] w-full min-w-0 resize-y rounded-xl border border-slate-200 bg-white p-4 text-sm font-medium leading-relaxed text-slate-800 shadow-sm outline-none transition-colors placeholder:text-slate-400 focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100";
 const fieldLabel =
     "text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500";
 const badgeRequired =
@@ -110,7 +123,7 @@ function CheckGrid({
     onToggle: (value: string) => void;
 }) {
     return (
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        <div className="flex flex-wrap gap-2">
             {options.map((opt) => {
                 const active = selected.includes(opt);
                 return (
@@ -119,22 +132,12 @@ function CheckGrid({
                         type="button"
                         onClick={() => onToggle(opt)}
                         className={clsx(
-                            "flex items-center gap-2.5 rounded-lg border px-3 py-2.5 text-left text-xs font-medium transition-colors",
+                            "rounded-full border px-3.5 py-2 text-xs font-semibold transition-colors",
                             active
-                                ? "border-indigo-200 bg-indigo-50 text-indigo-800"
-                                : "border-slate-200 bg-white text-slate-600 hover:border-indigo-100 hover:bg-slate-50",
+                                ? "border-indigo-500 bg-indigo-50 text-indigo-700"
+                                : "border-slate-200 bg-white text-slate-600 hover:border-indigo-200",
                         )}
                     >
-                        <span
-                            className={clsx(
-                                "flex h-4 w-4 shrink-0 items-center justify-center rounded border",
-                                active
-                                    ? "border-indigo-600 bg-indigo-600 text-white"
-                                    : "border-slate-300 bg-white",
-                            )}
-                        >
-                            {active ? <CheckCircle2 className="h-3 w-3" /> : null}
-                        </span>
                         {opt}
                     </button>
                 );
@@ -213,14 +216,14 @@ function FullFilePreview({ file }: { file: any }) {
 }
 
 function ResourceCard({
-    res, idx, onUpdate, onRemove, canRemove, getFieldError,
+    res, idx, onUpdate, onUpdateFields, onRemove, canRemove, getFieldError,
 }: {
     res: any; idx: number; canRemove: boolean;
     onUpdate: (field: string, val: any) => void;
+    onUpdateFields: (fields: Record<string, any>) => void;
     onRemove: () => void;
     getFieldError: (key: string) => string | undefined;
 }) {
-    const purposeWords = countWords(res.purpose || "");
     const sources: string[] = res.sources || [];
     const verifications: string[] = Array.isArray(res.verification)
         ? res.verification
@@ -261,54 +264,42 @@ function ResourceCard({
 
             <div className="space-y-1.5">
                 <Label className={fieldLabel}>
-                    6.2.1 Resource type
+                    6.2.1 Resource type — what kind?
                 </Label>
-                <div className="relative">
-                    <select
-                        value={res.type}
-                        onChange={e => onUpdate("type", e.target.value)}
-                        className={selectClasses}
-                    >
-                        <option value="">Select resource type...</option>
-                        {resourceTypes.map(t => <option key={t} value={t}>{t}</option>)}
-                    </select>
-                    <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                    {resourceTypes.map(t => {
+                        const active = res.type === t;
+                        const meta = RESOURCE_TYPE_META[t];
+                        return (
+                            <button
+                                key={t}
+                                type="button"
+                                onClick={() => onUpdateFields(
+                                    !res.unit && meta?.defaultUnit
+                                        ? { type: t, unit: meta.defaultUnit }
+                                        : { type: t },
+                                )}
+                                className={clsx(
+                                    "flex flex-col items-center gap-1.5 rounded-xl border-2 px-2 py-3 text-center transition-colors",
+                                    active
+                                        ? "border-indigo-500 bg-indigo-50 text-indigo-700"
+                                        : "border-slate-200 bg-white text-slate-600 hover:border-indigo-200",
+                                )}
+                            >
+                                <span className="text-xl">{meta?.emoji || "📦"}</span>
+                                <span className="text-[11px] font-semibold leading-tight">{t.split(" (")[0]}</span>
+                            </button>
+                        );
+                    })}
                 </div>
                 {res.type === "Other (Specify)" ? (
                     <div className="space-y-1.5 pt-1">
-                        <Textarea
-                            placeholder="Specify resource type (50–200 words)…"
+                        <Input
+                            placeholder="Describe the resource type in a few words…"
                             value={res.type_other || ""}
                             onChange={e => onUpdate("type_other", e.target.value)}
-                            className={textareaClasses}
+                            className={inputClasses}
                         />
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                            <div className="h-1.5 w-40 overflow-hidden rounded-full bg-slate-100 sm:w-48">
-                                <div
-                                    className={clsx(
-                                        "h-full rounded-full transition-all",
-                                        countWords(res.type_other || "") < 50
-                                            ? "bg-amber-400"
-                                            : countWords(res.type_other || "") > 200
-                                              ? "bg-red-500"
-                                              : "bg-emerald-500",
-                                    )}
-                                    style={{
-                                        width: `${Math.min((countWords(res.type_other || "") / 200) * 100, 100)}%`,
-                                    }}
-                                />
-                            </div>
-                            <span className={clsx(
-                                "text-[11px] tabular-nums",
-                                countWords(res.type_other || "") >= 50 && countWords(res.type_other || "") <= 200
-                                    ? "text-emerald-600"
-                                    : countWords(res.type_other || "") > 200
-                                      ? "text-red-500"
-                                      : "text-amber-600",
-                            )}>
-                                {countWords(res.type_other || "")} / 200 words (min 50)
-                            </span>
-                        </div>
                         <FieldError message={getFieldError(`resources.${idx}.type_other`)} />
                     </div>
                 ) : null}
@@ -344,39 +335,12 @@ function ResourceCard({
 
             {res.unit === "Other (Specify)" ? (
                 <div className="space-y-1.5">
-                    <Textarea
-                        placeholder="Specify unit (50–200 words)…"
+                    <Input
+                        placeholder="Describe the unit in a few words…"
                         value={res.unit_other || ""}
                         onChange={e => onUpdate("unit_other", e.target.value)}
-                        className={textareaClasses}
+                        className={inputClasses}
                     />
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                        <div className="h-1.5 w-40 overflow-hidden rounded-full bg-slate-100 sm:w-48">
-                            <div
-                                className={clsx(
-                                    "h-full rounded-full transition-all",
-                                    countWords(res.unit_other || "") < 50
-                                        ? "bg-amber-400"
-                                        : countWords(res.unit_other || "") > 200
-                                          ? "bg-red-500"
-                                          : "bg-emerald-500",
-                                )}
-                                style={{
-                                    width: `${Math.min((countWords(res.unit_other || "") / 200) * 100, 100)}%`,
-                                }}
-                            />
-                        </div>
-                        <span className={clsx(
-                            "text-[11px] tabular-nums",
-                            countWords(res.unit_other || "") >= 50 && countWords(res.unit_other || "") <= 200
-                                ? "text-emerald-600"
-                                : countWords(res.unit_other || "") > 200
-                                  ? "text-red-500"
-                                  : "text-amber-600",
-                        )}>
-                            {countWords(res.unit_other || "")} / 200 words (min 50)
-                        </span>
-                    </div>
                     <FieldError message={getFieldError(`resources.${idx}.unit_other`)} />
                 </div>
             ) : null}
@@ -387,39 +351,12 @@ function ResourceCard({
                 <CheckGrid options={sourceOptions} selected={sources} onToggle={toggleSource} />
                 {sources.includes("Other (Specify)") ? (
                     <div className="space-y-1.5 pt-1">
-                        <Textarea
-                            placeholder="Specify source (50–200 words)…"
+                        <Input
+                            placeholder="Describe the source in a few words…"
                             value={res.source_other || ""}
                             onChange={e => onUpdate("source_other", e.target.value)}
-                            className={textareaClasses}
+                            className={inputClasses}
                         />
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                            <div className="h-1.5 w-40 overflow-hidden rounded-full bg-slate-100 sm:w-48">
-                                <div
-                                    className={clsx(
-                                        "h-full rounded-full transition-all",
-                                        countWords(res.source_other || "") < 50
-                                            ? "bg-amber-400"
-                                            : countWords(res.source_other || "") > 200
-                                              ? "bg-red-500"
-                                              : "bg-emerald-500",
-                                    )}
-                                    style={{
-                                        width: `${Math.min((countWords(res.source_other || "") / 200) * 100, 100)}%`,
-                                    }}
-                                />
-                            </div>
-                            <span className={clsx(
-                                "text-[11px] tabular-nums",
-                                countWords(res.source_other || "") >= 50 && countWords(res.source_other || "") <= 200
-                                    ? "text-emerald-600"
-                                    : countWords(res.source_other || "") > 200
-                                      ? "text-red-500"
-                                      : "text-amber-600",
-                            )}>
-                                {countWords(res.source_other || "")} / 200 words (min 50)
-                            </span>
-                        </div>
                         <FieldError message={getFieldError(`resources.${idx}.source_other`)} />
                     </div>
                 ) : null}
@@ -432,40 +369,14 @@ function ResourceCard({
             </div>
 
             <div className="space-y-1.5">
-                <Label className={fieldLabel}>6.2.6 Purpose of resource</Label>
-                <Textarea
-                    placeholder="Explain what exactly this resource enabled (e.g. 'Used to purchase hygiene kits for 45 participants')"
+                <Label className={fieldLabel}>6.2.6 What did it make possible? (one line)</Label>
+                <Input
+                    placeholder="e.g. bought paint and furniture for both classrooms"
                     value={res.purpose}
                     onChange={e => onUpdate("purpose", e.target.value)}
-                    className={clsx(textareaClasses, "min-h-[120px]")}
+                    className={inputClasses}
                 />
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div className="h-1.5 w-40 overflow-hidden rounded-full bg-slate-100 sm:w-48">
-                        <div
-                            className={clsx(
-                                "h-full rounded-full transition-all",
-                                purposeWords < 50
-                                    ? "bg-amber-400"
-                                    : purposeWords > 200
-                                      ? "bg-red-500"
-                                      : "bg-emerald-500",
-                            )}
-                            style={{
-                                width: `${Math.min((purposeWords / 200) * 100, 100)}%`,
-                            }}
-                        />
-                    </div>
-                    <span className={clsx(
-                        "text-[11px] tabular-nums",
-                        purposeWords >= 50 && purposeWords <= 200
-                            ? "text-emerald-600"
-                            : purposeWords > 200
-                              ? "text-red-500"
-                              : "text-amber-600",
-                    )}>
-                        {purposeWords} / 200 words · min 50
-                    </span>
-                </div>
+                <p className="text-xs text-slate-500">One clear line beats a 50-word minimum. ✂️</p>
                 <FieldError message={getFieldError(`resources.${idx}.purpose`)} />
             </div>
         </div>
@@ -486,6 +397,11 @@ export default function Section6Resources({ projectData }: { projectData?: unkno
     const updateResource = (i: number, field: string, val: any) => {
         const next = [...resources];
         next[i] = { ...next[i], [field]: val };
+        update("resources", next);
+    };
+    const updateResourceFields = (i: number, fields: Record<string, any>) => {
+        const next = [...resources];
+        next[i] = { ...next[i], ...fields };
         update("resources", next);
     };
 
@@ -545,6 +461,16 @@ export default function Section6Resources({ projectData }: { projectData?: unkno
     );
     const inKindTypes = resources.filter(r => !financialTypes.includes(r));
     const uniqueSources = new Set(resources.flatMap(r => r.sources || [])).size;
+    const moneyByUnit = useMemo(() => {
+        const totals: Record<string, number> = {};
+        resources.forEach(r => {
+            if (r.unit !== "PKR" && r.unit !== "USD") return;
+            const amt = parseFloat(r.amount) || 0;
+            if (!amt) return;
+            totals[r.unit] = (totals[r.unit] || 0) + amt;
+        });
+        return totals;
+    }, [resources]);
 
     return (
         <div className="mx-auto max-w-6xl space-y-8 pb-10">
@@ -629,25 +555,23 @@ export default function Section6Resources({ projectData }: { projectData?: unkno
                 </div>
 
                 <div className="space-y-5 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-                    <Label className={fieldLabel}>Did this project use additional resources?</Label>
+                    <Label className={fieldLabel}>What did your project run on?</Label>
 
                     <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                         <button
                             type="button"
                             onClick={() => update("use_resources", "no")}
                             className={clsx(
-                                "rounded-xl border p-5 text-left transition-colors",
+                                "rounded-xl border-2 p-5 text-center transition-colors",
                                 use_resources === "no"
-                                    ? "border-slate-900 bg-slate-900 text-white shadow-sm"
+                                    ? "border-indigo-500 bg-indigo-50 shadow-sm"
                                     : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50",
                             )}
                         >
-                            <p className="text-sm font-semibold">Time &amp; volunteer effort only</p>
-                            <p className={clsx(
-                                "mt-1.5 text-xs leading-relaxed",
-                                use_resources === "no" ? "text-slate-300" : "text-slate-500",
-                            )}>
-                                No financial, material, or external resources were used.
+                            <p className="text-2xl">💪</p>
+                            <p className="mt-2 text-sm font-semibold text-slate-900">Just our time &amp; effort</p>
+                            <p className="mt-1.5 text-xs leading-relaxed text-slate-500">
+                                No money, materials, or outside support used.
                             </p>
                         </button>
 
@@ -655,20 +579,16 @@ export default function Section6Resources({ projectData }: { projectData?: unkno
                             type="button"
                             onClick={() => update("use_resources", "yes")}
                             className={clsx(
-                                "rounded-xl border p-5 text-left transition-colors",
+                                "rounded-xl border-2 p-5 text-center transition-colors",
                                 use_resources === "yes"
-                                    ? "border-indigo-600 bg-indigo-600 text-white shadow-sm"
+                                    ? "border-indigo-500 bg-indigo-50 shadow-sm"
                                     : "border-slate-200 bg-white text-slate-700 hover:border-indigo-200 hover:bg-indigo-50/40",
                             )}
                         >
-                            <p className="text-sm font-semibold">
-                                Yes — financial, material, or other resources were used
-                            </p>
-                            <p className={clsx(
-                                "mt-1.5 text-xs leading-relaxed",
-                                use_resources === "yes" ? "text-indigo-100" : "text-slate-500",
-                            )}>
-                                Continue to Step 2 to record each resource.
+                            <p className="text-2xl">📦</p>
+                            <p className="mt-2 text-sm font-semibold text-slate-900">We used resources</p>
+                            <p className="mt-1.5 text-xs leading-relaxed text-slate-500">
+                                Money, materials, venue, equipment, or expert help.
                             </p>
                         </button>
                     </div>
@@ -743,6 +663,7 @@ export default function Section6Resources({ projectData }: { projectData?: unkno
                                         idx={idx}
                                         canRemove={resources.length > 1}
                                         onUpdate={(field, val) => updateResource(idx, field, val)}
+                                        onUpdateFields={(fields) => updateResourceFields(idx, fields)}
                                         onRemove={() => removeResource(idx)}
                                         getFieldError={getFieldError}
                                     />
@@ -882,6 +803,17 @@ export default function Section6Resources({ projectData }: { projectData?: unkno
                                 </div>
                             ))}
                         </div>
+
+                        {Object.keys(moneyByUnit).length > 0 ? (
+                            <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-indigo-50 px-5 py-3.5 text-sm font-bold text-indigo-700">
+                                <span>💵 Total money used</span>
+                                <span>
+                                    {Object.entries(moneyByUnit)
+                                        .map(([unit, amt]) => `${unit} ${amt.toLocaleString()}`)
+                                        .join(" · ")}
+                                </span>
+                            </div>
+                        ) : null}
 
                         <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
                             <p className="text-sm leading-relaxed text-slate-700">{autoNarrative}</p>

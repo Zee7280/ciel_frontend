@@ -1,9 +1,10 @@
-import React, { useMemo, useEffect, useState } from "react";
+import React, { useMemo, useEffect, useRef, useState } from "react";
 import {
     GraduationCap, BrainCircuit, Star, Info, TrendingUp,
     Users2, ChevronDown, Compass,
 } from "lucide-react";
 import { Label } from "./ui/label";
+import { Input } from "./ui/input";
 import { Textarea } from "./ui/textarea";
 import { useReportForm } from "../context/ReportContext";
 import { FieldError } from "./ui/FieldError";
@@ -11,12 +12,35 @@ import clsx from "clsx";
 
 // ─── Static configuration ───────────────────────────────────────────────────
 const integrationOptions = [
-    { id: "Voluntary extracurricular activity", label: "Voluntary extracurricular" },
-    { id: "Course-linked assignment", label: "Course-linked assignment" },
-    { id: "Credit-bearing component", label: "Credit-bearing component" },
-    { id: "Capstone / Thesis-linked project", label: "Capstone / thesis" },
-    { id: "Research-integrated project", label: "Research-integrated" },
+    { id: "Voluntary extracurricular activity", label: "🙋 Voluntary / extracurricular" },
+    { id: "Course-linked assignment", label: "📖 Part of a course" },
+    { id: "Credit-bearing component", label: "🎓 For credit" },
+    { id: "Capstone / Thesis-linked project", label: "📑 Capstone / thesis" },
+    { id: "Research-integrated project", label: "🔬 Research project" },
 ];
+
+const SKILL_OPTIONS = [
+    "🗣️ Communication",
+    "🤝 Teamwork",
+    "📋 Planning",
+    "🧩 Problem-solving",
+    "📊 Working with data",
+    "🎤 Leadership",
+    "💗 Empathy",
+    "⏰ Time management",
+];
+
+function stripEmoji(s: string): string {
+    return (s || "").replace(/^[^\s]+\s/, "");
+}
+function lowerFirst(text: string): string {
+    const t = (text || "").trim();
+    return t ? t.charAt(0).toLowerCase() + t.slice(1).replace(/\.$/, "") : "";
+}
+function joinList(items: string[]): string {
+    if (items.length < 2) return items.join("");
+    return `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
+}
 
 const ratingGuide = [
     { val: "1", meaning: "Low", context: "No meaningful engagement — little to no involvement in this area" },
@@ -149,6 +173,10 @@ export default function Section9Reflection() {
         personal_learning,
         academic_application,
         competency_scores,
+        skills_grown = [],
+        reflection_biggest_learning = "",
+        reflection_moment = "",
+        reflection_discipline_help = "",
     } = section9;
 
     const [showRatingGuide, setShowRatingGuide] = useState(false);
@@ -156,6 +184,52 @@ export default function Section9Reflection() {
     const update = (field: string, val: unknown) => updateSection("section9", { [field]: val });
     const updateScore = (key: string, val: number) =>
         update("competency_scores", { ...competency_scores, [key]: val });
+
+    /** Tracks the last text WE composed into each field, so a student's hand-edit is never silently overwritten. */
+    const lastAutoPersonalRef = useRef("");
+    const lastAutoAppRef = useRef("");
+
+    const composeAndUpdate = (fieldPatch: Record<string, unknown>) => {
+        const skills = (fieldPatch.skills_grown as string[] | undefined) ?? skills_grown;
+        const biggest = (fieldPatch.reflection_biggest_learning as string | undefined) ?? reflection_biggest_learning;
+        const moment = (fieldPatch.reflection_moment as string | undefined) ?? reflection_moment;
+        const disciplineHelp = (fieldPatch.reflection_discipline_help as string | undefined) ?? reflection_discipline_help;
+
+        const personalParts: string[] = [];
+        if (skills.length) personalParts.push(`Through this project I grew my ${joinList(skills.map((s) => stripEmoji(s).toLowerCase()))}.`);
+        if (biggest) personalParts.push(`The biggest thing I learned was ${lowerFirst(biggest)}.`);
+        if (moment) personalParts.push(`A moment that changed how I see things was ${lowerFirst(moment)}.`);
+        const composedPersonal = personalParts.join(" ");
+        const composedApplication = disciplineHelp ? `My field of study helped because ${lowerFirst(disciplineHelp)}.` : "";
+
+        const patch: Record<string, unknown> = { ...fieldPatch };
+        const personalStillAuto = !personal_learning || personal_learning === lastAutoPersonalRef.current;
+        if (personalStillAuto && composedPersonal) {
+            lastAutoPersonalRef.current = composedPersonal;
+            patch.personal_learning = composedPersonal;
+        }
+        const appStillAuto = !academic_application || academic_application === lastAutoAppRef.current;
+        if (appStillAuto && composedApplication) {
+            lastAutoAppRef.current = composedApplication;
+            patch.academic_application = composedApplication;
+        }
+        updateSection("section9", patch);
+    };
+
+    const toggleSkill = (skill: string) => {
+        const next = skills_grown.includes(skill) ? skills_grown.filter((s) => s !== skill) : [...skills_grown, skill];
+        composeAndUpdate({ skills_grown: next });
+    };
+
+    /** Combined preview only — the real, validated text lives in personal_learning / academic_application below. */
+    const reflectionPreview = useMemo(() => {
+        const parts: string[] = [];
+        if (skills_grown.length) parts.push(`Through this project I grew my ${joinList(skills_grown.map((s) => stripEmoji(s).toLowerCase()))}.`);
+        if (reflection_biggest_learning) parts.push(`The biggest thing I learned was ${lowerFirst(reflection_biggest_learning)}.`);
+        if (reflection_moment) parts.push(`A moment that changed how I see things was ${lowerFirst(reflection_moment)}.`);
+        if (reflection_discipline_help) parts.push(`My field of study helped because ${lowerFirst(reflection_discipline_help)}.`);
+        return parts.join(" ");
+    }, [skills_grown, reflection_biggest_learning, reflection_moment, reflection_discipline_help]);
 
     const getWordCount = (text: string) =>
         (text || "").trim().split(/\s+/).filter((w) => w.length > 0).length;
@@ -257,66 +331,109 @@ export default function Section9Reflection() {
                 </div>
             </section>
 
-            {/* 9.1 Personal learning */}
+            {/* 9.1 + 9.2 merged — guided reflection */}
             <section className="space-y-4">
-                <StepHeader n="9.1" title="Step 2 — Personal learning reflection" status="mandatory" />
+                <StepHeader n="9.1" title="Step 2 — Your reflection" status="mandatory" />
 
-                <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-                    <div>
-                        <Label className={fieldLabel}>Personal learning reflection</Label>
-                        <p className="mt-1.5 text-sm leading-relaxed text-slate-500">
-                            Reflect on new skills, community insights, perspective changes, and challenges.
-                            Focus on learning, not just repeating activities.
-                        </p>
+                <div className="space-y-5 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+                    <p className="text-sm text-slate-500">
+                        Tap the skills you grew, then finish three sentences — that composes the reflection below. Edit it directly any time.
+                    </p>
+
+                    <div className="space-y-2">
+                        <Label className={fieldLabel}>Skills I grew (tap all that apply)</Label>
+                        <div className="flex flex-wrap gap-2">
+                            {SKILL_OPTIONS.map((skill) => {
+                                const active = skills_grown.includes(skill);
+                                return (
+                                    <button
+                                        key={skill}
+                                        type="button"
+                                        onClick={() => toggleSkill(skill)}
+                                        className={clsx(
+                                            "rounded-full border px-3.5 py-2 text-xs font-semibold transition-colors",
+                                            active
+                                                ? "border-indigo-500 bg-indigo-50 text-indigo-700"
+                                                : "border-slate-200 bg-white text-slate-600 hover:border-indigo-200",
+                                        )}
+                                    >
+                                        {skill}
+                                    </button>
+                                );
+                            })}
+                        </div>
                     </div>
 
-                    <Textarea
-                        placeholder="Through this project, I improved my communication and teamwork skills while working with community members..."
-                        value={personal_learning}
-                        onChange={(e) => update("personal_learning", e.target.value)}
-                        className={textareaClasses}
-                    />
-
-                    <WordCount count={plWords} />
-                    <FieldError message={getFieldError("personal_learning")} />
-                </div>
-            </section>
-
-            {/* 9.2 Academic application */}
-            <section className="space-y-4">
-                <StepHeader n="9.2" title="Step 3 — Academic application" status="mandatory" />
-
-                <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-                    <div>
-                        <Label className={fieldLabel}>
-                            Academic application &amp; discipline contribution
-                        </Label>
-                        <p className="mt-1.5 text-sm leading-relaxed text-slate-500">
-                            Explain how your field of study helped you understand the problem, design the
-                            intervention, or apply technical methods.
-                        </p>
+                    <div className="space-y-1.5">
+                        <Label className={fieldLabel}>The biggest thing I learned was…</Label>
+                        <Input
+                            placeholder="e.g. that listening to the community matters more than my plan"
+                            value={reflection_biggest_learning}
+                            onChange={(e) => composeAndUpdate({ reflection_biggest_learning: e.target.value })}
+                            className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50/60 px-3.5 text-sm text-slate-900 placeholder:text-slate-400 focus-visible:border-indigo-300 focus-visible:bg-white focus-visible:ring-2 focus-visible:ring-indigo-100"
+                        />
+                    </div>
+                    <div className="space-y-1.5">
+                        <Label className={fieldLabel}>A moment that changed how I see things…</Label>
+                        <Input
+                            placeholder="e.g. seeing children choose books over the playground on day one"
+                            value={reflection_moment}
+                            onChange={(e) => composeAndUpdate({ reflection_moment: e.target.value })}
+                            className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50/60 px-3.5 text-sm text-slate-900 placeholder:text-slate-400 focus-visible:border-indigo-300 focus-visible:bg-white focus-visible:ring-2 focus-visible:ring-indigo-100"
+                        />
+                    </div>
+                    <div className="space-y-1.5">
+                        <Label className={fieldLabel}>My field of study helped because…</Label>
                         {section2?.discipline ? (
-                            <p className="mt-2 inline-flex rounded-lg border border-indigo-100 bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700">
-                                Your discipline: {section2.discipline}
-                            </p>
+                            <p className="text-xs font-semibold text-indigo-700">Your discipline: {section2.discipline}</p>
                         ) : null}
+                        <Input
+                            placeholder="e.g. I used simple data tracking to measure attendance improvements"
+                            value={reflection_discipline_help}
+                            onChange={(e) => composeAndUpdate({ reflection_discipline_help: e.target.value })}
+                            className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50/60 px-3.5 text-sm text-slate-900 placeholder:text-slate-400 focus-visible:border-indigo-300 focus-visible:bg-white focus-visible:ring-2 focus-visible:ring-indigo-100"
+                        />
                     </div>
 
-                    <Textarea
-                        placeholder="As a student, I applied basic data analysis techniques to track attendance and measure improvement..."
-                        value={academic_application}
-                        onChange={(e) => update("academic_application", e.target.value)}
-                        className={textareaClasses}
-                    />
+                    <div className="rounded-xl border border-dashed border-indigo-200 bg-indigo-50/40 p-4 text-sm leading-relaxed text-slate-700">
+                        {reflectionPreview || <span className="text-slate-400">Your reflection builds here as you tap and type…</span>}
+                    </div>
 
-                    <WordCount count={aaWords} />
-                    <FieldError message={getFieldError("academic_application")} />
+                    <div className="space-y-4 border-t border-slate-100 pt-5">
+                        <div>
+                            <Label className={fieldLabel}>Personal learning reflection</Label>
+                            <p className="mt-1.5 text-xs text-slate-500">Filled in from your answers above — fine-tune it here if you like.</p>
+                        </div>
+                        <Textarea
+                            placeholder="Through this project, I improved my communication and teamwork skills while working with community members..."
+                            value={personal_learning}
+                            onChange={(e) => update("personal_learning", e.target.value)}
+                            className={textareaClasses}
+                        />
+                        <WordCount count={plWords} />
+                        <FieldError message={getFieldError("personal_learning")} />
+                    </div>
+
+                    <div className="space-y-4 border-t border-slate-100 pt-5">
+                        <div>
+                            <Label className={fieldLabel}>Academic application &amp; discipline contribution</Label>
+                            <p className="mt-1.5 text-xs text-slate-500">Filled in from your answer above — fine-tune it here if you like.</p>
+                        </div>
+                        <Textarea
+                            placeholder="As a student, I applied basic data analysis techniques to track attendance and measure improvement..."
+                            value={academic_application}
+                            onChange={(e) => update("academic_application", e.target.value)}
+                            className={textareaClasses}
+                        />
+                        <WordCount count={aaWords} />
+                        <FieldError message={getFieldError("academic_application")} />
+                    </div>
                 </div>
             </section>
 
             {/* 9.3 Competency self-assessment */}
             <section className="space-y-4">
-                <StepHeader n="9.3" title="Step 4 — Competency self-assessment" />
+                <StepHeader n="9.2" title="Step 3 — Rate yourself, be honest" />
 
                 <div className="space-y-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
                     <button

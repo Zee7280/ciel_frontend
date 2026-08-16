@@ -245,34 +245,21 @@ export function validateSection6(data: any): ValidationResult {
             errors.push({ field: 'resources', message: 'Please list the resources used' });
         } else {
             data.resources.forEach((res: any, index: number) => {
-                // Validate Purpose (50-200 words)
-                const purposeWords = countWords(res.purpose || '');
-                if (purposeWords < 50) {
-                    errors.push({ field: `resources.${index}.purpose`, message: `Purpose is too short (${purposeWords}/50 words min)` });
-                } else if (purposeWords > 200) {
-                    errors.push({ field: `resources.${index}.purpose`, message: `Purpose is too long (${purposeWords}/200 words max)` });
+                // One clear line beats a 50-word minimum — just require it's said.
+                if (!String(res.purpose || '').trim()) {
+                    errors.push({ field: `resources.${index}.purpose`, message: 'Say what this resource made possible' });
                 }
 
-                // Validate Other fields if selected (50-200 words)
-                if (res.type === 'Other (Specify)') {
-                    const typeOtherWords = countWords(res.type_other || '');
-                    if (typeOtherWords < 50 || typeOtherWords > 200) {
-                        errors.push({ field: `resources.${index}.type_other`, message: `Please specify resource type (50-200 words)` });
-                    }
+                if (res.type === 'Other (Specify)' && !String(res.type_other || '').trim()) {
+                    errors.push({ field: `resources.${index}.type_other`, message: 'Please specify the resource type' });
                 }
 
-                if (res.unit === 'Other (Specify)') {
-                    const unitOtherWords = countWords(res.unit_other || '');
-                    if (unitOtherWords < 50 || unitOtherWords > 200) {
-                        errors.push({ field: `resources.${index}.unit_other`, message: `Please specify unit (50-200 words)` });
-                    }
+                if (res.unit === 'Other (Specify)' && !String(res.unit_other || '').trim()) {
+                    errors.push({ field: `resources.${index}.unit_other`, message: 'Please specify the unit' });
                 }
 
-                if (res.sources?.includes('Other (Specify)')) {
-                    const sourceOtherWords = countWords(res.source_other || '');
-                    if (sourceOtherWords < 50 || sourceOtherWords > 200) {
-                        errors.push({ field: `resources.${index}.source_other`, message: `Please specify source (50-200 words)` });
-                    }
+                if (res.sources?.includes('Other (Specify)') && !String(res.source_other || '').trim()) {
+                    errors.push({ field: `resources.${index}.source_other`, message: 'Please specify the source' });
                 }
             });
         }
@@ -342,9 +329,8 @@ export function validateSection8(data: any): ValidationResult {
     if (!data.evidence_types?.length) {
         errors.push({ field: 'evidence_types', message: 'At least one evidence type is mandatory' });
     }
-    const wordCount = (data.description || '').trim().split(/\s+/).filter((w: string) => w.length > 0).length;
-    if (wordCount < 100 || wordCount > 200) {
-        errors.push({ field: 'description', message: `Description must be between 100 and 200 words (Currently ${wordCount})` });
+    if (!String(data.description || '').trim()) {
+        errors.push({ field: 'description', message: 'Say what your evidence shows' });
     }
     if (!data.media_visible) {
         errors.push({ field: 'media_visible', message: 'Media visibility preference is required' });
@@ -388,8 +374,9 @@ export function validateSection9(data: any): ValidationResult {
  */
 export function validateSection10(data: any): ValidationResult {
     const errors: ValidationError[] = [];
-    const detailWords = countWords(data.continuation_details || '');
-    if (detailWords < 100 || detailWords > 200) errors.push({ field: 'continuation_details', message: `Sustainability roadmap must be 100-200 words (${detailWords} current)` });
+    if (!String(data.continuation_details || '').trim()) {
+        errors.push({ field: 'continuation_details', message: 'Say what will keep going, or what will happen next' });
+    }
 
     if (data.continuation_status !== 'no' && !data.mechanisms?.length) {
         errors.push({ field: 'mechanisms', message: 'Identify at least one sustainability mechanism' });

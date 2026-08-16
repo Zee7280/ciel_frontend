@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
-    ShieldCheck, Camera, FileUp, Globe, FileText, Lock, CheckCircle2,
+    ShieldCheck, Camera, FileUp, Globe, FileText, CheckCircle2,
     Info, AlertCircle, Activity, Image as ImageIcon, Users, BookOpen, Trash2, Upload,
 } from "lucide-react";
 import { Label } from "./ui/label";
@@ -24,31 +24,25 @@ const evidenceOptions = [
     { id: "Other supporting document", icon: FileUp },
 ];
 
-const ethicalOptions = [
-    { key: "authentic", label: "Authentic & Relevant", desc: "The evidence is authentic and directly related to this project" },
-    { key: "informed_consent", label: "Informed Consent", desc: "Informed consent was obtained where required" },
-    { key: "no_harm", label: "Non-Maleficence", desc: "No harm, exploitation, or misrepresentation is shown" },
-    { key: "privacy_respected", label: "Privacy & Dignity", desc: "Privacy and dignity of beneficiaries were respected" },
-];
 
 const visibilityOptions = [
     {
         id: "public",
         label: "Public",
-        desc: "May be used on website, social media, and public reports",
-        icon: Globe,
+        emoji: "🌐",
+        desc: "Website, social media, public reports",
     },
     {
         id: "limited",
-        label: "Limited",
-        desc: "Institutional reports and presentations only",
-        icon: Users,
+        label: "Institutional",
+        emoji: "🏛️",
+        desc: "University & HEC reports only",
     },
     {
         id: "internal",
-        label: "Internal",
+        label: "Private",
+        emoji: "🔒",
         desc: "Verification purposes only",
-        icon: Lock,
     },
 ];
 
@@ -320,15 +314,41 @@ export default function Section8Evidence() {
         const cur = evidence_types || [];
         update("evidence_types", cur.includes(type) ? cur.filter((t) => t !== type) : [...cur, type]);
     };
-    const updateEthical = (key: string, val: boolean) => {
-        update("ethical_compliance", { ...ethical_compliance, [key]: val });
-    };
     const toggleLinkedItem = (item: string) => {
         const cur = linked_items || [];
         update("linked_items", cur.includes(item) ? cur.filter((t) => t !== item) : [...cur, item]);
     };
+    /** One combined confirmation drives all four ethics keys at once — the checks themselves are unchanged. */
+    const setAllEthics = (checked: boolean) => {
+        update("ethical_compliance", {
+            authentic: checked,
+            informed_consent: checked,
+            no_harm: checked,
+            privacy_respected: checked,
+        });
+    };
 
-    const wordCount = (description || "").trim().split(/\s+/).filter((w) => w.length > 0).length;
+    /** Evidence already attached in earlier sections — nothing to re-upload or re-describe. */
+    const collectedElsewhere = useMemo(() => {
+        const items: { file: EvidenceFileItem; label: string; source: string }[] = [];
+        (data.section1?.attendance_logs || []).forEach((log) => {
+            if (log.evidence_file) {
+                items.push({
+                    file: log.evidence_file,
+                    label: log.date ? `Field visit — ${log.date}` : (log.activity_type || "Attendance evidence"),
+                    source: "Attendance (Sec 1)",
+                });
+            }
+        });
+        (data.section6?.evidence_files || []).forEach((f, i) => {
+            items.push({ file: f, label: getFileName(f, i), source: "Resources (Sec 6)" });
+        });
+        (data.section7?.formalization_files || []).forEach((f, i) => {
+            items.push({ file: f, label: getFileName(f, i), source: "Partnerships (Sec 7)" });
+        });
+        return items;
+    }, [data.section1?.attendance_logs, data.section6?.evidence_files, data.section7?.formalization_files]);
+
     const allEthicalChecked =
         Object.values(ethical_compliance || {}).every((v) => v === true) &&
         Object.keys(ethical_compliance || {}).length === 4;
@@ -404,6 +424,45 @@ export default function Section8Evidence() {
                     </div>
                 </div>
             </div>
+
+            {/* Already collected — pulled from earlier sections, nothing to redo */}
+            {collectedElsewhere.length > 0 ? (
+                <section className="space-y-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                        <h3 className="text-base font-semibold text-slate-900">
+                            Already collected <span className="font-normal text-slate-500">({collectedElsewhere.length})</span>
+                        </h3>
+                        <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-emerald-700">
+                            <CheckCircle2 className="h-3 w-3" />
+                            Pulled from your earlier sections
+                        </span>
+                    </div>
+                    <p className="text-sm text-slate-500">
+                        Nothing to re-upload or re-describe — each item keeps the note you gave it originally.
+                    </p>
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+                        {collectedElsewhere.map((item, i) => {
+                            const isImage = getFileType(item.file).startsWith("image/") || /\.(jpg|jpeg|png|gif|webp|heic|heif)$/i.test(item.label);
+                            return (
+                                <button
+                                    key={`${item.source}-${i}`}
+                                    type="button"
+                                    onClick={() => setPreviewFile({ file: item.file, name: item.label })}
+                                    className="overflow-hidden rounded-xl border border-slate-200 bg-white text-left shadow-sm transition-colors hover:border-indigo-200"
+                                >
+                                    <div className="flex aspect-[4/3] items-center justify-center bg-gradient-to-br from-indigo-50 to-purple-50 text-2xl">
+                                        {isImage ? "🖼️" : "📄"}
+                                    </div>
+                                    <div className="p-2.5">
+                                        <p className="truncate text-xs font-semibold text-slate-800">{item.label}</p>
+                                        <p className="mt-0.5 truncate text-[10px] font-semibold text-emerald-600">from {item.source}</p>
+                                    </div>
+                                </button>
+                            );
+                        })}
+                    </div>
+                </section>
+            ) : null}
 
             {/* 8.1 Upload evidence */}
             <section className="space-y-4">
@@ -646,45 +705,24 @@ export default function Section8Evidence() {
 
             {/* 8.3 Describe */}
             <section className="space-y-4">
-                <StepHeader n="8.3" title="Step 3 — Describe the evidence" />
+                <StepHeader n="8.3" title="Step 3 — What does your evidence show?" />
 
                 <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
                     <div>
-                        <Label className={fieldLabel}>Evidence description (mandatory)</Label>
+                        <Label className={fieldLabel}>A few lines is enough</Label>
                         <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-slate-500">
-                            Briefly explain what this evidence shows, how it relates to your activity,
-                            and what it verifies (attendance, outputs, outcomes, resource use).
+                            What do these files show, and what do they verify — attendance, outputs, outcomes, resource use? No 100-word essay needed.
                         </p>
                     </div>
 
                     <textarea
                         spellCheck={true}
-                        placeholder="Example: The uploaded photos show students conducting hygiene awareness sessions at a community school. The attendance sheet confirms 60 participants across three sessions. The presentation slides demonstrate the structured content delivered."
+                        placeholder="e.g. Photos show students running hygiene awareness sessions at the community school; the attendance sheet confirms 60 participants across three sessions."
                         value={description}
                         onChange={(e) => update("description", e.target.value)}
-                        rows={4}
+                        rows={3}
                         className={textareaClasses}
                     />
-
-                    <div className="flex items-center justify-between">
-                        <span
-                            className={clsx(
-                                "text-xs font-medium",
-                                wordCount >= 100 && wordCount <= 200
-                                    ? "text-emerald-600"
-                                    : wordCount > 200
-                                        ? "text-red-500"
-                                        : "text-amber-600",
-                            )}
-                        >
-                            {wordCount} / 200 words (min 100)
-                        </span>
-                        {wordCount >= 100 && wordCount <= 200 && (
-                            <span className="flex items-center gap-1 text-xs font-semibold text-emerald-600">
-                                <CheckCircle2 className="h-3 w-3" /> Valid length
-                            </span>
-                        )}
-                    </div>
 
                     <FieldError message={getFieldError("section8.description")} />
                 </div>
@@ -694,47 +732,35 @@ export default function Section8Evidence() {
             <section className="space-y-4">
                 <StepHeader n="8.4" title="Step 4 — Ethical & consent confirmation" />
 
-                <div className="space-y-5 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-                    <div>
-                        <Label className={fieldLabel}>Ethical declaration (all required)</Label>
-                        <div className="mt-3 flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
-                            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
-                            <p className="text-sm leading-relaxed text-amber-900">
-                                False or misleading submissions may result in rejection and institutional action.
-                            </p>
-                        </div>
+                <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+                    <label
+                        className={clsx(
+                            "flex cursor-pointer items-start gap-3 rounded-xl border px-4 py-4 transition-colors",
+                            allEthicalChecked ? "border-indigo-200 bg-indigo-50" : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50",
+                        )}
+                    >
+                        <input
+                            type="checkbox"
+                            checked={allEthicalChecked}
+                            onChange={(e) => setAllEthics(e.target.checked)}
+                            className="mt-1 h-[18px] w-[18px] shrink-0 accent-indigo-600"
+                        />
+                        <span>
+                            <span className="block text-sm font-semibold text-slate-900">
+                                I confirm this evidence is genuine and was gathered respectfully.
+                            </span>
+                            <span className="mt-1.5 block text-xs leading-relaxed text-slate-500">
+                                That means: it&apos;s from this project · people in photos agreed to them · no one is shown in a harmful or misleading way · beneficiaries&apos; privacy and dignity are respected.
+                            </span>
+                        </span>
+                    </label>
+                    <div className="flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+                        <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+                        <p className="text-sm leading-relaxed text-amber-900">
+                            False or misleading submissions may result in rejection and institutional action.
+                        </p>
                     </div>
-
-                    <div className="grid gap-2.5">
-                        {ethicalOptions.map((opt) => {
-                            const isChecked = !!ethical_compliance?.[opt.key as keyof typeof ethical_compliance];
-                            return (
-                                <button
-                                    key={opt.key}
-                                    type="button"
-                                    onClick={() => updateEthical(opt.key, !isChecked)}
-                                    className={clsx(
-                                        "flex items-start gap-3.5 rounded-lg border px-4 py-3.5 text-left transition-colors",
-                                        isChecked
-                                            ? "border-indigo-200 bg-indigo-50"
-                                            : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50",
-                                    )}
-                                >
-                                    <span
-                                        className={clsx(
-                                            "mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border",
-                                            isChecked
-                                                ? "border-indigo-600 bg-indigo-600 text-white"
-                                                : "border-slate-300 bg-white",
-                                        )}
-                                    >
-                                        {isChecked ? <CheckCircle2 className="h-3.5 w-3.5" /> : null}
-                                    </span>
-                                    <p className="text-sm font-medium text-slate-800">{opt.desc}</p>
-                                </button>
-                            );
-                        })}
-                    </div>
+                    <FieldError message={getFieldError("section8.ethical_compliance")} />
                 </div>
             </section>
 
@@ -754,20 +780,15 @@ export default function Section8Evidence() {
                                     type="button"
                                     onClick={() => update("media_visible", opt.id)}
                                     className={clsx(
-                                        "rounded-xl border p-5 text-left transition-colors",
+                                        "rounded-xl border-2 p-5 text-center transition-colors",
                                         active
-                                            ? "border-indigo-600 bg-indigo-600 text-white shadow-sm"
+                                            ? "border-indigo-500 bg-indigo-50 shadow-sm"
                                             : "border-slate-200 bg-white text-slate-700 hover:border-indigo-200 hover:bg-indigo-50/40",
                                     )}
                                 >
-                                    <div className="mb-2 flex items-center gap-2.5">
-                                        <opt.icon className="h-5 w-5" />
-                                        <p className="text-sm font-semibold">{opt.label}</p>
-                                    </div>
-                                    <p className={clsx(
-                                        "text-xs leading-relaxed",
-                                        active ? "text-indigo-100" : "text-slate-500",
-                                    )}>
+                                    <p className="text-2xl">{opt.emoji}</p>
+                                    <p className="mt-2 text-sm font-semibold text-slate-900">{opt.label}</p>
+                                    <p className="mt-1.5 text-xs leading-relaxed text-slate-500">
                                         {opt.desc}
                                     </p>
                                 </button>
@@ -792,32 +813,23 @@ export default function Section8Evidence() {
                             </p>
                         </div>
 
-                        <div className="flex min-w-[200px] gap-1 rounded-lg border border-slate-200 bg-slate-50 p-1">
-                            <button
-                                type="button"
-                                onClick={() => update("partner_verification", false)}
+                        <button
+                            type="button"
+                            role="switch"
+                            aria-checked={partner_verification}
+                            onClick={() => update("partner_verification", !partner_verification)}
+                            className={clsx(
+                                "relative h-[30px] w-[52px] shrink-0 rounded-full transition-colors",
+                                partner_verification ? "bg-emerald-500" : "bg-slate-200",
+                            )}
+                        >
+                            <span
                                 className={clsx(
-                                    "flex-1 rounded-md py-2 text-xs font-semibold transition-colors",
-                                    !partner_verification
-                                        ? "bg-indigo-600 text-white shadow-sm"
-                                        : "text-slate-400 hover:text-slate-600",
+                                    "absolute top-[3px] h-6 w-6 rounded-full bg-white shadow transition-all",
+                                    partner_verification ? "left-[25px]" : "left-[3px]",
                                 )}
-                            >
-                                No
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => update("partner_verification", true)}
-                                className={clsx(
-                                    "flex-1 rounded-md py-2 text-xs font-semibold transition-colors",
-                                    partner_verification
-                                        ? "bg-indigo-600 text-white shadow-sm"
-                                        : "text-slate-400 hover:text-slate-600",
-                                )}
-                            >
-                                Yes
-                            </button>
-                        </div>
+                            />
+                        </button>
                     </div>
 
                     {partner_verification && (

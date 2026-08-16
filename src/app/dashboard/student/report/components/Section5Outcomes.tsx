@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useRef } from "react";
 import {
     TrendingUp, Info, Plus, Trash2, CheckCircle2, AlertCircle,
     BarChart3, PlusCircle, ChevronDown, Target, Lock,
@@ -164,6 +164,20 @@ const badgeMandatory =
 function wordCount(text: string): number {
     return (text || "").trim().split(/\s+/).filter(Boolean).length;
 }
+
+function lowerFirst(text: string): string {
+    const t = (text || "").trim();
+    return t ? t.charAt(0).toLowerCase() + t.slice(1).replace(/\.$/, "") : "";
+}
+
+const CHALLENGE_TAGS = [
+    "⏰ Not enough time",
+    "💸 Limited budget",
+    "🚪 Access to the site",
+    "📐 Hard to measure change",
+    "🗓️ Scheduling with partner",
+    "✨ Other",
+];
 
 function outcomeTitle(outcome: MeasurableOutcome): string {
     if (outcome.outcome_sub_category) return outcome.outcome_sub_category;
@@ -385,12 +399,22 @@ function OutcomeCard({
                     </div>
                 </div>
 
-                <div className="flex items-center justify-between rounded-lg border border-emerald-100 bg-emerald-50 px-4 py-3">
-                    <div className="flex items-center gap-2 text-sm font-medium text-emerald-800">
-                        <TrendingUp className="h-4 w-4" />
-                        Improvement
+                <div className="space-y-2 rounded-lg border border-emerald-100 bg-emerald-50 px-4 py-3">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 text-sm font-medium text-emerald-800">
+                            <TrendingUp className="h-4 w-4" />
+                            {outcome.baseline || outcome.endline ? `${outcome.baseline || 0} → ${outcome.endline || 0}` : "Improvement"}
+                        </div>
+                        <span className="text-sm font-bold text-emerald-700">{improvementLabel}</span>
                     </div>
-                    <span className="text-sm font-bold text-emerald-700">{improvementLabel}</span>
+                    <div className="h-1.5 overflow-hidden rounded-full bg-emerald-100">
+                        <div
+                            className="h-full rounded-full bg-emerald-500 transition-all"
+                            style={{
+                                width: `${endline > 0 ? Math.min(100, (Math.abs(endline - baseline) / endline) * 100) : 0}%`,
+                            }}
+                        />
+                    </div>
                 </div>
 
                 <div className="space-y-2">
@@ -527,6 +551,28 @@ export default function Section5Outcomes() {
     const observedWords = wordCount(section5.observed_change);
     const challengeWords = wordCount(section5.challenges);
 
+    /** Tracks the last story sentence WE composed, so a student's hand-edit is never silently overwritten. */
+    const lastAutoStoryRef = useRef("");
+    const updateStoryBlank = (field: "story_before" | "story_now" | "story_because", val: string) => {
+        const before = field === "story_before" ? val : section5.story_before || "";
+        const now = field === "story_now" ? val : section5.story_now || "";
+        const because = field === "story_because" ? val : section5.story_because || "";
+        const composed = `Before our project, ${lowerFirst(before) || "…"}. Now, ${lowerFirst(now) || "…"}. We can see this change because ${lowerFirst(because) || "…"}.`;
+        const isStillAuto = !section5.observed_change || section5.observed_change === lastAutoStoryRef.current;
+        const patch: Record<string, string> = { [field]: val };
+        if (isStillAuto && (before || now || because)) {
+            lastAutoStoryRef.current = composed;
+            patch.observed_change = composed;
+        }
+        updateSection("section5", patch);
+    };
+
+    const toggleChallengeTag = (tag: string) => {
+        const cur = section5.challenge_tags || [];
+        const next = cur.includes(tag) ? cur.filter((t) => t !== tag) : [...cur, tag];
+        updateSection("section5", { challenge_tags: next });
+    };
+
     return (
         <div className="mx-auto max-w-6xl space-y-8 pb-10">
             {/* Header */}
@@ -628,6 +674,40 @@ export default function Section5Outcomes() {
                                     Do not repeat activities here — focus only on the resulting change.
                                 </p>
                             </div>
+                        </div>
+                    </div>
+
+                    <div className="space-y-3 rounded-xl border border-dashed border-indigo-200 bg-indigo-50/40 p-4">
+                        <div>
+                            <p className="text-sm font-semibold text-slate-900">✍️ Tell the story of the change</p>
+                            <p className="text-xs text-slate-500">Three blanks — we&apos;ll draft the paragraph below. Edit it directly once it appears.</p>
+                        </div>
+                        <div className="space-y-1">
+                            <Label className={fieldLabel}>Before our project…</Label>
+                            <Input
+                                placeholder="e.g. classes were held in bare rooms with no materials"
+                                value={section5.story_before || ""}
+                                onChange={e => updateStoryBlank("story_before", e.target.value)}
+                                className={inputClasses}
+                            />
+                        </div>
+                        <div className="space-y-1">
+                            <Label className={fieldLabel}>Now…</Label>
+                            <Input
+                                placeholder="e.g. 120 children learn in two renovated, equipped classrooms"
+                                value={section5.story_now || ""}
+                                onChange={e => updateStoryBlank("story_now", e.target.value)}
+                                className={inputClasses}
+                            />
+                        </div>
+                        <div className="space-y-1">
+                            <Label className={fieldLabel}>We know because…</Label>
+                            <Input
+                                placeholder="e.g. we compared attendance registers and photos from day one"
+                                value={section5.story_because || ""}
+                                onChange={e => updateStoryBlank("story_because", e.target.value)}
+                                className={inputClasses}
+                            />
                         </div>
                     </div>
 
@@ -744,6 +824,31 @@ export default function Section5Outcomes() {
                             </div>
                         </div>
                     ) : null}
+
+                    <div className="space-y-2">
+                        <Label className={fieldLabel}>What was hard? <span className="font-normal normal-case text-slate-400">(tap all that apply)</span></Label>
+                        <p className="text-xs text-slate-500">Being honest here makes your report stronger, not weaker.</p>
+                        <div className="flex flex-wrap gap-2">
+                            {CHALLENGE_TAGS.map((tag) => {
+                                const active = (section5.challenge_tags || []).includes(tag);
+                                return (
+                                    <button
+                                        key={tag}
+                                        type="button"
+                                        onClick={() => toggleChallengeTag(tag)}
+                                        className={clsx(
+                                            "rounded-full border px-3.5 py-2 text-xs font-semibold transition-colors",
+                                            active
+                                                ? "border-indigo-500 bg-indigo-50 text-indigo-700"
+                                                : "border-slate-200 bg-white text-slate-600 hover:border-indigo-200",
+                                        )}
+                                    >
+                                        {tag}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
 
                     <div className="space-y-1.5">
                         <Label className="text-sm font-medium text-slate-700">

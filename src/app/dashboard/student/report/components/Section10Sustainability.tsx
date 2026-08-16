@@ -1,9 +1,9 @@
-import React, { useMemo, useEffect } from "react";
+import React, { useMemo, useEffect, useRef } from "react";
 import {
-    Leaf, Recycle, TrendingUp, Info, ShieldCheck, Globe, Zap,
-    FileText, AlertCircle, Share2, Lock, Network,
+    Leaf, Recycle, TrendingUp, Info, Lock,
 } from "lucide-react";
 import { Label } from "./ui/label";
+import { Input } from "./ui/input";
 import { Textarea } from "./ui/textarea";
 import { useReportForm } from "../context/ReportContext";
 import { FieldError } from "./ui/FieldError";
@@ -11,34 +11,34 @@ import clsx from "clsx";
 
 // ─── Static configuration ───────────────────────────────────────────────────
 const continuationOptions = [
-    { id: "yes", label: "Yes", desc: "Impact likely to continue independently", icon: Leaf },
-    { id: "partially", label: "Partial", desc: "Some elements may continue but require support", icon: Recycle },
-    { id: "no", label: "No", desc: "Impact will not continue without further action", icon: AlertCircle },
+    { id: "yes", emoji: "🌳", label: "Yes, on its own", desc: "It runs without us now" },
+    { id: "partially", emoji: "🌿", label: "Partly", desc: "Some parts continue, some need support" },
+    { id: "no", emoji: "🍂", label: "Not really", desc: "It needs someone to keep it going" },
 ];
 
 const mechanismOptions = [
-    { id: "Partner-led continuation", label: "Partner-led continuation", icon: ShieldCheck },
-    { id: "Community ownership", label: "Community ownership", icon: Globe },
-    { id: "Institutional integration (course or program linkage)", label: "Institutional integration", icon: FileText },
-    { id: "Resource handover (materials/tools transferred)", label: "Resource handover", icon: Share2 },
-    { id: "Policy or system change", label: "Policy or system change", icon: Network },
-    { id: "Funding secured", label: "Funding secured", icon: Zap },
-    { id: "Follow-up plan scheduled", label: "Follow-up plan scheduled", icon: TrendingUp },
-    { id: "No continuation mechanism", label: "No continuation mechanism", icon: Info },
+    { id: "Partner-led continuation", label: "🤝 Partner is taking it over" },
+    { id: "Community ownership", label: "🏘️ Community owns it now" },
+    { id: "Institutional integration (course or program linkage)", label: "🎓 It's part of a course / program now" },
+    { id: "Resource handover (materials/tools transferred)", label: "📦 We handed over materials & tools" },
+    { id: "Funding secured", label: "💵 Funding is secured" },
+    { id: "Follow-up plan scheduled", label: "🗓️ Follow-up visit planned" },
+    { id: "Policy or system change", label: "📜 A rule / policy changed" },
+    { id: "No continuation mechanism", label: "🤷 Nothing in place (honest!)" },
 ];
 
 const scalingOptions = [
-    { id: "Not scalable", label: "Not scalable" },
-    { id: "Scalable within institution", label: "Scalable within institution" },
-    { id: "Scalable to other communities", label: "Scalable to other communities" },
-    { id: "Scalable at policy or government level", label: "Scalable at policy or government level" },
+    { id: "Not scalable", label: "Not really" },
+    { id: "Scalable within institution", label: "In our university" },
+    { id: "Scalable to other communities", label: "Other communities" },
+    { id: "Scalable at policy or government level", label: "Policy level" },
 ];
 
 const policyOptions = [
     { id: "No", label: "No" },
-    { id: "Yes — Internal institutional level", label: "Yes — internal institutional level" },
-    { id: "Yes — Community level", label: "Yes — community level" },
-    { id: "Yes — Policy / Government level", label: "Yes — policy / government level" },
+    { id: "Yes — Internal institutional level", label: "In the partner org" },
+    { id: "Yes — Community level", label: "In the community" },
+    { id: "Yes — Policy / Government level", label: "Government / policy" },
 ];
 
 const textareaClasses =
@@ -83,6 +83,8 @@ export default function Section10Sustainability() {
         mechanisms,
         scaling_potential,
         policy_influence,
+        continuation_keep_going = "",
+        continuation_risk = "",
     } = section10;
 
     const update = (field: string, val: unknown) => updateSection("section10", { [field]: val });
@@ -99,24 +101,42 @@ export default function Section10Sustainability() {
         }
     };
 
-    const getWordCount = (text: string) =>
-        (text || "").trim().split(/\s+/).filter((w) => w.length > 0).length;
-    const cdWords = getWordCount(continuation_details);
+    const OPENERS: Record<string, string> = {
+        yes: "The impact of this project is likely to continue independently.",
+        partially: "The impact of this project will partly continue.",
+        no: "The impact of this project is unlikely to continue without further support.",
+    };
+    const lowerFirst = (text: string) => {
+        const t = (text || "").trim();
+        return t ? t.charAt(0).toLowerCase() + t.slice(1).replace(/\.$/, "") : "";
+    };
+    const capFirst = (text: string) => {
+        const t = (text || "").trim();
+        return t ? t.charAt(0).toUpperCase() + t.slice(1).replace(/\.$/, "") : "";
+    };
 
-    const minWords = 100;
-    const maxWords = 200;
+    /** Tracks the last text WE composed, so a student's hand-edit is never silently overwritten. */
+    const lastAutoDetailsRef = useRef("");
+    const composeAndUpdate = (fieldPatch: Record<string, unknown>) => {
+        const keepGoing = (fieldPatch.continuation_keep_going as string | undefined) ?? continuation_keep_going;
+        const risk = (fieldPatch.continuation_risk as string | undefined) ?? continuation_risk;
+        const status = (fieldPatch.continuation_status as string | undefined) ?? continuation_status;
 
-    let explanationPrompt = "";
-    if (continuation_status === "yes") {
-        explanationPrompt =
-            "Explain: Who will continue the activity? What system or structure supports continuation? Were materials/tools transferred? Is a partner formally responsible?";
-    } else if (continuation_status === "partially") {
-        explanationPrompt =
-            "Explain: What will continue? What may stop? What support is required (funding, training, equipment, policy)?";
-    } else if (continuation_status === "no") {
-        explanationPrompt =
-            "Explain: Why continuation is unlikely. What structural changes could enable sustainability in the future. (Honest limitations improve institutional learning)";
-    }
+        let composed = "";
+        if (status && (keepGoing || risk)) {
+            composed = OPENERS[status] || "";
+            if (keepGoing) composed += ` ${capFirst(keepGoing)}.`;
+            if (risk) composed += ` However, ${lowerFirst(risk)}.`;
+        }
+
+        const patch: Record<string, unknown> = { ...fieldPatch };
+        const stillAuto = !continuation_details || continuation_details === lastAutoDetailsRef.current;
+        if (stillAuto && composed) {
+            lastAutoDetailsRef.current = composed;
+            patch.continuation_details = composed;
+        }
+        updateSection("section10", patch);
+    };
 
     const sustainabilityStrength = useMemo(() => {
         if (!continuation_status) {
@@ -274,32 +294,29 @@ export default function Section10Sustainability() {
                                     <button
                                         key={opt.id}
                                         type="button"
-                                        onClick={() => update("continuation_status", opt.id)}
+                                        onClick={() => composeAndUpdate({ continuation_status: opt.id })}
                                         className={clsx(
-                                            "flex flex-col items-center rounded-xl border p-5 text-center transition-colors",
+                                            "rounded-xl border-2 p-5 text-center transition-colors",
                                             active
-                                                ? "border-indigo-600 bg-indigo-600 text-white shadow-sm"
+                                                ? "border-indigo-500 bg-indigo-50 shadow-sm"
                                                 : "border-slate-200 bg-white text-slate-700 hover:border-indigo-200 hover:bg-indigo-50/40",
                                         )}
                                     >
-                                        <opt.icon
-                                            className={clsx(
-                                                "mb-3 h-6 w-6",
-                                                active ? "text-white" : "text-slate-400",
-                                            )}
-                                        />
-                                        <span className="text-sm font-semibold">{opt.label}</span>
-                                        <span
-                                            className={clsx(
-                                                "mt-1.5 text-xs leading-relaxed",
-                                                active ? "text-indigo-100" : "text-slate-500",
-                                            )}
-                                        >
+                                        <p className="text-2xl">{opt.emoji}</p>
+                                        <p className="mt-2 text-sm font-semibold text-slate-900">{opt.label}</p>
+                                        <p className="mt-1.5 text-xs leading-relaxed text-slate-500">
                                             {opt.desc}
-                                        </span>
+                                        </p>
                                     </button>
                                 );
                             })}
+                        </div>
+
+                        <div className="flex gap-2.5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-relaxed text-amber-900">
+                            <span>💛</span>
+                            <p>
+                                <span className="font-semibold">No penalty for honesty.</span> Most student projects are &ldquo;Partly&rdquo; or &ldquo;Not really&rdquo; — examiners trust reports that say so.
+                            </p>
                         </div>
 
                         <FieldError message={getFieldError("section10.continuation_status")} />
@@ -309,55 +326,48 @@ export default function Section10Sustainability() {
                 {/* 10.2 Explanation */}
                 {continuation_status ? (
                     <section className="space-y-4">
-                        <StepHeader n="10.2" title="Step 2 — Explanation of continuation" status="mandatory" />
+                        <StepHeader n="10.2" title="Step 2 — Tell us in two lines" status="mandatory" />
 
-                        <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-                            <div>
-                                <Label className={fieldLabel}>Continuation details (mandatory)</Label>
-                                <p className="mt-1.5 text-sm leading-relaxed text-slate-500">
-                                    {explanationPrompt}
-                                </p>
+                        <div className="space-y-5 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+                            <p className="text-sm text-slate-500">We build the explanation — no 100-word minimum.</p>
+
+                            <div className="space-y-1.5">
+                                <Label className={fieldLabel}>
+                                    {continuation_status === "no" ? "What did the project leave behind?" : "What will keep going?"}
+                                </Label>
+                                <Input
+                                    placeholder="e.g. the renovated classrooms and trained caregivers stay"
+                                    value={continuation_keep_going}
+                                    onChange={(e) => composeAndUpdate({ continuation_keep_going: e.target.value })}
+                                    className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50/60 px-3.5 text-sm text-slate-900 placeholder:text-slate-400 focus-visible:border-indigo-300 focus-visible:bg-white focus-visible:ring-2 focus-visible:ring-indigo-100"
+                                />
+                            </div>
+                            <div className="space-y-1.5">
+                                <Label className={fieldLabel}>What might stop, and what would keep it alive?</Label>
+                                <Input
+                                    placeholder="e.g. weekly reading sessions may stop without a volunteer or small budget"
+                                    value={continuation_risk}
+                                    onChange={(e) => composeAndUpdate({ continuation_risk: e.target.value })}
+                                    className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50/60 px-3.5 text-sm text-slate-900 placeholder:text-slate-400 focus-visible:border-indigo-300 focus-visible:bg-white focus-visible:ring-2 focus-visible:ring-indigo-100"
+                                />
                             </div>
 
-                            <Textarea
-                                placeholder={`Provide explanation for ${continuation_status.toUpperCase()}...`}
-                                value={continuation_details}
-                                onChange={(e) => update("continuation_details", e.target.value)}
-                                className={clsx(
-                                    textareaClasses,
-                                    getFieldError("section10.continuation_details") &&
-                                        "border-red-200 focus:border-red-300 focus:ring-red-100",
-                                )}
-                            />
+                            <div className="rounded-xl border border-dashed border-indigo-200 bg-indigo-50/40 p-4 text-sm leading-relaxed text-slate-700">
+                                {continuation_details || <span className="text-slate-400">Your continuation statement appears here…</span>}
+                            </div>
 
-                            <div className="flex flex-wrap items-center justify-between gap-2">
-                                <div className="h-1.5 w-40 overflow-hidden rounded-full bg-slate-100 sm:w-48">
-                                    <div
-                                        className={clsx(
-                                            "h-full rounded-full transition-all",
-                                            cdWords < minWords
-                                                ? "bg-amber-400"
-                                                : cdWords > maxWords
-                                                    ? "bg-red-500"
-                                                    : "bg-emerald-500",
-                                        )}
-                                        style={{
-                                            width: `${Math.min((cdWords / maxWords) * 100, 100)}%`,
-                                        }}
-                                    />
-                                </div>
-                                <p
+                            <div className="space-y-2 border-t border-slate-100 pt-4">
+                                <Label className={fieldLabel}>Fine-tune it directly if you like</Label>
+                                <Textarea
+                                    placeholder={`Provide explanation for ${continuation_status.toUpperCase()}...`}
+                                    value={continuation_details}
+                                    onChange={(e) => update("continuation_details", e.target.value)}
                                     className={clsx(
-                                        "text-[11px] tabular-nums",
-                                        cdWords >= minWords && cdWords <= maxWords
-                                            ? "text-emerald-600"
-                                            : cdWords > maxWords
-                                                ? "text-red-500"
-                                                : "text-slate-400",
+                                        textareaClasses,
+                                        getFieldError("section10.continuation_details") &&
+                                            "border-red-200 focus:border-red-300 focus:ring-red-100",
                                     )}
-                                >
-                                    {cdWords} / {maxWords} words (min {minWords})
-                                </p>
+                                />
                             </div>
 
                             <FieldError message={getFieldError("section10.continuation_details")} />
@@ -371,13 +381,11 @@ export default function Section10Sustainability() {
 
                     <div className="space-y-5 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
                         <div>
-                            <Label className={fieldLabel}>
-                                Continuation mechanisms (multi-select — required)
-                            </Label>
-                            <p className="mt-1.5 text-sm text-slate-500">Select all that apply.</p>
+                            <Label className={fieldLabel}>What&apos;s in place to keep it alive?</Label>
+                            <p className="mt-1.5 text-sm text-slate-500">Tap all that apply — plain words, no jargon.</p>
                         </div>
 
-                        <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
+                        <div className="flex flex-wrap gap-2">
                             {mechanismOptions.map((mech) => {
                                 const isSelected = (mechanisms || []).includes(mech.id);
                                 return (
@@ -386,21 +394,13 @@ export default function Section10Sustainability() {
                                         type="button"
                                         onClick={() => toggleMechanism(mech.id)}
                                         className={clsx(
-                                            "flex min-h-[100px] flex-col items-center justify-center gap-2.5 rounded-xl border p-4 text-center transition-colors",
+                                            "rounded-full border px-3.5 py-2 text-xs font-semibold transition-colors",
                                             isSelected
-                                                ? "border-indigo-200 bg-indigo-50 text-indigo-800"
-                                                : "border-slate-200 bg-white text-slate-600 hover:border-indigo-100 hover:bg-slate-50",
+                                                ? "border-indigo-500 bg-indigo-50 text-indigo-700"
+                                                : "border-slate-200 bg-white text-slate-600 hover:border-indigo-200",
                                         )}
                                     >
-                                        <mech.icon
-                                            className={clsx(
-                                                "h-5 w-5",
-                                                isSelected ? "text-indigo-600" : "text-slate-400",
-                                            )}
-                                        />
-                                        <span className="text-xs font-semibold leading-snug">
-                                            {mech.label}
-                                        </span>
+                                        {mech.label}
                                     </button>
                                 );
                             })}
@@ -412,12 +412,13 @@ export default function Section10Sustainability() {
 
                 {/* 10.4 Scaling & influence */}
                 <section className="space-y-4">
-                    <StepHeader n="10.4" title="Step 4 — Scaling & system influence" status="required" />
+                    <StepHeader n="10.4" title="Step 4 — Two last taps" status="required" />
 
-                    <div className="space-y-8 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-                        <div className="space-y-4">
-                            <Label className={fieldLabel}>Scaling potential (required)</Label>
-                            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+                    <div className="space-y-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+                        <div className="space-y-2">
+                            <Label className={fieldLabel}>Could others copy this project?</Label>
+                            <p className="text-xs text-slate-500">e.g. another campus, village, or city</p>
+                            <div className="flex flex-wrap gap-2">
                                 {scalingOptions.map((opt) => {
                                     const active = scaling_potential === opt.id;
                                     return (
@@ -426,10 +427,10 @@ export default function Section10Sustainability() {
                                             type="button"
                                             onClick={() => update("scaling_potential", opt.id)}
                                             className={clsx(
-                                                "rounded-xl border px-4 py-3.5 text-left text-sm font-semibold transition-colors",
+                                                "rounded-full border px-3.5 py-2 text-xs font-semibold transition-colors",
                                                 active
-                                                    ? "border-indigo-600 bg-indigo-600 text-white shadow-sm"
-                                                    : "border-slate-200 bg-white text-slate-700 hover:border-indigo-200 hover:bg-indigo-50/40",
+                                                    ? "border-indigo-500 bg-indigo-50 text-indigo-700"
+                                                    : "border-slate-200 bg-white text-slate-600 hover:border-indigo-200",
                                             )}
                                         >
                                             {opt.label}
@@ -440,16 +441,10 @@ export default function Section10Sustainability() {
                             <FieldError message={getFieldError("section10.scaling_potential")} />
                         </div>
 
-                        <div className="space-y-4 border-t border-slate-100 pt-6">
-                            <div>
-                                <Label className={fieldLabel}>
-                                    Policy / institutional influence (required)
-                                </Label>
-                                <p className="mt-1.5 text-sm text-slate-500">
-                                    Did this project influence any long-term system?
-                                </p>
-                            </div>
-                            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+                        <div className="space-y-2 border-t border-slate-100 pt-5">
+                            <Label className={fieldLabel}>Did it change how any institution works?</Label>
+                            <p className="text-xs text-slate-500">a rule, routine, or way of doing things that outlasts you</p>
+                            <div className="flex flex-wrap gap-2">
                                 {policyOptions.map((opt) => {
                                     const active = policy_influence === opt.id;
                                     return (
@@ -458,10 +453,10 @@ export default function Section10Sustainability() {
                                             type="button"
                                             onClick={() => update("policy_influence", opt.id)}
                                             className={clsx(
-                                                "rounded-xl border px-4 py-3.5 text-left text-sm font-semibold transition-colors",
+                                                "rounded-full border px-3.5 py-2 text-xs font-semibold transition-colors",
                                                 active
-                                                    ? "border-indigo-600 bg-indigo-600 text-white shadow-sm"
-                                                    : "border-slate-200 bg-white text-slate-700 hover:border-indigo-200 hover:bg-indigo-50/40",
+                                                    ? "border-indigo-500 bg-indigo-50 text-indigo-700"
+                                                    : "border-slate-200 bg-white text-slate-600 hover:border-indigo-200",
                                             )}
                                         >
                                             {opt.label}

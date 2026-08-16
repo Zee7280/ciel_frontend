@@ -1,23 +1,18 @@
 import {
     Handshake, Plus, Trash2, ShieldCheck, Info,
-    Users2, CheckCircle2, Activity, Globe, ChevronDown, Upload, FileText,
+    Users2, CheckCircle2, Activity, Globe, Upload, FileText,
 } from "lucide-react";
 import { Label } from "./ui/label";
 import { Button } from "./ui/button";
-import { Textarea } from "./ui/textarea";
 import { Input } from "./ui/input";
 import { useReportForm } from "../context/ReportContext";
 import { FieldError } from "./ui/FieldError";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog";
-import React, { useMemo, useEffect, useState } from "react";
+import React, { useMemo, useEffect, useRef, useState } from "react";
 import clsx from "clsx";
 import { toast } from "sonner";
 import { MAX_REPORT_UPLOAD_LABEL, splitReportFilesByImageSize } from "../utils/fileUploadLimits";
 import { REPORT_ATTACHMENT_ACCEPT } from "@/utils/reportAttachmentAccept";
-
-function countWords(str: string): number {
-    return (str || "").trim().split(/\s+/).filter(w => w.length > 0).length;
-}
 
 const partnerTypes = [
     "NGO",
@@ -93,10 +88,6 @@ const formalizationOptions = [
 
 const inputClasses =
     "h-11 w-full min-w-0 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-800 shadow-sm outline-none transition-colors placeholder:text-slate-400 focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100";
-const selectClasses =
-    "h-11 w-full min-w-0 appearance-none rounded-lg border border-slate-200 bg-white px-3 pr-9 text-sm font-medium text-slate-800 shadow-sm outline-none transition-colors focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100";
-const textareaClasses =
-    "min-h-[96px] w-full min-w-0 resize-y rounded-xl border border-slate-200 bg-white p-4 text-sm font-medium leading-relaxed text-slate-800 shadow-sm outline-none transition-colors placeholder:text-slate-400 focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100";
 const fieldLabel =
     "text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500";
 const badgeMandatory =
@@ -147,7 +138,7 @@ function CheckGrid({
     onToggle: (value: string) => void;
 }) {
     return (
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        <div className="flex flex-wrap gap-2">
             {options.map((opt) => {
                 const active = selected.includes(opt);
                 return (
@@ -156,22 +147,12 @@ function CheckGrid({
                         type="button"
                         onClick={() => onToggle(opt)}
                         className={clsx(
-                            "flex items-center gap-2.5 rounded-lg border px-3 py-2.5 text-left text-xs font-medium transition-colors",
+                            "rounded-full border px-3.5 py-2 text-xs font-semibold transition-colors",
                             active
-                                ? "border-indigo-200 bg-indigo-50 text-indigo-800"
-                                : "border-slate-200 bg-white text-slate-600 hover:border-indigo-100 hover:bg-slate-50",
+                                ? "border-indigo-500 bg-indigo-50 text-indigo-700"
+                                : "border-slate-200 bg-white text-slate-600 hover:border-indigo-200",
                         )}
                     >
-                        <span
-                            className={clsx(
-                                "flex h-4 w-4 shrink-0 items-center justify-center rounded border",
-                                active
-                                    ? "border-indigo-600 bg-indigo-600 text-white"
-                                    : "border-slate-300 bg-white",
-                            )}
-                        >
-                            {active ? <CheckCircle2 className="h-3 w-3" /> : null}
-                        </span>
                         {opt}
                     </button>
                 );
@@ -358,55 +339,37 @@ function PartnerCard({
 
             <div className="space-y-1.5">
                 <div className="flex items-center justify-between gap-2">
-                    <Label className={fieldLabel}>Partner type</Label>
+                    <Label className={fieldLabel}>What kind of organization?</Label>
                     <span className={badgeRequired}>Required</span>
                 </div>
-                <div className="relative">
-                    <select
-                        value={p.type}
-                        onChange={e => onUpdate("type", e.target.value)}
-                        className={selectClasses}
-                    >
-                        <option value="">Select partner type...</option>
-                        {partnerTypes.map(t => <option key={t} value={t}>{t}</option>)}
-                    </select>
-                    <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <div className="flex flex-wrap gap-2">
+                    {partnerTypes.map(t => {
+                        const active = p.type === t;
+                        return (
+                            <button
+                                key={t}
+                                type="button"
+                                onClick={() => onUpdate("type", t)}
+                                className={clsx(
+                                    "rounded-full border px-3.5 py-2 text-xs font-semibold transition-colors",
+                                    active
+                                        ? "border-indigo-500 bg-indigo-50 text-indigo-700"
+                                        : "border-slate-200 bg-white text-slate-600 hover:border-indigo-200",
+                                )}
+                            >
+                                {t}
+                            </button>
+                        );
+                    })}
                 </div>
                 {p.type === "Others (please specify)" ? (
                     <div className="space-y-1.5 pt-1">
-                        <Textarea
-                            placeholder="Specify partner type (100–200 words)…"
+                        <Input
+                            placeholder="Describe the organization type in a few words…"
                             value={p.type_other || ""}
                             onChange={e => onUpdate("type_other", e.target.value)}
-                            className={textareaClasses}
+                            className={inputClasses}
                         />
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                            <div className="h-1.5 w-40 overflow-hidden rounded-full bg-slate-100 sm:w-48">
-                                <div
-                                    className={clsx(
-                                        "h-full rounded-full transition-all",
-                                        countWords(p.type_other || "") < 100
-                                            ? "bg-amber-400"
-                                            : countWords(p.type_other || "") > 200
-                                              ? "bg-red-500"
-                                              : "bg-emerald-500",
-                                    )}
-                                    style={{
-                                        width: `${Math.min((countWords(p.type_other || "") / 200) * 100, 100)}%`,
-                                    }}
-                                />
-                            </div>
-                            <span className={clsx(
-                                "text-[11px] tabular-nums",
-                                countWords(p.type_other || "") >= 100 && countWords(p.type_other || "") <= 200
-                                    ? "text-emerald-600"
-                                    : countWords(p.type_other || "") > 200
-                                      ? "text-red-500"
-                                      : "text-slate-400",
-                            )}>
-                                {countWords(p.type_other || "")} / 200 words · min 100
-                            </span>
-                        </div>
                     </div>
                 ) : null}
                 <FieldError message={getFieldError(`partners.${idx}.type`)} />
@@ -435,24 +398,19 @@ function PartnerCard({
             <div className="space-y-2">
                 <Label className={fieldLabel}>Verification level</Label>
                 <p className="text-xs text-slate-500">Higher verification strengthens partnership credibility.</p>
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                <div className="flex flex-wrap gap-2">
                     {verificationOptions.map(v => (
                         <button
                             key={v}
                             type="button"
                             onClick={() => onUpdate("verification", v)}
                             className={clsx(
-                                "flex items-center gap-2.5 rounded-lg border px-3 py-2.5 text-left text-xs font-medium transition-colors",
+                                "rounded-full border px-3.5 py-2 text-xs font-semibold transition-colors",
                                 p.verification === v
-                                    ? "border-indigo-200 bg-indigo-50 text-indigo-800"
-                                    : "border-slate-200 bg-white text-slate-600 hover:border-indigo-100 hover:bg-slate-50",
+                                    ? "border-indigo-500 bg-indigo-50 text-indigo-700"
+                                    : "border-slate-200 bg-white text-slate-600 hover:border-indigo-200",
                             )}
                         >
-                            {p.verification === v ? (
-                                <ShieldCheck className="h-4 w-4 shrink-0 text-indigo-600" />
-                            ) : (
-                                <span className="h-4 w-4 shrink-0 rounded-full border-2 border-slate-300" />
-                            )}
                             {v}
                         </button>
                     ))}
@@ -462,7 +420,7 @@ function PartnerCard({
     );
 }
 
-export default function Section7Partnerships() {
+export default function Section7Partnerships({ projectData }: { projectData?: any } = {}) {
     const { data, updateSection, getFieldError } = useReportForm();
     const { has_partners, partners, formalization_status, formalization_files } = data.section7;
 
@@ -470,17 +428,31 @@ export default function Section7Partnerships() {
 
     const update = (field: string, val: any) => updateSection("section7", { [field]: val });
 
-    const addPartner = () =>
-        update("partners", [...partners, {
-            name: "",
-            pakistan_contact_name: "",
-            pakistan_contact_number: "",
-            pakistan_contact_email: "",
-            type: "",
-            role: [],
-            contribution: [],
-            verification: "",
-        }]);
+    const emptyPartner = () => ({
+        name: "",
+        pakistan_contact_name: "",
+        pakistan_contact_number: "",
+        pakistan_contact_email: "",
+        type: "",
+        role: [],
+        contribution: [],
+        verification: "",
+    });
+
+    const addPartner = () => update("partners", [...partners, emptyPartner()]);
+
+    /** The program partner from project setup is already known — log it for the student instead of asking them to re-type it. */
+    const programPartnerName = String(
+        projectData?.organization_name || projectData?.partner_name || projectData?.organization || "",
+    ).trim();
+    const seededProgramPartner = useRef(false);
+    useEffect(() => {
+        if (seededProgramPartner.current) return;
+        if (has_partners !== "yes" || partners.length > 0 || !programPartnerName) return;
+        seededProgramPartner.current = true;
+        update("partners", [{ ...emptyPartner(), name: programPartnerName, _seeded: true }]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [has_partners, partners.length, programPartnerName]);
     const removePartner = (i: number) =>
         update("partners", partners.filter((_, idx) => idx !== i));
     const updatePartner = (i: number, field: string, val: any) => {
@@ -605,18 +577,16 @@ export default function Section7Partnerships() {
                             type="button"
                             onClick={() => update("has_partners", "no")}
                             className={clsx(
-                                "rounded-xl border p-5 text-left transition-colors",
+                                "rounded-xl border-2 p-5 text-center transition-colors",
                                 has_partners === "no"
-                                    ? "border-slate-900 bg-slate-900 text-white shadow-sm"
+                                    ? "border-indigo-500 bg-indigo-50 shadow-sm"
                                     : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50",
                             )}
                         >
-                            <p className="text-sm font-semibold">No — students worked independently</p>
-                            <p className={clsx(
-                                "mt-1.5 text-xs leading-relaxed",
-                                has_partners === "no" ? "text-slate-300" : "text-slate-500",
-                            )}>
-                                System records: &ldquo;No formal partnerships reported.&rdquo;
+                            <p className="text-2xl">🎒</p>
+                            <p className="mt-2 text-sm font-semibold text-slate-900">We worked independently</p>
+                            <p className="mt-1.5 text-xs leading-relaxed text-slate-500">
+                                Beyond the program partner, no one else was actively involved.
                             </p>
                         </button>
 
@@ -624,20 +594,16 @@ export default function Section7Partnerships() {
                             type="button"
                             onClick={() => update("has_partners", "yes")}
                             className={clsx(
-                                "rounded-xl border p-5 text-left transition-colors",
+                                "rounded-xl border-2 p-5 text-center transition-colors",
                                 has_partners === "yes"
-                                    ? "border-indigo-600 bg-indigo-600 text-white shadow-sm"
+                                    ? "border-indigo-500 bg-indigo-50 shadow-sm"
                                     : "border-slate-200 bg-white text-slate-700 hover:border-indigo-200 hover:bg-indigo-50/40",
                             )}
                         >
-                            <p className="text-sm font-semibold">
-                                Yes — one or more partners were actively involved
-                            </p>
-                            <p className={clsx(
-                                "mt-1.5 text-xs leading-relaxed",
-                                has_partners === "yes" ? "text-indigo-100" : "text-slate-500",
-                            )}>
-                                Continue to Step 2 to enter partner details.
+                            <p className="text-2xl">🤝</p>
+                            <p className="mt-2 text-sm font-semibold text-slate-900">Others were involved</p>
+                            <p className="mt-1.5 text-xs leading-relaxed text-slate-500">
+                                One or more organizations actively contributed.
                             </p>
                         </button>
                     </div>
@@ -666,7 +632,13 @@ export default function Section7Partnerships() {
                                     Step 2 — Enter partner details
                                 </h3>
                             </div>
-                            <div className="flex items-center gap-3">
+                            <div className="flex flex-wrap items-center gap-3">
+                                {partners[0]?._seeded ? (
+                                    <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-emerald-700">
+                                        <CheckCircle2 className="h-3 w-3" />
+                                        Program partner added for you
+                                    </span>
+                                ) : null}
                                 <span className={badgeMandatory}>Mandatory</span>
                                 <Button
                                     type="button"
@@ -678,6 +650,11 @@ export default function Section7Partnerships() {
                                 </Button>
                             </div>
                         </div>
+                        {partners[0]?._seeded ? (
+                            <p className="text-xs text-slate-500">
+                                {programPartnerName} is already here from your project setup — finish tagging what they did below.
+                            </p>
+                        ) : null}
 
                         {partners.length === 0 ? (
                             <div className="flex flex-col items-center justify-center space-y-3 rounded-xl border border-dashed border-slate-300 bg-slate-50/80 px-6 py-12 text-center">

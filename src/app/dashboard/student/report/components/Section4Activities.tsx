@@ -70,6 +70,39 @@ function PillToggle({
     );
 }
 
+function SingleChip({
+    options,
+    value,
+    onChange,
+}: {
+    options: string[];
+    value: string;
+    onChange: (value: string) => void;
+}) {
+    return (
+        <div className="flex flex-wrap gap-2">
+            {options.map((opt) => {
+                const active = value === opt;
+                return (
+                    <button
+                        key={opt}
+                        type="button"
+                        onClick={() => onChange(opt)}
+                        className={clsx(
+                            "rounded-full border px-3.5 py-2 text-xs font-semibold transition-colors",
+                            active
+                                ? "border-indigo-500 bg-indigo-50 text-indigo-700"
+                                : "border-slate-200 bg-white text-slate-600 hover:border-indigo-200",
+                        )}
+                    >
+                        {opt}
+                    </button>
+                );
+            })}
+        </div>
+    );
+}
+
 export default function Section4Activities() {
     const { data, updateSection, getFieldError } = useReportForm();
     const section3 = data.section3 || {};
@@ -295,17 +328,11 @@ export default function Section4Activities() {
                     <div className="grid grid-cols-1 gap-5 border-t border-indigo-100/80 pt-5 md:grid-cols-2">
                         <div className="space-y-2">
                             <Label className={fieldLabel}>Overall beneficiary overlap</Label>
-                            <div className="relative">
-                                <select
-                                    value={section4.project_summary?.overall_overlap || ''}
-                                    onChange={e => updateProjectSummary('overall_overlap', e.target.value)}
-                                    className={selectClasses}
-                                >
-                                    <option value="">Select overlap...</option>
-                                    {OVERLAP_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
-                                </select>
-                                <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                            </div>
+                            <SingleChip
+                                options={OVERLAP_STATUSES}
+                                value={section4.project_summary?.overall_overlap || ''}
+                                onChange={(val) => updateProjectSummary('overall_overlap', val)}
+                            />
                         </div>
 
                         <div className="space-y-2">
@@ -440,10 +467,29 @@ function ActivityBlockComponent({ activity, index, updateActivity, removeActivit
                         <h4 className="truncate text-sm font-semibold text-slate-900">
                             {activity.title || 'Unnamed activity'}
                         </h4>
-                        <div className="mt-0.5 flex flex-wrap items-center gap-2">
-                            <span className="text-[11px] text-slate-500">
-                                {activity.primary_category || 'No category selected'}
-                            </span>
+                        <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                            {activity.primary_category ? (
+                                <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-semibold text-indigo-700">
+                                    {activity.primary_category}
+                                </span>
+                            ) : (
+                                <span className="text-[11px] text-slate-400">No category selected</span>
+                            )}
+                            {activity.delivery_mode ? (
+                                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600">
+                                    {activity.delivery_mode}
+                                </span>
+                            ) : null}
+                            {activity.sessions_count ? (
+                                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600">
+                                    {activity.sessions_count} session{Number(activity.sessions_count) === 1 ? '' : 's'}
+                                </span>
+                            ) : null}
+                            {activity.serves_beneficiaries && activity.beneficiaries_reached ? (
+                                <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-semibold text-indigo-700">
+                                    👥 {activity.beneficiaries_reached} reached
+                                </span>
+                            ) : null}
                             {activity.status ? (
                                 <span className="rounded-full border border-emerald-100 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700">
                                     {activity.status}
@@ -486,44 +532,44 @@ function ActivityBlockComponent({ activity, index, updateActivity, removeActivit
                         </div>
                         <div className="space-y-1.5">
                             <Label className={fieldLabel}>Activity status</Label>
-                            <div className="relative">
-                                <select
-                                    value={activity.status || ''}
-                                    onChange={e => update('status', e.target.value)}
-                                    className={selectClasses}
-                                >
-                                    <option value="">Select status...</option>
-                                    {['Completed', 'Partially Completed', 'Ongoing'].map(s => (
-                                        <option key={s} value={s}>{s}</option>
-                                    ))}
-                                </select>
-                                <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                            </div>
+                            <SingleChip
+                                options={['Completed', 'Partially Completed', 'Ongoing']}
+                                value={activity.status || ''}
+                                onChange={(val) => update('status', val)}
+                            />
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    <div className="space-y-4">
                         <div className="space-y-1.5">
                             <Label className={fieldLabel}>Primary activity category</Label>
-                            <div className="relative">
-                                <select
-                                    value={activity.primary_category}
-                                    onChange={e => update({ primary_category: e.target.value, sub_category: '' })}
-                                    className={selectClasses}
-                                >
-                                    <option value="">Select category...</option>
-                                    {PRIMARY_CATEGORIES.map(cat => (
-                                        <option key={cat.id} value={cat.id}>{cat.label}</option>
-                                    ))}
-                                </select>
-                                <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                            <div className="flex flex-wrap gap-2">
+                                {PRIMARY_CATEGORIES.map(cat => {
+                                    const active = activity.primary_category === cat.id;
+                                    return (
+                                        <button
+                                            key={cat.id}
+                                            type="button"
+                                            onClick={() => update({ primary_category: cat.id, sub_category: '' })}
+                                            className={clsx(
+                                                "flex items-center gap-1.5 rounded-full border px-3.5 py-2 text-xs font-semibold transition-colors",
+                                                active
+                                                    ? "border-indigo-500 bg-indigo-50 text-indigo-700"
+                                                    : "border-slate-200 bg-white text-slate-600 hover:border-indigo-200",
+                                            )}
+                                        >
+                                            <cat.icon className="h-3.5 w-3.5" />
+                                            {cat.label}
+                                        </button>
+                                    );
+                                })}
                             </div>
                             <FieldError message={getFieldError(`section4.activity_blocks.${index}.primary_category`)} />
                         </div>
                         {activity.primary_category ? (
                             <div className="space-y-1.5">
                                 <Label className={fieldLabel}>Activity sub-category</Label>
-                                <div className="relative">
+                                <div className="relative max-w-md">
                                     <select
                                         value={activity.sub_category}
                                         onChange={e => update('sub_category', e.target.value)}
@@ -603,17 +649,11 @@ function ActivityBlockComponent({ activity, index, updateActivity, removeActivit
 
                         <div className="space-y-1.5">
                             <Label className={fieldLabel}>Mode of delivery</Label>
-                            <div className="relative max-w-md">
-                                <select
-                                    value={activity.delivery_mode || ''}
-                                    onChange={e => update('delivery_mode', e.target.value)}
-                                    className={selectClasses}
-                                >
-                                    <option value="">Select mode...</option>
-                                    {DELIVERY_MODES.map(m => <option key={m} value={m}>{m}</option>)}
-                                </select>
-                                <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                            </div>
+                            <SingleChip
+                                options={DELIVERY_MODES}
+                                value={activity.delivery_mode || ''}
+                                onChange={(val) => update('delivery_mode', val)}
+                            />
                             <FieldError message={getFieldError(`section4.activity_blocks.${index}.delivery_mode`)} />
                         </div>
 

@@ -25,3 +25,7 @@ export async function POST(req: NextRequest, ctx: RouteCtx) {
 export async function PATCH(req: NextRequest, ctx: RouteCtx) {
     return delegate(req, ctx);
 }
+
+export async function DELETE(req: NextRequest, ctx: RouteCtx) {
+    return delegate(req, ctx);
+}

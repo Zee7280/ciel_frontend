@@ -138,6 +138,10 @@ export interface ReportData {
         problem_category?: string;
         primary_beneficiary?: string;
         summary_text?: string;
+        /** Short free-text answer to "who was affected?" — feeds the composed baseline statement. */
+        affected_group?: string;
+        /** Tapped chips answering "what was missing?" (Skills/Access/Resources/Systems/Awareness) — feeds the composed baseline statement. */
+        system_gaps?: string[];
     };
     // Section 3: SDG Contribution Mapping
     section3: {
@@ -230,6 +234,12 @@ export interface ReportData {
         }>;
         challenges: string;
         summary_text?: string;
+        /** Guided 3-blank inputs that compose `observed_change` — kept alongside it so the blanks survive navigation. */
+        story_before?: string;
+        story_now?: string;
+        story_because?: string;
+        /** Tapped chips answering "what was hard?" — compose a starting sentence into `challenges`. */
+        challenge_tags?: string[];
     };
 
     // Section 6: Resources (Structured Table)
@@ -262,6 +272,8 @@ export interface ReportData {
             role: string[]; // Multi-select — role in project
             contribution: string[]; // Multi-select
             verification: string;
+            /** True only for the program partner auto-added from project setup — drives the "added for you" badge. */
+            _seeded?: boolean;
         }>;
         formalization_status: string[]; // MOU, Letter, etc.
         formalization_files: File[];
@@ -307,6 +319,12 @@ export interface ReportData {
             transformative_sustainability: number;
         };
         summary_text?: string;
+        /** Tapped chips answering "skills I grew" — feeds the composed personal_learning draft. */
+        skills_grown?: string[];
+        /** Guided one-line inputs that compose personal_learning / academic_application — kept alongside them so the blanks survive navigation. */
+        reflection_biggest_learning?: string;
+        reflection_moment?: string;
+        reflection_discipline_help?: string;
     };
     // Section 10: Sustainability (Renamed from Section 10 Reflection)
     section10: {
@@ -316,6 +334,9 @@ export interface ReportData {
         scaling_potential: string;
         policy_influence: string;
         summary_text?: string;
+        /** Guided two-line inputs that compose continuation_details — kept alongside it so the blanks survive navigation. */
+        continuation_keep_going?: string;
+        continuation_risk?: string;
     };
     // Section 11: Summary (Intelligence Layer - mostly read-only/calculated, strictly strictly read-only so maybe empty here or just status)
     section11: {
@@ -367,7 +388,9 @@ const defaultReportData: ReportData = {
         baseline_other_entries: [],
         problem_category: '',
         primary_beneficiary: '',
-        summary_text: ''
+        summary_text: '',
+        affected_group: '',
+        system_gaps: []
     },
     section3: {
         primary_sdg: {
@@ -411,7 +434,11 @@ const defaultReportData: ReportData = {
             measurement_explanation: ''
         }],
         challenges: '',
-        summary_text: ''
+        summary_text: '',
+        story_before: '',
+        story_now: '',
+        story_because: '',
+        challenge_tags: []
     },
 
     section6: {
@@ -464,7 +491,11 @@ const defaultReportData: ReportData = {
             transformative_benefits: 0,
             transformative_sustainability: 0
         },
-        summary_text: ''
+        summary_text: '',
+        skills_grown: [],
+        reflection_biggest_learning: '',
+        reflection_moment: '',
+        reflection_discipline_help: ''
     },
     section10: {
         continuation_status: '',
@@ -472,7 +503,9 @@ const defaultReportData: ReportData = {
         mechanisms: [],
         scaling_potential: '',
         policy_influence: '',
-        summary_text: ''
+        summary_text: '',
+        continuation_keep_going: '',
+        continuation_risk: ''
     },
     section11: {
         summary_text: ''
