@@ -5,20 +5,8 @@ export async function POST(request: Request) {
     const authHeader = request.headers.get('Authorization');
     const token = authHeader?.substring(7) || ''; // Remove 'Bearer ' prefix if exists
 
-    // TODO: Uncomment below for production authentication
-    // if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    //     return NextResponse.json({
-    //         success: false,
-    //         message: "Unauthorized - No token provided"
-    //     }, { status: 401 });
-    // }
-
-    // if (!token) {
-    //     return NextResponse.json({
-    //         success: false,
-    //         message: "Unauthorized - Invalid token"
-    //     }, { status: 401 });
-    // }
+    // Nest's JwtAuthGuard on `partners/opportunities/applicants` rejects a missing/invalid
+    // token itself — no need to duplicate that check here.
 
     try {
         const body = await request.json();

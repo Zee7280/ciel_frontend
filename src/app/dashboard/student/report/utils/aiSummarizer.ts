@@ -1,4 +1,5 @@
 import type { ReportCIIauditMeta } from "@/lib/parseCIIauditSummary";
+import { authenticatedFetch } from "@/utils/api";
 
 export interface AISummaryResponse {
     summary?: string;
@@ -35,18 +36,23 @@ export async function generateAISummary(section: string, data: unknown): Promise
             return value;
         }));
 
-        const controller = new AbortController();
         const timeoutMs =
             section === "section11" || section === "section11_master_rubric" ? 180000 : 45000;
-        const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-        const response = await fetch("/api/ai/summarize", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
+        const response = await authenticatedFetch(
+            "/api/ai/summarize",
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ section: SUMMARY_ROUTE_BY_SECTION[section] || section, data: cleanData }),
             },
-            body: JSON.stringify({ section: SUMMARY_ROUTE_BY_SECTION[section] || section, data: cleanData }),
-            signal: controller.signal,
-        }).finally(() => clearTimeout(timeoutId));
+            { redirectToLogin: false, timeoutMs },
+        );
+
+        if (!response) {
+            throw new Error("Your session has expired. Please log in again.");
+        }
 
         if (!response.ok) {
             const errorData = await response.json();
