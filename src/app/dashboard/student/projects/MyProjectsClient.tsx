@@ -347,38 +347,64 @@ interface CourseProjectSummary {
     stepCompleted: number;
 }
 
+/** Must match the frontend Course Project wizard's STEPS.length (paths/course-project/[id]/page.tsx). */
+const COURSE_PROJECT_TOTAL_STEPS = 8;
+/** Must match the frontend FYP wizard's STEPS.length (paths/fyp-thesis/page.tsx). */
+const FYP_TOTAL_STEPS = 9;
+/** Must match the frontend Enterprise Path wizard's STEPS.length (paths/startup-business/page.tsx). */
+const VENTURE_TOTAL_STEPS = 8;
+
 interface FypSummary {
     projectTitle: string | null;
+    /** Legacy milestone timeline — the 9-step guided wizard no longer touches this, kept only for entries that predate it. */
     milestones: { status: "pending" | "in_progress" | "complete" }[];
+    stepCompleted: number;
+    status: "draft" | "submitted";
 }
 
 interface VentureSummary {
     ventureName: string | null;
     completenessPercent: number;
     isVisible: boolean;
+    stepCompleted?: number;
+    status?: "draft" | "submitted";
 }
 
 function coursProjectStatusLabel(entry: CourseProjectSummary): string {
-    return entry.status === "submitted" ? "Submitted" : `Draft · step ${entry.stepCompleted}/4`;
+    return entry.status === "submitted" ? "Submitted" : `Draft · step ${entry.stepCompleted}/${COURSE_PROJECT_TOTAL_STEPS}`;
 }
 
-function pathWorkspaceActionLabel(key: string, status: string, stepCompleted?: number): string {
-    if (key === "course-project") {
-        return status === "Submitted" ? "View & edit" : `Continue · step ${stepCompleted ?? 0}/4`;
-    }
-    if (status.toLowerCase().includes("complete") || status === "Submitted") {
-        return "Open workspace";
-    }
-    return "Continue";
-}
-
+/** Mirrors the backend's fypThesisPathStatus (impact-summary.service.ts) — stepCompleted/status once the
+ * guided wizard has been used at all; falls back to the legacy milestone count only for older entries. */
 function fypStatusLabel(entry: FypSummary): string {
+    if (entry.status === "submitted") return "Submitted";
+    if (entry.stepCompleted > 0) return `Draft · step ${entry.stepCompleted}/${FYP_TOTAL_STEPS}`;
     const total = entry.milestones?.length || 5;
     const complete = entry.milestones?.filter((m) => m.status === "complete").length || 0;
     return `${complete}/${total} milestones complete`;
 }
 
+function pathWorkspaceActionLabel(key: string, status: string, stepCompleted?: number): string {
+    if (key === "course-project") {
+        return status === "Submitted" ? "View & edit" : `Continue · step ${stepCompleted ?? 0}/${COURSE_PROJECT_TOTAL_STEPS}`;
+    }
+    if (key === "fyp-thesis") {
+        return status === "Submitted" ? "View & edit" : `Continue · step ${stepCompleted ?? 0}/${FYP_TOTAL_STEPS}`;
+    }
+    if (key === "startup-business" && !status.startsWith("Submitted") && stepCompleted !== undefined) {
+        return `Continue · step ${stepCompleted}/${VENTURE_TOTAL_STEPS}`;
+    }
+    if (status.startsWith("Submitted") || status.toLowerCase().includes("complete") || status === "Submitted") {
+        return "Open workspace";
+    }
+    return "Continue";
+}
+
+/** Mirrors the backend's startupBusinessPathStatus (impact-summary.service.ts) — stepCompleted/status
+ * once the guided wizard has been used at all; falls back to the legacy completeness % otherwise. */
 function ventureStatusLabel(entry: VentureSummary): string {
+    if (entry.status === "submitted") return entry.isVisible ? "Submitted · Visible to investors" : "Submitted · Not yet visible";
+    if ((entry.stepCompleted ?? 0) > 0) return `Draft · step ${entry.stepCompleted}/${VENTURE_TOTAL_STEPS}`;
     return `${entry.completenessPercent}% complete · ${entry.isVisible ? "Visible to investors" : "Not yet visible"}`;
 }
 
@@ -915,6 +941,7 @@ export default function MyProjectsPage() {
                         title: fypEntry.projectTitle || "FYP / Thesis",
                         subtitle: null,
                         status: fypStatusLabel(fypEntry),
+                        stepCompleted: fypEntry.stepCompleted,
                         href: "/dashboard/student/paths/fyp-thesis",
                     },
                     ventureEntry && {
@@ -924,6 +951,7 @@ export default function MyProjectsPage() {
                         title: ventureEntry.ventureName || "Startup / Business",
                         subtitle: null,
                         status: ventureStatusLabel(ventureEntry),
+                        stepCompleted: ventureEntry.stepCompleted,
                         href: "/dashboard/student/paths/startup-business",
                     },
                 ].filter(Boolean) as {
@@ -959,7 +987,7 @@ export default function MyProjectsPage() {
                             >
                                 {otherPaths.map((p) => {
                                     const actionLabel = pathWorkspaceActionLabel(p.key, p.status, p.stepCompleted);
-                                    const submitted = p.status === "Submitted";
+                                    const submitted = p.status === "Submitted" || p.status.startsWith("Submitted");
                                     return (
                                         <Link
                                             key={p.key}

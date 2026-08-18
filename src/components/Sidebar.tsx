@@ -319,7 +319,10 @@ export default function Sidebar() {
             { label: "Impact", href: "/dashboard/partner/impact", icon: FileBarChart },
             { label: "Analytics", href: "/dashboard/partner/analytics", icon: BarChart3 },
             ...(isUniversityPartnerOrg
-                ? [{ label: "Institution analytics", href: "/dashboard/partner/university-analytics", icon: GraduationCap }]
+                ? [
+                    { label: "Institution analytics", href: "/dashboard/partner/university-analytics", icon: GraduationCap },
+                    { label: "Showcase deck", href: "/dashboard/partner/university-showcase", icon: BookOpen },
+                  ]
                 : []),
             { label: "Messages", href: "/dashboard/partner/messages", icon: MessageSquare },
             { label: "Funding", href: "/dashboard/partner/funding", icon: PieChart },

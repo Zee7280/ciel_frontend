@@ -93,6 +93,22 @@ interface VentureTeamMember {
     email?: string;
 }
 
+interface VentureSectionSummaries {
+    opportunity?: string;
+    advantage?: string;
+    business?: string;
+    traction?: string;
+    impact?: string;
+    ask?: string;
+    founder?: string;
+}
+
+interface VentureGates {
+    academicOk: boolean;
+    showcaseOk: boolean;
+    investmentReadyOk: boolean;
+}
+
 interface AdminVentureRow {
     id: string;
     ventureName: string | null;
@@ -103,6 +119,10 @@ interface AdminVentureRow {
     materialUrls: string[] | null;
     isVisible: boolean;
     completenessPercent: number;
+    status?: "draft" | "submitted";
+    stepCompleted?: number;
+    sectionSummaries?: VentureSectionSummaries | null;
+    gates?: VentureGates;
     updatedAt: string;
     student: AdminStudent | null;
 }
@@ -532,13 +552,20 @@ export default function AdminPathSubmissionsPage() {
                                                   >
                                                       {row.isVisible ? "Visible" : "Private"}
                                                   </Badge>
-                                                  <Badge variant="outline" className="border-slate-200 text-slate-600">
-                                                      {row.completenessPercent}% complete
-                                                  </Badge>
+                                                  {row.gates?.investmentReadyOk ? (
+                                                      <Badge variant="outline" className="border-slate-900 bg-slate-900 text-white">★ Investment Ready</Badge>
+                                                  ) : row.gates?.showcaseOk ? (
+                                                      <Badge variant="outline" className="border-indigo-200 bg-indigo-50 text-indigo-800">Showcase Ready</Badge>
+                                                  ) : null}
+                                                  {row.stepCompleted != null ? (
+                                                      <Badge variant="outline" className="border-slate-200 text-slate-600">Step {row.stepCompleted}/8</Badge>
+                                                  ) : (
+                                                      <Badge variant="outline" className="border-slate-200 text-slate-600">{row.completenessPercent}% complete</Badge>
+                                                  )}
                                               </div>
                                               <p className="text-sm font-semibold text-slate-700">{row.stage || "Stage not set"}</p>
                                               <p className="text-sm text-slate-600">{studentLine(row.student)}</p>
-                                              <p className="line-clamp-2 text-sm text-slate-500">{row.description || "No description yet."}</p>
+                                              <p className="line-clamp-2 text-sm text-slate-500">{row.sectionSummaries?.opportunity || row.description || "No description yet."}</p>
                                               <p className="text-xs text-slate-500">
                                                   {row.tractionRows.length} traction row(s) · {row.team.length} team member(s) ·{" "}
                                                   {row.materialUrls?.length ?? 0} material(s)
@@ -555,6 +582,20 @@ export default function AdminPathSubmissionsPage() {
                                       </div>
                                       {expanded ? (
                                           <div className="space-y-4 border-t border-slate-100 bg-slate-50/70 px-5 py-4">
+                                              {row.sectionSummaries && Object.values(row.sectionSummaries).some(Boolean) ? (
+                                                  <div>
+                                                      <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Guided wizard summary</p>
+                                                      <ul className="mt-2 space-y-2">
+                                                          {(Object.entries(row.sectionSummaries) as [string, string | undefined][])
+                                                              .filter(([, text]) => !!text)
+                                                              .map(([key, text]) => (
+                                                                  <li key={key} className="text-sm text-slate-700">
+                                                                      <span className="font-semibold capitalize">{key}:</span> {text}
+                                                                  </li>
+                                                              ))}
+                                                      </ul>
+                                                  </div>
+                                              ) : null}
                                               {row.tractionRows.length ? (
                                                   <div>
                                                       <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Traction</p>
