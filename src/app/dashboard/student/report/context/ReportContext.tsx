@@ -140,8 +140,10 @@ export interface ReportData {
         summary_text?: string;
         /** Short free-text answer to "who was affected?" — feeds the composed baseline statement. */
         affected_group?: string;
-        /** Tapped chips answering "what was missing?" (Skills/Access/Resources/Systems/Awareness) — feeds the composed baseline statement. */
+        /** Tapped chips answering "what was missing?" (Skills/Access/Resources/Systems/Awareness/Other) — feeds the composed baseline statement. */
         system_gaps?: string[];
+        /** Custom text when "Other" is tapped in system_gaps. */
+        system_gaps_other?: string;
     };
     // Section 3: SDG Contribution Mapping
     section3: {
@@ -213,6 +215,8 @@ export interface ReportData {
             project_implementation_explanation: string;
         };
         summary_text?: string;
+        /** Set once the student taps "Finalise Section 4" — auto-cleared if they edit an activity afterward. */
+        finalized?: boolean;
     };
     // Section 5: Outcomes (Detailed Metrics)
     section5: {
@@ -240,6 +244,8 @@ export interface ReportData {
         story_because?: string;
         /** Tapped chips answering "what was hard?" — compose a starting sentence into `challenges`. */
         challenge_tags?: string[];
+        /** Set once the student taps "Finalise Section 5" — auto-cleared if they edit an outcome afterward. */
+        finalized?: boolean;
     };
 
     // Section 6: Resources (Structured Table)
@@ -390,7 +396,8 @@ const defaultReportData: ReportData = {
         primary_beneficiary: '',
         summary_text: '',
         affected_group: '',
-        system_gaps: []
+        system_gaps: [],
+        system_gaps_other: ''
     },
     section3: {
         primary_sdg: {
@@ -416,7 +423,8 @@ const defaultReportData: ReportData = {
             overall_geographic_reach: '',
             project_implementation_explanation: ''
         },
-        summary_text: ''
+        summary_text: '',
+        finalized: false
     },
 
     section5: {
@@ -438,7 +446,8 @@ const defaultReportData: ReportData = {
         story_before: '',
         story_now: '',
         story_because: '',
-        challenge_tags: []
+        challenge_tags: [],
+        finalized: false
     },
 
     section6: {

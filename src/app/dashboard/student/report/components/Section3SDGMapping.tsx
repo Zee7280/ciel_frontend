@@ -1,5 +1,5 @@
-import React, { useMemo, useEffect } from "react";
-import { Target, Info, Trash2, AlertCircle, CheckCircle2, Lock, Plus, Layers, ChevronDown } from "lucide-react";
+import React, { useMemo, useEffect, useRef } from "react";
+import { Target, Info, Trash2, AlertCircle, CheckCircle2, Lock, Plus, Layers, ChevronDown, Pencil, Globe2 } from "lucide-react";
 import { Label } from "./ui/label";
 import { Textarea } from "./ui/textarea";
 import { useReportForm } from "../context/ReportContext";
@@ -32,6 +32,15 @@ const ALL_SDGS = [
     { num: 16, color: "#00689D", name: "Peace, Justice & Strong Institutions" },
     { num: 17, color: "#19486A", name: "Partnerships for the Goals" },
 ];
+
+/** First sentence (or a clipped lead-in) of free text, used to quote the student's own wording in the finalized shortlist card. */
+function firstSentence(text: string, maxLen = 220): string {
+    const trimmed = (text || "").trim();
+    if (!trimmed) return "";
+    const match = trimmed.match(/^[^.!?]*[.!?]/);
+    const candidate = (match ? match[0] : trimmed).trim();
+    return candidate.length <= maxLen ? candidate : `${candidate.slice(0, maxLen).trim()}…`;
+}
 
 const dropdownClass =
     "h-11 w-full appearance-none rounded-lg border border-slate-200 bg-white px-3 pr-9 text-sm font-medium text-slate-800 shadow-sm outline-none transition-colors focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100 disabled:opacity-50";
@@ -147,6 +156,65 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
             i === index ? { ...item, ...payload } : item
         );
         updateSection('section3', { secondary_sdgs: updated });
+    };
+
+    // ── Finalize: "Finalise my SDGs" builds a shortlist card from whatever's been confirmed above ──
+    const finalizedGoals = useMemo(() => {
+        type FinalizedGoal = { num: number; isPrimary: boolean; targetId: string; quote: string };
+        const goals: FinalizedGoal[] = [];
+        const seen = new Set<number>();
+
+        if (oppPrimaryNum > 0) {
+            goals.push({ num: oppPrimaryNum, isPrimary: true, targetId: oppPrimaryRow?.targetId || "", quote: contribution_intent_statement || "" });
+            seen.add(oppPrimaryNum);
+        }
+
+        const studentNum = Number(studentPrimaryId);
+        if (studentNum && !seen.has(studentNum)) {
+            goals.push({ num: studentNum, isPrimary: oppPrimaryNum === 0, targetId: studentTargetId, quote: student_contribution_intent_statement || "" });
+            seen.add(studentNum);
+        }
+
+        (secondary_sdgs || []).forEach((sdg) => {
+            const num = Number(sdg.goal_number);
+            if (num && !seen.has(num)) {
+                goals.push({ num, isPrimary: false, targetId: sdg.target_id || "", quote: sdg.justification_text || "" });
+                seen.add(num);
+            }
+        });
+
+        return goals;
+    }, [oppPrimaryNum, oppPrimaryRow?.targetId, contribution_intent_statement, studentPrimaryId, studentTargetId, student_contribution_intent_statement, secondary_sdgs]);
+
+    const canFinalize = finalizedGoals.length > 0 && finalizedGoals.some((g) => g.quote.trim());
+    const isFinalized = section3.summary_stage === "validated";
+
+    /** Editing any goal/statement after finalizing invalidates the shortlist snapshot — drop back to draft. */
+    const lastFinalizedSnapshotRef = useRef("");
+    const finalizeSnapshot = useMemo(
+        () => JSON.stringify(finalizedGoals),
+        [finalizedGoals],
+    );
+    useEffect(() => {
+        if (!isFinalized) return;
+        // First render after a finalized report loads (e.g. a fresh page load or session) — seed the
+        // baseline from current data instead of comparing against an empty ref, which would never match.
+        if (!lastFinalizedSnapshotRef.current) {
+            lastFinalizedSnapshotRef.current = finalizeSnapshot;
+            return;
+        }
+        if (finalizeSnapshot !== lastFinalizedSnapshotRef.current) {
+            updateSection("section3", { summary_stage: "preliminary" });
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [finalizeSnapshot, isFinalized]);
+
+    const handleFinalize = () => {
+        lastFinalizedSnapshotRef.current = finalizeSnapshot;
+        updateSection("section3", { summary_stage: "validated" });
+    };
+    const handleUnfinalize = () => {
+        updateSection("section3", { summary_stage: "preliminary" });
     };
 
 
@@ -785,42 +853,160 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
                 </div>
             </section>
 
-            {/* ── Preliminary Summary ──────────────────────────────────── */}
-            <section className="space-y-4 border-t border-slate-200 pt-8">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                    <h3 className="text-base font-semibold text-slate-900">
-                        Preliminary SDG alignment statement
-                    </h3>
-                    <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-                        System synthesis
-                    </span>
-                </div>
-                <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-                    <p className="text-sm leading-relaxed text-slate-700">
-                        {data.section3.summary_text}
-                    </p>
-                    <div className="mt-4 flex flex-wrap gap-2 border-t border-slate-100 pt-4">
-                        {[
-                            { label: "Standardized formatting", icon: CheckCircle2 },
-                            { label: "No performance claims", icon: Info },
-                            { label: "Structural validation only", icon: Layers },
-                        ].map((tag) => (
-                            <span
-                                key={tag.label}
-                                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500"
-                            >
-                                <tag.icon className="h-3 w-3 text-indigo-500" />
-                                {tag.label}
-                            </span>
-                        ))}
-                    </div>
-                    <p className="mt-3 text-xs leading-relaxed text-slate-400">
-                        This statement is generated from your selections above and will be finalized with
-                        measurable impact data once Sections 4 and 5 are completed.
-                    </p>
-                </div>
+            {/* ── Finalize SDGs ────────────────────────────────────────── */}
+            <section className="space-y-3 border-t border-slate-200 pt-8">
+                {!isFinalized ? (
+                    <>
+                        <button
+                            type="button"
+                            onClick={handleFinalize}
+                            disabled={!canFinalize}
+                            className="flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-6 py-3.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                            Finalise my SDGs →
+                        </button>
+                        <p className="text-center text-xs text-slate-500">
+                            {canFinalize
+                                ? "Changed your mind later? You can come back and edit this until final submission."
+                                : "Add at least one SDG with a contribution statement above to finalise."}
+                        </p>
+                    </>
+                ) : (
+                    <>
+                        <div className="overflow-hidden rounded-xl border border-slate-200 shadow-sm">
+                            <div className="bg-slate-900 px-5 py-5 text-white sm:px-6">
+                                <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">
+                                    Section 3 finalised · Your SDG footprint
+                                </p>
+                                <h3 className="mt-2 flex items-center gap-2 text-lg font-bold">
+                                    <Globe2 className="h-5 w-5 text-indigo-300" />
+                                    This project advances {finalizedGoals.length} Global Goal{finalizedGoals.length === 1 ? "" : "s"}
+                                </h3>
+                                <p className="mt-1 text-sm text-slate-300">
+                                    Shortlist confirmed — each goal carries your own pathway-to-change, ready for
+                                    your report, flash card and portfolio.
+                                </p>
+                                <div className="mt-4 flex flex-wrap gap-2">
+                                    {finalizedGoals.map((g) => {
+                                        const sdg = ALL_SDGS.find((s) => s.num === g.num);
+                                        return (
+                                            <span
+                                                key={g.num}
+                                                style={{ backgroundColor: sdg?.color || "#5b5bf0" }}
+                                                className="flex h-11 w-11 flex-col items-center justify-center rounded-lg text-sm font-extrabold leading-none text-white"
+                                            >
+                                                {g.num}
+                                                <span className="mt-0.5 text-[8px] font-semibold uppercase tracking-wide">SDG</span>
+                                            </span>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+
+                            <div className="divide-y divide-slate-100 bg-white">
+                                {finalizedGoals.map((g) => {
+                                    const sdg = ALL_SDGS.find((s) => s.num === g.num);
+                                    const sdgRecord = sdgData.find((s) => s.number === g.num);
+                                    const targetDesc = sdgRecord?.targets?.find((t) => t.id === g.targetId)?.description || "";
+                                    return (
+                                        <div key={g.num} className="flex gap-4 p-5 sm:px-6">
+                                            <span
+                                                style={{ backgroundColor: sdg?.color || "#5b5bf0" }}
+                                                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-base font-extrabold text-white"
+                                            >
+                                                {g.num}
+                                            </span>
+                                            <div className="min-w-0 flex-1 space-y-1.5">
+                                                <div className="flex flex-wrap items-center gap-2">
+                                                    <h4 className="text-sm font-bold text-slate-900">
+                                                        SDG {g.num} — {sdg?.name}
+                                                    </h4>
+                                                    {g.isPrimary ? (
+                                                        <span className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-indigo-700">
+                                                            ★ Primary — set by program
+                                                        </span>
+                                                    ) : null}
+                                                </div>
+                                                {g.targetId ? (
+                                                    <p className="text-xs text-slate-500">
+                                                        Target {g.targetId}{targetDesc ? ` — ${targetDesc}` : ""}
+                                                    </p>
+                                                ) : null}
+                                                {g.quote.trim() ? (
+                                                    <p className="border-l-2 border-slate-200 pl-3 text-sm italic leading-relaxed text-slate-600">
+                                                        &ldquo;{firstSentence(g.quote, 220)}&rdquo;
+                                                    </p>
+                                                ) : null}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+
+                            <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-slate-100 bg-slate-50/60 px-5 py-3 text-xs text-slate-500 sm:px-6">
+                                <span className="inline-flex items-center gap-1.5">
+                                    <Lock className="h-3.5 w-3.5" /> Locked into your report
+                                </span>
+                                <span className="inline-flex items-center gap-1.5">
+                                    <Pencil className="h-3.5 w-3.5" /> Tap any goal above to edit before final submission
+                                </span>
+                                <span>This summary feeds your flash card &amp; the university&apos;s SDG analytics</span>
+                                <button
+                                    type="button"
+                                    onClick={handleUnfinalize}
+                                    className="ml-auto shrink-0 text-xs font-semibold text-indigo-600 hover:underline"
+                                >
+                                    Edit shortlist
+                                </button>
+                            </div>
+                        </div>
+
+                        <p className="flex items-center justify-center gap-1.5 text-center text-sm font-semibold text-emerald-600">
+                            <CheckCircle2 className="h-4 w-4" />
+                            Section 3 saved — your SDG summary above travels with your report.
+                        </p>
+                    </>
+                )}
             </section>
+
+            {/* ── Preliminary Summary ──────────────────────────────────── */}
+            {!isFinalized ? (
+                <section className="space-y-4 border-t border-slate-200 pt-8">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                        <h3 className="text-base font-semibold text-slate-900">
+                            Preliminary SDG alignment statement
+                        </h3>
+                        <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                            System synthesis
+                        </span>
+                    </div>
+                    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+                        <p className="text-sm leading-relaxed text-slate-700">
+                            {data.section3.summary_text}
+                        </p>
+                        <div className="mt-4 flex flex-wrap gap-2 border-t border-slate-100 pt-4">
+                            {[
+                                { label: "Standardized formatting", icon: CheckCircle2 },
+                                { label: "No performance claims", icon: Info },
+                                { label: "Structural validation only", icon: Layers },
+                            ].map((tag) => (
+                                <span
+                                    key={tag.label}
+                                    className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500"
+                                >
+                                    <tag.icon className="h-3 w-3 text-indigo-500" />
+                                    {tag.label}
+                                </span>
+                            ))}
+                        </div>
+                        <p className="mt-3 text-xs leading-relaxed text-slate-400">
+                            This statement is generated from your selections above and will be finalized with
+                            measurable impact data once Sections 4 and 5 are completed.
+                        </p>
+                    </div>
+                </section>
+            ) : null}
         </div>
     );
 }

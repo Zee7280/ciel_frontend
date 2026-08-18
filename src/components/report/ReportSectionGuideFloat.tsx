@@ -72,10 +72,13 @@ export function ReportSectionGuideFloat({
 
     return (
         <>
+            {/* Compact icon-only FAB — a wide text pill at a fixed viewport offset will eventually
+                scroll over real form content (e.g. Section 4.6's textarea) on any page this tall;
+                keeping the footprint small minimizes what it can obscure. */}
             <button
                 type="button"
                 onClick={() => setOpen(true)}
-                className="fixed z-[55] flex items-center gap-2 rounded-full border border-indigo-200 bg-indigo-600 px-3.5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-indigo-600/25 transition hover:bg-indigo-700 print:hidden sm:px-4"
+                className="fixed z-[55] flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-indigo-200 bg-indigo-600 text-white shadow-lg shadow-indigo-600/25 transition hover:bg-indigo-700 print:hidden"
                 style={{
                     right: "1rem",
                     /* Clear support stack (chat + WhatsApp @ bottom 7rem, ~8rem tall) + gap */
@@ -84,9 +87,7 @@ export function ReportSectionGuideFloat({
                 title={meta.title}
                 aria-label={`Open ${meta.title}`}
             >
-                <BookOpen className="h-4 w-4 shrink-0" aria-hidden />
-                <span className="hidden sm:inline">Section guide</span>
-                <span className="sm:hidden">Guide</span>
+                <BookOpen className="h-5 w-5" aria-hidden />
             </button>
 
             <Dialog open={open} onOpenChange={setOpen}>

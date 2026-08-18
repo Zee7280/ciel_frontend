@@ -44,6 +44,17 @@ interface FypDeliverable {
     uploadedAt: string;
 }
 
+interface FypSectionSummaries {
+    project?: string;
+    background?: string;
+    objectives?: string;
+    literature?: string;
+    methodology?: string;
+    findings?: string;
+    sdg?: string;
+    reflection?: string;
+}
+
 interface AdminFypRow {
     id: string;
     projectTitle: string | null;
@@ -60,6 +71,11 @@ interface AdminFypRow {
     milestonesTotal: number;
     deliverablesCount: number;
     progressStatus: "complete" | "in_progress";
+    /** Present only once a student has used the 9-step guided wizard — takes priority over the legacy milestone timeline above. */
+    wizardStepsComplete: number | null;
+    wizardStepsTotal: number | null;
+    status?: "draft" | "submitted";
+    sectionSummaries?: FypSectionSummaries | null;
     updatedAt: string;
     student: AdminStudent | null;
 }
@@ -404,14 +420,24 @@ export default function AdminPathSubmissionsPage() {
                                                               : "border-blue-200 bg-blue-50 text-blue-800"
                                                       }
                                                   >
-                                                      {row.progressStatus === "complete" ? "All milestones done" : "In progress"}
+                                                      {row.wizardStepsTotal != null
+                                                          ? row.status === "submitted"
+                                                              ? "Submitted for sign-off"
+                                                              : "In progress"
+                                                          : row.progressStatus === "complete"
+                                                            ? "All milestones done"
+                                                            : "In progress"}
                                                   </Badge>
                                                   <Badge variant="outline" className="border-slate-200 text-slate-600">
-                                                      {row.milestonesComplete}/{row.milestonesTotal} milestones
+                                                      {row.wizardStepsTotal != null
+                                                          ? `Step ${row.wizardStepsComplete}/${row.wizardStepsTotal}`
+                                                          : `${row.milestonesComplete}/${row.milestonesTotal} milestones`}
                                                   </Badge>
                                               </div>
                                               <p className="text-sm text-slate-600">{studentLine(row.student)}</p>
-                                              <p className="line-clamp-2 text-sm text-slate-500">{row.overview || "No overview yet."}</p>
+                                              <p className="line-clamp-2 text-sm text-slate-500">
+                                                  {row.sectionSummaries?.project || row.overview || "No overview yet."}
+                                              </p>
                                               <p className="text-xs text-slate-500">{row.deliverablesCount} deliverable(s) uploaded</p>
                                               <p className="text-xs text-slate-400">Updated {new Date(row.updatedAt).toLocaleString()}</p>
                                           </div>
@@ -425,6 +451,20 @@ export default function AdminPathSubmissionsPage() {
                                       </div>
                                       {expanded ? (
                                           <div className="space-y-4 border-t border-slate-100 bg-slate-50/70 px-5 py-4">
+                                              {row.sectionSummaries && Object.values(row.sectionSummaries).some(Boolean) ? (
+                                                  <div>
+                                                      <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Guided wizard summary</p>
+                                                      <ul className="mt-2 space-y-2">
+                                                          {(Object.entries(row.sectionSummaries) as [string, string | undefined][])
+                                                              .filter(([, text]) => !!text)
+                                                              .map(([key, text]) => (
+                                                                  <li key={key} className="text-sm text-slate-700">
+                                                                      <span className="font-semibold capitalize">{key}:</span> {text}
+                                                                  </li>
+                                                              ))}
+                                                      </ul>
+                                                  </div>
+                                              ) : null}
                                               <div>
                                                   <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Milestones</p>
                                                   <ul className="mt-2 space-y-2">

@@ -254,7 +254,8 @@ export default function CourseProjectWizardPage() {
             const presign = presignRes?.ok ? await presignRes.json() : null;
             const { uploadUrl, publicUrl } = presign?.data ?? {};
             if (!uploadUrl || !publicUrl) throw new Error("Could not prepare the upload");
-            await fetch(uploadUrl, { method: "PUT", headers: { "Content-Type": file.type }, body: file });
+            const putRes = await fetch(uploadUrl, { method: "PUT", headers: { "Content-Type": file.type }, body: file });
+            if (!putRes.ok) throw new Error("Upload failed — please try again");
             const nextUrls = [...(entry.evidenceUrls ?? []), publicUrl];
             setEntry((e) => ({ ...e, evidenceUrls: nextUrls }));
             await save({ evidenceUrls: nextUrls });

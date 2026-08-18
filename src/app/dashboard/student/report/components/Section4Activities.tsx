@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useRef, useEffect } from 'react';
 import { useReportForm } from '../context/ReportContext';
 import { Button } from './ui/button';
 import { Label } from './ui/label';
@@ -7,7 +7,7 @@ import { Textarea } from './ui/textarea';
 import { FieldError } from './ui/FieldError';
 import {
     Plus, Trash2, Globe, Target, Info, Layers, Users,
-    ChevronDown, ChevronUp, PlusCircle
+    ChevronDown, ChevronUp, PlusCircle, Lock, Pencil, CheckCircle2,
 } from 'lucide-react';
 import clsx from 'clsx';
 import {
@@ -183,6 +183,45 @@ export default function Section4Activities() {
     const partnersCount = Array.isArray(section7?.partners) ? section7.partners.length : 0;
 
     const implementationWords = wordCount(section4.project_summary?.project_implementation_explanation || '');
+
+    // ── Finalise Section 4 — "the effort" shortlist card ────────────────────
+    const activities: any[] = section4.activity_blocks || [];
+    const sessionsTotal = activities.reduce((sum, a) => sum + (parseInt(a.sessions_count) || 0), 0);
+    const outputsTotal = activities.reduce((sum, a) => sum + (a.outputs?.length || 0), 0);
+    const distinctPeople = section4.project_summary?.distinct_total_beneficiaries || '';
+    const countingMethod = section4.project_summary?.counting_method || '';
+    const primaryCategoryLabel = useMemo(() => {
+        const cats = Array.from(new Set(activities.map((a) => a.primary_category).filter(Boolean)));
+        return cats.join(' · ');
+        // `activities` is a plain `section4.activity_blocks || []` alias, not independent state.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [section4.activity_blocks]);
+    const canFinalizeSection4 = activities.length > 0 && !!distinctPeople && !!countingMethod;
+    const isSection4Finalized = !!section4.finalized;
+
+    const section4Snapshot = useMemo(
+        () => JSON.stringify({ activities, project_summary: section4.project_summary }),
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [section4.activity_blocks, section4.project_summary],
+    );
+    const lastFinalizedSection4SnapshotRef = useRef('');
+    useEffect(() => {
+        if (!isSection4Finalized) return;
+        // First render after a finalized report loads — seed the baseline instead of comparing against an empty ref.
+        if (!lastFinalizedSection4SnapshotRef.current) {
+            lastFinalizedSection4SnapshotRef.current = section4Snapshot;
+            return;
+        }
+        if (section4Snapshot !== lastFinalizedSection4SnapshotRef.current) {
+            update('finalized', false);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [section4Snapshot, isSection4Finalized]);
+    const handleFinalizeSection4 = () => {
+        lastFinalizedSection4SnapshotRef.current = section4Snapshot;
+        update('finalized', true);
+    };
+    const handleUnfinalizeSection4 = () => update('finalized', false);
 
     return (
         <div className="mx-auto max-w-6xl space-y-8 pb-10">
@@ -405,6 +444,119 @@ export default function Section4Activities() {
                         </div>
                     ))}
                 </div>
+            </section>
+
+            {/* ── Finalise Section 4 ────────────────────────────────────── */}
+            <section className="space-y-3 border-t border-slate-200 pt-8">
+                {!isSection4Finalized ? (
+                    <>
+                        <button
+                            type="button"
+                            onClick={handleFinalizeSection4}
+                            disabled={!canFinalizeSection4}
+                            className="flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-6 py-3.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                            Finalise Section 4 →
+                        </button>
+                        <p className="text-center text-xs text-slate-500">
+                            {canFinalizeSection4
+                                ? 'Ready ✨'
+                                : 'Add at least one activity plus distinct beneficiaries and counting method above to finalise.'}
+                        </p>
+                    </>
+                ) : (
+                    <>
+                        <div className="overflow-hidden rounded-xl border border-slate-200 shadow-sm">
+                            <div className="bg-gradient-to-br from-slate-900 to-indigo-950 px-5 py-5 text-white sm:px-6">
+                                <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">
+                                    Section 4 · The effort — finalised
+                                </p>
+                                <h3 className="mt-2 text-lg font-bold">
+                                    🛠️ {activities.length} activit{activities.length === 1 ? 'y' : 'ies'} → 📦 {outputsTotal} verified output{outputsTotal === 1 ? '' : 's'} → {distinctPeople} distinct people
+                                </h3>
+                                {(primaryCategoryLabel || countingMethod) ? (
+                                    <p className="mt-1 text-sm text-slate-300">
+                                        {primaryCategoryLabel}{primaryCategoryLabel && countingMethod ? ' · ' : ''}
+                                        {countingMethod ? `counted via ${countingMethod.toLowerCase()}` : ''}
+                                    </p>
+                                ) : null}
+                                <div className="mt-4 flex flex-wrap gap-2">
+                                    {[
+                                        { label: 'Activities', value: String(activities.length) },
+                                        { label: 'Sessions', value: String(sessionsTotal) },
+                                        { label: 'Outputs', value: String(outputsTotal) },
+                                        { label: 'Distinct people', value: distinctPeople || '—' },
+                                    ].map((stat) => (
+                                        <span key={stat.label} className="rounded-lg bg-white/10 px-4 py-2.5 text-center">
+                                            <span className="block text-lg font-bold leading-none">{stat.value}</span>
+                                            <span className="mt-1 block text-[9px] font-semibold uppercase tracking-wide text-slate-300">{stat.label}</span>
+                                        </span>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div className="divide-y divide-slate-100 bg-white">
+                                {activities.map((a, i) => {
+                                    const catMeta = PRIMARY_CATEGORIES.find((c) => c.id === a.primary_category);
+                                    const CatIcon = catMeta?.icon || Target;
+                                    const statusEmoji = a.status === 'Completed' ? '✅' : a.status === 'Ongoing' ? '⏳' : a.status ? '🔶' : '';
+                                    return (
+                                        <div key={a.id || i} className="flex gap-4 p-5 sm:px-6">
+                                            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
+                                                <CatIcon className="h-5 w-5" />
+                                            </span>
+                                            <div className="min-w-0 flex-1 space-y-1.5">
+                                                <h4 className="text-sm font-bold text-slate-900">
+                                                    {i + 1}. {a.title || 'Untitled activity'} {statusEmoji}
+                                                </h4>
+                                                <p className="text-xs text-slate-500">
+                                                    {a.primary_category}{a.sub_category ? ` → ${a.sub_category}` : ''}
+                                                    {a.site_note ? ` · 📍 ${a.site_note}` : ''}
+                                                    {a.sessions_count ? ` · ${a.sessions_count} sessions` : ''}
+                                                </p>
+                                                {a.description ? (
+                                                    <p className="text-sm leading-relaxed text-slate-700">{a.description}</p>
+                                                ) : null}
+                                                {(a.outputs || []).filter((o: any) => o.title || o.quantity).map((o: any, oi: number) => (
+                                                    <p key={oi} className="text-xs font-medium text-indigo-700">
+                                                        📦 Produced: {o.quantity} {o.unit} {o.title}{o.verification_note ? ` (${o.verification_note})` : ''}
+                                                    </p>
+                                                ))}
+                                            </div>
+                                            {a.serves_beneficiaries && a.beneficiaries_reached ? (
+                                                <div className="shrink-0 text-right">
+                                                    <p className="text-lg font-bold text-indigo-700">~{a.beneficiaries_reached}</p>
+                                                    <p className="text-[9px] font-semibold uppercase tracking-wide text-slate-400">People</p>
+                                                </div>
+                                            ) : null}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+
+                            <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-slate-100 bg-slate-50/60 px-5 py-3 text-xs text-slate-500 sm:px-6">
+                                <span className="inline-flex items-center gap-1.5">
+                                    <Lock className="h-3.5 w-3.5" /> Locked into your report
+                                </span>
+                                <span className="inline-flex items-center gap-1.5">
+                                    <Pencil className="h-3.5 w-3.5" /> Edit any activity above to update
+                                </span>
+                                <button
+                                    type="button"
+                                    onClick={handleUnfinalizeSection4}
+                                    className="ml-auto shrink-0 text-xs font-semibold text-indigo-600 hover:underline"
+                                >
+                                    Edit shortlist
+                                </button>
+                            </div>
+                        </div>
+
+                        <p className="flex items-center justify-center gap-1.5 text-center text-sm font-semibold text-emerald-600">
+                            <CheckCircle2 className="h-4 w-4" />
+                            Section 4 saved — your effort summary above travels with your report.
+                        </p>
+                    </>
+                )}
             </section>
         </div>
     );
