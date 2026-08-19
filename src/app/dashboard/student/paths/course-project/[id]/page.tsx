@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { CheckCircle2, UploadCloud, X, ChevronDown, ArrowLeft } from "lucide-react";
+import { CheckCircle2, UploadCloud, X, ChevronDown, ArrowLeft, Star } from "lucide-react";
 import clsx from "clsx";
 import { authenticatedFetch } from "@/utils/api";
 import { sdgData } from "@/utils/sdgData";
@@ -26,36 +26,41 @@ import {
 
 const STEPS = [
     { key: "course", emoji: "📌", label: "Course" },
-    { key: "format", emoji: "🧬", label: "Format" },
+    { key: "format", emoji: "🚀", label: "Format" },
     { key: "aims", emoji: "🎯", label: "Aims" },
     { key: "process", emoji: "🛠️", label: "Process" },
     { key: "results", emoji: "📦", label: "Results" },
     { key: "sdg", emoji: "🌍", label: "SDG map" },
-    { key: "reflection", emoji: "🪞", label: "Reflection" },
+    { key: "reflection", emoji: "💡", label: "Reflection" },
     { key: "submit", emoji: "📤", label: "Submit" },
 ];
 
-/** Which optional modules (Aim, Activities, Method, Findings, Impact, Limitations) a given assignment format typically needs. */
+const DEPARTMENT_OPTIONS = ["Business & Management", "Economics", "Architecture", "Design", "Fine Arts", "Media & Communication", "Computer Science", "Engineering", "Social Sciences", "Psychology", "Education", "Liberal Arts", "Natural Sciences", "Law", "Health Sciences"];
+const SEMESTER_OPTIONS = Array.from({ length: 10 }, (_, i) => `Semester ${i + 1}`);
+const TEAM_MODE_OPTIONS = ["Individual", "Pair", "Group / Team", "Whole class", "Interdisciplinary team"];
+const COURSEWORK_TYPE_OPTIONS = ["Assignment", "Semester project", "Research task", "Case study", "Studio / design project", "Practical / lab work", "Field-based work", "Presentation", "Creative production", "Campaign / activity", "Digital / software project", "Performance / exhibition", "Other"];
+
+/** Which optional modules apply to this assignment's format (Aim, Activities, Methods, Findings, Impact/Results, Limitations). */
 const FORMATS: Record<string, { p: CourseProjectModuleInclusion; note: string }> = {
-    "📊 Project (objectives → activities → outputs)": { p: { aim: true, act: true, meth: false, find: false, imp: true, lim: true }, note: "A project usually has objectives, activities, outputs and impact." },
-    "✍️ Essay / written argument": { p: { aim: true, act: false, meth: false, find: true, imp: false, lim: false }, note: "For an essay: your aim becomes your central argument, and findings become your key conclusions." },
-    "🔍 Case study analysis": { p: { aim: true, act: false, meth: true, find: true, imp: false, lim: true }, note: "A case study gets an aim, a method, findings and limitations." },
-    "🔧 Prototype / product development": { p: { aim: true, act: true, meth: true, find: true, imp: true, lim: true }, note: "Prototype work gets the full set — objectives, build activities, testing, findings, impact and limitations." },
-    "🔬 Research-based (survey, experiment, data)": { p: { aim: true, act: false, meth: true, find: true, imp: true, lim: true }, note: "Research gets aim, method & data scale, findings, impact and limitations." },
-    "🛠️ Practical / field experience": { p: { aim: true, act: true, meth: false, find: true, imp: true, lim: true }, note: "Field work gets objectives, activities, what you observed, and impact." },
-    "🪞 Reflection-based (journal, reflective essay)": { p: { aim: false, act: false, meth: false, find: true, imp: false, lim: false }, note: "Reflection-based work skips objectives, activities and methods — your insights carry it." },
-    "🎤 Presentation / viva": { p: { aim: true, act: false, meth: false, find: true, imp: false, lim: false }, note: "A presentation gets your core message and key points — nothing else needed." },
-    "📣 Campaign / event": { p: { aim: true, act: true, meth: false, find: true, imp: true, lim: true }, note: "Campaigns get objectives, activities, reach/impact and limitations." },
-    "🎬 Media / film / creative writing": { p: { aim: true, act: true, meth: false, find: false, imp: false, lim: false }, note: "Creative work gets your intent and the making process — the piece itself is the output." },
-    "📐 Design project (studio, graphics, fashion)": { p: { aim: true, act: true, meth: false, find: false, imp: false, lim: true }, note: "Design work gets the brief, the process, and the final piece." },
-    "🧪 Lab report / experiment write-up": { p: { aim: true, act: false, meth: true, find: true, imp: false, lim: true }, note: "A lab report gets hypothesis, method, results and limitations." },
-    "📜 Policy brief / legal memo": { p: { aim: true, act: false, meth: true, find: true, imp: false, lim: true }, note: "A brief gets the question, the analysis method, and your recommendations." },
-    "💼 Business plan / feasibility study": { p: { aim: true, act: false, meth: true, find: true, imp: true, lim: true }, note: "A business plan gets the opportunity, your research, key numbers and limitations." },
-    "🎭 Performance / exhibition": { p: { aim: true, act: true, meth: false, find: false, imp: false, lim: false }, note: "Performance work gets your intent and the preparation — the show is the output." },
-    "📱 Software / app development": { p: { aim: true, act: true, meth: true, find: true, imp: false, lim: true }, note: "Software gets requirements, build activities, testing and known limitations." },
-    "📖 Literature review / annotated bibliography": { p: { aim: true, act: false, meth: true, find: true, imp: false, lim: true }, note: "A review gets your question, search method, and what the literature says." },
-    "🌐 Translation / language portfolio": { p: { aim: true, act: true, meth: false, find: false, imp: false, lim: true }, note: "Language work gets your goal, the process, and the portfolio itself." },
-    "Other…": { p: { aim: true, act: true, meth: true, find: true, imp: true, lim: true }, note: "We've switched everything on — turn off whatever doesn't apply to your work." },
+    "✍️ Essay / written argument": { p: { aim: true, act: false, meth: true, find: true, imp: false, lim: true }, note: "Aim → Research → Argument → Findings → SDG connection." },
+    "📑 Report": { p: { aim: true, act: true, meth: false, find: true, imp: true, lim: true }, note: "A report usually has objectives, activities, findings and impact." },
+    "🔬 Research paper": { p: { aim: true, act: false, meth: true, find: true, imp: true, lim: true }, note: "Question → Method → Findings → Limitations → SDG connection." },
+    "🧭 Case study": { p: { aim: true, act: false, meth: true, find: true, imp: false, lim: true }, note: "Case → Analysis → Insights → Recommendation → SDG connection." },
+    "🎤 Presentation / slides": { p: { aim: true, act: false, meth: false, find: true, imp: false, lim: false }, note: "A presentation gets your core message and key points — nothing else needed." },
+    "🎨 Design / visual work": { p: { aim: true, act: true, meth: false, find: true, imp: true, lim: true }, note: "Design objective → Creative process → Iterations → Final design → Sustainability." },
+    "📐 Model": { p: { aim: true, act: true, meth: false, find: false, imp: true, lim: true }, note: "A model gets the brief, the process, and the final piece." },
+    "🔧 Prototype": { p: { aim: true, act: true, meth: true, find: false, imp: true, lim: true }, note: "Problem → Build → Test → Result → Sustainability link." },
+    "🧱 Physical product / making": { p: { aim: true, act: true, meth: false, find: false, imp: true, lim: true }, note: "Making work gets the brief, the process, and the final piece." },
+    "📱 App / website / software": { p: { aim: true, act: true, meth: true, find: false, imp: true, lim: true }, note: "Problem → Development → Testing → Users → Output → SDG link." },
+    "📊 Data / analysis": { p: { aim: true, act: false, meth: true, find: true, imp: true, lim: true }, note: "Question → Data → Analysis → Findings → SDG connection." },
+    "🎬 Video / film / audio": { p: { aim: true, act: true, meth: false, find: true, imp: false, lim: false }, note: "Concept → Creative process → Audience → Message → SDG link." },
+    "🖼️ Artwork / creative production": { p: { aim: true, act: true, meth: false, find: true, imp: false, lim: false }, note: "Concept → Creative process → Audience → Message → SDG link." },
+    "📣 Campaign / communication": { p: { aim: true, act: true, meth: false, find: false, imp: true, lim: true }, note: "Goal → Campaign → Reach → Response → SDG link." },
+    "🪧 Poster / infographic": { p: { aim: true, act: true, meth: false, find: false, imp: false, lim: false }, note: "Goal → Design → Message → SDG link." },
+    "🎭 Performance / exhibition": { p: { aim: true, act: true, meth: false, find: true, imp: false, lim: false }, note: "Concept → Creative process → Audience → Message → SDG link." },
+    "🥾 Fieldwork output": { p: { aim: true, act: true, meth: false, find: true, imp: true, lim: true }, note: "Field work gets objectives, activities, what you observed, and impact." },
+    "🧭 Strategy / proposal / plan": { p: { aim: true, act: false, meth: true, find: true, imp: true, lim: true }, note: "A plan gets the opportunity, your research, key numbers and limitations." },
+    "✍️ Other": { p: { aim: true, act: true, meth: true, find: true, imp: true, lim: true }, note: "We've switched everything on — turn off whatever doesn't apply to your work." },
 };
 const FORMAT_OPTIONS = Object.keys(FORMATS);
 
@@ -64,16 +69,29 @@ const INC_TILES: { key: keyof CourseProjectModuleInclusion; emoji: string; label
     { key: "act", emoji: "🛠️", label: "Activities" },
     { key: "meth", emoji: "🔬", label: "Method / research" },
     { key: "find", emoji: "📈", label: "Findings" },
-    { key: "imp", emoji: "📏", label: "Measurable impact" },
+    { key: "imp", emoji: "📏", label: "Results & evidence" },
     { key: "lim", emoji: "⚠️", label: "Limitations" },
 ];
 
-const ACTIVITY_OPTIONS = ["🔍 Research & reading", "📊 Data collection", "🎨 Designing / creating", "🧪 Testing / experimenting", "🎤 Presenting", "🤝 Working with an organisation", "📣 Running a campaign / event", "🏗️ Building / making", "✍️ Drafting & editing", "🎬 Filming / recording"];
-const METHOD_OPTIONS = ["📋 Survey", "🗣️ Interviews", "🧪 Experiment", "👀 Observation / site visit", "📊 Data analysis", "🗂️ Case analysis", "📚 Literature search", "⚖️ Legal / doctrinal analysis"];
+const ACTIVITY_OPTIONS = ["🔍 Research & reading", "📊 Data collection", "🎨 Designing / creating", "🧩 Ideation / concepts", "🧪 Testing / experimenting", "🧱 Building / making", "🖥 Coding / development", "👀 Observation / site visit", "🤝 Working with an organisation", "📣 Running a campaign / event", "🎤 Presenting / pitching", "✍️ Drafting & editing", "🎬 Filming / recording"];
+const METHOD_OPTIONS = ["📋 Survey", "🗣️ Interviews", "🧪 Experiment", "👀 Observation / site visit", "📊 Data analysis", "🗂️ Case analysis", "📚 Literature search", "⚖️ Legal / doctrinal analysis", "Not applicable"];
+const BENEFICIARY_OPTIONS = ["Students", "University / campus", "Community", "Business / industry", "Government / public sector", "Schools", "Environment / ecosystems", "Specific user group", "General public", "No specific external beneficiary"];
+const STAKEHOLDER_OPTIONS = ["No external stakeholders", "Students", "Faculty", "Community members", "Business / industry", "NGO / nonprofit", "Government / public body", "School", "Experts / professionals", "Clients / users"];
 const OUTPUT_OPTIONS = ["📄 Report / plan", "✍️ Essay / written piece", "📽️ Presentation / slides", "📐 Design / model", "🔧 Prototype", "📱 App / website", "📣 Campaign materials", "🎬 Video / artwork", "🎭 Performance / exhibit", "📊 Dataset / findings", "📜 Brief / memo", "🌐 Translation / portfolio"];
 const SKILL_OPTIONS = ["🗣️ Communication", "🤝 Teamwork", "🔬 Research", "🧩 Problem-solving", "🎨 Creativity", "⏰ Time management", "🌍 Sustainability thinking", "⚖️ Ethical reasoning", "✍️ Writing", "🎤 Presenting"];
-const ORIGIN_OPTIONS = ["📋 The assignment required it", "💡 Our own idea", "📖 The whole course is about it", "🔍 We noticed it along the way"];
-const HONESTY_OPTIONS = ["💪 Real — and we showed it", "👍 Real, but not measured", "🌓 A bit of both", "📚 Mostly on paper"];
+const ORIGIN_OPTIONS = ["📋 Built into the assignment", "📘 Built into the course", "💡 Introduced by the student / team", "👩‍🏫 Suggested by the instructor", "🔍 Emerged during the work", "🔗 Identified when reviewing the completed work"];
+const INTEGRATION_OPTIONS = ["🌱 Central to the work and demonstrated", "📊 Clearly connected, outcome not measured", "🌓 Partially integrated", "🔗 Indirectly connected", "🔍 Identified retrospectively"];
+const EVIDENCE_STATUS: { emoji: string; label: string }[] = [
+    { emoji: "📊", label: "Actual measured result" },
+    { emoji: "📝", label: "Qualitative evidence" },
+    { emoji: "🎯", label: "Proposed target" },
+    { emoji: "📈", label: "Estimated / projected" },
+    { emoji: "💡", label: "Conceptual recommendation" },
+    { emoji: "⏳", label: "Not measured yet" },
+    { emoji: "➖", label: "Not applicable" },
+];
+const NUMBER_REPRESENTS_OPTIONS = ["Baseline", "Target", "Estimated / projected", "Actual measured result"];
+const NEXT_STEP_OPTIONS = ["Completed as coursework", "Could be developed further", "Further research recommended", "Could be tested / piloted", "Recommended for implementation", "Share with external stakeholder", "Continued in another course", "Already taken forward", "Other"];
 
 const fieldClass = "w-full rounded-ciel-sm border-2 border-ciel-border bg-ciel-page/50 px-4 py-3 text-sm font-semibold text-ciel-text outline-none focus:border-ciel-green focus:bg-white focus-visible:ring-2 focus-visible:ring-ciel-green";
 const labelClass = "text-xs font-bold uppercase tracking-widest text-ciel-text-soft";
@@ -84,6 +102,26 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
             <label className={labelClass}>{label}</label>
             {hint ? <p className="text-xs text-ciel-text-soft">{hint}</p> : null}
             {children}
+        </div>
+    );
+}
+
+function ChipSingle({ options, value, onChange }: { options: string[]; value?: string; onChange: (v: string) => void }) {
+    return (
+        <div className="flex flex-wrap gap-2">
+            {options.map((opt) => (
+                <button
+                    key={opt}
+                    type="button"
+                    onClick={() => onChange(opt)}
+                    className={clsx(
+                        "ciel-transition rounded-full border-2 px-3.5 py-2 text-xs font-bold",
+                        value === opt ? "border-ciel-green bg-ciel-green-soft text-ciel-green-deep" : "border-ciel-border text-ciel-text-mid hover:border-ciel-green/40",
+                    )}
+                >
+                    {opt}
+                </button>
+            ))}
         </div>
     );
 }
@@ -236,9 +274,11 @@ export default function CourseProjectWizardPage() {
         setEntry((e) => ({ ...e, [key]: { ...(e[key] as object), ...patch } }));
     };
 
-    const handleFormatChange = (format: string) => {
-        patchGroup("assignmentInfo", { format });
-        const preset = FORMATS[format]?.p;
+    const toggleFormat = (fmt: string) => {
+        const cur = entry.assignmentInfo?.formats ?? (entry.assignmentInfo?.format ? [entry.assignmentInfo.format] : []);
+        const next = cur.includes(fmt) ? cur.filter((x) => x !== fmt) : [...cur, fmt];
+        patchGroup("assignmentInfo", { formats: next, format: next[0] });
+        const preset = next[0] ? FORMATS[next[0]]?.p : undefined;
         if (preset) setEntry((e) => ({ ...e, moduleInclusion: { ...preset } }));
     };
 
@@ -306,6 +346,11 @@ export default function CourseProjectWizardPage() {
     });
 
     const showCard = entry.status === "submitted" && !editing;
+    const teamMode = entry.studentInfo?.teamMode ?? "";
+    const isTeam = !!teamMode && teamMode !== "Individual";
+    const primaryFormat = entry.assignmentInfo?.formats?.[0] ?? entry.assignmentInfo?.format;
+    const formatMeta = primaryFormat ? FORMATS[primaryFormat] : undefined;
+    const showMetricFields = /measured|target|estimated/i.test(entry.resultsInfo?.evidenceStatus ?? "");
 
     return (
         <PathWorkspaceShell
@@ -374,6 +419,21 @@ export default function CourseProjectWizardPage() {
                             <Field label="Roll no.">
                                 <input type="text" value={entry.studentInfo?.rollNumber ?? ""} onChange={(e) => patchGroup("studentInfo", { rollNumber: e.target.value })} placeholder="F2023-1234" className={fieldClass} />
                             </Field>
+                            <Field label="Course name">
+                                <input type="text" value={entry.course ?? ""} onChange={(e) => setEntry((s) => ({ ...s, course: e.target.value }))} placeholder="e.g. Marketing Management" className={fieldClass} />
+                            </Field>
+                            <Field label="Course code (if any)">
+                                <input type="text" value={entry.studentInfo?.courseCode ?? ""} onChange={(e) => patchGroup("studentInfo", { courseCode: e.target.value })} placeholder="MKT-301" className={fieldClass} />
+                            </Field>
+                            <Field label="School / department">
+                                <input type="text" list="cw-depts" value={entry.studentInfo?.department ?? ""} onChange={(e) => patchGroup("studentInfo", { department: e.target.value })} placeholder="e.g. School of Business" className={fieldClass} />
+                                <datalist id="cw-depts">
+                                    {DEPARTMENT_OPTIONS.map((d) => <option key={d} value={d} />)}
+                                </datalist>
+                            </Field>
+                            <Field label="Programme">
+                                <input type="text" value={entry.studentInfo?.programme ?? ""} onChange={(e) => patchGroup("studentInfo", { programme: e.target.value })} placeholder="e.g. BBA" className={fieldClass} />
+                            </Field>
                             <Field label="University">
                                 <SearchableSelect value={entry.studentInfo?.universityName ?? ""} onChange={(v) => patchGroup("studentInfo", { universityName: v })} options={pakistaniUniversities} placeholder="Type your university" />
                             </Field>
@@ -381,27 +441,22 @@ export default function CourseProjectWizardPage() {
                                 <SearchableSelect value={entry.studentInfo?.disciplineName ?? ""} onChange={(v) => patchGroup("studentInfo", { disciplineName: v })} options={hecPrograms} placeholder="Type your discipline" />
                             </Field>
                             <Field label="Semester">
-                                <input type="text" value={entry.studentInfo?.semester ?? ""} onChange={(e) => patchGroup("studentInfo", { semester: e.target.value })} placeholder="e.g. Fall 2026, 5th semester" className={fieldClass} />
+                                <input type="text" list="cw-semesters" value={entry.studentInfo?.semester ?? ""} onChange={(e) => patchGroup("studentInfo", { semester: e.target.value })} placeholder="e.g. Semester 5" className={fieldClass} />
+                                <datalist id="cw-semesters">
+                                    {SEMESTER_OPTIONS.map((s) => <option key={s} value={s} />)}
+                                </datalist>
                             </Field>
-                            <Field label="Solo or group?">
-                                <div className="flex gap-2">
-                                    {["Solo", "Group"].map((m) => (
-                                        <button
-                                            key={m}
-                                            type="button"
-                                            onClick={() => patchGroup("studentInfo", { teamMode: m })}
-                                            className={clsx(
-                                                "ciel-transition rounded-full border-2 px-4 py-2 text-xs font-bold",
-                                                entry.studentInfo?.teamMode === m ? "border-ciel-green bg-ciel-green-soft text-ciel-green-deep" : "border-ciel-border text-ciel-text-mid hover:border-ciel-green/40",
-                                            )}
-                                        >
-                                            {m}
-                                        </button>
-                                    ))}
-                                </div>
+                            <Field label="Instructor">
+                                <input type="text" value={entry.studentInfo?.teacherName ?? ""} onChange={(e) => patchGroup("studentInfo", { teacherName: e.target.value })} placeholder="Prof. Bilal Ahmed" className={fieldClass} />
                             </Field>
-                            {entry.studentInfo?.teamMode === "Group" && (
-                                <Field label="👥 Group members — name every member">
+                            <Field label="Instructor's email">
+                                <input type="email" value={entry.studentInfo?.teacherEmail ?? ""} onChange={(e) => patchGroup("studentInfo", { teacherEmail: e.target.value })} placeholder="name@uni.edu.pk" className={fieldClass} />
+                            </Field>
+                            <Field label="How was this coursework completed?">
+                                <ChipSingle options={TEAM_MODE_OPTIONS} value={teamMode} onChange={(v) => patchGroup("studentInfo", { teamMode: v })} />
+                            </Field>
+                            {isTeam && (
+                                <Field label="👥 Team members — name everyone">
                                     <div className="space-y-2">
                                         {(entry.studentInfo?.groupMembers ?? [""]).map((m, i) => (
                                             <input
@@ -417,7 +472,7 @@ export default function CourseProjectWizardPage() {
                                                 className={fieldClass}
                                             />
                                         ))}
-                                        {(entry.studentInfo?.groupMembers?.length ?? 0) < 10 && (
+                                        {(entry.studentInfo?.groupMembers?.length ?? 0) < 20 && (
                                             <button
                                                 type="button"
                                                 onClick={() => patchGroup("studentInfo", { groupMembers: [...(entry.studentInfo?.groupMembers ?? [""]), ""] })}
@@ -429,14 +484,11 @@ export default function CourseProjectWizardPage() {
                                     </div>
                                 </Field>
                             )}
-                            <Field label="Course name">
-                                <input type="text" value={entry.course ?? ""} onChange={(e) => setEntry((s) => ({ ...s, course: e.target.value }))} placeholder="e.g. Principles of Marketing" className={fieldClass} />
-                            </Field>
-                            <Field label="Teacher / supervisor">
-                                <input type="text" value={entry.studentInfo?.teacherName ?? ""} onChange={(e) => patchGroup("studentInfo", { teacherName: e.target.value })} placeholder="Prof. Bilal Ahmed" className={fieldClass} />
-                            </Field>
-                            <Field label="Teacher's email">
-                                <input type="email" value={entry.studentInfo?.teacherEmail ?? ""} onChange={(e) => patchGroup("studentInfo", { teacherEmail: e.target.value })} placeholder="name@uni.edu.pk" className={fieldClass} />
+                            <Field label="What type of coursework was this?">
+                                <ChipSingle options={COURSEWORK_TYPE_OPTIONS} value={entry.studentInfo?.courseworkType} onChange={(v) => patchGroup("studentInfo", { courseworkType: v })} />
+                                {entry.studentInfo?.courseworkType === "Other" && (
+                                    <input type="text" value={entry.studentInfo?.courseworkTypeOther ?? ""} onChange={(e) => patchGroup("studentInfo", { courseworkTypeOther: e.target.value })} placeholder="Describe the type" className={clsx(fieldClass, "mt-2")} />
+                                )}
                             </Field>
                             <Field label="➕ Anything else about you or the course?">
                                 <textarea rows={2} value={entry.studentInfo?.notes ?? ""} onChange={(e) => patchGroup("studentInfo", { notes: e.target.value })} placeholder="Anything you'd like on the record…" className={fieldClass} />
@@ -446,29 +498,25 @@ export default function CourseProjectWizardPage() {
 
                     {step === 1 && (
                         <>
-                            <Field label="Project / assignment title">
-                                <input type="text" value={entry.projectTitle ?? ""} onChange={(e) => setEntry((s) => ({ ...s, projectTitle: e.target.value }))} placeholder="e.g. Zero-waste plan for the campus cafeteria" className={fieldClass} />
+                            <Field label="Title of your coursework">
+                                <input type="text" value={entry.projectTitle ?? ""} onChange={(e) => setEntry((s) => ({ ...s, projectTitle: e.target.value }))} placeholder="e.g. Zero-Waste Plan for a Plastic-Free Cafeteria" className={fieldClass} />
                             </Field>
-                            <Field label="What format did the assignment take?">
-                                <div className="relative">
-                                    <select value={entry.assignmentInfo?.format ?? ""} onChange={(e) => handleFormatChange(e.target.value)} className={clsx(fieldClass, "appearance-none pr-9")}>
-                                        <option value="">Select a format…</option>
-                                        {FORMAT_OPTIONS.map((f) => (
-                                            <option key={f} value={f}>{f}</option>
-                                        ))}
-                                    </select>
-                                    <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ciel-text-soft" />
-                                </div>
-                                {entry.assignmentInfo?.format === "Other…" && (
-                                    <input type="text" value={entry.assignmentInfo?.formatOther ?? ""} onChange={(e) => patchGroup("assignmentInfo", { formatOther: e.target.value })} placeholder="Describe your format in a few words" className={clsx(fieldClass, "mt-2")} />
-                                )}
+                            <Field label="What format did the work take?" hint="Tap all that apply — first pick leads.">
+                                <ChipGroup
+                                    options={FORMAT_OPTIONS}
+                                    selected={entry.assignmentInfo?.formats ?? (entry.assignmentInfo?.format ? [entry.assignmentInfo.format] : [])}
+                                    onToggle={toggleFormat}
+                                    otherValue={entry.assignmentInfo?.formatOther}
+                                    onOtherChange={(v) => patchGroup("assignmentInfo", { formatOther: v })}
+                                    otherPlaceholder="Describe your format"
+                                />
                             </Field>
-                            {entry.assignmentInfo?.format && FORMATS[entry.assignmentInfo.format] && (
+                            {formatMeta && (
                                 <div className="rounded-ciel-sm border-2 border-ciel-green/30 bg-ciel-green-soft/50 px-4 py-3 text-xs font-semibold leading-relaxed text-ciel-green-deep">
-                                    <b>Sections auto-set for your format.</b> {FORMATS[entry.assignmentInfo.format].note} Tap tiles below to adjust — you know your work best.
+                                    🧬 <b>{primaryFormat}</b> detected — we&apos;ll walk you through: <b>{formatMeta.note}</b> Adjust the tiles below if your work differs.
                                 </div>
                             )}
-                            <Field label="Which sections apply to your work?">
+                            <Field label="Which sections apply to your work?" hint="Pre-set from your format — tap to adjust.">
                                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                                     {INC_TILES.map((t) => (
                                         <button
@@ -486,12 +534,12 @@ export default function CourseProjectWizardPage() {
                                 </div>
                             </Field>
                             <Field label="What were you asked to do? (one line)">
-                                <input type="text" value={entry.assignmentInfo?.whatAsked ?? ""} onChange={(e) => patchGroup("assignmentInfo", { whatAsked: e.target.value })} placeholder="e.g. design a waste-reduction strategy with cost estimates" className={fieldClass} />
+                                <input type="text" value={entry.assignmentInfo?.whatAsked ?? ""} onChange={(e) => patchGroup("assignmentInfo", { whatAsked: e.target.value })} placeholder="e.g. Design a low-waste packaging solution for a local food business" className={fieldClass} />
                             </Field>
-                            <Field label="The real-world issue or question behind it (one line)">
-                                <input type="text" value={entry.assignmentInfo?.realWorldIssue ?? ""} onChange={(e) => patchGroup("assignmentInfo", { realWorldIssue: e.target.value })} placeholder="e.g. the cafeteria discards ~40kg of single-use plastic daily" className={fieldClass} />
+                            <Field label="What issue, question, need or opportunity did it address? (one line)">
+                                <input type="text" value={entry.assignmentInfo?.realWorldIssue ?? ""} onChange={(e) => patchGroup("assignmentInfo", { realWorldIssue: e.target.value })} placeholder="e.g. How can takeaway packaging be redesigned to reduce material waste?" className={fieldClass} />
                             </Field>
-                            <Field label="➕ Anything else about the assignment?">
+                            <Field label="➕ Anything else about the coursework?">
                                 <textarea rows={2} value={entry.assignmentInfo?.notes ?? ""} onChange={(e) => patchGroup("assignmentInfo", { notes: e.target.value })} placeholder="Anything we didn't ask…" className={fieldClass} />
                             </Field>
                         </>
@@ -501,7 +549,7 @@ export default function CourseProjectWizardPage() {
                         inc.aim ? (
                             <>
                                 <Field label="The overall aim (one line)">
-                                    <input type="text" value={entry.aimsInfo?.aimStatement ?? ""} onChange={(e) => patchGroup("aimsInfo", { aimStatement: e.target.value })} placeholder="e.g. make the cafeteria's operations measurably less wasteful" className={fieldClass} />
+                                    <input type="text" value={entry.aimsInfo?.aimStatement ?? ""} onChange={(e) => patchGroup("aimsInfo", { aimStatement: e.target.value })} placeholder="e.g. Develop a practical strategy to reduce cafeteria waste" className={fieldClass} />
                                 </Field>
                                 <Field label="Objectives">
                                     <div className="space-y-2">
@@ -515,16 +563,29 @@ export default function CourseProjectWizardPage() {
                                                     next[i] = e.target.value;
                                                     patchGroup("aimsInfo", { objectives: next });
                                                 }}
-                                                placeholder={i === 0 ? "e.g. Audit current waste volumes by category" : "Start with a verb…"}
+                                                placeholder={i === 0 ? "e.g. Identify major sources of waste" : "Start with a verb…"}
                                                 className={fieldClass}
                                             />
                                         ))}
-                                        {(entry.aimsInfo?.objectives?.length ?? 0) < 5 && (
+                                        {(entry.aimsInfo?.objectives?.length ?? 0) < 8 && (
                                             <button type="button" onClick={() => patchGroup("aimsInfo", { objectives: [...(entry.aimsInfo?.objectives ?? [""]), ""] })} className="text-xs font-bold text-ciel-green-deep hover:underline">
                                                 + Add another objective
                                             </button>
                                         )}
                                     </div>
+                                </Field>
+                                <Field label="Who or what was it intended to benefit, influence or improve?" hint="Tap all that apply.">
+                                    <ChipGroup
+                                        options={BENEFICIARY_OPTIONS}
+                                        selected={entry.aimsInfo?.beneficiaries ?? []}
+                                        onToggle={(v) => {
+                                            const cur = entry.aimsInfo?.beneficiaries ?? [];
+                                            patchGroup("aimsInfo", { beneficiaries: cur.includes(v) ? cur.filter((x) => x !== v) : [...cur, v] });
+                                        }}
+                                        otherValue={entry.aimsInfo?.beneficiariesOther}
+                                        onOtherChange={(v) => patchGroup("aimsInfo", { beneficiariesOther: v })}
+                                        otherPlaceholder="Who else?"
+                                    />
                                 </Field>
                                 <Field label="➕ Anything else here?">
                                     <textarea rows={2} value={entry.aimsInfo?.notes ?? ""} onChange={(e) => patchGroup("aimsInfo", { notes: e.target.value })} placeholder="Anything we didn't ask…" className={fieldClass} />
@@ -541,7 +602,7 @@ export default function CourseProjectWizardPage() {
                         (inc.act || inc.meth) ? (
                             <>
                                 {inc.act && (
-                                    <Field label="Activities conducted (tap all that apply)">
+                                    <Field label="Activities conducted" hint="Tap all that apply.">
                                         <ChipGroup
                                             options={ACTIVITY_OPTIONS}
                                             selected={entry.processInfo?.activities ?? []}
@@ -551,13 +612,13 @@ export default function CourseProjectWizardPage() {
                                             }}
                                             otherValue={entry.processInfo?.activitiesOther}
                                             onOtherChange={(v) => patchGroup("processInfo", { activitiesOther: v })}
-                                            otherPlaceholder="Type your own activity…"
+                                            otherPlaceholder="What else did you do?"
                                         />
                                     </Field>
                                 )}
                                 {inc.meth && (
                                     <>
-                                        <Field label="🔬 Research / method used (tap all that apply)">
+                                        <Field label="🔬 Research / method used" hint="Tap all that apply — “Not applicable” is a valid answer.">
                                             <ChipGroup
                                                 options={METHOD_OPTIONS}
                                                 selected={entry.processInfo?.methods ?? []}
@@ -567,7 +628,7 @@ export default function CourseProjectWizardPage() {
                                                 }}
                                                 otherValue={entry.processInfo?.methodsOther}
                                                 onOtherChange={(v) => patchGroup("processInfo", { methodsOther: v })}
-                                                otherPlaceholder="Type your own method…"
+                                                otherPlaceholder="Your method"
                                             />
                                         </Field>
                                         <Field label="Sample / data scale">
@@ -575,6 +636,19 @@ export default function CourseProjectWizardPage() {
                                         </Field>
                                     </>
                                 )}
+                                <Field label="Who did you engage or work with?" hint="Optional — tap all that apply.">
+                                    <ChipGroup
+                                        options={STAKEHOLDER_OPTIONS}
+                                        selected={entry.processInfo?.stakeholders ?? []}
+                                        onToggle={(v) => {
+                                            const cur = entry.processInfo?.stakeholders ?? [];
+                                            patchGroup("processInfo", { stakeholders: cur.includes(v) ? cur.filter((x) => x !== v) : [...cur, v] });
+                                        }}
+                                        otherValue={entry.processInfo?.stakeholdersOther}
+                                        onOtherChange={(v) => patchGroup("processInfo", { stakeholdersOther: v })}
+                                        otherPlaceholder="Who else?"
+                                    />
+                                </Field>
                                 <Field label="➕ Anything else about the process?">
                                     <textarea rows={2} value={entry.processInfo?.notes ?? ""} onChange={(e) => patchGroup("processInfo", { notes: e.target.value })} placeholder="Anything we didn't ask…" className={fieldClass} />
                                 </Field>
@@ -588,7 +662,7 @@ export default function CourseProjectWizardPage() {
 
                     {step === 4 && (
                         <>
-                            <Field label="Output — what did you produce? (tap all that apply)">
+                            <Field label="Output — what did you produce?" hint="Tap all that apply.">
                                 <ChipGroup
                                     options={OUTPUT_OPTIONS}
                                     selected={entry.resultsInfo?.outputs ?? []}
@@ -598,14 +672,14 @@ export default function CourseProjectWizardPage() {
                                     }}
                                     otherValue={entry.resultsInfo?.outputsOther}
                                     onOtherChange={(v) => patchGroup("resultsInfo", { outputsOther: v })}
-                                    otherPlaceholder="Type your own output…"
+                                    otherPlaceholder="What else?"
                                 />
                             </Field>
-                            <Field label="Describe the main output in one line">
-                                <input type="text" value={entry.resultsInfo?.outputDescription ?? ""} onChange={(e) => patchGroup("resultsInfo", { outputDescription: e.target.value })} placeholder="e.g. a 12-page zero-waste plan with a costed 4-month payback" className={fieldClass} />
+                            <Field label="Describe the main output (one line)">
+                                <input type="text" value={entry.resultsInfo?.outputDescription ?? ""} onChange={(e) => patchGroup("resultsInfo", { outputDescription: e.target.value })} placeholder="e.g. A zero-waste cafeteria strategy with implementation recommendations" className={fieldClass} />
                             </Field>
                             {inc.find && (
-                                <Field label="📈 Key findings / conclusions">
+                                <Field label="📈 Key findings / conclusions / insights" hint="What did it reveal, demonstrate, propose or conclude?">
                                     <div className="space-y-2">
                                         {(entry.resultsInfo?.findings ?? [""]).map((f, i) => (
                                             <input
@@ -617,7 +691,7 @@ export default function CourseProjectWizardPage() {
                                                     next[i] = e.target.value;
                                                     patchGroup("resultsInfo", { findings: next });
                                                 }}
-                                                placeholder={i === 0 ? "e.g. students would pay 15% more for steel utensils" : "Another…"}
+                                                placeholder={i === 0 ? "e.g. Reusable alternatives could substantially cut single-use plastics" : "Another…"}
                                                 className={fieldClass}
                                             />
                                         ))}
@@ -630,16 +704,54 @@ export default function CourseProjectWizardPage() {
                                 </Field>
                             )}
                             {inc.imp && (
-                                <Field label="📏 Measurable impact — put a number on it">
-                                    <input type="text" value={entry.resultsInfo?.measurableImpact ?? ""} onChange={(e) => patchGroup("resultsInfo", { measurableImpact: e.target.value })} placeholder="e.g. pilot week cut plastic waste 22% (weighed daily)" className={fieldClass} />
-                                </Field>
+                                <>
+                                    <Field label="What evidence of result or outcome did the work produce?" hint="Choose one — honesty scores higher.">
+                                        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                                            {EVIDENCE_STATUS.map((ev) => (
+                                                <button
+                                                    key={ev.label}
+                                                    type="button"
+                                                    onClick={() => patchGroup("resultsInfo", { evidenceStatus: ev.label })}
+                                                    className={clsx(
+                                                        "ciel-transition flex flex-col items-center gap-1 rounded-ciel-sm border-2 px-3 py-3 text-center",
+                                                        entry.resultsInfo?.evidenceStatus === ev.label ? "border-ciel-green bg-ciel-green-soft" : "border-ciel-border",
+                                                    )}
+                                                >
+                                                    <span className="text-lg">{ev.emoji}</span>
+                                                    <span className="text-[10px] font-bold leading-tight text-ciel-text-mid">{ev.label}</span>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </Field>
+                                    {showMetricFields && (
+                                        <div className="space-y-3 rounded-ciel-sm border border-ciel-border bg-ciel-page/40 p-4">
+                                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                                                <Field label="Metric">
+                                                    <input type="text" value={entry.resultsInfo?.metricName ?? ""} onChange={(e) => patchGroup("resultsInfo", { metricName: e.target.value })} placeholder="e.g. Plastic waste reduction" className={fieldClass} />
+                                                </Field>
+                                                <Field label="Value">
+                                                    <input type="text" inputMode="decimal" value={entry.resultsInfo?.metricValue ?? ""} onChange={(e) => patchGroup("resultsInfo", { metricValue: e.target.value })} placeholder="22" className={fieldClass} />
+                                                </Field>
+                                                <Field label="Unit">
+                                                    <input type="text" value={entry.resultsInfo?.metricUnit ?? ""} onChange={(e) => patchGroup("resultsInfo", { metricUnit: e.target.value })} placeholder="%" className={fieldClass} />
+                                                </Field>
+                                            </div>
+                                            <Field label="This number represents…">
+                                                <ChipSingle options={NUMBER_REPRESENTS_OPTIONS} value={entry.resultsInfo?.numberRepresents} onChange={(v) => patchGroup("resultsInfo", { numberRepresents: v })} />
+                                            </Field>
+                                        </div>
+                                    )}
+                                    <Field label="📏 Measurable impact — put a number on it (optional)">
+                                        <input type="text" value={entry.resultsInfo?.measurableImpact ?? ""} onChange={(e) => patchGroup("resultsInfo", { measurableImpact: e.target.value })} placeholder="e.g. pilot week cut plastic waste 22% (weighed daily)" className={fieldClass} />
+                                    </Field>
+                                </>
                             )}
                             {inc.lim && (
                                 <>
                                     <Field label="⚠️ Main limitation">
-                                        <input type="text" value={entry.resultsInfo?.limitationType ?? ""} onChange={(e) => patchGroup("resultsInfo", { limitationType: e.target.value })} placeholder="e.g. small sample size, time constraints, one supplier quote" className={fieldClass} />
+                                        <input type="text" value={entry.resultsInfo?.limitationType ?? ""} onChange={(e) => patchGroup("resultsInfo", { limitationType: e.target.value })} placeholder="e.g. Limited pilot period — results cover 3 weeks, not a full term" className={fieldClass} />
                                     </Field>
-                                    <Field label="One line on it">
+                                    <Field label="One line on how it affected the work">
                                         <input type="text" value={entry.resultsInfo?.limitationDetail ?? ""} onChange={(e) => patchGroup("resultsInfo", { limitationDetail: e.target.value })} placeholder="e.g. costing based on one supplier's quote" className={fieldClass} />
                                     </Field>
                                 </>
@@ -655,26 +767,12 @@ export default function CourseProjectWizardPage() {
                     {step === 6 && (
                         <>
                             <Field label="What did this work teach you?">
-                                <textarea rows={2} value={entry.reflectionInfo?.lessonLearned ?? ""} onChange={(e) => patchGroup("reflectionInfo", { lessonLearned: e.target.value })} placeholder="e.g. sustainability wasn't extra work — it made our plan better" className={fieldClass} />
+                                <textarea rows={2} value={entry.reflectionInfo?.lessonLearned ?? ""} onChange={(e) => patchGroup("reflectionInfo", { lessonLearned: e.target.value })} placeholder="Reflect on what you learned about the issue, your discipline, or the way you approached the work…" className={fieldClass} />
                             </Field>
-                            <Field label="Honestly — was the SDG link real, or mostly on paper?">
-                                <div className="flex flex-wrap gap-2">
-                                    {HONESTY_OPTIONS.map((o) => (
-                                        <button
-                                            key={o}
-                                            type="button"
-                                            onClick={() => patchGroup("reflectionInfo", { sdgLinkHonesty: o })}
-                                            className={clsx(
-                                                "ciel-transition rounded-full border-2 px-3.5 py-2 text-xs font-bold",
-                                                entry.reflectionInfo?.sdgLinkHonesty === o ? "border-ciel-green bg-ciel-green-soft text-ciel-green-deep" : "border-ciel-border text-ciel-text-mid hover:border-ciel-green/40",
-                                            )}
-                                        >
-                                            {o}
-                                        </button>
-                                    ))}
-                                </div>
+                            <Field label="How strongly was sustainability connected to the actual work?">
+                                <ChipSingle options={INTEGRATION_OPTIONS} value={entry.reflectionInfo?.integrationLevel} onChange={(v) => patchGroup("reflectionInfo", { integrationLevel: v })} />
                             </Field>
-                            <Field label="Skills you grew (tap all that apply)">
+                            <Field label="Skills you developed" hint="Tap all that apply.">
                                 <ChipGroup
                                     options={SKILL_OPTIONS}
                                     selected={entry.reflectionInfo?.skills ?? []}
@@ -684,14 +782,15 @@ export default function CourseProjectWizardPage() {
                                     }}
                                     otherValue={entry.reflectionInfo?.skillsOther}
                                     onOtherChange={(v) => patchGroup("reflectionInfo", { skillsOther: v })}
-                                    otherPlaceholder="Type another skill…"
+                                    otherPlaceholder="What else?"
                                 />
                             </Field>
-                            <Field label="What's next for this work?">
-                                <input type="text" value={entry.reflectionInfo?.whatsNext ?? ""} onChange={(e) => patchGroup("reflectionInfo", { whatsNext: e.target.value })} placeholder="e.g. pitching this to campus facilities next semester" className={fieldClass} />
+                            <Field label="What could happen next with this work?" hint="“Completed as coursework” is a complete answer.">
+                                <ChipSingle options={NEXT_STEP_OPTIONS} value={entry.reflectionInfo?.nextSteps} onChange={(v) => patchGroup("reflectionInfo", { nextSteps: v })} />
+                                <input type="text" value={entry.reflectionInfo?.whatsNext ?? ""} onChange={(e) => patchGroup("reflectionInfo", { whatsNext: e.target.value })} placeholder="Optional — one line on what's next" className={clsx(fieldClass, "mt-2")} />
                             </Field>
                             <Field label="One line you'd tell next semester's class">
-                                <input type="text" value={entry.reflectionInfo?.adviceNextSemester ?? ""} onChange={(e) => patchGroup("reflectionInfo", { adviceNextSemester: e.target.value })} placeholder="e.g. talk to real users in week one" className={fieldClass} />
+                                <input type="text" value={entry.reflectionInfo?.adviceNextSemester ?? ""} onChange={(e) => patchGroup("reflectionInfo", { adviceNextSemester: e.target.value })} placeholder="e.g. Talk to the cafeteria staff in week one — they know where the waste is" className={fieldClass} />
                             </Field>
                             <Field label="➕ Anything else you'd like to reflect on?">
                                 <textarea rows={2} value={entry.reflectionInfo?.notes ?? ""} onChange={(e) => patchGroup("reflectionInfo", { notes: e.target.value })} placeholder="Anything we didn't ask…" className={fieldClass} />
@@ -832,7 +931,7 @@ export default function CourseProjectWizardPage() {
 }
 
 // ---------------------------------------------------------------------------
-// Step 6 — SDG mapping (up to 3 goals, each with targets + a "how" line)
+// Step 6 — SDG mapping (up to 3 goals, first = primary, rest = supporting)
 // ---------------------------------------------------------------------------
 
 function SdgStep({
@@ -850,8 +949,16 @@ function SdgStep({
             patchGroup("sdgMapping", { entries: picked.filter((p) => p.goalNumber !== num) });
         } else {
             if (picked.length >= 3) return;
-            patchGroup("sdgMapping", { entries: [...picked, { goalNumber: num, targets: [] }] });
+            patchGroup("sdgMapping", { entries: [...picked, { goalNumber: num, targets: [], strength: picked.length ? "Supporting" : "Direct" }] });
         }
+    };
+    const makePrimary = (num: number) => {
+        const idx = picked.findIndex((p) => p.goalNumber === num);
+        if (idx <= 0) return;
+        const next = [...picked];
+        const [item] = next.splice(idx, 1);
+        next.unshift({ ...item, strength: "Direct" });
+        patchGroup("sdgMapping", { entries: next });
     };
     const toggleTarget = (num: number, targetId: string) => {
         const next = picked.map((p) => {
@@ -864,31 +971,21 @@ function SdgStep({
     const setHow = (num: number, how: string) => {
         patchGroup("sdgMapping", { entries: picked.map((p) => (p.goalNumber === num ? { ...p, how } : p)) });
     };
+    const setStrength = (num: number, strength: string) => {
+        patchGroup("sdgMapping", { entries: picked.map((p) => (p.goalNumber === num ? { ...p, strength } : p)) });
+    };
 
     return (
         <>
-            <Field label="Whose idea was the sustainability angle?">
-                <div className="flex flex-wrap gap-2">
-                    {ORIGIN_OPTIONS.map((o) => (
-                        <button
-                            key={o}
-                            type="button"
-                            onClick={() => patchGroup("sdgMapping", { origin: o })}
-                            className={clsx(
-                                "ciel-transition rounded-full border-2 px-3.5 py-2 text-xs font-bold",
-                                entry.sdgMapping?.origin === o ? "border-ciel-green bg-ciel-green-soft text-ciel-green-deep" : "border-ciel-border text-ciel-text-mid hover:border-ciel-green/40",
-                            )}
-                        >
-                            {o}
-                        </button>
-                    ))}
-                </div>
+            <Field label="How did sustainability become part of this coursework?">
+                <ChipSingle options={ORIGIN_OPTIONS} value={entry.sdgMapping?.origin} onChange={(v) => patchGroup("sdgMapping", { origin: v })} />
             </Field>
 
-            <Field label="Which SDGs does this work support?" hint="Pick up to 3 — tap a tile, then choose the target that fits.">
+            <Field label="Which SDGs does this work support?" hint="Pick up to 3 — first tapped becomes ★ primary; use “make primary” on a block to change.">
                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                     {sdgData.map((sdg) => {
                         const isSel = picked.some((p) => p.goalNumber === sdg.number);
+                        const isPrimary = picked[0]?.goalNumber === sdg.number;
                         const isDisabled = !isSel && picked.length >= 3;
                         return (
                             <button
@@ -902,7 +999,13 @@ function SdgStep({
                                     isSel ? "border-slate-900 shadow-lg" : isDisabled ? "cursor-not-allowed border-transparent opacity-15" : "border-transparent opacity-70 hover:-translate-y-0.5 hover:opacity-100",
                                 )}
                             >
-                                {isSel ? <CheckCircle2 className="absolute right-1.5 top-1.5 h-3.5 w-3.5" /> : null}
+                                {isPrimary ? (
+                                    <span className="absolute -right-1 -top-2 flex items-center gap-0.5 rounded-full bg-ciel-navy px-1.5 py-0.5 text-[7px] font-black text-amber-300">
+                                        <Star className="h-2 w-2 fill-current" /> PRIMARY
+                                    </span>
+                                ) : isSel ? (
+                                    <CheckCircle2 className="absolute right-1.5 top-1.5 h-3.5 w-3.5" />
+                                ) : null}
                                 <span className="text-base font-extrabold">{sdg.number}</span>
                                 {sdg.title}
                             </button>
@@ -913,39 +1016,66 @@ function SdgStep({
 
             {picked.length > 0 && (
                 <div className="space-y-3">
-                    {picked.map((p) => {
+                    {picked.map((p, i) => {
                         const sdg = sdgData.find((s) => s.number === p.goalNumber);
                         if (!sdg) return null;
                         return (
                             <div key={p.goalNumber} className="overflow-hidden rounded-ciel-sm border-2 border-ciel-border">
-                                <div className="flex items-center justify-between px-4 py-2.5 text-sm font-bold text-white" style={{ backgroundColor: sdg.color }}>
-                                    <span>SDG {sdg.number} · {sdg.title}</span>
-                                    <button type="button" onClick={() => toggleGoal(sdg.number)} className="flex h-6 w-6 items-center justify-center rounded-full bg-white/25 text-xs">✕</button>
-                                </div>
-                                <div className="space-y-2 bg-white p-4">
-                                    <p className={labelClass}>Which target fits your work? (pick one or more)</p>
-                                    <div className="flex flex-wrap gap-2">
-                                        {sdg.targets.map((t) => (
-                                            <button
-                                                key={t.id}
-                                                type="button"
-                                                onClick={() => toggleTarget(p.goalNumber, t.id)}
-                                                className={clsx(
-                                                    "ciel-transition rounded-full border-2 px-3 py-1.5 text-left text-[11px] font-bold",
-                                                    p.targets.includes(t.id) ? "border-ciel-green bg-ciel-green-soft text-ciel-green-deep" : "border-ciel-border text-ciel-text-mid hover:border-ciel-green/40",
-                                                )}
-                                                title={t.description}
-                                            >
-                                                {t.id} · {t.description}
+                                <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 text-sm font-bold text-white" style={{ backgroundColor: sdg.color }}>
+                                    <span>SDG {sdg.number} · {sdg.title} · {i === 0 ? "★ PRIMARY" : "SUPPORTING"}</span>
+                                    <div className="flex items-center gap-2">
+                                        {i > 0 && (
+                                            <button type="button" onClick={() => makePrimary(sdg.number)} className="rounded-full bg-white/20 px-2 py-1 text-[10px] font-black">
+                                                ☆ make primary
                                             </button>
-                                        ))}
+                                        )}
+                                        <button type="button" onClick={() => toggleGoal(sdg.number)} className="flex h-6 w-6 items-center justify-center rounded-full bg-white/25 text-xs">✕</button>
+                                    </div>
+                                </div>
+                                <div className="space-y-3 bg-white p-4">
+                                    <div>
+                                        <p className={labelClass}>Which target fits your work? (pick one or more)</p>
+                                        <div className="mt-2 flex flex-wrap gap-2">
+                                            {sdg.targets.map((t) => (
+                                                <button
+                                                    key={t.id}
+                                                    type="button"
+                                                    onClick={() => toggleTarget(p.goalNumber, t.id)}
+                                                    className={clsx(
+                                                        "ciel-transition rounded-full border-2 px-3 py-1.5 text-left text-[11px] font-bold",
+                                                        p.targets.includes(t.id) ? "border-ciel-green bg-ciel-green-soft text-ciel-green-deep" : "border-ciel-border text-ciel-text-mid hover:border-ciel-green/40",
+                                                    )}
+                                                    title={t.description}
+                                                >
+                                                    {t.id} · {t.description}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <p className={labelClass}>How strong is the connection?</p>
+                                        <div className="mt-2 flex gap-2">
+                                            {["Direct", "Supporting"].map((s) => (
+                                                <button
+                                                    key={s}
+                                                    type="button"
+                                                    onClick={() => setStrength(p.goalNumber, s)}
+                                                    className={clsx(
+                                                        "ciel-transition rounded-full border-2 px-3.5 py-1.5 text-xs font-bold",
+                                                        (p.strength || (i === 0 ? "Direct" : "Supporting")) === s ? "border-ciel-green bg-ciel-green-soft text-ciel-green-deep" : "border-ciel-border text-ciel-text-mid hover:border-ciel-green/40",
+                                                    )}
+                                                >
+                                                    {s}
+                                                </button>
+                                            ))}
+                                        </div>
                                     </div>
                                     <input
                                         type="text"
                                         value={p.how ?? ""}
                                         onChange={(e) => setHow(p.goalNumber, e.target.value)}
                                         placeholder="One line: how does your work support this goal?"
-                                        className={clsx(fieldClass, "mt-2")}
+                                        className={fieldClass}
                                     />
                                 </div>
                             </div>

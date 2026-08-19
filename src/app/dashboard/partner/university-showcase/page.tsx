@@ -1,48 +1,17 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { authenticatedFetch } from "@/utils/api";
 import { toast } from "sonner";
-import { Search, Sparkles, Trophy } from "lucide-react";
-import clsx from "clsx";
+import { Search } from "lucide-react";
 import CourseworkCard from "@/components/ciel/CourseworkCard";
-import { type CourseProjectEntry, resolveSectionSummaries } from "@/utils/courseProjectTypes";
-
-interface ShowcaseEntry extends CourseProjectEntry {
-    student?: { id: string; name: string; email: string; institution?: string; department?: string } | null;
-}
-
-interface CuratorResult {
-    ranking: { id: string; score: number }[];
-    top3: { id: string; reason: string }[];
-    pattern: string;
-}
-
-/** Deck-level evidence/initiative/impact/reflection flags — same weights the AI Curator scores on,
- * computed here so the prompt gets a compact, consistent signal instead of the raw report. */
-function cardSignals(entry: ShowcaseEntry) {
-    const rm = entry.resultsInfo || {};
-    const sm = entry.sdgMapping || {};
-    const summaries = resolveSectionSummaries(entry);
-    return {
-        id: entry.id,
-        title: entry.projectTitle || "Untitled",
-        one: summaries.results || summaries.aims || "",
-        proof: rm.findings?.[0] || rm.measurableImpact || "",
-        evidenceAttached: (entry.evidenceUrls?.length ?? 0) > 0,
-        studentInitiated: sm.origin?.includes("own idea") ?? false,
-        impactShown: !!rm.measurableImpact,
-        reflectionDepth: entry.reflectionInfo?.lessonLearned ? (entry.reflectionInfo?.sdgLinkHonesty?.includes("Real —") ? 3 : 2) : 1,
-    };
-}
+import MeritModelPanel, { type MeritEntry } from "@/components/ciel/MeritModelPanel";
 
 export default function UniversityShowcasePage() {
-    const [entries, setEntries] = useState<ShowcaseEntry[]>([]);
+    const [entries, setEntries] = useState<MeritEntry[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState("");
-    const [curating, setCurating] = useState(false);
-    const [curator, setCurator] = useState<CuratorResult | null>(null);
-    const [curatorError, setCuratorError] = useState<string | null>(null);
+    const [showMeritModel, setShowMeritModel] = useState(false);
 
     useEffect(() => {
         void fetchEntries();
@@ -78,33 +47,6 @@ export default function UniversityShowcasePage() {
         );
     });
 
-    const rankMap = useMemo(() => new Map((curator?.ranking ?? []).map((r) => [r.id, r.score])), [curator]);
-    const top3Map = useMemo(() => new Map((curator?.top3 ?? []).map((t) => [t.id, t.reason])), [curator]);
-    const ranked = useMemo(() => {
-        if (!curator) return filtered;
-        return [...filtered].sort((a, b) => (rankMap.get(b.id ?? "") ?? 0) - (rankMap.get(a.id ?? "") ?? 0));
-    }, [filtered, curator, rankMap]);
-
-    const runCurator = async () => {
-        if (!entries.length) return;
-        setCurating(true);
-        setCuratorError(null);
-        try {
-            const res = await authenticatedFetch("/api/ai/summarize", {
-                method: "POST",
-                body: JSON.stringify({ section: "course_project_curator", data: { cards: entries.map(cardSignals) } }),
-            });
-            const result = res?.ok ? await res.json() : null;
-            if (!result?.summary) throw new Error("Curator did not return a result");
-            const parsed = JSON.parse(result.summary) as CuratorResult;
-            setCurator(parsed);
-        } catch {
-            setCuratorError("Could not rank the deck right now. Try again in a moment.");
-        } finally {
-            setCurating(false);
-        }
-    };
-
     return (
         <div className="min-h-screen bg-[#f7f9fc] px-4 py-6 sm:px-6 lg:px-8">
             <div className="mx-auto max-w-5xl space-y-5">
@@ -120,24 +62,16 @@ export default function UniversityShowcasePage() {
                     </div>
                     <button
                         type="button"
-                        onClick={runCurator}
-                        disabled={curating || !entries.length}
-                        className="ciel-transition inline-flex shrink-0 items-center gap-2 rounded-xl bg-purple-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-purple-700 disabled:opacity-50"
+                        onClick={() => setShowMeritModel((v) => !v)}
+                        disabled={!entries.length}
+                        className="ciel-transition inline-flex shrink-0 items-center gap-2 rounded-xl bg-ciel-indigo px-5 py-2.5 text-sm font-bold text-white hover:bg-ciel-indigo/90 disabled:opacity-50"
                     >
-                        <Sparkles className="h-4 w-4" /> {curating ? "Ranking…" : "Rank this deck — AI Curator"}
+                        🧮 {showMeritModel ? "Hide merit model" : "Merit model — rank this deck"}
                     </button>
                 </div>
 
-                {curatorError && <p className="text-xs font-semibold text-red-600">{curatorError}</p>}
-
-                {curator && (
-                    <div className="rounded-2xl border border-purple-200 bg-purple-50 p-4 text-sm text-purple-900">
-                        <p className="font-bold">🧮 Curated with public criteria:</p>
-                        <p className="mt-1 text-xs leading-relaxed">
-                            Evidence attached &amp; verifiable <b>30%</b> · Student-initiated SDG link <b>25%</b> · Impact shown, not claimed <b>25%</b> · Reflection depth &amp; honesty <b>20%</b>. Never ranked on writing style or English fluency.
-                        </p>
-                        <p className="mt-2 text-xs leading-relaxed">🤖 <b>Pattern the Curator sees:</b> {curator.pattern}</p>
-                    </div>
+                {showMeritModel && !loading && entries.length > 0 && (
+                    <MeritModelPanel entries={entries} showDepartmentFilter />
                 )}
 
                 <div className="relative max-w-sm">
@@ -168,28 +102,9 @@ export default function UniversityShowcasePage() {
                     </div>
                 ) : (
                     <div className="space-y-4">
-                        {ranked.map((entry, i) => {
-                            const score = rankMap.get(entry.id ?? "");
-                            const reason = top3Map.get(entry.id ?? "");
-                            return (
-                                <div key={entry.id} className={clsx("relative rounded-2xl", reason && "ring-2 ring-purple-300")}>
-                                    {reason && (
-                                        <div className="absolute -top-2.5 left-4 z-10 flex items-center gap-1 rounded-full bg-gradient-to-r from-purple-600 to-purple-400 px-3 py-1 text-[10px] font-black text-white shadow">
-                                            <Trophy className="h-3 w-3" /> AI PICK #{i + 1}
-                                        </div>
-                                    )}
-                                    <CourseworkCard entry={entry} studentName={entry.student?.name} />
-                                    {reason && (
-                                        <p className="mt-1 rounded-b-2xl border border-t-0 border-purple-200 bg-purple-50 px-4 py-2 text-xs font-semibold text-purple-800">
-                                            🤖 AI Pick because: {reason}
-                                        </p>
-                                    )}
-                                    {score != null && !reason && (
-                                        <p className="mt-1 text-right text-[11px] font-bold text-purple-600">🧮 {score}/100</p>
-                                    )}
-                                </div>
-                            );
-                        })}
+                        {filtered.map((entry) => (
+                            <CourseworkCard key={entry.id} entry={entry} studentName={entry.student?.name} />
+                        ))}
                     </div>
                 )}
             </div>

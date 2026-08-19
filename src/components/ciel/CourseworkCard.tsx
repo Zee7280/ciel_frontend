@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { CheckCircle2, Sparkles, Users, ChevronDown } from "lucide-react";
+import { CheckCircle2, Sparkles, Users, ChevronDown, Star } from "lucide-react";
 import clsx from "clsx";
 import { sdgData } from "@/utils/sdgData";
 import {
@@ -35,14 +35,18 @@ export default function CourseworkCard({
     const si = entry.studentInfo || {};
     const ai = entry.assignmentInfo || {};
     const sm = entry.sdgMapping || {};
+    const re = entry.resultsInfo || {};
     const sdgEntries = sm.entries || [];
+    const primaryFormat = ai.formats?.[0] ?? ai.format;
     const summaries = resolveSectionSummaries(entry);
     const story = courseProjectStory(entry);
+    const isTeam = !!si.teamMode && si.teamMode !== "Individual" && si.teamMode !== "Solo";
     const groupSize = (si.groupMembers || []).filter(Boolean).length + 1;
     const displayName = studentName || si.studentName || "Student";
     const initials = (si.teacherName || "? ?").split(" ").map((w) => w[0]).filter(Boolean).slice(0, 2).join("").toUpperCase();
+    const integration = entry.reflectionInfo?.integrationLevel || entry.reflectionInfo?.sdgLinkHonesty;
 
-    const proof = entry.resultsInfo?.findings?.[0] || entry.resultsInfo?.measurableImpact;
+    const proof = re.findings?.[0] || re.measurableImpact;
 
     return (
         <div className="overflow-hidden rounded-ciel-lg border border-ciel-border bg-white shadow-sm">
@@ -51,12 +55,12 @@ export default function CourseworkCard({
                 <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="flex min-w-0 items-start gap-3">
                         <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-ciel-sm bg-ciel-navy text-lg text-white">
-                            {formatBadgeEmoji(ai.format)}
+                            {formatBadgeEmoji(primaryFormat)}
                         </span>
                         <div className="min-w-0">
                             <p className="truncate text-base font-black text-ciel-text">{entry.projectTitle || "Untitled coursework"}</p>
                             <p className="mt-0.5 truncate text-xs font-semibold uppercase tracking-wide text-ciel-text-soft">
-                                {ai.format ? stripEmoji(ai.format).split(" (")[0] + " · " : ""}
+                                {primaryFormat ? stripEmoji(primaryFormat).split(" (")[0] + " · " : ""}
                                 {entry.course || "Course"} · {displayName}
                                 {si.semester ? ` · ${si.semester}` : ""}
                                 {si.universityName ? ` · ${si.universityName}` : ""}
@@ -77,11 +81,12 @@ export default function CourseworkCard({
                 {sdgEntries.length > 0 && (
                     <div className="mt-4 flex flex-wrap items-center gap-2">
                         <span className="text-[10px] font-black uppercase tracking-widest text-ciel-text-soft">SDGs</span>
-                        {sdgEntries.map((en) => {
+                        {sdgEntries.map((en, i) => {
                             const sdg = sdgData.find((s) => s.number === en.goalNumber);
                             if (!sdg) return null;
                             return (
                                 <span key={en.goalNumber} className="flex items-center gap-1.5 rounded-ciel-xs px-2 py-1 text-[10px] font-black text-white" style={{ backgroundColor: sdg.color }}>
+                                    {i === 0 ? <Star className="h-2.5 w-2.5 fill-current" /> : null}
                                     <span>{sdg.number}</span>
                                     <span className="hidden sm:inline">{sdg.title.toUpperCase()}</span>
                                 </span>
@@ -105,9 +110,14 @@ export default function CourseworkCard({
                     </p>
                 ) : null}
                 <div className="mt-3 flex flex-wrap gap-2">
-                    {sm.origin?.includes("own idea") ? (
+                    {sm.origin && /student/i.test(sm.origin) ? (
                         <span className="inline-flex items-center gap-1 rounded-full bg-ciel-indigo-soft px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-ciel-indigo">
                             <Sparkles className="h-3 w-3" /> Student-initiated SDG
+                        </span>
+                    ) : null}
+                    {re.evidenceStatus ? (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-ciel-amber-soft px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-ciel-amber">
+                            {re.evidenceStatus}
                         </span>
                     ) : null}
                     {!!entry.evidenceUrls?.length && (
@@ -115,14 +125,14 @@ export default function CourseworkCard({
                             <CheckCircle2 className="h-3 w-3" /> Evidence attached
                         </span>
                     )}
-                    {groupSize > 1 && (
+                    {isTeam && groupSize > 1 && (
                         <span className="inline-flex items-center gap-1 rounded-full bg-ciel-page px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-ciel-text-mid">
-                            <Users className="h-3 w-3" /> Group of {groupSize}
+                            <Users className="h-3 w-3" /> {si.teamMode} of {groupSize}
                         </span>
                     )}
-                    {entry.reflectionInfo?.sdgLinkHonesty ? (
+                    {integration ? (
                         <span className="inline-flex items-center gap-1 rounded-full bg-ciel-page px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-ciel-text-mid">
-                            {stripEmoji(entry.reflectionInfo.sdgLinkHonesty)}
+                            {stripEmoji(integration)}
                         </span>
                     ) : null}
                 </div>

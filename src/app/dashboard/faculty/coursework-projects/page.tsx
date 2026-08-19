@@ -5,16 +5,13 @@ import { authenticatedFetch } from "@/utils/api";
 import { toast } from "sonner";
 import { Search } from "lucide-react";
 import CourseworkCard from "@/components/ciel/CourseworkCard";
-import { type CourseProjectEntry } from "@/utils/courseProjectTypes";
-
-interface SupervisedCourseProjectEntry extends CourseProjectEntry {
-    student?: { id: string; name: string; email: string; institution?: string; department?: string } | null;
-}
+import MeritModelPanel, { type MeritEntry } from "@/components/ciel/MeritModelPanel";
 
 export default function FacultyCourseworkProjectsPage() {
-    const [entries, setEntries] = useState<SupervisedCourseProjectEntry[]>([]);
+    const [entries, setEntries] = useState<MeritEntry[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState("");
+    const [showMeritModel, setShowMeritModel] = useState(false);
 
     useEffect(() => {
         void fetchEntries();
@@ -53,15 +50,29 @@ export default function FacultyCourseworkProjectsPage() {
     return (
         <div className="min-h-screen bg-[#f7f9fc] px-4 py-6 sm:px-6 lg:px-8">
             <div className="mx-auto max-w-5xl space-y-5">
-                <div>
-                    <p className="text-[11px] font-semibold uppercase tracking-widest text-blue-600">Faculty</p>
-                    <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
-                        Coursework reports
-                    </h1>
-                    <p className="mt-1.5 max-w-3xl text-sm text-slate-500">
-                        Submitted coursework reports from students who named you as their supervisor.
-                    </p>
+                <div className="flex flex-wrap items-start justify-between gap-4">
+                    <div>
+                        <p className="text-[11px] font-semibold uppercase tracking-widest text-blue-600">Faculty</p>
+                        <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
+                            Coursework reports
+                        </h1>
+                        <p className="mt-1.5 max-w-3xl text-sm text-slate-500">
+                            Submitted coursework reports from students who named you as their supervisor.
+                        </p>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={() => setShowMeritModel((v) => !v)}
+                        disabled={!entries.length}
+                        className="ciel-transition inline-flex shrink-0 items-center gap-2 rounded-xl bg-ciel-indigo px-5 py-2.5 text-sm font-bold text-white hover:bg-ciel-indigo/90 disabled:opacity-50"
+                    >
+                        🧮 {showMeritModel ? "Hide merit model" : "Merit model — rank my projects"}
+                    </button>
                 </div>
+
+                {showMeritModel && !loading && entries.length > 0 && (
+                    <MeritModelPanel entries={entries} />
+                )}
 
                 <div className="relative max-w-sm">
                     <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
