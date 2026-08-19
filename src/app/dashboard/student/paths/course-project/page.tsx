@@ -60,6 +60,10 @@ export default function CourseProjectDeckPage() {
 
     const submitted = entries.filter((e) => e.status === "submitted");
     const drafts = entries.filter((e) => e.status !== "submitted");
+    // Team-shared entries (isOwner === false) don't count toward this student's own report/impact
+    // tally — that credit belongs to whoever owns and submitted the report.
+    const ownedCount = entries.filter((e) => e.isOwner !== false).length;
+    const ownedSubmittedCount = submitted.filter((e) => e.isOwner !== false).length;
 
     return (
         <PathWorkspaceShell
@@ -67,8 +71,8 @@ export default function CourseProjectDeckPage() {
             primaryActionLabel={creating ? "Creating…" : "+ New coursework report"}
             onPrimaryAction={creating ? undefined : createNew}
             stats={[
-                { label: "Reports", value: String(entries.length) },
-                { label: "Verified", value: String(submitted.length), hint: "Contributes to sections 2, 3 of your impact score" },
+                { label: "Reports", value: String(ownedCount) },
+                { label: "Verified", value: String(ownedSubmittedCount), hint: "Contributes to sections 2, 3 of your impact score" },
             ]}
             tabs={[{ key: "deck", label: "My coursework" }]}
             activeTab="deck"
@@ -91,6 +95,8 @@ export default function CourseProjectDeckPage() {
                                     <CardOpenTarget entryId={entry.id!} router={router}>
                                         <CourseworkCard entry={entry} />
                                     </CardOpenTarget>
+                                    {/* Floats on the card's outer corner (not inside the header) so it never
+                                        overlaps the Draft/Verified status pill CourseworkCard renders there. */}
                                     <button
                                         type="button"
                                         onClick={(e) => {
@@ -99,7 +105,7 @@ export default function CourseProjectDeckPage() {
                                         }}
                                         disabled={deletingId === entry.id}
                                         aria-label="Delete draft"
-                                        className="ciel-transition absolute right-4 top-4 flex h-8 w-8 items-center justify-center rounded-full bg-white/90 text-ciel-text-soft shadow-sm hover:text-red-600 disabled:opacity-50"
+                                        className="ciel-transition absolute -right-2 -top-2 flex h-8 w-8 items-center justify-center rounded-full border border-ciel-border bg-white text-ciel-text-soft shadow-md hover:border-red-200 hover:text-red-600 disabled:opacity-50"
                                     >
                                         <Trash2 className="h-4 w-4" />
                                     </button>
@@ -110,9 +116,16 @@ export default function CourseProjectDeckPage() {
                     {submitted.length > 0 && (
                         <div className="space-y-3">
                             {submitted.map((entry) => (
-                                <CardOpenTarget key={entry.id} entryId={entry.id!} router={router}>
-                                    <CourseworkCard entry={entry} />
-                                </CardOpenTarget>
+                                <div key={entry.id} className="space-y-1.5">
+                                    {entry.isOwner === false && (
+                                        <p className="px-1 text-[11px] font-bold uppercase tracking-wide text-ciel-indigo">
+                                            👥 Team project — led by {entry.studentInfo?.studentName || "a teammate"}
+                                        </p>
+                                    )}
+                                    <CardOpenTarget entryId={entry.id!} router={router}>
+                                        <CourseworkCard entry={entry} />
+                                    </CardOpenTarget>
+                                </div>
                             ))}
                         </div>
                     )}
@@ -148,7 +161,7 @@ function CardOpenTarget({
                     open();
                 }
             }}
-            className="cursor-pointer text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ciel-green"
+            className="cursor-pointer text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ciel-gold"
         >
             {children}
         </div>

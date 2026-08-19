@@ -72,6 +72,10 @@ export default function MeritModelPanel({
     }, [pool, ranked]);
 
     const avg = scored.length ? Math.round(scored.reduce((s, x) => s + x.scorecard.total, 0) / scored.length) : 0;
+    const scopeText = [
+        showDepartmentFilter ? (department === "all" ? "all departments" : department) : null,
+        semesters.length > 1 ? `Semester ${from} → Semester ${to}` : null,
+    ].filter(Boolean).join(" · ");
 
     return (
         <div className="space-y-4">
@@ -123,15 +127,15 @@ export default function MeritModelPanel({
                 <button
                     type="button"
                     onClick={() => setRanked(true)}
-                    className="ciel-transition ml-auto rounded-ciel-sm bg-ciel-indigo px-5 py-2.5 text-sm font-bold text-white hover:bg-ciel-indigo/90"
+                    className="ciel-transition ml-auto rounded-ciel-sm bg-ciel-purple px-5 py-2.5 text-sm font-bold text-white hover:bg-ciel-purple/90"
                 >
                     🧮 Run merit model →
                 </button>
             </div>
 
             {ranked && (
-                <div className="rounded-ciel-sm border border-ciel-indigo-soft bg-ciel-indigo-soft/60 px-4 py-3 text-xs leading-relaxed text-ciel-indigo">
-                    🧮 <b>Model run complete</b> — {scored.length} flash card{scored.length === 1 ? "" : "s"} scored on the public rubric · cohort average <b>{avg}/100</b>. Same six criteria for every discipline — the order below is merit, nothing else.
+                <div className="rounded-ciel-sm border border-ciel-purple-soft bg-ciel-purple-soft/60 px-4 py-3 text-xs leading-relaxed text-ciel-purple">
+                    🧮 <b>Model run complete</b> — {scored.length} flash card{scored.length === 1 ? "" : "s"} scored on the public rubric{scopeText ? <> · scope: {scopeText}</> : null} · cohort average <b>{avg}/100</b>. Same six criteria for every discipline — the order below is merit, nothing else.
                 </div>
             )}
 
@@ -146,9 +150,9 @@ export default function MeritModelPanel({
                     const sdg = primary ? sdgData.find((s) => s.number === primary.goalNumber) : null;
                     const displayName = x.entry.student?.name || x.entry.studentInfo?.studentName || "Student";
                     return (
-                        <div key={x.entry.id} className={clsx("relative overflow-hidden rounded-ciel-lg border bg-white", top3 ? "border-ciel-indigo/50 shadow-md" : "border-ciel-border")}>
+                        <div key={x.entry.id} className={clsx("relative overflow-hidden rounded-ciel-lg border bg-white", top3 ? "border-ciel-purple/50 shadow-md" : "border-ciel-border")}>
                             {top3 && (
-                                <div className="absolute left-0 top-0 flex items-center gap-1 rounded-br-ciel-sm bg-ciel-indigo px-3 py-1 text-[9px] font-black text-white">
+                                <div className="absolute left-0 top-0 flex items-center gap-1 rounded-br-ciel-sm bg-ciel-purple px-3 py-1 text-[9px] font-black text-white">
                                     <Trophy className="h-2.5 w-2.5" /> TOP OF COHORT · #{i + 1}
                                 </div>
                             )}
@@ -173,17 +177,17 @@ export default function MeritModelPanel({
                                     </p>
                                 </div>
                                 <div className="shrink-0 text-right">
-                                    <div className="text-lg font-black text-ciel-indigo">{ranked ? `${x.scorecard.total}/100` : "—"}</div>
+                                    <div className="text-lg font-black text-ciel-purple">{ranked ? `${x.scorecard.total}/100` : "—"}</div>
                                     <div className="text-[9px] font-black" style={{ color: x.scorecard.gradeColor }}>{ranked ? x.scorecard.grade : "TAP RUN"}</div>
                                 </div>
                                 <ChevronDown className={clsx("h-4 w-4 shrink-0 text-ciel-text-soft transition-transform", open && "rotate-180")} />
                             </button>
 
-                            {top3 && <p className="px-5 pb-3 pl-[4.5rem] text-[11px] leading-relaxed text-ciel-indigo">🏆 {whyItLeads(x.scorecard)}</p>}
+                            {top3 && <p className="px-5 pb-3 pl-[4.5rem] text-[11px] leading-relaxed text-ciel-purple">🏆 {whyItLeads(x.scorecard)}</p>}
 
                             {open && (
                                 <div className="space-y-2.5 border-t border-ciel-border bg-ciel-page/40 px-5 py-4">
-                                    <p className="text-[9px] font-black uppercase tracking-widest text-ciel-indigo">Scorecard — why this score</p>
+                                    <p className="text-[9px] font-black uppercase tracking-widest text-ciel-purple">Scorecard — why this score</p>
                                     {x.scorecard.criteria.map((c) => (
                                         <div key={c.key} className="flex flex-wrap items-center gap-2 text-xs sm:flex-nowrap">
                                             <span className="w-full shrink-0 font-bold text-ciel-text-mid sm:w-40">{c.label}</span>

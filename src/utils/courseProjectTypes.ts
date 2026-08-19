@@ -1,9 +1,14 @@
 // Shared types + summary composition for the Course Project coursework wizard, flash card, and decks.
 // Mirrors ciel_backend/src/paths/entities/course-project-entry.entity.ts
 
+export interface CourseProjectGroupMember {
+    name: string;
+    email?: string;
+}
 export interface CourseProjectStudentInfo {
     studentName?: string;
     rollNumber?: string;
+    studentEmail?: string;
     universityName?: string;
     disciplineName?: string;
     department?: string;
@@ -11,12 +16,18 @@ export interface CourseProjectStudentInfo {
     courseCode?: string;
     semester?: string;
     teamMode?: string;
-    groupMembers?: string[];
+    /** Older entries may still hold plain name strings from before email capture was added — read via normalizeGroupMembers. */
+    groupMembers?: (string | CourseProjectGroupMember)[];
     courseworkType?: string;
     courseworkTypeOther?: string;
     teacherName?: string;
     teacherEmail?: string;
     notes?: string;
+}
+
+/** Handles both the legacy string[] shape and the current {name, email}[] shape. */
+export function normalizeGroupMembers(raw: (string | CourseProjectGroupMember)[] | undefined): CourseProjectGroupMember[] {
+    return (raw ?? []).map((m) => (typeof m === "string" ? { name: m } : m));
 }
 export interface CourseProjectAssignmentInfo {
     format?: string;
@@ -122,6 +133,9 @@ export interface CourseProjectEntry {
     status: "draft" | "submitted";
     createdAt?: string;
     updatedAt?: string;
+    /** False when this entry is showing because the viewer was named as a group member on someone else's
+     * submitted report, not because they own it — gates edit/delete access on the frontend. */
+    isOwner?: boolean;
 }
 
 export const EMPTY_COURSE_PROJECT: CourseProjectEntry = {
@@ -182,7 +196,7 @@ export function composeCourseProjectSummaries(entry: CourseProjectEntry): Course
     const re = entry.resultsInfo || {};
     const sm = entry.sdgMapping || {};
     const rf = entry.reflectionInfo || {};
-    const gms = si.groupMembers || [];
+    const gms = normalizeGroupMembers(si.groupMembers).map((m) => m.name).filter(Boolean);
     const formats = (ai.formats?.length ? ai.formats : ai.format ? [ai.format] : []);
     const primaryFormat = formats[0];
 

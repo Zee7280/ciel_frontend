@@ -242,7 +242,13 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                   ...calculated,
                   ...persisted,
                   totalScore: Math.round(persisted.totalScore),
-                  breakdown: calculated.breakdown,
+                  // Prefer the backend's own per-section breakdown (it's what actually produced
+                  // totalScore) — only fall back to the frontend's independent heuristic scorer
+                  // per-section when the backend didn't persist a value for that section, so the
+                  // badges below the gauge always agree with the headline number.
+                  breakdown: persisted.breakdown
+                      ? { ...calculated.breakdown, ...persisted.breakdown }
+                      : calculated.breakdown,
                   suggestions: persisted.suggestions ?? calculated.suggestions,
               }
             : calculated;

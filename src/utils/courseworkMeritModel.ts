@@ -15,16 +15,16 @@ export interface MeritRubricCriterion {
 
 /** The public rubric — shown to students before they write, faculty while they review, university on publish. */
 export const MERIT_RUBRIC: MeritRubricCriterion[] = [
-    { key: "purpose", label: "1 · Clarity of purpose", max: 15, color: "#2563eb", description: "A stated aim, concrete objectives, a real issue/question/opportunity named." },
-    { key: "rigor", label: "2 · Rigor of process", max: 20, color: "#0f766e", description: "Activities & method appropriate to the declared format, plus scale/scope stated. Practice-based inquiry counts equal to lab testing." },
-    { key: "results", label: "3 · Substance of results", max: 20, color: "#c98a04", description: "Output + insight present; evidence ladder: measured > qualitative > estimated > target > conceptual > not-yet. Honesty never scores zero." },
-    { key: "sdg", label: "4 · SDG authenticity", max: 20, color: "#3F7E44", description: "Primary SDG + target chosen, connection explained, integration level declared. Self-started or emergent links earn a bonus." },
-    { key: "honesty", label: "5 · Honesty & consistency", max: 15, color: "#dc2626", description: "Limitation named with its effect; numbers correctly classified; claims consistent with evidence." },
-    { key: "refl", label: "6 · Reflection & transfer", max: 10, color: "#7c3aed", description: "What was learned, skills claimed, advice to the next class, a realistic next step." },
+    { key: "purpose", label: "1 · Clarity of purpose", max: 15, color: "#2563eb", description: "A stated aim, concrete objectives, a real issue/question/opportunity named. Form §2–3." },
+    { key: "rigor", label: "2 · Rigor of process", max: 20, color: "#0f766e", description: "Activities & method appropriate to the declared format + scale/scope stated. Practice-based inquiry counts equal to lab testing. §4." },
+    { key: "results", label: "3 · Substance of results", max: 20, color: "#c98a04", description: "Output + insight present; evidence ladder: measured > qualitative > estimated > target > conceptual > not-yet. Honesty never scores zero. §5." },
+    { key: "sdg", label: "4 · SDG authenticity", max: 20, color: "#3F7E44", description: "Primary SDG + target chosen, connection explained, integration level declared. Self-started or emergent links earn a bonus. §6." },
+    { key: "honesty", label: "5 · Honesty & consistency", max: 15, color: "#dc2626", description: "Limitation named with its effect; numbers correctly classified; claims consistent with evidence (a \"central & demonstrated\" claim needs measurement behind it). §5–7." },
+    { key: "refl", label: "6 · Reflection & transfer", max: 10, color: "#7c3aed", description: "What was learned, skills claimed, advice to the next class, a realistic next step. §7." },
 ];
 
 export const MERIT_NEUTRALITY_NOTE =
-    "The model never scores English polish, word count, discipline prestige, or production budget. Expectations are format-adjusted — a section a format skips is never penalised, and honest low-evidence answers never score zero.";
+    "The model never scores English polish, word count, discipline prestige, or production budget. Expectations are format-adjusted — an essay is not penalised for having no lab data, an artwork is not penalised for having no survey. What's rewarded everywhere: clear purpose, honest evidence, real SDG thinking.";
 
 /** Evidence-status points — mirrors the wizard's EVIDENCE_STATUS labels exactly (no emoji, evidenceStatus is stored plain). */
 const EVIDENCE_POINTS: Record<string, number> = {

@@ -26,7 +26,7 @@ type PartnerDashboardData = {
     pendingVerifications?: number;
     pendingSummary?: PendingSummary;
     recentProjects?: PartnerProject[];
-    impactTarget?: {
+    verificationProgress?: {
         percentage?: number;
         label?: string;
     };
@@ -194,18 +194,18 @@ export default function PartnerDashboard() {
                     </div>
                 </div>
 
-                {/* Impact Chart Placeholder */}
+                {/* Verification progress — real data: verified vs. (verified + pending) submissions */}
                 <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 flex flex-col items-center justify-center text-center">
-                    <div className="w-48 h-48 rounded-full border-[12px] border-slate-50 border-t-blue-500 border-r-green-500 flex items-center justify-center mb-4 relative" style={{ background: `conic-gradient(from 0deg, #3b82f6 0%, #3b82f6 ${stats?.impactTarget?.percentage || 0}%, #f8fafc ${stats?.impactTarget?.percentage || 0}%, #f8fafc 100%)`, borderRadius: '50%' }}>
+                    <div className="w-48 h-48 rounded-full border-[12px] border-slate-50 border-t-blue-500 border-r-green-500 flex items-center justify-center mb-4 relative" style={{ background: `conic-gradient(from 0deg, #3b82f6 0%, #3b82f6 ${stats?.verificationProgress?.percentage || 0}%, #f8fafc ${stats?.verificationProgress?.percentage || 0}%, #f8fafc 100%)`, borderRadius: '50%' }}>
                         <div className="absolute inset-2 bg-white rounded-full flex items-center justify-center">
                             <div>
-                                <div className="text-3xl font-bold text-slate-800">{stats?.impactTarget?.percentage || 0}%</div>
-                                <div className="text-xs font-bold text-slate-400 uppercase">{stats?.impactTarget?.label || "Goal Met"}</div>
+                                <div className="text-3xl font-bold text-slate-800">{stats?.verificationProgress?.percentage || 0}%</div>
+                                <div className="text-xs font-bold text-slate-400 uppercase">Verified</div>
                             </div>
                         </div>
                     </div>
-                    <h3 className="font-bold text-slate-800">Annual Impact Targets</h3>
-                    <p className="text-sm text-slate-500 max-w-xs mt-2">You are on track to meet your beneficiary targets for Q1 2026.</p>
+                    <h3 className="font-bold text-slate-800">Verification Progress</h3>
+                    <p className="text-sm text-slate-500 max-w-xs mt-2">{stats?.verificationProgress?.label || "No submissions yet"}</p>
                 </div>
             </div>
 

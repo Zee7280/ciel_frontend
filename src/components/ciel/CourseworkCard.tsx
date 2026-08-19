@@ -11,6 +11,7 @@ import {
     activeSectionKeys,
     SECTION_LABELS,
     stripEmoji,
+    normalizeGroupMembers,
 } from "@/utils/courseProjectTypes";
 
 function formatBadgeEmoji(format?: string) {
@@ -41,7 +42,8 @@ export default function CourseworkCard({
     const summaries = resolveSectionSummaries(entry);
     const story = courseProjectStory(entry);
     const isTeam = !!si.teamMode && si.teamMode !== "Individual" && si.teamMode !== "Solo";
-    const groupSize = (si.groupMembers || []).filter(Boolean).length + 1;
+    const groupMembers = normalizeGroupMembers(si.groupMembers).filter((m) => m.name?.trim());
+    const groupSize = groupMembers.length + 1;
     const displayName = studentName || si.studentName || "Student";
     const initials = (si.teacherName || "? ?").split(" ").map((w) => w[0]).filter(Boolean).slice(0, 2).join("").toUpperCase();
     const integration = entry.reflectionInfo?.integrationLevel || entry.reflectionInfo?.sdgLinkHonesty;
@@ -143,7 +145,7 @@ export default function CourseworkCard({
                         e.stopPropagation();
                         setOpen((o) => !o);
                     }}
-                    className="ciel-transition mt-4 flex w-full items-center justify-center gap-2 rounded-ciel-sm border border-ciel-border py-2.5 text-xs font-bold text-ciel-text-mid hover:border-ciel-green/40 hover:text-ciel-navy"
+                    className="ciel-transition mt-4 flex w-full items-center justify-center gap-2 rounded-ciel-sm border border-ciel-border py-2.5 text-xs font-bold text-ciel-text-mid hover:border-ciel-gold/40 hover:text-ciel-navy"
                 >
                     <span>📖</span>
                     <span>{open ? "Close" : "View all — summary of every section"}</span>

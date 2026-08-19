@@ -64,7 +64,7 @@ export default function FacultyCourseworkProjectsPage() {
                         type="button"
                         onClick={() => setShowMeritModel((v) => !v)}
                         disabled={!entries.length}
-                        className="ciel-transition inline-flex shrink-0 items-center gap-2 rounded-xl bg-ciel-indigo px-5 py-2.5 text-sm font-bold text-white hover:bg-ciel-indigo/90 disabled:opacity-50"
+                        className="ciel-transition inline-flex shrink-0 items-center gap-2 rounded-xl bg-ciel-purple px-5 py-2.5 text-sm font-bold text-white hover:bg-ciel-purple/90 disabled:opacity-50"
                     >
                         🧮 {showMeritModel ? "Hide merit model" : "Merit model — rank my projects"}
                     </button>

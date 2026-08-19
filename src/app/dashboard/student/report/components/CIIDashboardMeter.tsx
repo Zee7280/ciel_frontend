@@ -19,7 +19,11 @@ export default function CIIDashboardMeter() {
                   ...calculated,
                   ...persisted,
                   totalScore: Math.round(persisted.totalScore),
-                  breakdown: calculated.breakdown,
+                  // Prefer the backend's own per-section breakdown — it's what actually produced
+                  // totalScore — falling back to the frontend heuristic per-section only when absent.
+                  breakdown: persisted.breakdown
+                      ? { ...calculated.breakdown, ...persisted.breakdown }
+                      : calculated.breakdown,
                   suggestions: persisted.suggestions ?? calculated.suggestions,
               }
             : calculated;

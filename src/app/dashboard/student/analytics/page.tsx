@@ -8,25 +8,29 @@ import UnifiedAnalyticsOverview from "@/components/analytics/UnifiedAnalyticsOve
 import { authenticatedFetch } from "@/utils/api";
 import { readStudentDashboardCache } from "@/utils/student-dashboard-fetch";
 
+type ProjectOption = { id: string; title: string | null };
+
 export default function StudentAnalyticsPage() {
+    const [projects, setProjects] = useState<ProjectOption[]>([]);
     const [projectId, setProjectId] = useState<string | null>(null);
-    const [projectTitle, setProjectTitle] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         let cancelled = false;
 
-        const applyProject = (id: string | null, title: string | null) => {
+        const applyProjects = (list: ProjectOption[]) => {
             if (cancelled) return;
-            setProjectId(id);
-            setProjectTitle(title);
+            setProjects(list);
+            setProjectId(list[0]?.id ?? null);
             setLoading(false);
         };
 
         const cached = readStudentDashboardCache();
-        const firstCached = cached?.activeProjects?.[0];
-        if (firstCached?.id) {
-            applyProject(firstCached.id, firstCached.title ?? null);
+        const cachedList = (cached?.activeProjects ?? [])
+            .filter((p) => p?.id)
+            .map((p) => ({ id: p.id, title: p.title ?? null }));
+        if (cachedList.length > 0) {
+            applyProjects(cachedList);
             return () => {
                 cancelled = true;
             };
@@ -36,15 +40,17 @@ export default function StudentAnalyticsPage() {
             try {
                 const res = await authenticatedFetch("/api/v1/student/projects", {}, { redirectToLogin: true });
                 if (!res?.ok) {
-                    applyProject(null, null);
+                    applyProjects([]);
                     return;
                 }
                 const body = await res.json().catch(() => ({}));
                 const raw = Array.isArray(body?.data) ? body.data : Array.isArray(body) ? body : [];
-                const first = raw[0] as { id?: string; title?: string } | undefined;
-                applyProject(first?.id ? String(first.id) : null, first?.title ? String(first.title) : null);
+                const list = (raw as { id?: string; title?: string }[])
+                    .filter((p) => p?.id)
+                    .map((p) => ({ id: String(p.id), title: p.title ? String(p.title) : null }));
+                applyProjects(list);
             } catch {
-                applyProject(null, null);
+                applyProjects([]);
             }
         })();
 
@@ -52,6 +58,8 @@ export default function StudentAnalyticsPage() {
             cancelled = true;
         };
     }, []);
+
+    const projectTitle = projects.find((p) => p.id === projectId)?.title ?? null;
 
     if (loading) {
         return (
@@ -69,6 +77,24 @@ export default function StudentAnalyticsPage() {
                 <p className="mt-1 text-sm text-slate-500">
                     Read-only report metrics for your active project, organized by section.
                 </p>
+                {projects.length > 1 && (
+                    <label className="mt-3 block max-w-sm">
+                        <span className="mb-1 block text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                            Project ({projects.length})
+                        </span>
+                        <select
+                            value={projectId ?? ""}
+                            onChange={(e) => setProjectId(e.target.value)}
+                            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:border-indigo-400"
+                        >
+                            {projects.map((p) => (
+                                <option key={p.id} value={p.id}>
+                                    {p.title || "Untitled project"}
+                                </option>
+                            ))}
+                        </select>
+                    </label>
+                )}
             </header>
 
             {projectId ? (

@@ -29,6 +29,19 @@
   --color-ciel-amber: #D97706;
   --color-ciel-amber-soft: #FEF3C7;
 
+  /* Coursework path accent (matches the "CIEL Coursework Sustainability & SDG Mapping" prototype's
+     own palette) — scoped to Course Project wizard/cards only, the rest of the app keeps ciel-green. */
+  --color-ciel-gold: #C98A04;
+  --color-ciel-gold-deep: #8A6003;
+  --color-ciel-gold-soft: #FDF3DD;
+  --color-ciel-teal: #0F766E;
+  --color-ciel-teal-soft: #E0F3F1;
+
+  /* Merit Model accent (matches the "CIEL Merit Model" prototype's own palette) — scoped to
+     the ranking panel only, the rest of the app keeps ciel-indigo. */
+  --color-ciel-purple: #7C3AED;
+  --color-ciel-purple-soft: #F1EAFE;
+
   --radius-ciel-xl: 28px;
   --radius-ciel-lg: 20px;
   --radius-ciel-md: 16px;

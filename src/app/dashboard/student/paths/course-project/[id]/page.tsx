@@ -17,9 +17,11 @@ import {
     type CourseProjectEntry,
     type CourseProjectModuleInclusion,
     type CourseProjectSectionSummaries,
+    type CourseProjectGroupMember,
     EMPTY_COURSE_PROJECT,
     mergeCourseProjectEntry,
     composeCourseProjectSummaries,
+    normalizeGroupMembers,
     activeSectionKeys,
     SECTION_LABELS,
 } from "@/utils/courseProjectTypes";
@@ -37,6 +39,14 @@ const STEPS = [
 
 const DEPARTMENT_OPTIONS = ["Business & Management", "Economics", "Architecture", "Design", "Fine Arts", "Media & Communication", "Computer Science", "Engineering", "Social Sciences", "Psychology", "Education", "Liberal Arts", "Natural Sciences", "Law", "Health Sciences"];
 const SEMESTER_OPTIONS = Array.from({ length: 10 }, (_, i) => `Semester ${i + 1}`);
+/** Older drafts may have saved a bare number (e.g. "5") from before this was a dropdown — match it to its option so it still shows as selected instead of appearing blank. */
+function semesterSelectValue(raw?: string): string {
+    if (!raw) return "";
+    if (SEMESTER_OPTIONS.includes(raw)) return raw;
+    const digit = raw.match(/\d+/)?.[0];
+    const canonical = digit ? `Semester ${digit}` : "";
+    return SEMESTER_OPTIONS.includes(canonical) ? canonical : "";
+}
 const TEAM_MODE_OPTIONS = ["Individual", "Pair", "Group / Team", "Whole class", "Interdisciplinary team"];
 const COURSEWORK_TYPE_OPTIONS = ["Assignment", "Semester project", "Research task", "Case study", "Studio / design project", "Practical / lab work", "Field-based work", "Presentation", "Creative production", "Campaign / activity", "Digital / software project", "Performance / exhibition", "Other"];
 
@@ -93,7 +103,7 @@ const EVIDENCE_STATUS: { emoji: string; label: string }[] = [
 const NUMBER_REPRESENTS_OPTIONS = ["Baseline", "Target", "Estimated / projected", "Actual measured result"];
 const NEXT_STEP_OPTIONS = ["Completed as coursework", "Could be developed further", "Further research recommended", "Could be tested / piloted", "Recommended for implementation", "Share with external stakeholder", "Continued in another course", "Already taken forward", "Other"];
 
-const fieldClass = "w-full rounded-ciel-sm border-2 border-ciel-border bg-ciel-page/50 px-4 py-3 text-sm font-semibold text-ciel-text outline-none focus:border-ciel-green focus:bg-white focus-visible:ring-2 focus-visible:ring-ciel-green";
+const fieldClass = "w-full rounded-ciel-sm border-2 border-ciel-border bg-ciel-page/50 px-4 py-3 text-sm font-semibold text-ciel-text outline-none focus:border-ciel-gold focus:bg-white focus-visible:ring-2 focus-visible:ring-ciel-gold";
 const labelClass = "text-xs font-bold uppercase tracking-widest text-ciel-text-soft";
 
 function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
@@ -116,7 +126,7 @@ function ChipSingle({ options, value, onChange }: { options: string[]; value?: s
                     onClick={() => onChange(opt)}
                     className={clsx(
                         "ciel-transition rounded-full border-2 px-3.5 py-2 text-xs font-bold",
-                        value === opt ? "border-ciel-green bg-ciel-green-soft text-ciel-green-deep" : "border-ciel-border text-ciel-text-mid hover:border-ciel-green/40",
+                        value === opt ? "border-ciel-gold bg-ciel-gold-soft text-ciel-gold-deep" : "border-ciel-border text-ciel-text-mid hover:border-ciel-gold/40",
                     )}
                 >
                     {opt}
@@ -155,7 +165,7 @@ function ChipGroup({
                             onClick={() => onToggle(opt)}
                             className={clsx(
                                 "ciel-transition rounded-full border-2 px-3.5 py-2 text-xs font-bold",
-                                isSel ? "border-ciel-green bg-ciel-green-soft text-ciel-green-deep" : "border-ciel-border text-ciel-text-mid hover:border-ciel-green/40",
+                                isSel ? "border-ciel-gold bg-ciel-gold-soft text-ciel-gold-deep" : "border-ciel-border text-ciel-text-mid hover:border-ciel-gold/40",
                             )}
                         >
                             {opt}
@@ -168,7 +178,7 @@ function ChipGroup({
                         onClick={() => onOtherChange!(otherSelected ? "" : " ")}
                         className={clsx(
                             "ciel-transition rounded-full border-2 border-dashed px-3.5 py-2 text-xs font-bold",
-                            otherSelected ? "border-ciel-green bg-ciel-green-soft text-ciel-green-deep" : "border-ciel-border text-ciel-text-mid hover:border-ciel-green/40",
+                            otherSelected ? "border-ciel-gold bg-ciel-gold-soft text-ciel-gold-deep" : "border-ciel-border text-ciel-text-mid hover:border-ciel-gold/40",
                         )}
                     >
                         ＋ Other…
@@ -274,6 +284,13 @@ export default function CourseProjectWizardPage() {
         setEntry((e) => ({ ...e, [key]: { ...(e[key] as object), ...patch } }));
     };
 
+    const updateGroupMember = (i: number, patch: Partial<CourseProjectGroupMember>) => {
+        const current = normalizeGroupMembers(entry.studentInfo?.groupMembers);
+        const next = [...current];
+        next[i] = { ...(next[i] ?? { name: "" }), ...patch };
+        patchGroup("studentInfo", { groupMembers: next });
+    };
+
     const toggleFormat = (fmt: string) => {
         const cur = entry.assignmentInfo?.formats ?? (entry.assignmentInfo?.format ? [entry.assignmentInfo.format] : []);
         const next = cur.includes(fmt) ? cur.filter((x) => x !== fmt) : [...cur, fmt];
@@ -317,7 +334,7 @@ export default function CourseProjectWizardPage() {
         return (
             <div className="mx-auto max-w-xl space-y-4 py-16 text-center">
                 <p className="text-lg font-black text-ciel-text">This coursework report doesn&apos;t exist, or isn&apos;t yours.</p>
-                <Link href="/dashboard/student/paths/course-project" className="text-sm font-bold text-ciel-green-deep hover:underline">
+                <Link href="/dashboard/student/paths/course-project" className="text-sm font-bold text-ciel-gold-deep hover:underline">
                     ← Back to my coursework
                 </Link>
             </div>
@@ -345,7 +362,8 @@ export default function CourseProjectWizardPage() {
         addedNote: entry.addedNote ?? undefined,
     });
 
-    const showCard = entry.status === "submitted" && !editing;
+    const isOwner = entry.isOwner !== false;
+    const showCard = (entry.status === "submitted" && !editing) || !isOwner;
     const teamMode = entry.studentInfo?.teamMode ?? "";
     const isTeam = !!teamMode && teamMode !== "Individual";
     const primaryFormat = entry.assignmentInfo?.formats?.[0] ?? entry.assignmentInfo?.format;
@@ -371,17 +389,24 @@ export default function CourseProjectWizardPage() {
 
             {showCard ? (
                 <div className="space-y-4">
+                    {!isOwner && (
+                        <div className="rounded-ciel-sm border border-ciel-indigo-soft bg-ciel-indigo-soft/60 px-4 py-2.5 text-xs font-semibold text-ciel-indigo">
+                            👥 You&apos;re named as a team member on this report — {entry.studentInfo?.studentName || "the lead"} owns it and is the only one who can edit or submit changes.
+                        </div>
+                    )}
                     <CourseworkCard entry={entry} defaultOpen />
-                    <button
-                        type="button"
-                        onClick={() => {
-                            setStep(0);
-                            setEditing(true);
-                        }}
-                        className="ciel-transition rounded-ciel-sm border border-ciel-border px-4 py-2.5 text-sm font-bold text-ciel-text-mid hover:border-ciel-green/40"
-                    >
-                        Edit this report
-                    </button>
+                    {isOwner && (
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setStep(0);
+                                setEditing(true);
+                            }}
+                            className="ciel-transition rounded-ciel-sm border border-ciel-border px-4 py-2.5 text-sm font-bold text-ciel-text-mid hover:border-ciel-gold/40"
+                        >
+                            Edit this report
+                        </button>
+                    )}
                 </div>
             ) : null}
 
@@ -395,8 +420,8 @@ export default function CourseProjectWizardPage() {
                                 onClick={() => i <= entry.stepCompleted && setStep(i)}
                                 disabled={i > entry.stepCompleted}
                                 className={clsx(
-                                    "flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-black ciel-transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ciel-green",
-                                    i === step ? "bg-ciel-green text-white" : i < entry.stepCompleted ? "bg-ciel-green-soft text-ciel-green-deep" : "bg-ciel-page text-ciel-text-soft",
+                                    "flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-black ciel-transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ciel-gold",
+                                    i === step ? "bg-ciel-gold text-white" : i < entry.stepCompleted ? "bg-ciel-green-soft text-ciel-green-deep" : "bg-ciel-page text-ciel-text-soft",
                                 )}
                                 title={s.label}
                             >
@@ -418,6 +443,9 @@ export default function CourseProjectWizardPage() {
                             </Field>
                             <Field label="Roll no.">
                                 <input type="text" value={entry.studentInfo?.rollNumber ?? ""} onChange={(e) => patchGroup("studentInfo", { rollNumber: e.target.value })} placeholder="F2023-1234" className={fieldClass} />
+                            </Field>
+                            <Field label="Your email">
+                                <input type="email" value={entry.studentInfo?.studentEmail ?? ""} onChange={(e) => patchGroup("studentInfo", { studentEmail: e.target.value })} placeholder="you@university.edu.pk" className={fieldClass} />
                             </Field>
                             <Field label="Course name">
                                 <input type="text" value={entry.course ?? ""} onChange={(e) => setEntry((s) => ({ ...s, course: e.target.value }))} placeholder="e.g. Marketing Management" className={fieldClass} />
@@ -441,10 +469,15 @@ export default function CourseProjectWizardPage() {
                                 <SearchableSelect value={entry.studentInfo?.disciplineName ?? ""} onChange={(v) => patchGroup("studentInfo", { disciplineName: v })} options={hecPrograms} placeholder="Type your discipline" />
                             </Field>
                             <Field label="Semester">
-                                <input type="text" list="cw-semesters" value={entry.studentInfo?.semester ?? ""} onChange={(e) => patchGroup("studentInfo", { semester: e.target.value })} placeholder="e.g. Semester 5" className={fieldClass} />
-                                <datalist id="cw-semesters">
-                                    {SEMESTER_OPTIONS.map((s) => <option key={s} value={s} />)}
-                                </datalist>
+                                <div className="relative">
+                                    <select value={semesterSelectValue(entry.studentInfo?.semester)} onChange={(e) => patchGroup("studentInfo", { semester: e.target.value })} className={clsx(fieldClass, "appearance-none pr-9")}>
+                                        <option value="">Select…</option>
+                                        {SEMESTER_OPTIONS.map((s) => (
+                                            <option key={s} value={s}>{s}</option>
+                                        ))}
+                                    </select>
+                                    <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ciel-text-soft" />
+                                </div>
                             </Field>
                             <Field label="Instructor">
                                 <input type="text" value={entry.studentInfo?.teacherName ?? ""} onChange={(e) => patchGroup("studentInfo", { teacherName: e.target.value })} placeholder="Prof. Bilal Ahmed" className={fieldClass} />
@@ -456,27 +489,31 @@ export default function CourseProjectWizardPage() {
                                 <ChipSingle options={TEAM_MODE_OPTIONS} value={teamMode} onChange={(v) => patchGroup("studentInfo", { teamMode: v })} />
                             </Field>
                             {isTeam && (
-                                <Field label="👥 Team members — name everyone">
-                                    <div className="space-y-2">
-                                        {(entry.studentInfo?.groupMembers ?? [""]).map((m, i) => (
-                                            <input
-                                                key={i}
-                                                type="text"
-                                                value={m}
-                                                onChange={(e) => {
-                                                    const next = [...(entry.studentInfo?.groupMembers ?? [""])];
-                                                    next[i] = e.target.value;
-                                                    patchGroup("studentInfo", { groupMembers: next });
-                                                }}
-                                                placeholder={`Member ${i + 1} — full name`}
-                                                className={fieldClass}
-                                            />
+                                <Field label="👥 Team members — name everyone" hint="Add each member's email — once you submit, this report also appears on their own dashboard.">
+                                    <div className="space-y-3">
+                                        {(normalizeGroupMembers(entry.studentInfo?.groupMembers).length ? normalizeGroupMembers(entry.studentInfo?.groupMembers) : [{ name: "" }]).map((m, i) => (
+                                            <div key={i} className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                                                <input
+                                                    type="text"
+                                                    value={m.name}
+                                                    onChange={(e) => updateGroupMember(i, { name: e.target.value })}
+                                                    placeholder={`Member ${i + 1} — full name`}
+                                                    className={fieldClass}
+                                                />
+                                                <input
+                                                    type="email"
+                                                    value={m.email ?? ""}
+                                                    onChange={(e) => updateGroupMember(i, { email: e.target.value })}
+                                                    placeholder={`Member ${i + 1} — email`}
+                                                    className={fieldClass}
+                                                />
+                                            </div>
                                         ))}
                                         {(entry.studentInfo?.groupMembers?.length ?? 0) < 20 && (
                                             <button
                                                 type="button"
-                                                onClick={() => patchGroup("studentInfo", { groupMembers: [...(entry.studentInfo?.groupMembers ?? [""]), ""] })}
-                                                className="text-xs font-bold text-ciel-green-deep hover:underline"
+                                                onClick={() => patchGroup("studentInfo", { groupMembers: [...normalizeGroupMembers(entry.studentInfo?.groupMembers), { name: "" }] })}
+                                                className="text-xs font-bold text-ciel-gold-deep hover:underline"
                                             >
                                                 + Add another member
                                             </button>
@@ -512,7 +549,7 @@ export default function CourseProjectWizardPage() {
                                 />
                             </Field>
                             {formatMeta && (
-                                <div className="rounded-ciel-sm border-2 border-ciel-green/30 bg-ciel-green-soft/50 px-4 py-3 text-xs font-semibold leading-relaxed text-ciel-green-deep">
+                                <div className="rounded-ciel-sm border-2 border-ciel-indigo/30 bg-ciel-indigo-soft/50 px-4 py-3 text-xs font-semibold leading-relaxed text-ciel-indigo">
                                     🧬 <b>{primaryFormat}</b> detected — we&apos;ll walk you through: <b>{formatMeta.note}</b> Adjust the tiles below if your work differs.
                                 </div>
                             )}
@@ -525,7 +562,7 @@ export default function CourseProjectWizardPage() {
                                             onClick={() => setEntry((e) => ({ ...e, moduleInclusion: { ...e.moduleInclusion, [t.key]: !e.moduleInclusion?.[t.key] } }))}
                                             className={clsx(
                                                 "ciel-transition flex items-center gap-2 rounded-ciel-sm border-2 px-3 py-2.5 text-xs font-bold",
-                                                inc[t.key] ? "border-ciel-green bg-ciel-green-soft text-ciel-green-deep" : "border-ciel-border text-ciel-text-mid",
+                                                inc[t.key] ? "border-ciel-teal bg-ciel-teal-soft text-ciel-teal" : "border-ciel-border text-ciel-text-mid",
                                             )}
                                         >
                                             <span>{t.emoji}</span> {t.label}
@@ -568,7 +605,7 @@ export default function CourseProjectWizardPage() {
                                             />
                                         ))}
                                         {(entry.aimsInfo?.objectives?.length ?? 0) < 8 && (
-                                            <button type="button" onClick={() => patchGroup("aimsInfo", { objectives: [...(entry.aimsInfo?.objectives ?? [""]), ""] })} className="text-xs font-bold text-ciel-green-deep hover:underline">
+                                            <button type="button" onClick={() => patchGroup("aimsInfo", { objectives: [...(entry.aimsInfo?.objectives ?? [""]), ""] })} className="text-xs font-bold text-ciel-gold-deep hover:underline">
                                                 + Add another objective
                                             </button>
                                         )}
@@ -696,7 +733,7 @@ export default function CourseProjectWizardPage() {
                                             />
                                         ))}
                                         {(entry.resultsInfo?.findings?.length ?? 0) < 5 && (
-                                            <button type="button" onClick={() => patchGroup("resultsInfo", { findings: [...(entry.resultsInfo?.findings ?? [""]), ""] })} className="text-xs font-bold text-ciel-green-deep hover:underline">
+                                            <button type="button" onClick={() => patchGroup("resultsInfo", { findings: [...(entry.resultsInfo?.findings ?? [""]), ""] })} className="text-xs font-bold text-ciel-gold-deep hover:underline">
                                                 + Add another finding
                                             </button>
                                         )}
@@ -714,7 +751,7 @@ export default function CourseProjectWizardPage() {
                                                     onClick={() => patchGroup("resultsInfo", { evidenceStatus: ev.label })}
                                                     className={clsx(
                                                         "ciel-transition flex flex-col items-center gap-1 rounded-ciel-sm border-2 px-3 py-3 text-center",
-                                                        entry.resultsInfo?.evidenceStatus === ev.label ? "border-ciel-green bg-ciel-green-soft" : "border-ciel-border",
+                                                        entry.resultsInfo?.evidenceStatus === ev.label ? "border-ciel-teal bg-ciel-teal-soft" : "border-ciel-border",
                                                     )}
                                                 >
                                                     <span className="text-lg">{ev.emoji}</span>
@@ -801,7 +838,7 @@ export default function CourseProjectWizardPage() {
                     {step === 7 && (
                         <div className="space-y-5">
                             <Field label="Evidence (screenshots, deliverables, photos)">
-                                <label className={clsx("ciel-transition flex cursor-pointer items-center gap-3 rounded-ciel-sm border-2 border-dashed border-ciel-border px-4 py-3 text-sm font-semibold text-ciel-text-mid hover:border-ciel-green/40", uploading && "opacity-60")}>
+                                <label className={clsx("ciel-transition flex cursor-pointer items-center gap-3 rounded-ciel-sm border-2 border-dashed border-ciel-border px-4 py-3 text-sm font-semibold text-ciel-text-mid hover:border-ciel-gold/40", uploading && "opacity-60")}>
                                     <UploadCloud className="h-4 w-4" />
                                     {uploading ? "Uploading..." : "Upload evidence (screenshots, deliverables, photos)"}
                                     <input type="file" accept="image/*,application/pdf" className="hidden" onChange={(e) => e.target.files?.[0] && handleEvidenceFile(e.target.files[0])} />
@@ -827,7 +864,7 @@ export default function CourseProjectWizardPage() {
                             <div className="space-y-3">
                                 <div className="flex items-center justify-between gap-3">
                                     <h3 className="text-sm font-black text-ciel-text">✨ Review your baseline summary</h3>
-                                    <button type="button" onClick={regenerateAllReview} className="ciel-transition shrink-0 rounded-ciel-xs border border-ciel-border px-3 py-1.5 text-xs font-bold text-ciel-text-mid hover:border-ciel-green/40">
+                                    <button type="button" onClick={regenerateAllReview} className="ciel-transition shrink-0 rounded-ciel-xs border border-ciel-border px-3 py-1.5 text-xs font-bold text-ciel-text-mid hover:border-ciel-gold/40">
                                         ↻ Regenerate all
                                     </button>
                                 </div>
@@ -857,7 +894,7 @@ export default function CourseProjectWizardPage() {
                                                 value={r.text}
                                                 onChange={(e) => setReview((prev) => ({ ...prev, [key]: { ...r, text: e.target.value, edited: true, accepted: false } }))}
                                                 placeholder="Nothing captured — go back and fill it in, or type here."
-                                                className="w-full resize-none bg-white p-4 text-sm leading-relaxed text-ciel-text outline-none focus-visible:ring-2 focus-visible:ring-ciel-green"
+                                                className="w-full resize-none bg-white p-4 text-sm leading-relaxed text-ciel-text outline-none focus-visible:ring-2 focus-visible:ring-ciel-gold"
                                             />
                                             <div className="flex gap-2 border-t border-ciel-border bg-white px-4 py-2.5">
                                                 <button
@@ -873,7 +910,7 @@ export default function CourseProjectWizardPage() {
                                                 <button
                                                     type="button"
                                                     onClick={() => setReview((prev) => ({ ...prev, [key]: { accepted: false, edited: false, text: sums[key] || "" } }))}
-                                                    className="ciel-transition rounded-ciel-xs border-2 border-ciel-border px-3 py-1.5 text-xs font-bold text-ciel-text-mid hover:border-ciel-green/40"
+                                                    className="ciel-transition rounded-ciel-xs border-2 border-ciel-border px-3 py-1.5 text-xs font-bold text-ciel-text-mid hover:border-ciel-gold/40"
                                                 >
                                                     ↻ Reset to AI version
                                                 </button>
@@ -894,7 +931,7 @@ export default function CourseProjectWizardPage() {
                         type="button"
                         disabled={step === 0}
                         onClick={() => setStep((s) => Math.max(0, s - 1))}
-                        className="ciel-transition rounded-ciel-sm border border-ciel-border px-4 py-2.5 text-sm font-bold text-ciel-text-mid hover:border-ciel-green/40 disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ciel-green"
+                        className="ciel-transition rounded-ciel-sm border border-ciel-border px-4 py-2.5 text-sm font-bold text-ciel-text-mid hover:border-ciel-gold/40 disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ciel-gold"
                     >
                         Back
                     </button>
@@ -904,7 +941,7 @@ export default function CourseProjectWizardPage() {
                                 type="button"
                                 disabled={saving}
                                 onClick={() => save(saveAllFields(), step + 1)}
-                                className="ciel-transition rounded-ciel-sm bg-ciel-navy px-5 py-2.5 text-sm font-bold text-white hover:bg-ciel-navy/90 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ciel-green focus-visible:ring-offset-2"
+                                className="ciel-transition rounded-ciel-sm bg-ciel-navy px-5 py-2.5 text-sm font-bold text-white hover:bg-ciel-navy/90 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ciel-gold focus-visible:ring-offset-2"
                             >
                                 {saving ? "Saving..." : "Save & continue"}
                             </button>
@@ -917,7 +954,7 @@ export default function CourseProjectWizardPage() {
                                     await save({ ...saveAllFields(), status: "submitted", sectionSummaries: finalSectionSummaries() }, 8);
                                     router.push("/dashboard/student/paths/course-project");
                                 }}
-                                className="ciel-transition rounded-ciel-sm bg-ciel-green-deep px-5 py-2.5 text-sm font-bold text-white hover:bg-ciel-green-deep/90 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ciel-green focus-visible:ring-offset-2"
+                                className="ciel-transition rounded-ciel-sm bg-ciel-gold px-5 py-2.5 text-sm font-bold text-white hover:bg-ciel-gold/90 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ciel-gold focus-visible:ring-offset-2"
                             >
                                 {saving ? "Submitting..." : "Submit project"}
                             </button>
@@ -1043,7 +1080,7 @@ function SdgStep({
                                                     onClick={() => toggleTarget(p.goalNumber, t.id)}
                                                     className={clsx(
                                                         "ciel-transition rounded-full border-2 px-3 py-1.5 text-left text-[11px] font-bold",
-                                                        p.targets.includes(t.id) ? "border-ciel-green bg-ciel-green-soft text-ciel-green-deep" : "border-ciel-border text-ciel-text-mid hover:border-ciel-green/40",
+                                                        p.targets.includes(t.id) ? "border-ciel-gold bg-ciel-gold-soft text-ciel-gold-deep" : "border-ciel-border text-ciel-text-mid hover:border-ciel-gold/40",
                                                     )}
                                                     title={t.description}
                                                 >
@@ -1062,7 +1099,7 @@ function SdgStep({
                                                     onClick={() => setStrength(p.goalNumber, s)}
                                                     className={clsx(
                                                         "ciel-transition rounded-full border-2 px-3.5 py-1.5 text-xs font-bold",
-                                                        (p.strength || (i === 0 ? "Direct" : "Supporting")) === s ? "border-ciel-green bg-ciel-green-soft text-ciel-green-deep" : "border-ciel-border text-ciel-text-mid hover:border-ciel-green/40",
+                                                        (p.strength || (i === 0 ? "Direct" : "Supporting")) === s ? "border-ciel-gold bg-ciel-gold-soft text-ciel-gold-deep" : "border-ciel-border text-ciel-text-mid hover:border-ciel-gold/40",
                                                     )}
                                                 >
                                                     {s}
