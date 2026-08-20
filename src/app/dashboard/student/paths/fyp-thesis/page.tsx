@@ -69,7 +69,7 @@ const SKILL_OPTIONS = ["🔬 Research & analysis", "🧩 Problem-solving", "🛠
 const NEXT_OPTIONS = ["Publication attempt", "Industry could take it forward", "I may build a startup on it", "Next year's students continue it", "It ends here — and that's okay"];
 const VISIBILITY_OPTIONS = ["🎓 Portfolio + university repository", "🌐 Public — open access", "🔒 Restricted — supervisor & examiners"];
 
-const fieldClass = "w-full rounded-ciel-sm border-2 border-ciel-border bg-ciel-page/50 px-4 py-3 text-sm font-semibold text-ciel-text outline-none focus:border-ciel-green focus:bg-white focus-visible:ring-2 focus-visible:ring-ciel-green";
+const fieldClass = "w-full rounded-ciel-sm border-2 border-ciel-border bg-ciel-page/50 px-4 py-3 text-sm font-semibold text-ciel-text outline-none focus:border-ciel-purple focus:bg-white focus-visible:ring-2 focus-visible:ring-ciel-purple";
 const labelClass = "text-xs font-bold uppercase tracking-widest text-ciel-text-soft";
 
 function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
@@ -113,7 +113,7 @@ function ChipGroup({
                             onClick={() => onToggle(opt)}
                             className={clsx(
                                 "ciel-transition rounded-full border-2 px-3.5 py-2 text-xs font-bold",
-                                isSel ? "border-ciel-green bg-ciel-green-soft text-ciel-green-deep" : "border-ciel-border text-ciel-text-mid hover:border-ciel-green/40",
+                                isSel ? "border-ciel-purple bg-ciel-purple-soft text-ciel-purple-deep" : "border-ciel-border text-ciel-text-mid hover:border-ciel-purple/40",
                             )}
                         >
                             {opt}
@@ -126,7 +126,7 @@ function ChipGroup({
                         onClick={() => onOtherChange!(otherSelected ? "" : " ")}
                         className={clsx(
                             "ciel-transition rounded-full border-2 border-dashed px-3.5 py-2 text-xs font-bold",
-                            otherSelected ? "border-ciel-green bg-ciel-green-soft text-ciel-green-deep" : "border-ciel-border text-ciel-text-mid hover:border-ciel-green/40",
+                            otherSelected ? "border-ciel-purple bg-ciel-purple-soft text-ciel-purple-deep" : "border-ciel-border text-ciel-text-mid hover:border-ciel-purple/40",
                         )}
                     >
                         ＋ Other…
@@ -163,6 +163,8 @@ export default function FypThesisPage() {
     const stashedSdgEntriesRef = useRef<FypSdgEntry[]>([]);
     const [expandedDeliverableLabel, setExpandedDeliverableLabel] = useState<string | null>(null);
     const [aiSdgOpen, setAiSdgOpen] = useState(false);
+    const [declarations, setDeclarations] = useState<[boolean, boolean]>([false, false]);
+    const declarationsOk = declarations.every(Boolean);
 
     useEffect(() => {
         authenticatedFetch("/api/v1/paths/fyp-thesis", {}, { redirectToLogin: false })
@@ -344,7 +346,7 @@ export default function FypThesisPage() {
                                 setStep(0);
                                 setEditing(true);
                             }}
-                            className="ciel-transition rounded-ciel-sm border border-ciel-border px-4 py-2.5 text-sm font-bold text-ciel-text-mid hover:border-ciel-green/40"
+                            className="ciel-transition rounded-ciel-sm border border-ciel-border px-4 py-2.5 text-sm font-bold text-ciel-text-mid hover:border-ciel-purple/40"
                         >
                             Edit this record
                         </button>
@@ -385,7 +387,7 @@ export default function FypThesisPage() {
                                 />
                             </Field>
                             {entry.projectInfo?.projectType && (
-                                <div className="rounded-ciel-sm border-2 border-ciel-indigo/30 bg-ciel-indigo-soft/50 px-4 py-3 text-xs font-semibold leading-relaxed text-ciel-indigo">
+                                <div className="rounded-ciel-sm border-2 border-ciel-purple/30 bg-ciel-purple-soft/50 px-4 py-3 text-xs font-semibold leading-relaxed text-ciel-purple-deep">
                                     🧭 {routeMode.note} Same eight sections for every school — only the language changes, so your work stays comparable university-wide.
                                 </div>
                             )}
@@ -454,7 +456,7 @@ export default function FypThesisPage() {
                                         <button
                                             type="button"
                                             onClick={() => patchGroup("projectInfo", { teamMembers: [...normalizeFypTeamMembers(entry.projectInfo?.teamMembers), { name: "" }] })}
-                                            className="text-xs font-bold text-ciel-green-deep hover:underline"
+                                            className="text-xs font-bold text-ciel-purple-deep hover:underline"
                                         >
                                             + Add co-author → sends invitation
                                         </button>
@@ -542,7 +544,7 @@ export default function FypThesisPage() {
                                 <button
                                     type="button"
                                     onClick={() => patchGroup("objectivesInfo", { objectives: [...(entry.objectivesInfo?.objectives?.length ? entry.objectivesInfo.objectives : [""]), ""] })}
-                                    className="text-xs font-bold text-ciel-green-deep hover:underline"
+                                    className="text-xs font-bold text-ciel-purple-deep hover:underline"
                                 >
                                     + Add another objective
                                 </button>
@@ -650,7 +652,7 @@ export default function FypThesisPage() {
                                     <button
                                         type="button"
                                         onClick={() => patchGroup("findings", { findings: [...(entry.findings?.findings?.length ? entry.findings.findings : [""]), ""] })}
-                                        className="text-xs font-bold text-ciel-green-deep hover:underline"
+                                        className="text-xs font-bold text-ciel-purple-deep hover:underline"
                                     >
                                         + Add another finding
                                     </button>
@@ -717,20 +719,24 @@ export default function FypThesisPage() {
 
                             <Field label="What evidence supports your strongest claim?" hint="Choose one — honesty scores higher.">
                                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                                    {FYP_EVIDENCE_STATUS.map((ev) => (
+                                    {FYP_EVIDENCE_STATUS.map((ev) => {
+                                        const isSel = entry.findings?.evidenceStatus === ev.label;
+                                        return (
                                         <button
                                             key={ev.label}
                                             type="button"
                                             onClick={() => patchGroup("findings", { evidenceStatus: ev.label })}
+                                            style={isSel ? { borderColor: ev.color, backgroundColor: ev.bg } : undefined}
                                             className={clsx(
                                                 "ciel-transition flex flex-col items-center gap-1 rounded-ciel-sm border-2 px-3 py-3 text-center",
-                                                entry.findings?.evidenceStatus === ev.label ? "border-ciel-green bg-ciel-green-soft" : "border-ciel-border",
+                                                !isSel && "border-ciel-border",
                                             )}
                                         >
                                             <span className="text-lg">{ev.emoji}</span>
-                                            <span className="text-[10px] font-bold leading-tight text-ciel-text-mid">{ev.label}</span>
+                                            <span className="text-[10px] font-bold leading-tight" style={isSel ? { color: ev.color } : undefined}>{ev.label}</span>
                                         </button>
-                                    ))}
+                                        );
+                                    })}
                                 </div>
                             </Field>
                             {entry.findings?.evidenceStatus && /measured|estimated/i.test(entry.findings.evidenceStatus) && (
@@ -779,7 +785,7 @@ export default function FypThesisPage() {
                                 <button
                                     type="button"
                                     onClick={() => setAiSdgOpen(true)}
-                                    className="ciel-transition rounded-ciel-sm bg-ciel-indigo px-4 py-2.5 text-xs font-bold text-white hover:bg-ciel-indigo/90"
+                                    className="ciel-transition rounded-ciel-sm bg-ciel-purple px-4 py-2.5 text-xs font-bold text-white hover:bg-ciel-purple/90"
                                 >
                                     🤖 Not sure? Let AI read my answers &amp; suggest SDGs
                                 </button>
@@ -861,7 +867,7 @@ export default function FypThesisPage() {
                                                                 onClick={() => toggleTarget(p.goalNumber, t.id)}
                                                                 className={clsx(
                                                                     "ciel-transition rounded-ciel-xs border-2 px-2.5 py-1.5 text-left text-xs font-semibold",
-                                                                    p.targets.includes(t.id) ? "border-ciel-green bg-ciel-green-soft text-ciel-green-deep" : "border-ciel-border text-ciel-text-mid hover:border-ciel-green/40",
+                                                                    p.targets.includes(t.id) ? "border-ciel-purple bg-ciel-purple-soft text-ciel-purple-deep" : "border-ciel-border text-ciel-text-mid hover:border-ciel-purple/40",
                                                                 )}
                                                             >
                                                                 <span className="font-black">{t.id}</span> {t.description}
@@ -947,14 +953,14 @@ export default function FypThesisPage() {
                     {step === 8 && (
                         <div className="space-y-5">
                             <Field label="Full thesis / report (PDF) — required">
-                                <label className={clsx("ciel-transition flex cursor-pointer items-center gap-3 rounded-ciel-sm border-2 border-dashed px-4 py-3 text-sm font-semibold hover:border-ciel-green/40", hasThesisPdf ? "border-ciel-green bg-ciel-green-soft text-ciel-green-deep" : "border-ciel-border text-ciel-text-mid", uploading === "Full thesis (PDF)" && "opacity-60")}>
+                                <label className={clsx("ciel-transition flex cursor-pointer items-center gap-3 rounded-ciel-sm border-2 border-dashed px-4 py-3 text-sm font-semibold hover:border-ciel-purple/40", hasThesisPdf ? "border-ciel-green bg-ciel-green-soft text-ciel-green-deep" : "border-ciel-border text-ciel-text-mid", uploading === "Full thesis (PDF)" && "opacity-60")}>
                                     <UploadCloud className="h-4 w-4" />
                                     {uploading === "Full thesis (PDF)" ? "Uploading..." : hasThesisPdf ? "✅ Thesis uploaded — click to replace" : "Upload full thesis (PDF)"}
                                     <input type="file" accept="application/pdf" className="hidden" onChange={(e) => e.target.files?.[0] && handleDeliverableFile(e.target.files[0], "Full thesis (PDF)")} />
                                 </label>
                             </Field>
                             <Field label="Supplementary evidence (optional)" hint="Data, photos, poster, slides…">
-                                <label className={clsx("ciel-transition flex cursor-pointer items-center gap-3 rounded-ciel-sm border-2 border-dashed border-ciel-border px-4 py-3 text-sm font-semibold text-ciel-text-mid hover:border-ciel-green/40", uploading === "Supplementary evidence" && "opacity-60")}>
+                                <label className={clsx("ciel-transition flex cursor-pointer items-center gap-3 rounded-ciel-sm border-2 border-dashed border-ciel-border px-4 py-3 text-sm font-semibold text-ciel-text-mid hover:border-ciel-purple/40", uploading === "Supplementary evidence" && "opacity-60")}>
                                     <UploadCloud className="h-4 w-4" />
                                     {uploading === "Supplementary evidence" ? "Uploading..." : "Upload supplementary evidence"}
                                     <input type="file" className="hidden" onChange={(e) => e.target.files?.[0] && handleDeliverableFile(e.target.files[0], "Supplementary evidence")} />
@@ -998,10 +1004,33 @@ export default function FypThesisPage() {
                                 </Field>
                             </div>
 
+                            <Field label="Declarations">
+                                <div className="space-y-2">
+                                    {[
+                                        "This record accurately represents our work; findings are stated as found, not improved.",
+                                        "All co-authors are named above and consent to institutional review.",
+                                    ].map((text, i) => (
+                                        <label key={i} className="flex cursor-pointer items-start gap-3 rounded-ciel-sm border border-ciel-border bg-white px-4 py-3 text-sm leading-relaxed text-ciel-text">
+                                            <input
+                                                type="checkbox"
+                                                checked={declarations[i]}
+                                                onChange={(e) => setDeclarations((d) => (i === 0 ? [e.target.checked, d[1]] : [d[0], e.target.checked]))}
+                                                className="mt-0.5 h-4 w-4 shrink-0 accent-ciel-purple"
+                                            />
+                                            <span>{text}</span>
+                                        </label>
+                                    ))}
+                                </div>
+                            </Field>
+
+                            <div className="rounded-ciel-sm border border-ciel-indigo-soft bg-ciel-indigo-soft/60 px-4 py-3 text-xs leading-relaxed text-ciel-indigo">
+                                🏛️ <b>Institutional review notice:</b> authorised faculty and reviewers may access this record for assessment, quality assurance and verification. Review is not publication — showcase and public visibility are separate, later, and consent-based.
+                            </div>
+
                             <div className="space-y-3 border-t border-ciel-border pt-5">
                                 <div className="flex items-center justify-between gap-3">
                                     <h3 className="text-sm font-black text-ciel-text">✨ Review your baseline summary</h3>
-                                    <button type="button" onClick={regenerateAllReview} className="ciel-transition shrink-0 rounded-ciel-xs border border-ciel-border px-3 py-1.5 text-xs font-bold text-ciel-text-mid hover:border-ciel-green/40">
+                                    <button type="button" onClick={regenerateAllReview} className="ciel-transition shrink-0 rounded-ciel-xs border border-ciel-border px-3 py-1.5 text-xs font-bold text-ciel-text-mid hover:border-ciel-purple/40">
                                         ↻ Regenerate all
                                     </button>
                                 </div>
@@ -1030,7 +1059,7 @@ export default function FypThesisPage() {
                                                 value={r.text}
                                                 onChange={(e) => setReview((prev) => ({ ...prev, [key]: { ...r, text: e.target.value, edited: true, accepted: false } }))}
                                                 placeholder="Nothing captured — go back and fill it in, or type here."
-                                                className="w-full resize-none bg-white p-4 text-sm leading-relaxed text-ciel-text outline-none focus-visible:ring-2 focus-visible:ring-ciel-green"
+                                                className="w-full resize-none bg-white p-4 text-sm leading-relaxed text-ciel-text outline-none focus-visible:ring-2 focus-visible:ring-ciel-purple"
                                             />
                                             <div className="flex gap-2 border-t border-ciel-border bg-white px-4 py-2.5">
                                                 <button
@@ -1043,7 +1072,7 @@ export default function FypThesisPage() {
                                                 <button
                                                     type="button"
                                                     onClick={() => setReview((prev) => ({ ...prev, [key]: { accepted: false, edited: false, text: sums[key] || "" } }))}
-                                                    className="ciel-transition rounded-ciel-xs border-2 border-ciel-border px-3 py-1.5 text-xs font-bold text-ciel-text-mid hover:border-ciel-green/40"
+                                                    className="ciel-transition rounded-ciel-xs border-2 border-ciel-border px-3 py-1.5 text-xs font-bold text-ciel-text-mid hover:border-ciel-purple/40"
                                                 >
                                                     ↻ Reset
                                                 </button>
@@ -1068,7 +1097,7 @@ export default function FypThesisPage() {
                         type="button"
                         disabled={step === 0}
                         onClick={() => setStep((s) => Math.max(0, s - 1))}
-                        className="ciel-transition rounded-ciel-sm border border-ciel-border px-4 py-2.5 text-sm font-bold text-ciel-text-mid hover:border-ciel-green/40 disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ciel-green"
+                        className="ciel-transition rounded-ciel-sm border border-ciel-border px-4 py-2.5 text-sm font-bold text-ciel-text-mid hover:border-ciel-purple/40 disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ciel-purple"
                     >
                         Back
                     </button>
@@ -1078,20 +1107,20 @@ export default function FypThesisPage() {
                                 type="button"
                                 disabled={saving}
                                 onClick={() => save(saveAllFields(), step + 1)}
-                                className="ciel-transition rounded-ciel-sm bg-ciel-navy px-5 py-2.5 text-sm font-bold text-white hover:bg-ciel-navy/90 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ciel-green focus-visible:ring-offset-2"
+                                className="ciel-transition rounded-ciel-sm bg-ciel-navy px-5 py-2.5 text-sm font-bold text-white hover:bg-ciel-navy/90 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ciel-purple focus-visible:ring-offset-2"
                             >
                                 {saving ? "Saving..." : "Save & continue"}
                             </button>
                         ) : (
                             <button
                                 type="button"
-                                disabled={saving || !allAccepted || !hasThesisPdf}
-                                title={!hasThesisPdf ? "Upload your full thesis PDF first" : !allAccepted ? "Accept every section above first" : undefined}
+                                disabled={saving || !allAccepted || !hasThesisPdf || !declarationsOk}
+                                title={!hasThesisPdf ? "Upload your full thesis PDF first" : !allAccepted ? "Accept every section above first" : !declarationsOk ? "Confirm both declarations first" : undefined}
                                 onClick={async () => {
                                     const ok = await save({ ...saveAllFields(), status: "submitted", sectionSummaries: finalSectionSummaries() }, 9);
                                     if (ok) setEditing(false);
                                 }}
-                                className="ciel-transition rounded-ciel-sm bg-ciel-green-deep px-5 py-2.5 text-sm font-bold text-white hover:bg-ciel-green-deep/90 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ciel-green focus-visible:ring-offset-2"
+                                className="ciel-transition rounded-ciel-sm bg-ciel-purple px-5 py-2.5 text-sm font-bold text-white hover:bg-ciel-purple/90 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ciel-purple focus-visible:ring-offset-2"
                             >
                                 {saving ? "Sending..." : "Send to supervisor for sign-off →"}
                             </button>

@@ -50,7 +50,7 @@ export default function ThesisCard({
             <div className="border-b border-ciel-border bg-ciel-page/60 p-5">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="flex min-w-0 items-start gap-3">
-                        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-ciel-sm bg-ciel-navy text-lg text-white">
+                        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-ciel-sm bg-ciel-purple-deep text-lg text-white">
                             {ROUTE_EMOJI[route]}
                         </span>
                         <div className="min-w-0">
@@ -104,7 +104,7 @@ export default function ThesisCard({
                     </p>
                 ) : null}
                 <div className="mt-3 flex flex-wrap gap-2">
-                    <span className="inline-flex items-center gap-1 rounded-full bg-ciel-indigo-soft px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-ciel-indigo">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-ciel-purple-soft px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-ciel-purple-deep">
                         {FYP_MODES[route].name}
                     </span>
                     {find.evidenceStatus ? (
@@ -131,7 +131,7 @@ export default function ThesisCard({
                         e.stopPropagation();
                         setOpen((o) => !o);
                     }}
-                    className="ciel-transition mt-4 flex w-full items-center justify-center gap-2 rounded-ciel-sm border border-ciel-border py-2.5 text-xs font-bold text-ciel-text-mid hover:border-ciel-green/40 hover:text-ciel-navy"
+                    className="ciel-transition mt-4 flex w-full items-center justify-center gap-2 rounded-ciel-sm border border-ciel-border py-2.5 text-xs font-bold text-ciel-text-mid hover:border-ciel-purple/40 hover:text-ciel-purple-deep"
                 >
                     <span>📖</span>
                     <span>{open ? "Close" : "View all — the whole thesis, summarised"}</span>

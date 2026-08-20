@@ -294,14 +294,14 @@ export function fypRouteFor(projectType?: string): FypRoute {
 // Evidence ladder — mirrors Course Project's resultsInfo.evidenceStatus
 // ---------------------------------------------------------------------------
 
-export const FYP_EVIDENCE_STATUS: { emoji: string; label: string }[] = [
-    { emoji: "🔬", label: "Measured / tested result" },
-    { emoji: "📝", label: "Qualitative evidence" },
-    { emoji: "🖼️", label: "The work itself is the evidence" },
-    { emoji: "📈", label: "Estimated / projected" },
-    { emoji: "💡", label: "Conceptual / proposed" },
-    { emoji: "⏳", label: "Not measured yet" },
-    { emoji: "➖", label: "Not applicable" },
+export const FYP_EVIDENCE_STATUS: { emoji: string; label: string; color: string; bg: string }[] = [
+    { emoji: "🔬", label: "Measured / tested result", color: "#16a34a", bg: "#e8f8ee" },
+    { emoji: "📝", label: "Qualitative evidence", color: "#0f766e", bg: "#e0f3f1" },
+    { emoji: "🖼️", label: "The work itself is the evidence", color: "#7c3aed", bg: "#f1eafe" },
+    { emoji: "📈", label: "Estimated / projected", color: "#2563eb", bg: "#e8effe" },
+    { emoji: "💡", label: "Conceptual / proposed", color: "#c98a04", bg: "#fdf3dd" },
+    { emoji: "⏳", label: "Not measured yet", color: "#7a8095", bg: "#f1f2f7" },
+    { emoji: "➖", label: "Not applicable", color: "#7a8095", bg: "#f1f2f7" },
 ];
 
 // ---------------------------------------------------------------------------

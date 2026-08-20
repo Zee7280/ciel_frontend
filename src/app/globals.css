@@ -37,9 +37,11 @@
   --color-ciel-teal: #0F766E;
   --color-ciel-teal-soft: #E0F3F1;
 
-  /* Merit Model accent (matches the "CIEL Merit Model" prototype's own palette) — scoped to
-     the ranking panel only, the rest of the app keeps ciel-indigo. */
+  /* Merit Model / FYP path accent (matches the "CIEL Merit Model" and "FYP / Thesis Record"
+     prototypes' own palette) — scoped to the ranking panel + FYP wizard, the rest of the app
+     keeps ciel-indigo. */
   --color-ciel-purple: #7C3AED;
+  --color-ciel-purple-deep: #2A1454;
   --color-ciel-purple-soft: #F1EAFE;
 
   --radius-ciel-xl: 28px;
