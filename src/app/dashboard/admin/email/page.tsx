@@ -225,7 +225,7 @@ export default function AdminEmailPage() {
                                                 {recipients.map((r) => (
                                                     <span
                                                         key={r.toLowerCase()}
-                                                        className="inline-flex items-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-sm font-medium text-indigo-700"
+                                                        className="inline-flex max-w-full items-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-sm font-medium text-indigo-700 break-all"
                                                     >
                                                         {r}
                                                         <button 

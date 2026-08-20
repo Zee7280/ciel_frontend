@@ -596,7 +596,7 @@ export default function ReportDetailPage() {
                                         type="button"
                                         onClick={() => handleVerify('approve')}
                                         disabled={isVerifying}
-                                        className="rounded-xl bg-emerald-500 px-3 py-3 text-xs font-black uppercase tracking-wide text-white transition hover:bg-emerald-400 disabled:opacity-50"
+                                        className="rounded-xl bg-emerald-500 px-3 py-3.5 text-xs font-black uppercase tracking-wide text-white transition hover:bg-emerald-400 disabled:opacity-50"
                                     >
                                         Approve
                                     </button>
@@ -604,7 +604,7 @@ export default function ReportDetailPage() {
                                         type="button"
                                         onClick={() => handleVerify('reject')}
                                         disabled={isVerifying}
-                                        className="rounded-xl bg-red-500 px-3 py-3 text-xs font-black uppercase tracking-wide text-white transition hover:bg-red-400 disabled:opacity-50"
+                                        className="rounded-xl bg-red-500 px-3 py-3.5 text-xs font-black uppercase tracking-wide text-white transition hover:bg-red-400 disabled:opacity-50"
                                     >
                                         Reject
                                     </button>
@@ -615,7 +615,7 @@ export default function ReportDetailPage() {
                                         const el = document.getElementById('actions');
                                         el?.scrollIntoView({ behavior: 'smooth' });
                                     }}
-                                    className="mt-3 w-full py-2 text-xs font-bold text-indigo-200 transition hover:text-white"
+                                    className="mt-3 w-full py-2.5 text-xs font-bold text-indigo-200 transition hover:text-white"
                                 >
                                     Open full decision panel
                                 </button>

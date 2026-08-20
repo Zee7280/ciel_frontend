@@ -950,7 +950,7 @@ export default function AdminApprovalsPage() {
                                             {req.opportunity}
                                         </span>
                                     )}
-                                    <span>{req.email}</span>
+                                    <span className="break-all">{req.email}</span>
                                     {isTeamCard ? (
                                         <span className="rounded bg-violet-100 px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-violet-800">
                                             Team apply
@@ -983,13 +983,13 @@ export default function AdminApprovalsPage() {
                             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
                                 <button
                                     onClick={() => handleRejectClick(req.id, 'user')}
-                                    className="flex items-center justify-center gap-2 rounded-lg bg-slate-100 px-4 py-2 text-sm font-bold text-slate-600 transition-colors hover:bg-red-50 hover:text-red-600">
+                                    className="flex items-center justify-center gap-2 rounded-lg bg-slate-100 px-4 py-2.5 text-sm font-bold text-slate-600 transition-colors hover:bg-red-50 hover:text-red-600">
                                     <XCircle className="w-4 h-4" /> Reject
                                 </button>
                                 <button
                                     onClick={() => handleApprove(req.id, 'user')}
                                     disabled={approveSubmittingKey === `user:${req.id}`}
-                                    className="flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white shadow-lg shadow-blue-200 transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60">
+                                    className="flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-200 transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60">
                                     {approveSubmittingKey === `user:${req.id}` ? (
                                         <>
                                             <Loader2 className="w-4 h-4 animate-spin" /> Approving...
@@ -1090,7 +1090,7 @@ export default function AdminApprovalsPage() {
                                 )}
                                 <button
                                     onClick={() => handleRejectClick(proj.id, "opportunity", "revise")}
-                                    className="px-4 py-2 bg-amber-50 text-amber-800 rounded-lg text-sm font-bold hover:bg-amber-100 flex items-center gap-2 transition-colors border border-amber-200"
+                                    className="px-4 py-2.5 bg-amber-50 text-amber-800 rounded-lg text-sm font-bold hover:bg-amber-100 flex items-center gap-2 transition-colors border border-amber-200"
                                     title={
                                         showPostApprovalActions
                                             ? "Send back for revision after mistaken approval"
@@ -1101,7 +1101,7 @@ export default function AdminApprovalsPage() {
                                 </button>
                                 <button
                                     onClick={() => handleRejectClick(proj.id, "opportunity", "reject_permanent")}
-                                    className="px-4 py-2 bg-slate-100 text-slate-600 rounded-lg text-sm font-bold hover:bg-red-50 hover:text-red-600 flex items-center gap-2 transition-colors"
+                                    className="px-4 py-2.5 bg-slate-100 text-slate-600 rounded-lg text-sm font-bold hover:bg-red-50 hover:text-red-600 flex items-center gap-2 transition-colors"
                                     title={
                                         showPostApprovalActions
                                             ? "Permanently reject even after approval"
@@ -1121,7 +1121,7 @@ export default function AdminApprovalsPage() {
                                             ? "Awaiting faculty or partner steps before CIEL final approval"
                                             : undefined
                                     }
-                                    className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors shadow-lg disabled:cursor-not-allowed ${
+                                    className={`px-4 py-2.5 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors shadow-lg disabled:cursor-not-allowed ${
                                         canAdminApprove
                                             ? "bg-green-600 text-white hover:bg-green-700 shadow-green-200 disabled:opacity-60"
                                             : "bg-slate-200 text-slate-500 shadow-none cursor-not-allowed opacity-70"
@@ -1225,7 +1225,7 @@ export default function AdminApprovalsPage() {
                                         setIsDetailModalOpen(false);
                                         setOpportunityDetail(null);
                                     }}
-                                    className="text-slate-400 hover:text-slate-600"
+                                    className="text-slate-400 hover:text-slate-600 p-2"
                                 >
                                     <XCircle className="w-6 h-6" />
                                 </button>
@@ -1270,7 +1270,7 @@ export default function AdminApprovalsPage() {
                                                             <span className="text-slate-500">Email:</span>{" "}
                                                             <a
                                                                 href={`mailto:${creatorEmail}`}
-                                                                className="font-medium text-blue-600 hover:underline"
+                                                                className="font-medium text-blue-600 hover:underline break-all"
                                                             >
                                                                 {creatorEmail}
                                                             </a>
@@ -1444,7 +1444,7 @@ export default function AdminApprovalsPage() {
                                                         ) : null}
                                                         {sh.student.email ? (
                                                             <li>
-                                                                <span className="text-slate-500">Email:</span> {sh.student.email}
+                                                                <span className="text-slate-500">Email:</span> <span className="break-all">{sh.student.email}</span>
                                                             </li>
                                                         ) : null}
                                                         {sh.student.id ? (
@@ -1483,7 +1483,7 @@ export default function AdminApprovalsPage() {
                                                         ) : null}
                                                         {sh.facultyEmail ? (
                                                             <li>
-                                                                <span className="text-slate-500">Official email:</span> {sh.facultyEmail}
+                                                                <span className="text-slate-500">Official email:</span> <span className="break-all">{sh.facultyEmail}</span>
                                                             </li>
                                                         ) : null}
                                                     </ul>
@@ -1507,7 +1507,7 @@ export default function AdminApprovalsPage() {
                                                         ) : null}
                                                         {sh.partnerEmail ? (
                                                             <li>
-                                                                <span className="text-slate-500">Email:</span> {sh.partnerEmail}
+                                                                <span className="text-slate-500">Email:</span> <span className="break-all">{sh.partnerEmail}</span>
                                                             </li>
                                                         ) : null}
                                                     </ul>
@@ -1754,7 +1754,7 @@ export default function AdminApprovalsPage() {
                                         setOpportunityDetail(null);
                                         handleRejectClick(selectedOpportunity.id, "opportunity", "revise");
                                     }}
-                                    className="px-4 py-2 bg-amber-50 text-amber-800 rounded-lg font-bold hover:bg-amber-100 border border-amber-200"
+                                    className="px-4 py-2.5 bg-amber-50 text-amber-800 rounded-lg font-bold hover:bg-amber-100 border border-amber-200"
                                 >
                                     Request revision
                                 </button>
@@ -1764,7 +1764,7 @@ export default function AdminApprovalsPage() {
                                         setOpportunityDetail(null);
                                         handleRejectClick(selectedOpportunity.id, "opportunity", "reject_permanent");
                                     }}
-                                    className="px-4 py-2 bg-red-50 text-red-600 rounded-lg font-bold hover:bg-red-100"
+                                    className="px-4 py-2.5 bg-red-50 text-red-600 rounded-lg font-bold hover:bg-red-100"
                                 >
                                     Reject permanently
                                 </button>
@@ -1784,7 +1784,7 @@ export default function AdminApprovalsPage() {
                                             ? "Executing organization verification pending"
                                             : undefined
                                     }
-                                    className={`px-4 py-2 rounded-lg font-bold disabled:cursor-not-allowed ${
+                                    className={`px-4 py-2.5 rounded-lg font-bold disabled:cursor-not-allowed ${
                                         readAdminCanApprove(adminDetailView as Record<string, unknown>)
                                             ? "bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
                                             : "bg-slate-200 text-slate-500 cursor-not-allowed opacity-70"
@@ -1817,7 +1817,7 @@ export default function AdminApprovalsPage() {
                                           ? "Request revision"
                                           : "Reject registration"}
                                 </h2>
-                                <button onClick={() => setIsRejectModalOpen(false)} className="text-slate-400 hover:text-slate-600">
+                                <button onClick={() => setIsRejectModalOpen(false)} className="text-slate-400 hover:text-slate-600 p-2">
                                     <XCircle className="w-6 h-6" />
                                 </button>
                             </div>
@@ -1850,7 +1850,7 @@ export default function AdminApprovalsPage() {
                                 <button
                                     onClick={confirmReject}
                                     disabled={!rejectReason.trim()}
-                                    className="px-4 py-2 bg-red-600 text-white rounded-lg font-bold hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    className="px-4 py-2.5 bg-red-600 text-white rounded-lg font-bold hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     {rejectType === "opportunity" && opportunityReviewMode === "reject_permanent"
                                         ? "Confirm permanent reject"

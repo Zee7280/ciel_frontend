@@ -950,7 +950,7 @@ export default function StudentBrowseOpportunitiesPage() {
                     </DialogHeader>
 
                     <div className="max-h-[65vh] overflow-y-auto p-4 sm:p-6">
-                        <div className="overflow-x-auto rounded-xl border border-slate-200 shadow-sm">
+                        <div className="hidden sm:block overflow-x-auto rounded-xl border border-slate-200 shadow-sm">
                             <table className="min-w-[720px] w-full text-left text-sm">
                                 <thead className="bg-slate-50 border-b border-slate-200">
                                     <tr>
@@ -1024,6 +1024,62 @@ export default function StudentBrowseOpportunitiesPage() {
                                     )}
                                 </tbody>
                             </table>
+                        </div>
+
+                        <div className="sm:hidden space-y-3">
+                            {selectedTeamOpp?.teamMembers?.map((member: TeamMember, idx: number) => (
+                                <div key={idx} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 font-bold text-sm ring-2 ring-white border border-slate-200">
+                                            {member.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
+                                        </div>
+                                        <div className="min-w-0">
+                                            <div className="font-semibold text-slate-900">{member.name}</div>
+                                            <div className="text-xs text-slate-400 font-mono mt-0.5">{member.cnic}</div>
+                                        </div>
+                                    </div>
+                                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                                        <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium border ${member.role === 'Leader'
+                                            ? 'bg-indigo-50 text-indigo-700 border-indigo-100'
+                                            : 'bg-slate-50 text-slate-600 border-slate-100'
+                                            }`}>
+                                            {member.role === 'Leader' && <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 mr-1.5 animate-pulse" />}
+                                            {member.role}
+                                        </span>
+                                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-[10px] font-bold uppercase ${member.is_verified
+                                            ? 'bg-green-100 text-green-700'
+                                            : 'bg-amber-100 text-amber-700'
+                                            }`}>
+                                            {member.is_verified ? 'Verified' : 'Pending'}
+                                        </span>
+                                    </div>
+                                    <div className="mt-3 flex flex-col gap-1.5 border-t border-slate-100 pt-3">
+                                        {member.email && (
+                                            <div className="flex items-center gap-2 text-slate-600 text-xs">
+                                                <Mail className="w-3 h-3 text-slate-400 shrink-0" />
+                                                {member.email}
+                                            </div>
+                                        )}
+                                        {member.mobile && (
+                                            <div className="flex items-center gap-2 text-slate-600 text-xs">
+                                                <Phone className="w-3 h-3 text-slate-400 shrink-0" />
+                                                {member.mobile}
+                                            </div>
+                                        )}
+                                        {member.university && (
+                                            <div className="flex items-center gap-2 text-slate-600 text-xs">
+                                                <GraduationCap className="w-3 h-3 text-slate-400 shrink-0" />
+                                                {member.university}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
+                            {(!selectedTeamOpp?.teamMembers || selectedTeamOpp.teamMembers.length === 0) && (
+                                <div className="rounded-xl border border-slate-200 px-6 py-8 text-center text-slate-500 italic">
+                                    No team members added to this project.
+                                </div>
+                            )}
                         </div>
                     </div>
 

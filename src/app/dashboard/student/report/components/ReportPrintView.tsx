@@ -1208,6 +1208,7 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
                 {allApplicantRows.length > 0 && (
                     <div className="break-inside-avoid space-y-3">
                         <p className={dossierSubsectionEyebrow}>All applicants / participant details</p>
+                        <div className="overflow-x-auto">
                         <table className="w-full border-collapse overflow-hidden rounded-xl border border-slate-200 text-xs">
                             <thead>
                                 <tr className="bg-slate-900 text-[9px] font-black uppercase tracking-widest text-white">
@@ -1240,6 +1241,7 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
                                 ))}
                             </tbody>
                         </table>
+                        </div>
                     </div>
                 )}
 
@@ -1802,6 +1804,7 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
                 />
                 <div className={dossierSectionStack}>
                     <div className="break-inside-avoid">
+                    <div className="overflow-x-auto">
                     <table className="w-full border-collapse overflow-hidden rounded-xl border border-slate-200 text-xs">
                         <thead>
                             <tr className="bg-slate-900 text-[9px] font-black uppercase tracking-widest text-white">
@@ -1857,6 +1860,7 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
                             </tr>
                         </tbody>
                     </table>
+                    </div>
                 </div>
 
                 {dossierSectionWiseAuditBlocks.length > 0 ? (

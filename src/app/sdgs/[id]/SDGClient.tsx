@@ -31,12 +31,12 @@ export default function SDGClient({ sdg }: { sdg: SDG }) {
                         Back to Dashboard
                     </Link>
 
-                    <div className="flex items-center gap-6">
+                    <div className="flex flex-col sm:flex-row items-center gap-6">
                         <div className="bg-white font-bold text-4xl w-24 h-24 flex items-center justify-center rounded-2xl shadow-xl shrink-0" style={{ color: sdg.color }}>
                             {sdg.number.toString().padStart(2, '0')}
                         </div>
                         <div>
-                            <h1 className="text-4xl font-bold tracking-tight">
+                            <h1 className="text-2xl sm:text-4xl font-bold tracking-tight">
                                 SDG {sdg.number}: {sdg.title}
                             </h1>
                             <p className="mt-3 text-white/90 max-w-2xl text-lg font-medium">

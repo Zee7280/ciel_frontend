@@ -318,8 +318,8 @@ export default function AdminProjectEvidencePage() {
                     return <span className="text-sm text-slate-400">—</span>;
                 }
                 return (
-                    <div className="py-1">
-                        <p className="text-sm font-medium text-slate-800 leading-snug">{name || email}</p>
+                    <div className="py-1 min-w-0">
+                        <p className="truncate max-w-[200px] text-sm font-medium text-slate-800 leading-snug">{name || email}</p>
                         {name && email ? (
                             <p className="text-[11px] text-slate-500 truncate max-w-[200px]" title={email}>
                                 {email}
@@ -364,7 +364,7 @@ export default function AdminProjectEvidencePage() {
                     type="button"
                     disabled={downloadingId === row.id || row.evidence_file_count === 0}
                     onClick={() => void downloadEvidence(row)}
-                    className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2.5 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                     {downloadingId === row.id ? (
                         <Loader2 className="h-4 w-4 animate-spin" />

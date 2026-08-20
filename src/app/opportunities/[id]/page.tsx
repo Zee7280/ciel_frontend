@@ -112,7 +112,7 @@ export default function PublicOpportunityPage() {
                                 )}
                             </div>
 
-                            <h1 className="text-4xl md:text-5xl lg:text-6xl font-black text-slate-900 leading-tight tracking-tight">
+                            <h1 className="text-2xl sm:text-4xl md:text-5xl lg:text-6xl font-black text-slate-900 leading-tight tracking-tight">
                                 {opportunity.title}
                             </h1>
 

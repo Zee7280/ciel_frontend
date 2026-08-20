@@ -418,7 +418,7 @@ export default function CourseProjectWizardPage() {
                                 onClick={() => i <= entry.stepCompleted && setStep(i)}
                                 disabled={i > entry.stepCompleted}
                                 className={clsx(
-                                    "flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-black ciel-transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ciel-gold",
+                                    "flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-xs font-black ciel-transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ciel-gold",
                                     i === step ? "bg-ciel-gold text-white" : i < entry.stepCompleted ? "bg-ciel-green-soft text-ciel-green-deep" : "bg-ciel-page text-ciel-text-soft",
                                 )}
                                 title={stepLabels[i]}

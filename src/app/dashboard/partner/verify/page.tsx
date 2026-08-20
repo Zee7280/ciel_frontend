@@ -513,10 +513,10 @@ export default function VerifyWorkPage() {
             </div>
 
             <div className="flex flex-wrap gap-2">
-                <Button variant={tab === "pending" ? "default" : "outline"} size="sm" className="h-9" onClick={() => setTab("pending")}>
+                <Button variant={tab === "pending" ? "default" : "outline"} size="sm" className="h-10" onClick={() => setTab("pending")}>
                     Pending Requests
                 </Button>
-                <Button variant={tab === "history" ? "default" : "outline"} size="sm" className="h-9" onClick={() => setTab("history")}>
+                <Button variant={tab === "history" ? "default" : "outline"} size="sm" className="h-10" onClick={() => setTab("history")}>
                     Approval History
                 </Button>
             </div>

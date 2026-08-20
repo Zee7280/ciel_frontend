@@ -456,7 +456,7 @@ function LoginContent() {
             <div className="w-full max-w-5xl grid grid-cols-1 lg:grid-cols-2 bg-white rounded-[2.5rem] shadow-[0_32px_64px_-16px_rgba(0,0,0,0.15)] overflow-hidden border border-slate-200/50">
 
                 {/* Left side: Premium Branding */}
-                <div className="relative bg-slate-800 p-12 text-white flex flex-col justify-between overflow-hidden">
+                <div className="relative bg-slate-800 p-6 sm:p-8 lg:p-12 text-white flex flex-col justify-between overflow-hidden order-2 lg:order-1">
                     {/* Abstract background elements */}
                     <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-emerald-600/20 rounded-full blur-[120px] -mr-48 -mt-48 transition-opacity duration-700"></div>
                     <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-orange-500/10 rounded-full blur-[100px] -ml-40 -mb-40"></div>
@@ -501,7 +501,7 @@ function LoginContent() {
                 </div>
 
                 {/* Right side: Modern Form */}
-                <div className="p-10 md:p-16 flex flex-col justify-center bg-white">
+                <div className="p-10 md:p-16 flex flex-col justify-center bg-white order-1 lg:order-2">
                     <div className="w-full max-w-sm mx-auto">
 
                         {/* ── Back nav ── */}
@@ -569,7 +569,7 @@ function LoginContent() {
                                             <button
                                                 type="button"
                                                 onClick={() => setShowPassword(!showPassword)}
-                                                className="absolute right-4 top-1/2 -translate-y-1/2 p-1.5 text-slate-400 hover:text-emerald-600 transition-colors"
+                                                className="absolute right-4 top-1/2 -translate-y-1/2 p-2.5 text-slate-400 hover:text-emerald-600 transition-colors"
                                             >
                                                 {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                                             </button>
@@ -721,7 +721,7 @@ function LoginContent() {
                                                     <button
                                                         type="button"
                                                         onClick={() => setShowNewPassword(!showNewPassword)}
-                                                        className="absolute right-4 top-1/2 -translate-y-1/2 p-1.5 text-slate-400 hover:text-emerald-600 transition-colors"
+                                                        className="absolute right-4 top-1/2 -translate-y-1/2 p-2.5 text-slate-400 hover:text-emerald-600 transition-colors"
                                                     >
                                                         {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                                                     </button>
@@ -747,7 +747,7 @@ function LoginContent() {
                                                     <button
                                                         type="button"
                                                         onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                                                        className="absolute right-4 top-1/2 -translate-y-1/2 p-1.5 text-slate-400 hover:text-emerald-600 transition-colors"
+                                                        className="absolute right-4 top-1/2 -translate-y-1/2 p-2.5 text-slate-400 hover:text-emerald-600 transition-colors"
                                                     >
                                                         {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                                                     </button>

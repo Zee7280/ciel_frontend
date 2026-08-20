@@ -720,7 +720,7 @@ export default function AdminPaymentsPage() {
                                                     <Button
                                                         variant="outline"
                                                         size="sm"
-                                                        className="h-8 gap-1.5 border-slate-200 px-2.5 text-xs font-semibold text-slate-700"
+                                                        className="h-10 gap-1.5 border-slate-200 px-2.5 text-xs font-semibold text-slate-700"
                                                         onClick={() => openPaymentPreview(payment)}
                                                     >
                                                         <Eye className="h-3.5 w-3.5" />
@@ -730,7 +730,7 @@ export default function AdminPaymentsPage() {
                                                         <>
                                                             <Button
                                                                 size="sm"
-                                                                className="h-8 gap-1 bg-emerald-600 px-2.5 text-xs font-semibold hover:bg-emerald-700"
+                                                                className="h-10 gap-1 bg-emerald-600 px-2.5 text-xs font-semibold hover:bg-emerald-700"
                                                                 onClick={() => {
                                                                     setSelectedPayment(payment);
                                                                     setActionType('approve');
@@ -743,7 +743,7 @@ export default function AdminPaymentsPage() {
                                                             <Button
                                                                 variant="outline"
                                                                 size="sm"
-                                                                className="h-8 w-8 border-red-200 p-0 text-red-600 hover:bg-red-50"
+                                                                className="h-10 w-10 border-red-200 p-0 text-red-600 hover:bg-red-50"
                                                                 title="Reject"
                                                                 onClick={() => {
                                                                     setSelectedPayment(payment);
@@ -759,7 +759,7 @@ export default function AdminPaymentsPage() {
                                                         <Button
                                                             variant="outline"
                                                             size="sm"
-                                                            className="h-8 gap-1 border-amber-200 px-2.5 text-xs font-semibold text-amber-800 hover:bg-amber-50"
+                                                            className="h-10 gap-1 border-amber-200 px-2.5 text-xs font-semibold text-amber-800 hover:bg-amber-50"
                                                             onClick={() => {
                                                                 setSelectedPayment(payment);
                                                                 setIsRevertOpen(true);

@@ -715,7 +715,7 @@ export default function FacultyOpportunityCreationPage() {
     };
 
     return (
-        <div className="max-w-8xl mx-auto p-4 space-y-4 pb-24">
+        <div className="mx-auto max-w-[96rem] p-4 space-y-4 pb-24">
             <div className="mb-4">
                 <h1 className="text-3xl font-bold text-slate-900">
                     {editingOpportunityId ? "Edit faculty opportunity" : "Create Faculty Opportunity"}
@@ -864,7 +864,7 @@ export default function FacultyOpportunityCreationPage() {
                                                             const next = formData.otherTypeSpecs.filter((_, i) => i !== idx);
                                                             setFormData({ ...formData, otherTypeSpecs: next.length ? next : [""] });
                                                         }}
-                                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-red-500 transition-colors"
+                                                        className="absolute right-1.5 top-1/2 -translate-y-1/2 p-1.5 text-slate-400 hover:text-red-500 transition-colors"
                                                         aria-label="Remove row"
                                                     >
                                                         <X className="w-4 h-4" />
@@ -1229,7 +1229,7 @@ export default function FacultyOpportunityCreationPage() {
                                                     ...formData,
                                                     secondarySdgs: formData.secondarySdgs.filter(s => s.sdgId !== item.sdgId)
                                                 })}
-                                                className="absolute top-4 right-4 text-slate-400 hover:text-red-500 transition-colors"
+                                                className="absolute top-2 right-2 p-2 text-slate-400 hover:text-red-500 transition-colors"
                                             >
                                                 <X className="w-5 h-5" />
                                             </button>
@@ -1437,7 +1437,7 @@ export default function FacultyOpportunityCreationPage() {
                                                                         },
                                                                     });
                                                                 }}
-                                                                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-red-500 transition-colors"
+                                                                className="absolute right-1.5 top-1/2 -translate-y-1/2 p-1.5 text-slate-400 hover:text-red-500 transition-colors"
                                                                 aria-label="Remove row"
                                                             >
                                                                 <X className="w-4 h-4" />
@@ -1569,7 +1569,7 @@ export default function FacultyOpportunityCreationPage() {
                                                                 },
                                                             });
                                                         }}
-                                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-red-500 transition-colors"
+                                                        className="absolute right-1.5 top-1/2 -translate-y-1/2 p-1.5 text-slate-400 hover:text-red-500 transition-colors"
                                                         aria-label="Remove row"
                                                     >
                                                         <X className="w-4 h-4" />
@@ -2219,17 +2219,17 @@ export default function FacultyOpportunityCreationPage() {
                 </div>
             </div>
 
-            <div className="fixed bottom-24 left-0 right-0 z-50 flex justify-end gap-3 border-t border-slate-200 bg-white p-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] lg:left-64 lg:bottom-0 lg:gap-4">
+            <div className="fixed bottom-24 left-0 right-0 z-50 flex flex-wrap justify-end gap-2 border-t border-slate-200 bg-white p-3 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] sm:gap-3 sm:p-4 lg:bottom-0 lg:left-[var(--ciel-sidebar-width)] lg:gap-4">
                 <button
                     type="button"
                     onClick={() => router.push("/dashboard/faculty")}
-                    className="px-6 py-2 border border-slate-200 text-slate-600 font-bold rounded-xl hover:bg-slate-50 flex items-center gap-2"
+                    className="flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2 font-bold text-slate-600 hover:bg-slate-50 sm:px-6"
                 >
                     <X className="w-4 h-4" /> Cancel
                 </button>
                 <button
                     onClick={handleSaveDraft}
-                    className="px-6 py-2 border border-slate-200 text-slate-600 font-bold rounded-xl hover:bg-slate-50"
+                    className="rounded-xl border border-slate-200 px-4 py-2 font-bold text-slate-600 hover:bg-slate-50 sm:px-6"
                     disabled={isSubmitting}
                 >
                     Save Draft
@@ -2237,7 +2237,7 @@ export default function FacultyOpportunityCreationPage() {
                 <button
                     onClick={handleSubmit}
                     disabled={isSubmitting}
-                    className="px-6 py-2 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 shadow-lg shadow-blue-500/30 flex items-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
+                    className="flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 font-bold text-white shadow-lg shadow-blue-500/30 hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-70 sm:px-6"
                 >
                     {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
                     {isSubmitting ? "Submitting..." : "Submit Opportunity"}

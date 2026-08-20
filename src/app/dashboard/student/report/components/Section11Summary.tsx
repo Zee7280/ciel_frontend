@@ -1160,7 +1160,7 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                             </div>
                             <div
                                 id="print-area-certificate"
-                                className="p-4 md:p-6 overflow-y-auto max-h-[85vh] print:max-h-none print:p-0 print-scroll-auto"
+                                className="overflow-x-auto overflow-y-auto max-h-[85vh] p-4 md:p-6 print:max-h-none print:overflow-visible print:p-0 print-scroll-auto"
                             >
                                 <CertificateView projectData={projectData} />
                             </div>

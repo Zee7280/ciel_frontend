@@ -332,7 +332,7 @@ export default function StudentProfilePage() {
                         <div className="px-6 pb-6 pt-2">
                             {/* Stats section - can be populated from API later */}
                             {user?.stats && (
-                                <div className="grid grid-cols-3 gap-4 border-t border-slate-50 pt-6">
+                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 border-t border-slate-50 pt-6">
                                     <div className="text-center">
                                         <div className="text-2xl font-bold text-slate-900">{user.stats.impact || 0}</div>
                                         <div className="text-xs text-slate-500 font-medium uppercase tracking-wider mt-1">Impact</div>

@@ -207,7 +207,7 @@ export default function PartnerRequestsPage() {
                                             <div className="flex items-center justify-end gap-2">
                                                 <Link
                                                     href={`/dashboard/partner/requests/${req.id}/applicants`}
-                                                    className="h-8 px-3 flex items-center gap-2 bg-slate-900 text-white text-xs font-bold rounded-lg hover:bg-slate-800 whitespace-nowrap transition-all shadow-sm"
+                                                    className="h-10 px-3 flex items-center gap-2 bg-slate-900 text-white text-xs font-bold rounded-lg hover:bg-slate-800 whitespace-nowrap transition-all shadow-sm"
                                                 >
                                                     <Users className="w-3 h-3" /> Applicants
                                                 </Link>
@@ -222,7 +222,7 @@ export default function PartnerRequestsPage() {
                                                             right: window.innerWidth - rect.right
                                                         });
                                                     }}
-                                                    className={`h-8 w-8 flex items-center justify-center rounded-lg transition-colors border border-transparent ${activeMenu?.id === req.id ? 'bg-slate-100 text-slate-900 border-slate-200' : 'text-slate-400 hover:bg-white hover:border-slate-200 hover:text-slate-600'}`}
+                                                    className={`h-10 w-10 flex items-center justify-center rounded-lg transition-colors border border-transparent ${activeMenu?.id === req.id ? 'bg-slate-100 text-slate-900 border-slate-200' : 'text-slate-400 hover:bg-white hover:border-slate-200 hover:text-slate-600'}`}
                                                 >
                                                     <MoreVertical className="w-4 h-4" />
                                                 </button>

@@ -672,7 +672,7 @@ export default function OpportunityPostingPage() {
                                                                 otherTypeSpecs: next.length ? next : [""],
                                                             });
                                                         }}
-                                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-red-500 transition-colors"
+                                                        className="absolute right-1.5 top-1/2 -translate-y-1/2 p-1.5 text-slate-400 hover:text-red-500 transition-colors"
                                                         aria-label="Remove row"
                                                     >
                                                         <X className="w-4 h-4" />
@@ -1329,7 +1329,7 @@ export default function OpportunityPostingPage() {
                                                                 },
                                                             });
                                                         }}
-                                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-red-500 transition-colors"
+                                                        className="absolute right-1.5 top-1/2 -translate-y-1/2 p-1.5 text-slate-400 hover:text-red-500 transition-colors"
                                                         aria-label="Remove skill"
                                                     >
                                                         <X className="w-4 h-4" />
@@ -1823,7 +1823,7 @@ export default function OpportunityPostingPage() {
                                 <div className="flex flex-wrap gap-2">
                                     {formData.restrictedUniversities.map(u => (
                                         <div key={u} className="bg-white px-3 py-1.5 rounded-lg border border-pink-200 flex items-center gap-2 shadow-sm animate-in zoom-in-95">
-                                            <span className="text-xs font-bold text-slate-700">{u}</span>
+                                            <span className="text-xs font-bold text-slate-700 max-w-[240px] truncate">{u}</span>
                                             <button
                                                 type="button"
                                                 onClick={() => setFormData({
@@ -1918,18 +1918,18 @@ export default function OpportunityPostingPage() {
                 </p>
             </div>
 
-            <div className="fixed bottom-24 left-0 right-0 z-50 flex justify-end gap-3 border-t border-slate-200 bg-white p-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] lg:left-64 lg:bottom-0 lg:gap-4">
+            <div className="fixed bottom-24 left-0 right-0 z-50 flex flex-wrap justify-end gap-2 border-t border-slate-200 bg-white p-3 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] sm:gap-3 sm:p-4 lg:bottom-0 lg:left-[var(--ciel-sidebar-width)] lg:gap-4">
                 <button
                     type="button"
                     onClick={() => router.push("/dashboard/partner/requests")}
-                    className="px-6 py-2 border border-slate-200 text-slate-600 font-bold rounded-xl hover:bg-slate-50 flex items-center gap-2"
+                    className="flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2 font-bold text-slate-600 hover:bg-slate-50 sm:px-6"
                 >
                     <X className="w-4 h-4" /> Cancel
                 </button>
                 <button
                     type="button"
                     onClick={handleSaveDraft}
-                    className="px-6 py-2 border border-slate-200 text-slate-600 font-bold rounded-xl hover:bg-slate-50"
+                    className="rounded-xl border border-slate-200 px-4 py-2 font-bold text-slate-600 hover:bg-slate-50 sm:px-6"
                     disabled={isSubmitting}
                 >
                     Save Draft
@@ -1938,7 +1938,7 @@ export default function OpportunityPostingPage() {
                     type="button"
                     onClick={handleSubmit}
                     disabled={isSubmitting}
-                    className="px-6 py-2 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 shadow-lg shadow-blue-500/30 flex items-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
+                    className="flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 font-bold text-white shadow-lg shadow-blue-500/30 hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-70 sm:px-6"
                 >
                     {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
                     {isSubmitting ? "Submitting..." : "Submit Opportunity"}

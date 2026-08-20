@@ -295,7 +295,7 @@ export default function AdminTutorialsPage() {
                                 className="mt-1.5 min-h-[88px]"
                             />
                         </div>
-                        <div className="grid grid-cols-2 gap-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             <div>
                                 <Label htmlFor="t-dur">Duration label (optional)</Label>
                                 <Input id="t-dur" value={durationLabel} onChange={(e) => setDurationLabel(e.target.value)} placeholder=" e.g. 5:30" className="mt-1.5" />
@@ -400,9 +400,9 @@ export default function AdminTutorialsPage() {
                                                     href={r.documentUrl}
                                                     target="_blank"
                                                     rel="noopener noreferrer"
-                                                    className="inline-flex items-center gap-1 font-medium text-emerald-700 hover:underline"
+                                                    className="inline-flex items-center gap-1 break-all font-medium text-emerald-700 hover:underline"
                                                 >
-                                                    <FileText className="h-3 w-3" />
+                                                    <FileText className="h-3 w-3 shrink-0" />
                                                     {r.documentFilename || "Document"}
                                                 </a>
                                             ) : null}

@@ -326,7 +326,7 @@ function SignUpContent() {
             <div className="w-full max-w-6xl grid grid-cols-1 lg:grid-cols-2 bg-white rounded-ciel-xl shadow-[0_32px_64px_-16px_rgba(0,0,0,0.15)] overflow-hidden border border-ciel-border min-h-[700px]">
 
                 {/* Left: navy rail — unchanged branding + stepper pattern */}
-                <div className="relative bg-ciel-navy p-12 text-white flex flex-col justify-between overflow-hidden order-2 lg:order-1">
+                <div className="relative bg-ciel-navy p-6 sm:p-8 lg:p-12 text-white flex flex-col justify-between overflow-hidden order-2 lg:order-1">
                     <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-ciel-green/10 rounded-full blur-[120px] -mr-48 -mt-48" />
                     <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-white/5 rounded-full blur-[100px] -ml-40 -mb-40" />
 
@@ -472,7 +472,7 @@ function SignUpContent() {
                                     )}
 
                                     {(role === "student" || role === "faculty") && (
-                                        <div key={`${role}-inst`} className="ciel-crossfade-enter grid grid-cols-2 gap-4">
+                                        <div key={`${role}-inst`} className="ciel-crossfade-enter grid grid-cols-1 sm:grid-cols-2 gap-4">
                                             <div className="space-y-1.5">
                                                 <label className="text-[11px] font-bold uppercase tracking-widest text-ciel-text-soft ml-1">Institution</label>
                                                 <div className="relative">
@@ -575,7 +575,7 @@ function SignUpContent() {
                                                 className={fieldClass(!!errors.password, "pl-12 pr-12")}
                                                 placeholder="••••••••"
                                             />
-                                            <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-ciel-text-soft hover:text-ciel-green ciel-transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ciel-green rounded-ciel-xs" tabIndex={-1}>
+                                            <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 p-2.5 text-ciel-text-soft hover:text-ciel-green ciel-transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ciel-green rounded-ciel-xs" tabIndex={-1}>
                                                 {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                                             </button>
                                         </div>
@@ -641,7 +641,7 @@ function SignUpContent() {
                                     </p>
                                 </div>
 
-                                <div className="flex gap-3 justify-center mb-6" onPaste={handleOtpPaste}>
+                                <div className="flex flex-wrap gap-2 sm:gap-3 justify-center mb-6" onPaste={handleOtpPaste}>
                                     {otpDigits.map((digit, i) => (
                                         <input
                                             key={i}
@@ -653,7 +653,7 @@ function SignUpContent() {
                                             onChange={(e) => handleOtpChange(i, e.target.value)}
                                             onKeyDown={(e) => handleOtpKeyDown(i, e)}
                                             className={clsx(
-                                                "w-12 h-14 text-center text-2xl font-black rounded-ciel-md border-2 outline-none ciel-transition bg-ciel-page focus:bg-white focus-visible:ring-2 focus-visible:ring-ciel-green",
+                                                "w-10 h-12 sm:w-12 sm:h-14 text-center text-xl sm:text-2xl font-black rounded-ciel-md border-2 outline-none ciel-transition bg-ciel-page focus:bg-white focus-visible:ring-2 focus-visible:ring-ciel-green",
                                                 otpError ? "border-red-400 bg-red-50" : digit ? "border-ciel-green" : "border-ciel-border focus:border-ciel-green",
                                             )}
                                         />

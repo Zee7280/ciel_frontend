@@ -234,15 +234,15 @@ export default function AdminFacultyUniversityScopePage() {
                                 <li key={r.id} className="flex flex-col gap-2 py-4 sm:flex-row sm:items-center sm:justify-between">
                                     <div>
                                         <p className="font-semibold text-slate-900">{r.faculty_name || "Faculty"}</p>
-                                        <p className="text-sm text-slate-500">{r.faculty_email}</p>
-                                        <p className="text-sm text-indigo-700 mt-1">
+                                        <p className="text-sm text-slate-500 break-words">{r.faculty_email}</p>
+                                        <p className="text-sm text-indigo-700 mt-1 break-words">
                                             → {r.university_organization_name || r.university_organization_id}
                                         </p>
                                     </div>
                                     <button
                                         type="button"
                                         onClick={() => r.faculty_user_id && handleRemove(r.faculty_user_id)}
-                                        className="inline-flex items-center justify-center gap-2 rounded-lg border border-red-200 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50"
+                                        className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-red-200 px-3 py-2.5 text-sm font-semibold text-red-700 hover:bg-red-50"
                                     >
                                         <Trash2 className="h-4 w-4" />
                                         Remove

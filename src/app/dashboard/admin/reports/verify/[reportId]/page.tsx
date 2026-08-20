@@ -529,7 +529,7 @@ function SectionCollapseTrigger({
         <button
             type="button"
             onClick={onToggle}
-            className="shrink-0 rounded-xl p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
+            className="shrink-0 rounded-xl p-2.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
             aria-expanded={isOpen}
             aria-controls={`${sectionId}-panel`}
             title={isOpen ? "Collapse section" : "Expand section"}
@@ -916,7 +916,7 @@ export default function AdminReportDetailPage() {
                 <div className="flex flex-col items-stretch justify-between gap-3 sm:flex-row sm:items-center">
                     <button
                         onClick={() => router.back()}
-                        className="flex items-center gap-2 px-4 py-2 text-slate-700 hover:bg-white rounded-lg font-medium transition-all"
+                        className="flex items-center gap-2 px-4 py-2.5 text-slate-700 hover:bg-white rounded-lg font-medium transition-all"
                     >
                         <ArrowLeft className="w-4 h-4" />
                         Back to Reports
@@ -1109,14 +1109,14 @@ export default function AdminReportDetailPage() {
                                     <button
                                         type="button"
                                         onClick={expandReportSections}
-                                        className="rounded-lg px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-indigo-700 hover:bg-indigo-50"
+                                        className="rounded-lg px-2 py-2 text-[10px] font-semibold uppercase tracking-wide text-indigo-700 hover:bg-indigo-50"
                                     >
                                         Expand
                                     </button>
                                     <button
                                         type="button"
                                         onClick={collapseReportSections}
-                                        className="rounded-lg px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500 hover:bg-slate-100"
+                                        className="rounded-lg px-2 py-2 text-[10px] font-semibold uppercase tracking-wide text-slate-500 hover:bg-slate-100"
                                     >
                                         Collapse
                                     </button>
@@ -2191,14 +2191,14 @@ export default function AdminReportDetailPage() {
                             <button
                                 type="button"
                                 onClick={() => handleVerify("approve")}
-                                className="flex items-center justify-center gap-2 rounded-full bg-emerald-600 px-5 py-2.5 text-xs font-semibold uppercase tracking-widest text-white shadow-lg shadow-emerald-900/25 transition-transform hover:bg-emerald-500 active:scale-95 sm:px-6"
+                                className="flex min-h-[2.75rem] items-center justify-center gap-2 rounded-full bg-emerald-600 px-5 py-2.5 text-xs font-semibold uppercase tracking-widest text-white shadow-lg shadow-emerald-900/25 transition-transform hover:bg-emerald-500 active:scale-95 sm:px-6"
                             >
                                 <CheckCircle2 className="h-3.5 w-3.5" strokeWidth={2} /> Approve
                             </button>
                             <button
                                 type="button"
                                 onClick={() => handleVerify("reject")}
-                                className="flex items-center justify-center gap-2 rounded-full bg-white/10 px-5 py-2.5 text-xs font-semibold uppercase tracking-widest text-white transition-colors hover:bg-white/20 active:scale-95 sm:px-6"
+                                className="flex min-h-[2.75rem] items-center justify-center gap-2 rounded-full bg-white/10 px-5 py-2.5 text-xs font-semibold uppercase tracking-widest text-white transition-colors hover:bg-white/20 active:scale-95 sm:px-6"
                             >
                                 <XCircle className="h-3.5 w-3.5 text-red-400" strokeWidth={2} /> Reject
                             </button>
@@ -2206,7 +2206,7 @@ export default function AdminReportDetailPage() {
                                 type="button"
                                 onClick={() => handleVerify("reject", "editable")}
                                 disabled={isReportReturnedForRevision(report)}
-                                className="flex items-center justify-center gap-2 rounded-full bg-amber-500 px-5 py-2.5 text-xs font-semibold uppercase tracking-widest text-slate-950 shadow-lg shadow-amber-950/20 transition-transform hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-50 active:scale-95 sm:px-6"
+                                className="flex min-h-[2.75rem] items-center justify-center gap-2 rounded-full bg-amber-500 px-5 py-2.5 text-xs font-semibold uppercase tracking-widest text-slate-950 shadow-lg shadow-amber-950/20 transition-transform hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-50 active:scale-95 sm:px-6"
                                 title="Return this report so the student can revise and resubmit it."
                             >
                                 <PencilLine className="h-3.5 w-3.5" strokeWidth={2} /> Editable
@@ -2217,7 +2217,7 @@ export default function AdminReportDetailPage() {
                                     const el = document.getElementById("actions");
                                     el?.scrollIntoView({ behavior: "smooth" });
                                 }}
-                                className="rounded-full p-2.5 text-white transition-colors hover:bg-white/10"
+                                className="rounded-full p-2.5 min-h-[2.75rem] min-w-[2.75rem] text-white transition-colors hover:bg-white/10"
                                 title="Notes & full actions"
                             >
                                 <MessageSquare className="h-4 w-4" strokeWidth={2} />

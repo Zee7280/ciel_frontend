@@ -189,7 +189,7 @@ function SessionCard({
 
     return (
         <article className="rounded-xl border border-slate-200 bg-white transition-shadow hover:shadow-sm">
-            <div className="flex items-stretch gap-0">
+            <div className="flex flex-wrap items-stretch gap-0">
                 {/* Date badge */}
                 <div className="flex w-[52px] shrink-0 flex-col items-center justify-center rounded-l-xl bg-indigo-50 px-2 py-3 text-indigo-700">
                     <span className="text-[9px] font-bold uppercase tracking-wider" suppressHydrationWarning>

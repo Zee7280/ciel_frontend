@@ -248,7 +248,7 @@ export default function AdminNotificationsPage() {
                                                     <button
                                                         type="button"
                                                         onClick={() => void markAsRead(notification.id)}
-                                                        className="inline-flex items-center gap-1.5 rounded-lg border border-transparent bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 shadow-none transition hover:border-slate-200 hover:bg-slate-50 hover:text-slate-900"
+                                                        className="inline-flex items-center gap-1.5 rounded-lg border border-transparent bg-white px-3 py-2.5 text-xs font-semibold text-slate-600 shadow-none transition hover:border-slate-200 hover:bg-slate-50 hover:text-slate-900"
                                                     >
                                                         <CheckCircle className="h-3.5 w-3.5 text-blue-600" strokeWidth={2} />
                                                         Mark as read
@@ -257,7 +257,7 @@ export default function AdminNotificationsPage() {
                                                 <button
                                                     type="button"
                                                     onClick={() => void deleteNotification(notification.id)}
-                                                    className="inline-flex items-center gap-1.5 rounded-lg border border-transparent bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:border-red-200 hover:bg-red-50 hover:text-red-700"
+                                                    className="inline-flex items-center gap-1.5 rounded-lg border border-transparent bg-white px-3 py-2.5 text-xs font-semibold text-slate-600 transition hover:border-red-200 hover:bg-red-50 hover:text-red-700"
                                                 >
                                                     <Trash2 className="h-3.5 w-3.5 text-red-500" strokeWidth={2} />
                                                     Delete

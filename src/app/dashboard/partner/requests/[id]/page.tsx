@@ -497,11 +497,11 @@ function OpportunityDetailsContent() {
         return (
             <div className="w-full space-y-8 animate-in fade-in duration-500 pb-24">
                 {/* Header Actions */}
-                <div className="flex justify-between items-center print:hidden">
+                <div className="flex flex-wrap items-center justify-between gap-3 print:hidden">
                     <Link href="/dashboard/partner/requests" className="text-slate-500 hover:text-slate-800 flex items-center gap-2 font-medium">
                         <ArrowLeft className="w-4 h-4" /> Back to List
                     </Link>
-                    <div className="flex gap-3">
+                    <div className="flex flex-wrap gap-3">
                         <button onClick={handlePrint} className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 font-medium">
                             <Printer className="w-4 h-4" /> Print PDF
                         </button>
@@ -1435,7 +1435,7 @@ function OpportunityDetailsContent() {
                                                                 },
                                                             });
                                                         }}
-                                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-red-500 transition-colors"
+                                                        className="absolute right-1.5 top-1/2 -translate-y-1/2 p-1.5 text-slate-400 hover:text-red-500 transition-colors"
                                                         aria-label="Remove skill"
                                                     >
                                                         <X className="w-4 h-4" />
@@ -1650,7 +1650,7 @@ function OpportunityDetailsContent() {
                             <div className="flex flex-wrap gap-2">
                                 {formData.restrictedUniversities.map((uni) => (
                                     <div key={uni} className="flex items-center gap-2 px-3 py-1.5 bg-pink-50 text-pink-700 border border-pink-100 rounded-lg text-sm font-medium animate-in zoom-in-95">
-                                        {uni}
+                                        <span className="max-w-[240px] truncate">{uni}</span>
                                         <button
                                             onClick={() => setFormData({
                                                 ...formData,
@@ -1672,17 +1672,17 @@ function OpportunityDetailsContent() {
             </div >
 
             {/* Action Bar for Edit Mode */}
-            < div className="fixed bottom-24 left-0 right-0 z-50 flex justify-end gap-3 border-t border-slate-200 bg-white p-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] lg:left-64 lg:bottom-0 lg:gap-4" >
+            < div className="fixed bottom-24 left-0 right-0 z-50 flex flex-wrap justify-end gap-2 border-t border-slate-200 bg-white p-3 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] sm:gap-3 sm:p-4 lg:bottom-0 lg:left-[var(--ciel-sidebar-width)] lg:gap-4" >
                 <button
                     onClick={() => router.replace(pathname)}
-                    className="px-6 py-2 border border-slate-200 text-slate-600 font-bold rounded-xl hover:bg-slate-50 flex items-center gap-2"
+                    className="px-4 py-2 border border-slate-200 text-slate-600 font-bold rounded-xl hover:bg-slate-50 flex items-center gap-2 sm:px-6"
                 >
                     <X className="w-4 h-4" /> Cancel
                 </button>
                 <button
                     onClick={handleUpdate}
                     disabled={isSubmitting}
-                    className="px-6 py-2 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 shadow-lg shadow-blue-500/30 flex items-center gap-2"
+                    className="px-4 py-2 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 shadow-lg shadow-blue-500/30 flex items-center gap-2 sm:px-6"
                 >
                     {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                     {isSubmitting ? "Updating..." : "Save Changes"}

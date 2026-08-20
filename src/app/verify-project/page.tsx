@@ -142,7 +142,7 @@ function VerifyProjectContent() {
                 <div className="absolute -top-24 -right-24 w-48 h-48 bg-blue-50 rounded-full opacity-50 blur-3xl animate-pulse"></div>
                 <div className="absolute -bottom-24 -left-24 w-48 h-48 bg-indigo-50 rounded-full opacity-50 blur-3xl animate-pulse"></div>
 
-                <div className="p-10 relative z-10 text-center">
+                <div className="p-6 sm:p-10 relative z-10 text-center">
                     {/* Brand Header */}
                     <div className="mb-10 flex flex-col items-center">
                         <div

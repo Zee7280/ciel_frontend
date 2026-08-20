@@ -64,7 +64,7 @@ export default function PartnerVolunteersPage() {
                                     </span>
                                 </td>
                                 <td className="p-6 text-right">
-                                    <button className="text-slate-400 hover:text-blue-600"><MoreVertical className="w-5 h-5" /></button>
+                                    <button className="p-2.5 text-slate-400 hover:text-blue-600"><MoreVertical className="w-5 h-5" /></button>
                                 </td>
                             </tr>
                         ))}

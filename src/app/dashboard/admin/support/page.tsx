@@ -527,7 +527,7 @@ export default function AdminSupportPage() {
                                                         <span className="text-slate-400">—</span>
                                                     )}
                                                     {t.studentEmail ? (
-                                                        <span className="inline-flex items-center gap-1.5 text-xs">
+                                                        <span className="inline-flex items-center gap-1.5 text-xs break-all">
                                                             <Mail className="h-3.5 w-3.5 text-slate-400" />
                                                             {t.studentEmail}
                                                         </span>
@@ -544,7 +544,7 @@ export default function AdminSupportPage() {
                                                 <Button
                                                     type="button"
                                                     variant="outline"
-                                                    size="sm"
+                                                    size="default"
                                                     title="Delete ticket"
                                                     disabled={ticketDeletingId !== null && String(ticketDeletingId) === String(t.id)}
                                                     className="shrink-0"
@@ -613,10 +613,10 @@ export default function AdminSupportPage() {
                                             <p className="mt-2 line-clamp-3 text-sm text-slate-600">{f.answer}</p>
                                         </div>
                                         <div className="flex shrink-0 gap-2">
-                                            <Button type="button" variant="outline" size="sm" onClick={() => openFaqEdit(f)}>
+                                            <Button type="button" variant="outline" size="default" onClick={() => openFaqEdit(f)}>
                                                 <Pencil className="h-4 w-4" />
                                             </Button>
-                                            <Button type="button" variant="outline" size="sm" onClick={() => void deleteFaq(f.id)}>
+                                            <Button type="button" variant="outline" size="default" onClick={() => void deleteFaq(f.id)}>
                                                 <Trash2 className="h-4 w-4 text-red-600" />
                                             </Button>
                                         </div>

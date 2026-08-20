@@ -162,7 +162,7 @@ function FilterPill({
             type="button"
             onClick={onClick}
             className={clsx(
-                "rounded-lg border px-3 py-1.5 text-left text-xs font-semibold transition-colors",
+                "rounded-lg border px-3 py-2.5 text-left text-xs font-semibold transition-colors",
                 active
                     ? "border-[#0F8F83] bg-[#0F8F83]/10 text-[#065f46]"
                     : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50",

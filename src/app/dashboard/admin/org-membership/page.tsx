@@ -91,7 +91,7 @@ function OrgAndAccountDetails({ row }: { row: MembershipRow }) {
                         ) : null}
                         <div>
                             <dt className="text-xs text-slate-500">Org contact</dt>
-                            <dd className="text-xs">
+                            <dd className="text-xs break-words">
                                 {[o.contactName, o.contactEmail, o.contactPhone].filter(Boolean).join(" · ") || "—"}
                             </dd>
                         </div>
@@ -99,7 +99,7 @@ function OrgAndAccountDetails({ row }: { row: MembershipRow }) {
                             <div>
                                 <dt className="text-xs text-slate-500">Website</dt>
                                 <dd>
-                                    <a href={o.websiteUrl} className="text-blue-600 hover:underline" target="_blank" rel="noreferrer">
+                                    <a href={o.websiteUrl} className="break-all text-blue-600 hover:underline" target="_blank" rel="noreferrer">
                                         {o.websiteUrl}
                                     </a>
                                 </dd>
@@ -127,7 +127,7 @@ function OrgAndAccountDetails({ row }: { row: MembershipRow }) {
                         </div>
                         <div>
                             <dt className="text-xs text-slate-500">Email</dt>
-                            <dd>{u.email}</dd>
+                            <dd className="break-all">{u.email}</dd>
                         </div>
                         <div>
                             <dt className="text-xs text-slate-500">Role · status</dt>
@@ -320,8 +320,8 @@ export default function AdminOrgMembershipPage() {
                             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                                 <div>
                                     <p className="font-semibold text-slate-900">{r.user?.name || "Unknown user"}</p>
-                                    <p className="text-sm text-slate-600">{r.user?.email}</p>
-                                    <p className="mt-1 text-xs text-slate-500">
+                                    <p className="text-sm text-slate-600 break-all">{r.user?.email}</p>
+                                    <p className="mt-1 text-xs text-slate-500 break-all">
                                         Role: {r.user?.role} · User ID: {r.userId} · PKR {r.paidAmountPkr.toLocaleString("en-PK")}
                                         {tab === "history" ? (
                                             <>
@@ -363,7 +363,7 @@ export default function AdminOrgMembershipPage() {
                                             type="button"
                                             disabled={actingId === r.id}
                                             onClick={() => approve(r.id)}
-                                            className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+                                            className="inline-flex min-h-10 items-center gap-1 rounded-lg bg-emerald-600 px-3 py-2.5 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
                                         >
                                             {actingId === r.id ? (
                                                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -376,7 +376,7 @@ export default function AdminOrgMembershipPage() {
                                             type="button"
                                             disabled={actingId === r.id}
                                             onClick={() => reject(r.id)}
-                                            className="inline-flex items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-800 hover:bg-red-100 disabled:opacity-50"
+                                            className="inline-flex min-h-10 items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-sm font-medium text-red-800 hover:bg-red-100 disabled:opacity-50"
                                         >
                                             <X className="h-4 w-4" />
                                             Reject

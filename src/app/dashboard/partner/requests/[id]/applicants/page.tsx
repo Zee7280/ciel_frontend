@@ -318,7 +318,7 @@ export default function ManageApplicantsPage() {
                                                     {app.status === 'pending' && (
                                                         <button
                                                             onClick={() => handleStatusUpdate(app.id, 'shortlisted')}
-                                                            className="px-3 py-1.5 border border-blue-200 text-blue-600 rounded-lg hover:bg-blue-50 text-xs font-bold transition-colors"
+                                                            className="px-3 py-2.5 border border-blue-200 text-blue-600 rounded-lg hover:bg-blue-50 text-xs font-bold transition-colors"
                                                         >
                                                             Shortlist
                                                         </button>
@@ -326,7 +326,7 @@ export default function ManageApplicantsPage() {
                                                     {app.status !== 'accepted' && (
                                                         <button
                                                             onClick={() => handleStatusUpdate(app.id, 'accepted')}
-                                                            className="px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 text-xs font-bold shadow-sm shadow-green-500/30 transition-colors"
+                                                            className="px-3 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 text-xs font-bold shadow-sm shadow-green-500/30 transition-colors"
                                                         >
                                                             Accept
                                                         </button>
@@ -334,7 +334,7 @@ export default function ManageApplicantsPage() {
                                                     {app.status !== 'rejected' && (
                                                         <button
                                                             onClick={() => handleStatusUpdate(app.id, 'rejected')}
-                                                            className="px-3 py-1.5 border border-red-200 text-red-600 rounded-lg hover:bg-red-50 text-xs font-bold transition-colors"
+                                                            className="px-3 py-2.5 border border-red-200 text-red-600 rounded-lg hover:bg-red-50 text-xs font-bold transition-colors"
                                                         >
                                                             Reject
                                                         </button>

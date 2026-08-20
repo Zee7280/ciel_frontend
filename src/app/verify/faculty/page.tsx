@@ -49,7 +49,7 @@ function FacultyVerifyContent() {
 
     return (
         <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
-            <div className="max-w-md w-full bg-white rounded-2xl shadow-lg border border-slate-100 p-10 text-center">
+            <div className="max-w-md w-full bg-white rounded-2xl shadow-lg border border-slate-100 p-6 sm:p-10 text-center">
                 <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">Faculty verification</p>
                 <div className="flex justify-center mb-6">
                     {status === "loading" && <Loader2 className="w-12 h-12 text-blue-500 animate-spin" />}

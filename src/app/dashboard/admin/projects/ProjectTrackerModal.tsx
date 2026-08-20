@@ -1095,8 +1095,8 @@ export function ProjectTrackerModal({ row, onClose, onOpenTeamsEnrollments }: Pr
                                                     const pendAtt = a.attendanceSessionsPendingReview ?? 0;
                                                     return (
                                                     <tr key={a.id} className="bg-white">
-                                                        <td className="px-3 py-2.5 min-w-[140px]">
-                                                            <div className="font-bold text-slate-900">{a.studentName}</div>
+                                                        <td className="px-3 py-2.5 min-w-[140px] max-w-[180px]">
+                                                            <div className="font-bold text-slate-900 truncate" title={a.studentName}>{a.studentName}</div>
                                                             {a.studentEmail ? (
                                                                 <div className="text-xs text-slate-500 truncate">{a.studentEmail}</div>
                                                             ) : null}

@@ -451,7 +451,7 @@ export default function Section9Reflection() {
                     </button>
 
                     {showRatingGuide ? (
-                        <div className="overflow-hidden rounded-xl border border-slate-200">
+                        <div className="overflow-x-auto rounded-xl border border-slate-200">
                             <table className="w-full text-left">
                                 <thead className="border-b border-slate-100 bg-slate-50">
                                     <tr>

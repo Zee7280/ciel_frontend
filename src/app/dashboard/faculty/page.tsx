@@ -289,7 +289,7 @@ export default function FacultyDashboard() {
                                         onClick={() => setView(m)}
                                         disabled={isLoading}
                                         className={
-                                            "rounded-lg px-3 py-2 text-xs font-bold transition sm:text-sm " +
+                                            "min-h-10 rounded-lg px-3 py-2.5 text-xs font-bold transition sm:text-sm " +
                                             (activeDashboardView === m
                                                 ? "bg-indigo-600 text-white shadow-sm"
                                                 : "bg-white text-slate-700 ring-1 ring-slate-200/80 hover:bg-slate-50")
@@ -616,10 +616,10 @@ export default function FacultyDashboard() {
                             </div>
 
                             <div className="mt-6 flex gap-3 border-t border-slate-50 pt-6">
-                                <button className="flex-1 rounded-lg bg-slate-50 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100">
+                                <button className="flex-1 min-h-10 rounded-lg bg-slate-50 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-100">
                                     View Roster
                                 </button>
-                                <button className="flex-1 rounded-lg bg-indigo-50 py-2 text-xs font-bold text-indigo-600 hover:bg-indigo-100">
+                                <button className="flex-1 min-h-10 rounded-lg bg-indigo-50 py-2.5 text-xs font-bold text-indigo-600 hover:bg-indigo-100">
                                     Grade Work
                                 </button>
                             </div>

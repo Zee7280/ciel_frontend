@@ -296,7 +296,7 @@ export default function AdminOrganizationsPage() {
                                         <td className="p-6 text-right relative">
                                             <button
                                                 onClick={() => setActiveActionMenu(activeActionMenu === org.id ? null : org.id)}
-                                                className="p-2 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50"
+                                                className="p-2.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50"
                                             >
                                                 <MoreVertical className="w-5 h-5" />
                                             </button>
@@ -312,19 +312,19 @@ export default function AdminOrganizationsPage() {
                                                     </button>
                                                     <button
                                                         onClick={() => handleAction(org.id, 'approve')}
-                                                        className="w-full text-left px-4 py-2 text-sm text-green-600 hover:bg-green-50 font-medium"
+                                                        className="w-full text-left px-4 py-2.5 text-sm text-green-600 hover:bg-green-50 font-medium"
                                                     >
                                                         Approve Organization
                                                     </button>
                                                     <button
                                                         onClick={() => handleAction(org.id, 'suspend')}
-                                                        className="w-full text-left px-4 py-2 text-sm text-amber-600 hover:bg-amber-50 font-medium"
+                                                        className="w-full text-left px-4 py-2.5 text-sm text-amber-600 hover:bg-amber-50 font-medium"
                                                     >
                                                         Suspend Organization
                                                     </button>
                                                     <button
                                                         onClick={() => handleAction(org.id, 'delete')}
-                                                        className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 font-medium"
+                                                        className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 font-medium"
                                                     >
                                                         Delete
                                                     </button>

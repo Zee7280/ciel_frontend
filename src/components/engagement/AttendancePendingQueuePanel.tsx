@@ -608,7 +608,7 @@ export default function AttendancePendingQueuePanel({
                                             disabled={acting !== null}
                                             onClick={() => void act(id, "approve")}
                                             className={clsx(
-                                                "inline-flex items-center justify-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-semibold shadow-sm transition disabled:opacity-50",
+                                                "inline-flex min-h-10 items-center justify-center gap-1 rounded-lg border px-3 py-2 text-xs font-semibold shadow-sm transition disabled:opacity-50",
                                                 isPartner
                                                     ? "rounded-[10px] border-emerald-600 bg-emerald-600 text-white hover:bg-emerald-700"
                                                     : "border-emerald-500 bg-emerald-50 text-emerald-800 hover:bg-emerald-100",
@@ -626,7 +626,7 @@ export default function AttendancePendingQueuePanel({
                                             disabled={acting !== null}
                                             onClick={() => void act(id, "reject")}
                                             className={clsx(
-                                                "inline-flex items-center justify-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-semibold shadow-sm transition disabled:opacity-50",
+                                                "inline-flex min-h-10 items-center justify-center gap-1 rounded-lg border px-3 py-2 text-xs font-semibold shadow-sm transition disabled:opacity-50",
                                                 isPartner
                                                     ? "rounded-[10px] border-red-200 bg-white text-red-700 hover:border-red-300 hover:bg-red-50"
                                                     : "border-red-500 bg-white text-red-700 hover:bg-red-50",
@@ -644,7 +644,7 @@ export default function AttendancePendingQueuePanel({
                                             disabled={acting !== null}
                                             onClick={() => void act(id, "flag")}
                                             className={clsx(
-                                                "inline-flex items-center justify-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-semibold shadow-sm transition disabled:opacity-50",
+                                                "inline-flex min-h-10 items-center justify-center gap-1 rounded-lg border px-3 py-2 text-xs font-semibold shadow-sm transition disabled:opacity-50",
                                                 isPartner
                                                     ? "rounded-[10px] border-amber-200 bg-white text-amber-800 hover:border-amber-300 hover:bg-amber-50"
                                                     : "border-amber-500 bg-white text-amber-800 hover:bg-amber-50",
@@ -905,7 +905,7 @@ export default function AttendancePendingQueuePanel({
                                                             disabled={acting !== null}
                                                             onClick={() => void act(id, "approve")}
                                                             className={clsx(
-                                                                "inline-flex items-center justify-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-semibold shadow-sm transition disabled:opacity-50",
+                                                                "inline-flex min-h-10 items-center justify-center gap-1 rounded-lg border px-3 py-2 text-xs font-semibold shadow-sm transition disabled:opacity-50",
                                                                 isPartner
                                                                     ? "rounded-[10px] border-emerald-600 bg-emerald-600 text-white hover:bg-emerald-700"
                                                                     : "border-emerald-500 bg-emerald-50 text-emerald-800 hover:bg-emerald-100",
@@ -923,7 +923,7 @@ export default function AttendancePendingQueuePanel({
                                                             disabled={acting !== null}
                                                             onClick={() => void act(id, "reject")}
                                                             className={clsx(
-                                                                "inline-flex items-center justify-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-semibold shadow-sm transition disabled:opacity-50",
+                                                                "inline-flex min-h-10 items-center justify-center gap-1 rounded-lg border px-3 py-2 text-xs font-semibold shadow-sm transition disabled:opacity-50",
                                                                 isPartner
                                                                     ? "rounded-[10px] border-red-200 bg-white text-red-700 hover:border-red-300 hover:bg-red-50"
                                                                     : "border-red-500 bg-white text-red-700 hover:bg-red-50",
@@ -941,7 +941,7 @@ export default function AttendancePendingQueuePanel({
                                                             disabled={acting !== null}
                                                             onClick={() => void act(id, "flag")}
                                                             className={clsx(
-                                                                "inline-flex items-center justify-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-semibold shadow-sm transition disabled:opacity-50",
+                                                                "inline-flex min-h-10 items-center justify-center gap-1 rounded-lg border px-3 py-2 text-xs font-semibold shadow-sm transition disabled:opacity-50",
                                                                 isPartner
                                                                     ? "rounded-[10px] border-amber-200 bg-white text-amber-800 hover:border-amber-300 hover:bg-amber-50"
                                                                     : "border-amber-500 bg-white text-amber-800 hover:bg-amber-50",

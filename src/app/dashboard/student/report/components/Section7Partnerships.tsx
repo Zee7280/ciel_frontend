@@ -847,7 +847,7 @@ export default function Section7Partnerships({ projectData }: { projectData?: an
                         ))}
                     </div>
 
-                    <div className="grid grid-cols-3 gap-3 rounded-xl border border-slate-200 bg-white p-4 text-center shadow-sm">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 rounded-xl border border-slate-200 bg-white p-4 text-center shadow-sm">
                         {[
                             { label: "Fully verified", val: fullyVerified, color: "text-emerald-600" },
                             { label: "Partially verified", val: partiallyVerified, color: "text-indigo-600" },

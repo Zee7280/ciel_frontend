@@ -878,7 +878,7 @@ function ReportFormContent() {
                                             }
                                         }}
                                         className={clsx(
-                                            "flex items-center gap-1.5 px-2.5 py-1 rounded-md transition-all text-[10px] font-bold uppercase tracking-tight cursor-pointer",
+                                            "flex items-center gap-1.5 px-2.5 py-1 min-h-10 rounded-md transition-all text-[10px] font-bold uppercase tracking-tight cursor-pointer",
                                             stepperLockedToSummaryOnly && stepNum !== 11 && "pointer-events-none cursor-not-allowed opacity-35",
                                             stepperLockedToSection1Only && stepNum !== 1 && "pointer-events-none cursor-not-allowed opacity-35",
                                             isActive ? "bg-blue-600 text-white shadow-lg shadow-blue-200/50 scale-105"
@@ -887,7 +887,7 @@ function ReportFormContent() {
                                         )}
                                     >
                                         <div className={clsx(
-                                            "w-4 h-4 rounded-full flex items-center justify-center text-[9px] border transition-colors",
+                                            "w-6 h-6 rounded-full flex items-center justify-center text-[9px] border transition-colors",
                                             isActive ? "border-white bg-white/20" : isCompleted ? "border-blue-200 bg-blue-50" : "border-slate-300"
                                         )}>
                                             {stepNum}

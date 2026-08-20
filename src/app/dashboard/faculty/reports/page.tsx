@@ -242,7 +242,7 @@ export default function FacultyStudentReportsPage() {
                                                         onClick={() =>
                                                             router.push(`/dashboard/faculty/reports/${report.id}`)
                                                         }
-                                                        className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-800"
+                                                        className="inline-flex h-10 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-800"
                                                     >
                                                         <Eye className="h-3.5 w-3.5" />
                                                         View dossier

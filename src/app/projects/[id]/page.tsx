@@ -277,7 +277,7 @@ export default function ProjectDetailsPage() {
                 </Link>
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                     <div>
-                        <h1 className="text-4xl md:text-5xl font-black text-slate-900 mb-3 tracking-tight leading-tight">{project.title}</h1>
+                        <h1 className="text-2xl sm:text-3xl md:text-5xl font-black text-slate-900 mb-3 tracking-tight leading-tight">{project.title}</h1>
                         {project.types && project.types.length > 0 ? (
                             <div className="flex flex-wrap gap-2 mb-2">
                                 {project.types.map((t) => (

@@ -363,7 +363,7 @@ export default function FypThesisPage() {
                                 onClick={() => i <= entry.stepCompleted && setStep(i)}
                                 disabled={i > entry.stepCompleted}
                                 className={clsx(
-                                    "ciel-transition flex h-8 min-w-[2rem] items-center justify-center gap-1 rounded-full px-2 text-xs font-black",
+                                    "ciel-transition flex h-10 min-w-[2.5rem] items-center justify-center gap-1 rounded-full px-2 text-xs font-black",
                                     step === i ? "bg-ciel-navy text-white" : i < entry.stepCompleted ? "bg-ciel-green-soft text-ciel-green-deep" : i === entry.stepCompleted ? "border-2 border-ciel-border text-ciel-text-mid" : "cursor-not-allowed text-ciel-border",
                                 )}
                                 title={s.label}

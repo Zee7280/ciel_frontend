@@ -252,7 +252,7 @@ export default function DashboardHeader() {
     };
 
     return (
-        <header className="sticky top-0 z-30 flex min-h-16 items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 py-3 font-sans sm:px-6 lg:ml-64 lg:h-20 lg:px-8">
+        <header className="ciel-transition sticky top-0 z-30 flex min-h-16 items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 py-3 font-sans sm:px-6 lg:ml-[var(--ciel-sidebar-width)] lg:h-20 lg:px-8">
             <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                     <h1 className="truncate text-base font-black tracking-tight text-slate-900 sm:text-xl">

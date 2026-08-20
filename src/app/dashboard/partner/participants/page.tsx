@@ -155,10 +155,10 @@ export default function PartnerParticipantsPage() {
                                         </span>
                                     </td>
                                     <td className="p-6 text-right flex justify-end gap-2">
-                                        <button className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg" title="View Timesheets">
+                                        <button className="p-2.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg" title="View Timesheets">
                                             <Eye className="w-4 h-4" />
                                         </button>
-                                        <button className="p-2 text-slate-400 hover:text-green-600 hover:bg-green-50 rounded-lg" title="Mark Complete">
+                                        <button className="p-2.5 text-slate-400 hover:text-green-600 hover:bg-green-50 rounded-lg" title="Mark Complete">
                                             <CheckCircle className="w-4 h-4" />
                                         </button>
                                     </td>

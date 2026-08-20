@@ -60,7 +60,7 @@ export default function PathWorkspaceShell({
                 <Tabs tabs={tabs} active={activeTab} onChange={onTabChange} />
             </div>
 
-            <div className="mt-6 flex gap-6">
+            <div className="mt-6 flex flex-col gap-6 lg:flex-row">
                 <div className="min-w-0 flex-1">{children}</div>
                 {contextRail}
             </div>

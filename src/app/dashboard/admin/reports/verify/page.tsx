@@ -766,22 +766,26 @@ export default function AdminReportsVerificationPage() {
                     const mergeKeep = mergeKeepId === report.id;
                     return (
                         <div className="flex flex-col items-center gap-1.5">
-                            <input
-                                type="checkbox"
-                                checked={mergeChecked}
-                                onChange={(e) => toggleMergeReport(report.id, e.target.checked)}
-                                aria-label={`Select report ${report.id}`}
-                                className="h-4 w-4 rounded border-slate-300 text-violet-600"
-                            />
+                            <label className="inline-flex cursor-pointer items-center justify-center p-1.5 -m-1.5">
+                                <input
+                                    type="checkbox"
+                                    checked={mergeChecked}
+                                    onChange={(e) => toggleMergeReport(report.id, e.target.checked)}
+                                    aria-label={`Select report ${report.id}`}
+                                    className="h-4 w-4 rounded border-slate-300 text-violet-600"
+                                />
+                            </label>
                             {mergeChecked ? (
                                 <label className="inline-flex flex-col items-center gap-0.5 text-[9px] font-bold uppercase tracking-wide text-violet-700">
-                                    <input
-                                        type="radio"
-                                        name="merge-keep-report"
-                                        checked={mergeKeep}
-                                        onChange={() => setMergeKeepId(report.id)}
-                                        className="h-3 w-3"
-                                    />
+                                    <span className="inline-flex cursor-pointer items-center justify-center p-1.5 -m-1.5">
+                                        <input
+                                            type="radio"
+                                            name="merge-keep-report"
+                                            checked={mergeKeep}
+                                            onChange={() => setMergeKeepId(report.id)}
+                                            className="h-3 w-3"
+                                        />
+                                    </span>
                                     Keep
                                 </label>
                             ) : null}
@@ -901,10 +905,10 @@ export default function AdminReportsVerificationPage() {
             },
             {
                 name: 'CII',
-                width: '176px',
-                minWidth: '176px',
+                width: '216px',
+                minWidth: '216px',
                 cell: (report) => (
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-2">
                         <span className="w-10 text-xs font-bold tabular-nums text-indigo-700">
                             {typeof ciiScores[report.id] === 'number'
                                 ? `${ciiScores[report.id]}`
@@ -917,7 +921,7 @@ export default function AdminReportsVerificationPage() {
                             onClick={() => void handleRefreshAiScore(report.id)}
                             disabled={Boolean(refreshingReportIds[report.id]) || Boolean(refreshingMasterRubricReportIds[report.id])}
                             title="Refresh AI CII score (v8.2)"
-                            className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-violet-200/80 bg-violet-50 text-violet-700 transition hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-50"
+                            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-violet-200/80 bg-violet-50 text-violet-700 transition hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                             {refreshingReportIds[report.id] ? (
                                 <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
@@ -930,7 +934,7 @@ export default function AdminReportsVerificationPage() {
                             onClick={() => void handleRefreshMasterRubricAiScore(report.id)}
                             disabled={Boolean(refreshingMasterRubricReportIds[report.id]) || Boolean(refreshingReportIds[report.id])}
                             title="Score with Master Rubric v1.2 (0–100)"
-                            className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-amber-200/80 bg-amber-50 text-amber-800 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50"
+                            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-amber-200/80 bg-amber-50 text-amber-800 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                             {refreshingMasterRubricReportIds[report.id] ? (
                                 <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
@@ -943,7 +947,7 @@ export default function AdminReportsVerificationPage() {
                             onClick={() => void handleDownloadAiPayload(report.id)}
                             disabled={Boolean(downloadingAiPayloadIds[report.id])}
                             title="Download AI payload JSON"
-                            className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                             {downloadingAiPayloadIds[report.id] ? (
                                 <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
@@ -969,7 +973,7 @@ export default function AdminReportsVerificationPage() {
                     <button
                         type="button"
                         onClick={() => router.push(`/dashboard/admin/reports/verify/${report.id}`)}
-                        className="inline-flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-700"
+                        className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-700"
                     >
                         <Eye className="h-3.5 w-3.5 shrink-0" />
                         Review
@@ -1105,7 +1109,7 @@ export default function AdminReportsVerificationPage() {
                             type="button"
                             onClick={() => setDuplicatesOnly((v) => !v)}
                             className={clsx(
-                                'inline-flex h-9 w-full items-center justify-center gap-2 rounded-lg border px-3 text-sm font-medium transition shadow-sm sm:w-auto',
+                                'inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg border px-3 text-sm font-medium transition shadow-sm sm:w-auto',
                                 duplicatesOnly
                                     ? 'border-violet-300 bg-violet-50 text-violet-900'
                                     : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300',
@@ -1140,7 +1144,7 @@ export default function AdminReportsVerificationPage() {
                         <button
                             type="button"
                             onClick={resetFilters}
-                            className="h-9 w-full rounded-lg border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 sm:w-auto"
+                            className="h-10 w-full rounded-lg border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 sm:w-auto"
                         >
                             Reset
                         </button>
@@ -1248,7 +1252,7 @@ export default function AdminReportsVerificationPage() {
                                                     <button
                                                         type="button"
                                                         onClick={() => selectDuplicateGroup(group)}
-                                                        className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg bg-violet-100 px-3 py-1.5 text-xs font-bold text-violet-800 transition hover:bg-violet-200"
+                                                        className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-lg bg-violet-100 px-3 py-1.5 text-xs font-bold text-violet-800 transition hover:bg-violet-200"
                                                     >
                                                         <Copy className="h-3.5 w-3.5" />
                                                         Select {group.reports.length} rows
@@ -1271,7 +1275,7 @@ export default function AdminReportsVerificationPage() {
                                     type="button"
                                     disabled={mergeSubmitting || !mergeSelectionSameProject || !mergeKeepId}
                                     onClick={() => void handleMergeReports()}
-                                    className="inline-flex items-center gap-2 rounded-xl bg-violet-600 px-4 py-2 text-sm font-bold text-white hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-50"
+                                    className="inline-flex h-10 items-center gap-2 rounded-xl bg-violet-600 px-4 py-2 text-sm font-bold text-white hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-50"
                                 >
                                     {mergeSubmitting ? (
                                         <>

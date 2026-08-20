@@ -293,7 +293,7 @@ export default function AdminUsersPage() {
         "h-10 rounded-lg border border-slate-200 bg-white text-sm text-slate-800 outline-none transition-shadow focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400";
 
     return (
-        <div className="relative p-0 lg:p-8">
+        <div className="relative p-4 sm:p-6 lg:p-8">
             <div className="mb-5 space-y-4">
                 <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
                 <div>
@@ -396,9 +396,9 @@ export default function AdminUsersPage() {
                                     <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center font-bold text-slate-500 uppercase">
                                         {user.name && user.name[0]}
                                     </div>
-                                    <div>
-                                        <div className="font-bold text-slate-900">{user.name}</div>
-                                        <div className="text-sm text-slate-500">{user.email}</div>
+                                    <div className="min-w-0">
+                                        <div className="font-bold text-slate-900 truncate">{user.name}</div>
+                                        <div className="text-sm text-slate-500 truncate">{user.email}</div>
                                     </div>
                                 </div>
                             ),
@@ -430,7 +430,7 @@ export default function AdminUsersPage() {
                                                   <button
                                                       type="button"
                                                       onClick={() => togglePasswordReveal(user.id)}
-                                                      className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+                                                      className="rounded-md p-2.5 text-slate-500 hover:bg-slate-100 hover:text-slate-800"
                                                       title={revealed ? "Hide password" : "Show password"}
                                                       aria-label={revealed ? "Hide password" : "Show password"}
                                                   >
@@ -443,7 +443,7 @@ export default function AdminUsersPage() {
                                                   <button
                                                       type="button"
                                                       onClick={() => copyStoredPassword(stored)}
-                                                      className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+                                                      className="rounded-md p-2.5 text-slate-500 hover:bg-slate-100 hover:text-slate-800"
                                                       title="Copy password"
                                                       aria-label="Copy password"
                                                   >
@@ -544,7 +544,7 @@ export default function AdminUsersPage() {
                                             const { x, y } = computeActionMenuPosition(rect);
                                             setActionMenu({ userId: user.id, x, y });
                                         }}
-                                        className="p-2 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition"
+                                        className="p-2.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition"
                                     >
                                         <MoreVertical className="w-5 h-5" />
                                     </button>
@@ -630,7 +630,7 @@ export default function AdminUsersPage() {
                                     aria-label="First page"
                                     disabled={currentPage <= 1}
                                     onClick={() => setCurrentPage(1)}
-                                    className="p-2 rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-800 disabled:opacity-40 disabled:pointer-events-none transition-colors"
+                                    className="p-2.5 rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-800 disabled:opacity-40 disabled:pointer-events-none transition-colors"
                                 >
                                     <ChevronsLeft className="w-4 h-4" />
                                 </button>
@@ -639,7 +639,7 @@ export default function AdminUsersPage() {
                                     aria-label="Previous page"
                                     disabled={currentPage <= 1}
                                     onClick={() => setCurrentPage((p) => p - 1)}
-                                    className="p-2 rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-800 disabled:opacity-40 disabled:pointer-events-none transition-colors"
+                                    className="p-2.5 rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-800 disabled:opacity-40 disabled:pointer-events-none transition-colors"
                                 >
                                     <ChevronLeft className="w-4 h-4" />
                                 </button>
@@ -648,7 +648,7 @@ export default function AdminUsersPage() {
                                     aria-label="Next page"
                                     disabled={currentPage >= totalPages}
                                     onClick={() => setCurrentPage((p) => p + 1)}
-                                    className="p-2 rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-800 disabled:opacity-40 disabled:pointer-events-none transition-colors"
+                                    className="p-2.5 rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-800 disabled:opacity-40 disabled:pointer-events-none transition-colors"
                                 >
                                     <ChevronRight className="w-4 h-4" />
                                 </button>
@@ -657,7 +657,7 @@ export default function AdminUsersPage() {
                                     aria-label="Last page"
                                     disabled={currentPage >= totalPages}
                                     onClick={() => setCurrentPage(totalPages)}
-                                    className="p-2 rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-800 disabled:opacity-40 disabled:pointer-events-none transition-colors"
+                                    className="p-2.5 rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-800 disabled:opacity-40 disabled:pointer-events-none transition-colors"
                                 >
                                     <ChevronsRight className="w-4 h-4" />
                                 </button>
@@ -680,14 +680,14 @@ export default function AdminUsersPage() {
                         <button
                             type="button"
                             onClick={() => openEditModal(actionMenuUser)}
-                            className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
+                            className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50"
                         >
                             <Edit className="h-4 w-4 shrink-0" /> Edit
                         </button>
                         <button
                             type="button"
                             onClick={() => handleDeleteUser(actionMenuUser.id)}
-                            className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50"
+                            className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50"
                         >
                             <Trash2 className="h-4 w-4 shrink-0" /> Delete
                         </button>

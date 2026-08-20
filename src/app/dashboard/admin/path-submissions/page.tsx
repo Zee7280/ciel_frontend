@@ -413,7 +413,7 @@ export default function AdminPathSubmissionsPage() {
                                                   </Badge>
                                               </div>
                                               <p className="text-sm font-semibold text-slate-700">{row.course || "Course not set"}</p>
-                                              <p className="text-sm text-slate-600">{studentLine(row.student)}</p>
+                                              <p className="text-sm text-slate-600 break-words">{studentLine(row.student)}</p>
                                               <p className="line-clamp-2 text-sm text-slate-500">{row.projectDescription || "No description yet."}</p>
                                               <p className="text-xs text-slate-400">Updated {new Date(row.updatedAt).toLocaleString()}</p>
                                           </div>
@@ -447,7 +447,7 @@ export default function AdminPathSubmissionsPage() {
                                                       <ul className="mt-2 space-y-2">
                                                           {row.evidenceUrls.map((url) => (
                                                               <li key={url}>
-                                                                  <a href={url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-sm font-semibold text-emerald-700 hover:underline">
+                                                                  <a href={url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-sm font-semibold text-emerald-700 hover:underline break-all">
                                                                       {url.split("/").pop() || url}
                                                                       <ExternalLink className="h-3.5 w-3.5" />
                                                                   </a>
@@ -497,7 +497,7 @@ export default function AdminPathSubmissionsPage() {
                                                           : `${row.milestonesComplete}/${row.milestonesTotal} milestones`}
                                                   </Badge>
                                               </div>
-                                              <p className="text-sm text-slate-600">{studentLine(row.student)}</p>
+                                              <p className="text-sm text-slate-600 break-words">{studentLine(row.student)}</p>
                                               <p className="line-clamp-2 text-sm text-slate-500">
                                                   {row.sectionSummaries?.project || row.overview || "No overview yet."}
                                               </p>
@@ -607,7 +607,7 @@ export default function AdminPathSubmissionsPage() {
                                                   )}
                                               </div>
                                               <p className="text-sm font-semibold text-slate-700">{row.stage || "Stage not set"}</p>
-                                              <p className="text-sm text-slate-600">{studentLine(row.student)}</p>
+                                              <p className="text-sm text-slate-600 break-words">{studentLine(row.student)}</p>
                                               <p className="line-clamp-2 text-sm text-slate-500">{row.sectionSummaries?.opportunity || row.description || "No description yet."}</p>
                                               <p className="text-xs text-slate-500">
                                                   {row.tractionRows.length} traction row(s) · {row.team.length} team member(s) ·{" "}
@@ -671,7 +671,7 @@ export default function AdminPathSubmissionsPage() {
                                                       <ul className="mt-2 space-y-2">
                                                           {row.materialUrls.map((url) => (
                                                               <li key={url}>
-                                                                  <a href={url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-sm font-semibold text-emerald-700 hover:underline">
+                                                                  <a href={url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-sm font-semibold text-emerald-700 hover:underline break-all">
                                                                       {url.split("/").pop() || url}
                                                                       <ExternalLink className="h-3.5 w-3.5" />
                                                                   </a>

@@ -1864,7 +1864,7 @@ export default function AdminProjectsPage() {
                                 e.stopPropagation();
                                 openProjectTrackerModal(r);
                             }}
-                            className="text-blue-600 hover:text-blue-800 p-1.5 rounded-full hover:bg-blue-50 transition-colors"
+                            className="text-blue-600 hover:text-blue-800 p-2.5 rounded-full hover:bg-blue-50 transition-colors"
                             aria-label="Track project pipeline"
                             title="Track project — details, applicants, stages"
                         >
@@ -1881,7 +1881,7 @@ export default function AdminProjectsPage() {
                                         : { id: r.id, top: rect.bottom + 6, right: window.innerWidth - rect.right },
                                 );
                             }}
-                            className="admin-project-menu-trigger text-slate-400 hover:text-slate-600 p-1.5 rounded-full hover:bg-slate-200 transition-colors"
+                            className="admin-project-menu-trigger text-slate-400 hover:text-slate-600 p-2.5 rounded-full hover:bg-slate-200 transition-colors"
                             aria-label="More actions"
                             aria-expanded={activeMenu?.id === r.id}
                         >
@@ -2281,7 +2281,7 @@ export default function AdminProjectsPage() {
                                                 type="button"
                                                 onClick={() => void handleRemoveIncompleteApplicant(r.applicationId)}
                                                 disabled={deletingApplicationId === r.applicationId}
-                                                className="shrink-0 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold text-red-700 bg-red-50 hover:bg-red-100 border border-red-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                className="shrink-0 inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg text-xs font-bold text-red-700 bg-red-50 hover:bg-red-100 border border-red-100 disabled:opacity-50 disabled:cursor-not-allowed"
                                             >
                                                 {deletingApplicationId === r.applicationId ? (
                                                     <>
@@ -2608,7 +2608,7 @@ export default function AdminProjectsPage() {
                                                                 ? "This row uses a listing-only group id (individual:…), not a persisted team id. Use per-member removal or application withdraw until the API supports synthetic ids."
                                                                 : undefined
                                                         }
-                                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-red-700 bg-red-50 border border-red-100 hover:bg-red-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                        className="inline-flex items-center gap-1.5 px-3 py-2.5 rounded-lg text-xs font-bold text-red-700 bg-red-50 border border-red-100 hover:bg-red-100 disabled:opacity-50 disabled:cursor-not-allowed"
                                                     >
                                                         {deletingTeamId === team.id ? (
                                                             <>
@@ -2713,16 +2713,16 @@ export default function AdminProjectsPage() {
                                                                         </td>
                                                                         <td className="px-4 py-3 text-xs text-slate-700 max-w-[260px]">
                                                                             {member.universityName.trim() ? (
-                                                                                <div className="font-medium text-slate-800">{member.universityName}</div>
+                                                                                <div className="font-medium text-slate-800 break-words">{member.universityName}</div>
                                                                             ) : null}
                                                                             {member.universityId.trim() ? (
-                                                                                <div className="text-slate-500 mt-0.5">ID: {member.universityId}</div>
+                                                                                <div className="text-slate-500 mt-0.5 break-words">ID: {member.universityId}</div>
                                                                             ) : null}
                                                                             {member.academicProgram.trim() ? (
-                                                                                <div className="mt-1 text-slate-600">{member.academicProgram}</div>
+                                                                                <div className="mt-1 text-slate-600 break-words">{member.academicProgram}</div>
                                                                             ) : null}
                                                                             {academicBits.length ? (
-                                                                                <div className="text-slate-500 mt-1 leading-snug">{academicBits.join(" · ")}</div>
+                                                                                <div className="text-slate-500 mt-1 leading-snug break-words">{academicBits.join(" · ")}</div>
                                                                             ) : null}
                                                                             {!member.universityName.trim() &&
                                                                             !member.universityId.trim() &&
@@ -2774,7 +2774,7 @@ export default function AdminProjectsPage() {
                                                                                                 ? "Remove admin attendance override"
                                                                                                 : "Allow this member to log attendance even when identity or verification gates are incomplete"
                                                                                         }
-                                                                                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-100 hover:bg-emerald-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                                                        className="inline-flex items-center gap-1 px-2.5 py-2 rounded-md text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-100 hover:bg-emerald-100 disabled:opacity-50 disabled:cursor-not-allowed"
                                                                                     >
                                                                                         {attendanceBusy ? (
                                                                                             <>
@@ -2836,7 +2836,7 @@ export default function AdminProjectsPage() {
                                                                                     type="button"
                                                                                     onClick={() => void handleRemoveTeamMember(team.id, member.id)}
                                                                                     disabled={deletingMemberId === member.id}
-                                                                                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-[11px] font-bold text-red-700 bg-red-50 border border-red-100 hover:bg-red-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                                                    className="inline-flex items-center gap-1 px-3 py-2.5 rounded-md text-[11px] font-bold text-red-700 bg-red-50 border border-red-100 hover:bg-red-100 disabled:opacity-50 disabled:cursor-not-allowed"
                                                                                 >
                                                                                     {deletingMemberId === member.id ? (
                                                                                         <>
