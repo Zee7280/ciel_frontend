@@ -5,7 +5,7 @@ import { ChevronDown, Trophy } from "lucide-react";
 import clsx from "clsx";
 import { sdgData } from "@/utils/sdgData";
 import { type CourseProjectEntry, stripEmoji } from "@/utils/courseProjectTypes";
-import { MERIT_RUBRIC, MERIT_NEUTRALITY_NOTE, computeMeritScorecard, type MeritScorecard } from "@/utils/courseworkMeritModel";
+import { MERIT_RUBRIC, MERIT_NEUTRALITY_NOTE, computeMeritScorecard, whyItLeads, courseworkPotential } from "@/utils/courseworkMeritModel";
 
 export interface MeritEntry extends CourseProjectEntry {
     student?: { id: string; name: string; email: string; institution?: string; department?: string } | null;
@@ -13,6 +13,12 @@ export interface MeritEntry extends CourseProjectEntry {
 
 function entryDepartment(e: MeritEntry): string {
     return e.student?.department || e.studentInfo?.department || "Unspecified";
+}
+function entryUniversity(e: MeritEntry): string {
+    return e.student?.institution || e.studentInfo?.universityName || "Unspecified";
+}
+function entryFaculty(e: MeritEntry): string {
+    return e.studentInfo?.teacherName || "Unassigned";
 }
 function entrySemesterNum(e: MeritEntry): number {
     const m = (e.studentInfo?.semester || "").match(/\d+/);
@@ -27,13 +33,6 @@ function entryEmoji(e: MeritEntry): string {
     return m ? m[0] : "📄";
 }
 
-/** Why the top-ranked entries lead — derived from their own highest-scoring criteria, not a canned line. */
-function whyItLeads(sc: MeritScorecard): string {
-    const ranked = [...sc.criteria].sort((a, b) => b.points / b.max - a.points / a.max);
-    const top = ranked.slice(0, 2).map((c) => c.label.replace(/^\d+ · /, "").toLowerCase());
-    return `Leads on ${top.join(" and ")} — ${sc.consistency.ok ? "claims match its declared evidence" : "though see the consistency flag below"}.`;
-}
-
 /**
  * Deterministic "Merit Model" ranking panel — computes the six-criterion public rubric score for each
  * entry client-side (no AI call, no run-to-run variance) and ranks on request. Shared by the university
@@ -42,16 +41,26 @@ function whyItLeads(sc: MeritScorecard): string {
 export default function MeritModelPanel({
     entries,
     showDepartmentFilter = false,
+    showFacultyFilter = false,
+    showUniversityFilter = false,
 }: {
     entries: MeritEntry[];
     /** Show a department dropdown — meaningful for a university-wide pool, not a single faculty member's list. */
     showDepartmentFilter?: boolean;
+    /** Show a faculty/supervisor dropdown — meaningful once the pool spans more than one teacher (university or CIEL scope). */
+    showFacultyFilter?: boolean;
+    /** Show a university dropdown — only meaningful for the CIEL-wide, all-universities scope. */
+    showUniversityFilter?: boolean;
 }) {
     const [ranked, setRanked] = useState(false);
     const [department, setDepartment] = useState("all");
+    const [faculty, setFaculty] = useState("all");
+    const [university, setUniversity] = useState("all");
     const [openId, setOpenId] = useState<string | null>(null);
 
     const departments = useMemo(() => Array.from(new Set(entries.map(entryDepartment))).sort(), [entries]);
+    const faculties = useMemo(() => Array.from(new Set(entries.map(entryFaculty))).sort(), [entries]);
+    const universities = useMemo(() => Array.from(new Set(entries.map(entryUniversity))).sort(), [entries]);
     const semesters = useMemo(() => Array.from(new Set(entries.map(entrySemesterNum).filter(Boolean))).sort((a, b) => a - b), [entries]);
     const [semFrom, setSemFrom] = useState<number | "">("");
     const [semTo, setSemTo] = useState<number | "">("");
@@ -61,9 +70,11 @@ export default function MeritModelPanel({
     const pool = useMemo(() => {
         let p = entries;
         if (showDepartmentFilter && department !== "all") p = p.filter((e) => entryDepartment(e) === department);
+        if (showFacultyFilter && faculty !== "all") p = p.filter((e) => entryFaculty(e) === faculty);
+        if (showUniversityFilter && university !== "all") p = p.filter((e) => entryUniversity(e) === university);
         if (semesters.length) p = p.filter((e) => { const s = entrySemesterNum(e); return !s || (s >= from && s <= to); });
         return p;
-    }, [entries, showDepartmentFilter, department, semesters, from, to]);
+    }, [entries, showDepartmentFilter, department, showFacultyFilter, faculty, showUniversityFilter, university, semesters, from, to]);
 
     const scored = useMemo(() => {
         const withScores = pool.map((e) => ({ entry: e, scorecard: computeMeritScorecard(e) }));
@@ -73,15 +84,18 @@ export default function MeritModelPanel({
 
     const avg = scored.length ? Math.round(scored.reduce((s, x) => s + x.scorecard.total, 0) / scored.length) : 0;
     const scopeText = [
+        showUniversityFilter ? (university === "all" ? "all universities" : university) : null,
         showDepartmentFilter ? (department === "all" ? "all departments" : department) : null,
+        showFacultyFilter ? (faculty === "all" ? "all faculty" : faculty) : null,
         semesters.length > 1 ? `Semester ${from} → Semester ${to}` : null,
     ].filter(Boolean).join(" · ");
+    const topN = 10;
 
     return (
         <div className="space-y-4">
             <div className="rounded-ciel-lg border border-ciel-border bg-white p-5">
-                <h2 className="text-sm font-black text-ciel-text">🧮 The rubric — 100 points, 6 criteria, public to everyone</h2>
-                <p className="mt-1 text-xs text-ciel-text-soft">Each criterion maps to sections of the coursework form. Students see this before they write; faculty see it while they review; the university publishes it.</p>
+                <h2 className="text-sm font-black text-ciel-text">🧮 The rubric v2 — 100 points, sustainability weighted strongest by design</h2>
+                <p className="mt-1 text-xs text-ciel-text-soft">Each criterion maps to sections of the coursework form. Students see this before they write; faculty see it while they review; the university publishes it. And every top pick carries the AI&apos;s <b>reason</b> and its <b>🔮 potential forecast</b>.</p>
                 <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
                     {MERIT_RUBRIC.map((c) => (
                         <div key={c.key} className="rounded-ciel-sm border border-ciel-border p-3" style={{ borderTopColor: c.color, borderTopWidth: 3 }}>
@@ -99,12 +113,30 @@ export default function MeritModelPanel({
             </div>
 
             <div className="flex flex-wrap items-end gap-3 rounded-ciel-lg border border-ciel-border bg-white p-4">
+                {showUniversityFilter && universities.length > 1 && (
+                    <div>
+                        <label className="mb-1 block text-[10px] font-bold uppercase tracking-widest text-ciel-text-soft">University</label>
+                        <select value={university} onChange={(e) => setUniversity(e.target.value)} className="rounded-ciel-xs border border-ciel-border bg-white px-3 py-2 text-xs font-semibold text-ciel-text outline-none focus:border-ciel-green">
+                            <option value="all">All universities</option>
+                            {universities.map((u) => <option key={u} value={u}>{u}</option>)}
+                        </select>
+                    </div>
+                )}
                 {showDepartmentFilter && departments.length > 1 && (
                     <div>
-                        <label className="mb-1 block text-[10px] font-bold uppercase tracking-widest text-ciel-text-soft">Department</label>
+                        <label className="mb-1 block text-[10px] font-bold uppercase tracking-widest text-ciel-text-soft">Discipline / school</label>
                         <select value={department} onChange={(e) => setDepartment(e.target.value)} className="rounded-ciel-xs border border-ciel-border bg-white px-3 py-2 text-xs font-semibold text-ciel-text outline-none focus:border-ciel-green">
-                            <option value="all">All departments</option>
+                            <option value="all">All disciplines</option>
                             {departments.map((d) => <option key={d} value={d}>{d}</option>)}
+                        </select>
+                    </div>
+                )}
+                {showFacultyFilter && faculties.length > 1 && (
+                    <div>
+                        <label className="mb-1 block text-[10px] font-bold uppercase tracking-widest text-ciel-text-soft">Faculty</label>
+                        <select value={faculty} onChange={(e) => setFaculty(e.target.value)} className="rounded-ciel-xs border border-ciel-border bg-white px-3 py-2 text-xs font-semibold text-ciel-text outline-none focus:border-ciel-green">
+                            <option value="all">All faculty</option>
+                            {faculties.map((f) => <option key={f} value={f}>{f}</option>)}
                         </select>
                     </div>
                 )}
@@ -135,7 +167,7 @@ export default function MeritModelPanel({
 
             {ranked && (
                 <div className="rounded-ciel-sm border border-ciel-purple-soft bg-ciel-purple-soft/60 px-4 py-3 text-xs leading-relaxed text-ciel-purple">
-                    🧮 <b>Model run complete</b> — {scored.length} flash card{scored.length === 1 ? "" : "s"} scored on the public rubric{scopeText ? <> · scope: {scopeText}</> : null} · cohort average <b>{avg}/100</b>. Same six criteria for every discipline — the order below is merit, nothing else.
+                    🧮 <b>Model run complete</b> — {scored.length} flash card{scored.length === 1 ? "" : "s"} scored on rubric v2 (sustainability-anchored, 25pts){scopeText ? <> · scope: {scopeText}</> : null} · cohort average <b>{avg}/100</b>. Top {Math.min(topN, scored.length)} are AI picks — each with its reason and its 🔮 potential. Order = merit, nothing else.
                 </div>
             )}
 
@@ -144,14 +176,14 @@ export default function MeritModelPanel({
                     <p className="rounded-ciel-sm bg-ciel-page px-4 py-8 text-center text-sm font-semibold text-ciel-text-soft">No flash cards in this scope.</p>
                 )}
                 {scored.map((x, i) => {
-                    const top3 = ranked && i < 3;
+                    const topPick = ranked && i < topN;
                     const open = openId === x.entry.id;
                     const primary = x.entry.sdgMapping?.entries?.[0];
                     const sdg = primary ? sdgData.find((s) => s.number === primary.goalNumber) : null;
                     const displayName = x.entry.student?.name || x.entry.studentInfo?.studentName || "Student";
                     return (
-                        <div key={x.entry.id} className={clsx("relative overflow-hidden rounded-ciel-lg border bg-white", top3 ? "border-ciel-purple/50 shadow-md" : "border-ciel-border")}>
-                            {top3 && (
+                        <div key={x.entry.id} className={clsx("relative overflow-hidden rounded-ciel-lg border bg-white", topPick ? "border-ciel-purple/50 shadow-md" : "border-ciel-border")}>
+                            {topPick && (
                                 <div className="absolute left-0 top-0 flex items-center gap-1 rounded-br-ciel-sm bg-ciel-purple px-3 py-1 text-[9px] font-black text-white">
                                     <Trophy className="h-2.5 w-2.5" /> TOP OF COHORT · #{i + 1}
                                 </div>
@@ -159,7 +191,7 @@ export default function MeritModelPanel({
                             <button
                                 type="button"
                                 onClick={() => setOpenId(open ? null : (x.entry.id ?? null))}
-                                className={clsx("flex w-full items-center gap-3 px-5 py-4 text-left", top3 && "pt-7")}
+                                className={clsx("flex w-full items-center gap-3 px-5 py-4 text-left", topPick && "pt-7")}
                             >
                                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-ciel-sm bg-ciel-page text-sm font-black text-ciel-text-soft">
                                     {ranked ? i + 1 : "·"}
@@ -173,7 +205,7 @@ export default function MeritModelPanel({
                                         )}
                                     </div>
                                     <p className="mt-0.5 truncate text-[11px] font-semibold text-ciel-text-soft">
-                                        {entryDepartment(x.entry)} · {entryFormat(x.entry)} · {x.entry.studentInfo?.semester || "—"} · {displayName}
+                                        {showUniversityFilter ? `${entryUniversity(x.entry)} · ` : ""}{entryDepartment(x.entry)} · {entryFormat(x.entry)} · {x.entry.studentInfo?.semester || "—"} · {displayName}
                                     </p>
                                 </div>
                                 <div className="shrink-0 text-right">
@@ -183,7 +215,12 @@ export default function MeritModelPanel({
                                 <ChevronDown className={clsx("h-4 w-4 shrink-0 text-ciel-text-soft transition-transform", open && "rotate-180")} />
                             </button>
 
-                            {top3 && <p className="px-5 pb-3 pl-[4.5rem] text-[11px] leading-relaxed text-ciel-purple">🏆 {whyItLeads(x.scorecard)}</p>}
+                            {topPick && (
+                                <div className="space-y-1 px-5 pb-3 pl-[4.5rem]">
+                                    <p className="text-[11px] leading-relaxed text-ciel-purple">🤖 <b>AI pick because:</b> {whyItLeads(x.entry, x.scorecard)}</p>
+                                    <p className="text-[11px] leading-relaxed text-ciel-teal">🔮 <b>Potential:</b> {courseworkPotential(x.entry)}</p>
+                                </div>
+                            )}
 
                             {open && (
                                 <div className="space-y-2.5 border-t border-ciel-border bg-ciel-page/40 px-5 py-4">

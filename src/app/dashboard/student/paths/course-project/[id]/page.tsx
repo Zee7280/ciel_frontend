@@ -24,6 +24,9 @@ import {
     normalizeGroupMembers,
     activeSectionKeys,
     SECTION_LABELS,
+    COURSEWORK_MODES,
+    FORMAT_ROUTE,
+    courseProjectRouteFor,
 } from "@/utils/courseProjectTypes";
 
 const STEPS = [
@@ -37,7 +40,7 @@ const STEPS = [
     { key: "submit", emoji: "📤", label: "Submit" },
 ];
 
-const DEPARTMENT_OPTIONS = ["Business & Management", "Economics", "Architecture", "Design", "Fine Arts", "Media & Communication", "Computer Science", "Engineering", "Social Sciences", "Psychology", "Education", "Liberal Arts", "Natural Sciences", "Law", "Health Sciences"];
+const DEPARTMENT_OPTIONS = ["Business & Management", "Economics", "Architecture", "Design", "Fine Arts", "Textile & Fashion", "Media & Communication", "Computer Science", "Engineering", "Mathematics & Statistics", "Social Sciences", "Psychology", "Education", "Liberal Arts", "Languages & Linguistics", "Natural Sciences", "Law", "Medicine & Nursing", "Pharmacy", "Health Sciences", "Agriculture & Food", "Hospitality & Tourism", "Islamic Studies & Theology"];
 const SEMESTER_OPTIONS = Array.from({ length: 10 }, (_, i) => `Semester ${i + 1}`);
 /** Older drafts may have saved a bare number (e.g. "5") from before this was a dropdown — match it to its option so it still shows as selected instead of appearing blank. */
 function semesterSelectValue(raw?: string): string {
@@ -50,29 +53,17 @@ function semesterSelectValue(raw?: string): string {
 const TEAM_MODE_OPTIONS = ["Individual", "Pair", "Group / Team", "Whole class", "Interdisciplinary team"];
 const COURSEWORK_TYPE_OPTIONS = ["Assignment", "Semester project", "Research task", "Case study", "Studio / design project", "Practical / lab work", "Field-based work", "Presentation", "Creative production", "Campaign / activity", "Digital / software project", "Performance / exhibition", "Other"];
 
-/** Which optional modules apply to this assignment's format (Aim, Activities, Methods, Findings, Impact/Results, Limitations). */
-const FORMATS: Record<string, { p: CourseProjectModuleInclusion; note: string }> = {
-    "✍️ Essay / written argument": { p: { aim: true, act: false, meth: true, find: true, imp: false, lim: true }, note: "Aim → Research → Argument → Findings → SDG connection." },
-    "📑 Report": { p: { aim: true, act: true, meth: false, find: true, imp: true, lim: true }, note: "A report usually has objectives, activities, findings and impact." },
-    "🔬 Research paper": { p: { aim: true, act: false, meth: true, find: true, imp: true, lim: true }, note: "Question → Method → Findings → Limitations → SDG connection." },
-    "🧭 Case study": { p: { aim: true, act: false, meth: true, find: true, imp: false, lim: true }, note: "Case → Analysis → Insights → Recommendation → SDG connection." },
-    "🎤 Presentation / slides": { p: { aim: true, act: false, meth: false, find: true, imp: false, lim: false }, note: "A presentation gets your core message and key points — nothing else needed." },
-    "🎨 Design / visual work": { p: { aim: true, act: true, meth: false, find: true, imp: true, lim: true }, note: "Design objective → Creative process → Iterations → Final design → Sustainability." },
-    "📐 Model": { p: { aim: true, act: true, meth: false, find: false, imp: true, lim: true }, note: "A model gets the brief, the process, and the final piece." },
-    "🔧 Prototype": { p: { aim: true, act: true, meth: true, find: false, imp: true, lim: true }, note: "Problem → Build → Test → Result → Sustainability link." },
-    "🧱 Physical product / making": { p: { aim: true, act: true, meth: false, find: false, imp: true, lim: true }, note: "Making work gets the brief, the process, and the final piece." },
-    "📱 App / website / software": { p: { aim: true, act: true, meth: true, find: false, imp: true, lim: true }, note: "Problem → Development → Testing → Users → Output → SDG link." },
-    "📊 Data / analysis": { p: { aim: true, act: false, meth: true, find: true, imp: true, lim: true }, note: "Question → Data → Analysis → Findings → SDG connection." },
-    "🎬 Video / film / audio": { p: { aim: true, act: true, meth: false, find: true, imp: false, lim: false }, note: "Concept → Creative process → Audience → Message → SDG link." },
-    "🖼️ Artwork / creative production": { p: { aim: true, act: true, meth: false, find: true, imp: false, lim: false }, note: "Concept → Creative process → Audience → Message → SDG link." },
-    "📣 Campaign / communication": { p: { aim: true, act: true, meth: false, find: false, imp: true, lim: true }, note: "Goal → Campaign → Reach → Response → SDG link." },
-    "🪧 Poster / infographic": { p: { aim: true, act: true, meth: false, find: false, imp: false, lim: false }, note: "Goal → Design → Message → SDG link." },
-    "🎭 Performance / exhibition": { p: { aim: true, act: true, meth: false, find: true, imp: false, lim: false }, note: "Concept → Creative process → Audience → Message → SDG link." },
-    "🥾 Fieldwork output": { p: { aim: true, act: true, meth: false, find: true, imp: true, lim: true }, note: "Field work gets objectives, activities, what you observed, and impact." },
-    "🧭 Strategy / proposal / plan": { p: { aim: true, act: false, meth: true, find: true, imp: true, lim: true }, note: "A plan gets the opportunity, your research, key numbers and limitations." },
-    "✍️ Other": { p: { aim: true, act: true, meth: true, find: true, imp: true, lim: true }, note: "We've switched everything on — turn off whatever doesn't apply to your work." },
-};
-const FORMAT_OPTIONS = Object.keys(FORMATS);
+/** The 27 raw format choices. Each maps to one of five pathways (COURSEWORK_MODES / FORMAT_ROUTE in courseProjectTypes.ts) which supplies its module-inclusion preset, field vocabulary, and roadmap. */
+const FORMAT_OPTIONS = [
+    "✍️ Essay / written argument", "📑 Report", "🔬 Research paper", "📖 Literature review", "🧪 Lab / practical report",
+    "🧭 Case study", "🩺 Clinical case / care plan", "⚖️ Legal brief / moot",
+    "🎤 Presentation / slides", "🎨 Design / visual work", "📐 Model", "🔧 Prototype", "🧱 Physical product / making",
+    "📱 App / website / software", "📊 Data / analysis", "🌐 Translation / language work",
+    "🎬 Video / film / audio", "🖼️ Artwork / creative production", "📣 Campaign / communication", "🪧 Poster / infographic", "🎭 Performance / exhibition",
+    "🧑‍🏫 Lesson plan / teaching practice", "🎪 Event / experience organised",
+    "🥾 Fieldwork output", "🧭 Strategy / proposal / plan", "💼 Business plan",
+    "✍️ Other",
+];
 
 const INC_TILES: { key: keyof CourseProjectModuleInclusion; emoji: string; label: string }[] = [
     { key: "aim", emoji: "🎯", label: "Aim & objectives" },
@@ -295,8 +286,10 @@ export default function CourseProjectWizardPage() {
         const cur = entry.assignmentInfo?.formats ?? (entry.assignmentInfo?.format ? [entry.assignmentInfo.format] : []);
         const next = cur.includes(fmt) ? cur.filter((x) => x !== fmt) : [...cur, fmt];
         patchGroup("assignmentInfo", { formats: next, format: next[0] });
-        const preset = next[0] ? FORMATS[next[0]]?.p : undefined;
-        if (preset) setEntry((e) => ({ ...e, moduleInclusion: { ...preset } }));
+        if (next[0]) {
+            const preset = COURSEWORK_MODES[courseProjectRouteFor(next)].i;
+            setEntry((e) => ({ ...e, moduleInclusion: { ...preset } }));
+        }
     };
 
     const handleEvidenceFile = async (file: File) => {
@@ -341,6 +334,8 @@ export default function CourseProjectWizardPage() {
         );
     }
 
+    const stepLabels = STEPS.map((s, i) => (routeMode && i >= 2 && i <= 4 ? routeMode.steps[i - 2] : s.label));
+
     const acceptedCount = activeStepIdx.filter((k) => review[k]?.accepted).length;
     const allAccepted = activeStepIdx.length > 0 && acceptedCount === activeStepIdx.length;
     const finalSectionSummaries = (): CourseProjectSectionSummaries => {
@@ -366,8 +361,11 @@ export default function CourseProjectWizardPage() {
     const showCard = (entry.status === "submitted" && !editing) || !isOwner;
     const teamMode = entry.studentInfo?.teamMode ?? "";
     const isTeam = !!teamMode && teamMode !== "Individual";
-    const primaryFormat = entry.assignmentInfo?.formats?.[0] ?? entry.assignmentInfo?.format;
-    const formatMeta = primaryFormat ? FORMATS[primaryFormat] : undefined;
+    const allFormats = entry.assignmentInfo?.formats ?? (entry.assignmentInfo?.format ? [entry.assignmentInfo.format] : []);
+    const primaryFormat = allFormats[0];
+    const route = primaryFormat ? FORMAT_ROUTE[primaryFormat] || "writer" : undefined;
+    const routeMode = route ? COURSEWORK_MODES[route] : undefined;
+    const blended = allFormats.length > 1 && allFormats.slice(1).some((f) => (FORMAT_ROUTE[f] || "writer") !== route);
     const showMetricFields = /measured|target|estimated/i.test(entry.resultsInfo?.evidenceStatus ?? "");
 
     return (
@@ -423,12 +421,12 @@ export default function CourseProjectWizardPage() {
                                     "flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-black ciel-transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ciel-gold",
                                     i === step ? "bg-ciel-gold text-white" : i < entry.stepCompleted ? "bg-ciel-green-soft text-ciel-green-deep" : "bg-ciel-page text-ciel-text-soft",
                                 )}
-                                title={s.label}
+                                title={stepLabels[i]}
                             >
                                 {i < entry.stepCompleted ? <CheckCircle2 className="h-4 w-4" /> : i + 1}
                             </button>
                             <span className={clsx("hidden text-xs font-bold sm:block", i === step ? "text-ciel-text" : "text-ciel-text-soft")}>
-                                {s.emoji} {s.label}
+                                {s.emoji} {stepLabels[i]}
                             </span>
                             {i < STEPS.length - 1 && <div className="h-px flex-1 bg-ciel-border" />}
                         </div>
@@ -548,9 +546,23 @@ export default function CourseProjectWizardPage() {
                                     otherPlaceholder="Describe your format"
                                 />
                             </Field>
-                            {formatMeta && (
+                            {routeMode && (
                                 <div className="rounded-ciel-sm border-2 border-ciel-indigo/30 bg-ciel-indigo-soft/50 px-4 py-3 text-xs font-semibold leading-relaxed text-ciel-indigo">
-                                    🧬 <b>{primaryFormat}</b> detected — we&apos;ll walk you through: <b>{formatMeta.note}</b> Adjust the tiles below if your work differs.
+                                    🧬 <b>{routeMode.name}</b> — led by your first pick, <b>{primaryFormat}</b>. The questions ahead now speak this language; adjust the tiles below if your work differs.
+                                    {blended && <> <br />🔀 <b>Blended work detected</b> — you picked formats from more than one pathway. The first pick leads; use the tiles to add any sections the other format needs.</>}
+                                </div>
+                            )}
+                            {routeMode && (
+                                <div>
+                                    <div className="mb-1.5 text-[10px] font-black uppercase tracking-widest text-ciel-gold-deep">🗺️ Your pathway through this form</div>
+                                    <div className="flex flex-wrap items-center gap-1.5">
+                                        {routeMode.road.map((r, i) => (
+                                            <div key={r} className="flex items-center gap-1.5">
+                                                <span className="rounded-full border border-ciel-gold-soft bg-ciel-gold-soft/70 px-3 py-1.5 text-[10px] font-bold text-ciel-gold-deep">{r}</span>
+                                                {i < routeMode.road.length - 1 && <span className="font-bold text-ciel-border">→</span>}
+                                            </div>
+                                        ))}
+                                    </div>
                                 </div>
                             )}
                             <Field label="Which sections apply to your work?" hint="Pre-set from your format — tap to adjust.">
@@ -585,8 +597,8 @@ export default function CourseProjectWizardPage() {
                     {step === 2 && (
                         inc.aim ? (
                             <>
-                                <Field label="The overall aim (one line)">
-                                    <input type="text" value={entry.aimsInfo?.aimStatement ?? ""} onChange={(e) => patchGroup("aimsInfo", { aimStatement: e.target.value })} placeholder="e.g. Develop a practical strategy to reduce cafeteria waste" className={fieldClass} />
+                                <Field label={`${routeMode?.aimL ?? "The overall aim"} (one line)`}>
+                                    <input type="text" value={entry.aimsInfo?.aimStatement ?? ""} onChange={(e) => patchGroup("aimsInfo", { aimStatement: e.target.value })} placeholder={routeMode?.aimPh ?? "e.g. Develop a practical strategy to reduce cafeteria waste"} className={fieldClass} />
                                 </Field>
                                 <Field label="Objectives">
                                     <div className="space-y-2">
@@ -716,7 +728,7 @@ export default function CourseProjectWizardPage() {
                                 <input type="text" value={entry.resultsInfo?.outputDescription ?? ""} onChange={(e) => patchGroup("resultsInfo", { outputDescription: e.target.value })} placeholder="e.g. A zero-waste cafeteria strategy with implementation recommendations" className={fieldClass} />
                             </Field>
                             {inc.find && (
-                                <Field label="📈 Key findings / conclusions / insights" hint="What did it reveal, demonstrate, propose or conclude?">
+                                <Field label={`📈 ${routeMode?.fndL ?? "Key findings / conclusions / insights"}`} hint="What did it reveal, demonstrate, propose or conclude?">
                                     <div className="space-y-2">
                                         {(entry.resultsInfo?.findings ?? [""]).map((f, i) => (
                                             <input

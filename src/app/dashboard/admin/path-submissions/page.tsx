@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { BookOpen, Briefcase, ExternalLink, GraduationCap, Loader2, Search } from "lucide-react";
+import { BookOpen, Briefcase, Calculator, ExternalLink, GraduationCap, Loader2, Search } from "lucide-react";
 import { authenticatedFetch } from "@/utils/api";
 import { Badge } from "@/app/dashboard/student/report/components/ui/badge";
 import { Card } from "@/app/dashboard/student/report/components/ui/card";
 import { sdgData } from "@/utils/sdgData";
+import MeritModelPanel, { type MeritEntry } from "@/components/ciel/MeritModelPanel";
 
 type PathTab = "course-project" | "fyp-thesis" | "startup-business";
 
@@ -149,6 +150,26 @@ export default function AdminPathSubmissionsPage() {
     const [search, setSearch] = useState("");
     const [loading, setLoading] = useState(true);
     const [expandedId, setExpandedId] = useState<string | null>(null);
+    const [meritView, setMeritView] = useState(false);
+    const [meritEntries, setMeritEntries] = useState<MeritEntry[]>([]);
+    const [meritLoading, setMeritLoading] = useState(false);
+
+    useEffect(() => {
+        if (pathTab !== "course-project" || !meritView) return;
+        let cancelled = false;
+        setMeritLoading(true);
+        authenticatedFetch("/api/v1/admin/paths/course-projects")
+            .then((res) => (res?.ok ? res.json() : null))
+            .then((payload) => {
+                if (!cancelled) setMeritEntries(Array.isArray(payload?.data) ? payload.data : []);
+            })
+            .finally(() => {
+                if (!cancelled) setMeritLoading(false);
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, [pathTab, meritView]);
 
     useEffect(() => {
         setExpandedId(null);
@@ -276,8 +297,30 @@ export default function AdminPathSubmissionsPage() {
                         </button>
                     );
                 })}
+                {pathTab === "course-project" && (
+                    <button
+                        type="button"
+                        onClick={() => setMeritView((v) => !v)}
+                        className={`ml-auto inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-bold transition ${
+                            meritView ? "bg-purple-700 text-white" : "border border-purple-200 bg-white text-purple-700 hover:border-purple-400"
+                        }`}
+                    >
+                        <Calculator className="h-4 w-4" />
+                        {meritView ? "Back to submissions" : "🧮 Merit model — CIEL wide"}
+                    </button>
+                )}
             </div>
 
+            {pathTab === "course-project" && meritView ? (
+                meritLoading ? (
+                    <div className="flex justify-center py-20">
+                        <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
+                    </div>
+                ) : (
+                    <MeritModelPanel entries={meritEntries} showDepartmentFilter showFacultyFilter showUniversityFilter />
+                )
+            ) : (
+            <>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex flex-wrap gap-2">
                     {pathTab === "course-project"
@@ -644,6 +687,8 @@ export default function AdminPathSubmissionsPage() {
                           })
                         : null}
                 </div>
+            )}
+            </>
             )}
         </div>
     );

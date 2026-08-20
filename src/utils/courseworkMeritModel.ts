@@ -13,12 +13,12 @@ export interface MeritRubricCriterion {
     description: string;
 }
 
-/** The public rubric — shown to students before they write, faculty while they review, university on publish. */
+/** The public rubric v2 — sustainability weighted strongest by design. Shown to students before they write, faculty while they review, university on publish. */
 export const MERIT_RUBRIC: MeritRubricCriterion[] = [
-    { key: "purpose", label: "1 · Clarity of purpose", max: 15, color: "#2563eb", description: "A stated aim, concrete objectives, a real issue/question/opportunity named. Form §2–3." },
-    { key: "rigor", label: "2 · Rigor of process", max: 20, color: "#0f766e", description: "Activities & method appropriate to the declared format + scale/scope stated. Practice-based inquiry counts equal to lab testing. §4." },
-    { key: "results", label: "3 · Substance of results", max: 20, color: "#c98a04", description: "Output + insight present; evidence ladder: measured > qualitative > estimated > target > conceptual > not-yet. Honesty never scores zero. §5." },
-    { key: "sdg", label: "4 · SDG authenticity", max: 20, color: "#3F7E44", description: "Primary SDG + target chosen, connection explained, integration level declared. Self-started or emergent links earn a bonus. §6." },
+    { key: "sdg", label: "1 · Sustainability & SDG authenticity — the anchor", max: 25, color: "#3F7E44", description: "Primary SDG + target, connection explained, integration level declared. Self-started or emergent links earn a bonus; decorative name-dropping scores near zero. §6." },
+    { key: "results", label: "2 · Substance of results — is it real & fruitful?", max: 20, color: "#c98a04", description: "Output + insight present; evidence ladder: measured > qualitative > estimated > target > conceptual > not-yet. Honesty never scores zero. §5." },
+    { key: "purpose", label: "3 · Clarity & quality of the idea", max: 15, color: "#2563eb", description: "A stated aim anyone can grasp, concrete objectives, a real issue/question/opportunity — concise beats padded. §2–3." },
+    { key: "rigor", label: "4 · Rigor of process — pathway-adjusted", max: 15, color: "#0f766e", description: "Activities & method appropriate to the declared format + scale stated. Practice-based inquiry counts equal to lab testing. §4." },
     { key: "honesty", label: "5 · Honesty & consistency", max: 15, color: "#dc2626", description: "Limitation named with its effect; numbers correctly classified; claims consistent with evidence (a \"central & demonstrated\" claim needs measurement behind it). §5–7." },
     { key: "refl", label: "6 · Reflection & transfer", max: 10, color: "#7c3aed", description: "What was learned, skills claimed, advice to the next class, a realistic next step. §7." },
 ];
@@ -122,7 +122,7 @@ export function computeMeritScorecard(entry: CourseProjectEntry): MeritScorecard
     const methOk = !inc.meth || methsFilled;
     const fitPts = actOk && methOk ? 2 : actOk || methOk ? 1 : 0;
     const scalePts = !inc.meth || pr.sampleScale?.trim() ? 1 : 0;
-    const rigorPts = clampPts(fitPts * 7 + scalePts * 4 + 2, 20);
+    const rigorPts = clampPts(fitPts * 5.5 + scalePts * 3 + 1, 15);
     const rigorNote =
         fitPts === 2
             ? `Method & activities fit the declared format${scalePts ? "; scale/scope stated" : ""}`
@@ -143,7 +143,7 @@ export function computeMeritScorecard(entry: CourseProjectEntry): MeritScorecard
     const sdgHasHow = primary?.how?.trim() ? 1 : 0;
     const integPts = integrationPoints(rf.integrationLevel || rf.sdgLinkHonesty);
     const origPts = originPoints(sm.origin);
-    const sdgPts = clampPts((primary ? 5 : 0) + sdgHasTarget * 3 + sdgHasHow * 4 + integPts + origPts - 4, 20);
+    const sdgPts = clampPts((primary ? 6 : 0) + sdgHasTarget * 4 + sdgHasHow * 5 + integPts + origPts - 2, 25);
     const sdgNote = primary
         ? `SDG ${primary.goalNumber}${sdgHasTarget ? " + target" : ""}${sdgHasHow ? " + explained link" : ""} · ${stripEmoji(rf.integrationLevel || rf.sdgLinkHonesty || "").toLowerCase() || "integration not declared"} · ${stripEmoji(sm.origin || "").toLowerCase() || "origin not declared"}`
         : "No SDG selected yet";
@@ -174,16 +174,60 @@ export function computeMeritScorecard(entry: CourseProjectEntry): MeritScorecard
     const reflPts = clampPts(learnPts * 3 + advicePts * 2 + nextPts * 1 + Math.min(skillsCount, 4) * 0.5, 10);
     const reflNote = learnPts === 2 ? "Substantive learning + advice to the next class" : learnPts === 1 ? "Some reflection present" : "Reflection thin";
 
+    const critFor = (key: MeritRubricCriterion["key"]) => MERIT_RUBRIC.find((c) => c.key === key)!;
     const criteria: MeritCriterionResult[] = [
-        { ...MERIT_RUBRIC[0], points: purposePts, note: purposeNote },
-        { ...MERIT_RUBRIC[1], points: rigorPts, note: rigorNote },
-        { ...MERIT_RUBRIC[2], points: resultsPts, note: resultsNote },
-        { ...MERIT_RUBRIC[3], points: sdgPts, note: sdgNote },
-        { ...MERIT_RUBRIC[4], points: honestyPtsClamped, note: honestyNote },
-        { ...MERIT_RUBRIC[5], points: reflPts, note: reflNote },
+        { ...critFor("sdg"), points: sdgPts, note: sdgNote },
+        { ...critFor("results"), points: resultsPts, note: resultsNote },
+        { ...critFor("purpose"), points: purposePts, note: purposeNote },
+        { ...critFor("rigor"), points: rigorPts, note: rigorNote },
+        { ...critFor("honesty"), points: honestyPtsClamped, note: honestyNote },
+        { ...critFor("refl"), points: reflPts, note: reflNote },
     ];
     const total = Math.round(criteria.reduce((s, c) => s + c.points, 0));
     const [grade, gradeColor] = meritGrade(total);
 
     return { criteria, total, grade, gradeColor, consistency };
+}
+
+/** True when the sustainability link was self-started by the student/team rather than assigned — mirrors originPoints()'s own detection regex. */
+function isFounderOrigin(origin?: string): boolean {
+    return /introduced by the student|our own idea/i.test(stripEmoji(origin || "").toLowerCase());
+}
+
+const CRITERION_PHRASE: Record<MeritRubricCriterion["key"], (entry: CourseProjectEntry) => string> = {
+    sdg: (entry) => (isFounderOrigin(entry.sdgMapping?.origin) ? "a self-started, authentic sustainability core" : "an authentic, explained sustainability core"),
+    results: (entry) => ((entry.resultsInfo?.evidenceStatus || "").includes("measured result") ? "real measured results — fruitful, not decorative" : "substantive, honestly-classified results"),
+    purpose: () => "a concise, real idea anyone can grasp",
+    rigor: () => "rigor true to its own format",
+    honesty: () => "honest limits & correctly classified numbers",
+    refl: () => "reflection that transfers to the next cohort",
+};
+
+/** Why the top-ranked entries lead — derived from their own two highest-scoring criteria, not a canned line. */
+export function whyItLeads(entry: CourseProjectEntry, sc: MeritScorecard): string {
+    const ranked = [...sc.criteria].sort((a, b) => b.points / b.max - a.points / a.max);
+    const [top1, top2] = ranked;
+    return `${CRITERION_PHRASE[top1.key](entry)}, with ${CRITERION_PHRASE[top2.key](entry)}.`;
+}
+
+/** 🔮 What's the most likely next step for this piece of work — forecast from its own evidence ladder and declared format. */
+export function courseworkPotential(entry: CourseProjectEntry): string {
+    const re = entry.resultsInfo || {};
+    const sm = entry.sdgMapping || {};
+    const fmt = stripEmoji(entry.assignmentInfo?.formats?.[0] || entry.assignmentInfo?.format || "").toLowerCase();
+    const evs = re.evidenceStatus || "";
+    const base =
+        evs === "Actual measured result" ? "already proven at classroom scale"
+        : evs === "Proposed target" ? "a costed plan sitting one approval from implementation"
+        : evs === "Qualitative evidence" ? "documented change, ready for a measured follow-up"
+        : evs === "Estimated / projected" ? "a credible projection ready for a real-world pilot"
+        : "an idea one pilot away from becoming evidence";
+    const next =
+        /software|app/.test(fmt) ? "a natural FYP or Enterprise Path continuation"
+        : /design|model|prototype/.test(fmt) ? "prototype-to-pilot with a partner site next term"
+        : /artwork|exhibition|campaign|media/.test(fmt) ? "university-wide showcase and public-awareness scaling"
+        : /practical|audit|lab|field/.test(fmt) ? "protocol adoption across other departments"
+        : "handover to administration or the next cohort for implementation";
+    const founder = isFounderOrigin(sm.origin) ? " Founder-type initiative: flag to the Enterprise Path." : "";
+    return `${base} — most likely future course: ${next}.${founder}`;
 }

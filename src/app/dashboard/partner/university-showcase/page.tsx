@@ -136,7 +136,7 @@ export default function UniversityShowcasePage() {
 
                 {showMeritModel && !activeLoading && activeCount > 0 && (
                     mode === "course-project" ? (
-                        <MeritModelPanel entries={entries} showDepartmentFilter />
+                        <MeritModelPanel entries={entries} showDepartmentFilter showFacultyFilter />
                     ) : (
                         <FypMeritPanel entries={fypEntries} showSchoolFilter />
                     )

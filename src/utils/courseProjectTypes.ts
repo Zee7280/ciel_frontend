@@ -297,3 +297,104 @@ export function activeSectionKeys(entry: CourseProjectEntry): (keyof CourseProje
 export function primarySdgEntry(entry: CourseProjectEntry): CourseProjectSdgEntry | null {
     return entry.sdgMapping?.entries?.[0] ?? null;
 }
+
+// ---------------------------------------------------------------------------
+// Five pathways — adaptive vocabulary keyed by the assignment's first format pick.
+// Mirrors fypTypes.ts's FYP_MODES/PROJECT_TYPE_ROUTE pattern.
+// ---------------------------------------------------------------------------
+
+export type CourseProjectRoute = "writer" | "advisor" | "maker" | "builder" | "comm";
+
+export interface CourseProjectRouteMode {
+    name: string;
+    aimL: string;
+    aimPh: string;
+    fndL: string;
+    /** Stepper mini-labels for the Aims / Process / Results steps, in that order. */
+    steps: [string, string, string];
+    road: string[];
+    i: CourseProjectModuleInclusion;
+}
+
+export const COURSEWORK_MODES: Record<CourseProjectRoute, CourseProjectRouteMode> = {
+    writer: {
+        name: "✍️ Writer / analyst pathway",
+        aimL: "The overall aim",
+        aimPh: "e.g. Develop a practical strategy to reduce cafeteria waste",
+        fndL: "Key findings / conclusions",
+        steps: ["Aims", "Research", "Findings"],
+        road: ["🎯 Aim", "🔍 Research", "🧠 Argument", "📊 Findings", "🌍 SDG link"],
+        i: { aim: true, act: false, meth: true, find: true, imp: true, lim: true },
+    },
+    advisor: {
+        name: "🧭 Advisor pathway",
+        aimL: "What the brief asked you to solve",
+        aimPh: "e.g. Recommend how the café chain cuts single-use plastic without losing margin",
+        fndL: "Key recommendations",
+        steps: ["Brief", "Analysis", "Recommendation"],
+        road: ["🏢 The brief", "🔍 Analysis", "📈 Recommendation", "📏 Evidence", "🌍 SDG link"],
+        i: { aim: true, act: false, meth: true, find: true, imp: true, lim: true },
+    },
+    maker: {
+        name: "🎨 Maker pathway",
+        aimL: "Your design intention",
+        aimPh: "e.g. A poster series that makes water-saving feel modern, not preachy",
+        fndL: "What the work demonstrates",
+        steps: ["Intention", "Process", "The work"],
+        road: ["💡 Intention", "✂️ Process", "🔁 Iterations", "🖼️ Final work", "🌍 SDG link"],
+        i: { aim: true, act: true, meth: false, find: true, imp: true, lim: true },
+    },
+    builder: {
+        name: "💻 Builder pathway",
+        aimL: "The problem you set out to solve",
+        aimPh: "e.g. Society events clash because no shared campus calendar exists",
+        fndL: "What the build proved",
+        steps: ["Problem", "Build & test", "Output"],
+        road: ["🧩 Problem", "🛠️ Build", "🧪 Testing", "✅ Output", "🌍 SDG link"],
+        i: { aim: true, act: true, meth: true, find: false, imp: true, lim: true },
+    },
+    comm: {
+        name: "📣 Communicator pathway",
+        aimL: "Your concept / message",
+        aimPh: "e.g. Make campus recycling feel like a team sport, not a chore",
+        fndL: "Audience response / what it communicated",
+        steps: ["Concept", "Making", "Response"],
+        road: ["🎬 Concept", "🎥 Making", "👥 Audience", "💬 Response", "🌍 SDG link"],
+        i: { aim: true, act: true, meth: false, find: true, imp: true, lim: false },
+    },
+};
+
+/** Every format maps to exactly one of the five pathways — the first format picked leads. */
+export const FORMAT_ROUTE: Record<string, CourseProjectRoute> = {
+    "✍️ Essay / written argument": "writer",
+    "📑 Report": "writer",
+    "🔬 Research paper": "writer",
+    "📊 Data / analysis": "writer",
+    "🥾 Fieldwork output": "writer",
+    "📖 Literature review": "writer",
+    "🧪 Lab / practical report": "writer",
+    "🌐 Translation / language work": "writer",
+    "🧭 Case study": "advisor",
+    "🧭 Strategy / proposal / plan": "advisor",
+    "🩺 Clinical case / care plan": "advisor",
+    "⚖️ Legal brief / moot": "advisor",
+    "💼 Business plan": "advisor",
+    "🧑‍🏫 Lesson plan / teaching practice": "comm",
+    "🎪 Event / experience organised": "comm",
+    "🎨 Design / visual work": "maker",
+    "📐 Model": "maker",
+    "🔧 Prototype": "maker",
+    "🧱 Physical product / making": "maker",
+    "🖼️ Artwork / creative production": "maker",
+    "🪧 Poster / infographic": "maker",
+    "📱 App / website / software": "builder",
+    "🎤 Presentation / slides": "comm",
+    "🎬 Video / film / audio": "comm",
+    "📣 Campaign / communication": "comm",
+    "🎭 Performance / exhibition": "comm",
+};
+
+export function courseProjectRouteFor(formats?: string[]): CourseProjectRoute {
+    const first = formats?.[0];
+    return FORMAT_ROUTE[first || ""] || "writer";
+}
