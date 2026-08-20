@@ -7,77 +7,32 @@ import { authenticatedFetch } from "@/utils/api";
 import { sdgData } from "@/utils/sdgData";
 import PathWorkspaceShell from "@/components/ciel/PathWorkspaceShell";
 import { WorkspaceSkeleton } from "@/components/ciel/Skeleton";
+import ThesisCard from "@/components/ciel/ThesisCard";
+import {
+    type FypEntry,
+    type FypSdgEntry,
+    type FypSectionSummaries,
+    type FypTeamMember,
+    EMPTY_FYP,
+    mergeFypEntry,
+    normalizeFypTeamMembers,
+    composeFypSummaries,
+    groupFypDeliverablesByLabel,
+    suggestFypSdgs,
+    fypRouteFor,
+    FYP_MODES,
+    FYP_EVIDENCE_STATUS,
+    PROJECT_TYPE_OPTIONS,
+    FYP_SECTION_LABELS,
+    FYP_SECTION_KEYS,
+} from "@/utils/fypTypes";
 
-// ---------------------------------------------------------------------------
-// Types (mirror ciel_backend/src/paths/entities/fyp-entry.entity.ts's new groups)
-// ---------------------------------------------------------------------------
-
-interface FypProjectInfo { title?: string; school?: string; degree?: string; graduationYear?: string; supervisorName?: string; supervisorEmail?: string; }
-interface FypBackgroundInfo { problem?: string; whyUrgent?: string[]; whyUrgentOther?: string; audience?: string[]; audienceOther?: string; }
-interface FypObjectivesInfo { objectives?: string[]; }
-interface FypLiteratureInfo { sourcesReviewed?: string; sourceTypes?: string[]; sourceTypesOther?: string; gap?: string; }
-interface FypMethodologyInfo { approaches?: string[]; methods?: string[]; methodsOther?: string; sampleScale?: string; tools?: string; }
-interface FypFindingsInfo { findings?: string[]; measurableImpact?: string; limitationType?: string; limitationDetail?: string; }
-interface FypSdgEntry { goalNumber: number; targets: string[]; how?: string; }
-interface FypSdgMapping { entries?: FypSdgEntry[]; noSdgApplies?: boolean; }
-interface FypReflectionInfo { biggestLesson?: string; hardestMoment?: string; wrongAssumption?: string; sustainabilityShift?: string; skills?: string[]; whatsNext?: string; adviceForNext?: string; }
-interface FypRepositoryInfo { externalLinks?: string; visibility?: string; }
-interface FypSectionSummaries { project?: string; background?: string; objectives?: string; literature?: string; methodology?: string; findings?: string; sdg?: string; reflection?: string; }
-interface FypDeliverable { version: number; label: string; fileUrl: string; uploadedAt: string; }
-
-interface FypEntry {
-    projectTitle: string | null;
-    projectInfo: FypProjectInfo | null;
-    background: FypBackgroundInfo | null;
-    objectivesInfo: FypObjectivesInfo | null;
-    literature: FypLiteratureInfo | null;
-    methodology: FypMethodologyInfo | null;
-    findings: FypFindingsInfo | null;
-    sdgMapping: FypSdgMapping | null;
-    reflectionInfo: FypReflectionInfo | null;
-    repository: FypRepositoryInfo | null;
-    sectionSummaries: FypSectionSummaries | null;
-    addedNote: string | null;
-    deliverables: FypDeliverable[];
-    stepCompleted: number;
-    status: "draft" | "submitted";
-}
-
-const EMPTY: FypEntry = {
-    projectTitle: "",
-    projectInfo: {},
-    background: {},
-    objectivesInfo: {},
-    literature: {},
-    methodology: {},
-    findings: {},
-    sdgMapping: { entries: [], noSdgApplies: false },
-    reflectionInfo: {},
-    repository: {},
-    sectionSummaries: {},
-    addedNote: "",
-    deliverables: [],
-    stepCompleted: 0,
-    status: "draft",
-};
-
-function mergeEntry(base: FypEntry, data: Partial<FypEntry>): FypEntry {
-    return {
-        ...base,
-        ...data,
-        projectInfo: { ...base.projectInfo, ...data.projectInfo },
-        background: { ...base.background, ...data.background },
-        objectivesInfo: { ...base.objectivesInfo, ...data.objectivesInfo },
-        literature: { ...base.literature, ...data.literature },
-        methodology: { ...base.methodology, ...data.methodology },
-        findings: { ...base.findings, ...data.findings },
-        sdgMapping: { ...base.sdgMapping, ...data.sdgMapping },
-        reflectionInfo: { ...base.reflectionInfo, ...data.reflectionInfo },
-        repository: { ...base.repository, ...data.repository },
-        sectionSummaries: { ...base.sectionSummaries, ...data.sectionSummaries },
-        deliverables: data.deliverables ?? base.deliverables,
-    };
-}
+const EMPTY = EMPTY_FYP;
+const mergeEntry = mergeFypEntry;
+const composeSummaries = composeFypSummaries;
+const groupDeliverablesByLabel = groupFypDeliverablesByLabel;
+const SECTION_LABELS = FYP_SECTION_LABELS;
+const SECTION_KEYS = FYP_SECTION_KEYS;
 
 // ---------------------------------------------------------------------------
 // Static option lists (mirror the prototype exactly)
@@ -113,18 +68,6 @@ const LIMITATION_OPTIONS = ["Small sample size", "Lab-only — not field tested"
 const SKILL_OPTIONS = ["🔬 Research & analysis", "🧩 Problem-solving", "🛠️ Technical / lab", "✍️ Writing & communication", "⏰ Project management", "💪 Resilience", "🫶 Community / user work", "🌱 Sustainability thinking"];
 const NEXT_OPTIONS = ["Publication attempt", "Industry could take it forward", "I may build a startup on it", "Next year's students continue it", "It ends here — and that's okay"];
 const VISIBILITY_OPTIONS = ["🎓 Portfolio + university repository", "🌐 Public — open access", "🔒 Restricted — supervisor & examiners"];
-
-const SECTION_LABELS: Record<keyof FypSectionSummaries, { emoji: string; label: string }> = {
-    project: { emoji: "📌", label: "Project" },
-    background: { emoji: "🧩", label: "Background" },
-    objectives: { emoji: "🎯", label: "Objectives" },
-    literature: { emoji: "📚", label: "Literature" },
-    methodology: { emoji: "🔬", label: "Methodology" },
-    findings: { emoji: "📈", label: "Findings" },
-    sdg: { emoji: "🌍", label: "SDG links" },
-    reflection: { emoji: "🪞", label: "Reflection" },
-};
-const SECTION_KEYS: (keyof FypSectionSummaries)[] = ["project", "background", "objectives", "literature", "methodology", "findings", "sdg", "reflection"];
 
 const fieldClass = "w-full rounded-ciel-sm border-2 border-ciel-border bg-ciel-page/50 px-4 py-3 text-sm font-semibold text-ciel-text outline-none focus:border-ciel-green focus:bg-white focus-visible:ring-2 focus-visible:ring-ciel-green";
 const labelClass = "text-xs font-bold uppercase tracking-widest text-ciel-text-soft";
@@ -204,92 +147,6 @@ function ChipGroup({
 }
 
 // ---------------------------------------------------------------------------
-// Compose — builds each section's summary from the student's own answers.
-// ---------------------------------------------------------------------------
-
-function lc(s: string) {
-    const t = (s || "").trim();
-    return t ? t.replace(/\.$/, "").charAt(0).toLowerCase() + t.replace(/\.$/, "").slice(1) : "";
-}
-function joinList(a: string[]) {
-    return a.length < 2 ? a.join("") : a.slice(0, -1).join(", ") + " and " + a[a.length - 1];
-}
-function stripEmoji(s: string) {
-    return (s || "").replace(/^[^\s]+\s/, "");
-}
-
-/** Deliverables always append a new version rather than replace — group by label so re-uploads
- * show as "current" + a collapsed history instead of a flat, confusing list of every version. */
-function groupDeliverablesByLabel(deliverables: FypDeliverable[]) {
-    const byLabel = new Map<string, FypDeliverable[]>();
-    for (const d of deliverables) {
-        const list = byLabel.get(d.label) ?? [];
-        list.push(d);
-        byLabel.set(d.label, list);
-    }
-    return Array.from(byLabel.entries()).map(([label, versions]) => {
-        const sorted = [...versions].sort((a, b) => b.version - a.version);
-        return { label, latest: sorted[0], earlier: sorted.slice(1) };
-    });
-}
-
-function composeSummaries(entry: FypEntry): FypSectionSummaries {
-    const pi = entry.projectInfo || {};
-    const bg = entry.background || {};
-    const oi = entry.objectivesInfo || {};
-    const lit = entry.literature || {};
-    const meth = entry.methodology || {};
-    const find = entry.findings || {};
-    const sm = entry.sdgMapping || {};
-    const rf = entry.reflectionInfo || {};
-
-    const s: FypSectionSummaries = {};
-
-    s.project = pi.title
-        ? `${pi.title}${pi.degree ? ` — a ${pi.degree} thesis in ${pi.school || "its field"}${pi.graduationYear ? `, Class of ${pi.graduationYear}` : ""}` : ""}${pi.supervisorName ? `, supervised by ${pi.supervisorName}` : ""}.`
-        : "";
-
-    const why = [...(bg.whyUrgent || []), ...(bg.whyUrgentOther ? [bg.whyUrgentOther] : [])].map((x) => stripEmoji(x).toLowerCase());
-    const aud = [...(bg.audience || []), ...(bg.audienceOther ? [bg.audienceOther] : [])].map((x) => stripEmoji(x).toLowerCase());
-    s.background = bg.problem
-        ? `It addresses the problem that ${lc(bg.problem)}${why.length ? `, urgent because ${joinList(why)}` : ""}${aud.length ? `, primarily benefiting ${joinList(aud)}` : ""}.`
-        : "";
-
-    const objs = (oi.objectives || []).filter(Boolean);
-    s.objectives = objs.length ? `The study set out to ${objs.map((o, i) => `(${i + 1}) ${lc(o)}`).join("; ")}.` : "";
-
-    const lits = [...(lit.sourceTypes || []), ...(lit.sourceTypesOther ? [lit.sourceTypesOther] : [])].map((x) => stripEmoji(x).toLowerCase());
-    s.literature = lit.gap
-        ? `A review of ${lit.sourcesReviewed ? `${lit.sourcesReviewed} sources` : "the literature"}${lits.length ? ` (${joinList(lits)})` : ""} identified a gap: ${lc(lit.gap)}.`
-        : "";
-
-    const apps = (meth.approaches || []).map((x) => stripEmoji(x).toLowerCase());
-    const meths = [...(meth.methods || []), ...(meth.methodsOther ? [meth.methodsOther] : [])].map((x) => stripEmoji(x).toLowerCase());
-    s.methodology = apps.length || meths.length
-        ? `A ${joinList(apps) || "systematic"} approach was used${meths.length ? `, combining ${joinList(meths)}` : ""}${meth.sampleScale ? ` (${meth.sampleScale})` : ""}${meth.tools ? `, with ${meth.tools}` : ""}.`
-        : "";
-
-    const finds = (find.findings || []).filter(Boolean);
-    s.findings = finds.length
-        ? `Key findings: ${finds.map((f, i) => `(${i + 1}) ${lc(f)}`).join("; ")}.${find.measurableImpact ? ` Measured impact: ${lc(find.measurableImpact)}.` : ""}${find.limitationType ? ` Main limitation, honestly noted: ${find.limitationType.toLowerCase()}${find.limitationDetail ? ` — ${lc(find.limitationDetail)}` : ""}.` : ""}`
-        : "";
-
-    const entries = sm.entries || [];
-    s.sdg = sm.noSdgApplies
-        ? "The author assessed no direct SDG linkage; flagged for CIEL review."
-        : entries.length
-          ? `The work supports ${entries.map((en) => `SDG ${en.goalNumber}${en.targets.length ? ` (target ${en.targets.join(", ")})` : ""}${en.how ? ` — ${lc(en.how)}` : ""}`).join("; ")}.`
-          : "";
-
-    const sk = (rf.skills || []).map((x) => stripEmoji(x).toLowerCase());
-    s.reflection = rf.biggestLesson
-        ? `Reflecting, the author's foremost lesson: ${lc(rf.biggestLesson)}.${rf.wrongAssumption ? ` A key assumption proved wrong: ${lc(rf.wrongAssumption)}.` : ""}${rf.sustainabilityShift ? ` On sustainability: ${lc(rf.sustainabilityShift)}.` : ""}${sk.length ? ` Skills grown: ${joinList(sk)}.` : ""}${rf.whatsNext ? ` Next: ${rf.whatsNext.toLowerCase()}.` : ""}`
-        : "";
-
-    return s;
-}
-
-// ---------------------------------------------------------------------------
 // Page
 // ---------------------------------------------------------------------------
 
@@ -305,6 +162,7 @@ export default function FypThesisPage() {
     /** Stashes SDG picks when "No SDG applies" is checked, so unchecking it restores them instead of losing them. */
     const stashedSdgEntriesRef = useRef<FypSdgEntry[]>([]);
     const [expandedDeliverableLabel, setExpandedDeliverableLabel] = useState<string | null>(null);
+    const [aiSdgOpen, setAiSdgOpen] = useState(false);
 
     useEffect(() => {
         authenticatedFetch("/api/v1/paths/fyp-thesis", {}, { redirectToLogin: false })
@@ -417,13 +275,25 @@ export default function FypThesisPage() {
         literature: entry.literature ?? undefined,
         methodology: entry.methodology ?? undefined,
         findings: entry.findings ?? undefined,
+        routeDetails: entry.routeDetails ?? undefined,
         sdgMapping: entry.sdgMapping ?? undefined,
         reflectionInfo: entry.reflectionInfo ?? undefined,
         repository: entry.repository ?? undefined,
         addedNote: entry.addedNote ?? undefined,
     });
 
+    const updateTeamMember = (i: number, patch: Partial<FypTeamMember>) => {
+        const current = normalizeFypTeamMembers(entry.projectInfo?.teamMembers);
+        const next = [...current];
+        next[i] = { ...(next[i] ?? { name: "" }), ...patch };
+        patchGroup("projectInfo", { teamMembers: next });
+    };
+
     if (loading) return <WorkspaceSkeleton />;
+
+    const isOwner = entry.isOwner !== false;
+    const route = fypRouteFor(entry.projectInfo?.projectType);
+    const routeMode = FYP_MODES[route];
 
     const picked = entry.sdgMapping?.entries ?? [];
     const toggleGoal = (num: number) => {
@@ -442,6 +312,8 @@ export default function FypThesisPage() {
     const setHow = (num: number, how: string) => {
         patchGroup("sdgMapping", { entries: picked.map((p) => (p.goalNumber === num ? { ...p, how } : p)) });
     };
+    const sdgSuggestionText = [entry.background?.problem, entry.objectivesInfo?.aim, ...(entry.findings?.findings ?? [])].filter(Boolean).join(" ");
+    const sdgSuggestions = aiSdgOpen ? suggestFypSdgs(sdgSuggestionText) : [];
 
     return (
         <PathWorkspaceShell
@@ -454,44 +326,29 @@ export default function FypThesisPage() {
             activeTab="build"
             onTabChange={() => {}}
         >
-            {showCard ? (
-                <div className="space-y-4 rounded-ciel-lg border border-ciel-border bg-white p-6 shadow-sm">
-                    <div className="flex items-center gap-2 text-sm font-bold text-ciel-green-deep">
-                        <CheckCircle2 className="h-5 w-5" /> Submitted — awaiting supervisor sign-off
-                    </div>
-                    <p className="text-lg font-black text-ciel-text">{entry.projectInfo?.title || entry.projectTitle || "Untitled thesis"}</p>
-                    <p className="text-sm text-ciel-text-mid">
-                        {entry.projectInfo?.degree || ""} {entry.projectInfo?.school ? `· ${entry.projectInfo.school}` : ""} {entry.projectInfo?.graduationYear ? `· Class of ${entry.projectInfo.graduationYear}` : ""}
-                    </p>
-                    <div className="space-y-3 border-t border-ciel-border pt-4">
-                        {SECTION_KEYS.map((key) => {
-                            const text = entry.sectionSummaries?.[key];
-                            if (!text) return null;
-                            const meta = SECTION_LABELS[key];
-                            return (
-                                <div key={key} className="flex items-start gap-3">
-                                    <span className="text-base">{meta.emoji}</span>
-                                    <div className="min-w-0">
-                                        <p className="text-xs font-black uppercase tracking-wide text-ciel-text-soft">{meta.label}</p>
-                                        <p className="mt-0.5 text-sm leading-relaxed text-ciel-text">{text}</p>
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
-                    <button
-                        type="button"
-                        onClick={() => {
-                            // Clear stale review acceptances from the last submission so every section is re-reviewed
-                            // against whatever the student changes this time, instead of silently staying "accepted."
-                            setReview({});
-                            setStep(0);
-                            setEditing(true);
-                        }}
-                        className="ciel-transition rounded-ciel-sm border border-ciel-border px-4 py-2.5 text-sm font-bold text-ciel-text-mid hover:border-ciel-green/40"
-                    >
-                        Edit this record
-                    </button>
+            {showCard || !isOwner ? (
+                <div className="space-y-4">
+                    {!isOwner && (
+                        <div className="rounded-ciel-sm border border-ciel-indigo-soft bg-ciel-indigo-soft/60 px-4 py-2.5 text-xs font-semibold text-ciel-indigo">
+                            👥 You&apos;re named as a co-author on this record — the lead author owns it and is the only one who can edit or submit changes.
+                        </div>
+                    )}
+                    <ThesisCard entry={entry} defaultOpen />
+                    {isOwner && (
+                        <button
+                            type="button"
+                            onClick={() => {
+                                // Clear stale review acceptances from the last submission so every section is re-reviewed
+                                // against whatever the student changes this time, instead of silently staying "accepted."
+                                setReview({});
+                                setStep(0);
+                                setEditing(true);
+                            }}
+                            className="ciel-transition rounded-ciel-sm border border-ciel-border px-4 py-2.5 text-sm font-bold text-ciel-text-mid hover:border-ciel-green/40"
+                        >
+                            Edit this record
+                        </button>
+                    )}
                 </div>
             ) : (
             <div className="rounded-ciel-lg border border-ciel-border bg-white p-5 sm:p-6">
@@ -520,6 +377,18 @@ export default function FypThesisPage() {
                     {/* 1. Project & supervisor */}
                     {step === 0 && (
                         <>
+                            <Field label="What kind of final project is this?" hint="The form adapts its language to your answer — same eight sections, only the wording changes.">
+                                <ChipGroup
+                                    options={PROJECT_TYPE_OPTIONS}
+                                    selected={entry.projectInfo?.projectType ? [entry.projectInfo.projectType] : []}
+                                    onToggle={(v) => patchGroup("projectInfo", { projectType: entry.projectInfo?.projectType === v ? undefined : v })}
+                                />
+                            </Field>
+                            {entry.projectInfo?.projectType && (
+                                <div className="rounded-ciel-sm border-2 border-ciel-indigo/30 bg-ciel-indigo-soft/50 px-4 py-3 text-xs font-semibold leading-relaxed text-ciel-indigo">
+                                    🧭 {routeMode.note} Same eight sections for every school — only the language changes, so your work stays comparable university-wide.
+                                </div>
+                            )}
                             <Field label="Thesis / project title">
                                 <input type="text" value={entry.projectInfo?.title ?? ""} onChange={(e) => patchGroup("projectInfo", { title: e.target.value })} placeholder="e.g. Biodegradable denim from banana-fibre waste" className={fieldClass} />
                             </Field>
@@ -543,12 +412,69 @@ export default function FypThesisPage() {
                                     </select>
                                 </Field>
                             </div>
+                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                                <Field label="Your name">
+                                    <input type="text" value={entry.projectInfo?.studentName ?? ""} onChange={(e) => patchGroup("projectInfo", { studentName: e.target.value })} placeholder="Full name" className={fieldClass} />
+                                </Field>
+                                <Field label="Your email" hint="Your record links here.">
+                                    <input type="email" value={entry.projectInfo?.studentEmail ?? ""} onChange={(e) => patchGroup("projectInfo", { studentEmail: e.target.value })} placeholder="you@university.edu.pk" className={fieldClass} />
+                                </Field>
+                                <Field label="Roll / registration no.">
+                                    <input type="text" value={entry.projectInfo?.rollNumber ?? ""} onChange={(e) => patchGroup("projectInfo", { rollNumber: e.target.value })} placeholder="F21-0342" className={fieldClass} />
+                                </Field>
+                            </div>
+                            <Field label="Co-authors / team members" hint="Optional — each gets named on the record, and the submitted record appears on their own dashboard too.">
+                                <div className="space-y-3">
+                                    {(normalizeFypTeamMembers(entry.projectInfo?.teamMembers).length ? normalizeFypTeamMembers(entry.projectInfo?.teamMembers) : [{ name: "" }]).map((m, i) => (
+                                        <div key={i} className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                                            <input
+                                                type="text"
+                                                value={m.name}
+                                                onChange={(e) => updateTeamMember(i, { name: e.target.value })}
+                                                placeholder={`Co-author ${i + 1} — full name`}
+                                                className={fieldClass}
+                                            />
+                                            <input
+                                                type="email"
+                                                value={m.email ?? ""}
+                                                onChange={(e) => updateTeamMember(i, { email: e.target.value })}
+                                                placeholder={`Co-author ${i + 1} — email`}
+                                                className={fieldClass}
+                                            />
+                                            <input
+                                                type="text"
+                                                value={m.role ?? ""}
+                                                onChange={(e) => updateTeamMember(i, { role: e.target.value })}
+                                                placeholder="Role — optional"
+                                                className={fieldClass}
+                                            />
+                                        </div>
+                                    ))}
+                                    {(entry.projectInfo?.teamMembers?.length ?? 0) < 20 && (
+                                        <button
+                                            type="button"
+                                            onClick={() => patchGroup("projectInfo", { teamMembers: [...normalizeFypTeamMembers(entry.projectInfo?.teamMembers), { name: "" }] })}
+                                            className="text-xs font-bold text-ciel-green-deep hover:underline"
+                                        >
+                                            + Add co-author → sends invitation
+                                        </button>
+                                    )}
+                                </div>
+                            </Field>
                             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                 <Field label="Supervisor name">
                                     <input type="text" value={entry.projectInfo?.supervisorName ?? ""} onChange={(e) => patchGroup("projectInfo", { supervisorName: e.target.value })} placeholder="Dr. A. Malik" className={fieldClass} />
                                 </Field>
-                                <Field label="Supervisor email">
+                                <Field label="Supervisor email" hint="Their one-click approval link goes here.">
                                     <input type="email" value={entry.projectInfo?.supervisorEmail ?? ""} onChange={(e) => patchGroup("projectInfo", { supervisorEmail: e.target.value })} placeholder="name@uni.edu.pk" className={fieldClass} />
+                                </Field>
+                            </div>
+                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                <Field label="Co-supervisor (optional)">
+                                    <input type="text" value={entry.projectInfo?.coSupervisorName ?? ""} onChange={(e) => patchGroup("projectInfo", { coSupervisorName: e.target.value })} placeholder="—" className={fieldClass} />
+                                </Field>
+                                <Field label="Co-supervisor's email (optional)">
+                                    <input type="email" value={entry.projectInfo?.coSupervisorEmail ?? ""} onChange={(e) => patchGroup("projectInfo", { coSupervisorEmail: e.target.value })} placeholder="—" className={fieldClass} />
                                 </Field>
                             </div>
                         </>
@@ -557,7 +483,7 @@ export default function FypThesisPage() {
                     {/* 2. Background & problem */}
                     {step === 1 && (
                         <>
-                            <Field label="What problem does your thesis address? (1–2 lines)">
+                            <Field label={`${routeMode.probL} (1–2 lines)`}>
                                 <input type="text" value={entry.background?.problem ?? ""} onChange={(e) => patchGroup("background", { problem: e.target.value })} placeholder="e.g. textile production is a top water polluter while banana crop waste is burned" className={fieldClass} />
                             </Field>
                             <Field label="Why is it urgent now? (tap all that apply)">
@@ -591,7 +517,11 @@ export default function FypThesisPage() {
 
                     {/* 3. Objectives */}
                     {step === 2 && (
-                        <Field label="Objectives" hint="Start each with a verb. Add as many as your thesis has.">
+                        <>
+                        <Field label={routeMode.aimL}>
+                            <input type="text" value={entry.objectivesInfo?.aim ?? ""} onChange={(e) => patchGroup("objectivesInfo", { aim: e.target.value })} placeholder={routeMode.aimPh} className={fieldClass} />
+                        </Field>
+                        <Field label={routeMode.objsL} hint="Start each with a verb. Add as many as your thesis has.">
                             <div className="space-y-2.5">
                                 {(entry.objectivesInfo?.objectives?.length ? entry.objectivesInfo.objectives : [""]).map((obj, i) => (
                                     <input
@@ -618,12 +548,16 @@ export default function FypThesisPage() {
                                 </button>
                             ) : null}
                         </Field>
+                        <Field label="Scope — what you deliberately did NOT cover" hint="Optional, but reviewers love it.">
+                            <input type="text" value={entry.objectivesInfo?.scope ?? ""} onChange={(e) => patchGroup("objectivesInfo", { scope: e.target.value })} placeholder="e.g. we tested cotton only, not blends; cost modelling excluded labour" className={fieldClass} />
+                        </Field>
+                        </>
                     )}
 
                     {/* 4. Literature review */}
                     {step === 3 && (
                         <>
-                            <Field label="Sources reviewed">
+                            <Field label="Sources reviewed" hint={routeMode.litL}>
                                 <select value={entry.literature?.sourcesReviewed ?? ""} onChange={(e) => patchGroup("literature", { sourcesReviewed: e.target.value })} className={clsx(fieldClass, "sm:max-w-xs")}>
                                     <option value="">Select…</option>
                                     {LIT_SOURCES_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
@@ -682,13 +616,20 @@ export default function FypThesisPage() {
                                     <input type="text" value={entry.methodology?.tools ?? ""} onChange={(e) => patchGroup("methodology", { tools: e.target.value })} placeholder="e.g. SPSS, tensile rig, NVivo, AutoCAD" className={fieldClass} />
                                 </Field>
                             </div>
+                            <Field label="When was the work carried out? (optional)">
+                                <div className="flex max-w-sm items-center gap-2">
+                                    <input type="month" value={entry.methodology?.periodFrom ?? ""} onChange={(e) => patchGroup("methodology", { periodFrom: e.target.value })} className={fieldClass} />
+                                    <span className="shrink-0 text-xs font-black text-ciel-text-soft">→</span>
+                                    <input type="month" value={entry.methodology?.periodTo ?? ""} onChange={(e) => patchGroup("methodology", { periodTo: e.target.value })} className={fieldClass} />
+                                </div>
+                            </Field>
                         </>
                     )}
 
                     {/* 6. Findings, impact & limitations */}
                     {step === 5 && (
                         <>
-                            <Field label="Findings" hint="Theses rarely have just one finding — add each as its own line.">
+                            <Field label={routeMode.fndListL} hint="Theses rarely have just one finding — add each as its own line.">
                                 <div className="space-y-2.5">
                                     {(entry.findings?.findings?.length ? entry.findings.findings : [""]).map((f, i) => (
                                         <input
@@ -715,6 +656,105 @@ export default function FypThesisPage() {
                                     </button>
                                 ) : null}
                             </Field>
+
+                            {routeMode.blk === "studio" && (
+                                <div className="space-y-3 rounded-ciel-sm border-2 border-ciel-border p-4">
+                                    <p className={labelClass}>🎪 Degree show / exhibition (optional)</p>
+                                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                                        <input type="month" value={entry.routeDetails?.showMonth ?? ""} onChange={(e) => patchGroup("routeDetails", { showMonth: e.target.value })} className={fieldClass} title="Exhibition / degree show month" />
+                                        <input type="number" value={entry.routeDetails?.piecesShown ?? ""} onChange={(e) => patchGroup("routeDetails", { piecesShown: e.target.value ? Number(e.target.value) : undefined })} placeholder="Works / pieces shown" className={fieldClass} />
+                                        <input type="text" value={entry.routeDetails?.juryExaminer ?? ""} onChange={(e) => patchGroup("routeDetails", { juryExaminer: e.target.value })} placeholder="Jury / external examiner" className={fieldClass} />
+                                    </div>
+                                </div>
+                            )}
+                            {routeMode.blk === "build" && (
+                                <div className="space-y-3 rounded-ciel-sm border-2 border-ciel-border p-4">
+                                    <p className={labelClass}>🔧 Build status (optional)</p>
+                                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                                        <select value={entry.routeDetails?.buildStatus ?? ""} onChange={(e) => patchGroup("routeDetails", { buildStatus: e.target.value })} className={fieldClass}>
+                                            <option value="">Status…</option>
+                                            <option>Concept / drawings</option>
+                                            <option>Working prototype</option>
+                                            <option>Tested with users</option>
+                                            <option>Deployed / in use</option>
+                                        </select>
+                                        <input type="number" value={entry.routeDetails?.testersCount ?? ""} onChange={(e) => patchGroup("routeDetails", { testersCount: e.target.value ? Number(e.target.value) : undefined })} placeholder="People who tested it" className={fieldClass} />
+                                        <input type="number" value={entry.routeDetails?.iterationsCount ?? ""} onChange={(e) => patchGroup("routeDetails", { iterationsCount: e.target.value ? Number(e.target.value) : undefined })} placeholder="Iterations / versions" className={fieldClass} />
+                                    </div>
+                                </div>
+                            )}
+                            {routeMode.blk === "media" && (
+                                <div className="space-y-3 rounded-ciel-sm border-2 border-ciel-border p-4">
+                                    <p className={labelClass}>🎥 Screening / release (optional)</p>
+                                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                                        <input type="month" value={entry.routeDetails?.screeningMonth ?? ""} onChange={(e) => patchGroup("routeDetails", { screeningMonth: e.target.value })} className={fieldClass} title="Screening / release month" />
+                                        <input type="number" value={entry.routeDetails?.audienceReached ?? ""} onChange={(e) => patchGroup("routeDetails", { audienceReached: e.target.value ? Number(e.target.value) : undefined })} placeholder="Audience reached" className={fieldClass} />
+                                        <input type="text" value={entry.routeDetails?.runtimeFormat ?? ""} onChange={(e) => patchGroup("routeDetails", { runtimeFormat: e.target.value })} placeholder="Runtime / format" className={fieldClass} />
+                                    </div>
+                                </div>
+                            )}
+                            {routeMode.blk === "client" && (
+                                <div className="space-y-3 rounded-ciel-sm border-2 border-ciel-border p-4">
+                                    <p className={labelClass}>🏢 Client / engagement (optional)</p>
+                                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                                        <input type="text" value={entry.routeDetails?.clientOrg ?? ""} onChange={(e) => patchGroup("routeDetails", { clientOrg: e.target.value })} placeholder="Client organisation" className={fieldClass} />
+                                        <select value={entry.routeDetails?.engagementBasis ?? ""} onChange={(e) => patchGroup("routeDetails", { engagementBasis: e.target.value })} className={fieldClass}>
+                                            <option value="">Engagement basis…</option>
+                                            <option>Formal — engagement letter on file</option>
+                                            <option>Informal — verbal cooperation</option>
+                                            <option>Academic simulation — no real client</option>
+                                        </select>
+                                        <select value={entry.routeDetails?.recommendationStatus ?? ""} onChange={(e) => patchGroup("routeDetails", { recommendationStatus: e.target.value })} className={fieldClass}>
+                                            <option value="">Recommendation status…</option>
+                                            <option>Accepted / being implemented</option>
+                                            <option>Under consideration by client</option>
+                                            <option>Presented — no decision yet</option>
+                                            <option>Not shared with client</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            )}
+
+                            <Field label="What evidence supports your strongest claim?" hint="Choose one — honesty scores higher.">
+                                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                                    {FYP_EVIDENCE_STATUS.map((ev) => (
+                                        <button
+                                            key={ev.label}
+                                            type="button"
+                                            onClick={() => patchGroup("findings", { evidenceStatus: ev.label })}
+                                            className={clsx(
+                                                "ciel-transition flex flex-col items-center gap-1 rounded-ciel-sm border-2 px-3 py-3 text-center",
+                                                entry.findings?.evidenceStatus === ev.label ? "border-ciel-green bg-ciel-green-soft" : "border-ciel-border",
+                                            )}
+                                        >
+                                            <span className="text-lg">{ev.emoji}</span>
+                                            <span className="text-[10px] font-bold leading-tight text-ciel-text-mid">{ev.label}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            </Field>
+                            {entry.findings?.evidenceStatus && /measured|estimated/i.test(entry.findings.evidenceStatus) && (
+                                <>
+                                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                                        <Field label="Metric">
+                                            <input type="text" value={entry.findings?.metricName ?? ""} onChange={(e) => patchGroup("findings", { metricName: e.target.value })} placeholder="e.g. Wash-fastness score" className={fieldClass} />
+                                        </Field>
+                                        <Field label="Value">
+                                            <input type="text" value={entry.findings?.metricValue ?? ""} onChange={(e) => patchGroup("findings", { metricValue: e.target.value })} placeholder="4.5" className={fieldClass} />
+                                        </Field>
+                                        <Field label="Unit">
+                                            <input type="text" value={entry.findings?.metricUnit ?? ""} onChange={(e) => patchGroup("findings", { metricUnit: e.target.value })} placeholder="/5 grade · % · °C" className={fieldClass} />
+                                        </Field>
+                                    </div>
+                                    <Field label="This number is…">
+                                        <ChipGroup
+                                            options={["Measured result", "Estimated / projected", "Target / aspiration"]}
+                                            selected={entry.findings?.numberRepresents ? [entry.findings.numberRepresents] : []}
+                                            onToggle={(v) => patchGroup("findings", { numberRepresents: entry.findings?.numberRepresents === v ? undefined : v })}
+                                        />
+                                    </Field>
+                                </>
+                            )}
                             <Field label="Measurable impact — a number if you have one">
                                 <input type="text" value={entry.findings?.measurableImpact ?? ""} onChange={(e) => patchGroup("findings", { measurableImpact: e.target.value })} placeholder="e.g. −30% water per metre, verified across 40 samples" className={fieldClass} />
                             </Field>
@@ -735,6 +775,45 @@ export default function FypThesisPage() {
                     {/* 7. SDG linking */}
                     {step === 6 && (
                         <>
+                            <div className="flex flex-wrap items-center gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setAiSdgOpen(true)}
+                                    className="ciel-transition rounded-ciel-sm bg-ciel-indigo px-4 py-2.5 text-xs font-bold text-white hover:bg-ciel-indigo/90"
+                                >
+                                    🤖 Not sure? Let AI read my answers &amp; suggest SDGs
+                                </button>
+                            </div>
+                            {aiSdgOpen && (
+                                <div className="relative rounded-ciel-sm border border-ciel-indigo-soft bg-ciel-indigo-soft/60 px-4 py-3 pr-9 text-xs leading-relaxed text-ciel-indigo">
+                                    <button
+                                        type="button"
+                                        onClick={() => setAiSdgOpen(false)}
+                                        aria-label="Close suggestions"
+                                        className="absolute right-2.5 top-2.5 flex h-5 w-5 items-center justify-center rounded-full text-ciel-indigo/70 hover:bg-ciel-indigo/10 hover:text-ciel-indigo"
+                                    >
+                                        ✕
+                                    </button>
+                                    {sdgSuggestions.length ? (
+                                        <>
+                                            🤖 <b>I read your problem, aim and findings.</b> This work most likely connects to:
+                                            <ul className="mt-1.5 space-y-1">
+                                                {sdgSuggestions.map((s, i) => (
+                                                    <li key={s.goalNumber}>
+                                                        <b>{i === 0 ? "★ " : ""}SDG {s.goalNumber} — {sdgData.find((d) => d.number === s.goalNumber)?.title}</b>
+                                                        {" "}<span className="text-ciel-indigo/70">(you mentioned: {s.matchedKeywords.map((k) => `"${k}"`).join(", ")})</span>
+                                                        {" — "}
+                                                        <button type="button" onClick={() => !picked.some((p) => p.goalNumber === s.goalNumber) && toggleGoal(s.goalNumber)} className="font-bold underline">tap to add</button>
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                            <p className="mt-1.5 text-[10.5px]">Suggestions only — you choose, your supervisor verifies. &quot;No SDG applies&quot; below is also a respected answer.</p>
+                                        </>
+                                    ) : (
+                                        <>🤖 I couldn&apos;t find a clear SDG signal in your answers — that may simply mean <b>no SDG applies</b>, which is academically respectable. Tick the option below, or write your problem in more detail and try again.</>
+                                    )}
+                                </div>
+                            )}
                             <Field label="Which SDGs does this work support?" hint="Pick up to 3 — tap a tile, then choose the target that fits.">
                                 <div className={clsx("grid grid-cols-2 gap-2 sm:grid-cols-3", entry.sdgMapping?.noSdgApplies && "pointer-events-none opacity-30")}>
                                     {sdgData.map((sdg) => {

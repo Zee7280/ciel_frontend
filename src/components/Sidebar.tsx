@@ -338,6 +338,7 @@ export default function Sidebar() {
             { label: "Applications & Reports Approvals", href: "/dashboard/faculty/join-applications", icon: ClipboardList },
             { label: "Student impact reports", href: "/dashboard/faculty/reports", icon: FileText },
             { label: "Coursework reports", href: "/dashboard/faculty/coursework-projects", icon: BookOpen },
+            { label: "FYP / Thesis records", href: "/dashboard/faculty/fyp-thesis", icon: BookOpen },
             { label: "Attendance review", href: "/dashboard/faculty/attendance-review", icon: CalendarClock },
             { label: "My Opportunities", href: "/dashboard/faculty/my-opportunities", icon: Briefcase },
             { label: "Create Opportunity", href: "/dashboard/faculty/create-opportunity", icon: Plus },
