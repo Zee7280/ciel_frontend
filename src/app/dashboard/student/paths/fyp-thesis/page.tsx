@@ -53,6 +53,7 @@ const STEPS = [
 const SCHOOL_OPTIONS = ["Engineering", "Computer Science / IT", "Business / Management", "Textile / Fashion", "Architecture / Planning", "Medicine / Health Sciences", "Pharmacy", "Law", "Social Sciences", "Education", "Natural Sciences", "Agriculture / Environment", "Fine Arts / Media / Design", "Languages / Humanities", "Other"];
 const DEGREE_OPTIONS = ["BS / BSc", "BBA", "B.Arch", "MBBS / BDS", "Pharm-D", "LLB", "BFA", "MS / MPhil", "Other"];
 const YEAR_OPTIONS = ["2025", "2026", "2027"];
+const SPAN_OPTIONS = ["Semester 7", "Semester 8", "Spread across 7 & 8"];
 
 const WHY_URGENT_OPTIONS = ["📜 Policy / regulation changing", "📈 Problem growing fast", "🤖 New tech makes a fix possible", "🏘️ Community asked for it", "💰 Market opportunity opened", "🕳️ Long-ignored gap in my field"];
 const AUDIENCE_OPTIONS = ["🏭 Industry & manufacturers", "🌾 Farmers & rural communities", "🎓 Students & educators", "🏥 Patients & healthcare", "🛒 General public / consumers", "🏛️ Government & policymakers", "🔬 Researchers — advances the field", "🏘️ A specific local community"];
@@ -379,6 +380,18 @@ export default function FypThesisPage() {
                     {/* 1. Project & supervisor */}
                     {step === 0 && (
                         <>
+                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                <Field label="FYP span" hint="HEC allows splitting across the final year.">
+                                    <ChipGroup
+                                        options={SPAN_OPTIONS}
+                                        selected={entry.projectInfo?.span ? [entry.projectInfo.span] : []}
+                                        onToggle={(v) => patchGroup("projectInfo", { span: entry.projectInfo?.span === v ? undefined : v })}
+                                    />
+                                </Field>
+                                <Field label="Credit hours (optional)" hint="Typically 6 under HEC policy.">
+                                    <input type="number" value={entry.projectInfo?.creditHours ?? ""} onChange={(e) => patchGroup("projectInfo", { creditHours: e.target.value })} placeholder="6" className={fieldClass} />
+                                </Field>
+                            </div>
                             <Field label="What kind of final project is this?" hint="The form adapts its language to your answer — same eight sections, only the wording changes.">
                                 <ChipGroup
                                     options={PROJECT_TYPE_OPTIONS}
@@ -472,8 +485,8 @@ export default function FypThesisPage() {
                                 </Field>
                             </div>
                             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                                <Field label="Co-supervisor (optional)">
-                                    <input type="text" value={entry.projectInfo?.coSupervisorName ?? ""} onChange={(e) => patchGroup("projectInfo", { coSupervisorName: e.target.value })} placeholder="—" className={fieldClass} />
+                                <Field label="Co-supervisor" hint="Optional — industry co-supervisors welcome; HEC CS programs require joint industry supervision.">
+                                    <input type="text" value={entry.projectInfo?.coSupervisorName ?? ""} onChange={(e) => patchGroup("projectInfo", { coSupervisorName: e.target.value })} placeholder="e.g. Engr. Adeel Khan — Interloop Ltd." className={fieldClass} />
                                 </Field>
                                 <Field label="Co-supervisor's email (optional)">
                                     <input type="email" value={entry.projectInfo?.coSupervisorEmail ?? ""} onChange={(e) => patchGroup("projectInfo", { coSupervisorEmail: e.target.value })} placeholder="—" className={fieldClass} />
@@ -659,6 +672,16 @@ export default function FypThesisPage() {
                                 ) : null}
                             </Field>
 
+                            {routeMode.blk === "discussion" && (
+                                <div className="space-y-3 rounded-ciel-sm border-2 border-ciel-border p-4">
+                                    <Field label="💬 Discussion — what do your findings mean?" hint="The HEC thesis chain ends here: interpret, don't just report.">
+                                        <textarea rows={3} value={entry.routeDetails?.discussion ?? ""} onChange={(e) => patchGroup("routeDetails", { discussion: e.target.value })} placeholder="e.g. The results suggest craft knowledge outperforms lab-only approaches at small scale — challenging the assumption that industrial methods transfer downward…" className={fieldClass} />
+                                    </Field>
+                                    <Field label="Conclusion in one line" hint="What should the field take away?">
+                                        <input type="text" value={entry.routeDetails?.conclusion ?? ""} onChange={(e) => patchGroup("routeDetails", { conclusion: e.target.value })} placeholder="e.g. Food-waste dyes are viable for cotton at small-unit scale; blends need further work" className={fieldClass} />
+                                    </Field>
+                                </div>
+                            )}
                             {routeMode.blk === "studio" && (
                                 <div className="space-y-3 rounded-ciel-sm border-2 border-ciel-border p-4">
                                     <p className={labelClass}>🎪 Degree show / exhibition (optional)</p>
@@ -887,6 +910,10 @@ export default function FypThesisPage() {
                                     })}
                                 </div>
                             )}
+
+                            <div className="rounded-ciel-sm border-2 border-ciel-purple/30 bg-ciel-purple-soft/50 px-4 py-3 text-xs font-semibold leading-relaxed text-ciel-purple-deep">
+                                🏛️ <b>The living repository:</b> every approved record joins your university&apos;s searchable FYP repository — so next year&apos;s students stand on this year&apos;s work instead of repeating it. Records without an attached thesis are <b>ineligible for AI picks and showcase</b>.
+                            </div>
 
                             <label className="ciel-transition flex cursor-pointer items-start gap-3 rounded-ciel-sm border-2 border-amber-200 bg-amber-50 p-4">
                                 <input

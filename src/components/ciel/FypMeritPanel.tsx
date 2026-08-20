@@ -5,7 +5,7 @@ import { ChevronDown, Trophy } from "lucide-react";
 import clsx from "clsx";
 import { sdgData } from "@/utils/sdgData";
 import { type FypEntry, fypRouteFor, type FypRoute } from "@/utils/fypTypes";
-import { FYP_MERIT_RUBRIC, FYP_MERIT_NEUTRALITY_NOTE, computeFypMeritScorecard, whyFypLeads } from "@/utils/fypMeritModel";
+import { FYP_MERIT_RUBRIC, FYP_MERIT_NEUTRALITY_NOTE, computeFypMeritScorecard, whyFypLeads, fypPotential } from "@/utils/fypMeritModel";
 
 export interface FypMeritEntry extends FypEntry {
     student?: { id: string; name: string; email: string; institution?: string; department?: string } | null;
@@ -27,7 +27,7 @@ function entryDisplayName(e: FypMeritEntry): string {
 }
 
 /**
- * Deterministic "FYP Merit Model" ranking panel — computes the six-criterion, route-adjusted rubric
+ * Deterministic "FYP Merit Model" ranking panel — computes the seven-criterion, route-adjusted rubric
  * score for each entry client-side (no AI call, no run-to-run variance) and ranks on request. Shared
  * by the faculty supervision deck and the university showcase deck.
  */
@@ -55,7 +55,9 @@ export default function FypMeritPanel({
 
     const scored = useMemo(() => {
         const withScores = pool.map((e) => ({ entry: e, scorecard: computeFypMeritScorecard(e) }));
-        if (ranked) withScores.sort((a, b) => b.scorecard.total - a.scorecard.total);
+        // Eligible entries (repository + sent for sign-off) always sort above ineligible ones —
+        // no loophole where an incomplete record outranks a complete one just by scoring higher.
+        if (ranked) withScores.sort((a, b) => (Number(b.scorecard.eligible) - Number(a.scorecard.eligible)) || (b.scorecard.total - a.scorecard.total));
         return withScores;
     }, [pool, ranked]);
 
@@ -145,13 +147,16 @@ export default function FypMeritPanel({
                     <p className="rounded-ciel-sm bg-ciel-page px-4 py-8 text-center text-sm font-semibold text-ciel-text-soft">No FYP cards in this scope.</p>
                 )}
                 {scored.map((x, i) => {
-                    const top10 = ranked && i < 10;
+                    const ineligible = ranked && !x.scorecard.eligible;
+                    const top10 = ranked && i < 10 && x.scorecard.eligible;
                     const open = openId === x.entry.id;
                     const primary = x.entry.sdgMapping?.entries?.[0];
                     const sdg = primary ? sdgData.find((s) => s.number === primary.goalNumber) : null;
                     const routeMeta = ROUTE_META[x.scorecard.route];
+                    const missingRepo = !(x.entry.deliverables || []).some((d) => d.label === "Full thesis (PDF)");
+                    const missingSignoff = x.entry.status !== "submitted";
                     return (
-                        <div key={x.entry.id} className={clsx("relative overflow-hidden rounded-ciel-lg border bg-white", top10 ? "border-ciel-purple/50 shadow-md" : "border-ciel-border")}>
+                        <div key={x.entry.id} className={clsx("relative overflow-hidden rounded-ciel-lg border bg-white", top10 ? "border-ciel-purple/50 shadow-md" : "border-ciel-border", ineligible && "opacity-55")}>
                             {top10 && (
                                 <div className="absolute left-0 top-0 flex items-center gap-1 rounded-br-ciel-sm bg-ciel-purple px-3 py-1 text-[9px] font-black text-white">
                                     <Trophy className="h-2.5 w-2.5" /> TOP OF COHORT · #{i + 1}
@@ -163,7 +168,7 @@ export default function FypMeritPanel({
                                 className={clsx("flex w-full items-center gap-3 px-5 py-4 text-left", top10 && "pt-7")}
                             >
                                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-ciel-sm bg-ciel-page text-sm font-black text-ciel-text-soft">
-                                    {ranked ? i + 1 : "·"}
+                                    {ranked ? (ineligible ? "⛔" : i + 1) : "·"}
                                 </div>
                                 <div className="min-w-0 flex-1">
                                     <div className="flex flex-wrap items-center gap-2">
@@ -181,12 +186,22 @@ export default function FypMeritPanel({
                                 </div>
                                 <div className="shrink-0 text-right">
                                     <div className="text-lg font-black text-ciel-purple">{ranked ? `${x.scorecard.total}/100` : "—"}</div>
-                                    <div className="text-[9px] font-black" style={{ color: x.scorecard.gradeColor }}>{ranked ? x.scorecard.grade : "TAP RUN"}</div>
+                                    <div className="text-[9px] font-black" style={{ color: ineligible ? "#b45309" : x.scorecard.gradeColor }}>{ranked ? (ineligible ? "INELIGIBLE" : x.scorecard.grade) : "TAP RUN"}</div>
                                 </div>
                                 <ChevronDown className={clsx("h-4 w-4 shrink-0 text-ciel-text-soft transition-transform", open && "rotate-180")} />
                             </button>
 
-                            {top10 && <p className="px-5 pb-3 pl-[4.5rem] text-[11px] leading-relaxed text-ciel-purple">🏆 {whyFypLeads(x.scorecard)}</p>}
+                            {ineligible && (
+                                <p className="px-5 pb-3 pl-[4.5rem] text-[11px] leading-relaxed text-amber-700">
+                                    ⛔ <b>Ineligible for AI picks &amp; showcase:</b> {[missingRepo ? "no thesis in the repository" : null, missingSignoff ? "not yet sent for supervisor sign-off" : null].filter(Boolean).join(" + ")} — scored for feedback only. Fix and resubmit.
+                                </p>
+                            )}
+                            {top10 && (
+                                <>
+                                    <p className="px-5 pb-1 pl-[4.5rem] text-[11px] leading-relaxed text-ciel-purple">🤖 {whyFypLeads(x.entry, x.scorecard)}</p>
+                                    <p className="px-5 pb-3 pl-[4.5rem] text-[11px] leading-relaxed text-teal-700">🔮 <b>Potential:</b> {fypPotential(x.entry, x.scorecard)}</p>
+                                </>
+                            )}
 
                             {open && (
                                 <div className="space-y-2.5 border-t border-ciel-border bg-ciel-page/40 px-5 py-4">

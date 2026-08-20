@@ -7,7 +7,7 @@
 import { type FypEntry, fypRouteFor, normalizeFypTeamMembers, type FypRoute } from "./fypTypes";
 
 export interface FypMeritRubricCriterion {
-    key: "purpose" | "rigor" | "outcome" | "honesty" | "sdg" | "conn";
+    key: "purpose" | "rigor" | "outcome" | "honesty" | "sdg" | "pot" | "conn";
     label: string;
     max: number;
     color: string;
@@ -16,12 +16,13 @@ export interface FypMeritRubricCriterion {
 
 /** The public rubric — shown to students before they write, faculty/university while they review. */
 export const FYP_MERIT_RUBRIC: FypMeritRubricCriterion[] = [
-    { key: "purpose", label: "1 · Clarity of purpose", max: 15, color: "#2563eb", description: "Question / intention / problem stated so anyone can understand it; concrete objectives." },
-    { key: "rigor", label: "2 · Rigor of process — route-adjusted", max: 20, color: "#0f766e", description: "Methods appropriate to the declared route, plus scale & period stated. Practice-based inquiry counts equal to a lab experiment." },
+    { key: "purpose", label: "1 · Purpose & originality", max: 15, color: "#2563eb", description: "A question anyone can grasp, concrete objectives — and the freshness of the idea itself: genuinely new angle > fresh take > incremental." },
+    { key: "rigor", label: "2 · Rigor of process — route-adjusted", max: 15, color: "#0f766e", description: "Methods appropriate to the declared route + scale & period stated. Practice-based inquiry counts equal to a lab experiment." },
     { key: "outcome", label: "3 · Substance of outcome", max: 20, color: "#c98a04", description: "Findings or demonstrations present; the documented work itself counts as evidence for studio & media routes. Honesty never scores zero." },
     { key: "honesty", label: "4 · Scholarly honesty", max: 15, color: "#dc2626", description: "Limitation named with its effect, declared scope, a tested assumption, claims consistent with evidence." },
     { key: "sdg", label: "5 · SDG authenticity", max: 15, color: "#3F7E44", description: "A genuine link with target + explanation — or an honest \"no SDG applies,\" which scores respectably. Never punished for honesty." },
-    { key: "conn", label: "6 · Completeness & connection", max: 15, color: "#7c3aed", description: "Thesis in repository, co-authors linked by email, supervisor named, route block filled (degree show / build status / screening / client)." },
+    { key: "pot", label: "6 · Potential & continuation", max: 10, color: "#db2777", description: "Forward motion the record can prove: a declared next step, external engagement (jury, client, industry, community), evidence strong enough to build on." },
+    { key: "conn", label: "7 · Completeness & connection", max: 10, color: "#7c3aed", description: "Thesis in repository, co-authors linked by email, supervisor named, route block filled." },
 ];
 
 export const FYP_MERIT_NEUTRALITY_NOTE =
@@ -37,6 +38,9 @@ const EVIDENCE_POINTS: Record<string, number> = {
     "Not measured yet": 3,
     "Not applicable": 4,
 };
+
+/** Evidence tiers strong enough to build on, for the Potential criterion's bonus. */
+const STRONG_EVIDENCE = new Set(["Measured / tested result", "The work itself is the evidence"]);
 
 const clampPts = (n: number, max: number) => Math.max(0, Math.min(max, n));
 
@@ -57,6 +61,9 @@ export interface FypMeritScorecard {
     grade: string;
     gradeColor: string;
     consistency: FypMeritConsistencyFlag;
+    /** No repository (thesis PDF) or the supervisor hasn't been sent the record for sign-off yet —
+     * still scored for feedback, but excluded from AI picks / showcase. No loopholes. */
+    eligible: boolean;
 }
 
 const GRADE_BANDS: [number, string, string][] = [
@@ -81,9 +88,10 @@ const ROUTE_LABEL: Record<FypRoute, string> = {
     consultant: "consultant",
 };
 
-/** Computes the six-criterion scorecard for one FYP entry, deterministically, from its own wizard fields. */
+/** Computes the seven-criterion scorecard for one FYP entry, deterministically, from its own wizard fields. */
 export function computeFypMeritScorecard(entry: FypEntry): FypMeritScorecard {
     const pi = entry.projectInfo || {};
+    const bg = entry.background || {};
     const oi = entry.objectivesInfo || {};
     const meth = entry.methodology || {};
     const find = entry.findings || {};
@@ -92,12 +100,16 @@ export function computeFypMeritScorecard(entry: FypEntry): FypMeritScorecard {
     const rd = entry.routeDetails || {};
     const route = fypRouteFor(pi.projectType);
 
-    // ---- 1 · Clarity of purpose ----
+    // ---- 1 · Purpose & originality ----
     const aimText = oi.aim || "";
     const aimPts = aimText.trim().length > 12 ? 2 : aimText.trim() ? 1 : 0;
     const objsCount = (oi.objectives || []).filter((o) => o.trim()).length;
-    const purposePts = clampPts(aimPts * 5 + Math.min(objsCount, 3) * 1.7, 15);
-    const purposeNote = aimPts === 2 ? "Purpose anyone can understand, concrete objectives" : aimPts === 1 ? "Purpose present but loosely framed" : "Purpose unclear";
+    // Originality has no dedicated wizard field — a genuinely under-explored gap or a
+    // newly-possible fix is the closest honest, student-declared signal we have for it.
+    const novSignal = (bg.whyUrgent || []).some((w) => /long-ignored gap|new tech makes/i.test(w));
+    const novPts = novSignal ? 2 : aimText.trim() ? 1 : 0;
+    const purposePts = clampPts(aimPts * 4 + Math.min(objsCount, 3) * 1.2 + novPts * 2.6, 15);
+    const purposeNote = `${novPts === 2 ? "A genuinely fresh angle — " : novPts === 1 ? "A solid take — " : "An incremental take — "}${aimPts === 2 ? "purpose anyone can understand, concrete objectives" : "purpose loosely framed"}`;
 
     // ---- 2 · Rigor of process (route-adjusted) ----
     const approachesFilled = (meth.approaches || []).length > 0;
@@ -105,7 +117,7 @@ export function computeFypMeritScorecard(entry: FypEntry): FypMeritScorecard {
     const fitPts = approachesFilled && methodsFilled ? 2 : approachesFilled || methodsFilled ? 1 : 0;
     const scalePts = meth.sampleScale?.trim() ? 1 : 0;
     const periodPts = meth.periodFrom || meth.periodTo ? 1 : 0;
-    const rigorPts = clampPts(fitPts * 7 + scalePts * 3 + periodPts * 3, 20);
+    const rigorPts = clampPts(fitPts * 5.5 + scalePts * 2 + periodPts * 2, 15);
     const rigorNote =
         fitPts === 2
             ? `Method fits the ${ROUTE_LABEL[route]} route; scale & period declared`
@@ -151,26 +163,39 @@ export function computeFypMeritScorecard(entry: FypEntry): FypMeritScorecard {
               ? "SDG named without target or explanation — reads decorative"
               : `Genuine link${hasTarget ? " + target" : ""}${hasHow ? " + explained" : ""}`;
 
-    // ---- 6 · Completeness & connection ----
+    // ---- 6 · Potential & continuation ----
+    const fwdPts = rf.whatsNext && rf.whatsNext !== "It ends here — and that's okay" ? 1 : 0;
+    // No dedicated field for "external engagement" either — a co-supervisor, jury/examiner, or
+    // named client are the concrete, student-declared traces of a real outside party being involved.
+    const extPts = !!(pi.coSupervisorName?.trim() || rd.juryExaminer?.trim() || rd.clientOrg?.trim() || rd.engagementBasis) ? 1 : 0;
+    const evidenceBonus = STRONG_EVIDENCE.has(evidenceStatus) ? 3 : evidenceStatus === "Qualitative evidence" ? 2 : 1;
+    const potPts = clampPts(fwdPts * 3 + extPts * 4 + evidenceBonus, 10);
+    const potNote = `${fwdPts ? "Next step declared" : "No next step declared"}${extPts ? " · external engagement (jury / client / industry) ✓" : ""}${STRONG_EVIDENCE.has(evidenceStatus) ? " · evidence strong enough to build on" : ""}`;
+
+    // ---- 7 · Completeness & connection ----
     const repoPts = (entry.deliverables || []).some((d) => d.label === "Full thesis (PDF)") ? 1 : 0;
     const linkedPts = normalizeFypTeamMembers(pi.teamMembers).some((m) => m.name?.trim()) ? 1 : 0;
     const confPts = entry.status === "submitted" ? 1 : 0;
-    const blkPts = route === "scholar" ? 0 : Math.min(2, blockFieldsFilledForRoute(route, rd));
-    const connPts = clampPts(repoPts * 4 + linkedPts * 3 + confPts * 4 + blkPts * 2, 15);
+    const blkPts = route === "scholar" ? (rd.discussion || rd.conclusion ? 2 : 0) : Math.min(2, blockFieldsFilledForRoute(route, rd));
+    const connPts = clampPts(repoPts * 3 + linkedPts * 2 + confPts * 3 + blkPts * 1, 10);
     const connNote = `${repoPts ? "Repository ✓" : "No repository"}${linkedPts ? " · co-authors linked ✓" : ""}${confPts ? " · sent for supervisor sign-off ✓" : " · not yet submitted"}${blkPts === 2 ? " · route block complete ✓" : blkPts === 1 ? " · route block partial" : ""}`;
 
+    const critFor = (key: FypMeritRubricCriterion["key"]) => FYP_MERIT_RUBRIC.find((c) => c.key === key)!;
     const criteria: FypMeritCriterionResult[] = [
-        { ...FYP_MERIT_RUBRIC[0], points: purposePts, note: purposeNote },
-        { ...FYP_MERIT_RUBRIC[1], points: rigorPts, note: rigorNote },
-        { ...FYP_MERIT_RUBRIC[2], points: outcomePts, note: outcomeNote },
-        { ...FYP_MERIT_RUBRIC[3], points: honestyPtsClamped, note: honestyNote },
-        { ...FYP_MERIT_RUBRIC[4], points: sdgPts, note: sdgNote },
-        { ...FYP_MERIT_RUBRIC[5], points: connPts, note: connNote },
+        { ...critFor("purpose"), points: purposePts, note: purposeNote },
+        { ...critFor("rigor"), points: rigorPts, note: rigorNote },
+        { ...critFor("outcome"), points: outcomePts, note: outcomeNote },
+        { ...critFor("honesty"), points: honestyPtsClamped, note: honestyNote },
+        { ...critFor("sdg"), points: sdgPts, note: sdgNote },
+        { ...critFor("pot"), points: potPts, note: potNote },
+        { ...critFor("conn"), points: connPts, note: connNote },
     ];
     const total = Math.round(criteria.reduce((s, c) => s + c.points, 0));
     const [grade, gradeColor] = fypMeritGrade(total);
+    // No loopholes: no repository or no supervisor sign-off = ineligible for picks/showcase, still scored for feedback.
+    const eligible = !!repoPts && !!confPts;
 
-    return { route, criteria, total, grade, gradeColor, consistency };
+    return { route, criteria, total, grade, gradeColor, consistency, eligible };
 }
 
 function blockFieldsFilledForRoute(route: FypRoute, rd: NonNullable<FypEntry["routeDetails"]>): number {
@@ -181,9 +206,72 @@ function blockFieldsFilledForRoute(route: FypRoute, rd: NonNullable<FypEntry["ro
     return 0;
 }
 
-/** Why the top-ranked entries lead — derived from their own highest-scoring criteria, not a canned line. */
-export function whyFypLeads(sc: FypMeritScorecard): string {
+const CRITERION_PHRASE: Record<FypMeritRubricCriterion["key"], (entry: FypEntry, sc: FypMeritScorecard) => string> = {
+    outcome: (entry) => {
+        const evs = entry.findings?.evidenceStatus || "Not applicable";
+        const fnd = (entry.findings?.findings || []).filter((f) => f.trim()).length;
+        if (evs === "Measured / tested result") return `its results are proven, not promised — ${fnd} finding${fnd === 1 ? "" : "s"} backed by tested evidence`;
+        if (evs === "The work itself is the evidence") return "the finished work stands as its own evidence — fully documented";
+        return `its outcomes are substantive and honestly classified as ${evs.toLowerCase()}`;
+    },
+    purpose: (entry, sc) => {
+        const purpose = sc.criteria.find((c) => c.key === "purpose")!;
+        return purpose.note.startsWith("A genuinely fresh angle")
+            ? "the idea itself is genuinely fresh — an under-explored angle in this cohort"
+            : "its purpose is sharply framed, with concrete objectives anyone can follow";
+    },
+    sdg: (entry, sc) => {
+        const sdg = sc.criteria.find((c) => c.key === "sdg")!;
+        return sdg.note.startsWith('Honest "no SDG')
+            ? 'it declares "no SDG applies" honestly rather than decorating — integrity the rubric rewards'
+            : "its sustainability link is argued, targeted and verified — not a badge, a claim with evidence";
+    },
+    honesty: () => "it shows rare scholarly honesty: limits and scope declared, an assumption openly tested",
+    rigor: (entry, sc) => `its method discipline is true to the ${ROUTE_LABEL[sc.route]} route — right tools, stated scale, declared period`,
+    pot: (entry, sc) => {
+        const pot = sc.criteria.find((c) => c.key === "pot")!;
+        return pot.note.includes("external engagement")
+            ? "it already has forward motion — external partners (jury, client or industry) are engaged, not hypothetical"
+            : "it names a realistic next step and its evidence is strong enough to build on";
+    },
+    conn: () => "the record is complete and fully connected — repository, co-authors, supervisor, route details",
+};
+
+/** Why the top-ranked entries lead — two-part reasoning (why picked + value to CIEL), derived
+ * from the entry's own top-scoring criteria, not a canned line. */
+export function whyFypLeads(entry: FypEntry, sc: FypMeritScorecard): string {
     const ranked = [...sc.criteria].sort((a, b) => b.points / b.max - a.points / a.max);
-    const top = ranked.slice(0, 2).map((c) => c.label.replace(/^\d+ · /, "").toLowerCase());
-    return `Leads on ${top.join(" and ")} — ${sc.consistency.ok ? "claims match its declared evidence" : "though see the consistency flag below"}.`;
+    const first = CRITERION_PHRASE[ranked[0].key](entry, sc);
+    const second = CRITERION_PHRASE[ranked[1].key](entry, sc);
+    const pot = sc.criteria.find((c) => c.key === "pot")!;
+    const purpose = sc.criteria.find((c) => c.key === "purpose")!;
+    const sdg = sc.criteria.find((c) => c.key === "sdg")!;
+    const value = pot.note.includes("external engagement")
+        ? `Bridges the university to ${sc.route === "consultant" ? "industry" : "real partners"} — exactly the showcase story that makes CIEL credible to employers and funders.`
+        : purpose.note.startsWith("A genuinely fresh")
+          ? "A repository first: future cohorts will cite this record instead of starting from zero — compounding value for the platform."
+          : !sdg.note.startsWith('Honest "no SDG')
+            ? "A verified SDG datapoint the university can cite to HEC and rankings — the currency CIEL trades in."
+            : `An honest benchmark for its route — the kind of baseline record that keeps the whole ranking trustworthy.`;
+    return `Why picked: Above all, ${first}. It backs this with a second strength: ${second}. Value to CIEL: ${value}`;
+}
+
+const NEXT_COURSE_BY_ROUTE: Record<FypRoute, string> = {
+    scholar: "publication or a funded master's continuation",
+    maker: "exhibition circuit, industry commissions, or production at scale",
+    builder: "deployment pilot — a natural Enterprise Path continuation",
+    storyteller: "festival circuit and public-broadcast licensing",
+    consultant: "client implementation and a case-study publication",
+};
+
+/** A one-line "most likely future course" for a top-of-cohort pick, based on route + evidence quality. */
+export function fypPotential(entry: FypEntry, sc: FypMeritScorecard): string {
+    const evs = entry.findings?.evidenceStatus || "Not applicable";
+    const base =
+        evs === "Measured / tested result" ? "proven at thesis scale"
+        : evs === "The work itself is the evidence" ? "a finished, documented body of work"
+        : evs === "Qualitative evidence" ? "documented change ready for a measured follow-up"
+        : evs === "Estimated / projected" ? "a credible projection awaiting a real-world pilot"
+        : "early-stage — one pilot from evidence";
+    return `${base} — most likely future course: ${NEXT_COURSE_BY_ROUTE[sc.route]}.`;
 }

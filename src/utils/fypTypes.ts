@@ -16,6 +16,10 @@ export interface FypProjectInfo {
     studentName?: string;
     studentEmail?: string;
     rollNumber?: string;
+    /** HEC allows splitting the FYP across the final year — which semester(s) it spans. */
+    span?: string;
+    /** Typically 6 under HEC policy. */
+    creditHours?: string;
     /** Older entries may hold plain name strings — read via normalizeFypTeamMembers. */
     teamMembers?: (string | FypTeamMember)[];
     supervisorName?: string;
@@ -65,6 +69,9 @@ export interface FypRouteDetails {
     clientOrg?: string;
     engagementBasis?: string;
     recommendationStatus?: string;
+    // scholar route — discussion & conclusion (the HEC thesis chain's closing step)
+    discussion?: string;
+    conclusion?: string;
 }
 export interface FypSdgEntry { goalNumber: number; targets: string[]; how?: string; }
 export interface FypSdgMapping { entries?: FypSdgEntry[]; noSdgApplies?: boolean; }
@@ -154,6 +161,9 @@ function fmtRange(a?: string, b?: string): string {
  * switched away from would show up in the summary. */
 function routeDetailsClause(pi: FypProjectInfo, rd: FypRouteDetails): string {
     const route = fypRouteFor(pi.projectType);
+    if (route === "scholar" && (rd.discussion || rd.conclusion)) {
+        return `${rd.discussion ? ` ${lc(rd.discussion)}.` : ""}${rd.conclusion ? ` Conclusion: ${lc(rd.conclusion)}.` : ""}`;
+    }
     if (route === "maker" && (rd.showMonth || rd.piecesShown || rd.juryExaminer)) {
         return ` Degree show: ${rd.piecesShown ? `${rd.piecesShown} works shown` : "shown"}${rd.showMonth ? ` · ${fmtMonth(rd.showMonth)}` : ""}${rd.juryExaminer ? ` · examined by ${rd.juryExaminer}` : ""}.`;
     }
@@ -196,13 +206,13 @@ export interface FypRouteMode {
     fndL: string;
     fndListL: string;
     litL: string;
-    blk: "studio" | "build" | "media" | "client" | null;
+    blk: "discussion" | "studio" | "build" | "media" | "client" | null;
 }
 
 export const FYP_MODES: Record<FypRoute, FypRouteMode> = {
     scholar: {
         name: "SCHOLAR ROUTE",
-        note: "📜 Scholar route. The classic research grammar: question, literature, method, findings, contribution.",
+        note: "📜 Scholar route — the HEC thesis chain: aims & objectives, literature review, methodology, findings, discussion & conclusion.",
         probL: "What gap, question or debate does it address?",
         aimL: "The overall aim",
         aimPh: "e.g. Develop and test food-waste dyes that small units can afford",
@@ -210,7 +220,7 @@ export const FYP_MODES: Record<FypRoute, FypRouteMode> = {
         fndL: "Key findings / conclusions",
         fndListL: "Findings",
         litL: "Literature foundation",
-        blk: null,
+        blk: "discussion",
     },
     maker: {
         name: "MAKER ROUTE",
@@ -265,9 +275,12 @@ export const FYP_MODES: Record<FypRoute, FypRouteMode> = {
 export const PROJECT_TYPE_OPTIONS = [
     "📜 Thesis / dissertation",
     "🔬 Empirical research study",
+    "⚖️ Law dissertation / case-law study",
+    "🧑‍🏫 Action research / teaching practicum",
     "🧵 Degree-show collection",
     "🎨 Design project (brief-based)",
     "🏗️ Architecture / built design",
+    "🏭 Engineering capstone (design-build-test)",
     "🖥️ Software / engineering build",
     "🎬 Film / media production",
     "🎭 Performance / curation",
@@ -277,10 +290,13 @@ export const PROJECT_TYPE_OPTIONS = [
 const PROJECT_TYPE_ROUTE: Record<string, FypRoute> = {
     "📜 Thesis / dissertation": "scholar",
     "🔬 Empirical research study": "scholar",
+    "⚖️ Law dissertation / case-law study": "scholar",
+    "🧑‍🏫 Action research / teaching practicum": "scholar",
     "🧵 Degree-show collection": "maker",
     "🎨 Design project (brief-based)": "maker",
     "🏗️ Architecture / built design": "maker",
     "🎭 Performance / curation": "maker",
+    "🏭 Engineering capstone (design-build-test)": "builder",
     "🖥️ Software / engineering build": "builder",
     "🎬 Film / media production": "storyteller",
     "📊 Industry / consulting project": "consultant",
