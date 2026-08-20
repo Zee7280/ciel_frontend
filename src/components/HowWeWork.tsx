@@ -3,8 +3,7 @@
 import {
     UserCheck,
     ClipboardList,
-    Users,
-    BarChart2,
+    ShieldCheck,
     Award,
     ArrowRight,
 } from "lucide-react";
@@ -13,32 +12,26 @@ const steps = [
     {
         number: "01",
         icon: UserCheck,
-        title: "Register & Join Project",
-        description: "Sign up, verify your identity, and apply to a real community project aligned with your goals.",
+        title: "Register & pick your path",
+        description: "One account for your whole degree. Choose community service, coursework, FYP, or venture — switch or add anytime.",
     },
     {
         number: "02",
         icon: ClipboardList,
-        title: "Record Activities & Attendance",
-        description: "Log each session with date, hours, activity type, and upload supporting evidence.",
+        title: "Do the work, tap the form",
+        description: "Guided, mostly-tap reports. Attendance logs itself session by session; evidence attaches as you go.",
     },
     {
         number: "03",
-        icon: Users,
-        title: "Track Outputs & Beneficiaries",
-        description: "Document who you helped, what you produced, and how many lives were touched.",
+        icon: ShieldCheck,
+        title: "One-tap verification",
+        description: "Faculty and partners approve via a single link. Nothing enters the record — or our analytics — unverified.",
     },
     {
         number: "04",
-        icon: BarChart2,
-        title: "Measure Outcomes",
-        description: "Compare before vs. after data. CIEL generates your engagement intensity score automatically.",
-    },
-    {
-        number: "05",
         icon: Award,
-        title: "Get Reports + CII Score + Certificate",
-        description: "Receive your verified report, community impact index, and a digital certificate — all HEC-recognized.",
+        title: "Report, score & showcase",
+        description: "AI-generated reports, your CII score, HEC-recognized certificates — and the best work featured to universities and investors.",
     },
 ];
 
@@ -57,7 +50,7 @@ export default function HowWeWork() {
                 <div className="text-center mb-16">
                     <div className="inline-flex items-center gap-2 px-4 py-2 bg-slate-100 rounded-full text-slate-500 text-[10px] font-black uppercase tracking-widest mb-6">
                         <span className="w-1.5 h-1.5 rounded-full bg-slate-500 animate-pulse" />
-                        5 Simple Steps
+                        4 Simple Steps
                     </div>
 
                     <div className="relative inline-block mb-4">
@@ -74,7 +67,7 @@ export default function HowWeWork() {
                     </div>
 
                     <p className="text-base md:text-lg text-slate-500 font-medium max-w-2xl mx-auto mt-6">
-                        From registration to certification — every step is verified, documented, and SDG-aligned.
+                        The same simple spine whatever you&apos;re doing — only the questions adapt to your path.
                     </p>
                 </div>
 
@@ -82,7 +75,7 @@ export default function HowWeWork() {
                 <div className="relative">
                     <div className="hidden lg:block absolute top-[5.5rem] left-[10%] right-[10%] h-px bg-gradient-to-r from-violet-200 via-emerald-200 to-rose-200 z-0" />
 
-                    <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 relative z-10">
+                    <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 relative z-10">
                         {steps.map((step, i) => {
                             const Icon = step.icon;
                             const isLast = i === steps.length - 1;
@@ -90,7 +83,6 @@ export default function HowWeWork() {
                                 "bg-blue-50 text-blue-600",
                                 "bg-rose-50 text-rose-600",
                                 "bg-orange-50 text-orange-600",
-                                "bg-amber-50 text-amber-600",
                                 "bg-emerald-50 text-emerald-600",
                             ];
                             return (

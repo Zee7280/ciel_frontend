@@ -6,20 +6,13 @@ interface Stat {
     value: number;
     suffix: string;
     label: string;
+    /** Only the hours figure is a live, still-growing count — the rest are fixed facts about the platform's current shape, not metrics to inflate. */
+    live?: boolean;
 }
 
 type PlatformStatsData = {
-    students_enrolled?: unknown;
     engagement_hours?: unknown;
-    sdgs_covered?: unknown;
-    active_projects?: unknown;
-    avg_cii_score?: unknown;
-    contributors?: unknown;
-    universities?: unknown;
     impact_hours?: unknown;
-    sdgs_impacted?: unknown;
-    verified_records?: unknown;
-    people_reached?: unknown;
 };
 
 type PlatformStatsResponse = {
@@ -28,12 +21,12 @@ type PlatformStatsResponse = {
 };
 
 const defaultStats: Stat[] = [
-    { value: 539, suffix: "+", label: "Students enrolled" },
-    { value: 1840, suffix: "+", label: "Verified hours" },
-    { value: 247, suffix: "+", label: "Verified records" },
-    { value: 8400, suffix: "+", label: "People reached" },
-    { value: 12, suffix: "+", label: "Universities" },
-    { value: 9, suffix: "+", label: "SDGs advanced" },
+    { value: 1840, suffix: "+", label: "Verified hours — live & counting", live: true },
+    { value: 1, suffix: "", label: "Founding university — BNU pilot live" },
+    { value: 4, suffix: "", label: "Impact paths — open for records" },
+    { value: 17, suffix: "", label: "SDGs mapped in plain language" },
+    { value: 3, suffix: "", label: "Locks per record — student · faculty · partner" },
+    { value: 0, suffix: "", label: "Fake numbers — ever" },
 ];
 
 function normalizeCount(value: unknown, fallback: number): number {
@@ -42,25 +35,9 @@ function normalizeCount(value: unknown, fallback: number): number {
 }
 
 function buildStats(data?: PlatformStatsData): Stat[] {
-    return defaultStats.map((stat) => {
-        switch (stat.label) {
-            case "Students enrolled":
-                // Prefer live contributor count over total signups.
-                return { ...stat, value: normalizeCount(data?.contributors ?? data?.students_enrolled, stat.value) };
-            case "Verified hours":
-                return { ...stat, value: normalizeCount(data?.engagement_hours ?? data?.impact_hours, stat.value) };
-            case "Verified records":
-                return { ...stat, value: normalizeCount(data?.verified_records, stat.value) };
-            case "People reached":
-                return { ...stat, value: normalizeCount(data?.people_reached, stat.value) };
-            case "Universities":
-                return { ...stat, value: normalizeCount(data?.universities, stat.value) };
-            case "SDGs advanced":
-                return { ...stat, value: normalizeCount(data?.sdgs_covered ?? data?.sdgs_impacted, stat.value) };
-            default:
-                return stat;
-        }
-    });
+    return defaultStats.map((stat) =>
+        stat.live ? { ...stat, value: normalizeCount(data?.engagement_hours ?? data?.impact_hours, stat.value) } : stat,
+    );
 }
 
 function AnimatedCounter({ target, suffix, duration = 2000 }: { target: number; suffix: string; duration?: number }) {
@@ -134,15 +111,15 @@ export default function ImpactSnapshot() {
                 {/* Header */}
                 <div className="text-center mb-14">
                     <p className="text-xs font-black uppercase tracking-widest text-ciel-green mb-4">
-                        Live impact
+                        Live impact — the honest version
                     </p>
 
                     <h2 className="text-3xl md:text-4xl lg:text-[42px] font-black text-white tracking-tight leading-tight">
-                        Real numbers. Every one verified.
+                        We publish only what&apos;s verified. We&apos;re just getting started.
                     </h2>
 
                     <p className="text-base md:text-lg text-white/60 font-medium max-w-xl mx-auto mt-5">
-                        Not estimates — each figure traces to attendance evidence, faculty sign-off, and partner confirmation.
+                        Every number on this page traces to attendance evidence, faculty sign-off, and partner confirmation — which is why most tiles below aren&apos;t numbers yet. They will be.
                     </p>
                 </div>
 
@@ -154,7 +131,11 @@ export default function ImpactSnapshot() {
                             className="flex flex-col items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-4 py-7 text-center"
                         >
                             <div className="text-3xl font-black text-ciel-green tabular-nums tracking-tight">
-                                <AnimatedCounter target={stat.value} suffix={stat.suffix} />
+                                {stat.live ? (
+                                    <AnimatedCounter target={stat.value} suffix={stat.suffix} />
+                                ) : (
+                                    `${stat.value}${stat.suffix}`
+                                )}
                             </div>
                             <p className="mt-2 text-sm font-bold text-white">{stat.label}</p>
                         </div>
@@ -164,10 +145,9 @@ export default function ImpactSnapshot() {
                 {/* Community Dividend callout */}
                 <div className="mt-6 rounded-2xl border border-ciel-green/30 bg-ciel-green/5 px-6 py-5 text-center sm:px-10">
                     <p className="text-sm md:text-base leading-relaxed text-white/85">
-                        <span aria-hidden>💝 </span>
+                        <span aria-hidden>💞 </span>
                         <span className="font-bold text-white">The Community Dividend:</span>{" "}
-                        for every external rupee invested, communities and students contribute{" "}
-                        <span className="font-bold text-white">PKR 4.2</span> of their own effort — labour, cash, and in-kind. Communities aren&apos;t recipients on CIEL. They&apos;re the majority investor.
+                        CIEL values every verified volunteer hour (PKR 500/hr) and every rupee students spend from their own pockets. When the first semester closes, Pakistan will see — to the rupee — how much communities invest in themselves. On CIEL, communities aren&apos;t recipients. They&apos;re investors.
                     </p>
                 </div>
             </div>

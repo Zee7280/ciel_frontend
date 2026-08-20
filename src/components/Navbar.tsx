@@ -96,6 +96,12 @@ export default function Navbar() {
                                 Login
                             </Link>
                             <Link
+                                href="/login"
+                                className="inline-flex md:hidden items-center px-3 py-2 rounded-full border border-slate-200 text-xs font-bold text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-all duration-200"
+                            >
+                                Login
+                            </Link>
+                            <Link
                                 href="/signup"
                                 className="inline-flex items-center gap-2 px-4 py-2 sm:px-6 sm:py-2.5 bg-gradient-to-r from-emerald-500 to-sky-500 text-white rounded-full text-xs sm:text-sm font-black hover:scale-105 hover:shadow-xl hover:shadow-emerald-500/25 transition-all duration-300"
                             >

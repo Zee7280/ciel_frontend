@@ -3,6 +3,7 @@ import Hero from "@/components/Hero";
 import SdgStickerMarquee from "@/components/SdgStickerMarquee";
 import WhereImpactLives from "@/components/WhereImpactLives";
 import LiveProjectsShowcase from "@/components/LiveProjectsShowcase";
+import ShowcaseSpotlight from "@/components/ShowcaseSpotlight";
 import WhoIsItFor from "@/components/WhoIsItFor";
 import HowWeWork from "@/components/HowWeWork";
 import FeaturesBar from "@/components/FeaturesBar";
@@ -21,6 +22,7 @@ export default function Home() {
       <WhereImpactLives />
       <LiveProjectsShowcase />
       <ImpactSnapshot />
+      <ShowcaseSpotlight />
       <WhoIsItFor />
       <HowWeWork />
       <FeaturesBar />

@@ -6,9 +6,9 @@ import { ArrowRight } from "lucide-react";
 
 const PATH_CARDS = [
     { key: "community-service", emoji: "⛺", title: "Community Service", description: "Real field hours, verified end-to-end", stat: "1,840 hrs verified" },
-    { key: "course-project", emoji: "📚", title: "Course Projects", description: "Your class work, on the SDG map", stat: "67 records · free" },
-    { key: "fyp-thesis", emoji: "🎓", title: "FYP / Thesis", description: "Research that gets showcased", stat: "7 showcase stars" },
-    { key: "startup-business", emoji: "💼", title: "Startups", description: "Ventures investors can find", stat: "PKR 4.2M pipeline" },
+    { key: "course-project", emoji: "📚", title: "Course Projects", description: "Your class work, on the SDG map", stat: "Now open · free — record yours first" },
+    { key: "fyp-thesis", emoji: "🎓", title: "FYP / Thesis", description: "Research that gets showcased", stat: "Showcase opening — set the benchmark" },
+    { key: "startup-business", emoji: "💼", title: "Startups", description: "Ventures investors can find", stat: "Marketplace launching — build your card" },
 ];
 
 const TRUST_BADGES = [
