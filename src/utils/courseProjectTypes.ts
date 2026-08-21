@@ -34,6 +34,8 @@ export interface CourseProjectAssignmentInfo {
     format?: string;
     formatOther?: string;
     formats?: string[];
+    /** Explicit student override of which pathway leads, when picked formats span more than one — unset means "first pick leads". */
+    leadRoute?: string;
     whatAsked?: string;
     realWorldIssue?: string;
     notes?: string;
@@ -55,21 +57,56 @@ export interface CourseProjectProcessInfo {
     stakeholdersOther?: string;
     notes?: string;
 }
+/** One measured/estimated result inside resultsInfo.metrics — up to 5 per entry. */
+export interface CourseProjectMetric {
+    id: string;
+    name?: string;
+    type?: string;
+    value?: string;
+    unit?: string;
+    /** "Actual — measured" | "Target — intended future result" | "Estimated / projected" | "Proposed — not yet tested" */
+    status?: string;
+    meaning?: string;
+    sample?: string;
+    periodFrom?: string;
+    periodTo?: string;
+    source?: string;
+    character?: string;
+    verifier?: string;
+    comparedBeforeAfter?: boolean;
+    baseline?: string;
+    evidenceAttached?: boolean;
+}
 export interface CourseProjectResultsInfo {
     outputs?: string[];
     outputsOther?: string;
     outputDescription?: string;
     findings?: string[];
+    /** "Did you measure a result?" — Yes / Partly / No (findings-only) / Not yet. Drives whether `metrics` is shown at all. */
+    measured?: string;
+    /** Up to 5 structured results — replaces the older single evidenceStatus/metricName/metricValue/metricUnit/numberRepresents fields below. */
+    metrics?: CourseProjectMetric[];
     measurableImpact?: string;
-    evidenceStatus?: string;
-    metricName?: string;
-    metricValue?: string;
-    metricUnit?: string;
-    numberRepresents?: string;
     limitationType?: string;
     limitationOther?: string;
     limitationDetail?: string;
+    /** "How should this limitation be considered when reading your results?" */
+    limitationInterpretation?: string;
+    /** Up to 3 optional next-step recommendations. */
+    recommendations?: string[];
+    /** 2-3 sentence summary of the most important result. */
+    resultsSummary?: string;
     notes?: string;
+    /** @deprecated pre-multi-metric shape — still read for entries submitted before this system existed. */
+    evidenceStatus?: string;
+    /** @deprecated see evidenceStatus */
+    metricName?: string;
+    /** @deprecated see evidenceStatus */
+    metricValue?: string;
+    /** @deprecated see evidenceStatus */
+    metricUnit?: string;
+    /** @deprecated see evidenceStatus */
+    numberRepresents?: string;
 }
 export interface CourseProjectSdgEntry {
     goalNumber: number;
@@ -79,6 +116,8 @@ export interface CourseProjectSdgEntry {
 }
 export interface CourseProjectSdgMapping {
     origin?: string;
+    /** Honestly declared "no genuine SDG link" — flagged for teacher confirmation rather than force-mapped; the record still counts fully. */
+    notApplicable?: boolean;
     entries?: CourseProjectSdgEntry[];
     notes?: string;
 }
@@ -119,6 +158,8 @@ export interface CourseProjectEntry {
     projectTitle: string | null;
     projectDescription: string | null;
     sdgs: number[] | null;
+    /** The primary uploaded assignment file (essay/deck/design file/code link) — distinct from evidenceUrls' supporting files. Drives half the Verifiability score. */
+    assignmentFileUrl?: string | null;
     evidenceUrls: string[] | null;
     studentInfo: CourseProjectStudentInfo | null;
     assignmentInfo: CourseProjectAssignmentInfo | null;
@@ -132,6 +173,10 @@ export interface CourseProjectEntry {
     addedNote: string | null;
     stepCompleted: number;
     status: "draft" | "submitted";
+    /** Faculty review gate — only "approved" entries count toward Merit Model rankings/AI picks/showcase, mirroring FYP's eligibility gate. Unset/"pending" once submitted, until the named instructor reviews it. */
+    facultyApprovalStatus?: "pending" | "approved" | "rejected" | null;
+    facultyApprovalNote?: string | null;
+    facultyApprovalAt?: string | null;
     createdAt?: string;
     updatedAt?: string;
     /** False when this entry is showing because the viewer was named as a group member on someone else's
@@ -144,6 +189,7 @@ export const EMPTY_COURSE_PROJECT: CourseProjectEntry = {
     projectTitle: "",
     projectDescription: "",
     sdgs: [],
+    assignmentFileUrl: null,
     evidenceUrls: [],
     studentInfo: {},
     assignmentInfo: {},
@@ -157,6 +203,9 @@ export const EMPTY_COURSE_PROJECT: CourseProjectEntry = {
     addedNote: "",
     stepCompleted: 0,
     status: "draft",
+    facultyApprovalStatus: null,
+    facultyApprovalNote: null,
+    facultyApprovalAt: null,
 };
 
 export function mergeCourseProjectEntry(base: CourseProjectEntry, data: Partial<CourseProjectEntry>): CourseProjectEntry {
@@ -185,6 +234,14 @@ function joinList(a: string[]) {
 }
 export function stripEmoji(s: string) {
     return (s || "").replace(/^[^\s]+\s/, "");
+}
+
+/** Human-readable "name: value unit (status)" line for one structured result — shared by the summary composer, the flash card, and the Merit Model. */
+export function courseProjectMetricLine(m: CourseProjectMetric): string {
+    if (!m.name) return "";
+    const unit = m.unit === "Percentage (%)" ? "%" : m.unit && m.unit !== "Other" ? ` ${m.unit}` : "";
+    const statusTag = m.status ? ` (${m.status.split(" — ")[0].toLowerCase()})` : "";
+    return `${m.name}: ${m.value ?? ""}${unit}${statusTag}`;
 }
 
 /** Composed from the student's own answers — not a generic template. Shared by the wizard's review step and the flash card. */
@@ -225,19 +282,24 @@ export function composeCourseProjectSummaries(entry: CourseProjectEntry): Course
 
     const outs = (re.outputs || []).map(stripEmoji).map((x) => x.toLowerCase());
     const finds = (re.findings || []).filter(Boolean);
-    const evidenceLine = re.evidenceStatus
+    const metricLines = (re.metrics || []).map(courseProjectMetricLine).filter(Boolean);
+    const legacyEvidenceLine = !metricLines.length && re.evidenceStatus
         ? ` Evidence status: ${re.evidenceStatus}${re.metricName && re.metricValue ? ` — ${re.metricName}: ${re.metricValue}${re.metricUnit || ""}${re.numberRepresents ? ` (${re.numberRepresents.toLowerCase()})` : ""}` : ""}.`
         : "";
+    const resultsLine = metricLines.length ? ` Results: ${metricLines.join(" · ")}.` : legacyEvidenceLine;
+    const recs = (re.recommendations || []).filter(Boolean);
     s.results = outs.length || re.outputDescription
-        ? `It produced ${outs.length ? joinList(outs) : "its deliverable"}${re.outputDescription ? ` — ${lc(re.outputDescription)}` : ""}.${inc.find && finds.length ? ` Key findings: ${finds.map((f, i) => `(${i + 1}) ${lc(f)}`).join("; ")}.` : ""}${inc.imp && re.measurableImpact ? ` Measured impact: ${lc(re.measurableImpact)}.` : ""}${evidenceLine}${inc.lim && re.limitationType ? ` Limitation, honestly noted: ${lc(re.limitationType)}${re.limitationDetail ? ` — ${lc(re.limitationDetail)}` : ""}.` : ""}`
+        ? `It produced ${outs.length ? joinList(outs) : "its deliverable"}${re.outputDescription ? ` — ${lc(re.outputDescription)}` : ""}.${inc.find && finds.length ? ` Key findings: ${finds.map((f, i) => `(${i + 1}) ${lc(f)}`).join("; ")}.` : ""}${re.measured ? ` Measured a result? ${lc(stripEmoji(re.measured))}.` : ""}${inc.imp ? resultsLine : ""}${inc.imp && re.measurableImpact ? ` Measured impact: ${lc(re.measurableImpact)}.` : ""}${inc.lim && re.limitationType ? ` Limitation, honestly noted: ${lc(re.limitationType)}${re.limitationDetail ? ` — ${lc(re.limitationDetail)}` : ""}${re.limitationInterpretation ? ` — ${lc(re.limitationInterpretation)}` : ""}.` : ""}${recs.length ? ` Recommendations: ${recs.map(lc).join("; ")}.` : ""}${re.resultsSummary ? ` In summary: ${re.resultsSummary}` : ""}`
         : "";
 
     const entries = sm.entries || [];
-    s.sdg = entries.length
-        ? `${sm.origin ? `Sustainability entered because ${lc(stripEmoji(sm.origin))}. ` : ""}Primary: SDG ${entries[0].goalNumber}${entries[0].targets.length ? ` (target ${entries[0].targets.join(", ")})` : ""}${entries[0].how ? ` — ${lc(entries[0].how)}` : ""}.${entries.length > 1 ? ` Supporting: ${entries.slice(1).map((en) => `SDG ${en.goalNumber} (${(en.strength || "supporting").toLowerCase()})`).join(", ")}.` : ""}`
-        : sm.origin
-          ? `Sustainability entered because ${lc(stripEmoji(sm.origin))}; SDG mapping pending.`
-          : "";
+    s.sdg = sm.notApplicable
+        ? "Sustainability: not applicable to this assignment — honestly declared, flagged for teacher confirmation rather than force-mapped."
+        : entries.length
+          ? `${sm.origin ? `Sustainability entered because ${lc(stripEmoji(sm.origin))}. ` : ""}Primary: SDG ${entries[0].goalNumber}${entries[0].targets.length ? ` (target ${entries[0].targets.join(", ")})` : ""}${entries[0].how ? ` — ${lc(entries[0].how)}` : ""}.${entries.length > 1 ? ` Supporting: ${entries.slice(1).map((en) => `SDG ${en.goalNumber} (${(en.strength || "supporting").toLowerCase()})`).join(", ")}.` : ""}`
+          : sm.origin
+            ? `Sustainability entered because ${lc(stripEmoji(sm.origin))}; SDG mapping pending.`
+            : "";
 
     const sk = (rf.skills || []).map(stripEmoji).map((x) => x.toLowerCase());
     const integration = rf.integrationLevel || rf.sdgLinkHonesty;

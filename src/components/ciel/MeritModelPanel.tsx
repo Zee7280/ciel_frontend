@@ -78,7 +78,9 @@ export default function MeritModelPanel({
 
     const scored = useMemo(() => {
         const withScores = pool.map((e) => ({ entry: e, scorecard: computeMeritScorecard(e) }));
-        if (ranked) withScores.sort((a, b) => b.scorecard.total - a.scorecard.total);
+        // Eligible entries (faculty-approved) always sort above ineligible ones — no loophole where
+        // an unreviewed record outranks an approved one just by scoring higher.
+        if (ranked) withScores.sort((a, b) => (Number(b.scorecard.eligible) - Number(a.scorecard.eligible)) || (b.scorecard.total - a.scorecard.total));
         return withScores;
     }, [pool, ranked]);
 
@@ -94,8 +96,8 @@ export default function MeritModelPanel({
     return (
         <div className="space-y-4">
             <div className="rounded-ciel-lg border border-ciel-border bg-white p-5">
-                <h2 className="text-sm font-black text-ciel-text">🧮 The rubric v2 — 100 points, sustainability weighted strongest by design</h2>
-                <p className="mt-1 text-xs text-ciel-text-soft">Each criterion maps to sections of the coursework form. Students see this before they write; faculty see it while they review; the university publishes it. And every top pick carries the AI&apos;s <b>reason</b> and its <b>🔮 potential forecast</b>.</p>
+                <h2 className="text-sm font-black text-ciel-text">🧮 The rubric v3 — 100 points, sustainability weighted strongest by design</h2>
+                <p className="mt-1 text-xs text-ciel-text-soft">Each criterion maps to sections of the coursework form. Students see this before they write; faculty see it while they review; the university publishes it. And every top pick carries the AI&apos;s <b>reason</b> and its <b>🔮 potential forecast</b>. Faculty approval is the gate — an entry only ranks once its teacher approves it.</p>
                 <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
                     {MERIT_RUBRIC.map((c) => (
                         <div key={c.key} className="rounded-ciel-sm border border-ciel-border p-3" style={{ borderTopColor: c.color, borderTopWidth: 3 }}>
@@ -167,7 +169,7 @@ export default function MeritModelPanel({
 
             {ranked && (
                 <div className="rounded-ciel-sm border border-ciel-purple-soft bg-ciel-purple-soft/60 px-4 py-3 text-xs leading-relaxed text-ciel-purple">
-                    🧮 <b>Model run complete</b> — {scored.length} flash card{scored.length === 1 ? "" : "s"} scored on rubric v2 (sustainability-anchored, 25pts){scopeText ? <> · scope: {scopeText}</> : null} · cohort average <b>{avg}/100</b>. Top {Math.min(topN, scored.length)} are AI picks — each with its reason and its 🔮 potential. Order = merit, nothing else.
+                    🧮 <b>Model run complete</b> — {scored.length} flash card{scored.length === 1 ? "" : "s"} scored on rubric v3 (sustainability-anchored, +Verifiability){scopeText ? <> · scope: {scopeText}</> : null} · cohort average <b>{avg}/100</b> · <b>{scored.filter((x) => x.scorecard.eligible).length}</b> of {scored.length} faculty-approved and eligible. Top {Math.min(topN, scored.length)} eligible are AI picks — each with its reason and its 🔮 potential. Order = merit, nothing else.
                 </div>
             )}
 
@@ -176,13 +178,14 @@ export default function MeritModelPanel({
                     <p className="rounded-ciel-sm bg-ciel-page px-4 py-8 text-center text-sm font-semibold text-ciel-text-soft">No flash cards in this scope.</p>
                 )}
                 {scored.map((x, i) => {
-                    const topPick = ranked && i < topN;
+                    const ineligible = ranked && !x.scorecard.eligible;
+                    const topPick = ranked && i < topN && x.scorecard.eligible;
                     const open = openId === x.entry.id;
                     const primary = x.entry.sdgMapping?.entries?.[0];
                     const sdg = primary ? sdgData.find((s) => s.number === primary.goalNumber) : null;
                     const displayName = x.entry.student?.name || x.entry.studentInfo?.studentName || "Student";
                     return (
-                        <div key={x.entry.id} className={clsx("relative overflow-hidden rounded-ciel-lg border bg-white", topPick ? "border-ciel-purple/50 shadow-md" : "border-ciel-border")}>
+                        <div key={x.entry.id} className={clsx("relative overflow-hidden rounded-ciel-lg border bg-white", topPick ? "border-ciel-purple/50 shadow-md" : "border-ciel-border", ineligible && "opacity-55")}>
                             {topPick && (
                                 <div className="absolute left-0 top-0 flex items-center gap-1 rounded-br-ciel-sm bg-ciel-purple px-3 py-1 text-[9px] font-black text-white">
                                     <Trophy className="h-2.5 w-2.5" /> TOP OF COHORT · #{i + 1}
@@ -194,7 +197,7 @@ export default function MeritModelPanel({
                                 className={clsx("flex w-full items-center gap-3 px-5 py-4 text-left", topPick && "pt-7")}
                             >
                                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-ciel-sm bg-ciel-page text-sm font-black text-ciel-text-soft">
-                                    {ranked ? i + 1 : "·"}
+                                    {ranked ? (ineligible ? "⛔" : i + 1) : "·"}
                                 </div>
                                 <span className="text-xl">{entryEmoji(x.entry)}</span>
                                 <div className="min-w-0 flex-1">
@@ -210,11 +213,16 @@ export default function MeritModelPanel({
                                 </div>
                                 <div className="shrink-0 text-right">
                                     <div className="text-lg font-black text-ciel-purple">{ranked ? `${x.scorecard.total}/100` : "—"}</div>
-                                    <div className="text-[9px] font-black" style={{ color: x.scorecard.gradeColor }}>{ranked ? x.scorecard.grade : "TAP RUN"}</div>
+                                    <div className="text-[9px] font-black" style={{ color: ineligible ? "#b45309" : x.scorecard.gradeColor }}>{ranked ? (ineligible ? "INELIGIBLE" : x.scorecard.grade) : "TAP RUN"}</div>
                                 </div>
                                 <ChevronDown className={clsx("h-4 w-4 shrink-0 text-ciel-text-soft transition-transform", open && "rotate-180")} />
                             </button>
 
+                            {ineligible && (
+                                <p className="px-5 pb-3 pl-[4.5rem] text-[11px] leading-relaxed text-amber-700">
+                                    ⛔ <b>Ineligible for AI picks &amp; showcase:</b> {x.entry.facultyApprovalStatus === "rejected" ? "teacher requested changes" : "awaiting teacher approval"} — scored for feedback only. Once your teacher approves, it goes live in rankings.
+                                </p>
+                            )}
                             {topPick && (
                                 <div className="space-y-1 px-5 pb-3 pl-[4.5rem]">
                                     <p className="text-[11px] leading-relaxed text-ciel-purple">🤖 <b>AI pick because:</b> {whyItLeads(x.entry, x.scorecard)}</p>

@@ -12,6 +12,7 @@ export default function FacultyCourseworkProjectsPage() {
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState("");
     const [showMeritModel, setShowMeritModel] = useState(false);
+    const [reviewingId, setReviewingId] = useState<string | null>(null);
 
     useEffect(() => {
         void fetchEntries();
@@ -33,6 +34,27 @@ export default function FacultyCourseworkProjectsPage() {
             setEntries([]);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const reviewEntry = async (id: string, action: "approve" | "reject") => {
+        setReviewingId(id);
+        try {
+            const response = await authenticatedFetch(`/api/v1/paths/course-projects/${id}/faculty-review`, {
+                method: "PATCH",
+                body: JSON.stringify({ action }),
+            });
+            if (response?.ok) {
+                const data = await response.json();
+                setEntries((prev) => prev.map((e) => (e.id === id ? { ...e, ...data.data } : e)));
+                toast.success(action === "approve" ? "Approved — now live in Merit Model rankings" : "Changes requested — student will see this on their draft");
+            } else {
+                toast.error("Could not save your review");
+            }
+        } catch {
+            toast.error("Could not save your review");
+        } finally {
+            setReviewingId(null);
         }
     };
 
@@ -103,7 +125,13 @@ export default function FacultyCourseworkProjectsPage() {
                 ) : (
                     <div className="space-y-4">
                         {filtered.map((entry) => (
-                            <CourseworkCard key={entry.id} entry={entry} studentName={entry.student?.name} />
+                            <CourseworkCard
+                                key={entry.id}
+                                entry={entry}
+                                studentName={entry.student?.name}
+                                onFacultyReview={entry.id ? (action) => reviewEntry(entry.id!, action) : undefined}
+                                reviewing={reviewingId === entry.id}
+                            />
                         ))}
                     </div>
                 )}

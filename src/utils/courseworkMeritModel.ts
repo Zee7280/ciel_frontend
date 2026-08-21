@@ -1,32 +1,33 @@
 // Deterministic, rule-based scoring engine for coursework flash cards — the "CIEL Merit Model".
-// Replaces the earlier LLM-based "AI Curator": same six-criterion public rubric, but every point
+// Replaces the earlier LLM-based "AI Curator": same seven-criterion public rubric, but every point
 // is computed from the student's own declared wizard fields, so a score is always explainable and
 // reproducible (no OpenAI call, no run-to-run variance). See courseProjectTypes.ts for field shapes.
 
-import { type CourseProjectEntry, stripEmoji } from "./courseProjectTypes";
+import { type CourseProjectEntry, type CourseProjectResultsInfo, courseProjectMetricLine, stripEmoji } from "./courseProjectTypes";
 
 export interface MeritRubricCriterion {
-    key: "purpose" | "rigor" | "results" | "sdg" | "honesty" | "refl";
+    key: "purpose" | "rigor" | "results" | "sdg" | "honesty" | "refl" | "ver";
     label: string;
     max: number;
     color: string;
     description: string;
 }
 
-/** The public rubric v2 — sustainability weighted strongest by design. Shown to students before they write, faculty while they review, university on publish. */
+/** The public rubric v3 — sustainability weighted strongest by design, plus a Verifiability criterion for the attached real work. Shown to students before they write, faculty while they review, university on publish. */
 export const MERIT_RUBRIC: MeritRubricCriterion[] = [
-    { key: "sdg", label: "1 · Sustainability & SDG authenticity — the anchor", max: 25, color: "#3F7E44", description: "Primary SDG + target, connection explained, integration level declared. Self-started or emergent links earn a bonus; decorative name-dropping scores near zero. §6." },
+    { key: "sdg", label: "1 · Sustainability & SDG authenticity — the anchor", max: 25, color: "#3F7E44", description: "Primary SDG + target, connection explained, integration level declared. Self-started or emergent links earn a bonus; honest \"not applicable\" scores respectably. §6." },
     { key: "results", label: "2 · Substance of results — is it real & fruitful?", max: 20, color: "#c98a04", description: "Output + insight present; evidence ladder: measured > qualitative > estimated > target > conceptual > not-yet. Honesty never scores zero. §5." },
-    { key: "purpose", label: "3 · Clarity & quality of the idea", max: 15, color: "#2563eb", description: "A stated aim anyone can grasp, concrete objectives, a real issue/question/opportunity — concise beats padded. §2–3." },
-    { key: "rigor", label: "4 · Rigor of process — pathway-adjusted", max: 15, color: "#0f766e", description: "Activities & method appropriate to the declared format + scale stated. Practice-based inquiry counts equal to lab testing. §4." },
+    { key: "purpose", label: "3 · Clarity & quality of the idea", max: 14, color: "#2563eb", description: "A stated aim anyone can grasp, concrete objectives, a real issue/question/opportunity — concise beats padded. §2–3." },
+    { key: "rigor", label: "4 · Rigor of process — pathway-adjusted", max: 13, color: "#0f766e", description: "Activities & method appropriate to the declared format + scale stated. A deep study and a brief class exercise are judged against their own scale. §4." },
     { key: "honesty", label: "5 · Honesty & consistency", max: 15, color: "#dc2626", description: "Limitation named with its effect; numbers correctly classified; claims consistent with evidence (a \"central & demonstrated\" claim needs measurement behind it). §5–7." },
-    { key: "refl", label: "6 · Reflection & transfer", max: 10, color: "#7c3aed", description: "What was learned, skills claimed, advice to the next class, a realistic next step. §7." },
+    { key: "refl", label: "6 · Reflection & transfer", max: 8, color: "#7c3aed", description: "What was learned, skills claimed, advice to the next class, a realistic next step. §7." },
+    { key: "ver", label: "7 · Verifiability", max: 5, color: "#0e7490", description: "The actual assignment attached (📎) and evidence files on the metrics. Optional to attach — but the real work always outranks a claim about it, and attached cards rank with higher confidence. §5." },
 ];
 
 export const MERIT_NEUTRALITY_NOTE =
     "The model never scores English polish, word count, discipline prestige, or production budget. Expectations are format-adjusted — an essay is not penalised for having no lab data, an artwork is not penalised for having no survey. What's rewarded everywhere: clear purpose, honest evidence, real SDG thinking.";
 
-/** Evidence-status points — mirrors the wizard's EVIDENCE_STATUS labels exactly (no emoji, evidenceStatus is stored plain). */
+/** Evidence-status points — mirrors the wizard's old single evidence-status labels (still used as the scoring input, now derived from the multi-metric builder). */
 const EVIDENCE_POINTS: Record<string, number> = {
     "Actual measured result": 12,
     "Qualitative evidence": 10,
@@ -36,6 +37,24 @@ const EVIDENCE_POINTS: Record<string, number> = {
     "Not measured yet": 3,
     "Not applicable": 4,
 };
+
+/** Derives one of the classic evidence-ladder labels from the multi-metric builder (or falls back to the pre-multi-metric single field, for entries submitted before this system existed) — keeps the scoring formula below unchanged while sourcing from real declared data either way. */
+function effectiveEvidenceLabel(re: CourseProjectResultsInfo): string {
+    const metrics = re.metrics || [];
+    if (metrics.length) {
+        if (metrics.some((m) => m.status === "Actual — measured")) return "Actual measured result";
+        if (metrics.some((m) => m.status === "Target — intended future result")) return "Proposed target";
+        if (metrics.some((m) => m.status === "Estimated / projected")) return "Estimated / projected";
+        if (metrics.some((m) => m.status === "Proposed — not yet tested")) return "Conceptual recommendation";
+        return "Qualitative evidence";
+    }
+    if (re.measured) {
+        if (/Not yet/.test(re.measured)) return "Not measured yet";
+        if (/No —/.test(re.measured)) return "Not applicable";
+        if (/Yes|Partly/.test(re.measured)) return "Qualitative evidence";
+    }
+    return re.evidenceStatus || "Not applicable";
+}
 
 function integrationPoints(raw?: string): number {
     const s = stripEmoji(raw || "").toLowerCase();
@@ -78,6 +97,8 @@ export interface MeritScorecard {
     grade: string;
     gradeColor: string;
     consistency: MeritConsistencyFlag;
+    /** Only "approved" entries are eligible for Merit Model ranking/AI picks/showcase — mirrors the FYP eligibility gate. */
+    eligible: boolean;
 }
 
 const GRADE_BANDS: [number, string, string][] = [
@@ -94,7 +115,7 @@ export function meritGrade(total: number): [string, string] {
     return ["EMERGING", "#7a8095"];
 }
 
-/** Computes the six-criterion scorecard for one coursework entry, deterministically, from its own wizard fields. */
+/** Computes the seven-criterion scorecard for one coursework entry, deterministically, from its own wizard fields. */
 export function computeMeritScorecard(entry: CourseProjectEntry): MeritScorecard {
     const inc = entry.moduleInclusion || {};
     const ai = entry.assignmentInfo || {};
@@ -105,53 +126,59 @@ export function computeMeritScorecard(entry: CourseProjectEntry): MeritScorecard
     const rf = entry.reflectionInfo || {};
     const primary = sm.entries?.[0];
 
-    // ---- 1 · Clarity of purpose ----
+    // ---- 3 · Clarity & quality of the idea — 14 ----
     // Formats that skip formal aims (inc.aim=false) substitute "what were you asked to do" as the aim proxy —
     // the wizard's own format notes explain this ("your aim becomes your central argument", etc.).
     const aimText = inc.aim ? am.aimStatement : ai.whatAsked;
     const aimPts = aimText && aimText.trim().length > 12 ? 2 : aimText?.trim() ? 1 : 0;
     const objsCount = inc.aim ? (am.objectives || []).filter((o) => o.trim()).length : ai.whatAsked?.trim() ? 2 : 0;
     const issuePts = ai.realWorldIssue?.trim() ? 1 : 0;
-    const purposePts = clampPts(aimPts * 4 + Math.min(objsCount, 3) * 1.5 + issuePts * 2.5, 15);
+    const purposePts = clampPts(aimPts * 4 + Math.min(objsCount, 3) * 1.3 + issuePts * 2.3, 14);
     const purposeNote = aimPts === 2 ? "Clear aim, concrete objectives, real issue named" : aimPts === 1 ? "Aim present but loosely framed" : "Aim missing or vague";
 
-    // ---- 2 · Rigor of process (format-adjusted: a module the format skips can't be marked low) ----
+    // ---- 4 · Rigor of process — 13 (pathway-adjusted: a module the format skips can't be marked low) ----
     const actsFilled = (pr.activities || []).filter(Boolean).length > 0;
     const methsFilled = (pr.methods || []).filter((m) => m && !/not applicable/i.test(m)).length > 0;
     const actOk = !inc.act || actsFilled;
     const methOk = !inc.meth || methsFilled;
     const fitPts = actOk && methOk ? 2 : actOk || methOk ? 1 : 0;
     const scalePts = !inc.meth || pr.sampleScale?.trim() ? 1 : 0;
-    const rigorPts = clampPts(fitPts * 5.5 + scalePts * 3 + 1, 15);
+    const rigorPts = clampPts(fitPts * 4.5 + scalePts * 3 + 1, 13);
     const rigorNote =
         fitPts === 2
-            ? `Method & activities fit the declared format${scalePts ? "; scale/scope stated" : ""}`
+            ? `Method & activities fit the declared format${scalePts ? "; scale stated" : ""}`
             : fitPts === 1
               ? "Process only partly matches the declared format"
               : "Process poorly evidenced";
 
-    // ---- 3 · Substance of results ----
+    // ---- 2 · Substance of results — 20 ----
     const outputPts = (re.outputs || []).length > 0 || re.outputDescription?.trim() ? 1 : 0;
     const findingsCount = inc.find ? (re.findings || []).filter((f) => f.trim()).length : 2;
     const insightPts = findingsCount >= 2 ? 2 : findingsCount === 1 ? 1 : 0;
-    const evidenceStatus = re.evidenceStatus || "Not applicable";
+    const evidenceStatus = effectiveEvidenceLabel(re);
     const resultsPts = clampPts((EVIDENCE_POINTS[evidenceStatus] ?? 3) + outputPts * 3 + insightPts * 2.5, 20);
-    const resultsNote = `${evidenceStatus}${re.measurableImpact ? " — " + re.measurableImpact : ""}`;
+    const topMetricLine = (re.metrics || []).map(courseProjectMetricLine).filter(Boolean)[0];
+    const resultsNote = `${evidenceStatus}${topMetricLine ? " — " + topMetricLine : re.measurableImpact ? " — " + re.measurableImpact : ""}`;
 
-    // ---- 4 · SDG authenticity ----
+    // ---- 1 · Sustainability & SDG authenticity — 25 (the anchor) ----
     const sdgHasTarget = (primary?.targets?.length ?? 0) > 0 ? 1 : 0;
     const sdgHasHow = primary?.how?.trim() ? 1 : 0;
     const integPts = integrationPoints(rf.integrationLevel || rf.sdgLinkHonesty);
     const origPts = originPoints(sm.origin);
-    const sdgPts = clampPts((primary ? 6 : 0) + sdgHasTarget * 4 + sdgHasHow * 5 + integPts + origPts - 2, 25);
-    const sdgNote = primary
-        ? `SDG ${primary.goalNumber}${sdgHasTarget ? " + target" : ""}${sdgHasHow ? " + explained link" : ""} · ${stripEmoji(rf.integrationLevel || rf.sdgLinkHonesty || "").toLowerCase() || "integration not declared"} · ${stripEmoji(sm.origin || "").toLowerCase() || "origin not declared"}`
-        : "No SDG selected yet";
+    const sdgPts = sm.notApplicable
+        ? 15
+        : clampPts((primary ? 6 : 0) + sdgHasTarget * 4 + sdgHasHow * 5 + integPts + origPts - 2, 25);
+    const sdgNote = sm.notApplicable
+        ? "Honestly declared not applicable — flagged for teacher confirmation, record counts fully"
+        : primary
+          ? `SDG ${primary.goalNumber}${sdgHasTarget ? " + target" : ""}${sdgHasHow ? " + explained link" : ""} · ${stripEmoji(rf.integrationLevel || rf.sdgLinkHonesty || "").toLowerCase() || "integration not declared"} · ${stripEmoji(sm.origin || "").toLowerCase() || "origin not declared"}`
+          : "No SDG selected yet";
 
-    // ---- 5 · Honesty & consistency ----
-    const limPts = !inc.lim ? 2 : re.limitationType?.trim() && re.limitationDetail?.trim() ? 2 : re.limitationType?.trim() ? 1 : 0;
-    const hasMetricValue = !!re.metricValue?.trim();
-    const numOkPts = hasMetricValue ? (re.numberRepresents ? 1 : 0) : 1;
+    // ---- 5 · Honesty & consistency — 15 ----
+    const limPts = !inc.lim ? 2 : re.limitationType?.trim() && (re.limitationDetail?.trim() || re.limitationInterpretation?.trim()) ? 2 : re.limitationType?.trim() ? 1 : 0;
+    const hasMetrics = (re.metrics?.length ?? 0) > 0 || !!re.metricValue?.trim();
+    const metricsClassified = re.metrics?.length ? re.metrics.every((m) => !!m.status) : !!re.numberRepresents;
+    const numOkPts = hasMetrics ? (metricsClassified ? 1 : 0) : 1;
     let honestyPts = limPts * 4 + numOkPts * 4 + 3;
     const integrationText = stripEmoji(rf.integrationLevel || rf.sdgLinkHonesty || "");
     const claimsHigh = /central to the work and demonstrated|real\s*—/i.test(integrationText);
@@ -166,13 +193,23 @@ export function computeMeritScorecard(entry: CourseProjectEntry): MeritScorecard
     const honestyPtsClamped = clampPts(honestyPts, 15);
     const honestyNote = limPts === 2 ? "Limitation named with its effect" : limPts === 1 ? "Limitation named briefly" : !inc.lim ? "Not applicable to this format" : "No limitation acknowledged";
 
-    // ---- 6 · Reflection & transfer ----
+    // ---- 6 · Reflection & transfer — 8 ----
     const learnPts = rf.lessonLearned && rf.lessonLearned.trim().length > 20 ? 2 : rf.lessonLearned?.trim() ? 1 : 0;
     const advicePts = rf.adviceNextSemester?.trim() ? 1 : 0;
     const nextPts = rf.nextSteps?.trim() || rf.whatsNext?.trim() ? 1 : 0;
     const skillsCount = (rf.skills || []).filter(Boolean).length;
-    const reflPts = clampPts(learnPts * 3 + advicePts * 2 + nextPts * 1 + Math.min(skillsCount, 4) * 0.5, 10);
+    const reflPts = clampPts(learnPts * 2.5 + advicePts * 1.5 + nextPts * 1 + Math.min(skillsCount, 4) * 0.4, 8);
     const reflNote = learnPts === 2 ? "Substantive learning + advice to the next class" : learnPts === 1 ? "Some reflection present" : "Reflection thin";
+
+    // ---- 7 · Verifiability — 5 ----
+    const hasMainFile = !!entry.assignmentFileUrl;
+    const hasExtraFiles = (entry.evidenceUrls?.length ?? 0) > 0;
+    const verPts = clampPts((hasMainFile ? 3 : 0) + (hasExtraFiles ? 2 : 0), 5);
+    const verNote = hasMainFile
+        ? `📎 Assignment attached — reviewers can open the actual work${hasExtraFiles ? " · evidence files on metrics" : ""}`
+        : hasExtraFiles
+          ? "Evidence files attached, assignment not"
+          : "Card-only record — no files attached (optional, but attached work ranks with higher confidence)";
 
     const critFor = (key: MeritRubricCriterion["key"]) => MERIT_RUBRIC.find((c) => c.key === key)!;
     const criteria: MeritCriterionResult[] = [
@@ -182,11 +219,14 @@ export function computeMeritScorecard(entry: CourseProjectEntry): MeritScorecard
         { ...critFor("rigor"), points: rigorPts, note: rigorNote },
         { ...critFor("honesty"), points: honestyPtsClamped, note: honestyNote },
         { ...critFor("refl"), points: reflPts, note: reflNote },
+        { ...critFor("ver"), points: verPts, note: verNote },
     ];
     const total = Math.round(criteria.reduce((s, c) => s + c.points, 0));
     const [grade, gradeColor] = meritGrade(total);
+    // Faculty approval is the eligibility gate for ranking/showcase — see the "faculty approve → live" flow.
+    const eligible = entry.facultyApprovalStatus === "approved";
 
-    return { criteria, total, grade, gradeColor, consistency };
+    return { criteria, total, grade, gradeColor, consistency, eligible };
 }
 
 /** True when the sustainability link was self-started by the student/team rather than assigned — mirrors originPoints()'s own detection regex. */
@@ -195,19 +235,21 @@ function isFounderOrigin(origin?: string): boolean {
 }
 
 const CRITERION_PHRASE: Record<MeritRubricCriterion["key"], (entry: CourseProjectEntry) => string> = {
-    sdg: (entry) => (isFounderOrigin(entry.sdgMapping?.origin) ? "a self-started, authentic sustainability core" : "an authentic, explained sustainability core"),
-    results: (entry) => ((entry.resultsInfo?.evidenceStatus || "").includes("measured result") ? "real measured results — fruitful, not decorative" : "substantive, honestly-classified results"),
+    sdg: (entry) => (entry.sdgMapping?.notApplicable ? "an honestly declared non-claim, not decorative SDG name-dropping" : isFounderOrigin(entry.sdgMapping?.origin) ? "a self-started, authentic sustainability core" : "an authentic, explained sustainability core"),
+    results: (entry) => (effectiveEvidenceLabel(entry.resultsInfo || {}).includes("measured result") ? "real measured results — fruitful, not decorative" : "substantive, honestly-classified results"),
     purpose: () => "a concise, real idea anyone can grasp",
     rigor: () => "rigor true to its own format",
     honesty: () => "honest limits & correctly classified numbers",
     refl: () => "reflection that transfers to the next cohort",
+    ver: () => "the actual assignment attached — every claim openable and checkable",
 };
 
 /** Why the top-ranked entries lead — derived from their own two highest-scoring criteria, not a canned line. */
 export function whyItLeads(entry: CourseProjectEntry, sc: MeritScorecard): string {
     const ranked = [...sc.criteria].sort((a, b) => b.points / b.max - a.points / a.max);
     const [top1, top2] = ranked;
-    return `${CRITERION_PHRASE[top1.key](entry)}, with ${CRITERION_PHRASE[top2.key](entry)}.`;
+    const attachedSuffix = entry.assignmentFileUrl ? ". The attached work lets reviewers verify, not trust" : "";
+    return `${CRITERION_PHRASE[top1.key](entry)}, with ${CRITERION_PHRASE[top2.key](entry)}${attachedSuffix}.`;
 }
 
 /** 🔮 What's the most likely next step for this piece of work — forecast from its own evidence ladder and declared format. */
@@ -215,7 +257,7 @@ export function courseworkPotential(entry: CourseProjectEntry): string {
     const re = entry.resultsInfo || {};
     const sm = entry.sdgMapping || {};
     const fmt = stripEmoji(entry.assignmentInfo?.formats?.[0] || entry.assignmentInfo?.format || "").toLowerCase();
-    const evs = re.evidenceStatus || "";
+    const evs = effectiveEvidenceLabel(re);
     const base =
         evs === "Actual measured result" ? "already proven at classroom scale"
         : evs === "Proposed target" ? "a costed plan sitting one approval from implementation"

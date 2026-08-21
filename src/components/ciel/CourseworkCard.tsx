@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { CheckCircle2, Sparkles, Users, ChevronDown, Star } from "lucide-react";
+import { CheckCircle2, Sparkles, Users, ChevronDown, Star, Paperclip, ShieldAlert, Clock } from "lucide-react";
 import clsx from "clsx";
 import { sdgData } from "@/utils/sdgData";
 import {
@@ -25,11 +25,16 @@ export default function CourseworkCard({
     entry,
     defaultOpen = false,
     studentName,
+    onFacultyReview,
+    reviewing = false,
 }: {
     entry: CourseProjectEntry;
     defaultOpen?: boolean;
     /** Override for the ribbon's student name display (e.g. on a faculty/university deck showing someone else's card). */
     studentName?: string;
+    /** Supplying this renders Approve/Reject actions in the footer — the faculty-review gate that makes a submitted entry "go live" for Merit Model ranking. */
+    onFacultyReview?: (action: "approve" | "reject") => void;
+    reviewing?: boolean;
 }) {
     const [open, setOpen] = useState(defaultOpen);
 
@@ -48,7 +53,9 @@ export default function CourseworkCard({
     const initials = (si.teacherName || "? ?").split(" ").map((w) => w[0]).filter(Boolean).slice(0, 2).join("").toUpperCase();
     const integration = entry.reflectionInfo?.integrationLevel || entry.reflectionInfo?.sdgLinkHonesty;
 
-    const proof = re.findings?.[0] || re.measurableImpact;
+    const proof = re.findings?.[0] || re.metrics?.[0]?.meaning || re.measurableImpact;
+    const evidenceLabel = re.metrics?.length ? (re.metrics.some((m) => m.status === "Actual — measured") ? "Actual measured result" : re.metrics[0].status || "Result declared") : re.measured ? stripEmoji(re.measured) : re.evidenceStatus;
+    const approval = entry.facultyApprovalStatus;
 
     return (
         <div className="overflow-hidden rounded-ciel-lg border border-ciel-border bg-white shadow-sm">
@@ -69,9 +76,17 @@ export default function CourseworkCard({
                             </p>
                         </div>
                     </div>
-                    {entry.status === "submitted" ? (
+                    {entry.status === "submitted" && approval === "approved" ? (
                         <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-emerald-700">
-                            <CheckCircle2 className="h-3 w-3" /> Verified
+                            <CheckCircle2 className="h-3 w-3" /> Approved & live
+                        </span>
+                    ) : entry.status === "submitted" && approval === "rejected" ? (
+                        <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-red-200 bg-red-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-red-700">
+                            <ShieldAlert className="h-3 w-3" /> Changes requested
+                        </span>
+                    ) : entry.status === "submitted" ? (
+                        <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-amber-700">
+                            <Clock className="h-3 w-3" /> Awaiting faculty approval
                         </span>
                     ) : (
                         <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-amber-700">
@@ -117,12 +132,16 @@ export default function CourseworkCard({
                             <Sparkles className="h-3 w-3" /> Student-initiated SDG
                         </span>
                     ) : null}
-                    {re.evidenceStatus ? (
+                    {evidenceLabel ? (
                         <span className="inline-flex items-center gap-1 rounded-full bg-ciel-amber-soft px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-ciel-amber">
-                            {re.evidenceStatus}
+                            {evidenceLabel}
                         </span>
                     ) : null}
-                    {!!entry.evidenceUrls?.length && (
+                    {entry.assignmentFileUrl ? (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-ciel-green-soft px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-ciel-green-deep">
+                            <Paperclip className="h-3 w-3" /> Assignment attached — verifiable
+                        </span>
+                    ) : !!entry.evidenceUrls?.length && (
                         <span className="inline-flex items-center gap-1 rounded-full bg-ciel-green-soft px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-ciel-green-deep">
                             <CheckCircle2 className="h-3 w-3" /> Evidence attached
                         </span>
@@ -183,19 +202,43 @@ export default function CourseworkCard({
             </div>
 
             {/* Footer */}
-            <div className="flex items-center gap-3 border-t border-ciel-border bg-ciel-page/60 px-5 py-3.5">
+            <div className="flex flex-wrap items-center gap-3 border-t border-ciel-border bg-ciel-page/60 px-5 py-3.5">
                 <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-ciel-navy text-[10px] font-black text-white">
                     {initials || "?"}
                 </span>
-                <p className="min-w-0 text-xs leading-relaxed text-ciel-text-mid">
-                    {entry.status === "submitted" ? (
-                        <>Verified by <b className="text-ciel-text">{si.teacherName || "supervisor"}</b>{si.teacherEmail ? ` · ${si.teacherEmail}` : ""}</>
+                <p className="min-w-0 flex-1 text-xs leading-relaxed text-ciel-text-mid">
+                    {entry.status === "submitted" && approval === "approved" ? (
+                        <>Approved by <b className="text-ciel-text">{si.teacherName || "supervisor"}</b>{si.teacherEmail ? ` · ${si.teacherEmail}` : ""} — live in Merit Model rankings</>
+                    ) : entry.status === "submitted" && approval === "rejected" ? (
+                        <>Changes requested by <b className="text-ciel-text">{si.teacherName || "supervisor"}</b>{entry.facultyApprovalNote ? `: "${entry.facultyApprovalNote}"` : ""}</>
+                    ) : entry.status === "submitted" ? (
+                        <>Awaiting approval by <b className="text-ciel-text">{si.teacherName || "supervisor"}</b>{si.teacherEmail ? ` · ${si.teacherEmail}` : ""} — not yet ranked</>
                     ) : (
-                        <>Awaiting confirmation by <b className="text-ciel-text">{si.teacherName || "supervisor"}</b>{si.teacherEmail ? ` · ${si.teacherEmail}` : ""}</>
+                        <>Draft — not yet submitted to <b className="text-ciel-text">{si.teacherName || "supervisor"}</b></>
                     )}
                     <br />
                     Live on: 🧑‍🎓 student portfolio · 🧑‍🏫 faculty deck
                 </p>
+                {onFacultyReview && entry.status === "submitted" && approval !== "approved" && (
+                    <div className="flex shrink-0 gap-2">
+                        <button
+                            type="button"
+                            onClick={() => onFacultyReview("reject")}
+                            disabled={reviewing}
+                            className="ciel-transition rounded-ciel-xs border-2 border-red-200 bg-white px-3 py-2 text-xs font-bold text-red-700 hover:bg-red-50 disabled:opacity-50"
+                        >
+                            Request changes
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => onFacultyReview("approve")}
+                            disabled={reviewing}
+                            className="ciel-transition rounded-ciel-xs border-2 border-ciel-green bg-ciel-green px-3 py-2 text-xs font-bold text-white hover:bg-ciel-green-deep disabled:opacity-50"
+                        >
+                            ✓ Approve — make live
+                        </button>
+                    </div>
+                )}
             </div>
         </div>
     );

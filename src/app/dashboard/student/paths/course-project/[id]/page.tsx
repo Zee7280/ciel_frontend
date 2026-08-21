@@ -18,6 +18,8 @@ import {
     type CourseProjectModuleInclusion,
     type CourseProjectSectionSummaries,
     type CourseProjectGroupMember,
+    type CourseProjectMetric,
+    type CourseProjectRoute,
     EMPTY_COURSE_PROJECT,
     mergeCourseProjectEntry,
     composeCourseProjectSummaries,
@@ -82,18 +84,164 @@ const OUTPUT_OPTIONS = ["📄 Report / plan", "✍️ Essay / written piece", "�
 const SKILL_OPTIONS = ["🗣️ Communication", "🤝 Teamwork", "🔬 Research", "🧩 Problem-solving", "🎨 Creativity", "⏰ Time management", "🌍 Sustainability thinking", "⚖️ Ethical reasoning", "✍️ Writing", "🎤 Presenting"];
 const ORIGIN_OPTIONS = ["📋 Built into the assignment", "📘 Built into the course", "💡 Introduced by the student / team", "👩‍🏫 Suggested by the instructor", "🔍 Emerged during the work", "🔗 Identified when reviewing the completed work"];
 const INTEGRATION_OPTIONS = ["🌱 Central to the work and demonstrated", "📊 Clearly connected, outcome not measured", "🌓 Partially integrated", "🔗 Indirectly connected", "🔍 Identified retrospectively"];
-const EVIDENCE_STATUS: { emoji: string; label: string }[] = [
-    { emoji: "📊", label: "Actual measured result" },
-    { emoji: "📝", label: "Qualitative evidence" },
-    { emoji: "🎯", label: "Proposed target" },
-    { emoji: "📈", label: "Estimated / projected" },
-    { emoji: "💡", label: "Conceptual recommendation" },
-    { emoji: "⏳", label: "Not measured yet" },
-    { emoji: "➖", label: "Not applicable" },
-];
-const NUMBER_REPRESENTS_OPTIONS = ["Baseline", "Target", "Estimated / projected", "Actual measured result"];
-const METRIC_UNIT_OPTIONS = ["%", "people", "students", "households", "responses", "items", "sessions", "hours", "days", "kg", "tonnes CO₂e", "litres", "kWh", "km", "sq. ft.", "PKR", "trees", "/5 rating", "times"];
+const MEASURED_OPTIONS = ["✅ Yes — a result was actually measured", "🌓 Partly — some evidence, not enough to confirm", "📋 No — findings / designs / recommendations only", "⏳ Not yet — will be measured later"];
+const METRIC_TYPE_OPTIONS = ["People / participation", "Behaviour / practice", "Awareness / knowledge", "Learning / skills", "Environmental", "Social / community", "Economic / financial", "Health / well-being", "Design / technical performance", "User / customer", "Business / entrepreneurship", "Digital / technology", "Research", "Other"];
+const METRIC_UNIT_OPTIONS = ["Count / number", "Percentage (%)", "People", "Units / items", "Ratio", "Score / rating", "Hours", "Days", "kg", "Tonnes", "Litres", "m²", "km", "kWh", "CO₂e (kg)", "CO₂e (tonnes)", "PKR", "USD", "Other"];
+const METRIC_STATUS_OPTIONS = ["Actual — measured", "Target — intended future result", "Estimated / projected", "Proposed — not yet tested"];
+const METRIC_SOURCE_OPTIONS = ["Survey", "Interview", "Focus group", "Observation", "Experiment / lab test", "Prototype testing", "Pre/post assessment", "System / platform analytics", "Sales / financial records", "Attendance records", "Client / user feedback", "Partner records", "Environmental measurement", "Photos / video", "Documents / reports", "Published data", "Simulation / modelling", "Expert assessment", "Other"];
+const METRIC_CHARACTER_OPTIONS = ["Positive / expected", "Mixed", "No significant change", "Negative / unsuccessful", "Unexpected finding", "Too early to determine"];
+const METRIC_VERIFIER_OPTIONS = ["Faculty / supervisor", "University department", "Client / user", "Community partner", "NGO", "Business / industry partner", "Government / public institution", "Laboratory / technical facility", "System / digital records", "Student team records", "No external verifier", "Other"];
+const LIMITATION_OPTIONS = ["Small sample size", "Limited time", "One location only", "Limited access to participants", "No baseline available", "Prototype not tested in real conditions", "Self-reported responses only", "Technical limitations", "No long-term follow-up", "Other — describe below"];
 const NEXT_STEP_OPTIONS = ["Completed as coursework", "Could be developed further", "Further research recommended", "Could be tested / piloted", "Recommended for implementation", "Share with external stakeholder", "Continued in another course", "Already taken forward", "Other"];
+
+function metricUnitSuffix(unit?: string): string {
+    if (unit === "Percentage (%)") return "%";
+    if (!unit || unit === "Other") return "";
+    return ` ${unit}`;
+}
+function metricDeltaLine(m: CourseProjectMetric): string {
+    if (!m.comparedBeforeAfter || m.baseline === undefined || m.baseline === "" || m.value === undefined || m.value === "") return "";
+    const d = Number(m.value) - Number(m.baseline);
+    const pp = m.unit === "Percentage (%)";
+    return `📈 Change: ${d >= 0 ? "+" : ""}${Math.round(d * 100) / 100}${pp ? " percentage points" : metricUnitSuffix(m.unit)} (${m.baseline} → ${m.value})`;
+}
+
+/** Up-to-5 structured results builder — replaces the old single evidence-status + metric/value/unit fields. */
+function MetricsBuilder({ metrics, onChange }: { metrics: CourseProjectMetric[]; onChange: (next: CourseProjectMetric[]) => void }) {
+    const [openId, setOpenId] = useState<string | null>(metrics[0]?.id ?? null);
+
+    const addMetric = () => {
+        if (metrics.length >= 5) return;
+        const id = `m${Date.now()}`;
+        onChange([...metrics, { id }]);
+        setOpenId(id);
+    };
+    const setMetric = (id: string, patch: Partial<CourseProjectMetric>) => onChange(metrics.map((m) => (m.id === id ? { ...m, ...patch } : m)));
+    const delMetric = (id: string) => onChange(metrics.filter((m) => m.id !== id));
+
+    return (
+        <div className="space-y-2.5">
+            {metrics.map((m, i) => {
+                const open = openId === m.id;
+                return (
+                    <div key={m.id} className="overflow-hidden rounded-ciel-sm border-2 border-ciel-border bg-white">
+                        <button
+                            type="button"
+                            onClick={() => setOpenId(open ? null : m.id)}
+                            className="flex w-full flex-wrap items-center gap-2 bg-ciel-page/50 px-3.5 py-2.5 text-left"
+                        >
+                            <span className="shrink-0 rounded-full bg-ciel-gold px-2.5 py-1 text-[9px] font-black text-white">RESULT {String(i + 1).padStart(2, "0")}</span>
+                            <span className="min-w-0 flex-1 truncate text-xs font-bold text-ciel-text">
+                                {m.name ? <>{m.name}{m.value ? <>: <b>{m.value}{metricUnitSuffix(m.unit)}</b></> : null}</> : <i className="text-ciel-text-soft">New result — tap to fill</i>}
+                            </span>
+                            {m.status && <span className="shrink-0 rounded-full bg-ciel-teal-soft px-2 py-0.5 text-[9px] font-black text-ciel-teal">{m.status.split(" — ")[0].toUpperCase()}</span>}
+                            <ChevronDown className={clsx("h-4 w-4 shrink-0 text-ciel-text-soft transition-transform", open && "rotate-180")} />
+                        </button>
+                        {open && (
+                            <div className="space-y-3 p-3.5">
+                                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                    <Field label="What did you measure?" hint="The thing, not the method.">
+                                        <input type="text" value={m.name ?? ""} onChange={(e) => setMetric(m.id, { name: e.target.value })} placeholder="e.g. Students willing to reduce single-use plastic" className={fieldClass} />
+                                    </Field>
+                                    <Field label="What type of result?">
+                                        <select value={m.type ?? ""} onChange={(e) => setMetric(m.id, { type: e.target.value })} className={fieldClass}>
+                                            <option value="">Select…</option>
+                                            {METRIC_TYPE_OPTIONS.map((t) => <option key={t} value={t}>{t}</option>)}
+                                        </select>
+                                    </Field>
+                                </div>
+                                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                                    <Field label="Result (number)">
+                                        <input type="number" value={m.value ?? ""} onChange={(e) => setMetric(m.id, { value: e.target.value })} placeholder="74" className={fieldClass} />
+                                    </Field>
+                                    <Field label="Unit">
+                                        <select value={m.unit ?? ""} onChange={(e) => setMetric(m.id, { unit: e.target.value })} className={fieldClass}>
+                                            <option value="">Select…</option>
+                                            {METRIC_UNIT_OPTIONS.map((u) => <option key={u} value={u}>{u}</option>)}
+                                        </select>
+                                    </Field>
+                                    <Field label="Status" hint="Essential.">
+                                        <select value={m.status ?? ""} onChange={(e) => setMetric(m.id, { status: e.target.value })} className={fieldClass}>
+                                            <option value="">Select…</option>
+                                            {METRIC_STATUS_OPTIONS.map((s) => <option key={s} value={s}>{s}</option>)}
+                                        </select>
+                                    </Field>
+                                </div>
+                                <Field label="What does this number mean?" hint="What happened, to whom, under what condition.">
+                                    <input type="text" value={m.meaning ?? ""} onChange={(e) => setMetric(m.id, { meaning: e.target.value })} placeholder="e.g. 74% of surveyed students said they'd reduce plastic if reusables were easily available" className={fieldClass} />
+                                </Field>
+                                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                                    <Field label="Based on" hint="“Not applicable” is fine.">
+                                        <input type="text" value={m.sample ?? ""} onChange={(e) => setMetric(m.id, { sample: e.target.value })} placeholder="e.g. 120 students" className={fieldClass} />
+                                    </Field>
+                                    <Field label="Measured when?">
+                                        <div className="grid grid-cols-2 gap-1.5">
+                                            <input type="month" value={m.periodFrom ?? ""} onChange={(e) => setMetric(m.id, { periodFrom: e.target.value })} className={fieldClass} />
+                                            <input type="month" value={m.periodTo ?? ""} onChange={(e) => setMetric(m.id, { periodTo: e.target.value })} className={fieldClass} />
+                                        </div>
+                                    </Field>
+                                    <Field label="Evidenced by">
+                                        <select value={m.source ?? ""} onChange={(e) => setMetric(m.id, { source: e.target.value })} className={fieldClass}>
+                                            <option value="">Select…</option>
+                                            {METRIC_SOURCE_OPTIONS.map((s) => <option key={s} value={s}>{s}</option>)}
+                                        </select>
+                                    </Field>
+                                </div>
+                                <details className="rounded-ciel-xs border border-ciel-border">
+                                    <summary className="cursor-pointer px-3 py-2 text-xs font-bold text-ciel-teal">＋ More detail (optional — character, baseline, verifier, evidence)</summary>
+                                    <div className="space-y-3 px-3 pb-3 pt-1">
+                                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                                            <Field label="How would you describe it?" hint="No result needs to be positive.">
+                                                <select value={m.character ?? ""} onChange={(e) => setMetric(m.id, { character: e.target.value })} className={fieldClass}>
+                                                    <option value="">Select…</option>
+                                                    {METRIC_CHARACTER_OPTIONS.map((c) => <option key={c} value={c}>{c}</option>)}
+                                                </select>
+                                            </Field>
+                                            <Field label="Who can verify it?">
+                                                <select value={m.verifier ?? ""} onChange={(e) => setMetric(m.id, { verifier: e.target.value })} className={fieldClass}>
+                                                    <option value="">Select…</option>
+                                                    {METRIC_VERIFIER_OPTIONS.map((v) => <option key={v} value={v}>{v}</option>)}
+                                                </select>
+                                            </Field>
+                                            <Field label="Compared before → after?">
+                                                <ChipSingle options={["Yes — I have a baseline"]} value={m.comparedBeforeAfter ? "Yes — I have a baseline" : undefined} onChange={() => setMetric(m.id, { comparedBeforeAfter: !m.comparedBeforeAfter })} />
+                                            </Field>
+                                        </div>
+                                        {m.comparedBeforeAfter && (
+                                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                                <Field label="Baseline (before)">
+                                                    <input type="number" value={m.baseline ?? ""} onChange={(e) => setMetric(m.id, { baseline: e.target.value })} placeholder="42" className={fieldClass} />
+                                                </Field>
+                                                <p className="self-end text-xs font-bold text-ciel-green-deep">{metricDeltaLine(m) || "Enter baseline + result to compute the change"}</p>
+                                            </div>
+                                        )}
+                                        <ChipSingle
+                                            options={["📎 Attach evidence — PDF · XLSX · JPG (recommended)"]}
+                                            value={m.evidenceAttached ? "📎 Attach evidence — PDF · XLSX · JPG (recommended)" : undefined}
+                                            onChange={() => setMetric(m.id, { evidenceAttached: !m.evidenceAttached })}
+                                        />
+                                    </div>
+                                </details>
+                                <div className="flex justify-end border-t border-ciel-border pt-2.5">
+                                    <button type="button" onClick={() => delMetric(m.id)} className="text-xs font-bold text-red-600 hover:underline">🗑 Remove this result</button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                );
+            })}
+            <button
+                type="button"
+                onClick={addMetric}
+                disabled={metrics.length >= 5}
+                className="ciel-transition w-full rounded-ciel-sm border-2 border-dashed border-ciel-gold/50 bg-ciel-gold-soft px-4 py-3 text-xs font-black text-ciel-gold-deep hover:bg-ciel-gold-soft/70 disabled:cursor-not-allowed disabled:opacity-45"
+            >
+                {metrics.length >= 5 ? "Maximum 5 results reached" : metrics.length ? "➕ Add another result / metric" : "➕ Add your first result / metric"}
+            </button>
+            {metrics.length > 0 && <p className="text-center text-[10.5px] text-ciel-text-soft">{metrics.length} of 5 results added · tap a header to fold it away</p>}
+        </div>
+    );
+}
 
 const fieldClass = "w-full rounded-ciel-sm border-2 border-ciel-border bg-ciel-page/50 px-4 py-3 text-sm font-semibold text-ciel-text outline-none focus:border-ciel-gold focus:bg-white focus-visible:ring-2 focus-visible:ring-ciel-gold";
 const labelClass = "text-xs font-bold uppercase tracking-widest text-ciel-text-soft";
@@ -190,6 +338,88 @@ function ChipGroup({
     );
 }
 
+const SCALE_UNIT_OPTIONS = ["survey responses", "interviews", "focus-group participants", "observation sites / visits", "design iterations", "prototypes / versions", "test cases", "works / pieces created", "events / sessions held", "people engaged", "documents analysed", "samples tested", "Other…"];
+const SCALE_NA_OPTIONS = ["🚫 Not applicable", "🖥️ Desk research only", "🏫 Class exercise — no external scale"];
+
+interface ScaleRow { n: string; u: string; o: string }
+
+/** Tap-based scale/scope builder — composes a plain "120 survey responses · 3 sites" string, same field as before. */
+function ScaleBuilder({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+    const [naVal, setNaVal] = useState<string>(() => (SCALE_NA_OPTIONS.includes(value) ? value : ""));
+    const [rows, setRows] = useState<ScaleRow[]>([]);
+
+    const compose = (nextNa: string, nextRows: ScaleRow[]) =>
+        nextNa || nextRows.filter((r) => r.n && (r.u || r.o)).map((r) => `${r.n} ${r.u === "Other…" ? r.o : r.u}`).join(" · ");
+
+    const pickNa = (opt: string) => {
+        const next = naVal === opt ? "" : opt;
+        setNaVal(next);
+        if (next) setRows([]);
+        onChange(compose(next, next ? [] : rows));
+    };
+    const addRow = () => {
+        if (rows.length >= 6) return;
+        const next = [...rows, { n: "", u: "", o: "" }];
+        setRows(next);
+        onChange(compose(naVal, next));
+    };
+    const setRow = (i: number, patch: Partial<ScaleRow>) => {
+        const next = rows.map((r, idx) => (idx === i ? { ...r, ...patch } : r));
+        setRows(next);
+        onChange(compose(naVal, next));
+    };
+    const delRow = (i: number) => {
+        const next = rows.filter((_, idx) => idx !== i);
+        setRows(next);
+        onChange(compose(naVal, next));
+    };
+
+    const composed = compose(naVal, rows);
+
+    return (
+        <div className="space-y-2.5">
+            <div className="flex flex-wrap gap-2">
+                {SCALE_NA_OPTIONS.map((opt) => (
+                    <button
+                        key={opt}
+                        type="button"
+                        onClick={() => pickNa(opt)}
+                        className={clsx(
+                            "ciel-transition rounded-full border-2 px-3.5 py-2 text-xs font-bold",
+                            naVal === opt ? "border-ciel-gold bg-ciel-gold-soft text-ciel-gold-deep" : "border-ciel-border text-ciel-text-mid hover:border-ciel-gold/40",
+                        )}
+                    >
+                        {opt}
+                    </button>
+                ))}
+            </div>
+            {!naVal && (
+                <div className="space-y-2">
+                    {rows.map((r, i) => (
+                        <div key={i} className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_1fr_auto]">
+                            <input type="number" value={r.n} onChange={(e) => setRow(i, { n: e.target.value })} placeholder="How many? e.g. 120" className={fieldClass} />
+                            <select value={r.u} onChange={(e) => setRow(i, { u: e.target.value })} className={fieldClass}>
+                                <option value="">…of what?</option>
+                                {SCALE_UNIT_OPTIONS.map((u) => <option key={u} value={u}>{u}</option>)}
+                            </select>
+                            <div className="flex gap-2">
+                                {r.u === "Other…" && <input type="text" value={r.o} onChange={(e) => setRow(i, { o: e.target.value })} placeholder="your unit" className={fieldClass} />}
+                                <button type="button" onClick={() => delRow(i)} className="shrink-0 rounded-ciel-xs border border-red-200 bg-red-50 px-3 text-red-600 hover:bg-red-100" aria-label="Remove row">🗑</button>
+                            </div>
+                        </div>
+                    ))}
+                    {rows.length < 6 && (
+                        <button type="button" onClick={addRow} className="text-xs font-bold text-ciel-gold-deep hover:underline">
+                            ＋ add a number (e.g. 120 survey responses)
+                        </button>
+                    )}
+                    <p className="text-xs text-ciel-text-soft">{composed ? <>✨ <b>Your scale, composed:</b> {composed}</> : "Add only the numbers that are true — one is fine, none is fine."}</p>
+                </div>
+            )}
+        </div>
+    );
+}
+
 export default function CourseProjectWizardPage() {
     const params = useParams<{ id: string }>();
     const router = useRouter();
@@ -204,6 +434,7 @@ export default function CourseProjectWizardPage() {
     const [saving, setSaving] = useState(false);
     const [uploading, setUploading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [fabOpen, setFabOpen] = useState(false);
 
     useEffect(() => {
         authenticatedFetch(`/api/v1/paths/course-projects/${id}`, {}, { redirectToLogin: false })
@@ -322,6 +553,30 @@ export default function CourseProjectWizardPage() {
         save({ evidenceUrls: nextUrls });
     };
 
+    /** The primary assignment file — distinct from evidenceUrls' supporting files, drives half the Verifiability score. */
+    const handleAssignmentFile = async (file: File) => {
+        setUploading(true);
+        setError(null);
+        try {
+            const presignRes = await authenticatedFetch(
+                "/api/v1/paths/evidence/presign",
+                { method: "POST", body: JSON.stringify({ filename: file.name, contentType: file.type, size: file.size }) },
+                { redirectToLogin: false },
+            );
+            const presign = presignRes?.ok ? await presignRes.json() : null;
+            const { uploadUrl, publicUrl } = presign?.data ?? {};
+            if (!uploadUrl || !publicUrl) throw new Error("Could not prepare the upload");
+            const putRes = await fetch(uploadUrl, { method: "PUT", headers: { "Content-Type": file.type }, body: file });
+            if (!putRes.ok) throw new Error("Upload failed — please try again");
+            setEntry((e) => ({ ...e, assignmentFileUrl: publicUrl }));
+            await save({ assignmentFileUrl: publicUrl });
+        } catch {
+            setError("Assignment upload failed. Try again.");
+        } finally {
+            setUploading(false);
+        }
+    };
+
     if (loading) return <WorkspaceSkeleton />;
 
     if (notFound) {
@@ -362,10 +617,12 @@ export default function CourseProjectWizardPage() {
     const isTeam = !!teamMode && teamMode !== "Individual";
     const allFormats = entry.assignmentInfo?.formats ?? (entry.assignmentInfo?.format ? [entry.assignmentInfo.format] : []);
     const primaryFormat = allFormats[0];
-    const route = primaryFormat ? FORMAT_ROUTE[primaryFormat] || "writer" : undefined;
+    const routesIn = Array.from(new Set(allFormats.map((f) => FORMAT_ROUTE[f] || "writer")));
+    const leadRoute = entry.assignmentInfo?.leadRoute;
+    const leadRouteValid = leadRoute && (routesIn as string[]).includes(leadRoute) ? (leadRoute as CourseProjectRoute) : undefined;
+    const route = leadRouteValid ?? (primaryFormat ? FORMAT_ROUTE[primaryFormat] || "writer" : undefined);
     const routeMode = route ? COURSEWORK_MODES[route] : undefined;
-    const blended = allFormats.length > 1 && allFormats.slice(1).some((f) => (FORMAT_ROUTE[f] || "writer") !== route);
-    const showMetricFields = /measured|target|estimated/i.test(entry.resultsInfo?.evidenceStatus ?? "");
+    const blended = routesIn.length > 1;
     const stepLabels = STEPS.map((s, i) => (routeMode && i >= 2 && i <= 4 ? routeMode.steps[i - 2] : s.label));
 
     return (
@@ -484,10 +741,10 @@ export default function CourseProjectWizardPage() {
                                 <ChipSingle options={TEAM_MODE_OPTIONS} value={teamMode} onChange={(v) => patchGroup("studentInfo", { teamMode: v })} />
                             </Field>
                             {isTeam && (
-                                <Field label="👥 Team members — name everyone" hint="Add each member's email — once you submit, this report also appears on their own dashboard.">
+                                <Field label="👥 Team members — name everyone" hint="Add each member's email → sends an invitation. Once you submit, this report also appears on their own dashboard.">
                                     <div className="space-y-3">
                                         {(normalizeGroupMembers(entry.studentInfo?.groupMembers).length ? normalizeGroupMembers(entry.studentInfo?.groupMembers) : [{ name: "" }]).map((m, i) => (
-                                            <div key={i} className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                                            <div key={i} className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
                                                 <input
                                                     type="text"
                                                     value={m.name}
@@ -506,9 +763,14 @@ export default function CourseProjectWizardPage() {
                                                     type="email"
                                                     value={m.email ?? ""}
                                                     onChange={(e) => updateGroupMember(i, { email: e.target.value })}
-                                                    placeholder={`Member ${i + 1} — email`}
+                                                    placeholder="Email — links their dashboard"
                                                     className={fieldClass}
                                                 />
+                                                {m.email?.trim() ? (
+                                                    <span className="flex items-center justify-center rounded-full bg-ciel-gold-soft px-3 py-2 text-center text-[10px] font-black text-ciel-gold-deep">
+                                                        🔗 LINKED — SHOWS ON SUBMIT
+                                                    </span>
+                                                ) : <span />}
                                             </div>
                                         ))}
                                         {(entry.studentInfo?.groupMembers?.length ?? 0) < 20 && (
@@ -520,6 +782,9 @@ export default function CourseProjectWizardPage() {
                                                 + Add another member
                                             </button>
                                         )}
+                                        <div className="flex flex-wrap items-center gap-1.5 rounded-ciel-sm border border-ciel-teal/30 bg-ciel-teal-soft/60 px-3 py-2.5 text-[10px] font-black text-ciel-teal">
+                                            🔗 <span className="rounded-full bg-white px-2.5 py-1">🃏 Card created</span>→<span className="rounded-full bg-white px-2.5 py-1">👥 On every member&apos;s dashboard (once submitted)</span>→<span className="rounded-full bg-white px-2.5 py-1">🖋️ Teacher&apos;s approval in her dashboard</span>→<span className="rounded-full bg-white px-2.5 py-1">🧑‍🎓 + 🧑‍🏫 + 🏫 profiles</span>
+                                        </div>
                                     </div>
                                 </Field>
                             )}
@@ -552,8 +817,27 @@ export default function CourseProjectWizardPage() {
                             </Field>
                             {routeMode && (
                                 <div className="rounded-ciel-sm border-2 border-ciel-indigo/30 bg-ciel-indigo-soft/50 px-4 py-3 text-xs font-semibold leading-relaxed text-ciel-indigo">
-                                    🧬 <b>{routeMode.name}</b> — led by your first pick, <b>{primaryFormat}</b>. The questions ahead now speak this language; adjust the tiles below if your work differs.
-                                    {blended && <> <br />🔀 <b>Blended work detected</b> — you picked formats from more than one pathway. The first pick leads; use the tiles to add any sections the other format needs.</>}
+                                    🧬 <b>{routeMode.name}</b>{leadRouteValid ? " — you chose this to lead" : <> — led by your first pick, <b>{primaryFormat}</b></>}. The questions ahead now speak this language; adjust the tiles below if your work differs.
+                                    {blended && (
+                                        <>
+                                            <br />🔀 <b>You picked formats from {routesIn.length} pathways.</b> The <b>main deliverable</b> should lead (the essay leads an essay-with-presentation; the slides are just how you shared it). Tap to choose:
+                                            <div className="mt-1.5 flex flex-wrap gap-1.5">
+                                                {routesIn.map((r) => (
+                                                    <button
+                                                        key={r}
+                                                        type="button"
+                                                        onClick={() => patchGroup("assignmentInfo", { leadRoute: r })}
+                                                        className={clsx(
+                                                            "ciel-transition rounded-full border-2 px-3 py-1.5 text-[10.5px] font-bold",
+                                                            r === route ? "border-ciel-gold bg-ciel-gold-soft text-ciel-gold-deep" : "border-ciel-border bg-white text-ciel-text-mid hover:border-ciel-gold/40",
+                                                        )}
+                                                    >
+                                                        {COURSEWORK_MODES[r as CourseProjectRoute].name}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </>
+                                    )}
                                 </div>
                             )}
                             {routeMode && (
@@ -684,8 +968,8 @@ export default function CourseProjectWizardPage() {
                                                 otherPlaceholder="Your method"
                                             />
                                         </Field>
-                                        <Field label="Sample / data scale">
-                                            <input type="text" value={entry.processInfo?.sampleScale ?? ""} onChange={(e) => patchGroup("processInfo", { sampleScale: e.target.value })} placeholder="e.g. 120 responses · 3 site visits · 40 samples" className={fieldClass} />
+                                        <Field label="Scale / scope of the work" hint="Taps only — this is a class assignment, not a PhD; “not applicable” is a complete answer.">
+                                            <ScaleBuilder value={entry.processInfo?.sampleScale ?? ""} onChange={(v) => patchGroup("processInfo", { sampleScale: v })} />
                                         </Field>
                                     </>
                                 )}
@@ -714,108 +998,130 @@ export default function CourseProjectWizardPage() {
                     )}
 
                     {step === 4 && (
-                        <>
-                            <Field label="Output — what did you produce?" hint="Tap all that apply.">
-                                <ChipGroup
-                                    options={OUTPUT_OPTIONS}
-                                    selected={entry.resultsInfo?.outputs ?? []}
-                                    onToggle={(v) => {
-                                        const cur = entry.resultsInfo?.outputs ?? [];
-                                        patchGroup("resultsInfo", { outputs: cur.includes(v) ? cur.filter((x) => x !== v) : [...cur, v] });
-                                    }}
-                                    otherValue={entry.resultsInfo?.outputsOther}
-                                    onOtherChange={(v) => patchGroup("resultsInfo", { outputsOther: v })}
-                                    otherPlaceholder="What else?"
-                                />
-                            </Field>
-                            <Field label="Describe the main output (one line)">
-                                <input type="text" value={entry.resultsInfo?.outputDescription ?? ""} onChange={(e) => patchGroup("resultsInfo", { outputDescription: e.target.value })} placeholder="e.g. A zero-waste cafeteria strategy with implementation recommendations" className={fieldClass} />
-                            </Field>
-                            {inc.find && (
-                                <Field label={`📈 ${routeMode?.fndL ?? "Key findings / conclusions / insights"}`} hint="What did it reveal, demonstrate, propose or conclude?">
-                                    <div className="space-y-2">
-                                        {(entry.resultsInfo?.findings ?? [""]).map((f, i) => (
-                                            <input
-                                                key={i}
-                                                type="text"
-                                                value={f}
-                                                onChange={(e) => {
-                                                    const next = [...(entry.resultsInfo?.findings ?? [""])];
-                                                    next[i] = e.target.value;
-                                                    patchGroup("resultsInfo", { findings: next });
-                                                }}
-                                                placeholder={i === 0 ? "e.g. Reusable alternatives could substantially cut single-use plastics" : "Another…"}
-                                                className={fieldClass}
-                                            />
-                                        ))}
-                                        {(entry.resultsInfo?.findings?.length ?? 0) < 5 && (
-                                            <button type="button" onClick={() => patchGroup("resultsInfo", { findings: [...(entry.resultsInfo?.findings ?? [""]), ""] })} className="text-xs font-bold text-ciel-gold-deep hover:underline">
-                                                + Add another finding
-                                            </button>
-                                        )}
-                                    </div>
+                        <div className="space-y-5">
+                            <div className="flex flex-wrap items-center gap-1.5 rounded-ciel-sm border border-dashed border-ciel-gold/40 bg-ciel-gold-soft/40 px-3.5 py-2.5 text-[10.5px] font-black text-ciel-gold-deep">
+                                <span>THE LADDER:</span>
+                                <span className="rounded-full bg-white px-2.5 py-1">📦 OUTPUT — what you made</span>→
+                                <span className="rounded-full bg-white px-2.5 py-1">💡 FINDING — what you learned</span>→
+                                <span className="rounded-full bg-white px-2.5 py-1">📊 RESULT — what you measured</span>→
+                                <span className="rounded-full bg-white px-2.5 py-1 opacity-65">🌍 IMPACT — only if real change is evidenced</span>
+                                <span className="w-full font-semibold text-ciel-gold-deep/80">Finishing with only the first three is completely legitimate coursework.</span>
+                            </div>
+
+                            <div className="space-y-3">
+                                <p className="text-xs font-black uppercase tracking-widest text-ciel-text-soft">A · Your output — what did you produce?</p>
+                                <Field label="" hint="Tap all that apply.">
+                                    <ChipGroup
+                                        options={OUTPUT_OPTIONS}
+                                        selected={entry.resultsInfo?.outputs ?? []}
+                                        onToggle={(v) => {
+                                            const cur = entry.resultsInfo?.outputs ?? [];
+                                            patchGroup("resultsInfo", { outputs: cur.includes(v) ? cur.filter((x) => x !== v) : [...cur, v] });
+                                        }}
+                                        otherValue={entry.resultsInfo?.outputsOther}
+                                        onOtherChange={(v) => patchGroup("resultsInfo", { outputsOther: v })}
+                                        otherPlaceholder="What else?"
+                                    />
                                 </Field>
-                            )}
-                            {inc.imp && (
-                                <>
-                                    <Field label="What evidence of result or outcome did the work produce?" hint="Choose one — honesty scores higher.">
-                                        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                                            {EVIDENCE_STATUS.map((ev) => (
-                                                <button
-                                                    key={ev.label}
-                                                    type="button"
-                                                    onClick={() => patchGroup("resultsInfo", { evidenceStatus: ev.label })}
-                                                    className={clsx(
-                                                        "ciel-transition flex flex-col items-center gap-1 rounded-ciel-sm border-2 px-3 py-3 text-center",
-                                                        entry.resultsInfo?.evidenceStatus === ev.label ? "border-ciel-teal bg-ciel-teal-soft" : "border-ciel-border",
-                                                    )}
-                                                >
-                                                    <span className="text-lg">{ev.emoji}</span>
-                                                    <span className="text-[10px] font-bold leading-tight text-ciel-text-mid">{ev.label}</span>
-                                                </button>
+                                <Field label="Describe the main output in one sentence">
+                                    <input type="text" maxLength={250} value={entry.resultsInfo?.outputDescription ?? ""} onChange={(e) => patchGroup("resultsInfo", { outputDescription: e.target.value })} placeholder="What did you create, develop, design, investigate or deliver?" className={fieldClass} />
+                                </Field>
+                            </div>
+
+                            {inc.find && (
+                                <div className="space-y-3">
+                                    <p className="text-xs font-black uppercase tracking-widest text-ciel-text-soft">B · What you found <span className="normal-case font-semibold text-ciel-text-soft/80">(up to 5 — a finding doesn&apos;t have to be numerical)</span></p>
+                                    <Field label={routeMode?.fndL ?? "Most important findings, conclusions or insights"}>
+                                        <div className="space-y-2">
+                                            {(entry.resultsInfo?.findings ?? [""]).map((f, i) => (
+                                                <input
+                                                    key={i}
+                                                    type="text"
+                                                    value={f}
+                                                    onChange={(e) => {
+                                                        const next = [...(entry.resultsInfo?.findings ?? [""])];
+                                                        next[i] = e.target.value;
+                                                        patchGroup("resultsInfo", { findings: next });
+                                                    }}
+                                                    placeholder={i === 0 ? "e.g. Convenience was the main reason students kept using single-use plastic" : "Another…"}
+                                                    className={fieldClass}
+                                                />
                                             ))}
+                                            {(entry.resultsInfo?.findings?.length ?? 0) < 5 && (
+                                                <button type="button" onClick={() => patchGroup("resultsInfo", { findings: [...(entry.resultsInfo?.findings ?? [""]), ""] })} className="text-xs font-bold text-ciel-gold-deep hover:underline">
+                                                    + Add finding (max 5)
+                                                </button>
+                                            )}
                                         </div>
                                     </Field>
-                                    {showMetricFields && (
-                                        <div className="space-y-3 rounded-ciel-sm border border-ciel-border bg-ciel-page/40 p-4">
-                                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                                                <Field label="Metric">
-                                                    <input type="text" value={entry.resultsInfo?.metricName ?? ""} onChange={(e) => patchGroup("resultsInfo", { metricName: e.target.value })} placeholder="e.g. Plastic waste reduction" className={fieldClass} />
-                                                </Field>
-                                                <Field label="Value">
-                                                    <input type="text" inputMode="decimal" value={entry.resultsInfo?.metricValue ?? ""} onChange={(e) => patchGroup("resultsInfo", { metricValue: e.target.value })} placeholder="22" className={fieldClass} />
-                                                </Field>
-                                                <Field label="Unit">
-                                                    <input type="text" list="cw-metric-unit" value={entry.resultsInfo?.metricUnit ?? ""} onChange={(e) => patchGroup("resultsInfo", { metricUnit: e.target.value })} placeholder="e.g. % · people · kg" className={fieldClass} />
-                                                    <datalist id="cw-metric-unit">
-                                                        {METRIC_UNIT_OPTIONS.map((u) => <option key={u} value={u} />)}
-                                                    </datalist>
-                                                </Field>
-                                            </div>
-                                            <Field label="This number represents…">
-                                                <ChipSingle options={NUMBER_REPRESENTS_OPTIONS} value={entry.resultsInfo?.numberRepresents} onChange={(v) => patchGroup("resultsInfo", { numberRepresents: v })} />
-                                            </Field>
-                                        </div>
-                                    )}
-                                    <Field label="📏 Measurable impact — put a number on it (optional)">
-                                        <input type="text" value={entry.resultsInfo?.measurableImpact ?? ""} onChange={(e) => patchGroup("resultsInfo", { measurableImpact: e.target.value })} placeholder="e.g. pilot week cut plastic waste 22% (weighed daily)" className={fieldClass} />
-                                    </Field>
-                                </>
+                                </div>
                             )}
+
+                            {inc.imp && (
+                                <div className="space-y-3">
+                                    <p className="text-xs font-black uppercase tracking-widest text-ciel-text-soft">C · Your evidence — did you measure any result?</p>
+                                    <ChipSingle options={MEASURED_OPTIONS} value={entry.resultsInfo?.measured} onChange={(v) => patchGroup("resultsInfo", { measured: v })} />
+                                    <p className="text-xs text-ciel-text-soft">💡 Select &ldquo;Yes&rdquo; only when something was really measured or observed. A future target or expected benefit is not an achieved result — and saying &ldquo;findings only&rdquo; scores honestly.</p>
+                                    {/Yes|Partly/.test(entry.resultsInfo?.measured ?? "") && (
+                                        <MetricsBuilder metrics={entry.resultsInfo?.metrics ?? []} onChange={(next) => patchGroup("resultsInfo", { metrics: next })} />
+                                    )}
+                                </div>
+                            )}
+
                             {inc.lim && (
-                                <>
-                                    <Field label="⚠️ Main limitation">
-                                        <input type="text" value={entry.resultsInfo?.limitationType ?? ""} onChange={(e) => patchGroup("resultsInfo", { limitationType: e.target.value })} placeholder="e.g. Limited pilot period — results cover 3 weeks, not a full term" className={fieldClass} />
+                                <div className="space-y-3">
+                                    <p className="text-xs font-black uppercase tracking-widest text-ciel-text-soft">D · Limitations — what could and couldn&apos;t be concluded?</p>
+                                    <Field label="Main limitation">
+                                        <select
+                                            value={LIMITATION_OPTIONS.includes(entry.resultsInfo?.limitationType ?? "") ? entry.resultsInfo?.limitationType : entry.resultsInfo?.limitationType ? "Other — describe below" : ""}
+                                            onChange={(e) => patchGroup("resultsInfo", { limitationType: e.target.value === "Other — describe below" ? (entry.resultsInfo?.limitationOther ?? "") : e.target.value })}
+                                            className={fieldClass}
+                                        >
+                                            <option value="">Select the closest…</option>
+                                            {LIMITATION_OPTIONS.map((l) => <option key={l} value={l}>{l}</option>)}
+                                        </select>
                                     </Field>
-                                    <Field label="One line on how it affected the work">
+                                    <Field label="Optional — briefly explain the limitation">
                                         <input type="text" value={entry.resultsInfo?.limitationDetail ?? ""} onChange={(e) => patchGroup("resultsInfo", { limitationDetail: e.target.value })} placeholder="e.g. costing based on one supplier's quote" className={fieldClass} />
                                     </Field>
-                                </>
+                                    <Field label="How should this limitation be considered when reading your results?" hint="One sentence.">
+                                        <input type="text" value={entry.resultsInfo?.limitationInterpretation ?? ""} onChange={(e) => patchGroup("resultsInfo", { limitationInterpretation: e.target.value })} placeholder="e.g. The findings show interest in change but can't confirm actual plastic use decreased" className={fieldClass} />
+                                    </Field>
+                                </div>
                             )}
-                            <Field label="➕ Anything else about the results?">
-                                <textarea rows={2} value={entry.resultsInfo?.notes ?? ""} onChange={(e) => patchGroup("resultsInfo", { notes: e.target.value })} placeholder="Anything we didn't ask…" className={fieldClass} />
+
+                            <div className="space-y-3">
+                                <p className="text-xs font-black uppercase tracking-widest text-ciel-text-soft">E · Recommendations — what should happen next? <span className="normal-case font-semibold text-ciel-text-soft/80">(optional, up to 3)</span></p>
+                                <div className="space-y-2">
+                                    {(entry.resultsInfo?.recommendations ?? [""]).map((r, i) => (
+                                        <input
+                                            key={i}
+                                            type="text"
+                                            value={r}
+                                            onChange={(e) => {
+                                                const next = [...(entry.resultsInfo?.recommendations ?? [""])];
+                                                next[i] = e.target.value;
+                                                patchGroup("resultsInfo", { recommendations: next });
+                                            }}
+                                            placeholder={i === 0 ? "e.g. Install refill stations at high-traffic campus locations" : "Another recommendation…"}
+                                            className={fieldClass}
+                                        />
+                                    ))}
+                                    {(entry.resultsInfo?.recommendations?.length ?? 0) < 3 && (
+                                        <button type="button" onClick={() => patchGroup("resultsInfo", { recommendations: [...(entry.resultsInfo?.recommendations ?? [""]), ""] })} className="text-xs font-bold text-ciel-gold-deep hover:underline">
+                                            + Add recommendation (max 3)
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+
+                            <Field label="Summarise your most important result in 2–3 sentences">
+                                <textarea rows={3} value={entry.resultsInfo?.resultsSummary ?? ""} onChange={(e) => patchGroup("resultsInfo", { resultsSummary: e.target.value })} placeholder="What you produced or discovered, the strongest evidence, and what the findings suggest…" className={fieldClass} />
                             </Field>
-                        </>
+                            <Field label="➕ Anything else about your results?" hint="Optional.">
+                                <input type="text" value={entry.resultsInfo?.notes ?? ""} onChange={(e) => patchGroup("resultsInfo", { notes: e.target.value })} placeholder="Only if something important wasn't captured above…" className={fieldClass} />
+                            </Field>
+                        </div>
                     )}
 
                     {step === 5 && <SdgStep entry={entry} patchGroup={patchGroup} />}
@@ -856,12 +1162,18 @@ export default function CourseProjectWizardPage() {
 
                     {step === 7 && (
                         <div className="space-y-5">
-                            <Field label="Evidence (screenshots, deliverables, photos)">
-                                <label className={clsx("ciel-transition flex cursor-pointer items-center gap-3 rounded-ciel-sm border-2 border-dashed border-ciel-border px-4 py-3 text-sm font-semibold text-ciel-text-mid hover:border-ciel-gold/40", uploading && "opacity-60")}>
+                            <Field label="📎 Upload your files" hint="Optional — the same uploads as the floating 📎 button; PDF · DOCX · PPTX · images · links.">
+                                <label className={clsx("ciel-transition flex cursor-pointer items-center gap-3 rounded-ciel-sm border-2 border-dashed px-4 py-3 text-sm font-semibold", entry.assignmentFileUrl ? "border-ciel-green bg-ciel-green-soft text-ciel-green-deep" : "border-ciel-gold/50 bg-ciel-gold-soft text-ciel-gold-deep hover:border-ciel-gold", uploading && "opacity-60")}>
                                     <UploadCloud className="h-4 w-4" />
-                                    {uploading ? "Uploading..." : "Upload evidence (screenshots, deliverables, photos)"}
+                                    {entry.assignmentFileUrl ? "✅ Assignment uploaded — travels privately with your card" : "📄 Upload your assignment — the essay, deck, design file. Lifts your Verifiability score (+3)."}
+                                    <input type="file" accept="image/*,application/pdf,.doc,.docx,.ppt,.pptx" className="hidden" onChange={(e) => e.target.files?.[0] && handleAssignmentFile(e.target.files[0])} />
+                                </label>
+                                <label className={clsx("ciel-transition mt-2 flex cursor-pointer items-center gap-3 rounded-ciel-sm border-2 border-dashed px-4 py-3 text-sm font-semibold", entry.evidenceUrls?.length ? "border-ciel-green bg-ciel-green-soft text-ciel-green-deep" : "border-ciel-gold/50 bg-ciel-gold-soft text-ciel-gold-deep hover:border-ciel-gold", uploading && "opacity-60")}>
+                                    <UploadCloud className="h-4 w-4" />
+                                    {uploading ? "Uploading..." : entry.evidenceUrls?.length ? "✅ Supporting files uploaded" : "🖼️ Upload supporting files — photos, data, video, survey sheets (+2)."}
                                     <input type="file" accept="image/*,application/pdf" className="hidden" onChange={(e) => e.target.files?.[0] && handleEvidenceFile(e.target.files[0])} />
                                 </label>
+                                <p className="mt-1.5 text-xs text-ciel-text-soft">🔒 Files stay private — visible to your teacher and reviewers only, never on the public card.</p>
                                 {!!entry.evidenceUrls?.length && (
                                     <ul className="mt-2 space-y-1.5">
                                         {entry.evidenceUrls.map((url) => (
@@ -875,6 +1187,20 @@ export default function CourseProjectWizardPage() {
                                     </ul>
                                 )}
                             </Field>
+
+                            <div className="rounded-ciel-sm border border-ciel-border bg-ciel-page/40 p-4 text-[11.5px] leading-relaxed text-ciel-text">
+                                <p className="mb-2 text-xs font-black uppercase tracking-widest text-ciel-text-soft">🧮 How your flash card will be judged <span className="normal-case font-semibold text-ciel-text-soft/80">(same rubric for every discipline)</span></p>
+                                <p>
+                                    <b className="text-[#3F7E44]">Sustainability &amp; SDG quality — 25</b> (genuine, targeted, explained; honest &ldquo;not applicable&rdquo; scores respectably) ·{" "}
+                                    <b className="text-[#c98a04]">Substance of results — 20</b> (measured &gt; qualitative &gt; target; depth of evidence earns more, within your pathway) ·{" "}
+                                    <b className="text-[#2563eb]">Clarity of the idea — 14</b> ·{" "}
+                                    <b className="text-[#0f766e]">Rigor, pathway-adjusted — 13</b> (a deep study and a brief class exercise are judged against their own scale) ·{" "}
+                                    <b className="text-[#dc2626]">Honesty &amp; consistency — 15</b> ·{" "}
+                                    <b className="text-[#7c3aed]">Reflection — 8</b> ·{" "}
+                                    <b className="text-[#0e7490]">Verifiability — 5</b> (attach your actual assignment — optional, but the real work always outranks a claim about it)
+                                </p>
+                                <p className="mt-1.5 text-[10.5px] text-ciel-text-soft">After your teacher approves, the AI ranks all flash cards best → least on this rubric — with a written reason for every top pick. Depth is rewarded; honesty is never punished.</p>
+                            </div>
 
                             <Field label="➕ Anything the AI missed?">
                                 <textarea rows={2} value={entry.addedNote ?? ""} onChange={(e) => setEntry((s) => ({ ...s, addedNote: e.target.value }))} placeholder="e.g. Our essay was selected for the department journal." className={fieldClass} />
@@ -981,6 +1307,41 @@ export default function CourseProjectWizardPage() {
                     </div>
                 </div>
             </div>
+            )}
+
+            {!showCard && (
+                <div className="fixed bottom-20 right-4 z-[60] sm:bottom-6 sm:right-6">
+                    {fabOpen && (
+                        <div className="ciel-crossfade-enter absolute bottom-14 right-0 w-72 rounded-ciel-lg border border-ciel-border bg-white p-4 shadow-[0_18px_44px_rgba(20,32,43,0.22)]">
+                            <p className="text-xs font-black text-ciel-text">📎 Attach your actual assignment</p>
+                            <p className="mt-1 text-[10.5px] leading-relaxed text-ciel-text-soft">Optional, any time, from any step. The essay, deck, design file — the real thing. It travels privately with your flash card and lifts your <b>Verifiability</b> score.</p>
+                            <button
+                                type="button"
+                                onClick={() => document.getElementById("cw-fab-main-input")?.click()}
+                                className={clsx("ciel-transition mt-2.5 flex w-full items-center gap-2 rounded-ciel-sm border-2 border-dashed px-3 py-2.5 text-left text-xs font-bold", entry.assignmentFileUrl ? "border-ciel-green bg-ciel-green-soft text-ciel-green-deep" : "border-ciel-gold/50 bg-ciel-gold-soft text-ciel-gold-deep")}
+                            >
+                                📄 {entry.assignmentFileUrl ? "Assignment attached ✓" : "Attach the assignment — PDF / DOCX / link"}
+                            </button>
+                            <input id="cw-fab-main-input" type="file" accept="image/*,application/pdf,.doc,.docx,.ppt,.pptx" className="hidden" onChange={(e) => e.target.files?.[0] && handleAssignmentFile(e.target.files[0])} />
+                            <button
+                                type="button"
+                                onClick={() => document.getElementById("cw-fab-extra-input")?.click()}
+                                className={clsx("ciel-transition mt-2 flex w-full items-center gap-2 rounded-ciel-sm border-2 border-dashed px-3 py-2.5 text-left text-xs font-bold", entry.evidenceUrls?.length ? "border-ciel-green bg-ciel-green-soft text-ciel-green-deep" : "border-ciel-gold/50 bg-ciel-gold-soft text-ciel-gold-deep")}
+                            >
+                                🖼️ {entry.evidenceUrls?.length ? "Supporting files attached ✓" : "Supporting files — images, data, video"}
+                            </button>
+                            <input id="cw-fab-extra-input" type="file" accept="image/*,application/pdf" className="hidden" onChange={(e) => e.target.files?.[0] && handleEvidenceFile(e.target.files[0])} />
+                            <p className="mt-2.5 text-[9.5px] leading-relaxed text-ciel-text-soft">🔒 Files stay private — visible to your teacher and reviewers only, never on the public card.</p>
+                        </div>
+                    )}
+                    <button
+                        type="button"
+                        onClick={() => setFabOpen((v) => !v)}
+                        className={clsx("ciel-transition flex items-center gap-2 rounded-full px-5 py-3 text-xs font-black text-white shadow-[0_12px_30px_rgba(20,32,43,0.28)]", entry.assignmentFileUrl ? "bg-ciel-green" : "bg-ciel-navy")}
+                    >
+                        📎 {entry.assignmentFileUrl ? "Assignment attached ✓" : "Attach assignment"}
+                    </button>
+                </div>
             )}
         </PathWorkspaceShell>
     );
@@ -1143,6 +1504,19 @@ function SdgStep({
             <Field label="➕ Anything else about the SDG link?">
                 <textarea rows={2} value={entry.sdgMapping?.notes ?? ""} onChange={(e) => patchGroup("sdgMapping", { notes: e.target.value })} placeholder="Anything we didn't ask…" className={fieldClass} />
             </Field>
+
+            <label className="flex cursor-pointer items-start gap-2.5 rounded-ciel-sm border border-dashed border-ciel-gold/50 bg-ciel-gold-soft/40 px-4 py-3 text-xs leading-relaxed text-ciel-gold-deep">
+                <input
+                    type="checkbox"
+                    checked={!!entry.sdgMapping?.notApplicable}
+                    onChange={(e) => {
+                        const checked = e.target.checked;
+                        patchGroup("sdgMapping", { notApplicable: checked, ...(checked ? { entries: [] } : {}) });
+                    }}
+                    className="mt-0.5 h-4 w-4 shrink-0"
+                />
+                <span><b>➖ Not applicable — this assignment has no genuine SDG link.</b> A completely acceptable answer: it&apos;s flagged for your teacher&apos;s confirmation instead of force-mapped, and the record still counts fully.</span>
+            </label>
         </>
     );
 }
