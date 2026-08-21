@@ -92,6 +92,7 @@ const EVIDENCE_STATUS: { emoji: string; label: string }[] = [
     { emoji: "➖", label: "Not applicable" },
 ];
 const NUMBER_REPRESENTS_OPTIONS = ["Baseline", "Target", "Estimated / projected", "Actual measured result"];
+const METRIC_UNIT_OPTIONS = ["%", "people", "students", "households", "responses", "items", "sessions", "hours", "days", "kg", "tonnes CO₂e", "litres", "kWh", "km", "sq. ft.", "PKR", "trees", "/5 rating", "times"];
 const NEXT_STEP_OPTIONS = ["Completed as coursework", "Could be developed further", "Further research recommended", "Could be tested / piloted", "Recommended for implementation", "Share with external stakeholder", "Continued in another course", "Already taken forward", "Other"];
 
 const fieldClass = "w-full rounded-ciel-sm border-2 border-ciel-border bg-ciel-page/50 px-4 py-3 text-sm font-semibold text-ciel-text outline-none focus:border-ciel-gold focus:bg-white focus-visible:ring-2 focus-visible:ring-ciel-gold";
@@ -334,8 +335,6 @@ export default function CourseProjectWizardPage() {
         );
     }
 
-    const stepLabels = STEPS.map((s, i) => (routeMode && i >= 2 && i <= 4 ? routeMode.steps[i - 2] : s.label));
-
     const acceptedCount = activeStepIdx.filter((k) => review[k]?.accepted).length;
     const allAccepted = activeStepIdx.length > 0 && acceptedCount === activeStepIdx.length;
     const finalSectionSummaries = (): CourseProjectSectionSummaries => {
@@ -367,6 +366,7 @@ export default function CourseProjectWizardPage() {
     const routeMode = route ? COURSEWORK_MODES[route] : undefined;
     const blended = allFormats.length > 1 && allFormats.slice(1).some((f) => (FORMAT_ROUTE[f] || "writer") !== route);
     const showMetricFields = /measured|target|estimated/i.test(entry.resultsInfo?.evidenceStatus ?? "");
+    const stepLabels = STEPS.map((s, i) => (routeMode && i >= 2 && i <= 4 ? routeMode.steps[i - 2] : s.label));
 
     return (
         <PathWorkspaceShell
@@ -448,9 +448,6 @@ export default function CourseProjectWizardPage() {
                             <Field label="Course name">
                                 <input type="text" value={entry.course ?? ""} onChange={(e) => setEntry((s) => ({ ...s, course: e.target.value }))} placeholder="e.g. Marketing Management" className={fieldClass} />
                             </Field>
-                            <Field label="Course code (if any)">
-                                <input type="text" value={entry.studentInfo?.courseCode ?? ""} onChange={(e) => patchGroup("studentInfo", { courseCode: e.target.value })} placeholder="MKT-301" className={fieldClass} />
-                            </Field>
                             <Field label="School / department">
                                 <input type="text" list="cw-depts" value={entry.studentInfo?.department ?? ""} onChange={(e) => patchGroup("studentInfo", { department: e.target.value })} placeholder="e.g. School of Business" className={fieldClass} />
                                 <datalist id="cw-depts">
@@ -490,12 +487,19 @@ export default function CourseProjectWizardPage() {
                                 <Field label="👥 Team members — name everyone" hint="Add each member's email — once you submit, this report also appears on their own dashboard.">
                                     <div className="space-y-3">
                                         {(normalizeGroupMembers(entry.studentInfo?.groupMembers).length ? normalizeGroupMembers(entry.studentInfo?.groupMembers) : [{ name: "" }]).map((m, i) => (
-                                            <div key={i} className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                                            <div key={i} className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                                                 <input
                                                     type="text"
                                                     value={m.name}
                                                     onChange={(e) => updateGroupMember(i, { name: e.target.value })}
                                                     placeholder={`Member ${i + 1} — full name`}
+                                                    className={fieldClass}
+                                                />
+                                                <input
+                                                    type="text"
+                                                    value={m.rollNumber ?? ""}
+                                                    onChange={(e) => updateGroupMember(i, { rollNumber: e.target.value })}
+                                                    placeholder={`Member ${i + 1} — roll no.`}
                                                     className={fieldClass}
                                                 />
                                                 <input
@@ -782,7 +786,10 @@ export default function CourseProjectWizardPage() {
                                                     <input type="text" inputMode="decimal" value={entry.resultsInfo?.metricValue ?? ""} onChange={(e) => patchGroup("resultsInfo", { metricValue: e.target.value })} placeholder="22" className={fieldClass} />
                                                 </Field>
                                                 <Field label="Unit">
-                                                    <input type="text" value={entry.resultsInfo?.metricUnit ?? ""} onChange={(e) => patchGroup("resultsInfo", { metricUnit: e.target.value })} placeholder="%" className={fieldClass} />
+                                                    <input type="text" list="cw-metric-unit" value={entry.resultsInfo?.metricUnit ?? ""} onChange={(e) => patchGroup("resultsInfo", { metricUnit: e.target.value })} placeholder="e.g. % · people · kg" className={fieldClass} />
+                                                    <datalist id="cw-metric-unit">
+                                                        {METRIC_UNIT_OPTIONS.map((u) => <option key={u} value={u} />)}
+                                                    </datalist>
                                                 </Field>
                                             </div>
                                             <Field label="This number represents…">

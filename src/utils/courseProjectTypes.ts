@@ -4,6 +4,7 @@
 export interface CourseProjectGroupMember {
     name: string;
     email?: string;
+    rollNumber?: string;
 }
 export interface CourseProjectStudentInfo {
     studentName?: string;

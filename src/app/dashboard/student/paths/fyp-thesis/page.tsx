@@ -69,6 +69,7 @@ const LIMITATION_OPTIONS = ["Small sample size", "Lab-only — not field tested"
 const SKILL_OPTIONS = ["🔬 Research & analysis", "🧩 Problem-solving", "🛠️ Technical / lab", "✍️ Writing & communication", "⏰ Project management", "💪 Resilience", "🫶 Community / user work", "🌱 Sustainability thinking"];
 const NEXT_OPTIONS = ["Publication attempt", "Industry could take it forward", "I may build a startup on it", "Next year's students continue it", "It ends here — and that's okay"];
 const VISIBILITY_OPTIONS = ["🎓 Portfolio + university repository", "🌐 Public — open access", "🔒 Restricted — supervisor & examiners"];
+const METRIC_UNIT_OPTIONS = ["%", "/5 rating", "°C", "people", "participants", "samples", "trials", "responses", "items", "hours", "days", "kg", "mg/L", "ppm", "litres", "kWh", "km", "sq. ft.", "PKR", "times", "points"];
 
 const fieldClass = "w-full rounded-ciel-sm border-2 border-ciel-border bg-ciel-page/50 px-4 py-3 text-sm font-semibold text-ciel-text outline-none focus:border-ciel-purple focus:bg-white focus-visible:ring-2 focus-visible:ring-ciel-purple";
 const labelClass = "text-xs font-bold uppercase tracking-widest text-ciel-text-soft";
@@ -772,7 +773,10 @@ export default function FypThesisPage() {
                                             <input type="text" value={entry.findings?.metricValue ?? ""} onChange={(e) => patchGroup("findings", { metricValue: e.target.value })} placeholder="4.5" className={fieldClass} />
                                         </Field>
                                         <Field label="Unit">
-                                            <input type="text" value={entry.findings?.metricUnit ?? ""} onChange={(e) => patchGroup("findings", { metricUnit: e.target.value })} placeholder="/5 grade · % · °C" className={fieldClass} />
+                                            <input type="text" list="fyp-metric-unit" value={entry.findings?.metricUnit ?? ""} onChange={(e) => patchGroup("findings", { metricUnit: e.target.value })} placeholder="/5 grade · % · °C" className={fieldClass} />
+                                            <datalist id="fyp-metric-unit">
+                                                {METRIC_UNIT_OPTIONS.map((u) => <option key={u} value={u} />)}
+                                            </datalist>
                                         </Field>
                                     </div>
                                     <Field label="This number is…">
