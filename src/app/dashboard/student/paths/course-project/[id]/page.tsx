@@ -788,11 +788,18 @@ export default function CourseProjectWizardPage() {
                                     </div>
                                 </Field>
                             )}
-                            <Field label="What type of coursework was this?">
-                                <ChipSingle options={COURSEWORK_TYPE_OPTIONS} value={entry.studentInfo?.courseworkType} onChange={(v) => patchGroup("studentInfo", { courseworkType: v })} />
-                                {entry.studentInfo?.courseworkType === "Other" && (
-                                    <input type="text" value={entry.studentInfo?.courseworkTypeOther ?? ""} onChange={(e) => patchGroup("studentInfo", { courseworkTypeOther: e.target.value })} placeholder="Describe the type" className={clsx(fieldClass, "mt-2")} />
-                                )}
+                            <Field label="What type of coursework was this?" hint="Tap all that apply.">
+                                <ChipGroup
+                                    options={COURSEWORK_TYPE_OPTIONS.filter((t) => t !== "Other")}
+                                    selected={entry.studentInfo?.courseworkTypes ?? (entry.studentInfo?.courseworkType ? [entry.studentInfo.courseworkType] : [])}
+                                    onToggle={(v) => {
+                                        const cur = entry.studentInfo?.courseworkTypes ?? (entry.studentInfo?.courseworkType ? [entry.studentInfo.courseworkType] : []);
+                                        patchGroup("studentInfo", { courseworkTypes: cur.includes(v) ? cur.filter((x) => x !== v) : [...cur, v] });
+                                    }}
+                                    otherValue={entry.studentInfo?.courseworkTypeOther}
+                                    onOtherChange={(v) => patchGroup("studentInfo", { courseworkTypeOther: v })}
+                                    otherPlaceholder="Describe the type"
+                                />
                             </Field>
                             <Field label="➕ Anything else about you or the course?">
                                 <textarea rows={2} value={entry.studentInfo?.notes ?? ""} onChange={(e) => patchGroup("studentInfo", { notes: e.target.value })} placeholder="Anything you'd like on the record…" className={fieldClass} />

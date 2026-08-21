@@ -19,8 +19,11 @@ export interface CourseProjectStudentInfo {
     teamMode?: string;
     /** Older entries may still hold plain name strings from before email capture was added — read via normalizeGroupMembers. */
     groupMembers?: (string | CourseProjectGroupMember)[];
-    courseworkType?: string;
+    /** Tap all that apply — students can mix e.g. "Semester project" + "Research task". */
+    courseworkTypes?: string[];
     courseworkTypeOther?: string;
+    /** @deprecated pre-multi-select shape — still read for entries submitted before this was a tap-all field. */
+    courseworkType?: string;
     teacherName?: string;
     teacherEmail?: string;
     notes?: string;
@@ -257,10 +260,13 @@ export function composeCourseProjectSummaries(entry: CourseProjectEntry): Course
     const gms = normalizeGroupMembers(si.groupMembers).map((m) => m.name).filter(Boolean);
     const formats = (ai.formats?.length ? ai.formats : ai.format ? [ai.format] : []);
     const primaryFormat = formats[0];
+    // COURSEWORK_TYPE_OPTIONS carry no emoji prefix (unlike formats) — lowercase directly, no stripEmoji (which would
+    // otherwise mistake a plain first word like "Semester" in "Semester project" for an emoji token and strip it).
+    const courseworkTypeLabel = si.courseworkTypes?.length ? joinList(si.courseworkTypes).toLowerCase() : si.courseworkType?.toLowerCase();
 
     const s: CourseProjectSectionSummaries = {};
     s.course = si.studentName || entry.course
-        ? `A ${primaryFormat ? stripEmoji(primaryFormat).split(" (")[0].toLowerCase() : si.courseworkType ? stripEmoji(si.courseworkType).toLowerCase() : "course assignment"} for ${entry.course || si.disciplineName || "this course"}${si.courseCode ? ` (${si.courseCode})` : ""}${si.department ? `, ${si.department}` : ""}${si.programme ? `, ${si.programme}` : ""}${si.semester ? `, ${si.semester}` : ""}${si.teamMode ? `, completed ${/individual|solo/i.test(si.teamMode) ? "individually" : `as ${lc(si.teamMode)}${gms.length ? ` (${si.studentName ? si.studentName + ", " : ""}${joinList(gms)})` : ""}`}` : ""}${si.teacherName ? `, under the supervision of ${si.teacherName}` : ""}.`
+        ? `A ${primaryFormat ? stripEmoji(primaryFormat).split(" (")[0].toLowerCase() : courseworkTypeLabel || "course assignment"} for ${entry.course || si.disciplineName || "this course"}${si.courseCode ? ` (${si.courseCode})` : ""}${si.department ? `, ${si.department}` : ""}${si.programme ? `, ${si.programme}` : ""}${si.semester ? `, ${si.semester}` : ""}${si.teamMode ? `, completed ${/individual|solo/i.test(si.teamMode) ? "individually" : `as ${lc(si.teamMode)}${gms.length ? ` (${si.studentName ? si.studentName + ", " : ""}${joinList(gms)})` : ""}`}` : ""}${si.teacherName ? `, under the supervision of ${si.teacherName}` : ""}.`
         : "";
 
     s.assignment = ai.whatAsked || ai.realWorldIssue

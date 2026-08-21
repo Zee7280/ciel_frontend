@@ -25,7 +25,9 @@ function entrySemesterNum(e: MeritEntry): number {
     return m ? parseInt(m[0], 10) : 0;
 }
 function entryFormat(e: MeritEntry): string {
-    return stripEmoji(e.assignmentInfo?.formats?.[0] || e.assignmentInfo?.format || e.studentInfo?.courseworkType || "Coursework");
+    const format = e.assignmentInfo?.formats?.[0] || e.assignmentInfo?.format;
+    if (format) return stripEmoji(format);
+    return e.studentInfo?.courseworkTypes?.[0] || e.studentInfo?.courseworkType || "Coursework";
 }
 function entryEmoji(e: MeritEntry): string {
     const f = e.assignmentInfo?.formats?.[0] || e.assignmentInfo?.format || "";
