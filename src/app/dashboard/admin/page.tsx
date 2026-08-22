@@ -53,8 +53,8 @@ const shortcutLinks = [
         className: "bg-indigo-50 text-indigo-700 ring-indigo-100 hover:bg-indigo-100/80",
     },
     {
-        href: "/dashboard/admin/impact",
-        label: "Impact analytics",
+        href: "/dashboard/admin/analytics",
+        label: "Analytics & Impact",
         description: "Hours, SDGs, HEC / Gov / UN",
         icon: BarChart3,
         className: "bg-emerald-50 text-emerald-800 ring-emerald-100 hover:bg-emerald-100/80",
@@ -313,7 +313,7 @@ export default function AdminDashboard() {
                         <div className="text-sm font-medium text-slate-500">Sum of verified timesheets across the platform.</div>
                         <div className="mt-auto pt-6">
                             <Link
-                                href="/dashboard/admin/impact"
+                                href="/dashboard/admin/analytics"
                                 className="inline-flex items-center gap-2 rounded-full bg-purple-100 px-3 py-1.5 text-xs font-bold text-purple-800 hover:bg-purple-200/80"
                             >
                                 <TrendingUp className="h-3 w-3" /> Open impact dashboard
@@ -371,10 +371,10 @@ export default function AdminDashboard() {
                             </p>
                         </div>
                         <Link
-                            href="/dashboard/admin/impact"
+                            href="/dashboard/admin/analytics"
                             className="text-sm font-bold text-blue-600 hover:text-blue-700"
                         >
-                            Impact analytics →
+                            Analytics &amp; Impact →
                         </Link>
                     </div>
 
@@ -487,10 +487,10 @@ export default function AdminDashboard() {
                                 <ArrowRight className="h-4 w-4 opacity-70" />
                             </Link>
                             <Link
-                                href="/dashboard/admin/impact"
+                                href="/dashboard/admin/analytics"
                                 className="flex w-full items-center justify-between rounded-2xl border border-white/10 bg-white/10 px-6 py-4 text-sm font-bold backdrop-blur-sm transition hover:bg-white/20"
                             >
-                                Impact & stakeholders
+                                Impact &amp; stakeholders
                                 <ArrowRight className="h-4 w-4 opacity-70" />
                             </Link>
                             <Link

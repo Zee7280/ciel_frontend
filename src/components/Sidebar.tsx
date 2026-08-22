@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect, useLayoutEffect, useCallback, type ComponentType } from "react";
-import { LayoutDashboard, Users, Settings, PieChart, LogOut, FileText, Building2, CheckCircle, Briefcase, FileBarChart, ShieldAlert, BarChart3, History, Bell, User, MessageSquare, Plus, CreditCard, ClipboardList, CalendarClock, LifeBuoy, Link2, GraduationCap, Globe2, PlayCircle, Mail, Archive, LayoutGrid, Clock, ChevronsLeft, ChevronsRight, Compass, HelpCircle, BookOpen, type LucideProps } from "lucide-react";
+import { LayoutDashboard, Users, Settings, PieChart, LogOut, FileText, Building2, CheckCircle, Briefcase, FileBarChart, ShieldAlert, BarChart3, History, Bell, User, MessageSquare, Plus, CreditCard, ClipboardList, CalendarClock, LifeBuoy, Link2, GraduationCap, Globe2, PlayCircle, Mail, Archive, Clock, ChevronsLeft, ChevronsRight, Compass, HelpCircle, BookOpen, type LucideProps } from "lucide-react";
 import clsx from "clsx";
 import { authenticatedFetch, isTokenValid } from "@/utils/api";
 import {
@@ -363,9 +363,7 @@ export default function Sidebar() {
             { label: "Project evidence export", href: "/dashboard/admin/project-evidence", icon: Archive },
             { label: "Student Reports", href: "/dashboard/admin/reports/verify", icon: FileText },
             { label: "CIEL Master", href: "/dashboard/admin/master-analytics", icon: Globe2 },
-            { label: "Analytics", href: "/dashboard/admin/analytics", icon: BarChart3 },
-            { label: "All-Fields Console", href: "/dashboard/admin/all-fields-console", icon: LayoutGrid },
-            { label: "Impact", href: "/dashboard/admin/impact", icon: FileBarChart },
+            { label: "Analytics & Impact", href: "/dashboard/admin/analytics", icon: BarChart3 },
             { label: "Messages", href: "/dashboard/admin/messages", icon: MessageSquare },
             { label: "Notifications", href: "/dashboard/admin/notifications", icon: Bell },
             { label: "Platform tutorial", href: "/dashboard/admin/tutorials", icon: PlayCircle },

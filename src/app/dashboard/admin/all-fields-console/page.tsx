@@ -1,8 +1,6 @@
-"use client";
+import { redirect } from "next/navigation";
 
-import AllFieldsConsolePanel from "@/components/analytics/AllFieldsConsolePanel";
-
-/** Standalone console route — same panel as CIEL Master View-as / Registry. */
+/** Legacy route; folded into CIEL Master's "View as stakeholder" / "Field ownership registry" tabs. */
 export default function AllFieldsConsolePage() {
-    return <AllFieldsConsolePanel />;
+    redirect("/dashboard/admin/master-analytics");
 }

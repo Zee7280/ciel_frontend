@@ -2,15 +2,14 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { BookOpen, Eye, LayoutDashboard } from "lucide-react";
+import { BookOpen, Eye } from "lucide-react";
 import AllFieldsConsolePanel from "@/components/analytics/AllFieldsConsolePanel";
-import MasterPlatformKpisPanel from "@/components/analytics/MasterPlatformKpisPanel";
 
-type MasterTab = "view" | "reg" | "platform";
+type MasterTab = "view" | "reg";
 
 /**
- * CIEL Master — All-Fields Analytics Console flow (HTML design) as primary,
- * with legacy Platform KPIs preserved on a third tab.
+ * CIEL Master — the per-role, per-field "view exactly what each stakeholder sees" governance
+ * console. Platform KPI reporting lives on the separate Analytics & Impact page.
  */
 export default function AdminMasterAnalyticsPage() {
     const [tab, setTab] = useState<MasterTab>("view");
@@ -49,10 +48,14 @@ export default function AdminMasterAnalyticsPage() {
                         All Analytics Live Here First
                     </h2>
                     <p className="mt-1 max-w-2xl text-[12.5px] text-slate-500">
-                        Every KPI, chart and field across Sections 1–10 belongs primarily to the Super
-                        Admin. Stakeholders see mapped copies. Use <b>View as</b> to open exactly what
-                        any stakeholder sees — all 5 roles × 10 sections — or open the{" "}
-                        <b>Field Ownership Registry</b>. Platform KPIs remain available for cohort filters.
+                        Every field across Sections 1–10 belongs primarily to the Super Admin. Stakeholders
+                        see mapped copies. Use <b>View as</b> to open exactly what any stakeholder sees —
+                        all 5 roles × 10 sections — or open the <b>Field Ownership Registry</b>. Looking for
+                        KPI charts and trends instead? See{" "}
+                        <Link href="/dashboard/admin/analytics" className="font-bold underline">
+                            Analytics &amp; Impact
+                        </Link>
+                        .
                     </p>
                 </div>
                 <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-amber-200 bg-[#fdf6e3] px-3 py-1 text-[10px] font-bold uppercase tracking-wide text-[#b8860b]">
@@ -83,29 +86,14 @@ export default function AdminMasterAnalyticsPage() {
                 >
                     <BookOpen className="h-3.5 w-3.5" /> Field ownership registry
                 </button>
-                <button
-                    type="button"
-                    onClick={() => setTab("platform")}
-                    className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-[11px] font-bold uppercase tracking-wide ${
-                        tab === "platform"
-                            ? "bg-slate-900 text-white"
-                            : "text-slate-500 hover:bg-slate-50"
-                    }`}
-                >
-                    <LayoutDashboard className="h-3.5 w-3.5" /> Platform KPIs
-                </button>
             </div>
 
-            {tab === "platform" ? (
-                <MasterPlatformKpisPanel />
-            ) : (
-                <AllFieldsConsolePanel
-                    embedded
-                    showModeTabs={false}
-                    mode={tab}
-                    onModeChange={(m) => setTab(m)}
-                />
-            )}
+            <AllFieldsConsolePanel
+                embedded
+                showModeTabs={false}
+                mode={tab}
+                onModeChange={(m) => setTab(m)}
+            />
         </div>
     );
 }
