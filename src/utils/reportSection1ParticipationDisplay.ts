@@ -240,17 +240,17 @@ export function buildSection1ParticipationDisplay(args: {
         : undefined;
 
     const teamLeadRole =
-        firstNonBlank(section1.team_lead.role) ||
-        (section1.participation_type === "team" ? "Team lead" : "Student lead");
+        firstNonBlank(section1?.team_lead?.role) ||
+        (section1?.participation_type === "team" ? "Team lead" : "Student lead");
 
     const teamLeadHours =
-        firstNonBlank(section1.team_lead.hours) ||
+        firstNonBlank(section1?.team_lead?.hours) ||
         (leadIndividualHit && leadIndividualHit.individual_hours > 0
             ? `${leadIndividualHit.individual_hours} hours`
             : "") ||
-        (section1.participation_type !== "team" &&
+        (section1?.participation_type !== "team" &&
         verifiedHours > 0 &&
-        !(section1.team_members ?? []).length
+        !(section1?.team_members ?? []).length
             ? `${verifiedHours} verified hours`
             : "");
 

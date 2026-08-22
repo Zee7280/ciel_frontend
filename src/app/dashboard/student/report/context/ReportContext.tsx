@@ -357,7 +357,7 @@ export interface ReportData {
 }
 
 
-const defaultReportData: ReportData = {
+export const defaultReportData: ReportData = {
     project_id: '',
     project_title: '',
     section1: {

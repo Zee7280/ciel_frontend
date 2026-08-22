@@ -11,7 +11,6 @@ import {
 } from "../utils/engagementMetrics";
 import { formatSection7PakistanDialForDisplay } from "@/utils/reportSection7PakistanDial";
 import { buildSection1ParticipationDisplay, resolveReportAuthorParticipationSnapshot } from "@/utils/reportSection1ParticipationDisplay";
-import { deriveCertificateProjectDisplay } from "../utils/certificateDisplay";
 import { parseSection11AuditSummary } from "@/lib/parseCIIauditSummary";
 import ReportVerificationQr from "@/components/ReportVerificationQr";
 import { CompetencyScoresTable } from "@/components/verify/CompetencyScoresTable";
@@ -664,21 +663,11 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
     })();
 
     const showEngagementDossierSection =
-        Boolean(metricsMerged) ||
+        Boolean(mBase) ||
         (Array.isArray(data.section1?.attendance_logs) && data.section1.attendance_logs.length > 0) ||
         engagementRecalc.total_verified_hours > 0 ||
         redFlagsForPrint.length > 0;
 
-    const projectRecord = printObject(projectData) ?? {};
-
-    const dossierProjectHeadline = deriveCertificateProjectDisplay({
-        ...(data as ReportData),
-        project_title:
-            (data as ReportData).project_title ||
-            (typeof projectRecord.title === "string" ? projectRecord.title : "") ||
-            "",
-    }).headline;
-    const teamMembers = data.section1.team_members || [];
     const sdgProjectData =
         projectData ??
         (data as { opportunity?: unknown }).opportunity ??
@@ -747,8 +736,6 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
         ? formatDisplayId(printHeaderReportIdSource, "CPK")
         : "—";
 
-    /** Dossier / print masthead accent (aligned with institutional report reference). */
-    const hdrInk = "#0056B3";
     const sectionInk = "#071A33";
     const tealInk = "#0F8F83";
     const scorePercent = (score: number, max: number) => Math.round((score / max) * 100);

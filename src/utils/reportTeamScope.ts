@@ -5,6 +5,7 @@
  */
 
 import { authenticatedFetch } from "@/utils/api";
+import { defaultReportData } from "@/app/dashboard/student/report/context/ReportContext";
 
 export function pickTeamIdFromRecord(rec: unknown): string {
     if (!rec || typeof rec !== "object") return "";
@@ -455,9 +456,30 @@ export function prepareReportForVerifyDossier(report: Record<string, unknown>): 
         return { ...m, studentRollNumber: roll };
     });
 
+    // The student's own report editor always renders against a full `defaultReportData` shape
+    // (ReportContext.setFullData merges every section against defaults), so a section missing
+    // entirely from an older/partial backend payload never crashes the student's own view.
+    // Admin/partner verify dossiers render the same ReportPrintView from raw fetched JSON — merge
+    // each section against the same defaults here so a missing section renders blank instead of
+    // throwing on the unguarded `data.sectionN.field` reads inside ReportPrintView.
+    const sectionDefaults: Record<string, unknown> = {
+        section2: { ...defaultReportData.section2, ...(report.section2 as Record<string, unknown> | undefined) },
+        section3: { ...defaultReportData.section3, ...(report.section3 as Record<string, unknown> | undefined) },
+        section4: { ...defaultReportData.section4, ...(report.section4 as Record<string, unknown> | undefined) },
+        section5: { ...defaultReportData.section5, ...(report.section5 as Record<string, unknown> | undefined) },
+        section6: { ...defaultReportData.section6, ...(report.section6 as Record<string, unknown> | undefined) },
+        section7: { ...defaultReportData.section7, ...(report.section7 as Record<string, unknown> | undefined) },
+        section8: { ...defaultReportData.section8, ...(report.section8 as Record<string, unknown> | undefined) },
+        section9: { ...defaultReportData.section9, ...(report.section9 as Record<string, unknown> | undefined) },
+        section10: { ...defaultReportData.section10, ...(report.section10 as Record<string, unknown> | undefined) },
+        section11: { ...defaultReportData.section11, ...(report.section11 as Record<string, unknown> | undefined) },
+    };
+
     return {
         ...report,
+        ...sectionDefaults,
         section1: {
+            ...defaultReportData.section1,
             ...section1,
             team_lead,
             team_members: membersWithRoll,
