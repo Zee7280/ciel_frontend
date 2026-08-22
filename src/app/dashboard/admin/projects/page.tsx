@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import Link from "next/link";
 import DataTable from "react-data-table-component";
 import type { TableColumn } from "react-data-table-component";
-import { Search, Filter, MoreVertical, Briefcase, MapPin, Eye, FileDown, Trash2, Users, Loader2, X, UserMinus, Pencil, Mail, ClipboardList, GitMerge, Unlock, Lock, Layers2, Sparkles, Wrench } from "lucide-react";
+import { Search, Filter, MoreVertical, Briefcase, MapPin, Eye, FileDown, Trash2, Users, Loader2, X, UserMinus, Pencil, Mail, ClipboardList, GitMerge, Unlock, Lock, Layers2, Sparkles, Wrench, AlertTriangle, Clock, Send } from "lucide-react";
 import { authenticatedFetch } from "@/utils/api";
 import { toast } from "sonner";
 import { ProjectTrackerModal } from "@/app/dashboard/admin/projects/ProjectTrackerModal";
@@ -725,10 +725,44 @@ function statusBadgeClass(statusKey: string): string {
     return "bg-slate-50 text-slate-600 border border-slate-200";
 }
 
+/** Seats caption under the Volunteers cell — over-capacity / full take priority over "seats left". */
+function seatsNote(r: AdminProjectRow): {
+    primary: string;
+    primaryTone: "rose" | "emerald" | "slate";
+    extra: string | null;
+} {
+    const required = r.volunteersRequired;
+    if (required != null) {
+        const over = r.volunteers - required;
+        if (over > 0) return { primary: `${over} over capacity`, primaryTone: "rose", extra: null };
+        if (over === 0) return { primary: "full", primaryTone: "emerald", extra: null };
+    }
+    if (r.remainingSeats != null) {
+        const extra =
+            r.remainingMembers != null && r.remainingMembers !== r.remainingSeats
+                ? `${r.remainingMembers} member slot${r.remainingMembers === 1 ? "" : "s"}`
+                : null;
+        return {
+            primary: `${r.remainingSeats} seat${r.remainingSeats === 1 ? "" : "s"} left`,
+            primaryTone: "slate",
+            extra,
+        };
+    }
+    if (r.remainingMembers != null) {
+        return {
+            primary: `${r.remainingMembers} member slot${r.remainingMembers === 1 ? "" : "s"} left`,
+            primaryTone: "slate",
+            extra: null,
+        };
+    }
+    return { primary: "", primaryTone: "slate", extra: null };
+}
+
 export default function AdminProjectsPage() {
     const [rows, setRows] = useState<AdminProjectRow[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [deletingId, setDeletingId] = useState<string | null>(null);
+    const [remindingZeroHours, setRemindingZeroHours] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
     const [studentEmailInput, setStudentEmailInput] = useState("");
     const [studentEmailApplied, setStudentEmailApplied] = useState("");
@@ -1686,6 +1720,60 @@ export default function AdminProjectsPage() {
         toast.success("Export started");
     };
 
+    /** All loaded rows (not filteredRows) so counts stay stable while the admin filters the table. */
+    const summaryStats = useMemo(() => {
+        const total = rows.length;
+        const active = rows.filter((r) => r.statusKey === "active").length;
+        const pendingFaculty = rows.filter((r) => r.statusKey === "pending_faculty").length;
+        const rejected = rows.filter((r) => r.statusKey === "rejected").length;
+        const unfilledSeatsTotal = rows.reduce((sum, r) => sum + (r.remainingSeats ?? 0), 0);
+        const unfilledSeatsProjects = rows.filter((r) => (r.remainingSeats ?? 0) > 0).length;
+        const totalHoursLogged = rows.reduce((sum, r) => sum + r.hours, 0);
+        const totalHoursCommitted = rows.reduce((sum, r) => sum + r.hours + (r.remainingHours ?? 0), 0);
+        return {
+            total,
+            active,
+            pendingFaculty,
+            rejected,
+            unfilledSeatsTotal,
+            unfilledSeatsProjects,
+            totalHoursLogged,
+            totalHoursCommitted,
+        };
+    }, [rows]);
+
+    const showZeroHoursBanner =
+        summaryStats.total > 0 && summaryStats.totalHoursLogged === 0 && summaryStats.totalHoursCommitted > 0;
+
+    const handleRemindZeroHours = async () => {
+        if (
+            !confirm(
+                "Send an hours-logging reminder email to every enrolled student on projects with 0 verified hours?",
+            )
+        ) {
+            return;
+        }
+        setRemindingZeroHours(true);
+        try {
+            const res = await authenticatedFetch("/api/v1/admin/projects/remind-zero-hours", { method: "POST" });
+            const data = res ? await res.json().catch(() => ({})) : null;
+            if (res?.ok) {
+                const notified = Number((data as { students_notified?: number })?.students_notified ?? 0);
+                toast.success(`Reminder sent to ${notified} student${notified === 1 ? "" : "s"}.`);
+            } else {
+                toast.error(
+                    typeof (data as { message?: string })?.message === "string"
+                        ? (data as { message: string }).message
+                        : "Could not send reminders",
+                );
+            }
+        } catch {
+            toast.error("Could not send reminders");
+        } finally {
+            setRemindingZeroHours(false);
+        }
+    };
+
     const handleStatusUpdate = async (id: string, newStatus: string) => {
         try {
             const res = await authenticatedFetch(`/api/v1/admin/opportunities/${id}/status`, {
@@ -1819,39 +1907,48 @@ export default function AdminProjectsPage() {
                 sortable: true,
                 width: "132px",
                 selector: (r) => r.volunteers,
-                cell: (r) => (
-                    <div className="text-center w-full py-1">
-                        <span className="text-sm font-bold text-slate-900">
-                            {r.volunteersRequired != null ? `${r.volunteers} / ${r.volunteersRequired}` : r.volunteers}
-                        </span>
-                        {r.remainingSeats != null || r.remainingMembers != null ? (
-                            <div className="text-[10px] font-medium text-slate-500 mt-0.5 leading-snug">
-                                {r.remainingSeats != null ? `${r.remainingSeats} seat${r.remainingSeats === 1 ? "" : "s"} left` : null}
-                                {r.remainingSeats != null && r.remainingMembers != null && r.remainingMembers !== r.remainingSeats ? " · " : null}
-                                {r.remainingMembers != null && r.remainingMembers !== r.remainingSeats
-                                    ? `${r.remainingMembers} member slot${r.remainingMembers === 1 ? "" : "s"}`
-                                    : null}
-                                {r.remainingSeats == null && r.remainingMembers != null
-                                    ? `${r.remainingMembers} member slot${r.remainingMembers === 1 ? "" : "s"} left`
-                                    : null}
-                            </div>
-                        ) : null}
-                    </div>
-                ),
+                cell: (r) => {
+                    const note = seatsNote(r);
+                    const overCapacity = r.volunteersRequired != null && r.volunteers > r.volunteersRequired;
+                    return (
+                        <div className="text-center w-full py-1">
+                            <span className={`text-sm font-bold ${overCapacity ? "text-rose-600" : "text-slate-900"}`}>
+                                {r.volunteersRequired != null ? `${r.volunteers} / ${r.volunteersRequired}` : r.volunteers}
+                            </span>
+                            {note.primary ? (
+                                <div className="text-[10px] font-medium mt-0.5 leading-snug">
+                                    <span
+                                        className={
+                                            note.primaryTone === "rose" ? "text-rose-600 font-semibold"
+                                            : note.primaryTone === "emerald" ? "text-emerald-600 font-semibold"
+                                            : "text-slate-500"
+                                        }
+                                    >
+                                        {note.primary}
+                                    </span>
+                                    {note.extra ? <span className="text-slate-500"> · {note.extra}</span> : null}
+                                </div>
+                            ) : null}
+                        </div>
+                    );
+                },
             },
             {
                 name: "Hours",
                 sortable: true,
                 width: "112px",
                 selector: (r) => r.hours,
-                cell: (r) => (
-                    <div className="text-center w-full py-1">
-                        <span className="text-sm font-bold text-slate-900">{r.hours}</span>
-                        {r.remainingHours != null ? (
-                            <div className="text-[10px] font-medium text-slate-500 mt-0.5">{r.remainingHours} h remaining</div>
-                        ) : null}
-                    </div>
-                ),
+                cell: (r) => {
+                    const committed = r.remainingHours != null ? r.hours + r.remainingHours : null;
+                    return (
+                        <div className="text-center w-full py-1">
+                            <span className="text-sm font-bold text-slate-900">{r.hours}</span>
+                            <div className="text-[10px] font-medium text-slate-500 mt-0.5">
+                                {committed != null ? `of ${committed} h committed` : "h logged"}
+                            </div>
+                        </div>
+                    );
+                },
             },
             {
                 name: "Actions",
@@ -1910,6 +2007,71 @@ export default function AdminProjectsPage() {
                 >
                     <FileDown className="w-4 h-4" /> Export report
                 </button>
+            </div>
+
+            {showZeroHoursBanner ? (
+                <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 p-4 flex flex-col gap-3">
+                    <div className="flex items-start gap-3">
+                        <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                        <div>
+                            <h3 className="text-sm font-bold text-amber-900">No hours have been logged on any project</h3>
+                            <p className="text-sm text-amber-800 mt-1">
+                                All {summaryStats.total} projects show 0 hours against a combined{" "}
+                                {summaryStats.totalHoursCommitted} hours of commitment. Either students aren&apos;t logging, or
+                                the logging step isn&apos;t reaching the platform — worth checking before the next
+                                verification cycle.
+                            </p>
+                        </div>
+                    </div>
+                    <div className="flex flex-wrap gap-2 pl-8">
+                        <Link
+                            href="/dashboard/admin/analytics"
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-bold text-amber-900 hover:bg-amber-100 transition-colors"
+                        >
+                            <Clock className="w-3.5 h-3.5" /> Check the hours log
+                        </Link>
+                        <button
+                            type="button"
+                            onClick={handleRemindZeroHours}
+                            disabled={remindingZeroHours}
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-bold text-amber-900 hover:bg-amber-100 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                            {remindingZeroHours ?
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            :   <Send className="w-3.5 h-3.5" />}
+                            Remind enrolled students
+                        </button>
+                    </div>
+                </div>
+            ) : null}
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-6">
+                {[
+                    { label: "All projects", value: summaryStats.total, caption: "this session", dot: "bg-slate-400" },
+                    { label: "Active", value: summaryStats.active, caption: "running now", dot: "bg-emerald-500" },
+                    {
+                        label: "Pending faculty",
+                        value: summaryStats.pendingFaculty,
+                        caption: "waiting on approval",
+                        dot: "bg-amber-500",
+                    },
+                    { label: "Rejected", value: summaryStats.rejected, caption: "not going ahead", dot: "bg-rose-500" },
+                    {
+                        label: "Unfilled seats",
+                        value: summaryStats.unfilledSeatsTotal,
+                        caption: `across ${summaryStats.unfilledSeatsProjects} projects`,
+                        dot: "bg-slate-400",
+                    },
+                ].map((card) => (
+                    <div key={card.label} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                        <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-500">
+                            <span className={`w-1.5 h-1.5 rounded-full ${card.dot}`} />
+                            {card.label}
+                        </div>
+                        <div className="text-2xl font-extrabold text-slate-900 mt-1">{card.value}</div>
+                        <div className="text-xs text-slate-400 mt-0.5">{card.caption}</div>
+                    </div>
+                ))}
             </div>
 
             <div className="bg-white p-2 rounded-2xl border border-slate-200 shadow-sm mb-6 flex flex-col gap-3">

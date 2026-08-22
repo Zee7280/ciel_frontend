@@ -16,6 +16,7 @@ export type ProjectTrackerRow = {
     volunteersRequired: number | null;
     remainingSeats: number | null;
     hours: number;
+    remainingHours?: number | null;
     raw: Record<string, unknown>;
 };
 
@@ -746,7 +747,13 @@ export function ProjectTrackerModal({ row, onClose, onOpenTeamsEnrollments }: Pr
                 label: "Seats remaining",
                 value: row.remainingSeats != null ? String(row.remainingSeats) : "—",
             },
-            { label: "Verified hours logged", value: String(row.hours) },
+            {
+                label: "Verified hours logged",
+                value:
+                    row.remainingHours != null
+                        ? `${row.hours} of ${row.hours + row.remainingHours} committed`
+                        : String(row.hours),
+            },
             { label: "Expected hours (per person)", value: formatDetailValue(timeline?.expected_hours) },
             { label: "Activity mode", value: formatDetailValue(row.raw.mode ?? timeline?.type) },
             { label: "Eligible departments", value: departments.length ? departments.join(", ") : "—" },
@@ -1201,8 +1208,8 @@ export function ProjectTrackerModal({ row, onClose, onOpenTeamsEnrollments }: Pr
                                                                     {totalAtt > 0 &&
                                                                     a.attendanceSessionsPreview.length === 0 ? (
                                                                         <p className="text-[10px] text-amber-900/90 mt-1 leading-snug">
-                                                                            Session-by-session list will appear after backend
-                                                                            deploy (field <code className="font-mono">attendance_sessions_preview</code>).
+                                                                            Session-by-session detail isn&apos;t available for this
+                                                                            entry.
                                                                         </p>
                                                                     ) : null}
                                                                 </div>
