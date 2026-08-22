@@ -90,6 +90,8 @@ const METRIC_CHARACTER_OPTIONS = ["Positive / expected", "Mixed", "No significan
 const METRIC_VERIFIER_OPTIONS = ["Faculty / supervisor", "University department", "Client / user", "Community partner", "NGO", "Business / industry partner", "Government / public institution", "Laboratory / technical facility", "System / digital records", "Student team records", "No external verifier", "Other"];
 const LIMITATION_OPTIONS = ["Small sample size", "Limited time", "One location only", "Limited access to participants", "No baseline available", "Prototype not tested in real conditions", "Self-reported responses only", "Technical limitations", "No long-term follow-up", "Other — describe below"];
 const NEXT_STEP_OPTIONS = ["Completed as coursework", "Could be developed further", "Further research recommended", "Could be tested / piloted", "Recommended for implementation", "Share with external stakeholder", "Continued in another course", "Already taken forward", "Other"];
+/** Broad discipline/field categories — distinct from Programme (a specific HEC degree title, e.g. "BBA"). */
+const DISCIPLINE_OPTIONS = ["Business & Management", "Economics", "Architecture", "Design", "Fine Arts", "Textile & Fashion", "Media & Communication", "Computer Science", "Engineering", "Mathematics & Statistics", "Social Sciences", "Psychology", "Education", "Liberal Arts", "Languages & Linguistics", "Natural Sciences", "Law", "Medicine & Nursing", "Pharmacy", "Health Sciences", "Agriculture & Food", "Hospitality & Tourism", "Islamic Studies & Theology"];
 
 function metricUnitSuffix(m: { unit?: string; unitOther?: string }): string {
     if (m.unit === "Percentage (%)") return "%";
@@ -744,8 +746,8 @@ export default function CourseProjectWizardPage() {
                             <Field label="University">
                                 <SearchableSelect value={entry.studentInfo?.universityName ?? ""} onChange={(v) => patchGroup("studentInfo", { universityName: v })} options={pakistaniUniversities} placeholder="Type your university" />
                             </Field>
-                            <Field label="Discipline">
-                                <SearchableSelect value={entry.studentInfo?.disciplineName ?? ""} onChange={(v) => patchGroup("studentInfo", { disciplineName: v })} options={hecPrograms} placeholder="Type your discipline" />
+                            <Field label="Discipline" hint="Broad field of study — Programme above is the specific degree title.">
+                                <SearchableSelect value={entry.studentInfo?.disciplineName ?? ""} onChange={(v) => patchGroup("studentInfo", { disciplineName: v })} options={DISCIPLINE_OPTIONS} placeholder="e.g. Business & Management" />
                             </Field>
                             <Field label="Semester">
                                 <div className="relative">
