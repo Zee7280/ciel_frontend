@@ -41,8 +41,6 @@ const STEPS = [
     { key: "reflection", emoji: "💡", label: "Reflection" },
     { key: "submit", emoji: "📤", label: "Submit" },
 ];
-
-const DEPARTMENT_OPTIONS = ["Business & Management", "Economics", "Architecture", "Design", "Fine Arts", "Textile & Fashion", "Media & Communication", "Computer Science", "Engineering", "Mathematics & Statistics", "Social Sciences", "Psychology", "Education", "Liberal Arts", "Languages & Linguistics", "Natural Sciences", "Law", "Medicine & Nursing", "Pharmacy", "Health Sciences", "Agriculture & Food", "Hospitality & Tourism", "Islamic Studies & Theology"];
 const SEMESTER_OPTIONS = Array.from({ length: 10 }, (_, i) => `Semester ${i + 1}`);
 /** Older drafts may have saved a bare number (e.g. "5") from before this was a dropdown — match it to its option so it still shows as selected instead of appearing blank. */
 function semesterSelectValue(raw?: string): string {
@@ -53,7 +51,6 @@ function semesterSelectValue(raw?: string): string {
     return SEMESTER_OPTIONS.includes(canonical) ? canonical : "";
 }
 const TEAM_MODE_OPTIONS = ["Individual", "Pair", "Group / Team", "Whole class", "Interdisciplinary team"];
-const COURSEWORK_TYPE_OPTIONS = ["Assignment", "Semester project", "Research task", "Case study", "Studio / design project", "Practical / lab work", "Field-based work", "Presentation", "Creative production", "Campaign / activity", "Digital / software project", "Performance / exhibition", "Other"];
 
 /** The 27 raw format choices. Each maps to one of five pathways (COURSEWORK_MODES / FORMAT_ROUTE in courseProjectTypes.ts) which supplies its module-inclusion preset, field vocabulary, and roadmap. */
 const FORMAT_OPTIONS = [
@@ -94,17 +91,23 @@ const METRIC_VERIFIER_OPTIONS = ["Faculty / supervisor", "University department"
 const LIMITATION_OPTIONS = ["Small sample size", "Limited time", "One location only", "Limited access to participants", "No baseline available", "Prototype not tested in real conditions", "Self-reported responses only", "Technical limitations", "No long-term follow-up", "Other — describe below"];
 const NEXT_STEP_OPTIONS = ["Completed as coursework", "Could be developed further", "Further research recommended", "Could be tested / piloted", "Recommended for implementation", "Share with external stakeholder", "Continued in another course", "Already taken forward", "Other"];
 
-function metricUnitSuffix(unit?: string): string {
-    if (unit === "Percentage (%)") return "%";
-    if (!unit || unit === "Other") return "";
-    return ` ${unit}`;
+function metricUnitSuffix(m: { unit?: string; unitOther?: string }): string {
+    if (m.unit === "Percentage (%)") return "%";
+    if (!m.unit || m.unit === "Other") return m.unit === "Other" && m.unitOther ? ` ${m.unitOther}` : "";
+    return ` ${m.unit}`;
 }
 function metricDeltaLine(m: CourseProjectMetric): string {
     if (!m.comparedBeforeAfter || m.baseline === undefined || m.baseline === "" || m.value === undefined || m.value === "") return "";
     const d = Number(m.value) - Number(m.baseline);
     const pp = m.unit === "Percentage (%)";
-    return `📈 Change: ${d >= 0 ? "+" : ""}${Math.round(d * 100) / 100}${pp ? " percentage points" : metricUnitSuffix(m.unit)} (${m.baseline} → ${m.value})`;
+    return `📈 Change: ${d >= 0 ? "+" : ""}${Math.round(d * 100) / 100}${pp ? " percentage points" : metricUnitSuffix(m)} (${m.baseline} → ${m.value})`;
 }
+const METRIC_STATUS_CHIP_CLASS: Record<string, string> = {
+    "Actual — measured": "border-ciel-green bg-ciel-green-soft text-ciel-green-deep",
+    "Target — intended future result": "border-ciel-indigo bg-ciel-indigo-soft text-ciel-indigo",
+    "Estimated / projected": "border-ciel-gold bg-ciel-gold-soft text-ciel-gold-deep",
+    "Proposed — not yet tested": "border-ciel-teal bg-ciel-teal-soft text-ciel-teal",
+};
 
 /** Up-to-5 structured results builder — replaces the old single evidence-status + metric/value/unit fields. */
 function MetricsBuilder({ metrics, onChange }: { metrics: CourseProjectMetric[]; onChange: (next: CourseProjectMetric[]) => void }) {
@@ -132,80 +135,115 @@ function MetricsBuilder({ metrics, onChange }: { metrics: CourseProjectMetric[];
                         >
                             <span className="shrink-0 rounded-full bg-ciel-gold px-2.5 py-1 text-[9px] font-black text-white">RESULT {String(i + 1).padStart(2, "0")}</span>
                             <span className="min-w-0 flex-1 truncate text-xs font-bold text-ciel-text">
-                                {m.name ? <>{m.name}{m.value ? <>: <b>{m.value}{metricUnitSuffix(m.unit)}</b></> : null}</> : <i className="text-ciel-text-soft">New result — tap to fill</i>}
+                                {m.name ? <>{m.name}{m.value ? <>: <b>{m.value}{metricUnitSuffix(m)}</b></> : null}</> : <i className="text-ciel-text-soft">New result — tap to fill</i>}
                             </span>
                             {m.status && <span className="shrink-0 rounded-full bg-ciel-teal-soft px-2 py-0.5 text-[9px] font-black text-ciel-teal">{m.status.split(" — ")[0].toUpperCase()}</span>}
                             <ChevronDown className={clsx("h-4 w-4 shrink-0 text-ciel-text-soft transition-transform", open && "rotate-180")} />
                         </button>
                         {open && (
                             <div className="space-y-3 p-3.5">
-                                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                                    <Field label="What did you measure?" hint="The thing, not the method.">
-                                        <input type="text" value={m.name ?? ""} onChange={(e) => setMetric(m.id, { name: e.target.value })} placeholder="e.g. Students willing to reduce single-use plastic" className={fieldClass} />
-                                    </Field>
-                                    <Field label="What type of result?">
-                                        <select value={m.type ?? ""} onChange={(e) => setMetric(m.id, { type: e.target.value })} className={fieldClass}>
-                                            <option value="">Select…</option>
-                                            {METRIC_TYPE_OPTIONS.map((t) => <option key={t} value={t}>{t}</option>)}
-                                        </select>
-                                    </Field>
-                                </div>
-                                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                                    <Field label="Result (number)">
-                                        <input type="number" value={m.value ?? ""} onChange={(e) => setMetric(m.id, { value: e.target.value })} placeholder="74" className={fieldClass} />
-                                    </Field>
-                                    <Field label="Unit">
-                                        <select value={m.unit ?? ""} onChange={(e) => setMetric(m.id, { unit: e.target.value })} className={fieldClass}>
-                                            <option value="">Select…</option>
-                                            {METRIC_UNIT_OPTIONS.map((u) => <option key={u} value={u}>{u}</option>)}
-                                        </select>
-                                    </Field>
-                                    <Field label="Status" hint="Essential.">
-                                        <select value={m.status ?? ""} onChange={(e) => setMetric(m.id, { status: e.target.value })} className={fieldClass}>
-                                            <option value="">Select…</option>
-                                            {METRIC_STATUS_OPTIONS.map((s) => <option key={s} value={s}>{s}</option>)}
-                                        </select>
-                                    </Field>
-                                </div>
-                                <Field label="What does this number mean?" hint="What happened, to whom, under what condition.">
-                                    <input type="text" value={m.meaning ?? ""} onChange={(e) => setMetric(m.id, { meaning: e.target.value })} placeholder="e.g. 74% of surveyed students said they'd reduce plastic if reusables were easily available" className={fieldClass} />
+                                {/* Tier 1 — the essentials, just three things */}
+                                <Field label="What did you measure?" hint="The thing, not the method.">
+                                    <input type="text" value={m.name ?? ""} onChange={(e) => setMetric(m.id, { name: e.target.value })} placeholder="e.g. Students willing to reduce single-use plastic" className={fieldClass} />
                                 </Field>
-                                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                                    <Field label="Based on" hint="“Not applicable” is fine.">
-                                        <input type="text" value={m.sample ?? ""} onChange={(e) => setMetric(m.id, { sample: e.target.value })} placeholder="e.g. 120 students" className={fieldClass} />
-                                    </Field>
-                                    <Field label="Measured when?">
-                                        <div className="grid grid-cols-2 gap-1.5">
-                                            <input type="month" value={m.periodFrom ?? ""} onChange={(e) => setMetric(m.id, { periodFrom: e.target.value })} className={fieldClass} />
-                                            <input type="month" value={m.periodTo ?? ""} onChange={(e) => setMetric(m.id, { periodTo: e.target.value })} className={fieldClass} />
+                                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <Field label="The number">
+                                            <input type="number" value={m.value ?? ""} onChange={(e) => setMetric(m.id, { value: e.target.value })} placeholder="74" className={fieldClass} />
+                                        </Field>
+                                        <Field label="…of what?">
+                                            <select value={m.unit ?? ""} onChange={(e) => setMetric(m.id, { unit: e.target.value })} className={fieldClass}>
+                                                <option value="">Unit…</option>
+                                                {METRIC_UNIT_OPTIONS.map((u) => <option key={u} value={u}>{u}</option>)}
+                                            </select>
+                                            {m.unit === "Other" && (
+                                                <input type="text" value={m.unitOther ?? ""} onChange={(e) => setMetric(m.id, { unitOther: e.target.value })} placeholder="Your own unit — e.g. meals, stalls, lux" className={clsx(fieldClass, "mt-1.5")} />
+                                            )}
+                                        </Field>
+                                    </div>
+                                    <Field label="Is this real, or planned?" hint="One tap.">
+                                        <div className="flex flex-wrap gap-2">
+                                            {METRIC_STATUS_OPTIONS.map((s) => {
+                                                const short = s.split(" — ")[0];
+                                                const active = m.status === s;
+                                                return (
+                                                    <button
+                                                        key={s}
+                                                        type="button"
+                                                        onClick={() => setMetric(m.id, { status: s })}
+                                                        className={clsx(
+                                                            "ciel-transition rounded-full border-2 px-3 py-1.5 text-xs font-bold",
+                                                            active ? METRIC_STATUS_CHIP_CLASS[s] : "border-ciel-border text-ciel-text-mid hover:border-ciel-gold/40",
+                                                        )}
+                                                    >
+                                                        {short}
+                                                    </button>
+                                                );
+                                            })}
                                         </div>
                                     </Field>
-                                    <Field label="Evidenced by">
-                                        <select value={m.source ?? ""} onChange={(e) => setMetric(m.id, { source: e.target.value })} className={fieldClass}>
-                                            <option value="">Select…</option>
-                                            {METRIC_SOURCE_OPTIONS.map((s) => <option key={s} value={s}>{s}</option>)}
-                                        </select>
-                                    </Field>
                                 </div>
+
+                                {/* Tier 2 — everything else lives in one fold */}
                                 <details className="rounded-ciel-xs border border-ciel-border">
-                                    <summary className="cursor-pointer px-3 py-2 text-xs font-bold text-ciel-teal">＋ More detail (optional — character, baseline, verifier, evidence)</summary>
-                                    <div className="space-y-3 px-3 pb-3 pt-1">
+                                    <summary className="cursor-pointer px-3 py-2 text-xs font-bold text-ciel-teal">＋ Add detail <span className="font-semibold text-ciel-text-soft">(all optional — what it means, who &amp; when, proof, baseline)</span></summary>
+                                    <div className="space-y-3 border-l-2 border-ciel-teal-soft px-3 pb-3 pt-1">
+                                        <Field label="📖 What does this number mean?" hint="One sentence.">
+                                            <input type="text" value={m.meaning ?? ""} onChange={(e) => setMetric(m.id, { meaning: e.target.value })} placeholder="e.g. 74% of surveyed students said they'd switch if reusables were available" className={fieldClass} />
+                                        </Field>
                                         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                                            <Field label="How would you describe it?" hint="No result needs to be positive.">
-                                                <select value={m.character ?? ""} onChange={(e) => setMetric(m.id, { character: e.target.value })} className={fieldClass}>
+                                            <Field label="Based on" hint="“Not applicable” is fine.">
+                                                <input type="text" value={m.sample ?? ""} onChange={(e) => setMetric(m.id, { sample: e.target.value })} placeholder="e.g. 120 students" className={fieldClass} />
+                                            </Field>
+                                            <Field label="When?" hint="Exact dates.">
+                                                <div className="grid grid-cols-2 gap-1.5">
+                                                    <input type="date" value={m.periodFrom ?? ""} onChange={(e) => setMetric(m.id, { periodFrom: e.target.value })} className={fieldClass} title="From" />
+                                                    <input type="date" value={m.periodTo ?? ""} onChange={(e) => setMetric(m.id, { periodTo: e.target.value })} className={fieldClass} title="To" />
+                                                </div>
+                                            </Field>
+                                            <Field label="Type of result">
+                                                <select value={m.type ?? ""} onChange={(e) => setMetric(m.id, { type: e.target.value })} className={fieldClass}>
                                                     <option value="">Select…</option>
-                                                    {METRIC_CHARACTER_OPTIONS.map((c) => <option key={c} value={c}>{c}</option>)}
+                                                    {METRIC_TYPE_OPTIONS.map((t) => <option key={t} value={t}>{t}</option>)}
                                                 </select>
+                                                {m.type === "Other" && (
+                                                    <input type="text" value={m.typeOther ?? ""} onChange={(e) => setMetric(m.id, { typeOther: e.target.value })} placeholder="What kind — in your words" className={clsx(fieldClass, "mt-1.5")} />
+                                                )}
+                                            </Field>
+                                        </div>
+                                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                                            <Field label="🧾 Evidenced by">
+                                                <select value={m.source ?? ""} onChange={(e) => setMetric(m.id, { source: e.target.value })} className={fieldClass}>
+                                                    <option value="">Select…</option>
+                                                    {METRIC_SOURCE_OPTIONS.map((s) => <option key={s} value={s}>{s}</option>)}
+                                                </select>
+                                                {m.source === "Other" && (
+                                                    <input type="text" value={m.sourceOther ?? ""} onChange={(e) => setMetric(m.id, { sourceOther: e.target.value })} placeholder="How was it evidenced — in your words" className={clsx(fieldClass, "mt-1.5")} />
+                                                )}
                                             </Field>
                                             <Field label="Who can verify it?">
                                                 <select value={m.verifier ?? ""} onChange={(e) => setMetric(m.id, { verifier: e.target.value })} className={fieldClass}>
                                                     <option value="">Select…</option>
                                                     {METRIC_VERIFIER_OPTIONS.map((v) => <option key={v} value={v}>{v}</option>)}
                                                 </select>
+                                                {m.verifier === "Other" && (
+                                                    <input type="text" value={m.verifierOther ?? ""} onChange={(e) => setMetric(m.id, { verifierOther: e.target.value })} placeholder="Who can verify — in your words" className={clsx(fieldClass, "mt-1.5")} />
+                                                )}
                                             </Field>
-                                            <Field label="Compared before → after?">
-                                                <ChipSingle options={["Yes — I have a baseline"]} value={m.comparedBeforeAfter ? "Yes — I have a baseline" : undefined} onChange={() => setMetric(m.id, { comparedBeforeAfter: !m.comparedBeforeAfter })} />
+                                            <Field label="How did it turn out?" hint="Honest is fine.">
+                                                <select value={m.character ?? ""} onChange={(e) => setMetric(m.id, { character: e.target.value })} className={fieldClass}>
+                                                    <option value="">Select…</option>
+                                                    {METRIC_CHARACTER_OPTIONS.map((c) => <option key={c} value={c}>{c}</option>)}
+                                                </select>
                                             </Field>
+                                        </div>
+                                        <div className="flex flex-wrap gap-2">
+                                            <ChipSingle options={["📈 I have a before-number (baseline)"]} value={m.comparedBeforeAfter ? "📈 I have a before-number (baseline)" : undefined} onChange={() => setMetric(m.id, { comparedBeforeAfter: !m.comparedBeforeAfter })} />
+                                            <ChipSingle
+                                                options={[m.evidenceAttached ? "✅ Evidence attached" : "📎 Attach evidence file"]}
+                                                value={m.evidenceAttached ? "✅ Evidence attached" : undefined}
+                                                onChange={() => setMetric(m.id, { evidenceAttached: !m.evidenceAttached })}
+                                            />
                                         </div>
                                         {m.comparedBeforeAfter && (
                                             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -215,11 +253,6 @@ function MetricsBuilder({ metrics, onChange }: { metrics: CourseProjectMetric[];
                                                 <p className="self-end text-xs font-bold text-ciel-green-deep">{metricDeltaLine(m) || "Enter baseline + result to compute the change"}</p>
                                             </div>
                                         )}
-                                        <ChipSingle
-                                            options={["📎 Attach evidence — PDF · XLSX · JPG (recommended)"]}
-                                            value={m.evidenceAttached ? "📎 Attach evidence — PDF · XLSX · JPG (recommended)" : undefined}
-                                            onChange={() => setMetric(m.id, { evidenceAttached: !m.evidenceAttached })}
-                                        />
                                     </div>
                                 </details>
                                 <div className="flex justify-end border-t border-ciel-border pt-2.5">
@@ -705,14 +738,8 @@ export default function CourseProjectWizardPage() {
                             <Field label="Course name">
                                 <input type="text" value={entry.course ?? ""} onChange={(e) => setEntry((s) => ({ ...s, course: e.target.value }))} placeholder="e.g. Marketing Management" className={fieldClass} />
                             </Field>
-                            <Field label="School / department">
-                                <input type="text" list="cw-depts" value={entry.studentInfo?.department ?? ""} onChange={(e) => patchGroup("studentInfo", { department: e.target.value })} placeholder="e.g. School of Business" className={fieldClass} />
-                                <datalist id="cw-depts">
-                                    {DEPARTMENT_OPTIONS.map((d) => <option key={d} value={d} />)}
-                                </datalist>
-                            </Field>
-                            <Field label="Programme">
-                                <input type="text" value={entry.studentInfo?.programme ?? ""} onChange={(e) => patchGroup("studentInfo", { programme: e.target.value })} placeholder="e.g. BBA" className={fieldClass} />
+                            <Field label="Programme" hint="Pick from HEC undergraduate programmes — or type your own.">
+                                <SearchableSelect value={entry.studentInfo?.programme ?? ""} onChange={(v) => patchGroup("studentInfo", { programme: v })} options={hecPrograms} placeholder="Start typing — e.g. BBA" />
                             </Field>
                             <Field label="University">
                                 <SearchableSelect value={entry.studentInfo?.universityName ?? ""} onChange={(v) => patchGroup("studentInfo", { universityName: v })} options={pakistaniUniversities} placeholder="Type your university" />
@@ -788,19 +815,6 @@ export default function CourseProjectWizardPage() {
                                     </div>
                                 </Field>
                             )}
-                            <Field label="What type of coursework was this?" hint="Tap all that apply.">
-                                <ChipGroup
-                                    options={COURSEWORK_TYPE_OPTIONS.filter((t) => t !== "Other")}
-                                    selected={entry.studentInfo?.courseworkTypes ?? (entry.studentInfo?.courseworkType ? [entry.studentInfo.courseworkType] : [])}
-                                    onToggle={(v) => {
-                                        const cur = entry.studentInfo?.courseworkTypes ?? (entry.studentInfo?.courseworkType ? [entry.studentInfo.courseworkType] : []);
-                                        patchGroup("studentInfo", { courseworkTypes: cur.includes(v) ? cur.filter((x) => x !== v) : [...cur, v] });
-                                    }}
-                                    otherValue={entry.studentInfo?.courseworkTypeOther}
-                                    onOtherChange={(v) => patchGroup("studentInfo", { courseworkTypeOther: v })}
-                                    otherPlaceholder="Describe the type"
-                                />
-                            </Field>
                             <Field label="➕ Anything else about you or the course?">
                                 <textarea rows={2} value={entry.studentInfo?.notes ?? ""} onChange={(e) => patchGroup("studentInfo", { notes: e.target.value })} placeholder="Anything you'd like on the record…" className={fieldClass} />
                             </Field>
@@ -1066,9 +1080,9 @@ export default function CourseProjectWizardPage() {
 
                             {inc.imp && (
                                 <div className="space-y-3">
-                                    <p className="text-xs font-black uppercase tracking-widest text-ciel-text-soft">C · Your evidence — did you measure any result?</p>
+                                    <p className="text-xs font-black uppercase tracking-widest text-ciel-text-soft">C · Your numbers — did anything countable come out of this work? <span className="font-semibold normal-case tracking-normal text-ciel-text-soft">(most class assignments have one number at most — that&apos;s normal)</span></p>
                                     <ChipSingle options={MEASURED_OPTIONS} value={entry.resultsInfo?.measured} onChange={(v) => patchGroup("resultsInfo", { measured: v })} />
-                                    <p className="text-xs text-ciel-text-soft">💡 Select &ldquo;Yes&rdquo; only when something was really measured or observed. A future target or expected benefit is not an achieved result — and saying &ldquo;findings only&rdquo; scores honestly.</p>
+                                    <p className="text-xs text-ciel-text-soft">💡 &ldquo;Yes&rdquo; means something was really counted or observed — a survey %, a temperature, attendance. A hope or a plan isn&apos;t a result yet, and &ldquo;findings only&rdquo; is an honest, full answer. Each number needs just 3 taps: what, how much, real-or-planned. Everything else is optional.</p>
                                     {/Yes|Partly/.test(entry.resultsInfo?.measured ?? "") && (
                                         <MetricsBuilder metrics={entry.resultsInfo?.metrics ?? []} onChange={(next) => patchGroup("resultsInfo", { metrics: next })} />
                                     )}
@@ -1215,12 +1229,12 @@ export default function CourseProjectWizardPage() {
 
                             <div className="space-y-3">
                                 <div className="flex items-center justify-between gap-3">
-                                    <h3 className="text-sm font-black text-ciel-text">✨ Review your baseline summary</h3>
+                                    <h3 className="text-sm font-black text-ciel-text">📤 Your story, in your words</h3>
                                     <button type="button" onClick={regenerateAllReview} className="ciel-transition shrink-0 rounded-ciel-xs border border-ciel-border px-3 py-1.5 text-xs font-bold text-ciel-text-mid hover:border-ciel-gold/40">
                                         ↻ Regenerate all
                                     </button>
                                 </div>
-                                <p className="text-xs text-ciel-text-soft">Only the sections your format used appear below. Accept each, edit inline, or reset. Your teacher sees only what you approve.</p>
+                                <p className="text-xs text-ciel-text-soft">🗣️ Everything below is assembled <b>from what you wrote — in your voice, not the computer&apos;s</b>. Read it as your teacher will; edit any section until it sounds like you. Only the sections your format used appear below. Accept each, edit inline, or reset — your teacher sees only what you approve.</p>
 
                                 <div className="flex items-center gap-3">
                                     <div className="h-2 flex-1 overflow-hidden rounded-full bg-ciel-border">

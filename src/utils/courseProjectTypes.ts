@@ -65,8 +65,10 @@ export interface CourseProjectMetric {
     id: string;
     name?: string;
     type?: string;
+    typeOther?: string;
     value?: string;
     unit?: string;
+    unitOther?: string;
     /** "Actual — measured" | "Target — intended future result" | "Estimated / projected" | "Proposed — not yet tested" */
     status?: string;
     meaning?: string;
@@ -74,8 +76,10 @@ export interface CourseProjectMetric {
     periodFrom?: string;
     periodTo?: string;
     source?: string;
+    sourceOther?: string;
     character?: string;
     verifier?: string;
+    verifierOther?: string;
     comparedBeforeAfter?: boolean;
     baseline?: string;
     evidenceAttached?: boolean;
@@ -232,6 +236,9 @@ function lc(s: string) {
     const t = (s || "").trim();
     return t ? t.replace(/\.$/, "").charAt(0).toLowerCase() + t.replace(/\.$/, "").slice(1) : "";
 }
+function cap(s: string) {
+    return s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
+}
 function joinList(a: string[]) {
     return a.length < 2 ? a.join("") : a.slice(0, -1).join(", ") + " and " + a[a.length - 1];
 }
@@ -242,7 +249,7 @@ export function stripEmoji(s: string) {
 /** Human-readable "name: value unit (status)" line for one structured result — shared by the summary composer, the flash card, and the Merit Model. */
 export function courseProjectMetricLine(m: CourseProjectMetric): string {
     if (!m.name) return "";
-    const unit = m.unit === "Percentage (%)" ? "%" : m.unit && m.unit !== "Other" ? ` ${m.unit}` : "";
+    const unit = m.unit === "Percentage (%)" ? "%" : m.unit === "Other" ? (m.unitOther ? ` ${m.unitOther}` : "") : m.unit ? ` ${m.unit}` : "";
     const statusTag = m.status ? ` (${m.status.split(" — ")[0].toLowerCase()})` : "";
     return `${m.name}: ${m.value ?? ""}${unit}${statusTag}`;
 }
@@ -259,59 +266,65 @@ export function composeCourseProjectSummaries(entry: CourseProjectEntry): Course
     const rf = entry.reflectionInfo || {};
     const gms = normalizeGroupMembers(si.groupMembers).map((m) => m.name).filter(Boolean);
     const formats = (ai.formats?.length ? ai.formats : ai.format ? [ai.format] : []);
-    const primaryFormat = formats[0];
-    // COURSEWORK_TYPE_OPTIONS carry no emoji prefix (unlike formats) — lowercase directly, no stripEmoji (which would
-    // otherwise mistake a plain first word like "Semester" in "Semester project" for an emoji token and strip it).
-    const courseworkTypeLabel = si.courseworkTypes?.length ? joinList(si.courseworkTypes).toLowerCase() : si.courseworkType?.toLowerCase();
+    // Written in the student's own voice — I/we, never third-person — driven by team mode.
+    const solo = !si.teamMode || /individual|solo/i.test(si.teamMode);
+    const W = solo ? "I" : "We";
+    const Wl = solo ? "I" : "we";
+    const My = solo ? "my" : "our";
+    const Me = solo ? "me" : "us";
 
     const s: CourseProjectSectionSummaries = {};
-    s.course = si.studentName || entry.course
-        ? `A ${primaryFormat ? stripEmoji(primaryFormat).split(" (")[0].toLowerCase() : courseworkTypeLabel || "course assignment"} for ${entry.course || si.disciplineName || "this course"}${si.courseCode ? ` (${si.courseCode})` : ""}${si.department ? `, ${si.department}` : ""}${si.programme ? `, ${si.programme}` : ""}${si.semester ? `, ${si.semester}` : ""}${si.teamMode ? `, completed ${/individual|solo/i.test(si.teamMode) ? "individually" : `as ${lc(si.teamMode)}${gms.length ? ` (${si.studentName ? si.studentName + ", " : ""}${joinList(gms)})` : ""}`}` : ""}${si.teacherName ? `, under the supervision of ${si.teacherName}` : ""}.`
+    s.course = entry.course
+        ? `${W} took <b>${entry.course}</b>${si.programme ? ` (${si.programme}${si.semester ? `, ${si.semester}` : ""})` : si.semester ? ` in ${si.semester}` : ""}${si.teamMode && !solo ? `, working as ${lc(si.teamMode)}${gms.length ? ` — ${joinList(gms)}` : ""}` : ""}${si.teacherName ? `, under ${si.teacherName}` : ""}.`
         : "";
 
-    s.assignment = ai.whatAsked || ai.realWorldIssue
-        ? `${entry.projectTitle ? `"${entry.projectTitle}": the` : "The"} task asked us to ${lc(ai.whatAsked || "")}${ai.realWorldIssue ? `, engaging the real issue that ${lc(ai.realWorldIssue)}` : ""}.`
+    const formatLabels = formats.map((f) => stripEmoji(f).split(" (")[0]);
+    s.assignment = entry.projectTitle
+        ? `${cap(My)} work is "<b>${entry.projectTitle}</b>"${formatLabels.length ? ` — ${formatLabels.join(" + ")}` : ""}.${ai.whatAsked ? ` ${W} ${solo ? "was" : "were"} asked to ${lc(ai.whatAsked)}.` : ""}${ai.realWorldIssue ? ` It addresses ${lc(ai.realWorldIssue)}.` : ""}`
         : "";
 
     const objs = (am.objectives || []).filter(Boolean);
-    const benef = (am.beneficiaries || []).filter((b) => b && !/no specific/i.test(b)).map(stripEmoji);
+    // BENEFICIARY_OPTIONS carry no emoji prefix — no stripEmoji (it would mistake "Environment" in
+    // "Environment / ecosystems" for an emoji token and strip it).
+    const benef = (am.beneficiaries || []).filter((b) => b && !/no specific/i.test(b)).map((b) => b.toLowerCase());
     s.aims = inc.aim && (am.aimStatement || objs.length)
-        ? `${am.aimStatement ? `The aim was to ${lc(am.aimStatement)}.` : ""}${objs.length ? ` Objectives: ${objs.map((o, i) => `(${i + 1}) ${lc(o)}`).join("; ")}.` : ""}${benef.length ? ` Intended to benefit or influence: ${benef.join(", ").toLowerCase()}.` : ""}`
+        ? `${cap(My)} aim was to <b>${am.aimStatement ? lc(am.aimStatement) : "—"}</b>${objs.length ? `. ${W} set out to: ${objs.map((o, i) => `(${i + 1}) ${lc(o)}`).join("; ")}` : ""}${benef.length ? `. ${W} hoped it would benefit ${benef.join(", ").toLowerCase()}` : ""}.`
         : "";
 
     const acts = (pr.activities || []).map(stripEmoji).map((x) => x.toLowerCase());
     const meths = (pr.methods || []).filter((m) => !/not applicable/i.test(m)).map(stripEmoji).map((x) => x.toLowerCase());
-    const stakeholders = (pr.stakeholders || []).filter((x) => !/no external/i.test(x)).map(stripEmoji);
-    s.process = (inc.act && acts.length) || (inc.meth && meths.length)
-        ? `The work involved ${inc.act && acts.length ? joinList(acts) : ""}${inc.act && acts.length && inc.meth && meths.length ? ", using " : ""}${inc.meth && meths.length ? joinList(meths) : ""}${inc.meth && pr.sampleScale ? ` (${pr.sampleScale})` : ""}.${stakeholders.length ? ` Engaged: ${stakeholders.join(", ").toLowerCase()}.` : ""}`
+    const noFormalMethod = (pr.methods || []).some((m) => /not applicable/i.test(m));
+    // STAKEHOLDER_OPTIONS carry no emoji prefix — no stripEmoji, same reasoning as beneficiaries above.
+    const stakeholders = (pr.stakeholders || []).filter((x) => !/no external/i.test(x)).map((x) => x.toLowerCase());
+    s.process = (inc.act && acts.length) || (inc.meth && (meths.length || pr.sampleScale || noFormalMethod))
+        ? `${inc.act && acts.length ? `${W} worked through <b>${joinList(acts)}</b>. ` : ""}${inc.meth && meths.length ? `${cap(My)} methods: ${joinList(meths)}. ` : inc.meth && noFormalMethod ? `${W} used no formal research method — this was practice-led work. ` : ""}${inc.meth && pr.sampleScale ? `The scale of ${My} work: <b>${pr.sampleScale}</b>. ` : ""}${stakeholders.length ? `Along the way ${Wl} engaged ${stakeholders.join(", ").toLowerCase()}.` : ""}`
         : "";
 
     const outs = (re.outputs || []).map(stripEmoji).map((x) => x.toLowerCase());
     const finds = (re.findings || []).filter(Boolean);
     const metricLines = (re.metrics || []).map(courseProjectMetricLine).filter(Boolean);
-    const legacyEvidenceLine = !metricLines.length && re.evidenceStatus
-        ? ` Evidence status: ${re.evidenceStatus}${re.metricName && re.metricValue ? ` — ${re.metricName}: ${re.metricValue}${re.metricUnit || ""}${re.numberRepresents ? ` (${re.numberRepresents.toLowerCase()})` : ""}` : ""}.`
+    const legacyEvidenceLine = inc.imp && !metricLines.length && re.evidenceStatus
+        ? ` ${W} noted evidence status: ${re.evidenceStatus}${re.metricName && re.metricValue ? ` — ${re.metricName}: ${re.metricValue}${re.metricUnit || ""}${re.numberRepresents ? ` (${re.numberRepresents.toLowerCase()})` : ""}` : ""}.`
         : "";
-    const resultsLine = metricLines.length ? ` Results: ${metricLines.join(" · ")}.` : legacyEvidenceLine;
+    const resultsLine = metricLines.length ? ` ${cap(My)} results: ${metricLines.join(" · ")}.` : legacyEvidenceLine;
     const recs = (re.recommendations || []).filter(Boolean);
     s.results = outs.length || re.outputDescription
-        ? `It produced ${outs.length ? joinList(outs) : "its deliverable"}${re.outputDescription ? ` — ${lc(re.outputDescription)}` : ""}.${inc.find && finds.length ? ` Key findings: ${finds.map((f, i) => `(${i + 1}) ${lc(f)}`).join("; ")}.` : ""}${re.measured ? ` Measured a result? ${lc(stripEmoji(re.measured))}.` : ""}${inc.imp ? resultsLine : ""}${inc.imp && re.measurableImpact ? ` Measured impact: ${lc(re.measurableImpact)}.` : ""}${inc.lim && re.limitationType ? ` Limitation, honestly noted: ${lc(re.limitationType)}${re.limitationDetail ? ` — ${lc(re.limitationDetail)}` : ""}${re.limitationInterpretation ? ` — ${lc(re.limitationInterpretation)}` : ""}.` : ""}${recs.length ? ` Recommendations: ${recs.map(lc).join("; ")}.` : ""}${re.resultsSummary ? ` In summary: ${re.resultsSummary}` : ""}`
+        ? `${W} produced <b>${outs.length ? joinList(outs) : "—"}</b>${re.outputDescription ? ` — ${lc(re.outputDescription)}` : ""}.${inc.find && finds.length ? ` ${W} found that ${finds.map((f, i) => `(${i + 1}) ${lc(f)}`).join("; ")}.` : ""}${resultsLine}${inc.imp && re.measurableImpact ? ` Measured impact: ${lc(re.measurableImpact)}.` : ""}${inc.lim && re.limitationType ? ` ${W} acknowledge the main limitation honestly: ${lc(re.limitationType)}${re.limitationDetail ? ` — ${lc(re.limitationDetail)}` : ""}${re.limitationInterpretation ? ` — ${lc(re.limitationInterpretation)}` : ""}.` : ""}${recs.length ? ` Based on this, ${Wl} recommend: ${recs.map(lc).join("; ")}.` : ""}${re.resultsSummary ? ` <b>In ${My} own words:</b> ${re.resultsSummary}` : ""}`
         : "";
 
     const entries = sm.entries || [];
     s.sdg = sm.notApplicable
-        ? "Sustainability: not applicable to this assignment — honestly declared, flagged for teacher confirmation rather than force-mapped."
+        ? `${W} looked honestly and found <b>no genuine SDG link in this assignment</b> — ${Wl}'d rather declare that than force one. Flagged for ${My} teacher's confirmation.`
         : entries.length
-          ? `${sm.origin ? `Sustainability entered because ${lc(stripEmoji(sm.origin))}. ` : ""}Primary: SDG ${entries[0].goalNumber}${entries[0].targets.length ? ` (target ${entries[0].targets.join(", ")})` : ""}${entries[0].how ? ` — ${lc(entries[0].how)}` : ""}.${entries.length > 1 ? ` Supporting: ${entries.slice(1).map((en) => `SDG ${en.goalNumber} (${(en.strength || "supporting").toLowerCase()})`).join(", ")}.` : ""}`
+          ? `${sm.origin ? `For ${Me}, sustainability ${lc(stripEmoji(sm.origin))}. ` : ""}${W} connected the work primarily to <b>SDG ${entries[0].goalNumber}${entries[0].targets.length ? ` (target ${entries[0].targets.join(", ")})` : ""}</b>${entries.length > 1 ? `, with ${entries.slice(1).map((en) => `SDG ${en.goalNumber} (${(en.strength || "supporting").toLowerCase()})`).join(" and ")} in support` : ""}.${entries[0].how ? ` In ${My} words: ${lc(entries[0].how)}` : ""}`
           : sm.origin
-            ? `Sustainability entered because ${lc(stripEmoji(sm.origin))}; SDG mapping pending.`
+            ? `For ${Me}, sustainability ${lc(stripEmoji(sm.origin))} — SDG selection pending.`
             : "";
 
     const sk = (rf.skills || []).map(stripEmoji).map((x) => x.toLowerCase());
     const integration = rf.integrationLevel || rf.sdgLinkHonesty;
-    const nextLine = rf.nextSteps ? `${lc(stripEmoji(rf.nextSteps))}${rf.whatsNext ? ` — ${lc(rf.whatsNext)}` : ""}` : rf.whatsNext ? lc(rf.whatsNext) : "";
-    s.reflection = rf.lessonLearned
-        ? `Reflecting, the takeaway: ${lc(rf.lessonLearned)}.${integration ? ` Sustainability integration: "${lc(stripEmoji(integration))}".` : ""}${sk.length ? ` Skills grown: ${joinList(sk)}.` : ""}${nextLine ? ` Next: ${nextLine}.` : ""}${rf.adviceNextSemester ? ` Advice to next semester: "${rf.adviceNextSemester}".` : ""}`
+    s.reflection = rf.lessonLearned || integration
+        ? `${rf.lessonLearned ? `This work taught ${Me} ${lc(rf.lessonLearned)}. ` : ""}${integration ? `Honestly, sustainability was <b>${lc(stripEmoji(integration))}</b>. ` : ""}${sk.length ? `${W} built skills in ${joinList(sk)}. ` : ""}${rf.nextSteps ? `What's next: ${lc(rf.nextSteps)}${rf.whatsNext ? ` — ${lc(rf.whatsNext)}` : ""}. ` : ""}${rf.adviceNextSemester ? `${cap(My)} advice to the next class: "${rf.adviceNextSemester}".` : ""}`
         : "";
 
     return s;
