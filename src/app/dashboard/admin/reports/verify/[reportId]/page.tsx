@@ -198,7 +198,20 @@ interface ReportDetail {
 type AdminEvidenceFile = {
     url: string;
     name: string;
+    isImage: boolean;
 };
+
+const ADMIN_IMAGE_FILE_EXTENSION_RE = /\.(jpe?g|png|gif|webp|bmp|svg|heic|heif|avif)(\?|#|$)/i;
+
+function isAdminImageEvidence(url: string, value: unknown): boolean {
+    if (ADMIN_IMAGE_FILE_EXTENSION_RE.test(url)) return true;
+    if (value && typeof value === "object") {
+        const record = value as Record<string, unknown>;
+        const mime = record.type || record.mimeType || record.mimetype;
+        if (typeof mime === "string" && mime.startsWith("image/")) return true;
+    }
+    return false;
+}
 
 type AdminBlueprintRow = {
     label: string;
@@ -421,6 +434,7 @@ function collectAdminEvidenceFiles(report: ReportDetail | null): AdminEvidenceFi
         files.push({
             url,
             name: pickEvidenceName(item, `Evidence ${files.length + 1}`),
+            isImage: isAdminImageEvidence(url, item),
         });
         return files;
     }, []);
@@ -430,6 +444,53 @@ function adminRecordArray(value: unknown): Record<string, unknown>[] {
     return Array.isArray(value)
         ? value.filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object" && !Array.isArray(item))
         : [];
+}
+
+/** True when every non-empty item in the array looks like a file reference (string URL, or object with a url/path field) — as opposed to a plain tag/skill/SDG string array. */
+function looksLikeFileArray(value: unknown[]): boolean {
+    const items = value.filter((v) => v !== null && v !== undefined && v !== "");
+    if (!items.length) return false;
+    return items.every((item) => {
+        if (typeof item === "string") return /^https?:\/\//i.test(item) || item.startsWith("/");
+        return Boolean(item && typeof item === "object" && pickEvidenceUrl(item));
+    });
+}
+
+function AdminFieldFileGrid({ files }: { files: unknown[] }) {
+    return (
+        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
+            {files.map((item, index) => {
+                const url = pickEvidenceUrl(item);
+                const name = pickEvidenceName(item, `File ${index + 1}`);
+                if (!url) return null;
+                return isAdminImageEvidence(url, item) ? (
+                    <a
+                        key={`${url}-${index}`}
+                        href={url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="group overflow-hidden rounded-xl border border-slate-100 bg-slate-50/90 transition-colors hover:border-indigo-200"
+                    >
+                        <img src={url} alt={name} className="aspect-square w-full object-cover" />
+                        <span className="block truncate px-2 py-1.5 text-[11px] font-semibold text-slate-700 group-hover:text-indigo-800">
+                            {name}
+                        </span>
+                    </a>
+                ) : (
+                    <a
+                        key={`${url}-${index}`}
+                        href={url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="col-span-2 flex items-center gap-2 rounded-xl border border-slate-100 bg-slate-50/90 px-3 py-2.5 text-xs font-semibold text-indigo-700 underline decoration-indigo-200 underline-offset-2 transition-colors hover:bg-indigo-50/60 sm:col-span-3"
+                    >
+                        <ExternalLink className="h-3.5 w-3.5 shrink-0 text-indigo-400" />
+                        <span className="truncate">{name}</span>
+                    </a>
+                );
+            })}
+        </div>
+    );
 }
 
 function AdminFieldBody({ value }: { value: unknown }): ReactNode {
@@ -474,6 +535,9 @@ function AdminFieldBody({ value }: { value: unknown }): ReactNode {
         return <span className="text-sm font-medium tabular-nums text-slate-800">{value}</span>;
     }
     if (Array.isArray(value)) {
+        if (looksLikeFileArray(value)) {
+            return <AdminFieldFileGrid files={value} />;
+        }
         const parts = value
             .map((v) => {
                 if (typeof v === "string" || typeof v === "number" || typeof v === "boolean") return String(v);
@@ -1880,24 +1944,43 @@ export default function AdminReportDetailPage() {
                                 <div>
                                     <h3 className={clsx(adminDossier.microLabel, "mb-3 text-slate-400")}>Evidence files</h3>
                                     {evidenceFiles.length > 0 ? (
-                                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
-                                            {evidenceFiles.map((file, index) => (
-                                                <a
-                                                    key={file.url}
-                                                    href={file.url}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="group flex items-center justify-between rounded-2xl border border-slate-100 bg-slate-50/90 p-4 transition-colors hover:border-indigo-200 hover:bg-indigo-50/60"
-                                                >
-                                                    <span className="min-w-0 pr-3 font-semibold text-slate-900 group-hover:text-indigo-800">
-                                                        <span className="block truncate">{file.name || `Evidence ${index + 1}`}</span>
-                                                        <span className="mt-1 block text-xs font-medium text-slate-500">
-                                                            Evidence {index + 1}
+                                        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4">
+                                            {evidenceFiles.map((file, index) =>
+                                                file.isImage ? (
+                                                    <a
+                                                        key={file.url}
+                                                        href={file.url}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="group overflow-hidden rounded-2xl border border-slate-100 bg-slate-50/90 transition-colors hover:border-indigo-200"
+                                                    >
+                                                        <img
+                                                            src={file.url}
+                                                            alt={file.name || `Evidence ${index + 1}`}
+                                                            className="aspect-square w-full object-cover"
+                                                        />
+                                                        <span className="block truncate px-3 py-2 text-xs font-semibold text-slate-700 group-hover:text-indigo-800">
+                                                            {file.name || `Evidence ${index + 1}`}
                                                         </span>
-                                                    </span>
-                                                    <ExternalLink className="h-4 w-4 shrink-0 text-slate-400 group-hover:text-indigo-600" />
-                                                </a>
-                                            ))}
+                                                    </a>
+                                                ) : (
+                                                    <a
+                                                        key={file.url}
+                                                        href={file.url}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="group col-span-2 flex items-center justify-between rounded-2xl border border-slate-100 bg-slate-50/90 p-4 transition-colors hover:border-indigo-200 hover:bg-indigo-50/60 sm:col-span-3"
+                                                    >
+                                                        <span className="min-w-0 pr-3 font-semibold text-slate-900 group-hover:text-indigo-800">
+                                                            <span className="block truncate">{file.name || `Evidence ${index + 1}`}</span>
+                                                            <span className="mt-1 block text-xs font-medium text-slate-500">
+                                                                Evidence {index + 1}
+                                                            </span>
+                                                        </span>
+                                                        <ExternalLink className="h-4 w-4 shrink-0 text-slate-400 group-hover:text-indigo-600" />
+                                                    </a>
+                                                ),
+                                            )}
                                         </div>
                                     ) : (
                                         <div className={adminDossier.inset}>

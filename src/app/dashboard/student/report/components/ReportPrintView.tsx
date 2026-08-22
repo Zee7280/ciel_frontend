@@ -210,6 +210,18 @@ function printableFileSize(value: unknown): string {
         : "";
 }
 
+const IMAGE_FILE_EXTENSION_RE = /\.(jpe?g|png|gif|webp|bmp|svg|heic|heif|avif)(\?|#|$)/i;
+
+/** True when an evidence file (string URL, File, or {url,name,type}) is a viewable image — checked by MIME type first, then URL/filename extension. */
+function printableFileIsImage(value: unknown): boolean {
+    const mime = printableFileType(value);
+    if (mime) return mime.startsWith("image/");
+    const href = printableFileHref(value);
+    if (href && IMAGE_FILE_EXTENSION_RE.test(href)) return true;
+    if (typeof value === "string" && IMAGE_FILE_EXTENSION_RE.test(value)) return true;
+    return false;
+}
+
 function printObject(value: unknown): Record<string, unknown> | null {
     return value && typeof value === "object" && !Array.isArray(value)
         ? (value as Record<string, unknown>)
@@ -833,17 +845,38 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
                             Pending verification / not provided
                         </span>
                     ) : (
-                        <div className="space-y-2.5">
+                        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
                             {items.map((item, index) => {
                                 const name = printableFileName(item, index);
                                 const href = printableFileHref(item);
                                 const meta = [printableFileSize(item), printableFileType(item)]
                                     .filter(Boolean)
                                     .join(" · ");
+                                const isImage = printableFileIsImage(item);
+                                if (isImage && href) {
+                                    return (
+                                        <a
+                                            key={`${name}-${index}`}
+                                            href={href}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="group overflow-hidden rounded-xl border border-slate-100 bg-slate-50/80 transition-colors duration-200 hover:border-[#0F8F83]/40"
+                                        >
+                                            <img
+                                                src={href}
+                                                alt={name}
+                                                className="aspect-square w-full object-cover"
+                                            />
+                                            <p className="truncate px-2 py-1.5 text-[11px] font-semibold text-slate-700 group-hover:text-[#0F8F83]">
+                                                {name}
+                                            </p>
+                                        </a>
+                                    );
+                                }
                                 return (
                                     <div
                                         key={`${name}-${index}`}
-                                        className="rounded-xl border border-slate-100 bg-slate-50/80 px-3.5 py-2.5 transition-colors duration-200 hover:bg-slate-100/80"
+                                        className="col-span-2 rounded-xl border border-slate-100 bg-slate-50/80 px-3.5 py-2.5 transition-colors duration-200 hover:bg-slate-100/80 sm:col-span-3"
                                     >
                                         {href ? (
                                             <a
