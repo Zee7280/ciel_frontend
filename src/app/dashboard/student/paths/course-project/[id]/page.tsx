@@ -43,7 +43,7 @@ const STEPS = [
     { key: "results", emoji: "📦", label: "Results" },
     { key: "sdg", emoji: "🌍", label: "SDG map" },
     { key: "reflection", emoji: "💡", label: "Reflection" },
-    { key: "submit", emoji: "📤", label: "Submit" },
+    { key: "submit", emoji: "📩", label: "Submit" },
 ];
 const SEMESTER_OPTIONS = Array.from({ length: 10 }, (_, i) => `Semester ${i + 1}`);
 /** Older drafts may have saved a bare number (e.g. "5") from before this was a dropdown — match it to its option so it still shows as selected instead of appearing blank. */
@@ -401,10 +401,23 @@ const SCALE_NA_OPTIONS = ["🚫 Not applicable", "🖥️ Desk research only", "
 
 interface ScaleRow { n: string; u: string; o: string }
 
+/** Reverses ScaleBuilder's own "120 survey responses · 3 sites" composition back into rows, so
+ * reopening this step after a save shows what was actually entered instead of a blank builder. */
+function parseScaleRows(value: string): ScaleRow[] {
+    if (!value || SCALE_NA_OPTIONS.includes(value)) return [];
+    return value.split(" · ").flatMap((segment) => {
+        const m = segment.trim().match(/^(\d+)\s+(.*)$/);
+        if (!m) return [];
+        const [, n, rest] = m;
+        const known = SCALE_UNIT_OPTIONS.includes(rest) && rest !== "Other…";
+        return [{ n, u: known ? rest : "Other…", o: known ? "" : rest }];
+    });
+}
+
 /** Tap-based scale/scope builder — composes a plain "120 survey responses · 3 sites" string, same field as before. */
 function ScaleBuilder({ value, onChange }: { value: string; onChange: (v: string) => void }) {
     const [naVal, setNaVal] = useState<string>(() => (SCALE_NA_OPTIONS.includes(value) ? value : ""));
-    const [rows, setRows] = useState<ScaleRow[]>([]);
+    const [rows, setRows] = useState<ScaleRow[]>(() => parseScaleRows(value));
 
     const compose = (nextNa: string, nextRows: ScaleRow[]) =>
         nextNa || nextRows.filter((r) => r.n && (r.u || r.o)).map((r) => `${r.n} ${r.u === "Other…" ? r.o : r.u}`).join(" · ");
@@ -514,7 +527,7 @@ export default function CourseProjectWizardPage() {
     const sums = composeCourseProjectSummaries(entry);
     const activeStepIdx = activeSectionKeys(entry);
 
-    /** Populate un-accepted/un-edited review blocks with the latest AI draft whenever step 8 opens — mirrors "your teacher sees only what you approve": accepted or hand-edited text never gets silently overwritten. */
+    /** Populate un-accepted/un-edited review blocks whenever step 8 opens — mirrors "your teacher sees only what you approve": accepted or hand-edited text never gets silently overwritten. Prefers the student's previously saved/edited wording over a fresh AI draft, so reopening an already-submitted report doesn't discard their earlier edits. */
     useEffect(() => {
         if (step !== 7) return;
         setReview((prev) => {
@@ -522,7 +535,8 @@ export default function CourseProjectWizardPage() {
             for (const key of activeStepIdx) {
                 const existing = next[key];
                 if (!existing || (!existing.accepted && !existing.edited)) {
-                    next[key] = { accepted: false, edited: false, text: stripBoldMarkup(sums[key] || "") };
+                    const saved = entry.sectionSummaries?.[key];
+                    next[key] = { accepted: false, edited: false, text: stripBoldMarkup(saved || sums[key] || "") };
                 }
             }
             return next;

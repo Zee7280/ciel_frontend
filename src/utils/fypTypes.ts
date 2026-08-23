@@ -221,6 +221,14 @@ function joinList(a: string[]) {
 export function stripEmoji(s: string) {
     return (s || "").replace(/^[^\s]+\s/, "");
 }
+function article(s: string) {
+    return /^[aeiou]/i.test(s) ? "an" : "a";
+}
+/** Strips a trailing period without stripEmoji-ing — a free-typed "Other" answer isn't one of the
+ * canned emoji-prefixed options, so running it through stripEmoji would eat its first word. */
+function stripPeriod(s: string) {
+    return (s || "").trim().replace(/\.$/, "");
+}
 
 // ---------------------------------------------------------------------------
 // Adaptive vocabulary — one form, five research "routes"
@@ -447,8 +455,8 @@ export function composeFypSummaries(entry: FypEntry): FypSectionSummaries {
         ? `${pi.title}${pi.degree ? ` — a ${pi.degree} thesis in ${pi.school || "its field"}${pi.graduationYear ? `, Class of ${pi.graduationYear}` : ""}` : ""}${pi.supervisorName ? `, supervised by ${pi.supervisorName}` : ""}.`
         : "";
 
-    const why = [...(bg.whyUrgent || []), ...(bg.whyUrgentOther ? [bg.whyUrgentOther] : [])].map((x) => stripEmoji(x).toLowerCase());
-    const aud = [...(bg.audience || []), ...(bg.audienceOther ? [bg.audienceOther] : [])].map((x) => stripEmoji(x).toLowerCase());
+    const why = [...(bg.whyUrgent || []).map((x) => stripEmoji(x).toLowerCase()), ...(bg.whyUrgentOther ? [stripPeriod(bg.whyUrgentOther).toLowerCase()] : [])];
+    const aud = [...(bg.audience || []).map((x) => stripEmoji(x).toLowerCase()), ...(bg.audienceOther ? [stripPeriod(bg.audienceOther).toLowerCase()] : [])];
     s.background = bg.problem
         ? `It addresses the problem that ${lc(bg.problem)}${why.length ? `, urgent because ${joinList(why)}` : ""}${aud.length ? `, primarily benefiting ${joinList(aud)}` : ""}.`
         : "";
@@ -460,16 +468,18 @@ export function composeFypSummaries(entry: FypEntry): FypSectionSummaries {
           ? `The study set out to ${objs.map((o, i) => `(${i + 1}) ${lc(o)}`).join("; ")}.`
           : "";
 
-    const lits = [...(lit.sourceTypes || []), ...(lit.sourceTypesOther ? [lit.sourceTypesOther] : [])].map((x) => stripEmoji(x).toLowerCase());
+    const lits = [...(lit.sourceTypes || []).map((x) => stripEmoji(x).toLowerCase()), ...(lit.sourceTypesOther ? [stripPeriod(lit.sourceTypesOther).toLowerCase()] : [])];
     s.literature = lit.gap
         ? `A review of ${lit.sourcesReviewed ? `${lit.sourcesReviewed} sources` : "the literature"}${lits.length ? ` (${joinList(lits)})` : ""} identified a gap: ${lc(lit.gap)}.`
         : "";
 
     const apps = (meth.approaches || []).map((x) => stripEmoji(x).toLowerCase());
-    const meths = [...(meth.methods || []), ...(meth.methodsOther ? [meth.methodsOther] : [])].map((x) => stripEmoji(x).toLowerCase());
+    const meths = [...(meth.methods || []).map((x) => stripEmoji(x).toLowerCase()), ...(meth.methodsOther ? [stripPeriod(meth.methodsOther).toLowerCase()] : [])];
     const periodText = meth.periodFrom || meth.periodTo ? ` Conducted ${fmtRange(meth.periodFrom, meth.periodTo)}.` : "";
+    const approachPhrase = joinList(apps) || "systematic";
+    const approachArticle = article(approachPhrase) === "an" ? "An" : "A";
     s.methodology = apps.length || meths.length || periodText
-        ? `${apps.length || meths.length ? `A ${joinList(apps) || "systematic"} approach was used${meths.length ? `, combining ${joinList(meths)}` : ""}${meth.sampleScale ? ` (${meth.sampleScale})` : ""}${meth.tools ? `, with ${meth.tools}` : ""}.` : ""}${periodText}`
+        ? `${apps.length || meths.length ? `${approachArticle} ${approachPhrase} approach was used${meths.length ? `, combining ${joinList(meths)}` : ""}${meth.sampleScale ? ` (${meth.sampleScale})` : ""}${meth.tools ? `, with ${meth.tools}` : ""}.` : ""}${periodText}`
         : "";
 
     const finds = (find.findings || []).filter(Boolean);
@@ -499,7 +509,7 @@ export function composeFypSummaries(entry: FypEntry): FypSectionSummaries {
 
     const sk = (rf.skills || []).map((x) => stripEmoji(x).toLowerCase());
     s.reflection = rf.biggestLesson
-        ? `Reflecting, the author's foremost lesson: ${lc(rf.biggestLesson)}.${rf.wrongAssumption ? ` A key assumption proved wrong: ${lc(rf.wrongAssumption)}.` : ""}${rf.sustainabilityShift ? ` On sustainability: ${lc(rf.sustainabilityShift)}.` : ""}${sk.length ? ` Skills grown: ${joinList(sk)}.` : ""}${rf.whatsNext ? ` Next: ${rf.whatsNext.toLowerCase()}.` : ""}`
+        ? `Reflecting, the author's foremost lesson: ${lc(rf.biggestLesson)}.${rf.hardestMoment ? ` The hardest moment: ${lc(rf.hardestMoment)}.` : ""}${rf.wrongAssumption ? ` A key assumption proved wrong: ${lc(rf.wrongAssumption)}.` : ""}${rf.sustainabilityShift ? ` On sustainability: ${lc(rf.sustainabilityShift)}.` : ""}${sk.length ? ` Skills grown: ${joinList(sk)}.` : ""}${rf.whatsNext ? ` Next: ${rf.whatsNext.toLowerCase()}.` : ""}${rf.adviceForNext ? ` Advice to next year's students: "${stripPeriod(rf.adviceForNext)}".` : ""}`
         : "";
 
     return s;

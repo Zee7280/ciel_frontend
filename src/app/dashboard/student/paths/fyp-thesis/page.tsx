@@ -282,7 +282,7 @@ export default function FypThesisPage() {
         setEntry((e) => ({ ...e, [key]: { ...(e[key] as object), ...patch } }));
     };
 
-    /** Populate un-accepted/un-edited review blocks with the latest draft whenever the publish step opens. */
+    /** Populate un-accepted/un-edited review blocks whenever the publish step opens — prefers the student's previously saved/edited wording over a fresh draft, so reopening an already-submitted thesis record doesn't discard their earlier edits. */
     useEffect(() => {
         if (step !== 8) return;
         setReview((prev) => {
@@ -290,7 +290,8 @@ export default function FypThesisPage() {
             for (const key of SECTION_KEYS) {
                 const existing = next[key];
                 if (!existing || (!existing.accepted && !existing.edited)) {
-                    next[key] = { accepted: false, edited: false, text: sums[key] || "" };
+                    const saved = entry.sectionSummaries?.[key];
+                    next[key] = { accepted: false, edited: false, text: saved || sums[key] || "" };
                 }
             }
             return next;

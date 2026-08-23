@@ -215,6 +215,11 @@ function cap(s: string) {
     const t = (s || "").trim();
     return t ? t.replace(/\.$/, "").charAt(0).toUpperCase() + t.replace(/\.$/, "").slice(1) : "";
 }
+/** Strips a trailing period without changing case — for free text embedded mid-sentence, where a
+ * literal "." is appended right after it and a student-typed period would otherwise double up. */
+function stripPeriod(s: string) {
+    return (s || "").trim().replace(/\.$/, "");
+}
 
 function stageAdaptedTraction(entry: VentureEntry): string[] {
     const ev = entry.evidenceInfo || {};
@@ -253,11 +258,11 @@ function composeSummaries(entry: VentureEntry): VentureSectionSummaries {
     const s: VentureSectionSummaries = {};
 
     s.opportunity = idea.problem
-        ? `${cap(idea.problem)}.${idea.proofFact ? ` Strongest fact: ${idea.proofFact}.` : ""} Solution: ${sol.solution || "—"}.`
+        ? `${cap(idea.problem)}.${idea.proofFact ? ` Strongest fact: ${stripPeriod(idea.proofFact)}.` : ""} Solution: ${sol.solution || "—"}.`
         : "";
     s.advantage = sol.advantage ? `${cap(sol.advantage)}.` : "";
     s.business = sol.revenue
-        ? `Customers: ${idea.payerWho || sol.marketWho || "—"}. Revenue: ${sol.revenue}. Market: ${sol.marketWho || "—"}${sol.marketSize ? ` (est. ${sol.marketSize}${sol.marketSource ? `, ${sol.marketSource.toLowerCase()}` : ""})` : ""}. Milestone: ${sol.milestone12mo || "—"}.`
+        ? `Customers: ${stripPeriod(idea.payerWho || sol.marketWho || "—")}. Revenue: ${stripPeriod(sol.revenue)}. Market: ${sol.marketWho || "—"}${sol.marketSize ? ` (est. ${sol.marketSize}${sol.marketSource ? `, ${sol.marketSource.toLowerCase()}` : ""})` : ""}. Milestone: ${stripPeriod(sol.milestone12mo || "—")}.`
         : "";
     const tractionPills = stageAdaptedTraction(entry);
     s.traction = tractionPills.length ? `${tractionPills.join(" · ")}.` : "";
@@ -270,11 +275,11 @@ function composeSummaries(entry: VentureEntry): VentureSectionSummaries {
             : "";
     const openTo = (ev.openTo || []).join(" · ");
     s.ask = ev.fundingSought
-        ? `Seeking PKR ${ev.fundingSought.toLocaleString()}${ev.useOfFunds ? ` — use of funds: ${ev.useOfFunds}` : ""}${ev.expectedResult ? ` — expected: ${ev.expectedResult}` : ""}.${openTo ? ` Also open to: ${openTo}.` : ""}`
+        ? `Seeking PKR ${ev.fundingSought.toLocaleString()}${ev.useOfFunds ? ` — use of funds: ${stripPeriod(ev.useOfFunds)}` : ""}${ev.expectedResult ? ` — expected: ${stripPeriod(ev.expectedResult)}` : ""}.${openTo ? ` Also open to: ${openTo}.` : ""}`
         : (openTo ? `Open to: ${openTo}.` : "");
     const as = entry.academicSetup || {};
     s.founder = as.founderName
-        ? `${as.founderName}${as.founderCredentials ? ` — ${as.founderCredentials}` : ""}${(entry.team || []).length ? `. Team: ${entry.team.length} members.` : ""}`
+        ? `${as.founderName}${as.founderCredentials ? ` — ${as.founderCredentials}` : ""}.${(entry.team || []).length ? ` Team: ${entry.team.length} members.` : ""}`
         : "";
 
     return s;
@@ -345,7 +350,7 @@ export default function StartupBusinessPage() {
         setEntry((s) => ({ ...s, team: next }));
     };
 
-    /** Populate un-accepted/un-edited review blocks with the latest draft whenever the publish step opens. */
+    /** Populate un-accepted/un-edited review blocks whenever the publish step opens — prefers the student's previously saved/edited wording over a fresh draft, so reopening an already-submitted venture doesn't discard their earlier edits. */
     useEffect(() => {
         if (step !== 7) return;
         setReview((prev) => {
@@ -353,7 +358,8 @@ export default function StartupBusinessPage() {
             for (const key of SECTION_KEYS) {
                 const existing = next[key];
                 if (!existing || (!existing.accepted && !existing.edited)) {
-                    next[key] = { accepted: false, edited: false, text: sums[key] || "" };
+                    const saved = entry.sectionSummaries?.[key];
+                    next[key] = { accepted: false, edited: false, text: saved || sums[key] || "" };
                 }
             }
             return next;
@@ -417,6 +423,8 @@ export default function StartupBusinessPage() {
         sdgMapping: entry.sdgMapping ?? undefined,
         evidenceInfo: entry.evidenceInfo ?? undefined,
         reviewPipeline: entry.reviewPipeline ?? undefined,
+        publishSettings: entry.publishSettings ?? undefined,
+        teamConsent: entry.teamConsent ?? undefined,
     });
 
     if (loading) return <WorkspaceSkeleton />;

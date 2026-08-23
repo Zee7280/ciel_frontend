@@ -247,6 +247,14 @@ function lc(s: string) {
 function cap(s: string) {
     return s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
 }
+function article(s: string) {
+    return /^[aeiou]/i.test(s) ? "an" : "a";
+}
+/** Strips a trailing period without altering case — for quoting/echoing the student's own free
+ * text verbatim, where lc()'s forced lowercase would be wrong. */
+function stripPeriod(s: string) {
+    return (s || "").trim().replace(/\.$/, "");
+}
 function joinList(a: string[]) {
     return a.length < 2 ? a.join("") : a.slice(0, -1).join(", ") + " and " + a[a.length - 1];
 }
@@ -293,7 +301,7 @@ export function composeCourseProjectSummaries(entry: CourseProjectEntry): Course
 
     const s: CourseProjectSectionSummaries = {};
     s.course = entry.course
-        ? `${W} took <b>${entry.course}</b>${si.programme ? ` (${si.programme}${si.semester ? `, ${si.semester}` : ""})` : si.semester ? ` in ${si.semester}` : ""}${si.teamMode && !solo ? `, working as ${lc(si.teamMode)}${gms.length ? ` — ${joinList(gms)}` : ""}` : ""}${si.teacherName ? `, under ${si.teacherName}` : ""}.${note(si.notes)}`
+        ? `${W} took <b>${entry.course}</b>${si.programme ? ` (${si.programme}${si.semester ? `, ${si.semester}` : ""})` : si.semester ? ` in ${si.semester}` : ""}${si.teamMode && !solo ? `, working as ${article(lc(si.teamMode))} ${lc(si.teamMode)}${gms.length ? ` — ${joinList(gms)}` : ""}` : ""}${si.teacherName ? `, under ${si.teacherName}` : ""}.${note(si.notes)}`
         : "";
 
     const formatLabels = formats.map((f) => stripEmoji(f).split(" (")[0]);
@@ -328,14 +336,14 @@ export function composeCourseProjectSummaries(entry: CourseProjectEntry): Course
     const recs = (re.recommendations || []).filter(Boolean);
     const limitationLabel = re.limitationType === "Other — describe below" ? re.limitationOther : re.limitationType;
     s.results = outs.length || re.outputDescription
-        ? `${W} produced <b>${outs.length ? joinList(outs) : "—"}</b>${re.outputDescription ? ` — ${lc(re.outputDescription)}` : ""}.${inc.find && finds.length ? ` ${W} found that ${finds.map((f, i) => `(${i + 1}) ${lc(f)}`).join("; ")}.` : ""}${resultsLine}${(inc.res ?? inc.imp) && re.measurableImpact ? ` Measured impact: ${lc(re.measurableImpact)}.` : ""}${inc.lim && limitationLabel ? ` ${W} acknowledge the main limitation honestly: ${lc(limitationLabel)}${re.limitationDetail ? ` — ${lc(re.limitationDetail)}` : ""}${re.limitationInterpretation ? ` — ${lc(re.limitationInterpretation)}` : ""}.` : ""}${recs.length ? ` Based on this, ${Wl} recommend: ${recs.map(lc).join("; ")}.` : ""}${re.resultsSummary ? ` <b>In ${My} own words:</b> ${re.resultsSummary}` : ""}${note(re.notes)}`
+        ? `${W} produced <b>${outs.length ? joinList(outs) : "—"}</b>${re.outputDescription ? ` — ${lc(re.outputDescription)}` : ""}.${inc.find && finds.length ? ` ${W} found that ${finds.map((f, i) => `(${i + 1}) ${lc(f)}`).join("; ")}.` : ""}${resultsLine}${(inc.res ?? inc.imp) && re.measurableImpact ? ` Measured impact: ${lc(re.measurableImpact)}.` : ""}${inc.lim && limitationLabel ? ` ${W} acknowledge the main limitation honestly: ${lc(limitationLabel)}${re.limitationDetail ? ` — ${lc(re.limitationDetail)}` : ""}${re.limitationInterpretation ? ` — ${lc(re.limitationInterpretation)}` : ""}.` : ""}${recs.length ? ` Based on this, ${Wl} recommend: ${recs.map(lc).join("; ")}.` : ""}${re.resultsSummary ? ` <b>In ${My} own words:</b> ${stripPeriod(re.resultsSummary)}.` : ""}${note(re.notes)}`
         : "";
 
     const entries = sm.entries || [];
     s.sdg = sm.notApplicable
         ? `${W} looked honestly and found <b>no genuine SDG link in this assignment</b> — ${Wl}'d rather declare that than force one. Flagged for ${My} teacher's confirmation.${note(sm.notes)}`
         : entries.length
-          ? `${sm.origin ? `For ${Me}, sustainability ${lc(stripEmoji(sm.origin))}. ` : ""}${W} connected the work primarily to <b>SDG ${entries[0].goalNumber}${entries[0].targets.length ? ` (target ${entries[0].targets.join(", ")})` : ""}</b>${entries.length > 1 ? `, with ${entries.slice(1).map((en) => `SDG ${en.goalNumber}${en.targets.length ? ` (target ${en.targets.join(", ")})` : ""} (${(en.strength || "supporting").toLowerCase()})${en.how ? ` — ${lc(en.how)}` : ""}`).join(" and ")} in support` : ""}.${entries[0].how ? ` In ${My} words: ${lc(entries[0].how)}` : ""}${note(sm.notes)}`
+          ? `${sm.origin ? `For ${Me}, sustainability ${lc(stripEmoji(sm.origin))}. ` : ""}${W} connected the work primarily to <b>SDG ${entries[0].goalNumber}${entries[0].targets.length ? ` (target ${entries[0].targets.join(", ")})` : ""}</b>${entries.length > 1 ? `, with ${entries.slice(1).map((en) => `SDG ${en.goalNumber}${en.targets.length ? ` (target ${en.targets.join(", ")})` : ""} (${(en.strength || "supporting").toLowerCase()})${en.how ? ` — ${lc(en.how)}` : ""}`).join(" and ")} in support` : ""}.${entries[0].how ? ` In ${My} words: ${lc(entries[0].how)}.` : ""}${note(sm.notes)}`
           : sm.origin
             ? `For ${Me}, sustainability ${lc(stripEmoji(sm.origin))} — SDG selection pending.${note(sm.notes)}`
             : "";
@@ -343,7 +351,7 @@ export function composeCourseProjectSummaries(entry: CourseProjectEntry): Course
     const sk = (rf.skills || []).map(stripEmoji).map((x) => x.toLowerCase());
     const integration = rf.integrationLevel || rf.sdgLinkHonesty;
     s.reflection = rf.lessonLearned || integration
-        ? `${rf.lessonLearned ? `This work taught ${Me} ${lc(rf.lessonLearned)}. ` : ""}${integration ? `Honestly, sustainability was <b>${lc(stripEmoji(integration))}</b>. ` : ""}${sk.length ? `${W} built skills in ${joinList(sk)}. ` : ""}${rf.nextSteps ? `What's next: ${lc(rf.nextSteps)}${rf.whatsNext ? ` — ${lc(rf.whatsNext)}` : ""}. ` : ""}${rf.adviceNextSemester ? `${cap(My)} advice to the next class: "${rf.adviceNextSemester}".` : ""}${note(rf.notes)}`
+        ? `${rf.lessonLearned ? `This work taught ${Me} ${lc(rf.lessonLearned)}. ` : ""}${integration ? `Honestly, sustainability was <b>${lc(stripEmoji(integration))}</b>. ` : ""}${sk.length ? `${W} built skills in ${joinList(sk)}. ` : ""}${rf.nextSteps ? `What's next: ${lc(rf.nextSteps)}${rf.whatsNext ? ` — ${lc(rf.whatsNext)}` : ""}. ` : ""}${rf.adviceNextSemester ? `${cap(My)} advice to the next class: "${stripPeriod(rf.adviceNextSemester)}".` : ""}${note(rf.notes)}`
         : "";
 
     return s;
