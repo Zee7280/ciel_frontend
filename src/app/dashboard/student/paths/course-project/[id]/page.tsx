@@ -14,6 +14,7 @@ import { WorkspaceSkeleton } from "@/components/ciel/Skeleton";
 import SearchableSelect from "@/components/ui/SearchableSelect";
 import CourseworkCard from "@/components/ciel/CourseworkCard";
 import { TeamInviteBadge } from "@/components/ciel/TeamInviteBadge";
+import RichSummaryText from "@/components/ciel/RichSummaryText";
 import {
     type CourseProjectEntry,
     type CourseProjectModuleInclusion,
@@ -299,7 +300,7 @@ function SectionSummaryBox({ text }: { text?: string }) {
     return (
         <div className="rounded-ciel-sm border border-dashed border-ciel-gold/50 bg-ciel-gold-soft/60 px-4 py-3 text-xs leading-relaxed text-ciel-gold-deep">
             <span className="mb-1 block text-[9px] font-black uppercase tracking-widest text-ciel-gold">✨ Section summary</span>
-            <span>{text?.trim() ? text : "Fills as you type…"}</span>
+            <span>{text?.trim() ? <RichSummaryText text={text} /> : "Fills as you type…"}</span>
         </div>
     );
 }

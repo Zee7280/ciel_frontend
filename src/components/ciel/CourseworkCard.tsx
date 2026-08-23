@@ -4,6 +4,7 @@ import { useState } from "react";
 import { CheckCircle2, Sparkles, Users, ChevronDown, Star, Paperclip, ShieldAlert, Clock } from "lucide-react";
 import clsx from "clsx";
 import { sdgData } from "@/utils/sdgData";
+import RichSummaryText from "@/components/ciel/RichSummaryText";
 import {
     type CourseProjectEntry,
     resolveSectionSummaries,
@@ -186,7 +187,7 @@ export default function CourseworkCard({
                                     <span className="text-base">{meta.emoji}</span>
                                     <div className="min-w-0">
                                         <p className="text-xs font-black uppercase tracking-wide text-ciel-text-soft">{meta.label}</p>
-                                        <p className="mt-0.5 text-sm leading-relaxed text-ciel-text">{text}</p>
+                                        <p className="mt-0.5 text-sm leading-relaxed text-ciel-text"><RichSummaryText text={text} /></p>
                                     </div>
                                 </div>
                             );
