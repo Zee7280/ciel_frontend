@@ -24,7 +24,11 @@ interface TeamMember {
 interface VentureDocument { type: string; version: number; fileUrl: string; uploadedAt: string }
 
 interface VentureAcademicSetup {
-    submissionType?: string; university?: string; campus?: string; faculty?: string; department?: string;
+    /** @deprecated single-select predecessor of submissionTypes — still read as a fallback for older entries. */
+    submissionType?: string;
+    /** Multi-select — a venture can legitimately be both e.g. a Final-Year Project and started as coursework. Supersedes submissionType above. */
+    submissionTypes?: string[];
+    university?: string; campus?: string; faculty?: string; department?: string;
     program?: string; academicYear?: string; semester?: string; courseCode?: string; groupId?: string;
     supervisorName?: string; coSupervisor?: string; deadline?: string; teamType?: string; industrySponsor?: string;
     ethicsApproval?: string; confidentialityStatus?: string; ipOwnership?: string;
@@ -535,8 +539,16 @@ export default function StartupBusinessPage() {
                     {/* 1. Who you are */}
                     {step === 0 && (
                         <>
-                            <Field label="Submission type">
-                                <ChipGroup options={SUBMISSION_TYPES} selected={entry.academicSetup?.submissionType ? [entry.academicSetup.submissionType] : []} onToggle={(v) => patchGroup("academicSetup", { submissionType: v })} />
+                            <Field label="Submission type" hint="Tap all that apply — a venture can be both a Final-Year Project and started as coursework.">
+                                <ChipGroup
+                                    options={SUBMISSION_TYPES}
+                                    selected={entry.academicSetup?.submissionTypes ?? (entry.academicSetup?.submissionType ? [entry.academicSetup.submissionType] : [])}
+                                    onToggle={(v) => {
+                                        const cur = entry.academicSetup?.submissionTypes ?? (entry.academicSetup?.submissionType ? [entry.academicSetup.submissionType] : []);
+                                        const next = cur.includes(v) ? cur.filter((x) => x !== v) : [...cur, v];
+                                        patchGroup("academicSetup", { submissionTypes: next, submissionType: next[0] });
+                                    }}
+                                />
                             </Field>
                             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                                 <Field label="University"><input type="text" value={entry.academicSetup?.university ?? ""} onChange={(e) => patchGroup("academicSetup", { university: e.target.value })} className={fieldClass} /></Field>
