@@ -8,6 +8,7 @@ import { sdgData } from "@/utils/sdgData";
 import PathWorkspaceShell from "@/components/ciel/PathWorkspaceShell";
 import { WorkspaceSkeleton } from "@/components/ciel/Skeleton";
 import ThesisCard from "@/components/ciel/ThesisCard";
+import { TeamInviteBadge } from "@/components/ciel/TeamInviteBadge";
 import {
     type FypEntry,
     type FypMetric,
@@ -509,10 +510,10 @@ export default function FypThesisPage() {
                                     <input type="text" value={entry.projectInfo?.rollNumber ?? ""} onChange={(e) => patchGroup("projectInfo", { rollNumber: e.target.value })} placeholder="F21-0342" className={fieldClass} />
                                 </Field>
                             </div>
-                            <Field label="Co-authors / team members" hint="Optional — each gets named on the record, and the submitted record appears on their own dashboard too.">
+                            <Field label="Co-authors / team members" hint="Optional — add their email and we'll send a confirmation link. Once they accept, the submitted record appears on their own dashboard too.">
                                 <div className="space-y-3">
                                     {(normalizeFypTeamMembers(entry.projectInfo?.teamMembers).length ? normalizeFypTeamMembers(entry.projectInfo?.teamMembers) : [{ name: "" }]).map((m, i) => (
-                                        <div key={i} className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                                        <div key={i} className="grid grid-cols-1 gap-2 sm:grid-cols-3 lg:grid-cols-4">
                                             <input
                                                 type="text"
                                                 value={m.name}
@@ -534,6 +535,7 @@ export default function FypThesisPage() {
                                                 placeholder="Role — optional"
                                                 className={fieldClass}
                                             />
+                                            <TeamInviteBadge kind="fyp" entryId={entry.id} email={m.email} inviteStatus={m.inviteStatus} />
                                         </div>
                                     ))}
                                     {(entry.projectInfo?.teamMembers?.length ?? 0) < 20 && (
@@ -542,7 +544,7 @@ export default function FypThesisPage() {
                                             onClick={() => patchGroup("projectInfo", { teamMembers: [...normalizeFypTeamMembers(entry.projectInfo?.teamMembers), { name: "" }] })}
                                             className="text-xs font-bold text-ciel-purple-deep hover:underline"
                                         >
-                                            + Add co-author → sends invitation
+                                            + Add co-author
                                         </button>
                                     )}
                                 </div>

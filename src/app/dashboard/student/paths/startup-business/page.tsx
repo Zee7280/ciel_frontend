@@ -7,13 +7,20 @@ import { authenticatedFetch } from "@/utils/api";
 import { sdgData } from "@/utils/sdgData";
 import PathWorkspaceShell from "@/components/ciel/PathWorkspaceShell";
 import { WorkspaceSkeleton } from "@/components/ciel/Skeleton";
+import { TeamInviteBadge } from "@/components/ciel/TeamInviteBadge";
 
 // ---------------------------------------------------------------------------
 // Types (mirror ciel_backend/src/paths/entities/venture-entry.entity.ts's new groups)
 // ---------------------------------------------------------------------------
 
 interface TractionRow { date: string; metric: string; value: string; note?: string }
-interface TeamMember { name: string; role: string; email?: string }
+interface TeamMember {
+    name: string;
+    role: string;
+    email?: string;
+    /** Server-computed — 'accepted' only once this teammate clicked their emailed invite link. */
+    inviteStatus?: "pending" | "accepted";
+}
 interface VentureDocument { type: string; version: number; fileUrl: string; uploadedAt: string }
 
 interface VentureAcademicSetup {
@@ -55,6 +62,7 @@ interface VentureSectionSummaries { opportunity?: string; advantage?: string; bu
 interface VentureGates { academicOk: boolean; showcaseOk: boolean; investmentReadyOk: boolean }
 
 interface VentureEntry {
+    id?: string;
     ventureName: string | null;
     description: string | null;
     stage: string | null;
@@ -75,6 +83,9 @@ interface VentureEntry {
     stepCompleted: number;
     status: "draft" | "submitted";
     gates?: VentureGates;
+    /** False when this entry is showing because the viewer accepted a team invite on someone
+     * else's submitted venture, not because they own it — gates edit/submit access on the frontend. */
+    isOwner?: boolean;
 }
 
 const EMPTY: VentureEntry = {
@@ -293,7 +304,8 @@ export default function StartupBusinessPage() {
     }, []);
 
     const sums = composeSummaries(entry);
-    const showCard = entry.status === "submitted" && !editing;
+    const isOwner = entry.isOwner !== false;
+    const showCard = (entry.status === "submitted" && !editing) || !isOwner;
 
     const save = async (patch: Partial<VentureEntry>, advanceTo?: number) => {
         setSaving(true);
@@ -320,6 +332,13 @@ export default function StartupBusinessPage() {
 
     const patchGroup = <K extends keyof VentureEntry>(key: K, patch: Partial<NonNullable<VentureEntry[K]>>) => {
         setEntry((e) => ({ ...e, [key]: { ...(e[key] as object), ...patch } }));
+    };
+
+    const updateTeamMember = (i: number, patch: Partial<TeamMember>) => {
+        const current = entry.team.length ? entry.team : [{ name: "", role: "" }];
+        const next = [...current];
+        next[i] = { ...next[i], ...patch };
+        setEntry((s) => ({ ...s, team: next }));
     };
 
     /** Populate un-accepted/un-edited review blocks with the latest draft whenever the publish step opens. */
@@ -440,6 +459,11 @@ export default function StartupBusinessPage() {
         >
             {showCard ? (
                 <div className="space-y-4 rounded-ciel-lg border border-ciel-border bg-white p-6 shadow-sm">
+                    {!isOwner && (
+                        <div className="rounded-ciel-sm border border-ciel-indigo/30 bg-ciel-indigo-soft/60 p-3 text-sm font-semibold text-ciel-indigo">
+                            👥 You&apos;re named as a team member on this venture — the founder owns it and is the only one who can edit or submit changes.
+                        </div>
+                    )}
                     <div className="flex items-center gap-2 text-sm font-bold text-ciel-green-deep">
                         <CheckCircle2 className="h-5 w-5" /> Submitted — awaiting supervisor sign-off
                     </div>
@@ -474,13 +498,15 @@ export default function StartupBusinessPage() {
                             );
                         })}
                     </div>
-                    <button
-                        type="button"
-                        onClick={() => { setReview({}); setStep(0); setEditing(true); }}
-                        className="ciel-transition rounded-ciel-sm border border-ciel-border px-4 py-2.5 text-sm font-bold text-ciel-text-mid hover:border-ciel-green/40"
-                    >
-                        Edit this record
-                    </button>
+                    {isOwner && (
+                        <button
+                            type="button"
+                            onClick={() => { setReview({}); setStep(0); setEditing(true); }}
+                            className="ciel-transition rounded-ciel-sm border border-ciel-border px-4 py-2.5 text-sm font-bold text-ciel-text-mid hover:border-ciel-green/40"
+                        >
+                            Edit this record
+                        </button>
+                    )}
                 </div>
             ) : (
             <div className="rounded-ciel-lg border border-ciel-border bg-white p-5 sm:p-6">
@@ -544,12 +570,14 @@ export default function StartupBusinessPage() {
                                 <Field label="Your role"><input type="text" value={entry.academicSetup?.founderRole ?? ""} onChange={(e) => patchGroup("academicSetup", { founderRole: e.target.value })} className={fieldClass} placeholder="e.g. Team lead" /></Field>
                                 <Field label="Your background in one line"><input type="text" value={entry.academicSetup?.founderCredentials ?? ""} onChange={(e) => patchGroup("academicSetup", { founderCredentials: e.target.value })} className={fieldClass} /></Field>
                             </div>
-                            <Field label="Team members" hint="One per row — name and role.">
+                            <Field label="Team members" hint="Name, role, and (optionally) email — add an email and we'll send a confirmation link so this venture appears on their dashboard too.">
                                 <div className="space-y-2">
                                     {(entry.team.length ? entry.team : [{ name: "", role: "" }]).map((m, i) => (
-                                        <div key={i} className="grid grid-cols-2 gap-2">
-                                            <input type="text" value={m.name} onChange={(e) => { const next = [...(entry.team.length ? entry.team : [{ name: "", role: "" }])]; next[i] = { ...next[i], name: e.target.value }; setEntry((s) => ({ ...s, team: next })); }} placeholder="Name" className={fieldClass} />
-                                            <input type="text" value={m.role} onChange={(e) => { const next = [...(entry.team.length ? entry.team : [{ name: "", role: "" }])]; next[i] = { ...next[i], role: e.target.value }; setEntry((s) => ({ ...s, team: next })); }} placeholder="Role" className={fieldClass} />
+                                        <div key={i} className="grid grid-cols-1 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+                                            <input type="text" value={m.name} onChange={(e) => updateTeamMember(i, { name: e.target.value })} placeholder="Name" className={fieldClass} />
+                                            <input type="text" value={m.role} onChange={(e) => updateTeamMember(i, { role: e.target.value })} placeholder="Role" className={fieldClass} />
+                                            <input type="email" value={m.email ?? ""} onChange={(e) => updateTeamMember(i, { email: e.target.value })} placeholder="Email — optional" className={fieldClass} />
+                                            <TeamInviteBadge kind="venture" entryId={entry.id} email={m.email} inviteStatus={m.inviteStatus} />
                                         </div>
                                     ))}
                                 </div>

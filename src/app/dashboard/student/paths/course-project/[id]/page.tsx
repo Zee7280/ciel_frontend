@@ -13,6 +13,7 @@ import PathWorkspaceShell from "@/components/ciel/PathWorkspaceShell";
 import { WorkspaceSkeleton } from "@/components/ciel/Skeleton";
 import SearchableSelect from "@/components/ui/SearchableSelect";
 import CourseworkCard from "@/components/ciel/CourseworkCard";
+import { TeamInviteBadge } from "@/components/ciel/TeamInviteBadge";
 import {
     type CourseProjectEntry,
     type CourseProjectModuleInclusion,
@@ -829,7 +830,7 @@ export default function CourseProjectWizardPage() {
                                 <ChipSingle options={TEAM_MODE_OPTIONS} value={teamMode} onChange={(v) => patchGroup("studentInfo", { teamMode: v })} />
                             </Field>
                             {isTeam && (
-                                <Field label="👥 Team members — name everyone" hint="Add each member's email → sends an invitation. Once you submit, this report also appears on their own dashboard.">
+                                <Field label="👥 Team members — name everyone" hint="Add each teammate's email — we'll email them a confirmation link. Once they accept, this report appears on their dashboard too.">
                                     <div className="space-y-3">
                                         {(normalizeGroupMembers(entry.studentInfo?.groupMembers).length ? normalizeGroupMembers(entry.studentInfo?.groupMembers) : [{ name: "" }]).map((m, i) => (
                                             <div key={i} className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
@@ -851,14 +852,10 @@ export default function CourseProjectWizardPage() {
                                                     type="email"
                                                     value={m.email ?? ""}
                                                     onChange={(e) => updateGroupMember(i, { email: e.target.value })}
-                                                    placeholder="Email — links their dashboard"
+                                                    placeholder="Email — confirmation link sent here"
                                                     className={fieldClass}
                                                 />
-                                                {m.email?.trim() ? (
-                                                    <span className="flex items-center justify-center rounded-full bg-ciel-gold-soft px-3 py-2 text-center text-[10px] font-black text-ciel-gold-deep">
-                                                        🔗 LINKED — SHOWS ON SUBMIT
-                                                    </span>
-                                                ) : <span />}
+                                                <TeamInviteBadge kind="course_project" entryId={entry.id} email={m.email} inviteStatus={m.inviteStatus} />
                                             </div>
                                         ))}
                                         {(entry.studentInfo?.groupMembers?.length ?? 0) < 20 && (

@@ -200,6 +200,28 @@ export default function CourseworkCard({
                                 </div>
                             </div>
                         ) : null}
+                        {groupMembers.length > 0 && (
+                            <div className="flex items-start gap-3">
+                                <span className="text-base">👥</span>
+                                <div className="min-w-0">
+                                    <p className="text-xs font-black uppercase tracking-wide text-ciel-text-soft">Team members</p>
+                                    <ul className="mt-1 space-y-1">
+                                        {groupMembers.map((m, i) => (
+                                            <li key={i} className="text-sm leading-relaxed text-ciel-text">
+                                                {m.name}
+                                                {m.email ? (
+                                                    m.inviteStatus === "accepted" ? (
+                                                        <span className="ml-1.5 text-xs font-bold text-ciel-green-deep">✅ Confirmed</span>
+                                                    ) : (
+                                                        <span className="ml-1.5 text-xs font-bold text-ciel-gold-deep">✉️ Invited</span>
+                                                    )
+                                                ) : null}
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 )}
             </div>

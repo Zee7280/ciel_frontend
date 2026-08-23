@@ -19,6 +19,14 @@ interface AdminStudent {
     department?: string | null;
 }
 
+interface AdminGroupMember {
+    name: string;
+    email?: string;
+    rollNumber?: string;
+    role?: string;
+    inviteStatus?: "pending" | "accepted";
+}
+
 interface AdminCourseProjectRow {
     id: string;
     course: string | null;
@@ -30,6 +38,7 @@ interface AdminCourseProjectRow {
     status: "draft" | "submitted";
     updatedAt: string;
     student: AdminStudent | null;
+    studentInfo?: { groupMembers?: (string | AdminGroupMember)[] } | null;
 }
 
 interface FypMilestone {
@@ -80,6 +89,7 @@ interface AdminFypRow {
     sectionSummaries?: FypSectionSummaries | null;
     updatedAt: string;
     student: AdminStudent | null;
+    projectInfo?: { teamMembers?: (string | AdminGroupMember)[] } | null;
 }
 
 interface VentureTractionRow {
@@ -93,6 +103,7 @@ interface VentureTeamMember {
     name: string;
     role: string;
     email?: string;
+    inviteStatus?: "pending" | "accepted";
 }
 
 interface VentureSectionSummaries {
@@ -138,6 +149,15 @@ const PATH_TABS: { id: PathTab; label: string; icon: typeof BookOpen }[] = [
 function studentLine(student: AdminStudent | null) {
     if (!student) return "Unknown student";
     return [student.name, student.email, student.institution].filter(Boolean).join(" · ");
+}
+
+function normalizeMembers(raw: (string | AdminGroupMember)[] | undefined): AdminGroupMember[] {
+    return (raw ?? []).map((m) => (typeof m === "string" ? { name: m } : m)).filter((m) => m.name?.trim());
+}
+
+function memberStatusLabel(member: { email?: string; inviteStatus?: "pending" | "accepted" }) {
+    if (!member.email) return null;
+    return member.inviteStatus === "accepted" ? "✅ confirmed" : "✉️ invited, unconfirmed";
 }
 
 export default function AdminPathSubmissionsPage() {
@@ -486,6 +506,23 @@ export default function AdminPathSubmissionsPage() {
                                               ) : (
                                                   <p className="text-sm text-slate-500">No evidence uploaded.</p>
                                               )}
+                                              {(() => {
+                                                  const members = normalizeMembers(row.studentInfo?.groupMembers);
+                                                  return members.length ? (
+                                                      <div>
+                                                          <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Team members</p>
+                                                          <ul className="mt-2 space-y-1 text-sm text-slate-700">
+                                                              {members.map((member, i) => (
+                                                                  <li key={`${member.name}-${i}`}>
+                                                                      {member.name}
+                                                                      {member.email ? ` · ${member.email}` : ""}
+                                                                      {memberStatusLabel(member) ? ` · ${memberStatusLabel(member)}` : ""}
+                                                                  </li>
+                                                              ))}
+                                                          </ul>
+                                                      </div>
+                                                  ) : null;
+                                              })()}
                                           </div>
                                       ) : null}
                                   </Card>
@@ -596,6 +633,23 @@ export default function AdminPathSubmissionsPage() {
                                                       ) : null}
                                                   </div>
                                               ) : null}
+                                              {(() => {
+                                                  const members = normalizeMembers(row.projectInfo?.teamMembers);
+                                                  return members.length ? (
+                                                      <div>
+                                                          <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Co-authors</p>
+                                                          <ul className="mt-2 space-y-1 text-sm text-slate-700">
+                                                              {members.map((member, i) => (
+                                                                  <li key={`${member.name}-${i}`}>
+                                                                      {member.role?.trim() ? `${member.name} (${member.role})` : member.name}
+                                                                      {member.email ? ` · ${member.email}` : ""}
+                                                                      {memberStatusLabel(member) ? ` · ${memberStatusLabel(member)}` : ""}
+                                                                  </li>
+                                                              ))}
+                                                          </ul>
+                                                      </div>
+                                                  ) : null;
+                                              })()}
                                           </div>
                                       ) : null}
                                   </Card>
@@ -688,6 +742,7 @@ export default function AdminPathSubmissionsPage() {
                                                               <li key={`${member.name}-${i}`}>
                                                                   {member.name} · {member.role}
                                                                   {member.email ? ` · ${member.email}` : ""}
+                                                                  {memberStatusLabel(member) ? ` · ${memberStatusLabel(member)}` : ""}
                                                               </li>
                                                           ))}
                                                       </ul>

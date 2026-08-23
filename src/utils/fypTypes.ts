@@ -5,6 +5,8 @@ export interface FypTeamMember {
     name: string;
     email?: string;
     role?: string;
+    /** Server-computed — 'accepted' only once this co-author clicked their emailed invite link. */
+    inviteStatus?: "pending" | "accepted";
 }
 export interface FypProjectInfo {
     title?: string;

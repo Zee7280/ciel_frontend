@@ -4,14 +4,17 @@
  */
 export const FRONTEND_VERIFY_PROJECT_PATH = "/verify-project";
 export const FRONTEND_VERIFY_FACULTY_PATH = "/verify/faculty";
+export const FRONTEND_VERIFY_TEAM_INVITE_PATH = "/verify/team-invite";
 
 /** Magic-link verify URLs — CIEL account required before the verify API runs. */
 export function isFrontendVerificationPath(pathname: string): boolean {
     return (
         pathname === FRONTEND_VERIFY_PROJECT_PATH ||
         pathname === FRONTEND_VERIFY_FACULTY_PATH ||
+        pathname === FRONTEND_VERIFY_TEAM_INVITE_PATH ||
         pathname.startsWith(`${FRONTEND_VERIFY_PROJECT_PATH}/`) ||
-        pathname.startsWith(`${FRONTEND_VERIFY_FACULTY_PATH}/`)
+        pathname.startsWith(`${FRONTEND_VERIFY_FACULTY_PATH}/`) ||
+        pathname.startsWith(`${FRONTEND_VERIFY_TEAM_INVITE_PATH}/`)
     );
 }
 

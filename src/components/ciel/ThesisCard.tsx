@@ -185,7 +185,20 @@ export default function ThesisCard({
                                 <span className="text-base">👥</span>
                                 <div className="min-w-0">
                                     <p className="text-xs font-black uppercase tracking-wide text-ciel-text-soft">Co-authors</p>
-                                    <p className="mt-0.5 text-sm leading-relaxed text-ciel-text">{teamMembers.map((m) => m.role?.trim() ? `${m.name} (${m.role})` : m.name).join(", ")}</p>
+                                    <ul className="mt-1 space-y-1">
+                                        {teamMembers.map((m, i) => (
+                                            <li key={i} className="text-sm leading-relaxed text-ciel-text">
+                                                {m.role?.trim() ? `${m.name} (${m.role})` : m.name}
+                                                {m.email ? (
+                                                    m.inviteStatus === "accepted" ? (
+                                                        <span className="ml-1.5 text-xs font-bold text-ciel-green-deep">✅ Confirmed</span>
+                                                    ) : (
+                                                        <span className="ml-1.5 text-xs font-bold text-ciel-gold-deep">✉️ Invited</span>
+                                                    )
+                                                ) : null}
+                                            </li>
+                                        ))}
+                                    </ul>
                                 </div>
                             </div>
                         )}
