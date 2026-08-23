@@ -15,6 +15,7 @@ import {
     type FypSdgEntry,
     type FypSectionSummaries,
     type FypTeamMember,
+    type FypRoute,
     EMPTY_FYP,
     mergeFypEntry,
     normalizeFypTeamMembers,
@@ -25,6 +26,7 @@ import {
     FYP_MODES,
     FYP_EVIDENCE_STATUS,
     PROJECT_TYPE_OPTIONS,
+    PROJECT_TYPE_ROUTE,
     FYP_SECTION_LABELS,
     FYP_SECTION_KEYS,
 } from "@/utils/fypTypes";
@@ -362,11 +364,22 @@ export default function FypThesisPage() {
         patchGroup("projectInfo", { teamMembers: next });
     };
 
+    const toggleProjectType = (type: string) => {
+        const cur = entry.projectInfo?.projectTypes ?? (entry.projectInfo?.projectType ? [entry.projectInfo.projectType] : []);
+        const next = cur.includes(type) ? cur.filter((x) => x !== type) : [...cur, type];
+        patchGroup("projectInfo", { projectTypes: next, projectType: next[0] });
+    };
+
     if (loading) return <WorkspaceSkeleton />;
 
     const isOwner = entry.isOwner !== false;
-    const route = fypRouteFor(entry.projectInfo?.projectType);
+    const allProjectTypes = entry.projectInfo?.projectTypes ?? (entry.projectInfo?.projectType ? [entry.projectInfo.projectType] : []);
+    const primaryProjectType = allProjectTypes[0];
+    const routesIn = Array.from(new Set(allProjectTypes.map((t) => PROJECT_TYPE_ROUTE[t] || "scholar")));
+    const leadRouteValid = entry.projectInfo?.leadRoute as FypRoute | undefined;
+    const route = fypRouteFor(entry.projectInfo);
     const routeMode = FYP_MODES[route];
+    const blendedRoutes = routesIn.length > 1;
 
     const picked = entry.sdgMapping?.entries ?? [];
     const toggleGoal = (num: number) => {
@@ -464,16 +477,36 @@ export default function FypThesisPage() {
                                     <input type="number" value={entry.projectInfo?.creditHours ?? ""} onChange={(e) => patchGroup("projectInfo", { creditHours: e.target.value })} placeholder="6" className={fieldClass} />
                                 </Field>
                             </div>
-                            <Field label="What kind of final project is this?" hint="The form adapts its language to your answer — same eight sections, only the wording changes.">
+                            <Field label="What kind of final project is this?" hint="Tap all that apply — first pick leads. The form adapts its language to your answer — same eight sections, only the wording changes.">
                                 <ChipGroup
                                     options={PROJECT_TYPE_OPTIONS}
-                                    selected={entry.projectInfo?.projectType ? [entry.projectInfo.projectType] : []}
-                                    onToggle={(v) => patchGroup("projectInfo", { projectType: entry.projectInfo?.projectType === v ? undefined : v })}
+                                    selected={allProjectTypes}
+                                    onToggle={toggleProjectType}
                                 />
                             </Field>
-                            {entry.projectInfo?.projectType && (
+                            {primaryProjectType && (
                                 <div className="rounded-ciel-sm border-2 border-ciel-purple/30 bg-ciel-purple-soft/50 px-4 py-3 text-xs font-semibold leading-relaxed text-ciel-purple-deep">
-                                    🧭 {routeMode.note} Same eight sections for every school — only the language changes, so your work stays comparable university-wide.
+                                    🧭 {routeMode.note}{leadRouteValid ? " You chose this route to lead." : ""} Same eight sections for every school — only the language changes, so your work stays comparable university-wide.
+                                    {blendedRoutes && (
+                                        <>
+                                            <br />🔀 <b>You picked types from {routesIn.length} routes.</b> The <b>main deliverable</b> should lead. Tap to choose:
+                                            <div className="mt-1.5 flex flex-wrap gap-1.5">
+                                                {routesIn.map((r) => (
+                                                    <button
+                                                        key={r}
+                                                        type="button"
+                                                        onClick={() => patchGroup("projectInfo", { leadRoute: r })}
+                                                        className={clsx(
+                                                            "ciel-transition rounded-full border-2 px-3 py-1.5 text-[10.5px] font-bold",
+                                                            r === route ? "border-ciel-purple bg-ciel-purple-soft text-ciel-purple-deep" : "border-ciel-border bg-white text-ciel-text-mid hover:border-ciel-purple/40",
+                                                        )}
+                                                    >
+                                                        {FYP_MODES[r as FypRoute].name}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </>
+                                    )}
                                 </div>
                             )}
                             <Field label="Thesis / project title">

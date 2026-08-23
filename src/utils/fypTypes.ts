@@ -13,8 +13,12 @@ export interface FypProjectInfo {
     school?: string;
     degree?: string;
     graduationYear?: string;
-    /** Drives the adaptive-vocabulary "route" (scholar/maker/builder/storyteller/consultant). */
+    /** @deprecated single-select predecessor of projectTypes — still read as a fallback for older entries. */
     projectType?: string;
+    /** Multi-select project type(s) — supersedes the single projectType above; first pick leads unless leadRoute overrides. */
+    projectTypes?: string[];
+    /** Explicit override of which route leads when projectTypes span more than one route — unset means "first pick leads". */
+    leadRoute?: string;
     studentName?: string;
     studentEmail?: string;
     rollNumber?: string;
@@ -188,7 +192,7 @@ function fmtRange(a?: string, b?: string): string {
  * sense to mention for the matching route — otherwise leftover fields from a route the student
  * switched away from would show up in the summary. */
 function routeDetailsClause(pi: FypProjectInfo, rd: FypRouteDetails): string {
-    const route = fypRouteFor(pi.projectType);
+    const route = fypRouteFor(pi);
     if (route === "scholar" && (rd.discussion || rd.conclusion)) {
         return `${rd.discussion ? ` ${lc(rd.discussion)}.` : ""}${rd.conclusion ? ` Conclusion: ${lc(rd.conclusion)}.` : ""}`;
     }
@@ -315,7 +319,7 @@ export const PROJECT_TYPE_OPTIONS = [
     "📊 Industry / consulting project",
 ];
 
-const PROJECT_TYPE_ROUTE: Record<string, FypRoute> = {
+export const PROJECT_TYPE_ROUTE: Record<string, FypRoute> = {
     "📜 Thesis / dissertation": "scholar",
     "🔬 Empirical research study": "scholar",
     "⚖️ Law dissertation / case-law study": "scholar",
@@ -330,8 +334,18 @@ const PROJECT_TYPE_ROUTE: Record<string, FypRoute> = {
     "📊 Industry / consulting project": "consultant",
 };
 
-export function fypRouteFor(projectType?: string): FypRoute {
-    return PROJECT_TYPE_ROUTE[projectType || ""] || "scholar";
+/** Resolves the leading route from a (possibly multi-select) project type pick — leadRoute wins
+ * outright when set, otherwise the first picked type leads. Mirrors the backend's deriveFypRoute
+ * exactly (same unconditional leadRoute trust) so the route shown while filling the form always
+ * matches what the Merit Model actually scores against. Accepts a bare string for backward
+ * compatibility with old call sites. */
+export function fypRouteFor(pi?: { projectType?: string; projectTypes?: string[]; leadRoute?: string } | string | null): FypRoute {
+    const info = typeof pi === "string" ? { projectType: pi } : pi;
+    const lead = info?.leadRoute as FypRoute | undefined;
+    if (lead) return lead;
+    const types = info?.projectTypes?.length ? info.projectTypes : info?.projectType ? [info.projectType] : [];
+    if (!types.length) return "scholar";
+    return PROJECT_TYPE_ROUTE[types[0]] || "scholar";
 }
 
 // ---------------------------------------------------------------------------

@@ -44,7 +44,7 @@ export default function ThesisCard({
     const find = entry.findings || {};
     const sm = entry.sdgMapping || {};
     const summaries = entry.sectionSummaries && Object.keys(entry.sectionSummaries).length ? entry.sectionSummaries : composeFypSummaries(entry);
-    const route = fypRouteFor(pi.projectType);
+    const route = fypRouteFor(pi);
     const teamMembers = normalizeFypTeamMembers(pi.teamMembers).filter((m) => m.name?.trim());
     const isTeam = teamMembers.length > 0;
     const displayName = studentName || pi.studentName || "Student";

@@ -107,7 +107,7 @@ export default function FypMeritPanel({
         let p = entries;
         if (showUniversityFilter && university !== "all") p = p.filter((e) => entryUniversity(e) === university);
         if (showSchoolFilter && school !== "all") p = p.filter((e) => entrySchool(e) === school);
-        if (route !== "all") p = p.filter((e) => fypRouteFor(e.projectInfo?.projectType) === route);
+        if (route !== "all") p = p.filter((e) => fypRouteFor(e.projectInfo) === route);
         return p;
     }, [entries, showUniversityFilter, university, showSchoolFilter, school, route]);
 

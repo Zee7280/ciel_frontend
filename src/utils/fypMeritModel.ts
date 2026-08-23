@@ -99,7 +99,7 @@ export function computeFypMeritScorecard(entry: FypEntry): FypMeritScorecard {
     const sm = entry.sdgMapping || {};
     const rf = entry.reflectionInfo || {};
     const rd = entry.routeDetails || {};
-    const route = fypRouteFor(pi.projectType);
+    const route = fypRouteFor(pi);
 
     // ---- 1 · Purpose & originality ----
     const aimText = oi.aim || "";
