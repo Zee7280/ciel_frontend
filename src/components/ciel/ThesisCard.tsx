@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { CheckCircle2, ChevronDown, Users } from "lucide-react";
+import { CheckCircle2, ChevronDown, Users, ShieldAlert, Clock } from "lucide-react";
 import clsx from "clsx";
 import { sdgData } from "@/utils/sdgData";
 import {
@@ -27,11 +27,16 @@ export default function ThesisCard({
     entry,
     defaultOpen = false,
     studentName,
+    onSupervisorReview,
+    reviewing = false,
 }: {
     entry: FypEntry;
     defaultOpen?: boolean;
     /** Override for the ribbon's student name display (e.g. on a faculty/university deck showing someone else's card). */
     studentName?: string;
+    /** Supplying this renders Approve/Reject actions in the footer — the supervisor-review gate that makes a submitted entry "go live" for Merit Model ranking. */
+    onSupervisorReview?: (action: "approve" | "reject") => void;
+    reviewing?: boolean;
 }) {
     const [open, setOpen] = useState(defaultOpen);
 
@@ -43,6 +48,9 @@ export default function ThesisCard({
     const teamMembers = normalizeFypTeamMembers(pi.teamMembers).filter((m) => m.name?.trim());
     const isTeam = teamMembers.length > 0;
     const displayName = studentName || pi.studentName || "Student";
+    const approval = entry.supervisorApprovalStatus;
+    // A brand-new, still-empty draft reads as broken if labelled "Untitled" — it's just not started yet.
+    const displayTitle = pi.title || entry.projectTitle || (entry.status === "draft" ? "New FYP / thesis record — tap to continue" : "Untitled thesis");
 
     return (
         <div className="overflow-hidden rounded-ciel-lg border border-ciel-border bg-white shadow-sm">
@@ -54,7 +62,7 @@ export default function ThesisCard({
                             {ROUTE_EMOJI[route]}
                         </span>
                         <div className="min-w-0">
-                            <p className="truncate text-base font-black text-ciel-text">{pi.title || entry.projectTitle || "Untitled thesis"}</p>
+                            <p className="truncate text-base font-black text-ciel-text">{displayTitle}</p>
                             <p className="mt-0.5 truncate text-xs font-semibold uppercase tracking-wide text-ciel-text-soft">
                                 {pi.school ? `${pi.school} · ` : ""}
                                 {pi.degree || "Thesis"} · {displayName}
@@ -62,9 +70,17 @@ export default function ThesisCard({
                             </p>
                         </div>
                     </div>
-                    {entry.status === "submitted" ? (
+                    {entry.status === "submitted" && approval === "approved" ? (
                         <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-emerald-700">
-                            <CheckCircle2 className="h-3 w-3" /> Submitted
+                            <CheckCircle2 className="h-3 w-3" /> Approved & live
+                        </span>
+                    ) : entry.status === "submitted" && approval === "rejected" ? (
+                        <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-red-200 bg-red-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-red-700">
+                            <ShieldAlert className="h-3 w-3" /> Changes requested
+                        </span>
+                    ) : entry.status === "submitted" ? (
+                        <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-amber-700">
+                            <Clock className="h-3 w-3" /> Awaiting supervisor approval
                         </span>
                     ) : (
                         <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-amber-700">
@@ -178,19 +194,43 @@ export default function ThesisCard({
             </div>
 
             {/* Footer */}
-            <div className="flex items-center gap-3 border-t border-ciel-border bg-ciel-page/60 px-5 py-3.5">
+            <div className="flex flex-wrap items-center gap-3 border-t border-ciel-border bg-ciel-page/60 px-5 py-3.5">
                 <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-ciel-navy text-[10px] font-black text-white">
                     {(pi.supervisorName || "? ?").split(" ").map((w) => w[0]).filter(Boolean).slice(0, 2).join("").toUpperCase() || "?"}
                 </span>
-                <p className="min-w-0 text-xs leading-relaxed text-ciel-text-mid">
-                    {entry.status === "submitted" ? (
-                        <>Awaiting one-click confirmation: <b className="text-ciel-text">{pi.supervisorName || "supervisor"}</b>{pi.supervisorEmail ? ` · ${pi.supervisorEmail}` : ""}</>
+                <p className="min-w-0 flex-1 text-xs leading-relaxed text-ciel-text-mid">
+                    {entry.status === "submitted" && approval === "approved" ? (
+                        <>Approved by <b className="text-ciel-text">{pi.supervisorName || "supervisor"}</b>{pi.supervisorEmail ? ` · ${pi.supervisorEmail}` : ""} — live in Merit Model rankings</>
+                    ) : entry.status === "submitted" && approval === "rejected" ? (
+                        <>Changes requested by <b className="text-ciel-text">{pi.supervisorName || "supervisor"}</b>{entry.supervisorApprovalNote ? `: "${entry.supervisorApprovalNote}"` : ""}</>
+                    ) : entry.status === "submitted" ? (
+                        <>Awaiting one-click confirmation: <b className="text-ciel-text">{pi.supervisorName || "supervisor"}</b>{pi.supervisorEmail ? ` · ${pi.supervisorEmail}` : ""} — not yet ranked</>
                     ) : (
                         <>Supervised by <b className="text-ciel-text">{pi.supervisorName || "supervisor"}</b>{pi.supervisorEmail ? ` · ${pi.supervisorEmail}` : ""}</>
                     )}
                     <br />
                     On approval: 🧑‍🎓 co-author profiles · 🧑‍🏫 faculty deck · 🏫 university portal
                 </p>
+                {onSupervisorReview && entry.status === "submitted" && approval !== "approved" && (
+                    <div className="flex shrink-0 gap-2">
+                        <button
+                            type="button"
+                            onClick={() => onSupervisorReview("reject")}
+                            disabled={reviewing}
+                            className="ciel-transition rounded-ciel-xs border-2 border-red-200 bg-white px-3 py-2 text-xs font-bold text-red-700 hover:bg-red-50 disabled:opacity-50"
+                        >
+                            Request changes
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => onSupervisorReview("approve")}
+                            disabled={reviewing}
+                            className="ciel-transition rounded-ciel-xs border-2 border-ciel-purple bg-ciel-purple px-3 py-2 text-xs font-bold text-white hover:bg-ciel-purple-deep disabled:opacity-50"
+                        >
+                            ✓ Approve — make live
+                        </button>
+                    </div>
+                )}
             </div>
         </div>
     );

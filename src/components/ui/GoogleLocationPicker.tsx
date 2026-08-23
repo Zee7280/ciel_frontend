@@ -506,7 +506,7 @@ export default function GoogleLocationPicker({ onLocationSelect, initialLocation
 
     return (
         <div className="relative isolate space-y-4">
-            <div className="relative z-20 flex gap-3">
+            <div className={`relative flex gap-3 ${showSuggestions && suggestions.length > 0 ? "z-40" : "z-20"}`}>
                 <div className="group relative flex-1">
                     <div className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400 transition-colors group-focus-within:text-blue-500">
                         <MapPin className="h-full w-full" />

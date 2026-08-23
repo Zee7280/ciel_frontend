@@ -1,14 +1,32 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { ChevronDown, Trophy } from "lucide-react";
 import clsx from "clsx";
 import { sdgData } from "@/utils/sdgData";
+import { authenticatedFetch } from "@/utils/api";
 import { type FypEntry, fypRouteFor, type FypRoute } from "@/utils/fypTypes";
-import { FYP_MERIT_RUBRIC, FYP_MERIT_NEUTRALITY_NOTE, computeFypMeritScorecard, whyFypLeads, fypPotential } from "@/utils/fypMeritModel";
+import {
+    FYP_MERIT_RUBRIC,
+    FYP_MERIT_NEUTRALITY_NOTE,
+    computeFypMeritScorecard,
+    whyFypLeads,
+    fypPotential,
+    fypMeritGrade,
+    type FypMeritScorecard,
+    type FypMeritCriterionResult,
+    type FypMeritConsistencyFlag,
+} from "@/utils/fypMeritModel";
 
 export interface FypMeritEntry extends FypEntry {
     student?: { id: string; name: string; email: string; institution?: string; department?: string } | null;
+}
+
+/** Shape of one ranked card from GET .../fyp-thesis/merit-model (ciel_backend's RankedFypMeritCard). */
+interface BackendFypMeritCard {
+    id: string;
+    route: FypRoute;
+    scorecard: Record<FypMeritCriterionResult["key"], { pts: number; max: number; note: string; flag?: string }> & { total: number };
 }
 
 const ROUTE_META: Record<FypRoute, { emoji: string; label: string; color: string; soft: string }> = {
@@ -18,9 +36,35 @@ const ROUTE_META: Record<FypRoute, { emoji: string; label: string; color: string
     storyteller: { emoji: "🎬", label: "Storyteller", color: "#db2777", soft: "#fdeaf3" },
     consultant: { emoji: "📊", label: "Consultant", color: "#7c3aed", soft: "#f1eafe" },
 };
+/** The backend's `leadRoute` is a free-text field with no server-side enum validation — coerce
+ * anything outside the 5 known routes to "scholar" rather than let an unrecognized string reach
+ * ROUTE_META lookups downstream (which would otherwise throw on render). */
+function asKnownFypRoute(route: string): FypRoute {
+    return route in ROUTE_META ? (route as FypRoute) : "scholar";
+}
+
+/** Backend scores are the source of truth for the entries it returns (only supervisor-approved
+ * entries are eligible, so every card here is eligible by construction) — local
+ * computeFypMeritScorecard remains the fallback for anything the backend didn't return. */
+function fypScorecardFromBackend(card: BackendFypMeritCard): FypMeritScorecard {
+    const criteria: FypMeritCriterionResult[] = FYP_MERIT_RUBRIC.map((rubric) => {
+        const crit = card.scorecard[rubric.key];
+        return { ...rubric, points: crit?.pts ?? 0, note: crit?.note ?? "" };
+    });
+    const honestyFlag = card.scorecard.honesty?.flag;
+    const consistency: FypMeritConsistencyFlag = honestyFlag
+        ? { ok: honestyFlag.startsWith("✅"), message: honestyFlag.replace(/^[✅⚠️]\s*/u, "") }
+        : { ok: true, message: "Consistency: claims match declared evidence." };
+    const total = card.scorecard.total;
+    const [grade, gradeColor] = fypMeritGrade(total);
+    return { route: asKnownFypRoute(card.route), criteria, total, grade, gradeColor, consistency, eligible: true };
+}
 
 function entrySchool(e: FypMeritEntry): string {
     return e.projectInfo?.school || e.student?.department || "Unspecified";
+}
+function entryUniversity(e: FypMeritEntry): string {
+    return e.student?.institution || "Unspecified";
 }
 function entryDisplayName(e: FypMeritEntry): string {
     return e.projectInfo?.studentName || e.student?.name || "Student";
@@ -34,32 +78,70 @@ function entryDisplayName(e: FypMeritEntry): string {
 export default function FypMeritPanel({
     entries,
     showSchoolFilter = false,
+    showUniversityFilter = false,
+    meritEndpoint,
 }: {
     entries: FypMeritEntry[];
     /** Show a school/department dropdown — meaningful for a university-wide pool, not a single supervisor's list. */
     showSchoolFilter?: boolean;
+    /** Show a university dropdown — only meaningful for the CIEL-wide, all-universities scope. */
+    showUniversityFilter?: boolean;
+    /** GET .../fyp-thesis/merit-model route matching this caller's role scope. When set, real
+     * backend-computed scores are used for every entry the backend returns (source of truth);
+     * entries it doesn't return (not yet approved, or the fetch failed) still show via local computation. */
+    meritEndpoint?: string;
 }) {
     const [ranked, setRanked] = useState(false);
     const [school, setSchool] = useState("all");
+    const [university, setUniversity] = useState("all");
     const [route, setRoute] = useState<FypRoute | "all">("all");
     const [openId, setOpenId] = useState<string | null>(null);
+    const [backendCards, setBackendCards] = useState<Map<string, BackendFypMeritCard>>(new Map());
+    const [meritLoading, setMeritLoading] = useState(false);
+    const requestIdRef = useRef(0);
 
     const schools = useMemo(() => Array.from(new Set(entries.map(entrySchool))).sort(), [entries]);
+    const universities = useMemo(() => Array.from(new Set(entries.map(entryUniversity))).sort(), [entries]);
 
     const pool = useMemo(() => {
         let p = entries;
+        if (showUniversityFilter && university !== "all") p = p.filter((e) => entryUniversity(e) === university);
         if (showSchoolFilter && school !== "all") p = p.filter((e) => entrySchool(e) === school);
         if (route !== "all") p = p.filter((e) => fypRouteFor(e.projectInfo?.projectType) === route);
         return p;
-    }, [entries, showSchoolFilter, school, route]);
+    }, [entries, showUniversityFilter, university, showSchoolFilter, school, route]);
+
+    const runMeritModel = () => {
+        setRanked(true);
+        if (!meritEndpoint) return;
+        const requestId = ++requestIdRef.current;
+        setMeritLoading(true);
+        authenticatedFetch(meritEndpoint)
+            .then((res) => (res?.ok ? res.json() : null))
+            .then((result) => {
+                if (requestId !== requestIdRef.current) return; // a newer click already superseded this one
+                const cards: BackendFypMeritCard[] = Array.isArray(result?.data?.entries) ? result.data.entries : [];
+                setBackendCards(new Map(cards.filter((c) => c.id).map((c) => [c.id, c])));
+            })
+            .catch(() => {
+                // Fetch failed — the panel silently keeps using local computeFypMeritScorecard for everyone.
+            })
+            .finally(() => {
+                if (requestId === requestIdRef.current) setMeritLoading(false);
+            });
+    };
 
     const scored = useMemo(() => {
-        const withScores = pool.map((e) => ({ entry: e, scorecard: computeFypMeritScorecard(e) }));
-        // Eligible entries (repository + sent for sign-off) always sort above ineligible ones —
-        // no loophole where an incomplete record outranks a complete one just by scoring higher.
+        const withScores = pool.map((e) => {
+            const backendCard = e.id ? backendCards.get(e.id) : undefined;
+            const scorecard = backendCard ? fypScorecardFromBackend(backendCard) : computeFypMeritScorecard(e);
+            return { entry: e, scorecard };
+        });
+        // Eligible entries (supervisor-approved) always sort above ineligible ones — no loophole
+        // where an unapproved record outranks an approved one just by scoring higher.
         if (ranked) withScores.sort((a, b) => (Number(b.scorecard.eligible) - Number(a.scorecard.eligible)) || (b.scorecard.total - a.scorecard.total));
         return withScores;
-    }, [pool, ranked]);
+    }, [pool, ranked, backendCards]);
 
     const avg = scored.length ? Math.round(scored.reduce((s, x) => s + x.scorecard.total, 0) / scored.length) : 0;
 
@@ -99,6 +181,15 @@ export default function FypMeritPanel({
             </div>
 
             <div className="flex flex-wrap items-end gap-3 rounded-ciel-lg border border-ciel-border bg-white p-4">
+                {showUniversityFilter && universities.length > 1 && (
+                    <div>
+                        <label className="mb-1 block text-[10px] font-bold uppercase tracking-widest text-ciel-text-soft">University</label>
+                        <select value={university} onChange={(e) => setUniversity(e.target.value)} className="rounded-ciel-xs border border-ciel-border bg-white px-3 py-2 text-xs font-semibold text-ciel-text outline-none focus:border-ciel-purple">
+                            <option value="all">All universities</option>
+                            {universities.map((u) => <option key={u} value={u}>{u}</option>)}
+                        </select>
+                    </div>
+                )}
                 {showSchoolFilter && schools.length > 1 && (
                     <div>
                         <label className="mb-1 block text-[10px] font-bold uppercase tracking-widest text-ciel-text-soft">School / dept</label>
@@ -119,7 +210,7 @@ export default function FypMeritPanel({
                 </div>
                 <button
                     type="button"
-                    onClick={() => setRanked(true)}
+                    onClick={runMeritModel}
                     className="ciel-transition ml-auto rounded-ciel-sm bg-ciel-purple px-5 py-2.5 text-sm font-bold text-white hover:bg-ciel-purple/90"
                 >
                     🧮 Run merit model →
@@ -128,7 +219,11 @@ export default function FypMeritPanel({
 
             {ranked && (
                 <div className="rounded-ciel-sm border border-ciel-purple-soft bg-ciel-purple-soft/60 px-4 py-3 text-xs leading-relaxed text-ciel-purple">
-                    🧮 <b>Model run complete</b> — {scored.length} FYP flash card{scored.length === 1 ? "" : "s"} scored · cohort average <b>{avg}/100</b>. Top {Math.min(10, scored.length)} are picks, each with its reason. Order is rubric merit, nothing else.
+                    {meritLoading ? (
+                        <>⏳ <b>Syncing official scores…</b> — showing a provisional local ranking while the real Merit Model results load.</>
+                    ) : (
+                        <>🧮 <b>Model run complete</b> — {scored.length} FYP flash card{scored.length === 1 ? "" : "s"} scored · cohort average <b>{avg}/100</b>. Top {Math.min(10, scored.length)} are picks, each with its reason. Order is rubric merit, nothing else.</>
+                    )}
                     {byRoute.length > 1 && (
                         <div className="mt-2 flex flex-wrap gap-1.5">
                             <span className="text-[10px] font-black uppercase tracking-widest">⚖️ Route fairness — avg by route:</span>
@@ -153,8 +248,6 @@ export default function FypMeritPanel({
                     const primary = x.entry.sdgMapping?.entries?.[0];
                     const sdg = primary ? sdgData.find((s) => s.number === primary.goalNumber) : null;
                     const routeMeta = ROUTE_META[x.scorecard.route];
-                    const missingRepo = !(x.entry.deliverables || []).some((d) => d.label === "Full thesis (PDF)");
-                    const missingSignoff = x.entry.status !== "submitted";
                     return (
                         <div key={x.entry.id} className={clsx("relative overflow-hidden rounded-ciel-lg border bg-white", top10 ? "border-ciel-purple/50 shadow-md" : "border-ciel-border", ineligible && "opacity-55")}>
                             {top10 && (
@@ -193,7 +286,7 @@ export default function FypMeritPanel({
 
                             {ineligible && (
                                 <p className="px-5 pb-3 pl-[4.5rem] text-[11px] leading-relaxed text-amber-700">
-                                    ⛔ <b>Ineligible for AI picks &amp; showcase:</b> {[missingRepo ? "no thesis in the repository" : null, missingSignoff ? "not yet sent for supervisor sign-off" : null].filter(Boolean).join(" + ")} — scored for feedback only. Fix and resubmit.
+                                    ⛔ <b>Ineligible for AI picks &amp; showcase:</b> {x.entry.supervisorApprovalStatus === "rejected" ? "supervisor requested changes" : "awaiting supervisor approval"} — scored for feedback only. Once your supervisor approves, it goes live in rankings.
                                 </p>
                             )}
                             {top10 && (

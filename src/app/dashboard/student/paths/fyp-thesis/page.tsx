@@ -10,6 +10,7 @@ import { WorkspaceSkeleton } from "@/components/ciel/Skeleton";
 import ThesisCard from "@/components/ciel/ThesisCard";
 import {
     type FypEntry,
+    type FypMetric,
     type FypSdgEntry,
     type FypSectionSummaries,
     type FypTeamMember,
@@ -102,7 +103,8 @@ function ChipGroup({
     single?: boolean;
 }) {
     const hasOther = onOtherChange !== undefined;
-    const otherSelected = hasOther && !!otherValue?.trim();
+    const [otherOn, setOtherOn] = useState(() => !!otherValue?.trim());
+    const showOther = hasOther && (otherOn || !!otherValue?.trim());
     return (
         <div className="space-y-2.5">
             <div className="flex flex-wrap gap-2">
@@ -125,24 +127,90 @@ function ChipGroup({
                 {hasOther && !single ? (
                     <button
                         type="button"
-                        onClick={() => onOtherChange!(otherSelected ? "" : " ")}
+                        onClick={() => {
+                            if (showOther) {
+                                setOtherOn(false);
+                                onOtherChange!("");
+                            } else {
+                                setOtherOn(true);
+                            }
+                        }}
                         className={clsx(
                             "ciel-transition rounded-full border-2 border-dashed px-3.5 py-2 text-xs font-bold",
-                            otherSelected ? "border-ciel-purple bg-ciel-purple-soft text-ciel-purple-deep" : "border-ciel-border text-ciel-text-mid hover:border-ciel-purple/40",
+                            showOther ? "border-ciel-purple bg-ciel-purple-soft text-ciel-purple-deep" : "border-ciel-border text-ciel-text-mid hover:border-ciel-purple/40",
                         )}
                     >
                         ＋ Other…
                     </button>
                 ) : null}
             </div>
-            {hasOther && otherSelected ? (
+            {showOther ? (
                 <input
                     type="text"
-                    value={otherValue?.trim() ?? ""}
+                    value={otherValue ?? ""}
                     onChange={(e) => onOtherChange!(e.target.value)}
                     placeholder={otherPlaceholder || "Type your own…"}
                     className={fieldClass}
                 />
+            ) : null}
+        </div>
+    );
+}
+
+/** Up to 3 structured results, each status-tagged Measured/Estimated/Target — feeds the FYP Merit
+ * Model's outcome & honesty criteria directly (unlike a flat single metric, which the model can only
+ * read as a fallback with no status). */
+function FypMetricsBuilder({ metrics, onChange }: { metrics: FypMetric[]; onChange: (next: FypMetric[]) => void }) {
+    const addMetric = () => {
+        if (metrics.length >= 3) return;
+        onChange([...metrics, { id: `m${metrics.length}-${Math.random().toString(36).slice(2, 8)}` }]);
+    };
+    const setMetric = (id: string, patch: Partial<FypMetric>) => {
+        onChange(metrics.map((m) => (m.id === id ? { ...m, ...patch } : m)));
+    };
+    const delMetric = (id: string) => onChange(metrics.filter((m) => m.id !== id));
+
+    return (
+        <div className="space-y-3">
+            <datalist id="fyp-metric-unit">
+                {METRIC_UNIT_OPTIONS.map((u) => <option key={u} value={u} />)}
+            </datalist>
+            {metrics.map((m, i) => (
+                <div key={m.id} className="space-y-3 rounded-ciel-sm border-2 border-ciel-border p-4">
+                    <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-ciel-purple">Metric {i + 1}</span>
+                        <button type="button" onClick={() => delMetric(m.id!)} className="text-xs font-bold text-red-600 hover:text-red-700">
+                            🗑 Remove
+                        </button>
+                    </div>
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                        <Field label="Metric">
+                            <input type="text" value={m.name ?? ""} onChange={(e) => setMetric(m.id!, { name: e.target.value })} placeholder="e.g. Wash-fastness score" className={fieldClass} />
+                        </Field>
+                        <Field label="Value">
+                            <input type="text" value={m.value ?? ""} onChange={(e) => setMetric(m.id!, { value: e.target.value })} placeholder="4.5" className={fieldClass} />
+                        </Field>
+                        <Field label="Unit">
+                            <input type="text" list="fyp-metric-unit" value={m.unit ?? ""} onChange={(e) => setMetric(m.id!, { unit: e.target.value })} placeholder="/5 grade · % · °C" className={fieldClass} />
+                        </Field>
+                    </div>
+                    <Field label="This number is…">
+                        <ChipGroup
+                            options={["Measured", "Estimated", "Target"]}
+                            selected={m.status ? [m.status] : []}
+                            onToggle={(v) => setMetric(m.id!, { status: m.status === v ? undefined : v })}
+                        />
+                    </Field>
+                </div>
+            ))}
+            {metrics.length < 3 ? (
+                <button
+                    type="button"
+                    onClick={addMetric}
+                    className="ciel-transition w-full rounded-ciel-sm border-2 border-dashed border-ciel-purple/40 bg-ciel-purple-soft/40 px-4 py-3 text-xs font-bold text-ciel-purple-deep hover:border-ciel-purple"
+                >
+                    ➕ Add {metrics.length ? "another" : "a"} number
+                </button>
             ) : null}
         </div>
     );
@@ -342,9 +410,11 @@ export default function FypThesisPage() {
                         <button
                             type="button"
                             onClick={() => {
-                                // Clear stale review acceptances from the last submission so every section is re-reviewed
-                                // against whatever the student changes this time, instead of silently staying "accepted."
+                                // Clear stale review acceptances AND declarations from the last submission so every
+                                // section is re-reviewed and re-affirmed against whatever the student changes this
+                                // time, instead of resubmitting on consent that was given for the old content.
                                 setReview({});
+                                setDeclarations([false, false]);
                                 setStep(0);
                                 setEditing(true);
                             }}
@@ -764,29 +834,12 @@ export default function FypThesisPage() {
                                 </div>
                             </Field>
                             {entry.findings?.evidenceStatus && /measured|estimated/i.test(entry.findings.evidenceStatus) && (
-                                <>
-                                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                                        <Field label="Metric">
-                                            <input type="text" value={entry.findings?.metricName ?? ""} onChange={(e) => patchGroup("findings", { metricName: e.target.value })} placeholder="e.g. Wash-fastness score" className={fieldClass} />
-                                        </Field>
-                                        <Field label="Value">
-                                            <input type="text" value={entry.findings?.metricValue ?? ""} onChange={(e) => patchGroup("findings", { metricValue: e.target.value })} placeholder="4.5" className={fieldClass} />
-                                        </Field>
-                                        <Field label="Unit">
-                                            <input type="text" list="fyp-metric-unit" value={entry.findings?.metricUnit ?? ""} onChange={(e) => patchGroup("findings", { metricUnit: e.target.value })} placeholder="/5 grade · % · °C" className={fieldClass} />
-                                            <datalist id="fyp-metric-unit">
-                                                {METRIC_UNIT_OPTIONS.map((u) => <option key={u} value={u} />)}
-                                            </datalist>
-                                        </Field>
-                                    </div>
-                                    <Field label="This number is…">
-                                        <ChipGroup
-                                            options={["Measured result", "Estimated / projected", "Target / aspiration"]}
-                                            selected={entry.findings?.numberRepresents ? [entry.findings.numberRepresents] : []}
-                                            onToggle={(v) => patchGroup("findings", { numberRepresents: entry.findings?.numberRepresents === v ? undefined : v })}
-                                        />
-                                    </Field>
-                                </>
+                                <Field label="Your numbers" hint="Up to 3 — name the thing, give the number, tag what kind it is.">
+                                    <FypMetricsBuilder
+                                        metrics={entry.findings?.metrics ?? []}
+                                        onChange={(next) => patchGroup("findings", { metrics: next })}
+                                    />
+                                </Field>
                             )}
                             <Field label="Measurable impact — a number if you have one">
                                 <input type="text" value={entry.findings?.measurableImpact ?? ""} onChange={(e) => patchGroup("findings", { measurableImpact: e.target.value })} placeholder="e.g. −30% water per metre, verified across 40 samples" className={fieldClass} />

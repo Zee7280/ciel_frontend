@@ -45,15 +45,34 @@ export interface FypMethodologyInfo {
     periodFrom?: string;
     periodTo?: string;
 }
+/** One measured/estimated/target number inside findings.metrics — up to 3 per entry. */
+export interface FypMetric {
+    id?: string;
+    name?: string;
+    value?: string;
+    unit?: string;
+    unitOther?: string;
+    /** 'Measured' | 'Estimated' | 'Target' */
+    status?: string;
+}
 export interface FypFindingsInfo {
     findings?: string[];
     measurableImpact?: string;
+    /** @deprecated superseded by limitation — still read by the backend as a fallback. */
     limitationType?: string;
+    /** @deprecated see limitationType */
     limitationDetail?: string;
+    limitation?: string;
     evidenceStatus?: string;
+    /** Up to 3 structured results, each status-tagged Measured/Estimated/Target — supersedes the flat metric fields below. */
+    metrics?: FypMetric[];
+    /** @deprecated superseded by metrics — still read by the backend as a fallback. */
     metricName?: string;
+    /** @deprecated see metricName */
     metricValue?: string;
+    /** @deprecated see metricName */
     metricUnit?: string;
+    /** @deprecated see metricName */
     numberRepresents?: string;
 }
 export interface FypRouteDetails {
@@ -98,6 +117,10 @@ export interface FypEntry {
     deliverables: FypDeliverable[];
     stepCompleted: number;
     status: "draft" | "submitted";
+    /** Supervisor review gate — only "approved" entries count toward Merit Model rankings/showcase. */
+    supervisorApprovalStatus?: "pending" | "approved" | "rejected" | null;
+    supervisorApprovalNote?: string | null;
+    supervisorApprovalAt?: string | null;
     /** False when this entry is showing because the viewer was named as a co-author on someone else's
      * submitted record, not because they own it — gates edit/delete access on the frontend. */
     isOwner?: boolean;
@@ -120,6 +143,9 @@ export const EMPTY_FYP: FypEntry = {
     deliverables: [],
     stepCompleted: 0,
     status: "draft",
+    supervisorApprovalStatus: null,
+    supervisorApprovalNote: null,
+    supervisorApprovalAt: null,
 };
 
 export function mergeFypEntry(base: FypEntry, data: Partial<FypEntry>): FypEntry {
@@ -431,9 +457,21 @@ export function composeFypSummaries(entry: FypEntry): FypSectionSummaries {
         : "";
 
     const finds = (find.findings || []).filter(Boolean);
-    const metricText = find.metricValue ? ` ${find.metricName || "Metric"}: ${find.metricValue}${find.metricUnit || ""}${find.numberRepresents ? ` (${find.numberRepresents.toLowerCase()})` : ""}.` : "";
+    const metricText = (find.metrics || []).filter((m) => m.value?.trim()).length
+        ? " " + (find.metrics || [])
+              .filter((m) => m.value?.trim())
+              .map((m) => `${m.name || "Metric"}: ${m.value}${m.unit || m.unitOther || ""}${m.status ? ` (${m.status.toLowerCase()})` : ""}`)
+              .join("; ") + "."
+        : find.metricValue
+          ? ` ${find.metricName || "Metric"}: ${find.metricValue}${find.metricUnit || ""}${find.numberRepresents ? ` (${find.numberRepresents.toLowerCase()})` : ""}.`
+          : "";
+    const limitationText = find.limitation
+        ? ` Main limitation, honestly noted: ${lc(find.limitation)}.`
+        : find.limitationType
+          ? ` Main limitation, honestly noted: ${find.limitationType.toLowerCase()}${find.limitationDetail ? ` — ${lc(find.limitationDetail)}` : ""}.`
+          : "";
     s.findings = finds.length
-        ? `Key findings: ${finds.map((f, i) => `(${i + 1}) ${lc(f)}`).join("; ")}.${find.evidenceStatus ? ` Evidence: ${find.evidenceStatus.toLowerCase()}.` : ""}${metricText}${find.measurableImpact ? ` Measured impact: ${lc(find.measurableImpact)}.` : ""}${find.limitationType ? ` Main limitation, honestly noted: ${find.limitationType.toLowerCase()}${find.limitationDetail ? ` — ${lc(find.limitationDetail)}` : ""}.` : ""}${routeDetailsClause(pi, entry.routeDetails || {})}`
+        ? `Key findings: ${finds.map((f, i) => `(${i + 1}) ${lc(f)}`).join("; ")}.${find.evidenceStatus ? ` Evidence: ${find.evidenceStatus.toLowerCase()}.` : ""}${metricText}${find.measurableImpact ? ` Measured impact: ${lc(find.measurableImpact)}.` : ""}${limitationText}${routeDetailsClause(pi, entry.routeDetails || {})}`
         : "";
 
     const entries = sm.entries || [];

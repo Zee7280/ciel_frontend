@@ -56,6 +56,9 @@ export default function CourseworkCard({
     const proof = re.findings?.[0] || re.metrics?.[0]?.meaning || re.measurableImpact;
     const evidenceLabel = re.metrics?.length ? (re.metrics.some((m) => m.status === "Actual — measured") ? "Actual measured result" : re.metrics[0].status || "Result declared") : re.measured ? stripEmoji(re.measured) : re.evidenceStatus;
     const approval = entry.facultyApprovalStatus;
+    // A brand-new, still-empty draft reads as a broken/orphaned record if labelled "Untitled" —
+    // it's just not started yet. Once anything's been typed, fall back to the generic label instead.
+    const displayTitle = entry.projectTitle || (entry.status === "draft" ? "New coursework report — tap to continue" : "Untitled coursework");
 
     return (
         <div className="overflow-hidden rounded-ciel-lg border border-ciel-border bg-white shadow-sm">
@@ -67,7 +70,7 @@ export default function CourseworkCard({
                             {formatBadgeEmoji(primaryFormat)}
                         </span>
                         <div className="min-w-0">
-                            <p className="truncate text-base font-black text-ciel-text">{entry.projectTitle || "Untitled coursework"}</p>
+                            <p className="truncate text-base font-black text-ciel-text">{displayTitle}</p>
                             <p className="mt-0.5 truncate text-xs font-semibold uppercase tracking-wide text-ciel-text-soft">
                                 {primaryFormat ? stripEmoji(primaryFormat).split(" (")[0] + " · " : ""}
                                 {entry.course || "Course"} · {displayName}

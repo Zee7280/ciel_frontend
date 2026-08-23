@@ -93,7 +93,7 @@ export default function FacultyCourseworkProjectsPage() {
                 </div>
 
                 {showMeritModel && !loading && entries.length > 0 && (
-                    <MeritModelPanel entries={entries} />
+                    <MeritModelPanel entries={entries} meritEndpoint="/api/v1/paths/course-projects/merit-model" />
                 )}
 
                 <div className="relative max-w-sm">

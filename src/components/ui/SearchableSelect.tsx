@@ -111,7 +111,7 @@ export default function SearchableSelect({
     };
 
     return (
-        <div ref={containerRef} className="relative z-20">
+        <div ref={containerRef} className={clsx("relative", isOpen ? "z-40" : "z-20")}>
             <button
                 type="button"
                 onClick={() => (isOpen ? setIsOpen(false) : openDropdown())}

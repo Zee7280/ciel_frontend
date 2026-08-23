@@ -7,6 +7,7 @@ import { Badge } from "@/app/dashboard/student/report/components/ui/badge";
 import { Card } from "@/app/dashboard/student/report/components/ui/card";
 import { sdgData } from "@/utils/sdgData";
 import MeritModelPanel, { type MeritEntry } from "@/components/ciel/MeritModelPanel";
+import FypMeritPanel, { type FypMeritEntry } from "@/components/ciel/FypMeritPanel";
 
 type PathTab = "course-project" | "fyp-thesis" | "startup-business";
 
@@ -153,6 +154,8 @@ export default function AdminPathSubmissionsPage() {
     const [meritView, setMeritView] = useState(false);
     const [meritEntries, setMeritEntries] = useState<MeritEntry[]>([]);
     const [meritLoading, setMeritLoading] = useState(false);
+    const [fypMeritEntries, setFypMeritEntries] = useState<FypMeritEntry[]>([]);
+    const [fypMeritLoading, setFypMeritLoading] = useState(false);
 
     useEffect(() => {
         if (pathTab !== "course-project" || !meritView) return;
@@ -165,6 +168,23 @@ export default function AdminPathSubmissionsPage() {
             })
             .finally(() => {
                 if (!cancelled) setMeritLoading(false);
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, [pathTab, meritView]);
+
+    useEffect(() => {
+        if (pathTab !== "fyp-thesis" || !meritView) return;
+        let cancelled = false;
+        setFypMeritLoading(true);
+        authenticatedFetch("/api/v1/admin/paths/fyp-thesis")
+            .then((res) => (res?.ok ? res.json() : null))
+            .then((payload) => {
+                if (!cancelled) setFypMeritEntries(Array.isArray(payload?.data) ? payload.data : []);
+            })
+            .finally(() => {
+                if (!cancelled) setFypMeritLoading(false);
             });
         return () => {
             cancelled = true;
@@ -297,7 +317,7 @@ export default function AdminPathSubmissionsPage() {
                         </button>
                     );
                 })}
-                {pathTab === "course-project" && (
+                {pathTab === "course-project" || pathTab === "fyp-thesis" ? (
                     <button
                         type="button"
                         onClick={() => setMeritView((v) => !v)}
@@ -308,7 +328,7 @@ export default function AdminPathSubmissionsPage() {
                         <Calculator className="h-4 w-4" />
                         {meritView ? "Back to submissions" : "🧮 Merit model — CIEL wide"}
                     </button>
-                )}
+                ) : null}
             </div>
 
             {pathTab === "course-project" && meritView ? (
@@ -317,7 +337,15 @@ export default function AdminPathSubmissionsPage() {
                         <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
                     </div>
                 ) : (
-                    <MeritModelPanel entries={meritEntries} showDepartmentFilter showFacultyFilter showUniversityFilter />
+                    <MeritModelPanel entries={meritEntries} showDepartmentFilter showFacultyFilter showUniversityFilter meritEndpoint="/api/v1/paths/course-projects/merit-model" />
+                )
+            ) : pathTab === "fyp-thesis" && meritView ? (
+                fypMeritLoading ? (
+                    <div className="flex justify-center py-20">
+                        <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
+                    </div>
+                ) : (
+                    <FypMeritPanel entries={fypMeritEntries} showSchoolFilter showUniversityFilter meritEndpoint="/api/v1/paths/fyp-thesis/merit-model" />
                 )
             ) : (
             <>

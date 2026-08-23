@@ -23,6 +23,7 @@ import {
     EMPTY_COURSE_PROJECT,
     mergeCourseProjectEntry,
     composeCourseProjectSummaries,
+    courseProjectMetricLine,
     normalizeGroupMembers,
     activeSectionKeys,
     SECTION_LABELS,
@@ -68,17 +69,17 @@ const INC_TILES: { key: keyof CourseProjectModuleInclusion; emoji: string; label
     { key: "aim", emoji: "🎯", label: "Aim & objectives" },
     { key: "act", emoji: "🛠️", label: "Activities" },
     { key: "meth", emoji: "🔬", label: "Method / research" },
-    { key: "find", emoji: "📈", label: "Findings" },
-    { key: "imp", emoji: "📏", label: "Results & evidence" },
+    { key: "find", emoji: "📊", label: "Findings" },
+    { key: "res", emoji: "📏", label: "Results & evidence" },
     { key: "lim", emoji: "⚠️", label: "Limitations" },
 ];
 
-const ACTIVITY_OPTIONS = ["🔍 Research & reading", "📊 Data collection", "🎨 Designing / creating", "🧩 Ideation / concepts", "🧪 Testing / experimenting", "🧱 Building / making", "🖥 Coding / development", "👀 Observation / site visit", "🤝 Working with an organisation", "📣 Running a campaign / event", "🎤 Presenting / pitching", "✍️ Drafting & editing", "🎬 Filming / recording"];
-const METHOD_OPTIONS = ["📋 Survey", "🗣️ Interviews", "🧪 Experiment", "👀 Observation / site visit", "📊 Data analysis", "🗂️ Case analysis", "📚 Literature search", "⚖️ Legal / doctrinal analysis", "Not applicable"];
-const BENEFICIARY_OPTIONS = ["Students", "University / campus", "Community", "Business / industry", "Government / public sector", "Schools", "Environment / ecosystems", "Specific user group", "General public", "No specific external beneficiary"];
+const ACTIVITY_OPTIONS = ["🔍 Research & reading", "📊 Data collection", "🎨 Designing / creating", "🧩 Ideation / concepts", "🧪 Testing / experimenting", "🧱 Building / making", "🖥 Coding / development", "👀 Observation / site visit", "🤝 Working with an organisation", "📣 Running a campaign / event", "🎤 Presenting / pitching", "✍️ Drafting & editing", "🎬 Filming / recording", "📐 Modelling / simulation", "🔬 Lab / practical work", "👥 Stakeholder engagement", "🎭 Performance / exhibition", "📚 Teaching / facilitating", "🧠 Analysis / evaluation"];
+const METHOD_OPTIONS = ["📋 Survey", "🗣️ Interviews", "🗣️ Focus groups", "🧪 Experiment", "👀 Observation / site visit", "🥾 Site visit / field study", "📊 Data analysis", "🗂️ Case analysis", "📚 Literature search", "🗄️ Document / archival analysis", "🧑‍🤝‍🧑 User research", "🧪 User testing", "🎨 Design research", "📐 Modelling / simulation", "🧫 Lab testing", "🛠️ Technical testing", "⚖️ Legal / doctrinal analysis", "📜 Legal / policy analysis", "🎨 Creative / practice-based inquiry", "📊 Comparative analysis", "Not applicable"];
+const BENEFICIARY_OPTIONS = ["Students", "University / campus", "Community", "Business / industry", "Government / public sector", "Schools", "Environment / ecosystems", "Specific user group", "General public", "Knowledge / understanding", "No specific external beneficiary"];
 const STAKEHOLDER_OPTIONS = ["No external stakeholders", "Students", "Faculty", "Community members", "Business / industry", "NGO / nonprofit", "Government / public body", "School", "Experts / professionals", "Clients / users"];
-const OUTPUT_OPTIONS = ["📄 Report / plan", "✍️ Essay / written piece", "📽️ Presentation / slides", "📐 Design / model", "🔧 Prototype", "📱 App / website", "📣 Campaign materials", "🎬 Video / artwork", "🎭 Performance / exhibit", "📊 Dataset / findings", "📜 Brief / memo", "🌐 Translation / portfolio"];
-const SKILL_OPTIONS = ["🗣️ Communication", "🤝 Teamwork", "🔬 Research", "🧩 Problem-solving", "🎨 Creativity", "⏰ Time management", "🌍 Sustainability thinking", "⚖️ Ethical reasoning", "✍️ Writing", "🎤 Presenting"];
+const OUTPUT_OPTIONS = ["📄 Report / plan", "✍️ Essay / written piece", "📽️ Presentation / slides", "📐 Design / model", "🔧 Prototype", "📱 App / website", "📣 Campaign materials", "🎬 Video / artwork", "🎭 Performance / exhibit", "📊 Dataset / findings", "📜 Brief / memo", "🌐 Translation / portfolio", "📋 Proposal / plan", "💼 Business plan", "🧱 Product", "🏛️ Architectural / spatial design", "📚 Teaching / learning material", "🎪 Event / workshop / activity", "🤝 Community intervention", "🧮 Model / simulation", "🛠️ Technical solution"];
+const SKILL_OPTIONS = ["🗣️ Communication", "🤝 Teamwork", "🔬 Research", "🧩 Problem-solving", "🎨 Creativity", "⏰ Time management", "🌍 Sustainability thinking", "⚖️ Ethical reasoning", "✍️ Writing", "🎤 Presenting", "🧠 Critical thinking", "📋 Project management", "🔗 Systems thinking", "📊 Data literacy", "💻 Digital / technical", "🚀 Leadership", "🤝 Stakeholder engagement"];
 const ORIGIN_OPTIONS = ["📋 Built into the assignment", "📘 Built into the course", "💡 Introduced by the student / team", "👩‍🏫 Suggested by the instructor", "🔍 Emerged during the work", "🔗 Identified when reviewing the completed work"];
 const INTEGRATION_OPTIONS = ["🌱 Central to the work and demonstrated", "📊 Clearly connected, outcome not measured", "🌓 Partially integrated", "🔗 Indirectly connected", "🔍 Identified retrospectively"];
 const MEASURED_OPTIONS = ["✅ Yes — a result was actually measured", "🌓 Partly — some evidence, not enough to confirm", "📋 No — findings / designs / recommendations only", "⏳ Not yet — will be measured later"];
@@ -90,6 +91,7 @@ const METRIC_CHARACTER_OPTIONS = ["Positive / expected", "Mixed", "No significan
 const METRIC_VERIFIER_OPTIONS = ["Faculty / supervisor", "University department", "Client / user", "Community partner", "NGO", "Business / industry partner", "Government / public institution", "Laboratory / technical facility", "System / digital records", "Student team records", "No external verifier", "Other"];
 const LIMITATION_OPTIONS = ["Small sample size", "Limited time", "One location only", "Limited access to participants", "No baseline available", "Prototype not tested in real conditions", "Self-reported responses only", "Technical limitations", "No long-term follow-up", "Other — describe below"];
 const NEXT_STEP_OPTIONS = ["Completed as coursework", "Could be developed further", "Further research recommended", "Could be tested / piloted", "Recommended for implementation", "Share with external stakeholder", "Continued in another course", "Already taken forward", "Other"];
+const EVIDENCE_TYPE_OPTIONS = ["📄 Report", "🎤 Slides", "🪧 Poster", "📸 Photos", "🎬 Video", "🖼️ Artwork / design", "🔧 Prototype docs", "📊 Dataset", "🌐 Link"];
 /** Broad discipline/field categories — distinct from Programme (a specific HEC degree title, e.g. "BBA"). */
 const DISCIPLINE_OPTIONS = ["Business & Management", "Economics", "Architecture", "Design", "Fine Arts", "Textile & Fashion", "Media & Communication", "Computer Science", "Engineering", "Mathematics & Statistics", "Social Sciences", "Psychology", "Education", "Liberal Arts", "Languages & Linguistics", "Natural Sciences", "Law", "Medicine & Nursing", "Pharmacy", "Health Sciences", "Agriculture & Food", "Hospitality & Tourism", "Islamic Studies & Theology"];
 
@@ -291,6 +293,16 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
     );
 }
 
+/** Live, read-only preview of this section's auto-composed paragraph — updates on every keystroke/tap. */
+function SectionSummaryBox({ text }: { text?: string }) {
+    return (
+        <div className="rounded-ciel-sm border border-dashed border-ciel-gold/50 bg-ciel-gold-soft/60 px-4 py-3 text-xs leading-relaxed text-ciel-gold-deep">
+            <span className="mb-1 block text-[9px] font-black uppercase tracking-widest text-ciel-gold">✨ Section summary</span>
+            <span>{text?.trim() ? text : "Fills as you type…"}</span>
+        </div>
+    );
+}
+
 function ChipSingle({ options, value, onChange }: { options: string[]; value?: string; onChange: (v: string) => void }) {
     return (
         <div className="flex flex-wrap gap-2">
@@ -327,7 +339,8 @@ function ChipGroup({
     otherPlaceholder?: string;
 }) {
     const hasOther = onOtherChange !== undefined;
-    const otherSelected = hasOther && !!otherValue?.trim();
+    const [otherOn, setOtherOn] = useState(() => !!otherValue?.trim());
+    const showOther = hasOther && (otherOn || !!otherValue?.trim());
     return (
         <div className="space-y-2.5">
             <div className="flex flex-wrap gap-2">
@@ -350,20 +363,27 @@ function ChipGroup({
                 {hasOther ? (
                     <button
                         type="button"
-                        onClick={() => onOtherChange!(otherSelected ? "" : " ")}
+                        onClick={() => {
+                            if (showOther) {
+                                setOtherOn(false);
+                                onOtherChange!("");
+                            } else {
+                                setOtherOn(true);
+                            }
+                        }}
                         className={clsx(
                             "ciel-transition rounded-full border-2 border-dashed px-3.5 py-2 text-xs font-bold",
-                            otherSelected ? "border-ciel-gold bg-ciel-gold-soft text-ciel-gold-deep" : "border-ciel-border text-ciel-text-mid hover:border-ciel-gold/40",
+                            showOther ? "border-ciel-gold bg-ciel-gold-soft text-ciel-gold-deep" : "border-ciel-border text-ciel-text-mid hover:border-ciel-gold/40",
                         )}
                     >
                         ＋ Other…
                     </button>
                 ) : null}
             </div>
-            {hasOther && otherSelected ? (
+            {showOther ? (
                 <input
                     type="text"
-                    value={otherValue?.trim() ?? ""}
+                    value={otherValue ?? ""}
                     onChange={(e) => onOtherChange!(e.target.value)}
                     placeholder={otherPlaceholder || "Type your own…"}
                     className={fieldClass}
@@ -466,6 +486,7 @@ export default function CourseProjectWizardPage() {
     const [step, setStep] = useState(0);
     const [editing, setEditing] = useState(false);
     const [review, setReview] = useState<Record<string, { accepted: boolean; edited: boolean; text: string }>>({});
+    const [declarationChecked, setDeclarationChecked] = useState(false);
     const [saving, setSaving] = useState(false);
     const [uploading, setUploading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -553,8 +574,13 @@ export default function CourseProjectWizardPage() {
         const cur = entry.assignmentInfo?.formats ?? (entry.assignmentInfo?.format ? [entry.assignmentInfo.format] : []);
         const next = cur.includes(fmt) ? cur.filter((x) => x !== fmt) : [...cur, fmt];
         patchGroup("assignmentInfo", { formats: next, format: next[0] });
-        if (next[0]) {
-            const preset = COURSEWORK_MODES[courseProjectRouteFor(next)].i;
+        // Only re-apply the "which sections apply" preset when the leading route actually changes —
+        // adding/removing a secondary format that keeps the same route shouldn't silently discard
+        // any manual tile customization the student already made.
+        const prevRoute = cur.length ? courseProjectRouteFor(cur) : null;
+        const nextRoute = next.length ? courseProjectRouteFor(next) : null;
+        if (nextRoute && nextRoute !== prevRoute) {
+            const preset = COURSEWORK_MODES[nextRoute].i;
             setEntry((e) => ({ ...e, moduleInclusion: { ...preset } }));
         }
     };
@@ -649,7 +675,8 @@ export default function CourseProjectWizardPage() {
     const isOwner = entry.isOwner !== false;
     const showCard = (entry.status === "submitted" && !editing) || !isOwner;
     const teamMode = entry.studentInfo?.teamMode ?? "";
-    const isTeam = !!teamMode && teamMode !== "Individual";
+    // Legacy entries may still say "Solo" instead of "Individual" — treat both as not-a-team.
+    const isTeam = !!teamMode && !/^(individual|solo)$/i.test(teamMode);
     const allFormats = entry.assignmentInfo?.formats ?? (entry.assignmentInfo?.format ? [entry.assignmentInfo.format] : []);
     const primaryFormat = allFormats[0];
     const routesIn = Array.from(new Set(allFormats.map((f) => FORMAT_ROUTE[f] || "writer")));
@@ -659,6 +686,38 @@ export default function CourseProjectWizardPage() {
     const routeMode = route ? COURSEWORK_MODES[route] : undefined;
     const blended = routesIn.length > 1;
     const stepLabels = STEPS.map((s, i) => (routeMode && i >= 2 && i <= 4 ? routeMode.steps[i - 2] : s.label));
+
+    const primarySdg = entry.sdgMapping?.entries?.[0];
+    const supportingSdgs = entry.sdgMapping?.entries?.slice(1) ?? [];
+    const metricLines = (entry.resultsInfo?.metrics ?? []).map(courseProjectMetricLine).filter(Boolean);
+    const snapshotRows: [string, string][] = [
+        ["Course", [entry.course, entry.studentInfo?.programme, entry.studentInfo?.semester].filter(Boolean).join(" · ") || "—"],
+        ["Coursework", [entry.projectTitle, allFormats.join(" + "), teamMode].filter(Boolean).join(" · ") || "—"],
+        ["Format", allFormats.join(" + ") || "—"],
+        ["Aim", inc.aim ? entry.aimsInfo?.aimStatement || "—" : "Not applicable to this format"],
+        ["Activities", (entry.processInfo?.activities ?? []).join(" · ") || "—"],
+        ["Main output", entry.resultsInfo?.outputDescription || "—"],
+        ["Key insight", entry.resultsInfo?.findings?.[0] || "—"],
+        ["Evidence status", metricLines.join(" · ") || entry.resultsInfo?.evidenceStatus || "—"],
+        ["Limitation", entry.resultsInfo?.limitationType || "—"],
+        [
+            "Primary SDG",
+            entry.sdgMapping?.notApplicable
+                ? "➖ Not applicable — honestly declared, flagged for teacher confirmation"
+                : primarySdg
+                  ? `SDG ${primarySdg.goalNumber}${primarySdg.targets?.length ? ` · ${primarySdg.targets.join(", ")}` : ""}`
+                  : "—",
+        ],
+        ["Supporting SDGs", entry.sdgMapping?.notApplicable ? "—" : supportingSdgs.map((e) => `SDG ${e.goalNumber} (${e.strength || "supporting"})`).join(" · ") || "—"],
+        ["Sustainability integration", entry.reflectionInfo?.integrationLevel || entry.reflectionInfo?.sdgLinkHonesty || "—"],
+        [
+            "Attachment",
+            entry.assignmentFileUrl
+                ? `📎 Assignment attached (+ supporting files: ${entry.evidenceUrls?.length ? "yes" : "no"}) — private, reviewer-visible`
+                : "None — optional, but it lifts your Verifiability score",
+        ],
+        ["Instructor", [entry.studentInfo?.teacherName, entry.studentInfo?.teacherEmail].filter(Boolean).join(" · ") || "—"],
+    ];
 
     return (
         <PathWorkspaceShell
@@ -820,6 +879,7 @@ export default function CourseProjectWizardPage() {
                             <Field label="➕ Anything else about you or the course?">
                                 <textarea rows={2} value={entry.studentInfo?.notes ?? ""} onChange={(e) => patchGroup("studentInfo", { notes: e.target.value })} placeholder="Anything you'd like on the record…" className={fieldClass} />
                             </Field>
+                            <SectionSummaryBox text={sums.course} />
                         </>
                     )}
 
@@ -902,6 +962,7 @@ export default function CourseProjectWizardPage() {
                             <Field label="➕ Anything else about the coursework?">
                                 <textarea rows={2} value={entry.assignmentInfo?.notes ?? ""} onChange={(e) => patchGroup("assignmentInfo", { notes: e.target.value })} placeholder="Anything we didn't ask…" className={fieldClass} />
                             </Field>
+                            <SectionSummaryBox text={sums.assignment} />
                         </>
                     )}
 
@@ -927,11 +988,9 @@ export default function CourseProjectWizardPage() {
                                                 className={fieldClass}
                                             />
                                         ))}
-                                        {(entry.aimsInfo?.objectives?.length ?? 0) < 8 && (
-                                            <button type="button" onClick={() => patchGroup("aimsInfo", { objectives: [...(entry.aimsInfo?.objectives ?? [""]), ""] })} className="text-xs font-bold text-ciel-gold-deep hover:underline">
-                                                + Add another objective
-                                            </button>
-                                        )}
+                                        <button type="button" onClick={() => patchGroup("aimsInfo", { objectives: [...(entry.aimsInfo?.objectives ?? [""]), ""] })} className="text-xs font-bold text-ciel-gold-deep hover:underline">
+                                            + Add another objective
+                                        </button>
                                     </div>
                                 </Field>
                                 <Field label="Who or what was it intended to benefit, influence or improve?" hint="Tap all that apply.">
@@ -950,6 +1009,7 @@ export default function CourseProjectWizardPage() {
                                 <Field label="➕ Anything else here?">
                                     <textarea rows={2} value={entry.aimsInfo?.notes ?? ""} onChange={(e) => patchGroup("aimsInfo", { notes: e.target.value })} placeholder="Anything we didn't ask…" className={fieldClass} />
                                 </Field>
+                                <SectionSummaryBox text={sums.aims} />
                             </>
                         ) : (
                             <p className="rounded-ciel-sm bg-ciel-page px-4 py-6 text-center text-sm font-semibold text-ciel-text-soft">
@@ -959,65 +1019,63 @@ export default function CourseProjectWizardPage() {
                     )}
 
                     {step === 3 && (
-                        (inc.act || inc.meth) ? (
-                            <>
-                                {inc.act && (
-                                    <Field label="Activities conducted" hint="Tap all that apply.">
-                                        <ChipGroup
-                                            options={ACTIVITY_OPTIONS}
-                                            selected={entry.processInfo?.activities ?? []}
-                                            onToggle={(v) => {
-                                                const cur = entry.processInfo?.activities ?? [];
-                                                patchGroup("processInfo", { activities: cur.includes(v) ? cur.filter((x) => x !== v) : [...cur, v] });
-                                            }}
-                                            otherValue={entry.processInfo?.activitiesOther}
-                                            onOtherChange={(v) => patchGroup("processInfo", { activitiesOther: v })}
-                                            otherPlaceholder="What else did you do?"
-                                        />
-                                    </Field>
-                                )}
-                                {inc.meth && (
-                                    <>
-                                        <Field label="🔬 Research / method used" hint="Tap all that apply — “Not applicable” is a valid answer.">
-                                            <ChipGroup
-                                                options={METHOD_OPTIONS}
-                                                selected={entry.processInfo?.methods ?? []}
-                                                onToggle={(v) => {
-                                                    const cur = entry.processInfo?.methods ?? [];
-                                                    patchGroup("processInfo", { methods: cur.includes(v) ? cur.filter((x) => x !== v) : [...cur, v] });
-                                                }}
-                                                otherValue={entry.processInfo?.methodsOther}
-                                                onOtherChange={(v) => patchGroup("processInfo", { methodsOther: v })}
-                                                otherPlaceholder="Your method"
-                                            />
-                                        </Field>
-                                        <Field label="Scale / scope of the work" hint="Taps only — this is a class assignment, not a PhD; “not applicable” is a complete answer.">
-                                            <ScaleBuilder value={entry.processInfo?.sampleScale ?? ""} onChange={(v) => patchGroup("processInfo", { sampleScale: v })} />
-                                        </Field>
-                                    </>
-                                )}
-                                <Field label="Who did you engage or work with?" hint="Optional — tap all that apply.">
+                        <>
+                            {inc.act && (
+                                <Field label="Activities conducted" hint="Tap all that apply.">
                                     <ChipGroup
-                                        options={STAKEHOLDER_OPTIONS}
-                                        selected={entry.processInfo?.stakeholders ?? []}
+                                        options={ACTIVITY_OPTIONS}
+                                        selected={entry.processInfo?.activities ?? []}
                                         onToggle={(v) => {
-                                            const cur = entry.processInfo?.stakeholders ?? [];
-                                            patchGroup("processInfo", { stakeholders: cur.includes(v) ? cur.filter((x) => x !== v) : [...cur, v] });
+                                            const cur = entry.processInfo?.activities ?? [];
+                                            patchGroup("processInfo", { activities: cur.includes(v) ? cur.filter((x) => x !== v) : [...cur, v] });
                                         }}
-                                        otherValue={entry.processInfo?.stakeholdersOther}
-                                        onOtherChange={(v) => patchGroup("processInfo", { stakeholdersOther: v })}
-                                        otherPlaceholder="Who else?"
+                                        otherValue={entry.processInfo?.activitiesOther}
+                                        onOtherChange={(v) => patchGroup("processInfo", { activitiesOther: v })}
+                                        otherPlaceholder="What else did you do?"
                                     />
                                 </Field>
-                                <Field label="➕ Anything else about the process?">
-                                    <textarea rows={2} value={entry.processInfo?.notes ?? ""} onChange={(e) => patchGroup("processInfo", { notes: e.target.value })} placeholder="Anything we didn't ask…" className={fieldClass} />
+                            )}
+                            {inc.meth && (
+                                <Field label="🔬 Research / method used" hint="Tap all that apply — “Not applicable” is a valid answer.">
+                                    <ChipGroup
+                                        options={METHOD_OPTIONS}
+                                        selected={entry.processInfo?.methods ?? []}
+                                        onToggle={(v) => {
+                                            const cur = entry.processInfo?.methods ?? [];
+                                            patchGroup("processInfo", { methods: cur.includes(v) ? cur.filter((x) => x !== v) : [...cur, v] });
+                                        }}
+                                        otherValue={entry.processInfo?.methodsOther}
+                                        onOtherChange={(v) => patchGroup("processInfo", { methodsOther: v })}
+                                        otherPlaceholder="Your method"
+                                    />
                                 </Field>
-                            </>
-                        ) : (
-                            <p className="rounded-ciel-sm bg-ciel-page px-4 py-6 text-center text-sm font-semibold text-ciel-text-soft">
-                                Not applicable for this format — go back to step 2 to turn it on if that&apos;s wrong.
-                            </p>
-                        )
+                            )}
+                            {!inc.act && !inc.meth && (
+                                <p className="rounded-ciel-sm bg-ciel-page px-4 py-3 text-center text-xs font-semibold text-ciel-text-soft">
+                                    Activities and methods aren&apos;t usually needed for this format — go back to step 2 to turn them on if that&apos;s wrong.
+                                </p>
+                            )}
+                            <Field label="Scale / scope of the work" hint="Taps only — this is a class assignment, not a PhD; “not applicable” is a complete answer.">
+                                <ScaleBuilder value={entry.processInfo?.sampleScale ?? ""} onChange={(v) => patchGroup("processInfo", { sampleScale: v })} />
+                            </Field>
+                            <Field label="Who did you engage or work with?" hint="Optional — tap all that apply.">
+                                <ChipGroup
+                                    options={STAKEHOLDER_OPTIONS}
+                                    selected={entry.processInfo?.stakeholders ?? []}
+                                    onToggle={(v) => {
+                                        const cur = entry.processInfo?.stakeholders ?? [];
+                                        patchGroup("processInfo", { stakeholders: cur.includes(v) ? cur.filter((x) => x !== v) : [...cur, v] });
+                                    }}
+                                    otherValue={entry.processInfo?.stakeholdersOther}
+                                    onOtherChange={(v) => patchGroup("processInfo", { stakeholdersOther: v })}
+                                    otherPlaceholder="Who else?"
+                                />
+                            </Field>
+                            <Field label="➕ Anything else about the process?">
+                                <textarea rows={2} value={entry.processInfo?.notes ?? ""} onChange={(e) => patchGroup("processInfo", { notes: e.target.value })} placeholder="Anything we didn't ask…" className={fieldClass} />
+                            </Field>
+                            <SectionSummaryBox text={sums.process} />
+                        </>
                     )}
 
                     {step === 4 && (
@@ -1080,7 +1138,7 @@ export default function CourseProjectWizardPage() {
                                 </div>
                             )}
 
-                            {inc.imp && (
+                            {(inc.res ?? inc.imp) && (
                                 <div className="space-y-3">
                                     <p className="text-xs font-black uppercase tracking-widest text-ciel-text-soft">C · Your numbers — did anything countable come out of this work? <span className="font-semibold normal-case tracking-normal text-ciel-text-soft">(most class assignments have one number at most — that&apos;s normal)</span></p>
                                     <ChipSingle options={MEASURED_OPTIONS} value={entry.resultsInfo?.measured} onChange={(v) => patchGroup("resultsInfo", { measured: v })} />
@@ -1097,13 +1155,18 @@ export default function CourseProjectWizardPage() {
                                     <Field label="Main limitation">
                                         <select
                                             value={LIMITATION_OPTIONS.includes(entry.resultsInfo?.limitationType ?? "") ? entry.resultsInfo?.limitationType : entry.resultsInfo?.limitationType ? "Other — describe below" : ""}
-                                            onChange={(e) => patchGroup("resultsInfo", { limitationType: e.target.value === "Other — describe below" ? (entry.resultsInfo?.limitationOther ?? "") : e.target.value })}
+                                            onChange={(e) => patchGroup("resultsInfo", { limitationType: e.target.value })}
                                             className={fieldClass}
                                         >
                                             <option value="">Select the closest…</option>
                                             {LIMITATION_OPTIONS.map((l) => <option key={l} value={l}>{l}</option>)}
                                         </select>
                                     </Field>
+                                    {entry.resultsInfo?.limitationType === "Other — describe below" && (
+                                        <Field label="Describe the limitation">
+                                            <input type="text" value={entry.resultsInfo?.limitationOther ?? ""} onChange={(e) => patchGroup("resultsInfo", { limitationOther: e.target.value })} placeholder="Describe your limitation" className={fieldClass} />
+                                        </Field>
+                                    )}
                                     <Field label="Optional — briefly explain the limitation">
                                         <input type="text" value={entry.resultsInfo?.limitationDetail ?? ""} onChange={(e) => patchGroup("resultsInfo", { limitationDetail: e.target.value })} placeholder="e.g. costing based on one supplier's quote" className={fieldClass} />
                                     </Field>
@@ -1144,10 +1207,16 @@ export default function CourseProjectWizardPage() {
                             <Field label="➕ Anything else about your results?" hint="Optional.">
                                 <input type="text" value={entry.resultsInfo?.notes ?? ""} onChange={(e) => patchGroup("resultsInfo", { notes: e.target.value })} placeholder="Only if something important wasn't captured above…" className={fieldClass} />
                             </Field>
+                            <SectionSummaryBox text={sums.results} />
                         </div>
                     )}
 
-                    {step === 5 && <SdgStep entry={entry} patchGroup={patchGroup} />}
+                    {step === 5 && (
+                        <>
+                            <SdgStep entry={entry} patchGroup={patchGroup} />
+                            <SectionSummaryBox text={sums.sdg} />
+                        </>
+                    )}
 
                     {step === 6 && (
                         <>
@@ -1180,11 +1249,21 @@ export default function CourseProjectWizardPage() {
                             <Field label="➕ Anything else you'd like to reflect on?">
                                 <textarea rows={2} value={entry.reflectionInfo?.notes ?? ""} onChange={(e) => patchGroup("reflectionInfo", { notes: e.target.value })} placeholder="Anything we didn't ask…" className={fieldClass} />
                             </Field>
+                            <SectionSummaryBox text={sums.reflection} />
                         </>
                     )}
 
                     {step === 7 && (
                         <div className="space-y-5">
+                            <div className="rounded-ciel-sm border border-ciel-border bg-white">
+                                {snapshotRows.map(([k, val]) => (
+                                    <div key={k} className="flex gap-3 border-b border-ciel-border px-4 py-2.5 text-xs leading-relaxed last:border-b-0">
+                                        <span className="w-36 shrink-0 text-[10px] font-black uppercase tracking-widest text-ciel-text-soft">{k}</span>
+                                        <span className="text-ciel-text">{val}</span>
+                                    </div>
+                                ))}
+                            </div>
+
                             <Field label="📎 Upload your files" hint="Optional — the same uploads as the floating 📎 button; PDF · DOCX · PPTX · images · links.">
                                 <label className={clsx("ciel-transition flex cursor-pointer items-center gap-3 rounded-ciel-sm border-2 border-dashed px-4 py-3 text-sm font-semibold", entry.assignmentFileUrl ? "border-ciel-green bg-ciel-green-soft text-ciel-green-deep" : "border-ciel-gold/50 bg-ciel-gold-soft text-ciel-gold-deep hover:border-ciel-gold", uploading && "opacity-60")}>
                                     <UploadCloud className="h-4 w-4" />
@@ -1209,6 +1288,17 @@ export default function CourseProjectWizardPage() {
                                         ))}
                                     </ul>
                                 )}
+                            </Field>
+
+                            <Field label="What do the files include?" hint="Tap all that apply.">
+                                <ChipGroup
+                                    options={EVIDENCE_TYPE_OPTIONS}
+                                    selected={entry.evidenceTypes ?? []}
+                                    onToggle={(v) => {
+                                        const cur = entry.evidenceTypes ?? [];
+                                        setEntry((s) => ({ ...s, evidenceTypes: cur.includes(v) ? cur.filter((x) => x !== v) : [...cur, v] }));
+                                    }}
+                                />
                             </Field>
 
                             <div className="rounded-ciel-sm border border-ciel-border bg-ciel-page/40 p-4 text-[11.5px] leading-relaxed text-ciel-text">
@@ -1288,6 +1378,19 @@ export default function CourseProjectWizardPage() {
                                 })}
                                 {!allAccepted && <p className="text-xs font-semibold text-ciel-text-soft">Accept every section above to unlock submission.</p>}
                             </div>
+
+                            <label className="flex items-start gap-3 rounded-ciel-sm border border-ciel-gold/40 bg-ciel-gold-soft/50 px-4 py-3 text-xs leading-relaxed text-ciel-gold-deep">
+                                <input
+                                    type="checkbox"
+                                    checked={declarationChecked}
+                                    onChange={(e) => setDeclarationChecked(e.target.checked)}
+                                    className="mt-0.5 h-[18px] w-[18px] shrink-0"
+                                />
+                                <span>
+                                    <b>Final declaration:</b> I confirm this accurately represents the coursework completed. Any targets,
+                                    estimates or projected outcomes are identified as such and not presented as measured results.
+                                </span>
+                            </label>
                         </div>
                     )}
                 </div>
@@ -1316,8 +1419,8 @@ export default function CourseProjectWizardPage() {
                         ) : (
                             <button
                                 type="button"
-                                disabled={saving || !allAccepted}
-                                title={allAccepted ? undefined : "Accept every section above first"}
+                                disabled={saving || !allAccepted || !declarationChecked}
+                                title={!allAccepted ? "Accept every section above first" : !declarationChecked ? "Confirm the final declaration first" : undefined}
                                 onClick={async () => {
                                     await save({ ...saveAllFields(), status: "submitted", sectionSummaries: finalSectionSummaries() }, 8);
                                     router.push("/dashboard/student/paths/course-project");

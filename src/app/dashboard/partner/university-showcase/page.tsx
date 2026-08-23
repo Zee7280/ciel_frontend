@@ -136,9 +136,9 @@ export default function UniversityShowcasePage() {
 
                 {showMeritModel && !activeLoading && activeCount > 0 && (
                     mode === "course-project" ? (
-                        <MeritModelPanel entries={entries} showDepartmentFilter showFacultyFilter />
+                        <MeritModelPanel entries={entries} showDepartmentFilter showFacultyFilter meritEndpoint="/api/v1/paths/course-projects/merit-model" />
                     ) : (
-                        <FypMeritPanel entries={fypEntries} showSchoolFilter />
+                        <FypMeritPanel entries={fypEntries} showSchoolFilter meritEndpoint="/api/v1/paths/fyp-thesis/merit-model" />
                     )
                 )}
 

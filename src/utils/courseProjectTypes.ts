@@ -145,7 +145,9 @@ export interface CourseProjectModuleInclusion {
     act?: boolean;
     meth?: boolean;
     find?: boolean;
+    /** @deprecated the wizard's tile is "Results / evidence" (key `res`), not "Impact" — kept for older entries. */
     imp?: boolean;
+    res?: boolean;
     lim?: boolean;
 }
 export interface CourseProjectSectionSummaries {
@@ -168,6 +170,8 @@ export interface CourseProjectEntry {
     /** The primary uploaded assignment file (essay/deck/design file/code link) — distinct from evidenceUrls' supporting files. Drives half the Verifiability score. */
     assignmentFileUrl?: string | null;
     evidenceUrls: string[] | null;
+    /** What the uploaded files include (report, slides, poster, photos, etc.) — student-declared, shown alongside the upload boxes at review. */
+    evidenceTypes?: string[] | null;
     studentInfo: CourseProjectStudentInfo | null;
     assignmentInfo: CourseProjectAssignmentInfo | null;
     aimsInfo: CourseProjectAimsInfo | null;
@@ -198,6 +202,7 @@ export const EMPTY_COURSE_PROJECT: CourseProjectEntry = {
     sdgs: [],
     assignmentFileUrl: null,
     evidenceUrls: [],
+    evidenceTypes: [],
     studentInfo: {},
     assignmentInfo: {},
     aimsInfo: {},
@@ -205,7 +210,7 @@ export const EMPTY_COURSE_PROJECT: CourseProjectEntry = {
     resultsInfo: {},
     sdgMapping: {},
     reflectionInfo: {},
-    moduleInclusion: { aim: true, act: true, meth: false, find: false, imp: true, lim: true },
+    moduleInclusion: { aim: true, act: true, meth: true, find: true, res: true, lim: true },
     sectionSummaries: {},
     addedNote: "",
     stepCompleted: 0,
@@ -229,6 +234,7 @@ export function mergeCourseProjectEntry(base: CourseProjectEntry, data: Partial<
         moduleInclusion: { ...base.moduleInclusion, ...data.moduleInclusion },
         sectionSummaries: { ...base.sectionSummaries, ...data.sectionSummaries },
         evidenceUrls: data.evidenceUrls ?? base.evidenceUrls,
+        evidenceTypes: data.evidenceTypes ?? base.evidenceTypes,
     };
 }
 
@@ -273,14 +279,17 @@ export function composeCourseProjectSummaries(entry: CourseProjectEntry): Course
     const My = solo ? "my" : "our";
     const Me = solo ? "me" : "us";
 
+    // Mirrors the mockup's X(i) helper — appends the section's optional "anything else" free text.
+    const note = (n?: string) => (n?.trim() ? ` Additionally: ${lc(n.trim())}.` : "");
+
     const s: CourseProjectSectionSummaries = {};
     s.course = entry.course
-        ? `${W} took <b>${entry.course}</b>${si.programme ? ` (${si.programme}${si.semester ? `, ${si.semester}` : ""})` : si.semester ? ` in ${si.semester}` : ""}${si.teamMode && !solo ? `, working as ${lc(si.teamMode)}${gms.length ? ` — ${joinList(gms)}` : ""}` : ""}${si.teacherName ? `, under ${si.teacherName}` : ""}.`
+        ? `${W} took <b>${entry.course}</b>${si.programme ? ` (${si.programme}${si.semester ? `, ${si.semester}` : ""})` : si.semester ? ` in ${si.semester}` : ""}${si.teamMode && !solo ? `, working as ${lc(si.teamMode)}${gms.length ? ` — ${joinList(gms)}` : ""}` : ""}${si.teacherName ? `, under ${si.teacherName}` : ""}.${note(si.notes)}`
         : "";
 
     const formatLabels = formats.map((f) => stripEmoji(f).split(" (")[0]);
     s.assignment = entry.projectTitle
-        ? `${cap(My)} work is "<b>${entry.projectTitle}</b>"${formatLabels.length ? ` — ${formatLabels.join(" + ")}` : ""}.${ai.whatAsked ? ` ${W} ${solo ? "was" : "were"} asked to ${lc(ai.whatAsked)}.` : ""}${ai.realWorldIssue ? ` It addresses ${lc(ai.realWorldIssue)}.` : ""}`
+        ? `${cap(My)} work is "<b>${entry.projectTitle}</b>"${formatLabels.length ? ` — ${formatLabels.join(" + ")}` : ""}.${ai.whatAsked ? ` ${W} ${solo ? "was" : "were"} asked to ${lc(ai.whatAsked)}.` : ""}${ai.realWorldIssue ? ` It addresses ${lc(ai.realWorldIssue)}.` : ""}${note(ai.notes)}`
         : "";
 
     const objs = (am.objectives || []).filter(Boolean);
@@ -288,7 +297,7 @@ export function composeCourseProjectSummaries(entry: CourseProjectEntry): Course
     // "Environment / ecosystems" for an emoji token and strip it).
     const benef = (am.beneficiaries || []).filter((b) => b && !/no specific/i.test(b)).map((b) => b.toLowerCase());
     s.aims = inc.aim && (am.aimStatement || objs.length)
-        ? `${cap(My)} aim was to <b>${am.aimStatement ? lc(am.aimStatement) : "—"}</b>${objs.length ? `. ${W} set out to: ${objs.map((o, i) => `(${i + 1}) ${lc(o)}`).join("; ")}` : ""}${benef.length ? `. ${W} hoped it would benefit ${benef.join(", ").toLowerCase()}` : ""}.`
+        ? `${cap(My)} aim was to <b>${am.aimStatement ? lc(am.aimStatement) : "—"}</b>${objs.length ? `. ${W} set out to: ${objs.map((o, i) => `(${i + 1}) ${lc(o)}`).join("; ")}` : ""}${benef.length ? `. ${W} hoped it would benefit ${benef.join(", ").toLowerCase()}` : ""}.${note(am.notes)}`
         : "";
 
     const acts = (pr.activities || []).map(stripEmoji).map((x) => x.toLowerCase());
@@ -297,34 +306,35 @@ export function composeCourseProjectSummaries(entry: CourseProjectEntry): Course
     // STAKEHOLDER_OPTIONS carry no emoji prefix — no stripEmoji, same reasoning as beneficiaries above.
     const stakeholders = (pr.stakeholders || []).filter((x) => !/no external/i.test(x)).map((x) => x.toLowerCase());
     s.process = (inc.act && acts.length) || (inc.meth && (meths.length || pr.sampleScale || noFormalMethod))
-        ? `${inc.act && acts.length ? `${W} worked through <b>${joinList(acts)}</b>. ` : ""}${inc.meth && meths.length ? `${cap(My)} methods: ${joinList(meths)}. ` : inc.meth && noFormalMethod ? `${W} used no formal research method — this was practice-led work. ` : ""}${inc.meth && pr.sampleScale ? `The scale of ${My} work: <b>${pr.sampleScale}</b>. ` : ""}${stakeholders.length ? `Along the way ${Wl} engaged ${stakeholders.join(", ").toLowerCase()}.` : ""}`
+        ? `${inc.act && acts.length ? `${W} worked through <b>${joinList(acts)}</b>. ` : ""}${inc.meth && meths.length ? `${cap(My)} methods: ${joinList(meths)}. ` : inc.meth && noFormalMethod ? `${W} used no formal research method — this was practice-led work. ` : ""}${inc.meth && pr.sampleScale ? `The scale of ${My} work: <b>${pr.sampleScale}</b>. ` : ""}${stakeholders.length ? `Along the way ${Wl} engaged ${stakeholders.join(", ").toLowerCase()}.` : ""}${note(pr.notes)}`
         : "";
 
     const outs = (re.outputs || []).map(stripEmoji).map((x) => x.toLowerCase());
     const finds = (re.findings || []).filter(Boolean);
     const metricLines = (re.metrics || []).map(courseProjectMetricLine).filter(Boolean);
-    const legacyEvidenceLine = inc.imp && !metricLines.length && re.evidenceStatus
+    const legacyEvidenceLine = (inc.res ?? inc.imp) && !metricLines.length && re.evidenceStatus
         ? ` ${W} noted evidence status: ${re.evidenceStatus}${re.metricName && re.metricValue ? ` — ${re.metricName}: ${re.metricValue}${re.metricUnit || ""}${re.numberRepresents ? ` (${re.numberRepresents.toLowerCase()})` : ""}` : ""}.`
         : "";
     const resultsLine = metricLines.length ? ` ${cap(My)} results: ${metricLines.join(" · ")}.` : legacyEvidenceLine;
     const recs = (re.recommendations || []).filter(Boolean);
+    const limitationLabel = re.limitationType === "Other — describe below" ? re.limitationOther : re.limitationType;
     s.results = outs.length || re.outputDescription
-        ? `${W} produced <b>${outs.length ? joinList(outs) : "—"}</b>${re.outputDescription ? ` — ${lc(re.outputDescription)}` : ""}.${inc.find && finds.length ? ` ${W} found that ${finds.map((f, i) => `(${i + 1}) ${lc(f)}`).join("; ")}.` : ""}${resultsLine}${inc.imp && re.measurableImpact ? ` Measured impact: ${lc(re.measurableImpact)}.` : ""}${inc.lim && re.limitationType ? ` ${W} acknowledge the main limitation honestly: ${lc(re.limitationType)}${re.limitationDetail ? ` — ${lc(re.limitationDetail)}` : ""}${re.limitationInterpretation ? ` — ${lc(re.limitationInterpretation)}` : ""}.` : ""}${recs.length ? ` Based on this, ${Wl} recommend: ${recs.map(lc).join("; ")}.` : ""}${re.resultsSummary ? ` <b>In ${My} own words:</b> ${re.resultsSummary}` : ""}`
+        ? `${W} produced <b>${outs.length ? joinList(outs) : "—"}</b>${re.outputDescription ? ` — ${lc(re.outputDescription)}` : ""}.${inc.find && finds.length ? ` ${W} found that ${finds.map((f, i) => `(${i + 1}) ${lc(f)}`).join("; ")}.` : ""}${resultsLine}${(inc.res ?? inc.imp) && re.measurableImpact ? ` Measured impact: ${lc(re.measurableImpact)}.` : ""}${inc.lim && limitationLabel ? ` ${W} acknowledge the main limitation honestly: ${lc(limitationLabel)}${re.limitationDetail ? ` — ${lc(re.limitationDetail)}` : ""}${re.limitationInterpretation ? ` — ${lc(re.limitationInterpretation)}` : ""}.` : ""}${recs.length ? ` Based on this, ${Wl} recommend: ${recs.map(lc).join("; ")}.` : ""}${re.resultsSummary ? ` <b>In ${My} own words:</b> ${re.resultsSummary}` : ""}${note(re.notes)}`
         : "";
 
     const entries = sm.entries || [];
     s.sdg = sm.notApplicable
-        ? `${W} looked honestly and found <b>no genuine SDG link in this assignment</b> — ${Wl}'d rather declare that than force one. Flagged for ${My} teacher's confirmation.`
+        ? `${W} looked honestly and found <b>no genuine SDG link in this assignment</b> — ${Wl}'d rather declare that than force one. Flagged for ${My} teacher's confirmation.${note(sm.notes)}`
         : entries.length
-          ? `${sm.origin ? `For ${Me}, sustainability ${lc(stripEmoji(sm.origin))}. ` : ""}${W} connected the work primarily to <b>SDG ${entries[0].goalNumber}${entries[0].targets.length ? ` (target ${entries[0].targets.join(", ")})` : ""}</b>${entries.length > 1 ? `, with ${entries.slice(1).map((en) => `SDG ${en.goalNumber} (${(en.strength || "supporting").toLowerCase()})`).join(" and ")} in support` : ""}.${entries[0].how ? ` In ${My} words: ${lc(entries[0].how)}` : ""}`
+          ? `${sm.origin ? `For ${Me}, sustainability ${lc(stripEmoji(sm.origin))}. ` : ""}${W} connected the work primarily to <b>SDG ${entries[0].goalNumber}${entries[0].targets.length ? ` (target ${entries[0].targets.join(", ")})` : ""}</b>${entries.length > 1 ? `, with ${entries.slice(1).map((en) => `SDG ${en.goalNumber} (${(en.strength || "supporting").toLowerCase()})`).join(" and ")} in support` : ""}.${entries[0].how ? ` In ${My} words: ${lc(entries[0].how)}` : ""}${note(sm.notes)}`
           : sm.origin
-            ? `For ${Me}, sustainability ${lc(stripEmoji(sm.origin))} — SDG selection pending.`
+            ? `For ${Me}, sustainability ${lc(stripEmoji(sm.origin))} — SDG selection pending.${note(sm.notes)}`
             : "";
 
     const sk = (rf.skills || []).map(stripEmoji).map((x) => x.toLowerCase());
     const integration = rf.integrationLevel || rf.sdgLinkHonesty;
     s.reflection = rf.lessonLearned || integration
-        ? `${rf.lessonLearned ? `This work taught ${Me} ${lc(rf.lessonLearned)}. ` : ""}${integration ? `Honestly, sustainability was <b>${lc(stripEmoji(integration))}</b>. ` : ""}${sk.length ? `${W} built skills in ${joinList(sk)}. ` : ""}${rf.nextSteps ? `What's next: ${lc(rf.nextSteps)}${rf.whatsNext ? ` — ${lc(rf.whatsNext)}` : ""}. ` : ""}${rf.adviceNextSemester ? `${cap(My)} advice to the next class: "${rf.adviceNextSemester}".` : ""}`
+        ? `${rf.lessonLearned ? `This work taught ${Me} ${lc(rf.lessonLearned)}. ` : ""}${integration ? `Honestly, sustainability was <b>${lc(stripEmoji(integration))}</b>. ` : ""}${sk.length ? `${W} built skills in ${joinList(sk)}. ` : ""}${rf.nextSteps ? `What's next: ${lc(rf.nextSteps)}${rf.whatsNext ? ` — ${lc(rf.whatsNext)}` : ""}. ` : ""}${rf.adviceNextSemester ? `${cap(My)} advice to the next class: "${rf.adviceNextSemester}".` : ""}${note(rf.notes)}`
         : "";
 
     return s;
@@ -400,49 +410,49 @@ export interface CourseProjectRouteMode {
 
 export const COURSEWORK_MODES: Record<CourseProjectRoute, CourseProjectRouteMode> = {
     writer: {
-        name: "✍️ Writer / analyst pathway",
+        name: "✍️ WRITER / ANALYST PATHWAY",
         aimL: "The overall aim",
         aimPh: "e.g. Develop a practical strategy to reduce cafeteria waste",
         fndL: "Key findings / conclusions",
         steps: ["Aims", "Research", "Findings"],
         road: ["🎯 Aim", "🔍 Research", "🧠 Argument", "📊 Findings", "🌍 SDG link"],
-        i: { aim: true, act: false, meth: true, find: true, imp: true, lim: true },
+        i: { aim: true, act: false, meth: true, find: true, res: true, lim: true },
     },
     advisor: {
-        name: "🧭 Advisor pathway",
+        name: "🧭 ADVISOR PATHWAY",
         aimL: "What the brief asked you to solve",
         aimPh: "e.g. Recommend how the café chain cuts single-use plastic without losing margin",
         fndL: "Key recommendations",
         steps: ["Brief", "Analysis", "Recommendation"],
         road: ["🏢 The brief", "🔍 Analysis", "📈 Recommendation", "📏 Evidence", "🌍 SDG link"],
-        i: { aim: true, act: false, meth: true, find: true, imp: true, lim: true },
+        i: { aim: true, act: false, meth: true, find: true, res: true, lim: true },
     },
     maker: {
-        name: "🎨 Maker pathway",
+        name: "🎨 MAKER PATHWAY",
         aimL: "Your design intention",
         aimPh: "e.g. A poster series that makes water-saving feel modern, not preachy",
         fndL: "What the work demonstrates",
         steps: ["Intention", "Process", "The work"],
         road: ["💡 Intention", "✂️ Process", "🔁 Iterations", "🖼️ Final work", "🌍 SDG link"],
-        i: { aim: true, act: true, meth: false, find: true, imp: true, lim: true },
+        i: { aim: true, act: true, meth: false, find: true, res: true, lim: true },
     },
     builder: {
-        name: "💻 Builder pathway",
+        name: "💻 BUILDER PATHWAY",
         aimL: "The problem you set out to solve",
         aimPh: "e.g. Society events clash because no shared campus calendar exists",
         fndL: "What the build proved",
         steps: ["Problem", "Build & test", "Output"],
         road: ["🧩 Problem", "🛠️ Build", "🧪 Testing", "✅ Output", "🌍 SDG link"],
-        i: { aim: true, act: true, meth: true, find: false, imp: true, lim: true },
+        i: { aim: true, act: true, meth: true, find: false, res: true, lim: true },
     },
     comm: {
-        name: "📣 Communicator pathway",
+        name: "📣 COMMUNICATOR PATHWAY",
         aimL: "Your concept / message",
         aimPh: "e.g. Make campus recycling feel like a team sport, not a chore",
         fndL: "Audience response / what it communicated",
         steps: ["Concept", "Making", "Response"],
         road: ["🎬 Concept", "🎥 Making", "👥 Audience", "💬 Response", "🌍 SDG link"],
-        i: { aim: true, act: true, meth: false, find: true, imp: true, lim: false },
+        i: { aim: true, act: true, meth: false, find: true, res: true, lim: false },
     },
 };
 

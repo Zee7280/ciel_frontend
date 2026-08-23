@@ -1,14 +1,49 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { ChevronDown, Trophy } from "lucide-react";
 import clsx from "clsx";
 import { sdgData } from "@/utils/sdgData";
+import { authenticatedFetch } from "@/utils/api";
 import { type CourseProjectEntry, stripEmoji } from "@/utils/courseProjectTypes";
-import { MERIT_RUBRIC, MERIT_NEUTRALITY_NOTE, computeMeritScorecard, whyItLeads, courseworkPotential } from "@/utils/courseworkMeritModel";
+import {
+    MERIT_RUBRIC,
+    MERIT_NEUTRALITY_NOTE,
+    computeMeritScorecard,
+    whyItLeads,
+    courseworkPotential,
+    meritGrade,
+    type MeritScorecard,
+    type MeritCriterionResult,
+    type MeritConsistencyFlag,
+} from "@/utils/courseworkMeritModel";
 
 export interface MeritEntry extends CourseProjectEntry {
     student?: { id: string; name: string; email: string; institution?: string; department?: string } | null;
+}
+
+/** Shape of one ranked card from GET .../merit-model (ciel_backend's RankedMeritCard, over JSON). */
+interface BackendMeritCard {
+    id: string;
+    scorecard: Record<MeritCriterionResult["key"], { pts: number; max: number; note: string; flag?: string }> & { total: number };
+}
+
+/** Backend scores are the source of truth for the entries it returns (only "approved" entries are
+ * eligible, so every card here is eligible by construction) — local computeMeritScorecard remains
+ * the fallback for anything the backend didn't return (fetch failure, or an ineligible entry the
+ * backend deliberately excludes but this panel still wants to show, dimmed, with a reason). */
+function scorecardFromBackend(card: BackendMeritCard): MeritScorecard {
+    const criteria: MeritCriterionResult[] = MERIT_RUBRIC.map((rubric) => {
+        const crit = card.scorecard[rubric.key];
+        return { ...rubric, points: crit?.pts ?? 0, note: crit?.note ?? "" };
+    });
+    const honestyFlag = card.scorecard.honesty?.flag;
+    const consistency: MeritConsistencyFlag = honestyFlag
+        ? { ok: honestyFlag.startsWith("✅"), message: honestyFlag.replace(/^[✅⚠️]\s*/u, "") }
+        : { ok: true, message: "Consistency check passed: claims match the declared evidence." };
+    const total = card.scorecard.total;
+    const [grade, gradeColor] = meritGrade(total);
+    return { criteria, total, grade, gradeColor, consistency, eligible: true };
 }
 
 function entryDepartment(e: MeritEntry): string {
@@ -45,6 +80,7 @@ export default function MeritModelPanel({
     showDepartmentFilter = false,
     showFacultyFilter = false,
     showUniversityFilter = false,
+    meritEndpoint,
 }: {
     entries: MeritEntry[];
     /** Show a department dropdown — meaningful for a university-wide pool, not a single faculty member's list. */
@@ -53,8 +89,16 @@ export default function MeritModelPanel({
     showFacultyFilter?: boolean;
     /** Show a university dropdown — only meaningful for the CIEL-wide, all-universities scope. */
     showUniversityFilter?: boolean;
+    /** GET .../merit-model route matching this caller's role scope, e.g. "/api/v1/paths/course-projects/merit-model".
+     * When set, real backend-computed scores are used for every entry the backend returns (source of truth);
+     * entries it doesn't return (not yet approved, or the fetch failed) still show via local computation below. */
+    meritEndpoint?: string;
 }) {
     const [ranked, setRanked] = useState(false);
+    const [backendCards, setBackendCards] = useState<Map<string, BackendMeritCard>>(new Map());
+    const [meritLoading, setMeritLoading] = useState(false);
+    const requestIdRef = useRef(0);
+
     const [department, setDepartment] = useState("all");
     const [faculty, setFaculty] = useState("all");
     const [university, setUniversity] = useState("all");
@@ -78,13 +122,41 @@ export default function MeritModelPanel({
         return p;
     }, [entries, showDepartmentFilter, department, showFacultyFilter, faculty, showUniversityFilter, university, semesters, from, to]);
 
+    const runMeritModel = () => {
+        setRanked(true);
+        if (!meritEndpoint) return;
+        const requestId = ++requestIdRef.current;
+        setMeritLoading(true);
+        authenticatedFetch(meritEndpoint)
+            .then((res) => (res?.ok ? res.json() : null))
+            .then((result) => {
+                if (requestId !== requestIdRef.current) return; // a newer click already superseded this one
+                const cards: BackendMeritCard[] = Array.isArray(result?.data?.entries)
+                    ? result.data.entries
+                    : Array.isArray(result?.data?.groups)
+                      ? result.data.groups.flatMap((g: { entries: BackendMeritCard[] }) => g.entries)
+                      : [];
+                setBackendCards(new Map(cards.filter((c) => c.id).map((c) => [c.id, c])));
+            })
+            .catch(() => {
+                // Fetch failed — the panel silently keeps using local computeMeritScorecard for everyone.
+            })
+            .finally(() => {
+                if (requestId === requestIdRef.current) setMeritLoading(false);
+            });
+    };
+
     const scored = useMemo(() => {
-        const withScores = pool.map((e) => ({ entry: e, scorecard: computeMeritScorecard(e) }));
+        const withScores = pool.map((e) => {
+            const backendCard = e.id ? backendCards.get(e.id) : undefined;
+            const scorecard = backendCard ? scorecardFromBackend(backendCard) : computeMeritScorecard(e);
+            return { entry: e, scorecard };
+        });
         // Eligible entries (faculty-approved) always sort above ineligible ones — no loophole where
         // an unreviewed record outranks an approved one just by scoring higher.
         if (ranked) withScores.sort((a, b) => (Number(b.scorecard.eligible) - Number(a.scorecard.eligible)) || (b.scorecard.total - a.scorecard.total));
         return withScores;
-    }, [pool, ranked]);
+    }, [pool, ranked, backendCards]);
 
     const avg = scored.length ? Math.round(scored.reduce((s, x) => s + x.scorecard.total, 0) / scored.length) : 0;
     const scopeText = [
@@ -162,7 +234,7 @@ export default function MeritModelPanel({
                 )}
                 <button
                     type="button"
-                    onClick={() => setRanked(true)}
+                    onClick={runMeritModel}
                     className="ciel-transition ml-auto rounded-ciel-sm bg-ciel-purple px-5 py-2.5 text-sm font-bold text-white hover:bg-ciel-purple/90"
                 >
                     🧮 Run merit model →
@@ -171,7 +243,11 @@ export default function MeritModelPanel({
 
             {ranked && (
                 <div className="rounded-ciel-sm border border-ciel-purple-soft bg-ciel-purple-soft/60 px-4 py-3 text-xs leading-relaxed text-ciel-purple">
-                    🧮 <b>Model run complete</b> — {scored.length} flash card{scored.length === 1 ? "" : "s"} scored on rubric v3 (sustainability-anchored, +Verifiability){scopeText ? <> · scope: {scopeText}</> : null} · cohort average <b>{avg}/100</b> · <b>{scored.filter((x) => x.scorecard.eligible).length}</b> of {scored.length} faculty-approved and eligible. Top {Math.min(topN, scored.length)} eligible are AI picks — each with its reason and its 🔮 potential. Order = merit, nothing else.
+                    {meritLoading ? (
+                        <>⏳ <b>Syncing official scores…</b> — showing a provisional local ranking while the real Merit Model results load.</>
+                    ) : (
+                        <>🧮 <b>Model run complete</b> — {scored.length} flash card{scored.length === 1 ? "" : "s"} scored on rubric v3 (sustainability-anchored, +Verifiability){scopeText ? <> · scope: {scopeText}</> : null} · cohort average <b>{avg}/100</b> · <b>{scored.filter((x) => x.scorecard.eligible).length}</b> of {scored.length} faculty-approved and eligible. Top {Math.min(topN, scored.length)} eligible are AI picks — each with its reason and its 🔮 potential. Order = merit, nothing else.</>
+                    )}
                 </div>
             )}
 

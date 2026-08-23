@@ -61,8 +61,9 @@ export interface FypMeritScorecard {
     grade: string;
     gradeColor: string;
     consistency: FypMeritConsistencyFlag;
-    /** No repository (thesis PDF) or the supervisor hasn't been sent the record for sign-off yet —
-     * still scored for feedback, but excluded from AI picks / showcase. No loopholes. */
+    /** Supervisor approval is the one hard requirement — matches the backend's eligibility gate
+     * (supervisorApprovalStatus === "approved") exactly. Still scored for feedback either way, but
+     * excluded from AI picks / showcase until approved. No loopholes. */
     eligible: boolean;
 }
 
@@ -136,11 +137,13 @@ export function computeFypMeritScorecard(entry: FypEntry): FypMeritScorecard {
     const scopePts = oi.scope?.trim() ? 1 : 0;
     const wrongPts = rf.wrongAssumption?.trim() ? 1 : 0;
     let honestyPts = limPts * 4 + scopePts * 2 + wrongPts * 3 + 2;
-    const hasMetricValue = !!find.metricValue?.trim();
-    const metricOk = hasMetricValue ? (find.numberRepresents ? 1 : 0) : 1;
+    // Prefer the structured metrics[] array; fall back to the deprecated flat fields for older records.
+    const hasMeasuredMetric =
+        (find.metrics || []).some((m) => m.status === "Measured" && m.value?.trim()) ||
+        (!!find.metricValue?.trim() && find.numberRepresents === "Measured result");
     let consistency: FypMeritConsistencyFlag = { ok: true, message: "Consistency: claims match declared evidence." };
     const blockFieldsFilled = [rd.showMonth, rd.piecesShown, rd.juryExaminer].filter(Boolean).length;
-    if (evidenceStatus === "Measured / tested result" && !metricOk) {
+    if (evidenceStatus === "Measured / tested result" && !hasMeasuredMetric) {
         honestyPts -= 3;
         consistency = { ok: false, message: 'Claims "measured" but no classified metric on record — 3 points deducted.' };
     } else if (route === "maker" && evidenceStatus === "The work itself is the evidence" && blockFieldsFilled === 0) {
@@ -175,10 +178,10 @@ export function computeFypMeritScorecard(entry: FypEntry): FypMeritScorecard {
     // ---- 7 · Completeness & connection ----
     const repoPts = (entry.deliverables || []).some((d) => d.label === "Full thesis (PDF)") ? 1 : 0;
     const linkedPts = normalizeFypTeamMembers(pi.teamMembers).some((m) => m.name?.trim()) ? 1 : 0;
-    const confPts = entry.status === "submitted" ? 1 : 0;
+    const confPts = entry.supervisorApprovalStatus === "approved" ? 1 : 0;
     const blkPts = route === "scholar" ? (rd.discussion || rd.conclusion ? 2 : 0) : Math.min(2, blockFieldsFilledForRoute(route, rd));
     const connPts = clampPts(repoPts * 3 + linkedPts * 2 + confPts * 3 + blkPts * 1, 10);
-    const connNote = `${repoPts ? "Repository ✓" : "No repository"}${linkedPts ? " · co-authors linked ✓" : ""}${confPts ? " · sent for supervisor sign-off ✓" : " · not yet submitted"}${blkPts === 2 ? " · route block complete ✓" : blkPts === 1 ? " · route block partial" : ""}`;
+    const connNote = `${repoPts ? "Repository ✓" : "No repository"}${linkedPts ? " · co-authors linked ✓" : ""}${confPts ? " · supervisor confirmed ✓" : " · awaiting supervisor"}${blkPts === 2 ? " · route block complete ✓" : blkPts === 1 ? " · route block partial" : ""}`;
 
     const critFor = (key: FypMeritRubricCriterion["key"]) => FYP_MERIT_RUBRIC.find((c) => c.key === key)!;
     const criteria: FypMeritCriterionResult[] = [
@@ -192,8 +195,8 @@ export function computeFypMeritScorecard(entry: FypEntry): FypMeritScorecard {
     ];
     const total = Math.round(criteria.reduce((s, c) => s + c.points, 0));
     const [grade, gradeColor] = fypMeritGrade(total);
-    // No loopholes: no repository or no supervisor sign-off = ineligible for picks/showcase, still scored for feedback.
-    const eligible = !!repoPts && !!confPts;
+    // Supervisor approval is the one hard requirement — mirrors the backend's eligibility gate exactly.
+    const eligible = entry.supervisorApprovalStatus === "approved";
 
     return { route, criteria, total, grade, gradeColor, consistency, eligible };
 }
