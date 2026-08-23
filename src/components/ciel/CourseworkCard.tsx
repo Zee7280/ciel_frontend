@@ -110,14 +110,10 @@ export default function CourseworkCard({
                                     {i === 0 ? <Star className="h-2.5 w-2.5 fill-current" /> : null}
                                     <span>{sdg.number}</span>
                                     <span className="hidden sm:inline">{sdg.title.toUpperCase()}</span>
+                                    {en.targets.length ? <span className="font-semibold opacity-90">· {en.targets.join(", ")}</span> : null}
                                 </span>
                             );
                         })}
-                        {sdgEntries.some((e) => e.targets.length) && (
-                            <span className="text-[10px] font-semibold text-ciel-text-soft">
-                                + targets {sdgEntries.flatMap((e) => e.targets).join(", ")}
-                            </span>
-                        )}
                     </div>
                 )}
             </div>

@@ -262,6 +262,13 @@ export function courseProjectMetricLine(m: CourseProjectMetric): string {
     return `${m.name}: ${m.value ?? ""}${unit}${statusTag}`;
 }
 
+/** Section summaries embed literal `<b>...</b>` markers for emphasis (rendered via RichSummaryText
+ * in read-only views) — but a plain HTML `<textarea>` can't render partial bold, so the review
+ * step's editable boxes need the clean, tag-free version instead. */
+export function stripBoldMarkup(text: string): string {
+    return text.replace(/<\/?b>/g, "");
+}
+
 /** Composed from the student's own answers — not a generic template. Shared by the wizard's review step and the flash card. */
 export function composeCourseProjectSummaries(entry: CourseProjectEntry): CourseProjectSectionSummaries {
     const inc: CourseProjectModuleInclusion = entry.moduleInclusion || {};
@@ -328,7 +335,7 @@ export function composeCourseProjectSummaries(entry: CourseProjectEntry): Course
     s.sdg = sm.notApplicable
         ? `${W} looked honestly and found <b>no genuine SDG link in this assignment</b> — ${Wl}'d rather declare that than force one. Flagged for ${My} teacher's confirmation.${note(sm.notes)}`
         : entries.length
-          ? `${sm.origin ? `For ${Me}, sustainability ${lc(stripEmoji(sm.origin))}. ` : ""}${W} connected the work primarily to <b>SDG ${entries[0].goalNumber}${entries[0].targets.length ? ` (target ${entries[0].targets.join(", ")})` : ""}</b>${entries.length > 1 ? `, with ${entries.slice(1).map((en) => `SDG ${en.goalNumber} (${(en.strength || "supporting").toLowerCase()})`).join(" and ")} in support` : ""}.${entries[0].how ? ` In ${My} words: ${lc(entries[0].how)}` : ""}${note(sm.notes)}`
+          ? `${sm.origin ? `For ${Me}, sustainability ${lc(stripEmoji(sm.origin))}. ` : ""}${W} connected the work primarily to <b>SDG ${entries[0].goalNumber}${entries[0].targets.length ? ` (target ${entries[0].targets.join(", ")})` : ""}</b>${entries.length > 1 ? `, with ${entries.slice(1).map((en) => `SDG ${en.goalNumber}${en.targets.length ? ` (target ${en.targets.join(", ")})` : ""} (${(en.strength || "supporting").toLowerCase()})${en.how ? ` — ${lc(en.how)}` : ""}`).join(" and ")} in support` : ""}.${entries[0].how ? ` In ${My} words: ${lc(entries[0].how)}` : ""}${note(sm.notes)}`
           : sm.origin
             ? `For ${Me}, sustainability ${lc(stripEmoji(sm.origin))} — SDG selection pending.${note(sm.notes)}`
             : "";

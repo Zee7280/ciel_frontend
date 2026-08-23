@@ -27,6 +27,7 @@ import {
     composeCourseProjectSummaries,
     courseProjectMetricLine,
     normalizeGroupMembers,
+    stripBoldMarkup,
     activeSectionKeys,
     SECTION_LABELS,
     COURSEWORK_MODES,
@@ -521,7 +522,7 @@ export default function CourseProjectWizardPage() {
             for (const key of activeStepIdx) {
                 const existing = next[key];
                 if (!existing || (!existing.accepted && !existing.edited)) {
-                    next[key] = { accepted: false, edited: false, text: sums[key] || "" };
+                    next[key] = { accepted: false, edited: false, text: stripBoldMarkup(sums[key] || "") };
                 }
             }
             return next;
@@ -533,7 +534,7 @@ export default function CourseProjectWizardPage() {
     const regenerateAllReview = () => {
         setReview(() => {
             const next: Record<string, { accepted: boolean; edited: boolean; text: string }> = {};
-            for (const key of activeStepIdx) next[key] = { accepted: false, edited: false, text: sums[key] || "" };
+            for (const key of activeStepIdx) next[key] = { accepted: false, edited: false, text: stripBoldMarkup(sums[key] || "") };
             return next;
         });
     };
@@ -657,7 +658,7 @@ export default function CourseProjectWizardPage() {
     const allAccepted = activeStepIdx.length > 0 && acceptedCount === activeStepIdx.length;
     const finalSectionSummaries = (): CourseProjectSectionSummaries => {
         const out: CourseProjectSectionSummaries = {};
-        for (const key of activeStepIdx) out[key] = review[key]?.text ?? sums[key] ?? "";
+        for (const key of activeStepIdx) out[key] = review[key]?.text ?? stripBoldMarkup(sums[key] || "");
         return out;
     };
     const saveAllFields = () => ({
@@ -1335,7 +1336,7 @@ export default function CourseProjectWizardPage() {
 
                                 {activeStepIdx.map((key) => {
                                     const meta = SECTION_LABELS[key];
-                                    const r = review[key] ?? { accepted: false, edited: false, text: sums[key] || "" };
+                                    const r = review[key] ?? { accepted: false, edited: false, text: stripBoldMarkup(sums[key] || "") };
                                     return (
                                         <div key={key} className={clsx("overflow-hidden rounded-ciel-sm border-2", r.accepted ? "border-ciel-green" : "border-ciel-border")}>
                                             <div className={clsx("flex flex-wrap items-center gap-2 px-4 py-2.5", r.accepted ? "bg-ciel-green-soft" : "bg-ciel-page/60")}>
@@ -1365,7 +1366,7 @@ export default function CourseProjectWizardPage() {
                                                 </button>
                                                 <button
                                                     type="button"
-                                                    onClick={() => setReview((prev) => ({ ...prev, [key]: { accepted: false, edited: false, text: sums[key] || "" } }))}
+                                                    onClick={() => setReview((prev) => ({ ...prev, [key]: { accepted: false, edited: false, text: stripBoldMarkup(sums[key] || "") } }))}
                                                     className="ciel-transition rounded-ciel-xs border-2 border-ciel-border px-3 py-1.5 text-xs font-bold text-ciel-text-mid hover:border-ciel-gold/40"
                                                 >
                                                     ↻ Reset to AI version
