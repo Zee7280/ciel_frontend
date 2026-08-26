@@ -98,11 +98,11 @@ function SDGTileGrid({
                         onClick={() => onSelect(isSelected ? "" : id)}
                         style={{ backgroundColor: sdg.color }}
                         className={clsx(
-                            "relative flex min-h-[66px] flex-col gap-0.5 rounded-lg border-2 p-2 text-left text-[11px] font-bold leading-tight text-white transition-all",
+                            "cer-sdg-tile relative flex min-h-[66px] flex-col gap-0.5 rounded-lg border-2 p-2 text-left text-[11px] font-bold leading-tight text-white transition-all",
                             isSelected
-                                ? "border-slate-900 shadow-lg"
+                                ? "on border-slate-900 shadow-lg"
                                 : isDisabled
-                                  ? "cursor-not-allowed border-transparent opacity-15"
+                                  ? "prim cursor-not-allowed border-transparent opacity-15"
                                   : "border-transparent opacity-70 hover:-translate-y-0.5 hover:opacity-100",
                         )}
                     >
@@ -247,7 +247,7 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
         <div className="mx-auto max-w-6xl space-y-8 pb-10">
 
             {/* ── Section Header ───────────────────────────────────────── */}
-            <div className="space-y-5">
+            <div className="cer-dup-head space-y-5">
                 <div className="flex items-center gap-3.5">
                     <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-indigo-600 text-white shadow-sm">
                         <Target className="h-5 w-5" />
@@ -289,23 +289,23 @@ export default function Section3SDGMapping({ projectData }: Section3Props) {
                         ))}
                     </div>
                 </div>
-
-                {hasErrors && (
-                    <div className="flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-4">
-                        <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-red-600" />
-                        <div>
-                            <h4 className="text-sm font-semibold text-red-800">Validation errors</h4>
-                            <ul className="mt-1.5 space-y-1">
-                                {sectionErrors.slice(0, 5).map((error: { message?: string }, idx: number) => (
-                                    <li key={idx} className="text-sm text-red-700">
-                                        • {error.message}
-                                    </li>
-                                ))}
-                            </ul>
-                        </div>
-                    </div>
-                )}
             </div>
+
+            {hasErrors && (
+                <div className="flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-4">
+                    <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-red-600" />
+                    <div>
+                        <h4 className="text-sm font-semibold text-red-800">Validation errors</h4>
+                        <ul className="mt-1.5 space-y-1">
+                            {sectionErrors.slice(0, 5).map((error: { message?: string }, idx: number) => (
+                                <li key={idx} className="text-sm text-red-700">
+                                    • {error.message}
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+                </div>
+            )}
 
             {/* ── 1. Opportunity's Registered SDGs ─────────────────────── */}
             <section className="space-y-4">

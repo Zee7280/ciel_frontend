@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { MapPin, Clock, CheckCircle, AlertCircle, ChevronDown, ChevronUp, Users, Loader2, X, Plus, Lock, ExternalLink } from "lucide-react";
+import { MapPin, AlertCircle, ChevronDown, Loader2, X, Plus, ExternalLink } from "lucide-react";
 import { authenticatedFetch } from "@/utils/api";
 import { toast } from "sonner";
 import dynamic from 'next/dynamic';
@@ -19,6 +19,17 @@ import {
 } from "@/utils/countryCallingCodes";
 import { PAKISTAN_REGION_OPTIONS } from "@/utils/pakistanRegions";
 import { OpportunitySubmittedReviewModal } from "@/app/dashboard/student/components/OpportunityLifecyclePrompts";
+import {
+    ACTIVITY_TYPE_EMOJI,
+    BENEFICIARY_EMOJI,
+    CoChip,
+    CoSectionHead,
+    MODE_EMOJI,
+    SKILL_EMOJI,
+    TIMELINE_EMOJI,
+    VERIFICATION_EMOJI,
+} from "./CreateOpportunityChrome";
+import "./create-opportunity.css";
 
 // Dynamically import LocationPicker to avoid SSR issues with Google Maps.
 const LocationPicker = dynamic(() => import('@/components/ui/LocationPicker'), {
@@ -721,7 +732,7 @@ export default function StudentOpportunityCreationPage() {
         });
     };
 
-    const [expandedSections, setExpandedSections] = useState<string[]>(["A", "B"]);
+    const [expandedSections, setExpandedSections] = useState<string[]>(["A", "B", "C", "D", "E", "F", "G"]);
 
     const displayStudentContact = useMemo(
         () => parsePhoneForDisplay(studentDetails.contact),
@@ -1048,147 +1059,134 @@ export default function StudentOpportunityCreationPage() {
         );
     };
 
+    const previewType = formData.opportunityType.find((t) => t !== "Other") || formData.opportunityType[0] || "";
+    const previewEmoji = ACTIVITY_TYPE_EMOJI[previewType] || "✨";
+    const previewBits = [
+        formData.mode || "",
+        formData.capacity.hours.trim() ? `${formData.capacity.hours}h per student` : "",
+        formData.capacity.volunteers.trim() ? `team of ${formData.capacity.volunteers}` : "",
+        formData.objectives.beneficiariesCount.trim() ? `~${formData.objectives.beneficiariesCount} beneficiaries` : "",
+        formData.supervision.facultyName.trim() ? `supervised by ${formData.supervision.facultyName}` : "",
+    ].filter(Boolean);
+    const previewPrimarySdg = formData.sdg ? findSdgById(formData.sdg) : null;
+    const previewSecondarySdg = formData.secondarySdg ? findSdgById(formData.secondarySdg) : null;
+
     return (
-        <div className="max-w-8xl mx-auto p-4 space-y-4 pb-24">
+        <div className="co-form">
             {showTeamLeadNotice ? (
                 <div
-                    className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/55 backdrop-blur-[2px]"
+                    className="fixed inset-0 z-[100] flex items-center justify-center bg-[rgba(4,37,43,0.6)] p-5"
                     role="dialog"
                     aria-modal="true"
                     aria-labelledby="team-lead-notice-title"
                 >
-                    <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[min(90vh,640px)] overflow-y-auto border border-slate-200">
-                        <div className="p-6 sm:p-8 space-y-4">
-                            <div className="flex items-start gap-3">
-                                <div className="shrink-0 w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
-                                    <Users className="w-5 h-5 text-blue-700" aria-hidden />
-                                </div>
-                                <div className="min-w-0 space-y-3 text-slate-800 text-sm leading-relaxed">
-                                    <p className="text-xs font-bold uppercase tracking-widest text-blue-700">Disclaimer</p>
-                                    <h2
-                                        id="team-lead-notice-title"
-                                        className="text-lg font-bold text-slate-900 leading-snug"
-                                    >
-                                        One opportunity per team project
-                                    </h2>
-                                    <p>
-                                        <strong>Do not create separate opportunities</strong> for the same team project. Only one listing is needed per project.
-                                    </p>
-                                    <p>
-                                        <strong>One team lead</strong> should create the opportunity. After it is approved and live, the team lead must use{" "}
-                                        <strong>Apply Now</strong> on that listing and add all other team members there.
-                                    </p>
-                                    <p>
-                                        If duplicate listings already exist, agree on a single project lead and{" "}
-                                        <strong>remove the extra duplicate opportunities</strong> created by other members.
-                                    </p>
-                                    <p className="text-slate-600">By continuing, you confirm that you have read and understood this disclaimer.</p>
-                                </div>
-                            </div>
-                            <button
-                                type="button"
-                                className="w-full rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 text-sm shadow-sm transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
-                                onClick={() => setShowTeamLeadNotice(false)}
-                            >
-                                I understand — continue to the form
-                            </button>
-                        </div>
+                    <div className="w-full max-w-[440px] rounded-[24px] bg-white p-[26px] text-left">
+                        <div className="mb-3 flex h-[46px] w-[46px] items-center justify-center rounded-[14px] bg-[#e3f4fa] text-[22px]">👥</div>
+                        <p className="mb-2.5 block text-base font-extrabold text-[#0d2b33]" id="team-lead-notice-title">
+                            One opportunity per team project
+                        </p>
+                        <p className="mb-2 text-[11.5px] leading-relaxed text-[#3c5a5c]">
+                            <strong>Do not create separate opportunities</strong> for the same team project — only one listing is needed per project.
+                        </p>
+                        <p className="mb-2 text-[11.5px] leading-relaxed text-[#3c5a5c]">
+                            <strong>One team lead</strong> creates it. Once approved and live, the lead uses <strong>Apply Now</strong> on that listing and adds all other team members there.
+                        </p>
+                        <p className="mb-2 text-[11.5px] leading-relaxed text-[#3c5a5c]">
+                            If duplicates already exist, agree on a single project lead and remove the extras.
+                        </p>
+                        <button
+                            type="button"
+                            className="mt-2 w-full rounded-[13px] bg-[#0e7d74] py-3 text-[12.5px] font-extrabold text-white"
+                            onClick={() => setShowTeamLeadNotice(false)}
+                        >
+                            I understand — let’s build it 🚀
+                        </button>
                     </div>
                 </div>
             ) : null}
 
-            <div className="mb-4">
-                <h1 className="text-3xl font-bold text-slate-900">
-                    {editingOpportunityId ? "Edit student opportunity" : "Create Student Opportunity"}
+            <div className="mb-3.5 flex items-center gap-3">
+                <div>
+                    <p className="text-[10px] text-[#7a919a]">
+                        Community Service → <b className="text-[#0e7d74]">Create an Opportunity</b>
+                    </p>
+                </div>
+                <Link
+                    href="/dashboard/student/paths/community-service"
+                    className="ml-auto rounded-full border border-[#dcebee] bg-white px-4 py-2 text-[10.5px] font-extrabold text-[#0e7d74]"
+                >
+                    ← Back
+                </Link>
+            </div>
+
+            <div className="relative mb-4 overflow-hidden rounded-[24px] bg-[linear-gradient(115deg,#04252b,#0e5f63_55%,#12a5a0_110%)] px-[26px] py-[22px] text-white">
+                <div className="pointer-events-none absolute right-[-8px] top-2 text-[38px] tracking-[10px] opacity-[0.13]" aria-hidden>
+                    🚀 💡 🤝 🌱
+                </div>
+                <p className="text-[9.5px] font-extrabold tracking-[0.22em] text-[#99f6e4]">
+                    {editingOpportunityId ? "EDIT STUDENT OPPORTUNITY · SDG-ALIGNED" : "CREATE STUDENT OPPORTUNITY · SDG-ALIGNED"}
+                </p>
+                <h1 className="mt-1.5 text-[21px] font-extrabold">
+                    {editingOpportunityId ? "Update your listing" : "Your idea, your crew — let’s build it 🚀"}
                 </h1>
-                <p className="text-slate-500">
+                <p className="mt-1 max-w-[560px] text-xs leading-relaxed text-[#cdf5f0]">
                     {editingOpportunityId
                         ? "Update your opportunity and submit again for review."
-                        : "Create an SDG-aligned volunteer opportunity or project."}
+                        : "Seven quick sections. Your details are already filled, chips do most of the typing, and your listing preview builds itself at the bottom as you go."}
                 </p>
                 {isLoadingEdit ? (
-                    <p className="text-sm text-slate-500 mt-2 flex items-center gap-2">
-                        <Loader2 className="w-4 h-4 animate-spin" /> Loading opportunity…
+                    <p className="mt-2 flex items-center gap-2 text-sm text-[#cdf5f0]">
+                        <Loader2 className="h-4 w-4 animate-spin" /> Loading opportunity…
                     </p>
                 ) : null}
             </div>
 
             {/* SECTION A: STUDENT DETAILS */}
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                <div className="bg-slate-50 p-6 border-b border-slate-100 flex justify-between items-center">
-                    <div>
-                        <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                            Section A: Student Details
-                        </h2>
-                        <p className="text-xs text-slate-500 mt-1">All fields are shown from your profile (read-only).</p>
+            <div className="co-card">
+                <CoSectionHead letter="A" title="Student details" tag="✅ FROM YOUR PROFILE — NOTHING TO TYPE" tagAuto color="#0d2b33" />
+                {isLoadingProfile ? (
+                    <div className="py-4 text-center text-[#7a919a]">
+                        <Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" /> Loading details...
                     </div>
-                    {isLoadingProfile ? <Loader2 className="w-5 h-5 animate-spin text-slate-400" /> : <CheckCircle className="w-5 h-5 text-green-500" />}
-                </div>
-                <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {isLoadingProfile ? (
-                        <div className="col-span-2 text-center py-4 text-slate-400">Loading details...</div>
-                    ) : (
-                        <>
-                            <div className="opacity-75">
-                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Student Name</label>
-                                <input type="text" value={studentDetails.name} readOnly tabIndex={-1} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2 text-slate-700 font-medium pointer-events-none" />
-                            </div>
-                            <div className="opacity-75">
-                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Institution</label>
-                                <input type="text" value={studentDetails.institution} readOnly tabIndex={-1} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2 text-slate-700 font-medium pointer-events-none" />
-                            </div>
-                            <div className="opacity-75">
-                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Email</label>
-                                <input type="text" value={studentDetails.email} readOnly tabIndex={-1} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2 text-slate-700 font-medium pointer-events-none" />
-                            </div>
-                            <div className="opacity-75">
-                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Department</label>
-                                <input type="text" value={studentDetails.department} readOnly tabIndex={-1} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2 text-slate-700 font-medium pointer-events-none" />
-                            </div>
-                            <div className="opacity-75">
-                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">City / Province</label>
-                                <input type="text" value={studentDetails.city} readOnly tabIndex={-1} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2 text-slate-700 font-medium pointer-events-none" />
-                            </div>
-                            <div className="opacity-75 pointer-events-none">
-                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Contact No. <span className="text-red-500">*</span></label>
-                                <PhoneConnectivityRow
-                                    phoneCountryKey={displayStudentContact.phoneCountryKey}
-                                    nationalDigits={displayStudentContact.national}
-                                    readOnly
-                                    placeholderNational="—"
-                                    selectClassName="rounded-lg border border-slate-200 bg-slate-50 py-2 text-xs font-medium text-slate-700"
-                                    inputClassName="rounded-lg border border-slate-200 bg-slate-50 py-2 text-sm font-medium text-slate-700"
-                                />
-                            </div>
-                        </>
-                    )}
-                </div>
+                ) : (
+                    <div className="mt-2 flex flex-wrap gap-2">
+                        <span className="co-locked">🧑‍🎓 <b>{studentDetails.name || "—"}</b><span className="co-lock-badge">🔒</span></span>
+                        <span className="co-locked">🏛️ {studentDetails.institution || "—"}<span className="co-lock-badge">🔒</span></span>
+                        {studentDetails.department ? <span className="co-locked">🎓 {studentDetails.department}</span> : null}
+                        {studentDetails.email ? <span className="co-locked">📧 {studentDetails.email}</span> : null}
+                        {studentDetails.city ? <span className="co-locked">📍 {studentDetails.city}</span> : null}
+                        <span className="co-locked pointer-events-none">
+                            📱
+                            <PhoneConnectivityRow
+                                phoneCountryKey={displayStudentContact.phoneCountryKey}
+                                nationalDigits={displayStudentContact.national}
+                                readOnly
+                                placeholderNational="—"
+                                selectClassName="rounded-lg border border-transparent bg-transparent py-0 text-xs font-medium text-[#0d2b33]"
+                                inputClassName="rounded-lg border-transparent bg-transparent py-0 text-sm font-medium text-[#0d2b33]"
+                            />
+                        </span>
+                    </div>
+                )}
             </div>
 
             {/* SECTION B: OPPORTUNITY OVERVIEW */}
-            <div className={`bg-white rounded-2xl border transition-all duration-300 ${expandedSections.includes('B') ? 'border-blue-500 shadow-xl ring-1 ring-blue-500' : 'border-slate-200 shadow-sm'}`}>
-                <div
-                    className="p-6 border-b border-slate-100 flex justify-between items-center cursor-pointer hover:bg-slate-50 transition-colors"
-                >
-                    <div onClick={() => toggleSection("B")}>
-                        <h2 className={`text-lg font-bold flex items-center gap-2 ${expandedSections.includes('B') ? 'text-blue-600' : 'text-slate-800'}`}>
-                            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${expandedSections.includes('B') ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-600'}`}>B</div>
-                            Section B: Project Overview
-                        </h2>
-                        <p className="text-xs text-slate-500 mt-1 pl-8">Basic details about the activity.</p>
-                    </div>
-                    <div onClick={() => toggleSection("B")}>
-                        {expandedSections.includes('B') ? <ChevronUp className="w-5 h-5 text-slate-400" /> : <ChevronDown className="w-5 h-5 text-slate-400" />}
-                    </div>
-                </div>
+            <div className="co-card co-accent" style={{ borderTopColor: "#0891b2" }}>
+                <CoSectionHead
+                    letter="B"
+                    title="Project overview"
+                    tag="THE BASICS"
+                    color="#0891b2"
+                    expanded={expandedSections.includes("B")}
+                    onToggle={() => toggleSection("B")}
+                />
 
-                <div className={`p-8 space-y-8 ${!expandedSections.includes('B') ? 'hidden' : ''}`}>
+                <div className={`${!expandedSections.includes('B') ? 'hidden' : ''}`}>
                     {/* B1. Title */}
                     <div>
-                        <label className="block text-sm font-bold text-slate-900 mb-2">B1. Project Title <span className="text-red-500">*</span></label>
+                        <label className="co-label" style={{ marginTop: 4 }}>B1 · Project title</label>
                         <input
                             type="text"
-                            className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all font-medium"
                             placeholder="e.g. Community Clean Up Drive"
                             value={formData.title}
                             onChange={(e) => setFormData({ ...formData, title: e.target.value })}
@@ -1257,28 +1255,16 @@ export default function StudentOpportunityCreationPage() {
                     </div>
                     {/* B2. Type */}
                     <div>
-                        <label className="block text-sm font-bold text-slate-900 mb-3">B2. Activity Type <span className="text-red-500">*</span></label>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <label className="co-label">B2 · Activity type · tap one or more</label>
+                        <div className="co-chips">
                             {ACTIVITY_TYPES_MAIN.map((type) => (
-                                <label key={type} className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${formData.opportunityType.includes(type) ? 'bg-blue-50 border-blue-200' : 'border-slate-100 hover:border-slate-300'}`}>
-                                    <input
-                                        type="checkbox"
-                                        className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                                        checked={formData.opportunityType.includes(type)}
-                                        onChange={() => toggleType(type)}
-                                    />
-                                    <span className={`text-sm font-medium ${formData.opportunityType.includes(type) ? 'text-blue-700' : 'text-slate-600'}`}>{type}</span>
-                                </label>
+                                <CoChip key={type} selected={formData.opportunityType.includes(type)} onClick={() => toggleType(type)}>
+                                    {ACTIVITY_TYPE_EMOJI[type] || ""} {type}
+                                </CoChip>
                             ))}
-                            <label className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${formData.opportunityType.includes("Other") ? 'bg-blue-50 border-blue-200' : 'border-slate-100 hover:border-slate-300'}`}>
-                                <input
-                                    type="checkbox"
-                                    className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                                    checked={formData.opportunityType.includes("Other")}
-                                    onChange={() => toggleType("Other")}
-                                />
-                                <span className={`text-sm font-medium ${formData.opportunityType.includes("Other") ? 'text-blue-700' : 'text-slate-600'}`}>Other</span>
-                            </label>
+                            <CoChip selected={formData.opportunityType.includes("Other")} onClick={() => toggleType("Other")}>
+                                ✏️ Other
+                            </CoChip>
                         </div>
                         {formData.opportunityType.includes("Other") && (
                             <div className="mt-4 space-y-3 pl-4 border-l-2 border-blue-100">
@@ -1328,21 +1314,12 @@ export default function StudentOpportunityCreationPage() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                         {/* B3. Mode */}
                         <div>
-                            <label className="block text-sm font-bold text-slate-900 mb-3">B3. Mode of Engagement <span className="text-red-500">*</span></label>
-                            <div className="space-y-3">
+                            <label className="co-label">B3 · Mode of engagement</label>
+                            <div className="co-chips">
                                 {['On site', 'Remote', 'Hybrid'].map((m) => (
-                                    <label key={m} className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${formData.mode === m ? 'bg-blue-50 border-blue-200 ring-1 ring-blue-200' : 'border-slate-100 hover:border-slate-300'}`}>
-                                        <input
-                                            type="radio"
-                                            name="mode"
-                                            className="w-4 h-4 text-blue-600 border-slate-300 focus:ring-blue-500"
-                                            checked={formData.mode === m}
-                                            onChange={() => setFormData({ ...formData, mode: m })}
-                                        />
-                                        <div>
-                                            <span className="block text-sm font-bold text-slate-700">{m}</span>
-                                        </div>
-                                    </label>
+                                    <CoChip key={m} selected={formData.mode === m} onClick={() => setFormData({ ...formData, mode: m })}>
+                                        {MODE_EMOJI[m] || ""} {m === "On site" ? "On-site" : m}
+                                    </CoChip>
                                 ))}
                             </div>
                         </div>
@@ -1350,7 +1327,7 @@ export default function StudentOpportunityCreationPage() {
                         {/* B4. Location */}
                         {(formData.mode === 'On site' || formData.mode === 'Hybrid') && (
                             <div className="animate-in fade-in slide-in-from-top-4 duration-300 col-span-1 md:col-span-2">
-                                <label className="block text-sm font-bold text-slate-900 mb-3">B4. Location Details <span className="text-red-500">*</span></label>
+                                <label className="co-label">B4 · Location details</label>
                                 <div className="space-y-4">
                                     <div className="relative">
                                         <MapPin className="absolute left-3 top-1/2 z-10 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
@@ -1414,20 +1391,15 @@ export default function StudentOpportunityCreationPage() {
                     </div>
 
                     {/* B5. Timeline */}
-                    <div className="pt-6 border-t border-slate-100">
-                        <label className="block text-sm font-bold text-slate-900 mb-4">B5. Duration & Commitment <span className="text-red-500">*</span></label>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div className="pt-2">
+                        <label className="co-label">B5 · Duration &amp; commitment</label>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
-                                <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Timeline Type</label>
-                                <div className="flex gap-2 mb-4">
+                                <div className="co-chips mb-3">
                                     {['Fixed dates', 'Flexible', 'Ongoing'].map((t) => (
-                                        <button
-                                            key={t}
-                                            onClick={() => setFormData({ ...formData, timelineType: t })}
-                                            className={`px-3 py-2 rounded-lg text-xs font-bold border transition-all ${formData.timelineType === t ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'}`}
-                                        >
-                                            {t}
-                                        </button>
+                                        <CoChip key={t} selected={formData.timelineType === t} onClick={() => setFormData({ ...formData, timelineType: t })}>
+                                            {TIMELINE_EMOJI[t] || ""} {t}
+                                        </CoChip>
                                     ))}
                                 </div>
 
@@ -1491,32 +1463,24 @@ export default function StudentOpportunityCreationPage() {
                                 )}
                             </div>
 
-                            <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
-                                <div className="mb-3">
-                                    <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Expected Hours (Per Student)</label>
-                                    <div className="relative">
-                                        <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                                        <input
-                                            type="number"
-                                            className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:border-blue-500"
-                                            placeholder="e.g. 20"
-                                            value={formData.capacity.hours}
-                                            onChange={(e) => setFormData({ ...formData, capacity: { ...formData.capacity, hours: e.target.value } })}
-                                        />
-                                    </div>
+                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                <div>
+                                    <label className="co-label" style={{ marginTop: 0 }}>⏱️ Expected hours · per student</label>
+                                    <input
+                                        type="number"
+                                        placeholder="e.g. 20"
+                                        value={formData.capacity.hours}
+                                        onChange={(e) => setFormData({ ...formData, capacity: { ...formData.capacity, hours: e.target.value } })}
+                                    />
                                 </div>
                                 <div>
-                                    <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Volunteers/Team Size (Minimum 2 & Maximum team size 20)</label>
-                                    <div className="relative">
-                                        <Users className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                                        <input
-                                            type="number"
-                                            className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:border-blue-500"
-                                            placeholder="e.g. 5"
-                                            value={formData.capacity.volunteers}
-                                            onChange={(e) => setFormData({ ...formData, capacity: { ...formData.capacity, volunteers: e.target.value } })}
-                                        />
-                                    </div>
+                                    <label className="co-label" style={{ marginTop: 0 }}>👥 Team size · min 2, max 20</label>
+                                    <input
+                                        type="number"
+                                        placeholder="e.g. 5"
+                                        value={formData.capacity.volunteers}
+                                        onChange={(e) => setFormData({ ...formData, capacity: { ...formData.capacity, volunteers: e.target.value } })}
+                                    />
                                 </div>
                             </div>
                         </div>
@@ -1525,33 +1489,24 @@ export default function StudentOpportunityCreationPage() {
             </div>
 
             {/* SECTION C: SDG SELECTION */}
-            <div className={`bg-white rounded-2xl border transition-all duration-300 ${expandedSections.includes('C') ? 'border-purple-500 shadow-xl ring-1 ring-purple-500' : 'border-slate-200 shadow-sm'}`}>
-                <div
-                    className="p-6 border-b border-slate-100 flex justify-between items-center cursor-pointer hover:bg-slate-50 transition-colors"
-                    onClick={() => toggleSection("C")}
-                >
-                    <div>
-                        <h2 className={`text-lg font-bold flex items-center gap-2 ${expandedSections.includes('C') ? 'text-purple-600' : 'text-slate-800'}`}>
-                            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${expandedSections.includes('C') ? 'bg-purple-600 text-white' : 'bg-slate-200 text-slate-600'}`}>C</div>
-                            Section C: SDG Selection
-                        </h2>
-                        <p className="text-xs text-slate-500 mt-1 pl-8">Link your project to Global Goals.</p>
-                    </div>
-                    {expandedSections.includes('C') ? <ChevronUp className="w-5 h-5 text-slate-400" /> : <ChevronDown className="w-5 h-5 text-slate-400" />}
-                </div>
+            <div className="co-card co-accent" style={{ borderTopColor: "#6d28d9" }}>
+                <CoSectionHead
+                    letter="C"
+                    title="SDG selection"
+                    tag="LINK IT TO THE GLOBAL GOALS"
+                    color="#6d28d9"
+                    expanded={expandedSections.includes("C")}
+                    onToggle={() => toggleSection("C")}
+                />
 
-                <div className={`p-8 space-y-6 ${!expandedSections.includes('C') ? 'hidden' : ''}`}>
-                    <div className="bg-amber-50 p-4 rounded-xl border border-amber-100 flex gap-3 text-sm text-amber-800 mb-6">
-                        <AlertCircle className="w-5 h-5 flex-shrink-0" />
-                        <div>
-                            <strong>Important:</strong> The Primary (and optional Secondary) SDG selections, including Target and Indicator where chosen, will be
-                            <span className="font-bold underline ml-1">locked</span> for your report.
-                        </div>
+                <div className={`${!expandedSections.includes('C') ? 'hidden' : ''}`}>
+                    <div className="co-note">
+                        🔒 <span><b>Important:</b> the Primary (and optional Secondary) SDG you choose here — including Target and Indicator — will be <b>locked</b> into every member’s report. Choose once, choose well.</span>
                     </div>
 
                     {/* C1. Primary SDG */}
                     <div>
-                        <label className="block text-sm font-bold text-slate-900 mb-2">C1. Select PRIMARY SDG <span className="text-red-500">*</span></label>
+                        <label className="co-label">C1 · Primary SDG</label>
                         <select
                             className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-purple-500 focus:ring-4 focus:ring-purple-500/10 outline-none font-medium"
                             value={formData.sdg}
@@ -1579,7 +1534,7 @@ export default function StudentOpportunityCreationPage() {
 
                     {/* C2. SDG Target */}
                     <div className={!formData.sdg ? "opacity-50 pointer-events-none" : ""}>
-                        <label className="block text-sm font-bold text-slate-900 mb-2">C2. Select SDG Target <span className="text-red-500">*</span></label>
+                        <label className="co-label">C2 · SDG target</label>
                         <select
                             className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-purple-500 focus:ring-4 focus:ring-purple-500/10 outline-none font-medium"
                             value={formData.target}
@@ -1596,7 +1551,7 @@ export default function StudentOpportunityCreationPage() {
 
                     {/* C3. SDG Indicator */}
                     <div className={!formData.target ? "opacity-50 pointer-events-none" : ""}>
-                        <label className="block text-sm font-bold text-slate-900 mb-2">C3. SDG Indicator</label>
+                        <label className="co-label">C3 · SDG indicator · optional</label>
                         <select
                             className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-purple-500 focus:ring-4 focus:ring-purple-500/10 outline-none font-medium"
                             value={formData.indicator}
@@ -1615,13 +1570,13 @@ export default function StudentOpportunityCreationPage() {
 
                     <div className="border-t border-slate-100 pt-8 space-y-6">
                         <div>
-                            <p className="text-sm font-bold text-slate-800">Secondary SDG (optional)</p>
-                            <p className="text-xs text-slate-500 mt-1">If this project also advances another goal, choose it below. Leave blank if not applicable.</p>
+                            <p className="co-label" style={{ marginTop: 14 }}>Secondary SDG · optional — leave blank if not applicable</p>
+                            <p className="co-hint">If this project also advances another goal, choose it below.</p>
                         </div>
 
                         {/* C4. Secondary SDG */}
                         <div>
-                            <label className="block text-sm font-bold text-slate-900 mb-2">C4. Select SECONDARY SDG</label>
+                            <label className="co-label">C4 · Secondary SDG</label>
                             <select
                                 className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-purple-500 focus:ring-4 focus:ring-purple-500/10 outline-none font-medium"
                                 value={formData.secondarySdg}
@@ -1647,8 +1602,8 @@ export default function StudentOpportunityCreationPage() {
 
                         {/* C5. Secondary SDG Target */}
                         <div className={!formData.secondarySdg ? "opacity-50 pointer-events-none" : ""}>
-                            <label className="block text-sm font-bold text-slate-900 mb-2">
-                                C5. Select SDG Target {formData.secondarySdg ? <span className="text-red-500">*</span> : null}
+                            <label className="co-label">
+                                C5 · Secondary target {formData.secondarySdg ? <span className="text-red-500">*</span> : null}
                             </label>
                             <select
                                 className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-purple-500 focus:ring-4 focus:ring-purple-500/10 outline-none font-medium"
@@ -1669,7 +1624,7 @@ export default function StudentOpportunityCreationPage() {
 
                         {/* C6. Secondary SDG Indicator */}
                         <div className={!formData.secondaryTarget ? "opacity-50 pointer-events-none" : ""}>
-                            <label className="block text-sm font-bold text-slate-900 mb-2">C6. SDG Indicator</label>
+                            <label className="co-label">C6 · Secondary indicator</label>
                             <select
                                 className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-purple-500 focus:ring-4 focus:ring-purple-500/10 outline-none font-medium"
                                 value={formData.secondaryIndicator}
@@ -1692,23 +1647,19 @@ export default function StudentOpportunityCreationPage() {
             </div>
 
             {/* SECTION D: OBJECTIVES */}
-            <div className={`bg-white rounded-2xl border transition-all duration-300 ${expandedSections.includes('D') ? 'border-teal-500 shadow-xl ring-1 ring-teal-500' : 'border-slate-200 shadow-sm'}`}>
-                <div
-                    className="p-6 border-b border-slate-100 flex justify-between items-center cursor-pointer hover:bg-slate-50 transition-colors"
-                    onClick={() => toggleSection("D")}
-                >
-                    <div>
-                        <h2 className={`text-lg font-bold flex items-center gap-2 ${expandedSections.includes('D') ? 'text-teal-600' : 'text-slate-800'}`}>
-                            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${expandedSections.includes('D') ? 'bg-teal-600 text-white' : 'bg-slate-200 text-slate-600'}`}>D</div>
-                            Section D: Objectives
-                        </h2>
-                    </div>
-                    {expandedSections.includes('D') ? <ChevronUp className="w-5 h-5 text-slate-400" /> : <ChevronDown className="w-5 h-5 text-slate-400" />}
-                </div>
+            <div className="co-card co-accent" style={{ borderTopColor: "#0e7d74" }}>
+                <CoSectionHead
+                    letter="D"
+                    title="Objectives"
+                    tag="WHAT & FOR WHOM"
+                    color="#0e7d74"
+                    expanded={expandedSections.includes("D")}
+                    onToggle={() => toggleSection("D")}
+                />
 
-                <div className={`p-8 space-y-6 ${!expandedSections.includes('D') ? 'hidden' : ''}`}>
+                <div className={`${!expandedSections.includes('D') ? 'hidden' : ''}`}>
                     <div>
-                        <label className="block text-sm font-bold text-slate-900 mb-2">D1. Project Objective <span className="text-red-500">*</span></label>
+                        <label className="co-label" style={{ marginTop: 4 }}>D1 · Project objective</label>
                         <textarea spellCheck={true}
                             className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10 outline-none font-medium h-32"
                             placeholder="What do you aim to achieve?"
@@ -1716,82 +1667,58 @@ export default function StudentOpportunityCreationPage() {
                             onChange={(e) => setFormData({ ...formData, objectives: { ...formData.objectives, description: e.target.value } })}
                         ></textarea>
                     </div>
-                    <div className="bg-slate-50 p-6 rounded-xl border border-slate-100">
-                        <label className="block text-sm font-bold text-slate-900 mb-4">D2. Expected Outreach</label>
-                        <div className="space-y-6">
+                    <div>
+                        <label className="co-label">D2 · Expected outreach</label>
+                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                             <div>
-                                <label className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5 block">
-                                    Number of Beneficiaries
-                                </label>
+                                <label className="co-label" style={{ marginTop: 0 }}>Number of beneficiaries</label>
                                 <input
                                     type="number"
                                     min={1}
-                                    className="w-full max-w-[220px] px-4 py-2.5 rounded-lg border border-slate-200 bg-white focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 outline-none"
                                     placeholder="e.g. 50"
                                     value={formData.objectives.beneficiariesCount}
                                     onChange={(e) => setFormData({ ...formData, objectives: { ...formData.objectives, beneficiariesCount: e.target.value } })}
                                 />
                             </div>
                             <div>
-                                <label className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5 block">
-                                    Type of Beneficiaries
-                                </label>
-                                <div className="rounded-xl border border-slate-200 bg-white p-4">
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2.5">
-                                        {BENEFICIARY_PREDEFINED.map((b) => (
-                                            <label
-                                                key={b}
-                                                className="flex items-center gap-2.5 py-1 text-sm text-slate-700 cursor-pointer hover:text-slate-900"
-                                            >
-                                                <input
-                                                    type="checkbox"
-                                                    className="h-4 w-4 shrink-0 rounded border-slate-300 text-teal-600 focus:ring-teal-500"
-                                                    checked={formData.objectives.beneficiariesType.includes(b)}
-                                                    onChange={() => {
-                                                        const types = formData.objectives.beneficiariesType.includes(b)
-                                                            ? formData.objectives.beneficiariesType.filter((t) => t !== b)
-                                                            : [...formData.objectives.beneficiariesType, b];
-                                                        setFormData({
-                                                            ...formData,
-                                                            objectives: { ...formData.objectives, beneficiariesType: types },
-                                                        });
-                                                    }}
-                                                />
-                                                <span>{b}</span>
-                                            </label>
-                                        ))}
-                                    </div>
-                                </div>
-                                <div className="mt-4 space-y-3">
-                                    <label
-                                        className={`flex items-center gap-2.5 px-4 py-3 rounded-xl border bg-white cursor-pointer transition-colors hover:bg-slate-50 ${
-                                            formData.objectives.isOtherBeneficiaryChecked
-                                                ? "border-teal-300 ring-1 ring-teal-500/15"
-                                                : "border-slate-200"
-                                        }`}
-                                    >
-                                        <input
-                                            type="checkbox"
-                                            className="h-4 w-4 shrink-0 rounded border-slate-300 text-teal-600 focus:ring-teal-500"
-                                            checked={formData.objectives.isOtherBeneficiaryChecked}
-                                            onChange={(e) =>
+                                <label className="co-label" style={{ marginTop: 0 }}>Type of beneficiaries · tap all</label>
+                                <div className="co-chips">
+                                    {BENEFICIARY_PREDEFINED.map((b) => (
+                                        <CoChip
+                                            key={b}
+                                            selected={formData.objectives.beneficiariesType.includes(b)}
+                                            onClick={() => {
+                                                const types = formData.objectives.beneficiariesType.includes(b)
+                                                    ? formData.objectives.beneficiariesType.filter((t) => t !== b)
+                                                    : [...formData.objectives.beneficiariesType, b];
                                                 setFormData({
                                                     ...formData,
-                                                    objectives: {
-                                                        ...formData.objectives,
-                                                        isOtherBeneficiaryChecked: e.target.checked,
-                                                        ...(e.target.checked ? {} : { otherBeneficiarySpecs: [""] }),
-                                                    },
-                                                })
-                                            }
-                                        />
-                                        <span className="text-sm font-medium text-slate-700">Other (please specify)</span>
-                                    </label>
-                                    {formData.objectives.isOtherBeneficiaryChecked && (
-                                        <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
-                                            <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">
-                                                Add one or more other beneficiary types
-                                            </p>
+                                                    objectives: { ...formData.objectives, beneficiariesType: types },
+                                                });
+                                            }}
+                                        >
+                                            {BENEFICIARY_EMOJI[b] || ""} {b}
+                                        </CoChip>
+                                    ))}
+                                    <CoChip
+                                        selected={formData.objectives.isOtherBeneficiaryChecked}
+                                        onClick={() =>
+                                            setFormData({
+                                                ...formData,
+                                                objectives: {
+                                                    ...formData.objectives,
+                                                    isOtherBeneficiaryChecked: !formData.objectives.isOtherBeneficiaryChecked,
+                                                    ...(formData.objectives.isOtherBeneficiaryChecked ? { otherBeneficiarySpecs: [""] } : {}),
+                                                },
+                                            })
+                                        }
+                                    >
+                                        ✏️ Other
+                                    </CoChip>
+                                </div>
+                                {formData.objectives.isOtherBeneficiaryChecked && (
+                                        <div className="mt-3 space-y-3">
+                                            <p className="co-hint">Who else? Please specify…</p>
                                             {formData.objectives.otherBeneficiarySpecs.map((spec, idx) => (
                                                 <div key={idx} className="relative">
                                                     <input
@@ -1855,7 +1782,6 @@ export default function StudentOpportunityCreationPage() {
                                             </button>
                                         </div>
                                     )}
-                                </div>
                             </div>
                         </div>
                     </div>
@@ -1863,26 +1789,21 @@ export default function StudentOpportunityCreationPage() {
             </div>
 
             {/* SECTION E: ACTIVITY DETAILS */}
-            <div className={`bg-white rounded-2xl border transition-all duration-300 ${expandedSections.includes('E') ? 'border-indigo-500 shadow-xl ring-1 ring-indigo-500' : 'border-slate-200 shadow-sm'}`}>
-                <div
-                    className="p-6 border-b border-slate-100 flex justify-between items-center cursor-pointer hover:bg-slate-50 transition-colors"
-                    onClick={() => toggleSection("E")}
-                >
-                    <div>
-                        <h2 className={`text-lg font-bold flex items-center gap-2 ${expandedSections.includes('E') ? 'text-indigo-600' : 'text-slate-800'}`}>
-                            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${expandedSections.includes('E') ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-600'}`}>E</div>
-                            Section E: Activity Details
-                        </h2>
-                        <p className="text-xs text-slate-500 mt-1 pl-8">What exactly will you do?</p>
-                    </div>
-                    {expandedSections.includes('E') ? <ChevronUp className="w-5 h-5 text-slate-400" /> : <ChevronDown className="w-5 h-5 text-slate-400" />}
-                </div>
+            <div className="co-card co-accent" style={{ borderTopColor: "#38bdf8" }}>
+                <CoSectionHead
+                    letter="E"
+                    title="Activity details"
+                    tag="THE PLAN"
+                    color="#38bdf8"
+                    expanded={expandedSections.includes("E")}
+                    onToggle={() => toggleSection("E")}
+                />
 
-                <div className={`p-8 space-y-6 ${!expandedSections.includes('E') ? 'hidden' : ''}`}>
+                <div className={`${!expandedSections.includes('E') ? 'hidden' : ''}`}>
                     <div>
-                        <label className="block text-sm font-bold text-slate-900 mb-2">E1. Detailed Plan (Bullet List) <span className="text-red-500">*</span></label>
-                        <p className="text-xs text-slate-500 mb-2">
-                            Summarize what students will do in bullet points (max 12,000 characters). Do not paste a full multi-page roadmap here—link or upload that separately if needed.
+                        <label className="co-label" style={{ marginTop: 4 }}>E1 · Detailed plan — bullet list</label>
+                        <p className="co-hint" style={{ margin: "0 0 6px" }}>
+                            Short bullet points only (max 12,000 characters). Not an essay — you can attach the full roadmap later if needed.
                         </p>
                         <textarea spellCheck={true}
                             className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 outline-none font-medium h-32"
@@ -1891,13 +1812,13 @@ export default function StudentOpportunityCreationPage() {
                             value={formData.activity.responsibilities}
                             onChange={(e) => setFormData({ ...formData, activity: { ...formData.activity, responsibilities: e.target.value } })}
                         ></textarea>
-                        <p className="text-xs text-slate-400 mt-1 text-right">
-                            {formData.activity.responsibilities.length.toLocaleString()} / 12,000
+                        <p className="mt-1 text-right text-[8.5px] font-extrabold tracking-[0.08em] text-[#7a919a]">
+                            {formData.activity.responsibilities.length.toLocaleString()} / 12,000 CHARACTERS
                         </p>
                     </div>
                     <div>
-                        <label className="block text-sm font-bold text-slate-900 mb-2">E2. Skills Students Will Gain (Select up to 10)</label>
-                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                        <label className="co-label">E2 · Skills students will gain · tap up to 10</label>
+                        <div className="co-chips">
                             {[
                                 "Leadership", "Communication", "Teaching", "Teamwork", 
                                 "Digital Skills", "Community Engagement", "Critical Thinking", 
@@ -1905,46 +1826,39 @@ export default function StudentOpportunityCreationPage() {
                                 "Research", "Documentation", "Financial Literacy", 
                                 "Public Speaking", "Event Planning", "Media/Content Creation"
                             ].map(s => (
-                                <label key={s} className="flex items-center gap-2 p-3 border border-slate-100 rounded-lg hover:bg-slate-50 cursor-pointer">
-                                    <input
-                                        type="checkbox"
-                                        className="rounded text-indigo-600 focus:ring-indigo-500"
-                                        checked={formData.activity.skills.includes(s)}
-                                        onChange={(e) => {
-                                            if (e.target.checked && formData.activity.skills.length >= 10) {
-                                                toast.error("You can select up to 10 skills.");
-                                                return;
-                                            }
-                                            const skills = formData.activity.skills.includes(s)
-                                                ? formData.activity.skills.filter(i => i !== s)
-                                                : [...formData.activity.skills, s];
-                                            setFormData({ ...formData, activity: { ...formData.activity, skills: skills } });
-                                        }}
-                                    />
-                                    <span className="text-sm font-medium text-slate-700">{s}</span>
-                                </label>
+                                <CoChip
+                                    key={s}
+                                    selected={formData.activity.skills.includes(s)}
+                                    onClick={() => {
+                                        if (!formData.activity.skills.includes(s) && formData.activity.skills.length >= 10) {
+                                            toast.error("You can select up to 10 skills.");
+                                            return;
+                                        }
+                                        const skills = formData.activity.skills.includes(s)
+                                            ? formData.activity.skills.filter(i => i !== s)
+                                            : [...formData.activity.skills, s];
+                                        setFormData({ ...formData, activity: { ...formData.activity, skills: skills } });
+                                    }}
+                                >
+                                    {SKILL_EMOJI[s] || ""} {s}
+                                </CoChip>
                             ))}
+                            <CoChip
+                                selected={formData.activity.isOtherSkillChecked}
+                                onClick={() => setFormData({ ...formData, activity: { ...formData.activity, isOtherSkillChecked: !formData.activity.isOtherSkillChecked } })}
+                            >
+                                ✏️ Other
+                            </CoChip>
                         </div>
-                        <div className="mt-3">
-                            <label className="flex items-center gap-2 p-3 border border-slate-100 rounded-lg hover:bg-slate-50 cursor-pointer w-full md:w-1/3 mb-4">
-                                <input
-                                    type="checkbox"
-                                    className="rounded text-indigo-600 focus:ring-indigo-500"
-                                    checked={formData.activity.isOtherSkillChecked}
-                                    onChange={(e) => setFormData({ ...formData, activity: { ...formData.activity, isOtherSkillChecked: e.target.checked } })}
-                                />
-                                <span className="text-sm font-medium text-slate-700">Other</span>
-                            </label>
-
-                            {formData.activity.isOtherSkillChecked && (
-                                <div className="space-y-3 pl-4 border-l-2 border-indigo-100">
+                        <p className="co-hint">{formData.activity.skills.length} of 10 selected</p>
+                        {formData.activity.isOtherSkillChecked && (
+                                <div className="mt-3 space-y-3">
                                     {formData.activity.otherSkills.map((skill, idx) => (
                                         <div key={idx} className="flex gap-2">
                                             <div className="relative flex-1">
                                                 <input
                                                     type="text"
-                                                    placeholder="Please specify other skill..."
-                                                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-indigo-500 outline-none text-sm transition-all"
+                                                    placeholder="Another skill…"
                                                     value={skill}
                                                     onChange={(e) => {
                                                         const newOthers = [...formData.activity.otherSkills];
@@ -1954,6 +1868,7 @@ export default function StudentOpportunityCreationPage() {
                                                 />
                                                 {formData.activity.otherSkills.length > 1 && (
                                                     <button
+                                                        type="button"
                                                         onClick={() => {
                                                             const newOthers = formData.activity.otherSkills.filter((_, i) => i !== idx);
                                                             setFormData({ ...formData, activity: { ...formData.activity, otherSkills: newOthers } });
@@ -1975,50 +1890,41 @@ export default function StudentOpportunityCreationPage() {
                                                 otherSkills: [...formData.activity.otherSkills, ""] 
                                             } 
                                         })}
-                                        className="text-xs font-bold text-indigo-600 hover:text-indigo-700 flex items-center gap-1.5 px-2 py-1"
+                                        className="flex items-center gap-1.5 px-2 py-1 text-xs font-extrabold text-[#0e7d74]"
                                     >
                                         <Plus className="w-3.5 h-3.5" />
                                         Add another skill
                                     </button>
                                 </div>
                             )}
-                        </div>
                     </div>
                 </div>
             </div>
 
             {/* SECTION F: STUDENT-CREATED OPPORTUNITY (CONTROLLED) */}
-            <div className={`bg-white rounded-2xl border transition-all duration-300 ${expandedSections.includes('F') ? 'border-orange-500 shadow-xl ring-1 ring-orange-500' : 'border-slate-200 shadow-sm'}`}>
-                <div
-                    className="p-6 border-b border-slate-100 flex justify-between items-center cursor-pointer hover:bg-slate-50 transition-colors"
-                    onClick={() => toggleSection("F")}
-                >
-                    <div>
-                        <h2 className={`text-lg font-bold flex items-center gap-2 ${expandedSections.includes('F') ? 'text-orange-600' : 'text-slate-800'}`}>
-                            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${expandedSections.includes('F') ? 'bg-orange-600 text-white' : 'bg-slate-200 text-slate-600'}`}>F</div>
-                            Section F: Supervision, Safety &amp; Participation Scope
-                        </h2>
-                        <p className="text-xs text-slate-500 mt-1 pl-8">Faculty approval, executing context, declarations, and who can apply.</p>
-                    </div>
-                    {expandedSections.includes('F') ? <ChevronUp className="w-5 h-5 text-slate-400" /> : <ChevronDown className="w-5 h-5 text-slate-400" />}
-                </div>
-                <div className={`p-8 space-y-10 ${!expandedSections.includes('F') ? 'hidden' : ''}`}>
-                    <p className="text-sm text-slate-600">
+            <div className="co-card co-accent" style={{ borderTopColor: "#b45309" }}>
+                <CoSectionHead
+                    letter="F"
+                    title="Supervision, safety & participation scope"
+                    tag="MANDATORY"
+                    color="#b45309"
+                    expanded={expandedSections.includes("F")}
+                    onToggle={() => toggleSection("F")}
+                />
+                <div className={`${!expandedSections.includes('F') ? 'hidden' : ''}`}>
+                    <p className="mb-3 text-[11px] leading-relaxed text-[#7a919a]">
                         Student-created opportunities stay within your university, require faculty verification by email, and are reviewed by CIEL Admin before going live.
                     </p>
 
                     {/* F1 Faculty approval */}
-                    <div className="space-y-4">
-                        <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wide">F1. Faculty approval (mandatory)</h3>
-                        <p className="text-sm text-slate-600">
-                            A verification email is sent to the faculty member. The opportunity does not proceed without faculty approval.
-                        </p>
+                    <div>
+                        <label className="co-label">F1 · Faculty approval — a verification email is sent; <b className="text-[#b45309]">nothing proceeds without it</b></label>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
                                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Faculty name <span className="text-red-500">*</span></label>
                                 <input
                                     type="text"
-                                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-orange-500 outline-none text-sm"
+                                    placeholder="Faculty name…"
                                     value={formData.supervision.facultyName}
                                     onChange={(e) => setFormData({ ...formData, supervision: { ...formData.supervision, facultyName: e.target.value } })}
                                 />
@@ -2027,7 +1933,7 @@ export default function StudentOpportunityCreationPage() {
                                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Designation <span className="text-red-500">*</span></label>
                                 <input
                                     type="text"
-                                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-orange-500 outline-none text-sm"
+                                    placeholder="Designation…"
                                     value={formData.supervision.facultyDesignation}
                                     onChange={(e) => setFormData({ ...formData, supervision: { ...formData.supervision, facultyDesignation: e.target.value } })}
                                 />
@@ -2036,68 +1942,51 @@ export default function StudentOpportunityCreationPage() {
                                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Department <span className="text-red-500">*</span></label>
                                 <input
                                     type="text"
-                                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-orange-500 outline-none text-sm"
+                                    placeholder="Department…"
                                     value={formData.supervision.facultyDepartment}
                                     onChange={(e) => setFormData({ ...formData, supervision: { ...formData.supervision, facultyDepartment: e.target.value } })}
                                 />
                             </div>
                             <div>
-                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">University name <span className="text-red-500">*</span></label>
-                                <div className="relative">
-                                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                                    <input
-                                        type="text"
-                                        readOnly
-                                        tabIndex={-1}
-                                        className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 bg-slate-50 text-slate-700 text-sm pointer-events-none"
-                                        value={studentDetails.institution}
-                                    />
-                                </div>
-                                <p className="text-[11px] text-slate-500 mt-1">From your profile; cross-university listing is not allowed.</p>
+                                <span className="co-locked w-full">🏛️ {studentDetails.institution || "—"}<span className="co-lock-badge">🔒</span></span>
                             </div>
                             <div className="md:col-span-2">
                                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Official email address <span className="text-red-500">*</span></label>
                                 <input
                                     type="email"
-                                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-orange-500 outline-none text-sm"
-                                    placeholder="faculty.name@university.edu"
+                                    placeholder="Official email address — faculty.name@university.edu…"
                                     value={formData.supervision.facultyOfficialEmail}
                                     onChange={(e) => setFormData({ ...formData, supervision: { ...formData.supervision, facultyOfficialEmail: e.target.value } })}
                                 />
                             </div>
                         </div>
-                        <p className="text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded-lg p-3 flex gap-2">
-                            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                            <span>This confirms the opportunity is valid, supervised, and academically acceptable. Faculty approval is required before the opportunity can proceed.</span>
-                        </p>
+                        <div className="co-note aqua">
+                            📧 <span>This confirms the opportunity is valid, supervised, and academically acceptable. Faculty approval is required before the opportunity can proceed.</span>
+                        </div>
                     </div>
 
-                    {/* F2 Executing context */}
-                    <div className="space-y-4 border-t border-slate-100 pt-8">
-                        <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wide">F2. Executing context (choose one)</h3>
+                    <div>
+                        <label className="co-label" style={{ marginTop: 14 }}>F2 · Executing context · choose one</label>
                         <PartnerOrganizationGuidance context="create" />
-                        <p className="text-sm text-slate-600">Is this opportunity conducted with an external organization?</p>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            <label className={`flex items-start gap-3 p-4 rounded-xl border cursor-pointer ${formData.supervision.executingContext === "partner" ? "border-orange-300 bg-orange-50/50" : "border-slate-200 hover:border-slate-300"}`}>
-                                <input
-                                    type="radio"
-                                    name="executingContext"
-                                    className="mt-1 text-orange-600"
-                                    checked={formData.supervision.executingContext === "partner"}
-                                    onChange={() => setFormData({ ...formData, supervision: { ...formData.supervision, executingContext: "partner" } })}
-                                />
-                                <span className="text-sm font-medium text-slate-800">Yes — partner organization involved</span>
-                            </label>
-                            <label className={`flex items-start gap-3 p-4 rounded-xl border cursor-pointer ${formData.supervision.executingContext === "independent" ? "border-orange-300 bg-orange-50/50" : "border-slate-200 hover:border-slate-300"}`}>
-                                <input
-                                    type="radio"
-                                    name="executingContext"
-                                    className="mt-1 text-orange-600"
-                                    checked={formData.supervision.executingContext === "independent"}
-                                    onChange={() => setFormData({ ...formData, supervision: { ...formData.supervision, executingContext: "independent" } })}
-                                />
-                                <span className="text-sm font-medium text-slate-800">No — independent community-based activity</span>
-                            </label>
+                        <div className="mt-2 grid grid-cols-1 gap-3 md:grid-cols-2">
+                            <button
+                                type="button"
+                                className={`co-choice${formData.supervision.executingContext === "partner" ? " on" : ""}`}
+                                onClick={() => setFormData({ ...formData, supervision: { ...formData.supervision, executingContext: "partner" } })}
+                            >
+                                <div className="text-[22px]">🤝</div>
+                                <div className="mt-1 text-xs font-extrabold">Yes — partner organisation involved</div>
+                                <div className="mt-0.5 text-[10px] leading-snug text-[#7a919a]">NGO, school, hospital, community group…</div>
+                            </button>
+                            <button
+                                type="button"
+                                className={`co-choice${formData.supervision.executingContext === "independent" ? " on" : ""}`}
+                                onClick={() => setFormData({ ...formData, supervision: { ...formData.supervision, executingContext: "independent" } })}
+                            >
+                                <div className="text-[22px]">🧑‍🤝‍🧑</div>
+                                <div className="mt-1 text-xs font-extrabold">No — independent community-based</div>
+                                <div className="mt-0.5 text-[10px] leading-snug text-[#7a919a]">Your crew, directly with the community.</div>
+                            </button>
                         </div>
                         {formData.supervision.executingContext === "partner" && (
                             <div className="space-y-3 animate-in fade-in slide-in-from-top-2">
@@ -2179,91 +2068,50 @@ export default function StudentOpportunityCreationPage() {
                     </div>
 
                     {/* F3 Safety declaration */}
-                    <div className="space-y-4 border-t border-slate-100 pt-8">
-                        <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wide">F3. Safety &amp; responsibility (mandatory)</h3>
-                        <p className="text-sm text-slate-600">
-                            Primary supervision lies with the faculty. If a partner organization is involved, operational safety is shared.
-                        </p>
-                        <div className="space-y-3 bg-orange-50/60 p-5 rounded-xl border border-orange-100 text-sm">
-                            <label className="flex items-start gap-3 cursor-pointer">
-                                <input
-                                    type="checkbox"
-                                    className="mt-1 rounded text-orange-600"
-                                    checked={formData.supervision.declSafeEnvironment}
-                                    onChange={(e) => setFormData({ ...formData, supervision: { ...formData.supervision, declSafeEnvironment: e.target.checked } })}
-                                />
-                                <span className="text-slate-800">The activity environment is safe and appropriate.</span>
-                            </label>
-                            <label className="flex items-start gap-3 cursor-pointer">
-                                <input
-                                    type="checkbox"
-                                    className="mt-1 rounded text-orange-600"
-                                    checked={formData.supervision.declNoHazardous}
-                                    onChange={(e) => setFormData({ ...formData, supervision: { ...formData.supervision, declNoHazardous: e.target.checked } })}
-                                />
-                                <span className="text-slate-800">No hazardous or high-risk tasks are involved.</span>
-                            </label>
-                            <label className="flex items-start gap-3 cursor-pointer">
-                                <input
-                                    type="checkbox"
-                                    className="mt-1 rounded text-orange-600"
-                                    checked={formData.supervision.declFacultyOversight}
-                                    onChange={(e) => setFormData({ ...formData, supervision: { ...formData.supervision, declFacultyOversight: e.target.checked } })}
-                                />
-                                <span className="text-slate-800">Faculty oversight is ensured.</span>
-                            </label>
-                            <label className="flex items-start gap-3 cursor-pointer">
-                                <input
-                                    type="checkbox"
-                                    className="mt-1 rounded text-orange-600"
-                                    checked={formData.supervision.declEthicalLawful}
-                                    onChange={(e) => setFormData({ ...formData, supervision: { ...formData.supervision, declEthicalLawful: e.target.checked } })}
-                                />
-                                <span className="text-slate-800">All activities are ethical and lawful.</span>
-                            </label>
+                    <div className="pt-2">
+                        <label className="co-label" style={{ marginTop: 14 }}>F3 · Safety &amp; responsibility · tap all four to confirm</label>
+                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                            <button type="button" className={`co-safe${formData.supervision.declSafeEnvironment ? " on" : ""}`} onClick={() => setFormData({ ...formData, supervision: { ...formData.supervision, declSafeEnvironment: !formData.supervision.declSafeEnvironment } })}>
+                                <span className="co-tick">{formData.supervision.declSafeEnvironment ? "✓" : ""}</span>
+                                <span>This activity environment is safe and appropriate</span>
+                            </button>
+                            <button type="button" className={`co-safe${formData.supervision.declNoHazardous ? " on" : ""}`} onClick={() => setFormData({ ...formData, supervision: { ...formData.supervision, declNoHazardous: !formData.supervision.declNoHazardous } })}>
+                                <span className="co-tick">{formData.supervision.declNoHazardous ? "✓" : ""}</span>
+                                <span>No hazardous or high-risk tasks are involved</span>
+                            </button>
+                            <button type="button" className={`co-safe${formData.supervision.declFacultyOversight ? " on" : ""}`} onClick={() => setFormData({ ...formData, supervision: { ...formData.supervision, declFacultyOversight: !formData.supervision.declFacultyOversight } })}>
+                                <span className="co-tick">{formData.supervision.declFacultyOversight ? "✓" : ""}</span>
+                                <span>Faculty oversight is ensured</span>
+                            </button>
+                            <button type="button" className={`co-safe${formData.supervision.declEthicalLawful ? " on" : ""}`} onClick={() => setFormData({ ...formData, supervision: { ...formData.supervision, declEthicalLawful: !formData.supervision.declEthicalLawful } })}>
+                                <span className="co-tick">{formData.supervision.declEthicalLawful ? "✓" : ""}</span>
+                                <span>All activities are ethical and lawful</span>
+                            </button>
                         </div>
                     </div>
 
                     {/* F4 Admin */}
-                    <div className="space-y-2 border-t border-slate-100 pt-8">
-                        <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wide">F4. Admin approval (mandatory)</h3>
-                        <p className="text-sm text-slate-600">
-                            CIEL Admin will review feasibility and clarity, SDG alignment, risk level, and authenticity before the opportunity is published for applicants at your institution.
-                        </p>
+                    <div className="co-note aqua" style={{ marginTop: 12 }}>
+                        🛡️ <span><b>F4 · Admin approval:</b> CIEL Admin will review feasibility and clarity, SDG alignment, risk level, and authenticity before this is published at your institution.</span>
                     </div>
 
                     {/* F5 Visibility & participation */}
-                    <div className="space-y-4 border-t border-slate-100 pt-8">
-                        <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wide">F5. Visibility &amp; participation scope</h3>
-                        <div className="flex items-start gap-2 text-sm text-slate-700 bg-slate-50 border border-slate-200 rounded-xl p-4">
-                            <Lock className="w-4 h-4 text-slate-500 shrink-0 mt-0.5" />
-                            <div>
-                                <p className="font-bold text-slate-900">Restricted to your university only</p>
-                                <p className="text-slate-600 mt-1">Only students from the same university can view and apply. Cross-university participation is not allowed.</p>
-                            </div>
-                        </div>
-                        <p className="text-xs font-bold text-slate-500 uppercase">Optional department-level restriction</p>
-                        <div className="space-y-3">
-                            <label className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer ${formData.participation.departmentScope === "all" ? "border-orange-200 bg-orange-50/30" : "border-slate-200"}`}>
-                                <input
-                                    type="radio"
-                                    name="deptScope"
-                                    className="text-orange-600"
-                                    checked={formData.participation.departmentScope === "all"}
-                                    onChange={() => setFormData({ ...formData, participation: { ...formData.participation, departmentScope: "all" } })}
-                                />
-                                <span className="text-sm font-medium text-slate-800">Open to all departments within the university</span>
-                            </label>
-                            <label className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer ${formData.participation.departmentScope === "specific" ? "border-orange-200 bg-orange-50/30" : "border-slate-200"}`}>
-                                <input
-                                    type="radio"
-                                    name="deptScope"
-                                    className="text-orange-600"
-                                    checked={formData.participation.departmentScope === "specific"}
-                                    onChange={() => setFormData({ ...formData, participation: { ...formData.participation, departmentScope: "specific" } })}
-                                />
-                                <span className="text-sm font-medium text-slate-800">Restricted to specific departments/programs</span>
-                            </label>
+                    <div>
+                        <label className="co-label" style={{ marginTop: 14 }}>F5 · Visibility &amp; participation scope</label>
+                        <span className="co-locked w-full">🔒 <b>Restricted to your university only</b> — only {studentDetails.institution || "your university"} students can view and apply. Cross-university participation is not allowed.</span>
+                        <div className="co-chips mt-2">
+                            <CoChip
+                                selected={formData.participation.departmentScope === "all"}
+                                onClick={() => setFormData({ ...formData, participation: { ...formData.participation, departmentScope: "all" } })}
+                            >
+                                🌐 Open to all departments within the university
+                            </CoChip>
+                            <CoChip
+                                selected={formData.participation.departmentScope === "specific"}
+                                onClick={() => setFormData({ ...formData, participation: { ...formData.participation, departmentScope: "specific" } })}
+                            >
+                                🎯 Restricted to specific departments / programs
+                            </CoChip>
                         </div>
                         {formData.participation.departmentScope === "specific" && (
                             <div className="pl-1 space-y-3 border-l-2 border-orange-100">
@@ -2326,137 +2174,152 @@ export default function StudentOpportunityCreationPage() {
             </div>
 
             {/* SECTION G: VERIFICATION */}
-            <div className={`bg-white rounded-2xl border transition-all duration-300 ${expandedSections.includes('G') ? 'border-cyan-500 shadow-xl ring-1 ring-cyan-500' : 'border-slate-200 shadow-sm'}`}>
-                <div
-                    className="p-6 border-b border-slate-100 flex justify-between items-center cursor-pointer hover:bg-slate-50 transition-colors"
-                    onClick={() => toggleSection("G")}
-                >
-                    <h2 className={`text-lg font-bold flex items-center gap-2 ${expandedSections.includes('G') ? 'text-cyan-600' : 'text-slate-800'}`}>
-                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${expandedSections.includes('G') ? 'bg-cyan-600 text-white' : 'bg-slate-200 text-slate-600'}`}>G</div>
-                        Section G: Evidence & Verification
-                    </h2>
-                    {expandedSections.includes('G') ? <ChevronUp className="w-5 h-5 text-slate-400" /> : <ChevronDown className="w-5 h-5 text-slate-400" />}
-                </div>
-                <div className={`p-8 space-y-6 ${!expandedSections.includes('G') ? 'hidden' : ''}`}>
-                    <label className="block text-sm font-bold text-slate-900 mb-2">How will you prove your work?</label>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="co-card co-accent" style={{ borderTopColor: "#f472b6" }}>
+                <CoSectionHead
+                    letter="G"
+                    title="Evidence & verification"
+                    tag="SET EXPECTATIONS NOW"
+                    tagAuto
+                    color="#f472b6"
+                    expanded={expandedSections.includes("G")}
+                    onToggle={() => toggleSection("G")}
+                />
+                <div className={`${!expandedSections.includes('G') ? 'hidden' : ''}`}>
+                    <p className="mb-3 text-[11px] leading-relaxed text-[#7a919a]">What proof will your crew log as they go? Tap what applies — it becomes the checklist inside every member’s report.</p>
+                    <div className="co-chips">
                         {["Attendance sheets", "Supervisor sign-off", "Photos of activities", "Assessment sheets", "Digital logs"].map(v => (
-                            <label key={v} className={`flex items-center gap-2 text-sm font-medium text-slate-700`}>
-                                <input
-                                    type="checkbox"
-                                    className="rounded text-cyan-600 focus:ring-cyan-500"
-                                    checked={formData.verification.includes(v)}
-                                    onChange={() => {
-                                        const vers = formData.verification.includes(v)
-                                            ? formData.verification.filter(i => i !== v)
-                                            : [...formData.verification, v];
-                                        setFormData({ ...formData, verification: vers });
-                                    }}
-                                /> {v}
-                            </label>
+                            <CoChip
+                                key={v}
+                                selected={formData.verification.includes(v)}
+                                onClick={() => {
+                                    const vers = formData.verification.includes(v)
+                                        ? formData.verification.filter(i => i !== v)
+                                        : [...formData.verification, v];
+                                    setFormData({ ...formData, verification: vers });
+                                }}
+                            >
+                                {VERIFICATION_EMOJI[v] || ""} {v}
+                            </CoChip>
                         ))}
                     </div>
                 </div>
             </div>
 
             {/* SECTION: F6 REQUIRED CONFIRMATIONS + DECLARATION */}
-            <div className="bg-slate-900 rounded-2xl text-white p-8">
-                <h2 className="text-xl font-bold mb-2 flex items-center gap-2">
-                    <CheckCircle className="w-6 h-6 text-green-400" /> Final confirmations
-                </h2>
-                <p className="text-sm text-slate-400 mb-6">Section F6 — by submitting, you confirm the following.</p>
-                <div className="space-y-4 mb-8">
-                    <label className="flex items-start gap-3 cursor-pointer text-sm text-slate-200">
-                        <input
-                            type="checkbox"
-                            className="mt-1 rounded border-slate-600 bg-slate-800 text-green-500 focus:ring-green-500"
-                            checked={formData.sectionFConfirmations.facultyApproval}
-                            onChange={(e) =>
-                                setFormData({
-                                    ...formData,
-                                    sectionFConfirmations: { ...formData.sectionFConfirmations, facultyApproval: e.target.checked },
-                                })
-                            }
-                        />
-                        <span>Faculty approval has been obtained or will be obtained (verification email will be sent).</span>
-                    </label>
-                    <label className="flex items-start gap-3 cursor-pointer text-sm text-slate-200">
-                        <input
-                            type="checkbox"
-                            className="mt-1 rounded border-slate-600 bg-slate-800 text-green-500 focus:ring-green-500"
-                            checked={formData.sectionFConfirmations.genuineAccurate}
-                            onChange={(e) =>
-                                setFormData({
-                                    ...formData,
-                                    sectionFConfirmations: { ...formData.sectionFConfirmations, genuineAccurate: e.target.checked },
-                                })
-                            }
-                        />
-                        <span>The opportunity is genuine and accurately described.</span>
-                    </label>
-                    <label className="flex items-start gap-3 cursor-pointer text-sm text-slate-200">
-                        <input
-                            type="checkbox"
-                            className="mt-1 rounded border-slate-600 bg-slate-800 text-green-500 focus:ring-green-500"
-                            checked={formData.sectionFConfirmations.safeAppropriate}
-                            onChange={(e) =>
-                                setFormData({
-                                    ...formData,
-                                    sectionFConfirmations: { ...formData.sectionFConfirmations, safeAppropriate: e.target.checked },
-                                })
-                            }
-                        />
-                        <span>The activity is safe and appropriate.</span>
-                    </label>
-                    <label className="flex items-start gap-3 cursor-pointer text-sm text-slate-200">
-                        <input
-                            type="checkbox"
-                            className="mt-1 rounded border-slate-600 bg-slate-800 text-green-500 focus:ring-green-500"
-                            checked={formData.sectionFConfirmations.truthfulVerifiable}
-                            onChange={(e) =>
-                                setFormData({
-                                    ...formData,
-                                    sectionFConfirmations: { ...formData.sectionFConfirmations, truthfulVerifiable: e.target.checked },
-                                })
-                            }
-                        />
-                        <span>All provided information is truthful and verifiable.</span>
-                    </label>
+            <div className="co-final mb-3 rounded-[20px] bg-[#0d2b33] p-5 text-white">
+                <div className="mb-1 flex items-center gap-2.5">
+                    <span className="flex h-[26px] min-w-[28px] items-center justify-center rounded-[9px] bg-[#2dd4bf] px-2 text-[11px] font-extrabold text-[#04252b]">✓</span>
+                    <h2 className="text-[14.5px] font-extrabold text-white">Final confirmations</h2>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-6 border-t border-slate-700">
-                    <div>
-                        <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Student name</label>
-                        <input type="text" value={studentDetails.name} readOnly className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-3 text-white" />
-                    </div>
-                    <div>
-                        <label className="block text-xs font-bold text-slate-400 uppercase mb-1">University (locked scope)</label>
-                        <input type="text" value={studentDetails.institution} readOnly className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-3 text-slate-300" />
-                    </div>
+                <p className="mb-2 text-[11px] leading-relaxed text-[#a5e8de]">By submitting, you confirm the following — tap each:</p>
+                <button
+                    type="button"
+                    className={`co-confirm${formData.sectionFConfirmations.facultyApproval ? " on" : ""}`}
+                    onClick={() =>
+                        setFormData({
+                            ...formData,
+                            sectionFConfirmations: { ...formData.sectionFConfirmations, facultyApproval: !formData.sectionFConfirmations.facultyApproval },
+                        })
+                    }
+                >
+                    <span className="co-tick">{formData.sectionFConfirmations.facultyApproval ? "✓" : ""}</span>
+                    <span>Faculty approval has been obtained or will be obtained — the verification email will be sent.</span>
+                </button>
+                <button
+                    type="button"
+                    className={`co-confirm${formData.sectionFConfirmations.genuineAccurate ? " on" : ""}`}
+                    onClick={() =>
+                        setFormData({
+                            ...formData,
+                            sectionFConfirmations: { ...formData.sectionFConfirmations, genuineAccurate: !formData.sectionFConfirmations.genuineAccurate },
+                        })
+                    }
+                >
+                    <span className="co-tick">{formData.sectionFConfirmations.genuineAccurate ? "✓" : ""}</span>
+                    <span>The opportunity is genuine and accurately described.</span>
+                </button>
+                <button
+                    type="button"
+                    className={`co-confirm${formData.sectionFConfirmations.safeAppropriate ? " on" : ""}`}
+                    onClick={() =>
+                        setFormData({
+                            ...formData,
+                            sectionFConfirmations: { ...formData.sectionFConfirmations, safeAppropriate: !formData.sectionFConfirmations.safeAppropriate },
+                        })
+                    }
+                >
+                    <span className="co-tick">{formData.sectionFConfirmations.safeAppropriate ? "✓" : ""}</span>
+                    <span>The activity is safe and appropriate.</span>
+                </button>
+                <button
+                    type="button"
+                    className={`co-confirm${formData.sectionFConfirmations.truthfulVerifiable ? " on" : ""}`}
+                    onClick={() =>
+                        setFormData({
+                            ...formData,
+                            sectionFConfirmations: { ...formData.sectionFConfirmations, truthfulVerifiable: !formData.sectionFConfirmations.truthfulVerifiable },
+                        })
+                    }
+                >
+                    <span className="co-tick">{formData.sectionFConfirmations.truthfulVerifiable ? "✓" : ""}</span>
+                    <span>All provided information is truthful and verifiable.</span>
+                </button>
+                <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2">
+                    <span className="co-locked" style={{ background: "rgba(255,255,255,.08)", borderColor: "rgba(255,255,255,.25)", color: "#fff" }}>
+                        🧑‍🎓 <b style={{ color: "#fff" }}>{studentDetails.name || "—"}</b><span className="co-lock-badge">🔒</span>
+                    </span>
+                    <span className="co-locked" style={{ background: "rgba(255,255,255,.08)", borderColor: "rgba(255,255,255,.25)", color: "#fff" }}>
+                        🏛️ {studentDetails.institution || "—"} · LOCKED SCOPE<span className="co-lock-badge">🔒</span>
+                    </span>
+                </div>
+                <div className="mt-3.5 flex gap-2.5">
+                    <button
+                        type="button"
+                        onClick={handleSaveDraft}
+                        className="flex-1 rounded-[13px] border border-white/30 bg-transparent py-3 text-xs font-extrabold text-[#d9f7f2] disabled:opacity-50"
+                        disabled={isSubmitting || isLoadingEdit || Boolean(editingOpportunityId)}
+                    >
+                        💾 Save draft
+                    </button>
+                    <button
+                        type="button"
+                        onClick={handleSubmit}
+                        disabled={isSubmitting || isLoadingEdit}
+                        className="flex-[2] rounded-[13px] bg-[linear-gradient(90deg,#0e7d74,#2dd4bf)] py-3 text-[13px] font-extrabold text-white disabled:opacity-70"
+                    >
+                        {isSubmitting ? <Loader2 className="mx-auto h-4 w-4 animate-spin" /> : null}
+                        {isSubmitting
+                            ? "Submitting..."
+                            : editingOpportunityId
+                              ? "Save changes"
+                              : "🚀 Submit project"}
+                    </button>
                 </div>
             </div>
 
-            <div className="fixed bottom-0 left-0 md:left-64 right-0 p-4 bg-white border-t border-slate-200 z-50 flex justify-end gap-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
-                <button
-                    type="button"
-                    onClick={handleSaveDraft}
-                    className="px-6 py-2 border border-slate-200 text-slate-600 font-bold rounded-xl hover:bg-slate-50 disabled:opacity-70 disabled:cursor-not-allowed"
-                    disabled={isSubmitting || isLoadingEdit || Boolean(editingOpportunityId)}
-                >
-                    Save Draft
-                </button>
-                <button
-                    type="button"
-                    onClick={handleSubmit}
-                    disabled={isSubmitting || isLoadingEdit}
-                    className="px-6 py-2 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 shadow-lg shadow-blue-500/30 flex items-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
-                >
-                    {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-                    {isSubmitting
-                        ? "Submitting..."
-                        : editingOpportunityId
-                          ? "Save changes"
-                          : "Submit Project"}
-                </button>
+            <div className="sticky bottom-3.5 z-40 mt-4 overflow-hidden rounded-[20px] border border-[#dcebee] bg-white shadow-[0_-8px_30px_rgba(4,37,43,.10)]">
+                <div className="flex flex-wrap items-center gap-3 bg-[linear-gradient(130deg,#04252b,#0e5f63_55%,#12a5a0_120%)] px-4 py-3 text-white">
+                    <span className="text-[22px]">{previewEmoji}</span>
+                    <div className="min-w-0 flex-1">
+                        <b className="block text-[13px]">{formData.title.trim() || "Your listing builds itself here…"}</b>
+                        <span className="text-[9.5px] text-[#cdf5f0]">
+                            {previewBits.length ? previewBits.join(" · ") : "fill the form above and watch this card come alive"}
+                        </span>
+                    </div>
+                    <div className="flex gap-1">
+                        {previewPrimarySdg ? (
+                            <span className="co-sdg" style={{ background: previewPrimarySdg.color ?? "#0e7d74" }}>
+                                SDG {previewPrimarySdg.number}{formData.target ? ` · ${formData.target}` : ""}
+                            </span>
+                        ) : null}
+                        {previewSecondarySdg ? (
+                            <span className="co-sdg" style={{ background: previewSecondarySdg.color ?? "#6d28d9" }}>
+                                SDG {previewSecondarySdg.number}
+                            </span>
+                        ) : null}
+                    </div>
+                    <span className="rounded-full bg-white/18 px-2.5 py-1 text-[7.5px] font-extrabold">● LIVE PREVIEW</span>
+                </div>
             </div>
             <OpportunitySubmittedReviewModal
                 open={showSubmittedReviewModal}

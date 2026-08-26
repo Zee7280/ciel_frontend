@@ -252,6 +252,173 @@ export function whyItLeads(entry: CourseProjectEntry, sc: MeritScorecard): strin
     return `${CRITERION_PHRASE[top1.key](entry)}, with ${CRITERION_PHRASE[top2.key](entry)}${attachedSuffix}.`;
 }
 
+const CRITERION_SHORT: Record<MeritRubricCriterion["key"], string> = {
+    sdg: "sustainability & SDG authenticity",
+    results: "substance of results",
+    purpose: "clarity of the idea",
+    rigor: "pathway-adjusted rigor",
+    honesty: "honesty & consistency",
+    refl: "reflection",
+    ver: "verifiability",
+};
+
+const CRITERION_TIER: Record<MeritRubricCriterion["key"], [string, string, string]> = {
+    sdg: [
+        "the SDG core is targeted, explained and central — authenticity, not name-dropping",
+        "the SDG link is genuine, though its target could be sharper",
+        "the SDG connection is thin",
+    ],
+    results: [
+        "results are measured and defended — numbers that survive questioning",
+        "results are substantive, though partly qualitative",
+        "results lean on claims",
+    ],
+    purpose: [
+        "the idea is sharp enough to state in one sentence and still matter",
+        "a clear idea, loosely framed",
+        "the idea needs a tighter question",
+    ],
+    rigor: [
+        "process rigor is exemplary for its own format — on its own pathway, it excels",
+        "the process fits its format, with room to deepen",
+        "the method is under-explained",
+    ],
+    honesty: [
+        "limits are named with their effects — the honesty this rubric prizes most",
+        "honest overall, with one soft claim",
+        "claims outrun the evidence",
+    ],
+    refl: [
+        "reflection the next cohort can actually use",
+        "reflection present, transfer thin",
+        "reflection is cursory",
+    ],
+    ver: [
+        "every attached file checked against the claims — openable, checkable truth",
+        "evidence supports most claims",
+        "verifiability is the weak link",
+    ],
+};
+
+export type RubricBand = "EXEMPLARY" | "SOLID" | "DEVELOPING";
+
+export function rubricBand(points: number, max: number): RubricBand {
+    const r = max ? points / max : 0;
+    if (r >= 0.85) return "EXEMPLARY";
+    if (r >= 0.62) return "SOLID";
+    return "DEVELOPING";
+}
+
+export function rubricBandIndex(points: number, max: number): 0 | 1 | 2 {
+    const b = rubricBand(points, max);
+    return b === "EXEMPLARY" ? 0 : b === "SOLID" ? 1 : 2;
+}
+
+export const RUBRIC_SCALE: Record<
+    MeritRubricCriterion["key"],
+    { emoji: string; title: string; exemplary: string; solid: string; developing: string }
+> = {
+    sdg: {
+        emoji: "🌍",
+        title: "Sustainability & SDG authenticity",
+        exemplary: "Named SDG + specific target, central to the project design; the claimed link would survive an expert asking “how, exactly?”",
+        solid: "Genuine SDG connection, but the target is vague or the link is partial",
+        developing: "SDG is name-dropped — the project would be identical without it",
+    },
+    results: {
+        emoji: "📊",
+        title: "Substance of results",
+        exemplary: "Measured outcomes with baseline → endline, honestly counted, defensible under questioning",
+        solid: "Substantive results, but partly qualitative or missing a baseline",
+        developing: "Claims of impact without measurement",
+    },
+    purpose: {
+        emoji: "💡",
+        title: "Clarity of the idea",
+        exemplary: "Statable in one sharp sentence and still meaningful; original for its context",
+        solid: "A clear idea, loosely framed or partly borrowed",
+        developing: "Unfocused — the reader must guess what the project is",
+    },
+    rigor: {
+        emoji: "🔬",
+        title: "Rigor — pathway-adjusted",
+        exemplary: "Exemplary process for its OWN format: an artwork judged on craft, a prototype on iteration, a paper on method — never on each other’s scale",
+        solid: "Process fits the format with thin patches (skipped iteration, small sample, light sourcing)",
+        developing: "Method under-explained; the “how” is missing",
+    },
+    honesty: {
+        emoji: "🤝",
+        title: "Honesty & consistency",
+        exemplary: "Limitations named WITH their effects; numbers consistent everywhere; nothing inflated",
+        solid: "Honest overall; one soft or optimistic claim",
+        developing: "Claims outrun the evidence, or sections contradict each other",
+    },
+    refl: {
+        emoji: "🪞",
+        title: "Reflection",
+        exemplary: "Lessons the next cohort could act on; growth stated with proof",
+        solid: "Reflection present but generic; transfer value thin",
+        developing: "Cursory — “I learned a lot”",
+    },
+    ver: {
+        emoji: "🔍",
+        title: "Verifiability",
+        exemplary: "Attached files match the claims — openable, checkable truth",
+        solid: "Most claims supported; some evidence indirect",
+        developing: "Evidence missing, mismatched or unverifiable",
+    },
+};
+
+/** Full “why this rank” verdict — same formula at faculty, university and CIEL scope. */
+export function whyThisRank(
+    entry: CourseProjectEntry,
+    sc: MeritScorecard,
+    index: number,
+    pool: { entry: CourseProjectEntry; scorecard: MeritScorecard }[],
+    avg: number,
+): string {
+    const ratios = sc.criteria.map((c) => ({ c, r: c.max ? c.points / c.max : 0 }));
+    const ordered = [...ratios].sort((a, b) => b.r - a.r);
+    const t1 = ordered[0];
+    const t2 = ordered[1];
+    const wk = ordered[ordered.length - 1];
+    const nEx = ratios.filter((x) => x.r >= 0.85).length;
+    const diff = sc.total - avg;
+    const files = (entry.assignmentFileUrl ? 1 : 0) + (entry.evidenceUrls?.length ?? 0);
+    const fmt = stripEmoji(entry.assignmentInfo?.formats?.[0] || entry.assignmentInfo?.format || "work").toLowerCase();
+
+    const parts: string[] = [];
+    parts.push(
+        `Why #${index + 1} of ${pool.length}: ${nEx} of 7 criteria land in the Exemplary band. The rank is carried by ${CRITERION_SHORT[t1.c.key]} — ${CRITERION_TIER[t1.c.key][rubricBandIndex(t1.c.points, t1.c.max)]} (${Math.round(t1.c.points * 10) / 10}/${t1.c.max}) — reinforced by ${CRITERION_SHORT[t2.c.key]}: ${CRITERION_TIER[t2.c.key][rubricBandIndex(t2.c.points, t2.c.max)]} (${Math.round(t2.c.points * 10) / 10}/${t2.c.max}).`,
+    );
+    parts.push(
+        `Against the cohort: ${diff >= 0 ? "+" : ""}${diff} points versus the scoped average of ${avg} — ${diff >= 8 ? "a decisive margin" : diff >= 3 ? "a clear margin" : diff >= 0 ? "narrowly above the field" : "below the field on total, ranked on what it did earn"}.`,
+    );
+    parts.push(
+        files
+            ? `The evidence holds: ${files} file${files === 1 ? "" : "s"} re-read at ranking time — they match the claimed ${fmt}; nothing here rests on an unverifiable claim.`
+            : `The evidence holds: this is a card-only record — ranked on declared fields; attached work would raise verifiability.`,
+    );
+    if (index < pool.length - 1) {
+        const nx = pool[index + 1];
+        const d = sc.total - nx.scorecard.total;
+        const gaps = sc.criteria.map((c, j) => ({
+            key: c.key,
+            gap: c.points - nx.scorecard.criteria[j].points,
+        }));
+        const g = [...gaps].sort((a, b) => b.gap - a.gap)[0];
+        parts.push(
+            d > 0
+                ? `Versus the next card — “${nx.entry.projectTitle || "Untitled"}” (${nx.scorecard.total}): the ${d}-point gap is earned almost entirely on ${CRITERION_SHORT[g.key]} (+${Math.round(g.gap)}) — not on volume, polish or discipline prestige.`
+                : `Level on points with “${nx.entry.projectTitle || "Untitled"}” — placed higher on credibility of evidence, the declared tie-breaker.`,
+        );
+    }
+    parts.push(
+        `What holds it at #${index + 1}: ${CRITERION_TIER[wk.c.key][rubricBandIndex(wk.c.points, wk.c.max)]} (${Math.round(wk.c.points * 10) / 10}/${wk.c.max})${index === 0 ? " — even the top card is told its weakest link, because a rubric that only praises is not a rubric" : ""}.`,
+    );
+    return parts.join(" ");
+}
+
 /** 🔮 What's the most likely next step for this piece of work — forecast from its own evidence ladder and declared format. */
 export function courseworkPotential(entry: CourseProjectEntry): string {
     const re = entry.resultsInfo || {};

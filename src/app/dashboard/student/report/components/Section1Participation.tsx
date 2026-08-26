@@ -1398,16 +1398,122 @@ export default function Section1Participation({ projectData }: { projectData?: a
 
                         return (
                             <div className="space-y-4">
+                                <div className="cer-inner-bridge overflow-hidden rounded-[22px] bg-gradient-to-br from-[#04252b] via-[#0e5f63] to-[#12a5a0] px-5 py-4 text-white sm:px-6">
+                                    <p className="text-[9px] font-extrabold tracking-[0.22em] text-[#99f6e4]">
+                                        SECTION 1 · PARTICIPATION
+                                    </p>
+                                    <h3 className="mt-1 text-lg font-extrabold tracking-tight sm:text-[19px]">
+                                        Log sessions for your crew
+                                    </h3>
+                                    <p className="mt-1 max-w-xl text-[11.5px] leading-relaxed text-[#cdf5f0]">
+                                        Tap a member, log date · time · location · activity · photos. Hours compute
+                                        automatically. Faculty reviews pending sessions from their flash-card queue.
+                                    </p>
+                                </div>
+
+                                <div className="flex gap-2 rounded-[12px] border border-[#bfe6e2] bg-[#e3f4fa] px-3.5 py-2.5 text-[11px] leading-relaxed text-[#0f5e57]">
+                                    <span className="shrink-0 text-base" aria-hidden>
+                                        🎉
+                                    </span>
+                                    <span>
+                                        <b>Tip:</b> sessions save as you go. When everyone has met minimum hours,
+                                        use Step 3 to send for Faculty or Partner approval — they review each
+                                        session on a flash card.
+                                    </span>
+                                </div>
+
+                                <div className="rounded-[18px] border border-[#dcebee] bg-white p-4 shadow-sm sm:p-5">
+                                    <div className="mb-1 flex items-center gap-2">
+                                        <span className="flex h-[25px] min-w-[30px] items-center justify-center rounded-[9px] bg-[#0d2b33] px-1.5 text-[9.5px] font-extrabold text-white">
+                                            1.1
+                                        </span>
+                                        <h4 className="text-[14.5px] font-bold text-[#0d2b33]">Your crew</h4>
+                                        <span className="ml-auto rounded-full bg-[#e3f4fa] px-2.5 py-1 text-[8px] font-extrabold tracking-wide text-[#0891b2]">
+                                            TAP TO LOG FOR
+                                        </span>
+                                    </div>
+                                    <p className="mb-3 text-[11px] text-[#7a919a]">
+                                        Tap the member you’re logging hours for.
+                                    </p>
+                                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                                        {rawParticipants.map((u) => {
+                                            const on = u.id === selectedParticipantId;
+                                            const logsFor = data.section1.attendance_logs.filter(
+                                                (l: { participantId?: string }) =>
+                                                    engagementParticipantIdsMatch(l.participantId, u.id),
+                                            );
+                                            const hrs =
+                                                Math.round(
+                                                    logsFor.reduce(
+                                                        (acc: number, log: (typeof logsFor)[number]) =>
+                                                            acc + effectiveHoursFromLog(log),
+                                                        0,
+                                                    ) * 10,
+                                                ) / 10;
+                                            const pct =
+                                                requiredHoursPerStudent > 0
+                                                    ? Math.min(100, (hrs / requiredHoursPerStudent) * 100)
+                                                    : 0;
+                                            const initial = (u.name || "?").replace(/\s*\(Self\)\s*/i, "").trim().charAt(0).toUpperCase();
+                                            return (
+                                                <button
+                                                    key={u.id}
+                                                    type="button"
+                                                    onClick={() => setSelectedParticipantId(u.id)}
+                                                    className={clsx(
+                                                        "rounded-[14px] border p-3 text-center transition",
+                                                        on
+                                                            ? "border-[#0e7d74] bg-[#e6f6f4] ring-1 ring-[#0e7d74]/30"
+                                                            : "border-[#dcebee] bg-white hover:border-[#0e7d74]/50",
+                                                    )}
+                                                >
+                                                    <div
+                                                        className={clsx(
+                                                            "mx-auto mb-1.5 flex h-10 w-10 items-center justify-center rounded-full text-[15px] font-extrabold text-white",
+                                                            on
+                                                                ? "bg-gradient-to-br from-[#0e7d74] to-[#2dd4bf]"
+                                                                : "bg-gradient-to-br from-[#0f5e63] to-[#22d3ee]",
+                                                        )}
+                                                    >
+                                                        {initial}
+                                                    </div>
+                                                    <p className="truncate text-xs font-bold text-[#0d2b33]">
+                                                        {u.name}
+                                                    </p>
+                                                    <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-[#e8f2f0]">
+                                                        <div
+                                                            className="h-full rounded-full bg-gradient-to-r from-[#0e5f63] to-[#2dd4bf] transition-all"
+                                                            style={{ width: `${pct}%` }}
+                                                        />
+                                                    </div>
+                                                    <p className="mt-1 text-[10px] font-extrabold text-[#0e7d74]">
+                                                        {hrs}h / {requiredHoursPerStudent}h
+                                                        {hrs >= requiredHoursPerStudent ? " 🏆" : ""}
+                                                    </p>
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+
                                 <div>
-                                    <h3 className="text-lg font-semibold text-slate-900">Attendance logging</h3>
-                                    <p className="mt-0.5 text-sm text-slate-500">
-                                        Log each session with time, location, and a short activity summary.
+                                    <div className="mb-3 flex items-center gap-2">
+                                        <span className="flex h-[25px] min-w-[30px] items-center justify-center rounded-[9px] bg-[#0d2b33] px-1.5 text-[9.5px] font-extrabold text-white">
+                                            1.2
+                                        </span>
+                                        <h3 className="text-[14.5px] font-bold text-[#0d2b33]">Log a session</h3>
+                                        <span className="ml-auto rounded-full bg-[#fbf0d7] px-2.5 py-1 text-[8px] font-extrabold tracking-wide text-[#b45309]">
+                                            MANDATORY
+                                        </span>
+                                    </div>
+                                    <p className="mb-3 text-sm text-[#7a919a]">
+                                        Date, time, location, activity type, short description, and photo evidence.
                                     </p>
                                 </div>
 
                                 <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] lg:items-start">
                                     {/* Left: form */}
-                                    <div className="min-w-0 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+                                    <div className="min-w-0 rounded-[18px] border border-[#dcebee] bg-white p-4 shadow-sm sm:p-5">
                                         <AttendanceForm
                                             verifiedUsers={rawParticipants}
                                             onSuccess={() => loadAllEntries()}
@@ -1420,7 +1526,7 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                         />
 
                                         {!isSubmittedReport && !isParticipationUnlocked ? (
-                                            <div className="mt-5 border-t border-slate-100 pt-4">
+                                            <div className="mt-5 border-t border-[#dcebee] pt-4">
                                                 {isAttendanceVerificationRequested ? (
                                                     <div className="space-y-1.5">
                                                         <p className="text-xs font-semibold text-emerald-700">
@@ -1444,16 +1550,21 @@ export default function Section1Participation({ projectData }: { projectData?: a
 
                                     {/* Right: logged sessions + hours progress */}
                                     <div className="min-w-0 space-y-4">
-                                        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-                                            <div className="flex items-baseline justify-between gap-3 border-b border-slate-100 px-5 py-4">
-                                                <h4 className="text-base font-semibold text-slate-900">
-                                                    Logged sessions
-                                                </h4>
-                                                <p className="shrink-0 text-xs text-slate-400">
+                                        <div className="overflow-hidden rounded-[18px] border border-[#dcebee] bg-white shadow-sm">
+                                            <div className="flex items-baseline justify-between gap-3 border-b border-[#dcebee] px-5 py-4">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="flex h-[25px] min-w-[30px] items-center justify-center rounded-[9px] bg-[#0d2b33] px-1.5 text-[9.5px] font-extrabold text-white">
+                                                        1.3
+                                                    </span>
+                                                    <h4 className="text-[14.5px] font-bold text-[#0d2b33]">
+                                                        Activities log
+                                                    </h4>
+                                                </div>
+                                                <p className="shrink-0 text-xs text-[#7a919a]">
                                                     {filteredLogCount}{" "}
                                                     {filteredLogCount === 1 ? "record" : "records"}
                                                     {selectedParticipantId
-                                                        ? ` · filtered by ${selectedStudentName}`
+                                                        ? ` · ${selectedStudentName}`
                                                         : ""}
                                                 </p>
                                             </div>
@@ -1474,32 +1585,32 @@ export default function Section1Participation({ projectData }: { projectData?: a
                                         </div>
 
                                         {selectedParticipantId ? (
-                                            <div className="rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
+                                            <div className="rounded-[18px] border border-[#dcebee] bg-white px-5 py-4 shadow-sm">
                                                 <div className="mb-2.5 flex items-center justify-between gap-3">
-                                                    <p className="text-xs text-slate-500">
+                                                    <p className="text-xs text-[#7a919a]">
                                                         Hours logged toward {requiredHoursPerStudent}-hour minimum
                                                     </p>
-                                                    <p className="shrink-0 text-sm font-semibold text-slate-900">
+                                                    <p className="shrink-0 text-sm font-extrabold text-[#0e7d74]">
                                                         {loggedRounded} / {requiredHoursPerStudent} hrs
                                                     </p>
                                                 </div>
-                                                <div className="h-2.5 overflow-hidden rounded-full bg-slate-100">
+                                                <div className="h-2.5 overflow-hidden rounded-full bg-[#e8f2f0]">
                                                     <div
                                                         className={clsx(
                                                             "h-full rounded-full transition-all",
                                                             personalProgressPct >= 100
-                                                                ? "bg-emerald-500"
-                                                                : "bg-indigo-600",
+                                                                ? "bg-[#0e7d74]"
+                                                                : "bg-gradient-to-r from-[#0e5f63] to-[#2dd4bf]",
                                                         )}
                                                         style={{ width: `${personalProgressPct}%` }}
                                                     />
                                                 </div>
                                                 {remainingHours > 0 ? (
-                                                    <p className="mt-2 text-[11px] text-slate-400">
+                                                    <p className="mt-2 text-[11px] text-[#7a919a]">
                                                         {remainingHours} hrs remaining
                                                     </p>
                                                 ) : (
-                                                    <p className="mt-2 text-[11px] font-medium text-emerald-600">
+                                                    <p className="mt-2 text-[11px] font-medium text-[#0e7d74]">
                                                         Minimum hours met
                                                     </p>
                                                 )}

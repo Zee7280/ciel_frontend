@@ -12,6 +12,8 @@ import {
     ClipboardList,
     Inbox,
     Users,
+    LayoutGrid,
+    Rows3,
 } from "lucide-react";
 import { authenticatedFetch } from "@/utils/api";
 import { toast } from "sonner";
@@ -23,6 +25,7 @@ import {
     PARTNER_ATTENDANCE_AWAIT_TEAM,
     filterPendingRowsByTeamScope,
 } from "@/utils/engagementPartnerTeamScope";
+import AttendanceApprovalFlashCard from "@/components/engagement/AttendanceApprovalFlashCard";
 
 type PendingRow = Record<string, unknown>;
 
@@ -120,6 +123,8 @@ export default function AttendancePendingQueuePanel({
     partnerTeamRosterRows,
     /** Faculty wide layout: table body scrolls inside the card (viewport-height column). */
     scrollTableInPanel = false,
+    /** Shown on flash-card header (faculty). */
+    projectTitle,
 }: {
     projectId: string;
     title?: string;
@@ -137,12 +142,16 @@ export default function AttendancePendingQueuePanel({
     partnerScopedTeamFilter?: string;
     partnerTeamRosterRows?: unknown[];
     scrollTableInPanel?: boolean;
+    projectTitle?: string;
 }) {
     const isPartner = presentation === "partner";
     const [rows, setRows] = useState<PendingRow[]>([]);
     const [loading, setLoading] = useState(false);
     const [acting, setActing] = useState<string | null>(null);
     const [reasonByLogId, setReasonByLogId] = useState<Record<string, string>>({});
+    /** Faculty: flash-card deck (default) or classic table — same PATCH flow. */
+    const [facultyView, setFacultyView] = useState<"flash" | "table">("flash");
+    const useFlashCards = !isPartner && facultyView === "flash";
 
     const onCountRef = useRef(onPendingCountChanged);
     onCountRef.current = onPendingCountChanged;
@@ -335,6 +344,41 @@ export default function AttendancePendingQueuePanel({
                     </div>
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
+                    {!isPartner ? (
+                        <div
+                            className="inline-flex items-center rounded-lg border border-slate-200 bg-slate-50 p-0.5"
+                            role="group"
+                            aria-label="Queue view"
+                        >
+                            <button
+                                type="button"
+                                onClick={() => setFacultyView("flash")}
+                                className={clsx(
+                                    "inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[11px] font-bold transition",
+                                    facultyView === "flash"
+                                        ? "bg-[#0e7d74] text-white shadow-sm"
+                                        : "text-slate-600 hover:text-slate-900",
+                                )}
+                            >
+                                <LayoutGrid className="h-3.5 w-3.5" />
+                                <span className="hidden sm:inline">Flash cards</span>
+                                <span className="sm:hidden">Cards</span>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setFacultyView("table")}
+                                className={clsx(
+                                    "inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[11px] font-bold transition",
+                                    facultyView === "table"
+                                        ? "bg-slate-800 text-white shadow-sm"
+                                        : "text-slate-600 hover:text-slate-900",
+                                )}
+                            >
+                                <Rows3 className="h-3.5 w-3.5" />
+                                Table
+                            </button>
+                        </div>
+                    ) : null}
                     {scrollTableInPanel && !isPartner ? (
                         <span
                             className={clsx(
@@ -501,6 +545,25 @@ export default function AttendancePendingQueuePanel({
             ) : null}
 
             {tableRows.length > 0 ? (
+                <>
+                {useFlashCards ? (
+                    <div
+                        className={clsx(
+                            scrollTableInPanel && "min-h-0 flex-1 overflow-y-auto overscroll-contain",
+                        )}
+                    >
+                        <AttendanceApprovalFlashCard
+                            rows={tableRows}
+                            acting={acting}
+                            reasonByLogId={reasonByLogId}
+                            onReasonChange={(logId, reason) =>
+                                setReasonByLogId((prev) => ({ ...prev, [logId]: reason }))
+                            }
+                            onAct={(logId, action) => void act(logId, action)}
+                            projectTitle={projectTitle}
+                        />
+                    </div>
+                ) : (
                 <>
                 <div
                     className={clsx(
@@ -980,6 +1043,8 @@ export default function AttendancePendingQueuePanel({
                         </tbody>
                     </table>
                 </div>
+                </>
+                )}
                 </>
             ) : null}
         </div>

@@ -8,6 +8,10 @@ import { Card } from "@/app/dashboard/student/report/components/ui/card";
 import { sdgData } from "@/utils/sdgData";
 import MeritModelPanel, { type MeritEntry } from "@/components/ciel/MeritModelPanel";
 import FypMeritPanel, { type FypMeritEntry } from "@/components/ciel/FypMeritPanel";
+import CourseworkCard from "@/components/ciel/CourseworkCard";
+import CourseworkAnalyticsPanel from "@/components/ciel/coursework/CourseworkAnalyticsPanel";
+import { CourseworkCrumb, CourseworkHero, HubBackButton, HubTile } from "@/components/ciel/coursework/CourseworkHubChrome";
+import { isFacultyApproved } from "@/utils/courseworkSectionReview";
 
 type PathTab = "course-project" | "fyp-thesis" | "startup-business";
 
@@ -36,6 +40,7 @@ interface AdminCourseProjectRow {
     evidenceUrls: string[] | null;
     stepCompleted: number;
     status: "draft" | "submitted";
+    facultyApprovalStatus?: "pending" | "approved" | "rejected" | null;
     updatedAt: string;
     student: AdminStudent | null;
     studentInfo?: { groupMembers?: (string | AdminGroupMember)[] } | null;
@@ -172,13 +177,20 @@ export default function AdminPathSubmissionsPage() {
     const [loading, setLoading] = useState(true);
     const [expandedId, setExpandedId] = useState<string | null>(null);
     const [meritView, setMeritView] = useState(false);
+    const [courseView, setCourseView] = useState<"home" | "deck" | "rank" | "stats" | "submissions">("home");
     const [meritEntries, setMeritEntries] = useState<MeritEntry[]>([]);
     const [meritLoading, setMeritLoading] = useState(false);
     const [fypMeritEntries, setFypMeritEntries] = useState<FypMeritEntry[]>([]);
     const [fypMeritLoading, setFypMeritLoading] = useState(false);
 
     useEffect(() => {
-        if (pathTab !== "course-project" || !meritView) return;
+        if (pathTab !== "course-project") setCourseView("home");
+        if (pathTab !== "course-project" && pathTab !== "fyp-thesis") setMeritView(false);
+    }, [pathTab]);
+
+    useEffect(() => {
+        if (pathTab !== "course-project") return;
+        if (courseView !== "rank" && courseView !== "deck" && courseView !== "stats") return;
         let cancelled = false;
         setMeritLoading(true);
         authenticatedFetch("/api/v1/admin/paths/course-projects")
@@ -192,7 +204,7 @@ export default function AdminPathSubmissionsPage() {
         return () => {
             cancelled = true;
         };
-    }, [pathTab, meritView]);
+    }, [pathTab, courseView]);
 
     useEffect(() => {
         if (pathTab !== "fyp-thesis" || !meritView) return;
@@ -308,16 +320,42 @@ export default function AdminPathSubmissionsPage() {
               ? filteredFyp.length
               : filteredVentures.length;
 
+    const approvedCourse = useMemo(
+        () => (courseRows as unknown as MeritEntry[]).filter(isFacultyApproved),
+        [courseRows],
+    );
+    const uniCount = useMemo(
+        () => new Set(approvedCourse.map((e) => e.student?.institution || e.studentInfo?.universityName).filter(Boolean)).size,
+        [approvedCourse],
+    );
+
     return (
         <div className="space-y-6 p-6">
-            <header className="space-y-2">
-                <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-700">Admin · Student paths</p>
-                <h1 className="text-2xl font-black text-slate-900">Path submissions</h1>
-                <p className="max-w-3xl text-sm text-slate-600">
-                    Review student work from Course Project, FYP / Thesis, and Startup / Business workspaces. Community service
-                    opportunities stay under All projects and Applications.
-                </p>
-            </header>
+            {pathTab === "course-project" ? (
+                <div className="mx-auto max-w-[1040px] space-y-4">
+                    <CourseworkCrumb role="CIEL PK Master" view={courseView === "home" ? undefined : courseView} />
+                    <CourseworkHero
+                        kicker="CIEL PK MASTER · COURSEWORK"
+                        title="The national deck 🌍"
+                        subtitle="Every university, every filter, the standard Analyzer — plus the analytics only the Master sees."
+                        gradient="linear-gradient(115deg,#04252b,#0e7d74 55%,#2dd4bf 115%)"
+                        stats={[
+                            { value: String(approvedCourse.length), label: "APPROVED CARDS" },
+                            { value: String(uniCount || "—"), label: "UNIVERSITIES" },
+                            { value: String(courseRows.length), label: "ALL ENTRIES" },
+                        ]}
+                    />
+                </div>
+            ) : (
+                <header className="space-y-2">
+                    <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-700">Admin · Student paths</p>
+                    <h1 className="text-2xl font-black text-slate-900">Path submissions</h1>
+                    <p className="max-w-3xl text-sm text-slate-600">
+                        Review student work from Course Project, FYP / Thesis, and Startup / Business workspaces. Community service
+                        opportunities stay under All projects and Applications.
+                    </p>
+                </header>
+            )}
 
             <div className="flex flex-wrap gap-2 border-b border-slate-200 pb-3">
                 {PATH_TABS.map((tab) => {
@@ -337,7 +375,7 @@ export default function AdminPathSubmissionsPage() {
                         </button>
                     );
                 })}
-                {pathTab === "course-project" || pathTab === "fyp-thesis" ? (
+                {pathTab === "fyp-thesis" ? (
                     <button
                         type="button"
                         onClick={() => setMeritView((v) => !v)}
@@ -351,14 +389,80 @@ export default function AdminPathSubmissionsPage() {
                 ) : null}
             </div>
 
-            {pathTab === "course-project" && meritView ? (
-                meritLoading ? (
-                    <div className="flex justify-center py-20">
-                        <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
-                    </div>
-                ) : (
-                    <MeritModelPanel entries={meritEntries} showDepartmentFilter showFacultyFilter showUniversityFilter meritEndpoint="/api/v1/paths/course-projects/merit-model" />
-                )
+            {pathTab === "course-project" && courseView === "home" ? (
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                    <HubTile
+                        onClick={() => setCourseView("deck")}
+                        badge="ALL UNIVERSITIES"
+                        emoji="⭐"
+                        title="National deck"
+                        subtitle="Every approved card, every filter."
+                        background="linear-gradient(135deg,#0e7d74,#2dd4bf)"
+                    />
+                    <HubTile
+                        onClick={() => setCourseView("rank")}
+                        badge="STANDARD RUBRIC"
+                        emoji="🧠"
+                        title="AI Analyzer — rank the nation"
+                        subtitle="All disciplines, all universities — reasons no one can question."
+                        background="linear-gradient(135deg,#6d28d9,#a78bfa)"
+                    />
+                    <HubTile
+                        onClick={() => setCourseView("stats")}
+                        badge="MASTER ONLY"
+                        emoji="📊"
+                        title="Analytics"
+                        subtitle="Universities, criteria and formats — the intelligence layer."
+                        background="linear-gradient(135deg,#04252b,#0e7d74)"
+                    />
+                    <HubTile
+                        onClick={() => setCourseView("submissions")}
+                        badge={`${courseRows.length} ENTRIES`}
+                        emoji="🗂️"
+                        title="All submissions"
+                        subtitle="Drafts and submitted reports — the existing admin list."
+                        background="linear-gradient(135deg,#b45309,#f59e0b)"
+                    />
+                </div>
+            ) : pathTab === "course-project" && courseView === "rank" ? (
+                <>
+                    <HubBackButton onClick={() => setCourseView("home")} />
+                    {meritLoading ? (
+                        <div className="flex justify-center py-20">
+                            <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
+                        </div>
+                    ) : (
+                        <MeritModelPanel entries={meritEntries} showDepartmentFilter showFacultyFilter showUniversityFilter meritEndpoint="/api/v1/paths/course-projects/merit-model" scopeName="CIEL PK — all universities" />
+                    )}
+                </>
+            ) : pathTab === "course-project" && courseView === "stats" ? (
+                <>
+                    <HubBackButton onClick={() => setCourseView("home")} />
+                    {meritLoading ? (
+                        <div className="flex justify-center py-20">
+                            <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
+                        </div>
+                    ) : (
+                        <CourseworkAnalyticsPanel entries={meritEntries} />
+                    )}
+                </>
+            ) : pathTab === "course-project" && courseView === "deck" ? (
+                <>
+                    <HubBackButton onClick={() => setCourseView("home")} />
+                    {meritLoading ? (
+                        <div className="flex justify-center py-20">
+                            <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
+                        </div>
+                    ) : meritEntries.filter(isFacultyApproved).length === 0 ? (
+                        <Card className="border-dashed p-10 text-center text-slate-500">No faculty-approved coursework cards yet.</Card>
+                    ) : (
+                        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                            {meritEntries.filter(isFacultyApproved).map((entry) => (
+                                <CourseworkCard key={entry.id} entry={entry} studentName={entry.student?.name} />
+                            ))}
+                        </div>
+                    )}
+                </>
             ) : pathTab === "fyp-thesis" && meritView ? (
                 fypMeritLoading ? (
                     <div className="flex justify-center py-20">
@@ -369,6 +473,7 @@ export default function AdminPathSubmissionsPage() {
                 )
             ) : (
             <>
+            {pathTab === "course-project" && <HubBackButton onClick={() => setCourseView("home")} />}
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex flex-wrap gap-2">
                     {pathTab === "course-project"

@@ -1,0 +1,773 @@
+.fae {
+    --ink: #0d2b33;
+    --muted: #7a919a;
+    --line: #dcebee;
+    --bg: #f8fcfd;
+    --teal: #0e7d74;
+    --teal-soft: #e6f6f4;
+    --aqua: #0891b2;
+    --aqua-soft: #e3f4fa;
+    --gold: #b45309;
+    --gold-soft: #fbf0d7;
+    --red: #e11d48;
+    --vio: #6d28d9;
+    --vio-soft: #f1ebfd;
+    background: var(--bg);
+    color: var(--ink);
+    min-height: 100vh;
+    padding: 20px 14px 110px;
+}
+
+.fae .fae-wrap {
+    max-width: 1020px;
+    margin: 0 auto;
+}
+
+.fae .fae-logo {
+    font-size: 16px;
+    font-weight: 800;
+}
+
+.fae .fae-logo span {
+    color: var(--teal);
+}
+
+.fae .fae-sub {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 2px;
+}
+
+.fae .fae-nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 12px 0 4px;
+}
+
+.fae .fae-nav a,
+.fae .fae-nav button {
+    font-size: 11px;
+    font-weight: 800;
+    border-radius: 99px;
+    padding: 7px 12px;
+    border: 1px solid var(--line);
+    background: #fff;
+    color: var(--ink);
+    text-decoration: none;
+    cursor: pointer;
+    font-family: inherit;
+}
+
+.fae .fae-pipe {
+    display: flex;
+    gap: 0;
+    margin: 14px 0 16px;
+    flex-wrap: wrap;
+}
+
+.fae .fae-pst {
+    flex: 1;
+    min-width: 130px;
+    position: relative;
+    padding: 12px 10px 12px 22px;
+    background: #fff;
+    border: 1px solid var(--line);
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: 0.05em;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.fae .fae-pst:first-child {
+    border-radius: 14px 0 0 14px;
+    padding-left: 14px;
+}
+
+.fae .fae-pst:last-child {
+    border-radius: 0 14px 14px 0;
+}
+
+.fae .fae-pst::after {
+    content: "";
+    position: absolute;
+    right: -11px;
+    top: 50%;
+    transform: translateY(-50%) rotate(45deg);
+    width: 22px;
+    height: 22px;
+    border-top: 1px solid var(--line);
+    border-right: 1px solid var(--line);
+    background: inherit;
+    z-index: 2;
+}
+
+.fae .fae-pst:last-child::after {
+    display: none;
+}
+
+.fae .fae-pst.on {
+    background: var(--teal);
+    border-color: var(--teal);
+    color: #fff;
+}
+
+.fae .fae-pst.done {
+    background: var(--teal-soft);
+    color: var(--teal);
+}
+
+.fae .fae-cols {
+    display: grid;
+    grid-template-columns: 1fr 1.25fr;
+    gap: 15px;
+    align-items: start;
+}
+
+@media (max-width: 860px) {
+    .fae .fae-cols {
+        grid-template-columns: 1fr;
+    }
+}
+
+.fae .fae-card {
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 20px;
+    padding: 20px;
+    margin-bottom: 13px;
+    box-shadow: 0 1px 2px rgba(13, 43, 51, 0.04);
+}
+
+.fae .fae-k {
+    font-size: 8.5px;
+    letter-spacing: 0.18em;
+    font-weight: 800;
+    color: var(--muted);
+}
+
+.fae .fae-bsec {
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    color: var(--teal);
+    margin: 12px 0 7px;
+}
+
+.fae .fae-fc {
+    border-radius: 20px;
+    overflow: hidden;
+    border: 1px solid var(--line);
+}
+
+.fae .fae-fch {
+    background: linear-gradient(130deg, #04252b, #0e5f63 55%, #12a5a0 120%);
+    color: #fff;
+    padding: 17px 19px;
+}
+
+.fae .fae-rb {
+    font-size: 7.5px;
+    font-weight: 800;
+    letter-spacing: 0.2em;
+    background: rgba(255, 255, 255, 0.14);
+    border-radius: 99px;
+    padding: 4px 11px;
+    color: #99f6e4;
+}
+
+.fae .fae-fch h1 {
+    font-size: 15px;
+    margin: 8px 0 3px;
+    line-height: 1.35;
+}
+
+.fae .fae-fch .m {
+    font-size: 10px;
+    color: #cdf5f0;
+}
+
+.fae .fae-sdgrow {
+    display: flex;
+    gap: 5px;
+    margin-top: 8px;
+    flex-wrap: wrap;
+}
+
+.fae .fae-sdgc {
+    font-size: 8px;
+    font-weight: 800;
+    color: #fff;
+    border-radius: 7px;
+    padding: 3px 8px;
+}
+
+.fae .fae-fstats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    border-bottom: 1px solid var(--line);
+}
+
+.fae .fae-fs {
+    padding: 10px 6px;
+    text-align: center;
+    border-right: 1px solid var(--line);
+}
+
+.fae .fae-fs:last-child {
+    border-right: 0;
+}
+
+.fae .fae-fs .v {
+    font-size: 13px;
+    font-weight: 800;
+    color: var(--teal);
+}
+
+.fae .fae-fs .kk {
+    font-size: 6px;
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    margin-top: 2px;
+}
+
+.fae .fae-fbody {
+    padding: 13px 16px;
+}
+
+.fae .fae-gal {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
+    gap: 6px;
+}
+
+.fae .fae-ph {
+    aspect-ratio: 1;
+    border-radius: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 800;
+    position: relative;
+    cursor: zoom-in;
+    overflow: hidden;
+    background: linear-gradient(135deg, #0e5f63, #12a5a0);
+    color: #fff;
+}
+
+.fae .fae-ph img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.fae .fae-ph .b {
+    position: absolute;
+    bottom: 3px;
+    right: 4px;
+    font-size: 5.5px;
+    font-weight: 800;
+    color: #fff;
+    background: rgba(0, 0, 0, 0.4);
+    border-radius: 99px;
+    padding: 1px 5px;
+}
+
+.fae .fae-dq {
+    border-left: 3px solid var(--aqua);
+    background: var(--aqua-soft);
+    border-radius: 0 9px 9px 0;
+    padding: 8px 11px;
+    font-size: 10px;
+    line-height: 1.6;
+    color: #1d3a3d;
+    font-style: italic;
+    margin-top: 9px;
+}
+
+.fae .fae-aihdr {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.fae .fae-ic {
+    width: 38px;
+    height: 38px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, var(--vio), #a78bfa);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 13px;
+    font-weight: 800;
+}
+
+.fae .fae-t1 {
+    font-size: 13.5px;
+    font-weight: 800;
+}
+
+.fae .fae-t2 {
+    font-size: 8.5px;
+    font-weight: 800;
+    letter-spacing: 0.14em;
+    color: var(--muted);
+}
+
+.fae .fae-vtag {
+    margin-left: auto;
+    font-size: 8.5px;
+    font-weight: 800;
+    background: var(--vio-soft);
+    color: var(--vio);
+    border-radius: 99px;
+    padding: 4px 11px;
+}
+
+.fae .fae-scorebox {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+    margin-top: 14px;
+    flex-wrap: wrap;
+}
+
+.fae .fae-dial {
+    position: relative;
+    width: 120px;
+    height: 120px;
+    flex-shrink: 0;
+}
+
+.fae .fae-dial svg {
+    transform: rotate(-90deg);
+}
+
+.fae .fae-dv {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+.fae .fae-dn {
+    font-size: 26px;
+    font-weight: 800;
+    color: var(--teal);
+}
+
+.fae .fae-dk {
+    font-size: 7px;
+    font-weight: 800;
+    letter-spacing: 0.15em;
+    color: var(--muted);
+}
+
+.fae .fae-blvl {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    background: linear-gradient(135deg, #b45309, #f59e0b);
+    color: #fff;
+    border-radius: 99px;
+    padding: 6px 15px;
+}
+
+.fae .fae-btitle {
+    font-size: 16px;
+    font-weight: 800;
+    margin: 7px 0 4px;
+}
+
+.fae .fae-bcert {
+    font-size: 10.5px;
+    color: var(--muted);
+    line-height: 1.6;
+    font-style: italic;
+}
+
+.fae .fae-bready {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 8px;
+    font-size: 9.5px;
+    font-weight: 800;
+    color: var(--teal);
+    background: var(--teal-soft);
+    border-radius: 99px;
+    padding: 5px 13px;
+}
+
+.fae .fae-idx {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    margin-top: 14px;
+}
+
+@media (max-width: 560px) {
+    .fae .fae-idx {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+
+.fae .fae-ix {
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 9px;
+    text-align: center;
+    background: #f6fcfb;
+}
+
+.fae .fae-ix .v {
+    font-size: 14px;
+    font-weight: 800;
+    color: var(--teal);
+}
+
+.fae .fae-ix .kk {
+    font-size: 6px;
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    margin-top: 2px;
+}
+
+.fae .fae-strow {
+    display: grid;
+    grid-template-columns: 26px 1fr 46px 64px 56px;
+    gap: 8px;
+    align-items: center;
+    border-bottom: 1px dashed var(--line);
+    padding: 8px 0;
+    font-size: 10.5px;
+}
+
+.fae .fae-strow .nm {
+    font-weight: 700;
+}
+
+.fae .fae-strow .cm {
+    font-size: 9px;
+    color: var(--muted);
+    grid-column: 2 / 6;
+    margin-top: -3px;
+    line-height: 1.5;
+}
+
+.fae .fae-anc {
+    font-size: 8px;
+    font-weight: 800;
+    border-radius: 99px;
+    padding: 3px 8px;
+    text-align: center;
+}
+
+.fae .fae-anc5 {
+    background: var(--vio-soft);
+    color: var(--vio);
+}
+
+.fae .fae-anc4 {
+    background: var(--teal-soft);
+    color: var(--teal);
+}
+
+.fae .fae-anc3 {
+    background: var(--aqua-soft);
+    color: var(--aqua);
+}
+
+.fae .fae-anc2,
+.fae .fae-anc1,
+.fae .fae-anc0 {
+    background: var(--gold-soft);
+    color: var(--gold);
+}
+
+.fae .fae-bar {
+    height: 7px;
+    border-radius: 99px;
+    background: #e8f2f0;
+    overflow: hidden;
+}
+
+.fae .fae-bar i {
+    display: block;
+    height: 100%;
+    border-radius: 99px;
+    background: linear-gradient(90deg, #0e5f63, #2dd4bf);
+}
+
+.fae .fae-sv {
+    font-size: 11px;
+    font-weight: 800;
+    color: var(--teal);
+    text-align: right;
+}
+
+.fae .fae-mtag {
+    font-size: 9px;
+    font-weight: 800;
+    background: var(--teal-soft);
+    color: var(--teal);
+    border-radius: 99px;
+    padding: 4px 10px;
+}
+
+.fae .fae-mtag.g {
+    background: var(--gold-soft);
+    color: var(--gold);
+}
+
+.fae .fae-mrow {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.fae .fae-fb {
+    border: 1.5px dashed #cbe7e3;
+    border-radius: 13px;
+    background: #fbfefd;
+    padding: 12px 14px;
+    font-size: 11px;
+    line-height: 1.65;
+    color: #1d3a3d;
+    margin-top: 8px;
+}
+
+.fae .fae-acts {
+    margin: 0;
+    padding: 0;
+}
+
+.fae .fae-acts li {
+    font-size: 10.5px;
+    line-height: 1.7;
+    margin-left: 16px;
+    color: #2a4048;
+}
+
+.fae .fae-notes {
+    width: 100%;
+    min-height: 72px;
+    margin-top: 8px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 10px 12px;
+    font-size: 12px;
+    font-family: inherit;
+    color: var(--ink);
+    background: #fbfefd;
+}
+
+.fae .fae-dec {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 9px;
+    margin-top: 12px;
+}
+
+@media (max-width: 640px) {
+    .fae .fae-dec {
+        grid-template-columns: 1fr;
+    }
+}
+
+.fae .fae-db {
+    border: 1px solid var(--line);
+    border-radius: 13px;
+    padding: 12px;
+    font-size: 10.5px;
+    font-weight: 800;
+    cursor: pointer;
+    font-family: inherit;
+    background: #fff;
+    text-align: center;
+    line-height: 1.4;
+}
+
+.fae .fae-db:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+.fae .fae-db.ap {
+    border-color: #bfe6e2;
+    color: var(--teal);
+}
+
+.fae .fae-db.cn {
+    border-color: #f3d9a0;
+    color: var(--gold);
+}
+
+.fae .fae-db.ar {
+    border-color: #f6cfd8;
+    color: var(--red);
+}
+
+.fae .fae-db.sel {
+    outline: 3px solid currentColor;
+    outline-offset: -1px;
+}
+
+.fae .fae-livebar {
+    margin-top: 12px;
+    border: 1px solid #bfe6e2;
+    background: var(--teal-soft);
+    border-radius: 14px;
+    padding: 13px 16px;
+}
+
+.fae .fae-dash {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+}
+
+.fae .fae-dchip {
+    font-size: 8.5px;
+    font-weight: 800;
+    border-radius: 99px;
+    padding: 4px 11px;
+    background: #fff;
+    color: var(--teal);
+    border: 1px solid #bfe6e2;
+}
+
+.fae .fae-pdfbtn {
+    display: inline-block;
+    border: 0;
+    border-radius: 12px;
+    padding: 12px 20px;
+    font-size: 12px;
+    font-weight: 800;
+    cursor: pointer;
+    font-family: inherit;
+    background: var(--ink);
+    color: #fff;
+    margin-top: 11px;
+}
+
+.fae .fae-modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(4, 37, 43, 0.6);
+    z-index: 100;
+    padding: 20px;
+    align-items: center;
+    justify-content: center;
+}
+
+.fae .fae-modal.on {
+    display: flex;
+}
+
+.fae .fae-lbimg {
+    width: min(78vw, 520px);
+    max-height: 80vh;
+    border-radius: 24px;
+    overflow: hidden;
+    background: #04252b;
+    position: relative;
+    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.4);
+}
+
+.fae .fae-lbimg img {
+    width: 100%;
+    height: auto;
+    display: block;
+    max-height: 80vh;
+    object-fit: contain;
+}
+
+.fae .fae-lbimg .cap {
+    position: absolute;
+    bottom: 12px;
+    left: 12px;
+    right: 12px;
+    background: rgba(0, 0, 0, 0.5);
+    color: #fff;
+    border-radius: 11px;
+    padding: 7px 11px;
+    font-size: 10.5px;
+    font-weight: 700;
+}
+
+.fae .fae-print {
+    display: none;
+}
+
+@media print {
+    .fae {
+        background: #fff;
+        padding: 0;
+        min-height: 0;
+    }
+
+    .fae .fae-screen,
+    .fae .fae-modal {
+        display: none !important;
+    }
+
+    .fae .fae-print {
+        display: block !important;
+        font-size: 11px;
+        color: #111;
+        padding: 16px;
+    }
+
+    .fae .fae-print h1 {
+        font-size: 18px;
+        margin-bottom: 2px;
+    }
+
+    .fae .fae-print h2 {
+        font-size: 13px;
+        margin: 14px 0 5px;
+        border-bottom: 1.5px solid #0e7d74;
+        padding-bottom: 3px;
+        color: #0e7d74;
+    }
+
+    .fae .fae-print table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 6px;
+    }
+
+    .fae .fae-print td,
+    .fae .fae-print th {
+        border: 1px solid #ccc;
+        padding: 5px 7px;
+        font-size: 10px;
+        text-align: left;
+    }
+
+    .fae .fae-print th {
+        background: #e6f6f4;
+    }
+
+    .fae .fae-print .pquote {
+        border-left: 3px solid #0e7d74;
+        padding: 6px 10px;
+        background: #f4faf9;
+        font-style: italic;
+        margin: 6px 0;
+    }
+}

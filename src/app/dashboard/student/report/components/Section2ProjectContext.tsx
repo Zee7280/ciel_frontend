@@ -417,7 +417,9 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
     const chipClass = (isSel: boolean) =>
         clsx(
             "rounded-full border px-3.5 py-2 text-xs font-semibold transition",
-            isSel ? "border-indigo-500 bg-indigo-50 text-indigo-700" : "border-slate-200 bg-white text-slate-600 hover:border-indigo-200",
+            isSel
+                ? "border-[#0e7d74] bg-[#0e7d74] text-white"
+                : "border-slate-200 bg-white text-slate-600 hover:border-[#0e7d74] hover:text-[#0e7d74]",
             isReadOnly && "cursor-not-allowed opacity-60",
         );
 
@@ -425,7 +427,7 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
         <div className="mx-auto max-w-5xl space-y-5 pb-8">
 
             {/* ── Header ─────────────────────────────────────────────────── */}
-            <div className="space-y-1">
+            <div className="cer-dup-head space-y-1">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
                     Section 2 of 11 — Project Context
                 </p>

@@ -3,7 +3,7 @@
 import { Suspense, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Clock, FileText, Compass, ListChecks, UploadCloud, Send, Award, Pencil, Trash2 } from "lucide-react";
+import { Clock, FileText, ListChecks, UploadCloud, Send, Award, Pencil, Trash2 } from "lucide-react";
 import clsx from "clsx";
 import { toast } from "sonner";
 import { authenticatedFetch } from "@/utils/api";
@@ -14,6 +14,8 @@ import PathWorkspaceShell from "@/components/ciel/PathWorkspaceShell";
 import EmptyState from "@/components/ciel/EmptyState";
 import StatusPill, { type CielHourStatus } from "@/components/ciel/StatusPill";
 import { WorkspaceSkeleton } from "@/components/ciel/Skeleton";
+import CommunityServiceHub from "./CommunityServiceHub";
+import CommunityImpactWall from "./CommunityImpactWall";
 
 interface CreatedOpportunity {
     id: string;
@@ -52,11 +54,15 @@ const TABS = [
 function CommunityServiceContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
-    const activeTab = TABS.some((t) => t.key === searchParams.get("tab")) ? searchParams.get("tab")! : "engagements";
+    const rawTab = searchParams.get("tab");
+    const showHub = !rawTab;
+    const wallView = searchParams.get("view") === "wall";
+    const activeTab = TABS.some((t) => t.key === rawTab) ? rawTab! : "engagements";
 
     const [loading, setLoading] = useState(true);
     const [projects, setProjects] = useState<ActiveProject[]>([]);
     const [verifiedHours, setVerifiedHours] = useState(0);
+    const [wallCount, setWallCount] = useState(0);
 
     useEffect(() => {
         let cancelled = false;
@@ -64,6 +70,7 @@ function CommunityServiceContent() {
             if (cancelled) return;
             setProjects(data?.activeProjects ?? []);
             setVerifiedHours(data?.overview?.totalVerifiedHours ?? data?.stats?.hoursVolunteered ?? 0);
+            setWallCount(data?.overview?.impactHistoryBadgeCount ?? data?.overview?.completedCount ?? 0);
             setLoading(false);
         });
         return () => {
@@ -71,32 +78,58 @@ function CommunityServiceContent() {
         };
     }, []);
 
+    useEffect(() => {
+        if (rawTab === "find") {
+            router.replace("/dashboard/student/browse");
+        }
+    }, [rawTab, router]);
+
     const setTab = (key: string) => {
+        if (key === "find") {
+            router.push("/dashboard/student/browse");
+            return;
+        }
         const qs = new URLSearchParams(Array.from(searchParams.entries()));
         qs.set("tab", key);
         router.replace(`/dashboard/student/paths/community-service?${qs.toString()}`);
     };
 
     if (loading) return <WorkspaceSkeleton />;
+    if (rawTab === "find") return <WorkspaceSkeleton />;
+
+    if (showHub && wallView) {
+        return <CommunityImpactWall />;
+    }
+
+    if (showHub) {
+        return <CommunityServiceHub projects={projects} verifiedHours={verifiedHours} wallCount={wallCount} />;
+    }
 
     return (
-        <PathWorkspaceShell
-            title="Community Service"
-            primaryActionLabel={activeTab === "find" ? undefined : "Log hours"}
-            onPrimaryAction={() => setTab("log-hours")}
-            stats={[
-                { label: "Active engagements", value: String(projects.length), icon: ListChecks },
-                { label: "Verified hours", value: String(Math.round(verifiedHours)), icon: Clock, hint: "Contributes to sections 1, 4 of your impact score" },
-            ]}
-            tabs={TABS}
-            activeTab={activeTab}
-            onTabChange={setTab}
-        >
-            {activeTab === "engagements" && <EngagementsTab projects={projects} />}
-            {activeTab === "log-hours" && <LogHoursTab projects={projects} />}
-            {activeTab === "reports" && <ReportsTab projects={projects} />}
-            {activeTab === "find" && <FindOpportunitiesTab />}
-        </PathWorkspaceShell>
+        <div>
+            <Link
+                href="/dashboard/student/paths/community-service"
+                className="mb-3 inline-flex items-center text-xs font-extrabold text-[#0e7d74] hover:underline"
+            >
+                ← Community Service hub
+            </Link>
+            <PathWorkspaceShell
+                title="Community Service"
+                primaryActionLabel="Log hours"
+                onPrimaryAction={() => setTab("log-hours")}
+                stats={[
+                    { label: "Active engagements", value: String(projects.length), icon: ListChecks },
+                    { label: "Verified hours", value: String(Math.round(verifiedHours)), icon: Clock, hint: "Contributes to sections 1, 4 of your impact score" },
+                ]}
+                tabs={TABS}
+                activeTab={activeTab}
+                onTabChange={setTab}
+            >
+                {activeTab === "engagements" && <EngagementsTab projects={projects} />}
+                {activeTab === "log-hours" && <LogHoursTab projects={projects} />}
+                {activeTab === "reports" && <ReportsTab projects={projects} />}
+            </PathWorkspaceShell>
+        </div>
     );
 }
 
@@ -505,67 +538,6 @@ function ReportsTab({ projects }: { projects: ActiveProject[] }) {
                     </div>
                 </div>
             ))}
-        </div>
-    );
-}
-
-interface OpportunityCard {
-    id: string;
-    title: string;
-    organization_name?: string;
-    /** Backend returns the raw Organization entity here, not a string — always read .name. */
-    organization?: { name?: string } | null;
-    types?: string[];
-}
-
-function FindOpportunitiesTab() {
-    const [loading, setLoading] = useState(true);
-    const [opportunities, setOpportunities] = useState<OpportunityCard[]>([]);
-
-    useEffect(() => {
-        authenticatedFetch("/api/v1/students/opportunities/recommended", {}, { redirectToLogin: false })
-            .then((res) => (res?.ok ? res.json() : null))
-            .then((result) => setOpportunities(Array.isArray(result?.data) ? result.data.slice(0, 6) : []))
-            .finally(() => setLoading(false));
-    }, []);
-
-    if (loading) return <div className="h-40 animate-pulse rounded-ciel-lg bg-ciel-border/50" />;
-
-    if (!opportunities.length) {
-        return (
-            <EmptyState
-                emoji="🧭"
-                heading="No recommendations yet"
-                line="Browse the full opportunity board to find your next community service engagement."
-                actionLabel="Browse all opportunities"
-                href="/dashboard/student/browse"
-            />
-        );
-    }
-
-    return (
-        <div>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                {opportunities.map((opp) => (
-                    <Link
-                        key={opp.id}
-                        href={`/dashboard/student/browse/${opp.id}`}
-                        className="ciel-transition rounded-ciel-lg border border-ciel-border bg-white p-4 hover:border-ciel-green/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ciel-green"
-                    >
-                        <Compass className="h-4 w-4 text-ciel-green-deep" />
-                        <p className="mt-2 text-sm font-bold text-ciel-text">{opp.title}</p>
-                        <p className="mt-0.5 text-xs text-ciel-text-soft">{opp.organization_name || opp.organization?.name || "CIEL partner"}</p>
-                        {!!opp.types?.length && (
-                            <span className="mt-2 inline-block rounded-ciel-xs bg-ciel-indigo-soft px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-ciel-indigo">
-                                {opp.types[0]}
-                            </span>
-                        )}
-                    </Link>
-                ))}
-            </div>
-            <Link href="/dashboard/student/browse" className="ciel-transition mt-4 inline-block text-sm font-bold text-ciel-green-deep hover:underline">
-                Browse all opportunities →
-            </Link>
         </div>
     );
 }

@@ -712,10 +712,17 @@ export default function CourseProjectWizardPage() {
         ["Coursework", [entry.projectTitle, allFormats.join(" + "), teamMode].filter(Boolean).join(" · ") || "—"],
         ["Format", allFormats.join(" + ") || "—"],
         ["Aim", inc.aim ? entry.aimsInfo?.aimStatement || "—" : "Not applicable to this format"],
-        ["Activities", (entry.processInfo?.activities ?? []).join(" · ") || "—"],
+        ["Activities", inc.act ? (entry.processInfo?.activities ?? []).join(" · ") || "—" : "Not applicable to this format"],
         ["Main output", entry.resultsInfo?.outputDescription || "—"],
         ["Key insight", entry.resultsInfo?.findings?.[0] || "—"],
-        ["Evidence status", metricLines.join(" · ") || entry.resultsInfo?.evidenceStatus || "—"],
+        [
+            "Evidence status",
+            (inc.res ?? inc.imp)
+                ? metricLines.join(" · ") ||
+                  entry.resultsInfo?.evidenceStatus ||
+                  (/Yes|Partly/.test(entry.resultsInfo?.measured ?? "") ? "—" : entry.resultsInfo?.measured ? "Findings only — no measured result claimed" : "—")
+                : "Not applicable to this format",
+        ],
         ["Limitation", entry.resultsInfo?.limitationType || "—"],
         [
             "Primary SDG",
@@ -726,7 +733,7 @@ export default function CourseProjectWizardPage() {
                   : "—",
         ],
         ["Supporting SDGs", entry.sdgMapping?.notApplicable ? "—" : supportingSdgs.map((e) => `SDG ${e.goalNumber} (${e.strength || "supporting"})`).join(" · ") || "—"],
-        ["Sustainability integration", entry.reflectionInfo?.integrationLevel || entry.reflectionInfo?.sdgLinkHonesty || "—"],
+        ["Sustainability integration", entry.reflectionInfo?.integrationLevel || entry.reflectionInfo?.sdgLinkHonesty || "Not answered yet"],
         [
             "Attachment",
             entry.assignmentFileUrl
@@ -778,6 +785,12 @@ export default function CourseProjectWizardPage() {
 
             {!showCard && (
             <div className="rounded-ciel-lg border border-ciel-border bg-white p-5 sm:p-6">
+                {entry.facultyApprovalStatus !== "approved" && entry.facultyApprovalNote ? (
+                    <div className="mb-5 rounded-ciel-sm border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-relaxed text-amber-900">
+                        <b>Changes requested by {entry.studentInfo?.teacherName || "your supervisor"}.</b>{" "}
+                        {entry.facultyApprovalNote} Fix and resubmit — nothing is penalised.
+                    </div>
+                ) : null}
                 <div className="flex flex-wrap items-center gap-2">
                     {STEPS.map((s, i) => (
                         <div key={s.key} className="flex flex-1 items-center gap-2">
@@ -1328,7 +1341,7 @@ export default function CourseProjectWizardPage() {
                                 <p className="mt-1.5 text-[10.5px] text-ciel-text-soft">After your teacher approves, the AI ranks all flash cards best → least on this rubric — with a written reason for every top pick. Depth is rewarded; honesty is never punished.</p>
                             </div>
 
-                            <Field label="➕ Anything the AI missed?">
+                            <Field label="➕ Anything the summary missed?">
                                 <textarea rows={2} value={entry.addedNote ?? ""} onChange={(e) => setEntry((s) => ({ ...s, addedNote: e.target.value }))} placeholder="e.g. Our essay was selected for the department journal." className={fieldClass} />
                             </Field>
 
@@ -1383,7 +1396,7 @@ export default function CourseProjectWizardPage() {
                                                     onClick={() => setReview((prev) => ({ ...prev, [key]: { accepted: false, edited: false, text: stripBoldMarkup(sums[key] || "") } }))}
                                                     className="ciel-transition rounded-ciel-xs border-2 border-ciel-border px-3 py-1.5 text-xs font-bold text-ciel-text-mid hover:border-ciel-gold/40"
                                                 >
-                                                    ↻ Reset to AI version
+                                                    ↻ Reset to auto-drafted version
                                                 </button>
                                             </div>
                                         </div>

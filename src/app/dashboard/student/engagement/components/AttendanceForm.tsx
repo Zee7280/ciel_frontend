@@ -117,10 +117,10 @@ function computeSessionHours(startTime: string, endTime: string): number | null 
 }
 
 const labelClass =
-    "text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500";
+    "text-[10px] font-semibold uppercase tracking-[0.12em] text-[#7a919a]";
 
 const fieldClass =
-    "h-11 rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-900 shadow-sm transition-colors placeholder:text-slate-400 focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100";
+    "h-11 rounded-lg border border-[#dcebee] bg-[#f5fbfa] text-sm font-medium text-[#0d2b33] shadow-sm transition-colors placeholder:text-slate-400 focus:border-[#0e7d74] focus:bg-white focus:ring-2 focus:ring-[#0e7d74]/15";
 
 const ACTIVITY_TYPES = [
     "Training / Workshop",
@@ -397,7 +397,7 @@ export default function AttendanceForm({
             <div className="space-y-1.5">
                 <Label className={labelClass}>Select Student</Label>
                 <div className="relative">
-                    <div className="pointer-events-none absolute left-3 top-1/2 z-10 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full bg-indigo-600 text-xs font-bold text-white">
+                    <div className="pointer-events-none absolute left-3 top-1/2 z-10 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full bg-gradient-to-br from-[#0e7d74] to-[#2dd4bf] text-xs font-bold text-white">
                         {selectedInitial}
                     </div>
                     <select
@@ -476,8 +476,8 @@ export default function AttendanceForm({
             </div>
 
             {sessionHours != null ? (
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700">
-                    Session duration: {sessionHours} hrs
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-[#e6f6f4] px-3 py-1 text-xs font-extrabold text-[#0e7d74]">
+                    ⏱️ = {sessionHours} hours this session
                 </span>
             ) : formData.startTime && formData.endTime ? (
                 <p className="text-xs text-amber-600">End time must be after start time.</p>
@@ -555,8 +555,8 @@ export default function AttendanceForm({
                             className={clsx(
                                 "rounded-full border px-3.5 py-1.5 text-xs font-semibold transition-colors",
                                 formData.activityType === t
-                                    ? "border-indigo-300 bg-indigo-50 text-indigo-700"
-                                    : "border-slate-200 bg-slate-50 text-slate-500 hover:border-slate-300 hover:text-slate-700",
+                                    ? "border-[#0e7d74] bg-[#0e7d74] text-white"
+                                    : "border-[#dcebee] bg-white text-[#3c5a5c] hover:border-[#0e7d74] hover:text-[#0e7d74]",
                             )}
                         >
                             {t}
@@ -616,17 +616,17 @@ export default function AttendanceForm({
             <div className="space-y-1.5">
                 <Label className={labelClass}>Supporting Evidence</Label>
                 {evidenceFile ? (
-                    <div className="flex items-center justify-between rounded-xl border border-indigo-100 bg-indigo-50/50 px-4 py-3">
+                    <div className="flex items-center justify-between rounded-xl border border-[#cbe7e3] bg-[#e6f6f4] px-4 py-3">
                         <div className="flex min-w-0 items-center gap-2">
-                            <CheckCircle2 className="h-4 w-4 shrink-0 text-indigo-600" />
-                            <span className="truncate text-sm font-medium text-indigo-700">
+                            <CheckCircle2 className="h-4 w-4 shrink-0 text-[#0e7d74]" />
+                            <span className="truncate text-sm font-medium text-[#0f5e57]">
                                 {evidenceFile.name}
                             </span>
                         </div>
                         <button
                             type="button"
                             onClick={() => setEvidenceFile(null)}
-                            className="shrink-0 text-indigo-400 hover:text-indigo-600"
+                            className="shrink-0 text-[#0e7d74]/70 hover:text-[#0e7d74]"
                             aria-label="Remove file"
                         >
                             <X className="h-4 w-4" />
@@ -640,10 +640,10 @@ export default function AttendanceForm({
                             onChange={(e) => setEvidenceFile(e.target.files?.[0] || null)}
                             className="absolute inset-0 z-10 cursor-pointer opacity-0"
                         />
-                        <div className="flex flex-col items-center gap-1.5 rounded-xl border-2 border-dashed border-slate-300 bg-slate-50/40 px-4 py-8 text-center transition-colors hover:border-indigo-300 hover:bg-indigo-50/30">
-                            <Upload className="h-5 w-5 text-indigo-500" />
+                        <div className="flex flex-col items-center gap-1.5 rounded-xl border-2 border-dashed border-[#cbe7e3] bg-[#f5fbfa] px-4 py-8 text-center transition-colors hover:border-[#0e7d74] hover:bg-[#e6f6f4]/50">
+                            <Upload className="h-5 w-5 text-[#0e7d74]" />
                             <span className="text-sm font-semibold text-slate-700">
-                                <span className="text-indigo-600">Snap or drop a photo</span> — one clear photo is enough
+                                <span className="text-[#0e7d74]">📸 Attach photos</span> — JPG / PNG
                             </span>
                             <span className="text-[11px] text-slate-400">
                                 JPG, PNG, HEIC, WebP, PDF, Word
@@ -669,10 +669,10 @@ export default function AttendanceForm({
                     type="submit"
                     disabled={isSubmitting || descriptionOverLimit || effectiveLocked}
                     className={clsx(
-                        "h-11 w-full rounded-xl text-sm font-bold transition-all",
+                        "h-12 w-full rounded-[13px] text-sm font-extrabold transition-all",
                         effectiveLocked
                             ? "cursor-not-allowed border border-slate-200 bg-slate-100 text-slate-400 shadow-none"
-                            : "bg-indigo-600 text-white shadow-sm hover:bg-indigo-700",
+                            : "bg-[#0e7d74] text-white shadow-sm hover:brightness-105",
                     )}
                 >
                     {isSubmitting ? (

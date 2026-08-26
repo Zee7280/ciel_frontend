@@ -57,12 +57,21 @@ export default function CourseworkCard({
     const proof = re.findings?.[0] || re.metrics?.[0]?.meaning || re.measurableImpact;
     const evidenceLabel = re.metrics?.length ? (re.metrics.some((m) => m.status === "Actual — measured") ? "Actual measured result" : re.metrics[0].status || "Result declared") : re.measured ? stripEmoji(re.measured) : re.evidenceStatus;
     const approval = entry.facultyApprovalStatus;
+    const ribbon = entry.meritRibbon;
     // A brand-new, still-empty draft reads as a broken/orphaned record if labelled "Untitled" —
     // it's just not started yet. Once anything's been typed, fall back to the generic label instead.
     const displayTitle = entry.projectTitle || (entry.status === "draft" ? "New coursework report — tap to continue" : "Untitled coursework");
 
     return (
         <div className="overflow-hidden rounded-ciel-lg border border-ciel-border bg-white shadow-sm">
+            {ribbon && entry.status === "submitted" && approval === "approved" ? (
+                <div className="bg-[linear-gradient(90deg,#f59e0b,#fbbf24)] px-4 py-2 text-[10px] font-black uppercase tracking-wide text-[#3b2202]">
+                    {ribbon.rank === 1 ? "🥇" : ribbon.rank === 2 ? "🥈" : ribbon.rank === 3 ? "🥉" : "🏅"}{" "}
+                    Ranked #{ribbon.rank} of {ribbon.of}
+                    {ribbon.scope ? ` · ${ribbon.scope}` : ""}
+                    {ribbon.total != null ? ` · ${ribbon.total}/100` : ""}
+                </div>
+            ) : null}
             {/* Ribbon */}
             <div className="border-b border-ciel-border bg-ciel-page/60 p-5">
                 <div className="flex flex-wrap items-start justify-between gap-3">

@@ -525,7 +525,7 @@ export default function Section7Partnerships({ projectData }: { projectData?: an
     return (
         <div className="mx-auto max-w-6xl space-y-8 pb-10">
             {/* Header */}
-            <div className="space-y-5">
+            <div className="cer-dup-head space-y-5">
                 <div className="flex items-center gap-3.5">
                     <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-indigo-600 text-white shadow-sm">
                         <Handshake className="h-5 w-5" />

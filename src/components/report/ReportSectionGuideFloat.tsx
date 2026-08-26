@@ -39,6 +39,8 @@ type ReportSectionGuideFloatProps = {
     sectionStep: number;
     /** Hide on pre-report guide / locked summary-only modes. */
     enabled?: boolean;
+    /** Increment to open the existing section guide dialog (chrome help chip). */
+    openSignal?: number;
 };
 
 /**
@@ -48,12 +50,17 @@ type ReportSectionGuideFloatProps = {
 export function ReportSectionGuideFloat({
     sectionStep,
     enabled = true,
+    openSignal = 0,
 }: ReportSectionGuideFloatProps) {
     const [open, setOpen] = useState(false);
 
     useEffect(() => {
         setOpen(false);
     }, [sectionStep]);
+
+    useEffect(() => {
+        if (openSignal > 0) setOpen(true);
+    }, [openSignal]);
 
     const meta = useMemo(() => {
         const content = SECTION_GUIDE_CONTENT[sectionStep];
@@ -78,7 +85,7 @@ export function ReportSectionGuideFloat({
             <button
                 type="button"
                 onClick={() => setOpen(true)}
-                className="fixed z-[55] flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-indigo-200 bg-indigo-600 text-white shadow-lg shadow-indigo-600/25 transition hover:bg-indigo-700 print:hidden"
+                className="cer-helpfab fixed z-[55] flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-full border-0 bg-[linear-gradient(135deg,#0e5f63,#12a5a0)] text-white shadow-[0_10px_26px_rgba(14,125,116,0.35)] transition hover:scale-105 print:hidden"
                 style={{
                     right: "1rem",
                     /* Clear support stack (chat + WhatsApp @ bottom 7rem, ~8rem tall) + gap */

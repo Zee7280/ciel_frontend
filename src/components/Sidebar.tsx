@@ -317,6 +317,7 @@ export default function Sidebar() {
             { label: "Verify Work", href: "/dashboard/partner/verification", icon: CheckCircle },
             { label: "Reports", href: "/dashboard/partner/reports", icon: FileText },
             { label: "Impact", href: "/dashboard/partner/impact", icon: FileBarChart },
+            { label: "Community service", href: "/dashboard/partner/community-service", icon: BookOpen },
             { label: "Analytics", href: "/dashboard/partner/analytics", icon: BarChart3 },
             ...(isUniversityPartnerOrg
                 ? [
@@ -337,6 +338,7 @@ export default function Sidebar() {
             { label: "Opportunity Request Approvals", href: "/dashboard/faculty/approvals", icon: CheckCircle },
             { label: "Applications & Reports Approvals", href: "/dashboard/faculty/join-applications", icon: ClipboardList },
             { label: "Student impact reports", href: "/dashboard/faculty/reports", icon: FileText },
+            { label: "Community service", href: "/dashboard/faculty/community-service", icon: BookOpen },
             { label: "Coursework reports", href: "/dashboard/faculty/coursework-projects", icon: BookOpen },
             { label: "FYP / Thesis records", href: "/dashboard/faculty/fyp-thesis", icon: BookOpen },
             { label: "Attendance review", href: "/dashboard/faculty/attendance-review", icon: CalendarClock },
@@ -360,6 +362,7 @@ export default function Sidebar() {
             { label: "Payments", href: "/dashboard/admin/payments", icon: CreditCard },
             { label: "All projects", href: "/dashboard/admin/projects", icon: Briefcase },
             { label: "Path submissions", href: "/dashboard/admin/path-submissions", icon: BookOpen },
+            { label: "Community service", href: "/dashboard/admin/community-service", icon: Globe2 },
             { label: "Project evidence export", href: "/dashboard/admin/project-evidence", icon: Archive },
             { label: "Student Reports", href: "/dashboard/admin/reports/verify", icon: FileText },
             { label: "CIEL Master", href: "/dashboard/admin/master-analytics", icon: Globe2 },

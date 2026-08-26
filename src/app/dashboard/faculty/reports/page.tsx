@@ -14,6 +14,7 @@ interface FacultyReportRow {
     project_title: string;
     organization_name?: string;
     status: string;
+    faculty_status?: string;
     submission_date?: string;
     report_submitted_at?: string;
 }
@@ -99,6 +100,39 @@ export default function FacultyStudentReportsPage() {
         );
     };
 
+    const getFacultyBadge = (status: string | undefined) => {
+        const key = normalizeStatus(status) || "pending";
+        const config: Record<string, { color: string; icon: typeof Clock; label: string }> = {
+            approved: {
+                color: "bg-emerald-50 text-emerald-800 ring-1 ring-emerald-200/80",
+                icon: CheckCircle2,
+                label: "Approved",
+            },
+            rejected: {
+                color: "bg-rose-50 text-rose-800 ring-1 ring-rose-200/80",
+                icon: Clock,
+                label: "Admin review",
+            },
+            pending: {
+                color: "bg-amber-50 text-amber-800 ring-1 ring-amber-200/80",
+                icon: Clock,
+                label: "Your decision",
+            },
+        };
+        const { color, icon: Icon, label } = config[key] || config.pending;
+        return (
+            <span
+                className={clsx(
+                    "inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-semibold",
+                    color,
+                )}
+            >
+                <Icon className="h-3 w-3 shrink-0" />
+                {label}
+            </span>
+        );
+    };
+
     const filteredReports = reports.filter((report) => {
         const q = searchQuery.toLowerCase();
         const matchesSearch =
@@ -123,8 +157,8 @@ export default function FacultyStudentReportsPage() {
                         Student impact reports
                     </h1>
                     <p className="mt-1.5 max-w-3xl text-sm text-slate-500">
-                        Read-only executive dossiers for your supervised students, visible after CIEL Admin final
-                        approval.
+                        AI evaluation console for your supervised students, visible after CIEL Admin final
+                        approval. Full 10-section dossier remains available from each report.
                     </p>
                 </div>
 
@@ -174,7 +208,7 @@ export default function FacultyStudentReportsPage() {
                 ) : (
                     <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                         <div className="overflow-x-auto">
-                            <table className="w-full min-w-[960px] border-collapse text-left">
+                            <table className="w-full min-w-[1040px] border-collapse text-left">
                                 <thead className="sticky top-0 z-10 border-b border-slate-200 bg-slate-50/95 backdrop-blur-sm">
                                     <tr>
                                         <th className={TABLE_HEAD}>Student</th>
@@ -182,6 +216,7 @@ export default function FacultyStudentReportsPage() {
                                         <th className={TABLE_HEAD}>Organization</th>
                                         <th className={TABLE_HEAD}>Submitted</th>
                                         <th className={TABLE_HEAD}>Status</th>
+                                        <th className={TABLE_HEAD}>Faculty</th>
                                         <th className={clsx(TABLE_HEAD, "text-right")}>View</th>
                                     </tr>
                                 </thead>
@@ -236,6 +271,7 @@ export default function FacultyStudentReportsPage() {
                                                         : "—"}
                                                 </td>
                                                 <td className="px-4 py-3 align-top">{getStatusBadge(report.status)}</td>
+                                                <td className="px-4 py-3 align-top">{getFacultyBadge(report.faculty_status)}</td>
                                                 <td className="px-4 py-3 text-right align-top">
                                                     <button
                                                         type="button"
@@ -245,7 +281,7 @@ export default function FacultyStudentReportsPage() {
                                                         className="inline-flex h-10 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-800"
                                                     >
                                                         <Eye className="h-3.5 w-3.5" />
-                                                        View dossier
+                                                        Review evaluation
                                                     </button>
                                                 </td>
                                             </tr>

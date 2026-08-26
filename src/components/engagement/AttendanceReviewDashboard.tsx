@@ -1057,6 +1057,7 @@ export default function AttendanceReviewDashboard({
                                         partnerScopedTeamFilter={isPartner ? selectedTeamKey : undefined}
                                         partnerTeamRosterRows={isPartner ? partnerTeamRows : undefined}
                                         scrollTableInPanel={stretchViewport}
+                                        projectTitle={selected?.title}
                                     />
                                 </div>
                             </div>

@@ -354,32 +354,30 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
             <div className="space-y-4 md:space-y-5">
                 <div
                     className={clsx(
-                        "flex flex-col lg:flex-row lg:items-stretch lg:justify-between gap-5 md:gap-6 p-5 md:p-6",
+                        "cer-dup-head flex items-center gap-3.5 min-w-0 p-5 md:p-6",
                         surfaceCard,
                     )}
                 >
-                    <div className="flex items-center gap-3.5 min-w-0 flex-1">
-                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-indigo-600 text-white shadow-sm">
-                            <BarChart3 className="h-5 w-5" />
-                        </div>
-                        <div className="min-w-0">
-                            <h2 className="text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl">
-                                <span className="text-indigo-600">SECTION 11:</span> Institutional impact dashboard
-                            </h2>
-                            <p className="mt-0.5 text-sm text-slate-500">
-                                Final preview, compliance signals, and submission readiness
-                            </p>
-                        </div>
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-indigo-600 text-white shadow-sm">
+                        <BarChart3 className="h-5 w-5" />
                     </div>
-                    {!showVerifiedImpactScores && (
-                        <div className="flex items-start gap-2.5 rounded-xl border border-amber-200/70 bg-amber-50/80 px-4 py-3 text-left w-full lg:max-w-md lg:self-center shrink-0">
-                            <Lock className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
-                            <p className="text-[11px] font-semibold text-amber-900 leading-snug">
-                                Quantified scores (CII index, hours, beneficiaries, SDG priority) unlock after your reporting fee is confirmed and an administrator verifies your submission.
-                            </p>
-                        </div>
-                    )}
+                    <div className="min-w-0">
+                        <h2 className="text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl">
+                            <span className="text-indigo-600">SECTION 11:</span> Institutional impact dashboard
+                        </h2>
+                        <p className="mt-0.5 text-sm text-slate-500">
+                            Final preview, compliance signals, and submission readiness
+                        </p>
+                    </div>
                 </div>
+                {!showVerifiedImpactScores && (
+                    <div className="flex items-start gap-2.5 rounded-xl border border-amber-200/70 bg-amber-50/80 px-4 py-3 text-left w-full">
+                        <Lock className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+                        <p className="text-[11px] font-semibold text-amber-900 leading-snug">
+                            Quantified scores (CII index, hours, beneficiaries, SDG priority) unlock after your reporting fee is confirmed and an administrator verifies your submission.
+                        </p>
+                    </div>
+                )}
 
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-5">
                     {stats.map((stat, i) => (

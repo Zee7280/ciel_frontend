@@ -42,7 +42,7 @@ export function TeamInviteBadge({
 
     if (inviteStatus === "accepted") {
         return (
-            <span className="flex items-center justify-center gap-1 rounded-full bg-ciel-green-soft px-3 py-2 text-center text-[10px] font-black text-ciel-green-deep">
+            <span className="flex min-h-[2.5rem] flex-wrap items-center justify-center gap-1 rounded-ciel-sm bg-ciel-green-soft px-3 py-2 text-center text-[10px] font-black leading-snug text-ciel-green-deep">
                 ✅ Confirmed — visible on their dashboard
             </span>
         );
@@ -50,7 +50,7 @@ export function TeamInviteBadge({
 
     if (inviteStatus === "pending") {
         return (
-            <span className="flex flex-col items-center justify-center gap-0.5 rounded-full bg-ciel-gold-soft px-3 py-2 text-center text-[10px] font-black text-ciel-gold-deep">
+            <span className="flex min-h-[2.5rem] flex-col items-center justify-center gap-0.5 rounded-ciel-sm bg-ciel-gold-soft px-3 py-2 text-center text-[10px] font-black leading-snug text-ciel-gold-deep">
                 <span>✉️ Invited — awaiting confirmation</span>
                 <button
                     type="button"
@@ -65,7 +65,7 @@ export function TeamInviteBadge({
     }
 
     return (
-        <span className="flex items-center justify-center rounded-full bg-ciel-page px-3 py-2 text-center text-[10px] font-black text-ciel-text-mid">
+        <span className="flex min-h-[2.5rem] flex-wrap items-center justify-center rounded-ciel-sm bg-ciel-page px-3 py-2 text-center text-[10px] font-black leading-snug text-ciel-text-mid">
             Will invite on save
         </span>
     );

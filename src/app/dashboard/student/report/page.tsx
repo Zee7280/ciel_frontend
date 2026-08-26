@@ -4,7 +4,7 @@ import { useReportForm, ReportProvider } from './context/ReportContext';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { authenticatedFetch } from '@/utils/api';
 import { toast } from 'sonner';
-import { ChevronRight, Save, Loader2, ArrowLeft, Lock, Download, CheckCircle2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { Button } from './components/ui/button';
 import {
     Dialog,
@@ -14,7 +14,6 @@ import {
     DialogHeader,
     DialogTitle,
 } from "./components/ui/dialog";
-import clsx from 'clsx';
 import { canStudentAccessReportForProjectPayload } from '@/utils/studentJoinApplication';
 import { mergeReportSection1TeamScope, mergeReportSection1TeamScopeForCertificate } from '@/utils/reportTeamScope';
 import { getIncompleteSectionsSummary } from './utils/validation';
@@ -39,6 +38,8 @@ import Section10Sustainability from './components/Section10Sustainability'; // R
 import Section11Summary from './components/Section11Summary'; // New
 import PreReportGuide from './components/PreReportGuide';
 import { ReportSectionGuideFloat } from '@/components/report/ReportSectionGuideFloat';
+import { REPORT_TAB_ITEMS, ReportSectionBridge, ReportLiveBanner, ReportFlashCard } from './ReportFormChrome';
+import "./community-engagement-report.css";
 
 type ProjectDetails = { title?: string } & Record<string, unknown>;
 
@@ -150,6 +151,7 @@ function ReportFormContent() {
     const [projectDetails, setProjectDetails] = React.useState<ProjectDetails | null>(null);
     const [isLoading, setIsLoading] = React.useState(true);
     const [showGuide, setShowGuide] = React.useState(true);
+    const [helpSignal, setHelpSignal] = React.useState(0);
 
     React.useEffect(() => {
         if (memberAttendanceMode) {
@@ -746,10 +748,17 @@ function ReportFormContent() {
         );
     }
 
-    const steps = [
-        "Participation", "Context", "SDG Mapping", "Activities", "Outcomes",
-        "Resources", "Partnerships", "Evidence", "Reflection", "Sustainability", "Summary"
-    ];
+    const incompleteStepNums = new Set(incompleteSectionsSummary.map((block) => block.section));
+    const sectionsCompleteCount = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].filter(
+        (n) => !incompleteStepNums.has(n),
+    ).length;
+    const projectSubtitle = [
+        projectDetails?.title,
+        (projectDetails as { organization_name?: string } | null)?.organization_name,
+        (projectDetails as { partner_name?: string } | null)?.partner_name,
+    ]
+        .filter((part): part is string => typeof part === "string" && part.trim().length > 0)
+        .join(" · ");
 
     if (showGuide) {
         return (
@@ -766,147 +775,88 @@ function ReportFormContent() {
     }
 
     return (
-        <div className="mx-auto max-w-none space-y-3 px-0 py-2 sm:px-3 md:px-5 md:py-4">
-            {/* Sticky Header Wrapper */}
-            <div className="sticky top-0 z-30 -mx-4 border-b border-slate-200/60 bg-slate-50/80 px-4 py-2.5 backdrop-blur-md transition-all sm:-mx-3 sm:px-3 md:-mx-5 md:px-5 md:py-3">
-                <div className="mx-auto flex max-w-[1600px] flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="min-w-0">
-                        <Button variant="ghost" size="sm" onClick={() => router.back()} className="mb-1 -ml-2 text-slate-400 hover:text-slate-600 h-7 text-[11px] font-bold">
-                            <ArrowLeft className="w-3.5 h-3.5 mr-1" /> Back to Dashboard
-                        </Button>
-                        <div className="flex items-center gap-2.5 flex-wrap">
-                            <h1 className="text-lg font-extrabold tracking-tight text-slate-900 sm:text-xl md:text-2xl">
-                                Community Engagement Report
-                            </h1>
-                            <span className="px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 text-[9px] font-bold border border-blue-100 uppercase tracking-wider">
-                                Step {activeStep} of 11
-                            </span>
+        <div className="cer">
+            <div className="cer-wrap">
+                <div className="cer-apph">
+                    <div>
+                        <button type="button" className="cer-ghost" onClick={() => router.back()} style={{ marginBottom: 8 }}>
+                            ← Back
+                        </button>
+                        <div className="cer-logo">
+                            CIEL <span>PK</span> · Community Engagement Report
                         </div>
-                        <div className="flex items-center gap-2 mt-1.5 group min-w-0">
-                            <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 shrink-0 hidden sm:inline">
-                                Project
-                            </span>
-                            <p className="text-sm md:text-base font-bold text-slate-800 truncate group-hover:text-slate-950 transition-colors">
-                                {projectDetails?.title || 'Loading Project...'}
-                            </p>
-                        </div>
+                        <div className="cer-proj">{projectSubtitle || "Loading project…"}</div>
                     </div>
-
-                    {/* Eligibility Banner */}
-                    {isTeamMemberAttendanceOnly ? (
-                        <div className="hidden md:flex items-center gap-2.5 px-3 py-1.5 rounded-xl border bg-sky-50 border-sky-100 text-sky-800 shadow-sm max-w-md">
-                            <div className="w-2.5 h-2.5 rounded-full bg-sky-500 animate-pulse" />
-                            <div className="flex flex-col">
-                                <span className="text-[10px] font-black uppercase tracking-widest leading-none mb-0.5">
-                                    Team member — attendance only
-                                </span>
-                                <span className="text-[9px] font-bold opacity-80 leading-snug">
-                                    Your team lead files this report. You may update your attendance in Section 1 only.
-                                </span>
-                            </div>
-                        </div>
+                    {!isReadOnly && !isTeamMemberAttendanceOnly ? (
+                        <button
+                            type="button"
+                            className="cer-ghost"
+                            onClick={() => handleSave(false)}
+                            disabled={isSaving}
+                        >
+                            {isSaving ? "Saving…" : "Save draft"}
+                        </button>
                     ) : null}
-                    {!isReadOnly && !isTeamMemberAttendanceOnly && (
-                        <div className={clsx(
-                            "hidden md:flex items-center gap-2 px-2.5 py-1.5 rounded-lg border transition-all",
-                            canFinalizeSubmit
-                                ? "bg-emerald-50 border-emerald-100 text-emerald-700"
-                                : "bg-amber-50 border-amber-100 text-amber-700"
-                        )}>
-                            <div className={clsx(
-                                "w-2 h-2 rounded-full",
-                                canFinalizeSubmit ? "bg-emerald-500" : "bg-amber-500"
-                            )} />
-                            <div className="flex flex-col">
-                                <span className="text-[10px] font-bold uppercase tracking-wide leading-none">
-                                    {canFinalizeSubmit
-                                        ? "Ready to submit"
-                                        : canSubmitReport && !isTeamLeadForSubmit
-                                          ? "Team lead submit"
-                                          : isEligibleForSubmission
-                                            ? "Almost there"
-                                            : "Progress mode"}
-                                </span>
-                                <span className="mt-0.5 text-[10px] font-medium opacity-80 leading-snug">
-                                    {canSubmitReport && !isTeamLeadForSubmit
-                                        ? "Only your team lead can submit."
-                                        : canSubmitReport
-                                          ? "All sections complete — submit from Summary."
-                                          : isEligibleForSubmission
-                                            ? "Finish steps 1–10, then submit on Summary."
-                                            : `${data.section1.metrics?.total_verified_hours || 0}/${data.required_hours || 16} hours verified`}
-                                </span>
-                            </div>
-                            {canFinalizeSubmit && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 ml-0.5" />}
-                        </div>
-                    )}
-                    <div className="flex items-center gap-3 sm:justify-end">
-                        {!isReadOnly && !isTeamMemberAttendanceOnly && (
-                            <Button
-                                variant="outline"
-                                onClick={() => handleSave(false)}
-                                disabled={isSaving}
-                                className="h-9 w-full border-slate-200 px-4 text-xs font-bold text-slate-600 shadow-sm transition-all hover:border-slate-300 hover:bg-white sm:w-auto"
+                    <div className="cer-prog">
+                        <span className="cer-pt">{sectionsCompleteCount}/10</span>
+                        <span className="cer-pb">
+                            <i style={{ width: `${sectionsCompleteCount * 10}%` }} />
+                        </span>
+                    </div>
+                </div>
+
+                {isTeamMemberAttendanceOnly ? (
+                    <div className="cer-note">
+                        Team member — attendance only. Your team lead files this report. You may update Section 1 only.
+                    </div>
+                ) : null}
+
+                <div className="cer-tabs">
+                    {REPORT_TAB_ITEMS.map((tab) => {
+                        const isActive = activeStep === tab.step;
+                        const isCompleted = activeStep > tab.step;
+                        const isDone = tab.step <= 10 && !incompleteStepNums.has(tab.step);
+                        const lockedSummary = stepperLockedToSummaryOnly && tab.step !== 11;
+                        const lockedSection1 = stepperLockedToSection1Only && tab.step !== 1;
+                        return (
+                            <button
+                                key={tab.step}
+                                type="button"
+                                disabled={lockedSummary || lockedSection1}
+                                className={[
+                                    "cer-tb",
+                                    isActive ? "on" : "",
+                                    tab.flash ? "fc" : "",
+                                    isDone && !tab.flash ? "done" : "",
+                                ]
+                                    .filter(Boolean)
+                                    .join(" ")}
+                                onClick={() => {
+                                    if (lockedSummary || lockedSection1) return;
+                                    if (isCompleted || isReadOnly || activeStep < 11) {
+                                        setStep(tab.step);
+                                    } else if (!isActive && validateCurrentSection()) {
+                                        setStep(tab.step);
+                                    } else if (!isActive) {
+                                        toast.info("Navigating to step. Please complete mandatory fields later.");
+                                        setStep(tab.step);
+                                    }
+                                }}
                             >
-                                {isSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-2" /> : <Save className="w-3.5 h-3.5 mr-2 text-blue-500" />}
-                                Save Draft
-                            </Button>
-                        )}
-                    </div>
+                                {tab.label}
+                            </button>
+                        );
+                    })}
                 </div>
 
-                {/* Stepper Inside Sticky Header */}
-                <div className="max-w-[1600px] mx-auto mt-2 px-0.5">
-                    <div className="flex flex-wrap items-center gap-y-1.5 gap-x-1">
-                        {steps.map((label, i) => {
-                            const stepNum = i + 1;
-                            const isActive = activeStep === stepNum;
-                            const isCompleted = activeStep > stepNum;
-                            return (
-                                <React.Fragment key={label}>
-                                    <div
-                                        onClick={() => {
-                                            if (stepperLockedToSummaryOnly && stepNum !== 11) return;
-                                            if (stepperLockedToSection1Only && stepNum !== 1) return;
-                                            if (isCompleted || isReadOnly || activeStep < 11) {
-                                                setStep(stepNum);
-                                            } else if (!isActive && validateCurrentSection()) {
-                                                setStep(stepNum);
-                                            } else if (!isActive) {
-                                                toast.info("Navigating to step. Please complete mandatory fields later.");
-                                                setStep(stepNum);
-                                            }
-                                        }}
-                                        className={clsx(
-                                            "flex items-center gap-1.5 px-2.5 py-1 min-h-10 rounded-md transition-all text-[10px] font-bold uppercase tracking-tight cursor-pointer",
-                                            stepperLockedToSummaryOnly && stepNum !== 11 && "pointer-events-none cursor-not-allowed opacity-35",
-                                            stepperLockedToSection1Only && stepNum !== 1 && "pointer-events-none cursor-not-allowed opacity-35",
-                                            isActive ? "bg-blue-600 text-white shadow-lg shadow-blue-200/50 scale-105"
-                                                : isCompleted || isReadOnly ? "bg-white text-blue-600 border border-blue-100 hover:bg-blue-50"
-                                                    : "text-slate-400 bg-transparent border border-transparent hover:border-slate-200"
-                                        )}
-                                    >
-                                        <div className={clsx(
-                                            "w-6 h-6 rounded-full flex items-center justify-center text-[9px] border transition-colors",
-                                            isActive ? "border-white bg-white/20" : isCompleted ? "border-blue-200 bg-blue-50" : "border-slate-300"
-                                        )}>
-                                            {stepNum}
-                                        </div>
-                                        <span className={clsx(isActive ? "block" : "hidden sm:block")}>{label}</span>
-                                    </div>
-                                    {i < steps.length - 1 && (
-                                        <div className="w-2 h-px bg-slate-200 hidden sm:block opacity-40" />
-                                    )}
-                                </React.Fragment>
-                            )
-                        })}
-                    </div>
-                </div>
-            </div>
+                <ReportSectionBridge
+                    step={activeStep}
+                    data={data}
+                    projectData={projectDetails}
+                    onOpenHelp={() => setHelpSignal((n) => n + 1)}
+                />
 
-            {/* Main Content Area */}
-            <div className="max-w-[1600px] mx-auto pt-1 flex flex-col lg:flex-row gap-5 items-start">
-                <div className="min-w-0 flex-1 w-full min-h-[280px]">
+                <div>
                     {activeStep === 1 && <Section1Participation projectData={projectDetails} />}
                     {activeStep === 2 && <Section2ProjectContext projectData={projectDetails} />}
                     {activeStep === 3 && <Section3SDGMapping projectData={projectDetails} />}
@@ -918,81 +868,80 @@ function ReportFormContent() {
                     {activeStep === 9 && <Section9Reflection />}
                     {activeStep === 10 && <Section10Sustainability />}
                     {activeStep === 11 && (
-                        <Section11Summary
-                            onRequestFinalSubmit={
-                                summaryOnlyWorkspace || (needsRevision && !isReadOnly) ? handleSubmit : undefined
-                            }
-                            projectData={projectDetails}
-                        />
+                        <>
+                            <ReportFlashCard
+                                data={data}
+                                projectData={projectDetails}
+                                sectionsComplete={sectionsCompleteCount}
+                                missingLabels={incompleteSectionsSummary.map((block) => `Section ${block.section}`)}
+                                canSend={(canFinalizeSubmit || needsRevision) && !isReadOnly && !isTeamMemberAttendanceOnly}
+                                onSend={!isReadOnly && !isTeamMemberAttendanceOnly ? handleSubmit : undefined}
+                                sending={isSaving}
+                            />
+                            <Section11Summary
+                                onRequestFinalSubmit={
+                                    summaryOnlyWorkspace || (needsRevision && !isReadOnly) ? handleSubmit : undefined
+                                }
+                                projectData={projectDetails}
+                            />
+                        </>
                     )}
                 </div>
-
-                {/* PDF Checklist Preview - Visible on large screens only on Step 1 */}
-
-            </div>
-
+                {activeStep >= 1 && activeStep <= 10 ? (
+                    <ReportLiveBanner step={activeStep} data={data} projectData={projectDetails} />
+                ) : null}
 
             {!(summaryOnlyWorkspace || ciiVerifiedSummaryLock) && activeStep !== 1 && (
-                <div className="mt-4 rounded-xl border border-slate-200/80 bg-white/90 shadow-sm shadow-slate-200/50 backdrop-blur-sm px-3 py-3 md:px-5 md:py-3.5">
-                <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between max-w-[1600px] mx-auto">
-                    <div className="flex justify-start sm:flex-1">
+                <div className="cer-foot">
+                    <div>
                         {!isReadOnly && (
-                            <Button
+                            <button
                                 type="button"
-                                variant="outline"
+                                className="cer-prev"
                                 onClick={prevStep}
                                 disabled={activeStep === 1}
-                                className="h-9 rounded-lg border-slate-200 text-slate-700 text-sm font-semibold px-4 hover:bg-slate-50 disabled:opacity-40"
                             >
-                                Previous Step
-                            </Button>
+                                Previous step
+                            </button>
                         )}
                     </div>
 
                     {!isReadOnly && activeStep < 11 && !isTeamMemberAttendanceOnly && (
-                        <div className="flex justify-center sm:flex-1 sm:order-none order-2">
-                            <Button
-                                type="button"
-                                variant="outline"
-                                onClick={() => handleSave(false)}
-                                disabled={isSaving}
-                                className="bg-slate-50 hover:bg-slate-100 text-slate-800 h-9 px-4 rounded-lg border border-slate-200 font-semibold text-[11px] uppercase tracking-wide transition-all flex items-center gap-1.5 w-full sm:w-auto justify-center"
-                            >
-                                {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4 text-slate-500" />}
-                                <span>Save Section {activeStep} Progress</span>
-                            </Button>
-                        </div>
+                        <button
+                            type="button"
+                            className="cer-save"
+                            onClick={() => handleSave(false)}
+                            disabled={isSaving}
+                        >
+                            {isSaving ? "Saving…" : `Save section ${activeStep}`}
+                        </button>
                     )}
 
-                    <div className="flex justify-end sm:flex-1 order-3">
+                    <div>
                         {!(activeStep === 11 && postSubmitAwaitingReview) && (
-                            <Button
+                            <button
                                 type="button"
+                                className="cer-next"
                                 onClick={handleNext}
                                 disabled={
                                     isSaving ||
                                     (activeStep === 11 && !canFinalizeSubmit && !needsRevision) ||
                                     (isTeamMemberAttendanceOnly && activeStep === 1)
                                 }
-                                className="h-9 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm px-5 md:px-6 font-semibold shadow-sm shadow-blue-600/20 transition-all w-full sm:w-auto disabled:opacity-50"
                             >
-                                {isSaving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
-                                {activeStep === 11
-                                    ? isSaving
-                                        ? needsRevision
-                                            ? 'Resubmitting...'
-                                            : 'Submitting...'
-                                        : needsRevision
-                                          ? 'Resubmit Report'
-                                          : 'Submit Report'
-                                    : (aiStatus || 'Next Step')}
-                                {activeStep !== 11 && !isSaving && <ChevronRight className="w-4 h-4 ml-2" />}
-                            </Button>
+                                {isSaving ? (
+                                    "Working…"
+                                ) : activeStep === 11 ? (
+                                    needsRevision ? "Resubmit report" : "Submit report"
+                                ) : (
+                                    aiStatus || "Next step"
+                                )}
+                            </button>
                         )}
                     </div>
                 </div>
-            </div>
             )}
+            </div>
 
             {/* Submit Confirmation Dialog */}
             <Dialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>
@@ -1009,7 +958,7 @@ function ReportFormContent() {
                         <Button variant="outline" onClick={() => setIsConfirmOpen(false)}>
                             Cancel
                         </Button>
-                        <Button className="bg-blue-600 hover:bg-blue-700 text-white" onClick={confirmSubmit} disabled={isSaving}>
+                        <Button className="bg-[#0e7d74] hover:bg-[#0f5e57] text-white" onClick={confirmSubmit} disabled={isSaving}>
                             {isSaving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
                             Yes, Submit Report
                         </Button>
@@ -1066,6 +1015,7 @@ function ReportFormContent() {
             <ReportSectionGuideFloat
                 sectionStep={activeStep}
                 enabled={!summaryOnlyWorkspace && !ciiVerifiedSummaryLock}
+                openSignal={helpSignal}
             />
         </div>
     );

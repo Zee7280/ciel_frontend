@@ -1,0 +1,771 @@
+.cer {
+    --ink: #0d2b33;
+    --muted: #7a919a;
+    --line: #dcebee;
+    --bg: #f8fcfd;
+    --teal: #0e7d74;
+    --teal-soft: #e6f6f4;
+    --aqua: #0891b2;
+    --aqua-soft: #e3f4fa;
+    --gold: #b45309;
+    --gold-soft: #fbf0d7;
+    --red: #e11d48;
+    background: var(--bg);
+    color: var(--ink);
+    min-height: 100vh;
+    padding: 18px 14px 120px;
+}
+
+.cer .cer-wrap {
+    max-width: 1000px;
+    margin: 0 auto;
+}
+
+.cer .cer-apph {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+}
+
+.cer .cer-logo {
+    font-size: 16px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+}
+
+.cer .cer-logo span {
+    color: var(--teal);
+}
+
+.cer .cer-proj {
+    font-size: 11px;
+    color: var(--muted);
+}
+
+.cer .cer-prog {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 99px;
+    padding: 7px 14px;
+}
+
+.cer .cer-pb {
+    width: 120px;
+    height: 8px;
+    border-radius: 99px;
+    background: #e8f2f0;
+    overflow: hidden;
+}
+
+.cer .cer-pb i {
+    display: block;
+    height: 100%;
+    border-radius: 99px;
+    background: linear-gradient(90deg, #0e5f63, #2dd4bf);
+}
+
+.cer .cer-pt {
+    font-size: 10px;
+    font-weight: 800;
+    color: var(--teal);
+}
+
+.cer .cer-ghost {
+    border: 1px solid var(--line);
+    background: #fff;
+    color: var(--ink);
+    border-radius: 99px;
+    padding: 8px 15px;
+    font-size: 10.5px;
+    font-weight: 800;
+    cursor: pointer;
+    font-family: inherit;
+}
+
+.cer .cer-tabs {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+}
+
+.cer .cer-tb {
+    border: 1px solid var(--line);
+    background: #fff;
+    color: var(--muted);
+    border-radius: 99px;
+    padding: 8px 14px;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.05em;
+    cursor: pointer;
+    font-family: inherit;
+    position: relative;
+}
+
+.cer .cer-tb:hover:not(:disabled) {
+    border-color: var(--teal);
+    color: var(--teal);
+}
+
+.cer .cer-tb.on {
+    background: var(--teal);
+    border-color: var(--teal);
+    color: #fff;
+}
+
+.cer .cer-tb.done::after {
+    content: "✓";
+    margin-left: 5px;
+    color: #2dd4bf;
+    font-weight: 800;
+}
+
+.cer .cer-tb.on.done::after {
+    color: #99f6e4;
+}
+
+.cer .cer-tb.fc {
+    border-color: #f3d9a0;
+    background: var(--gold-soft);
+    color: var(--gold);
+}
+
+.cer .cer-tb.fc.on {
+    background: var(--gold);
+    border-color: var(--gold);
+    color: #fff;
+}
+
+.cer .cer-tb:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+}
+
+.cer .cer-bridge {
+    background: linear-gradient(115deg, #04252b, #0e5f63 60%, #12a5a0 115%);
+    border-radius: 22px;
+    color: #fff;
+    padding: 20px 24px;
+    margin-bottom: 13px;
+}
+
+.cer .cer-bridge .k {
+    font-size: 9px;
+    letter-spacing: 0.22em;
+    font-weight: 800;
+    color: #99f6e4;
+}
+
+.cer .cer-bridge h1 {
+    font-size: 19px;
+    margin: 5px 0 3px;
+    font-weight: 800;
+}
+
+.cer .cer-bridge p {
+    font-size: 11.5px;
+    color: #cdf5f0;
+    line-height: 1.6;
+    max-width: 660px;
+}
+
+.cer .cer-sdgrow {
+    display: flex;
+    gap: 6px;
+    margin-top: 9px;
+    flex-wrap: wrap;
+}
+
+.cer .cer-sdgc {
+    font-size: 8.5px;
+    font-weight: 800;
+    color: #fff;
+    border-radius: 8px;
+    padding: 4px 9px;
+}
+
+.cer .cer-bpills {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 11px;
+}
+
+.cer .cer-bp {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    border-radius: 12px;
+    padding: 7px 13px;
+    text-align: center;
+    min-width: 84px;
+}
+
+.cer .cer-bp .v {
+    font-size: 14px;
+    font-weight: 800;
+}
+
+.cer .cer-bp .kk {
+    font-size: 7px;
+    font-weight: 800;
+    letter-spacing: 0.13em;
+    color: #a5e8de;
+    margin-top: 2px;
+}
+
+.cer .cer-hchip {
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    background: rgba(255, 255, 255, 0.12);
+    color: #d9f7f2;
+    border-radius: 99px;
+    padding: 6px 14px;
+    font-size: 9.5px;
+    font-weight: 800;
+    cursor: pointer;
+    font-family: inherit;
+    margin-top: 11px;
+}
+
+.cer .cer-note {
+    display: flex;
+    gap: 8px;
+    background: var(--aqua-soft);
+    border: 1px solid #bfe6e2;
+    border-radius: 12px;
+    padding: 10px 13px;
+    font-size: 11px;
+    color: #0f5e57;
+    line-height: 1.55;
+    margin-bottom: 12px;
+}
+
+.cer .cer-foot {
+    margin-top: 16px;
+    border: 1px solid var(--line);
+    background: #fff;
+    border-radius: 18px;
+    padding: 12px 14px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.cer .cer-foot button {
+    border-radius: 12px;
+    padding: 10px 16px;
+    font-size: 12px;
+    font-weight: 800;
+    font-family: inherit;
+    cursor: pointer;
+}
+
+.cer .cer-foot .cer-prev,
+.cer .cer-foot .cer-save {
+    border: 1px solid var(--line);
+    background: #fff;
+    color: var(--ink);
+}
+
+.cer .cer-foot .cer-next {
+    border: 0;
+    background: var(--teal);
+    color: #fff;
+}
+
+.cer .cer-foot button:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.cer input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="hidden"]):not([type="button"]):not([type="submit"]),
+.cer textarea,
+.cer select {
+    border-color: var(--line) !important;
+    background: #f5fbfa !important;
+    color: var(--ink) !important;
+    border-radius: 10px !important;
+}
+
+.cer input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):focus,
+.cer textarea:focus,
+.cer select:focus {
+    border-color: var(--teal) !important;
+    background: #fff !important;
+    box-shadow: none !important;
+    outline: none !important;
+}
+
+.cer label {
+    color: var(--muted);
+}
+
+.cer .rounded-xl.border.bg-white,
+.cer .rounded-2xl.border.bg-white,
+.cer .rounded-3xl.border.bg-white {
+    border-color: var(--line) !important;
+    box-shadow: 0 1px 2px rgba(13, 43, 51, 0.04);
+}
+
+.cer .cer-dup-head,
+.cer .cer-inner-bridge {
+    display: none !important;
+}
+
+.cer [class*="bg-indigo-600"],
+.cer [class*="bg-blue-600"] {
+    background-color: var(--teal) !important;
+}
+
+.cer [class*="bg-indigo-50/"],
+.cer [class*="bg-indigo-50 "],
+.cer [class$="bg-indigo-50"],
+.cer [class*="bg-blue-50/"],
+.cer [class*="bg-blue-50 "],
+.cer [class$="bg-blue-50"],
+.cer [class*="bg-indigo-100"] {
+    background-color: var(--teal-soft) !important;
+}
+
+.cer [class*="text-indigo-600"],
+.cer [class*="text-indigo-700"],
+.cer [class*="text-indigo-500"],
+.cer [class*="text-blue-600"] {
+    color: var(--teal) !important;
+}
+
+.cer [class*="text-indigo-900"] {
+    color: var(--ink) !important;
+}
+
+.cer [class*="border-indigo-"],
+.cer [class*="border-blue-"] {
+    border-color: #cbe7e3 !important;
+}
+
+.cer [class*="ring-indigo"],
+.cer [class*="ring-blue"] {
+    --tw-ring-color: #cbe7e3;
+}
+
+.cer button.rounded-full.border {
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+}
+
+.cer button.rounded-full.border:hover:not(:disabled) {
+    border-color: var(--teal);
+    color: var(--teal);
+}
+
+.cer .cer-sdg-tile {
+    border-radius: 12px !important;
+    min-height: 74px;
+}
+
+.cer .cer-sdg-tile.on {
+    outline: 3px solid var(--aqua);
+    outline-offset: 2px;
+}
+
+.cer .cer-sdg-tile.prim {
+    outline: 3px solid var(--ink);
+    outline-offset: 2px;
+}
+
+.cer .cer-ban {
+    margin-top: 14px;
+    border-radius: 20px;
+    overflow: hidden;
+    border: 1px solid var(--line);
+    background: #fff;
+}
+
+.cer .cer-bh {
+    background: linear-gradient(115deg, #04252b, #0e5f63 60%, #12a5a0 120%);
+    color: #fff;
+    padding: 17px 21px;
+}
+
+.cer .cer-bk {
+    font-size: 8.5px;
+    letter-spacing: 0.2em;
+    font-weight: 800;
+    color: #99f6e4;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.cer .cer-live {
+    font-size: 7.5px;
+    font-weight: 800;
+    background: rgba(255, 255, 255, 0.18);
+    border-radius: 99px;
+    padding: 3px 8px;
+}
+
+.cer .cer-bt {
+    font-size: 15px;
+    font-weight: 800;
+    margin: 5px 0 3px;
+    line-height: 1.35;
+}
+
+.cer .cer-bb {
+    padding: 15px 19px;
+}
+
+.cer .cer-bsec {
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    color: var(--teal);
+    margin: 0 0 7px;
+}
+
+.cer .cer-quote {
+    border-left: 3px solid var(--aqua);
+    background: var(--aqua-soft);
+    border-radius: 0 10px 10px 0;
+    padding: 9px 13px;
+    font-size: 11px;
+    line-height: 1.65;
+    color: #1d3a3d;
+    font-style: italic;
+    margin-bottom: 10px;
+}
+
+.cer .cer-quote.tl {
+    border-color: var(--teal);
+    background: var(--teal-soft);
+}
+
+.cer .cer-bf {
+    border-top: 1px dashed var(--line);
+    padding: 11px 19px;
+    font-size: 10px;
+    color: var(--muted);
+    line-height: 1.6;
+    background: #fafdfd;
+}
+
+.cer .cer-bf b {
+    color: var(--ink);
+}
+
+.cer .cer-mtag {
+    font-size: 9.5px;
+    font-weight: 800;
+    background: var(--teal-soft);
+    color: var(--teal);
+    border-radius: 99px;
+    padding: 4px 11px;
+}
+
+.cer .cer-mrow {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+}
+
+.cer .cer-row {
+    display: flex;
+    gap: 8px;
+    font-size: 10.5px;
+    padding: 5px 0;
+    border-bottom: 1px dashed var(--line);
+    align-items: center;
+}
+
+.cer .cer-fcwrap {
+    max-width: 640px;
+    margin: 0 auto 18px;
+}
+
+.cer .cer-fcard {
+    border-radius: 26px;
+    overflow: hidden;
+    border: 1px solid var(--line);
+    background: #fff;
+    box-shadow: 0 24px 60px rgba(4, 37, 43, 0.16);
+}
+
+.cer .cer-fch {
+    background: linear-gradient(130deg, #04252b, #0e5f63 55%, #12a5a0 120%);
+    color: #fff;
+    padding: 24px 26px;
+    position: relative;
+    overflow: hidden;
+}
+
+.cer .cer-ribbon {
+    display: inline-block;
+    font-size: 8px;
+    font-weight: 800;
+    letter-spacing: 0.22em;
+    background: rgba(255, 255, 255, 0.14);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    border-radius: 99px;
+    padding: 5px 13px;
+    color: #99f6e4;
+}
+
+.cer .cer-fch h1 {
+    font-size: 21px;
+    margin: 10px 0 4px;
+    line-height: 1.3;
+    font-weight: 800;
+}
+
+.cer .cer-fm {
+    font-size: 11px;
+    color: #cdf5f0;
+}
+
+.cer .cer-avrow {
+    display: flex;
+    margin-top: 12px;
+}
+
+.cer .cer-av {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 800;
+    border: 2px solid #0e5f63;
+    margin: 0 -8px 0 0;
+}
+
+.cer .cer-fstats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    border-bottom: 1px solid var(--line);
+}
+
+@media (max-width: 560px) {
+    .cer .cer-fstats {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+.cer .cer-fs {
+    padding: 14px 10px;
+    text-align: center;
+    border-right: 1px solid var(--line);
+}
+
+.cer .cer-fs:last-child {
+    border-right: 0;
+}
+
+.cer .cer-fs .v {
+    font-size: 16px;
+    font-weight: 800;
+    color: var(--teal);
+}
+
+.cer .cer-fs .k {
+    font-size: 7px;
+    font-weight: 800;
+    letter-spacing: 0.13em;
+    color: var(--muted);
+    margin-top: 3px;
+}
+
+.cer .cer-fbody {
+    padding: 18px 22px;
+}
+
+.cer .cer-arrow {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: #f6fcfb;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 13px 16px;
+    margin-bottom: 13px;
+}
+
+.cer .cer-arrow .a {
+    flex: 1;
+    font-size: 11px;
+    line-height: 1.55;
+    color: #1d3a3d;
+}
+
+.cer .cer-arrow .mid {
+    font-size: 20px;
+    color: var(--teal);
+}
+
+.cer .cer-arrow b {
+    display: block;
+    font-size: 8.5px;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    margin-bottom: 3px;
+}
+
+.cer .cer-qsig {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 13px;
+}
+
+.cer .cer-qs {
+    flex: 1;
+    min-width: 120px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 9px 11px;
+    text-align: center;
+    background: #f6fcfb;
+}
+
+.cer .cer-qs .v {
+    font-size: 14px;
+    font-weight: 800;
+    color: var(--teal);
+}
+
+.cer .cer-qs .k {
+    font-size: 6.5px;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    color: var(--muted);
+    margin-top: 2px;
+}
+
+.cer .cer-dr {
+    display: flex;
+    gap: 11px;
+    border: 1px solid var(--line);
+    border-radius: 13px;
+    padding: 11px 13px;
+    margin-bottom: 8px;
+    align-items: flex-start;
+    background: #fff;
+}
+
+.cer .cer-dr .ic {
+    font-size: 17px;
+    margin-top: 1px;
+}
+
+.cer .cer-dr .bx {
+    flex: 1;
+}
+
+.cer .cer-dr .crit {
+    font-size: 8.5px;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    color: var(--teal);
+}
+
+.cer .cer-dr .txt {
+    font-size: 11.5px;
+    line-height: 1.6;
+    color: #1d3a3d;
+    margin-top: 3px;
+}
+
+.cer .cer-dr .ev {
+    font-size: 7.5px;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    background: var(--aqua-soft);
+    color: var(--aqua);
+    border-radius: 99px;
+    padding: 3px 9px;
+    white-space: nowrap;
+    margin-top: 2px;
+}
+
+.cer .cer-fcfoot {
+    border-top: 1px dashed var(--line);
+    padding: 14px 22px;
+    background: #fafdfd;
+}
+
+.cer .cer-status {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    font-size: 11px;
+    font-weight: 800;
+}
+
+.cer .cer-st-draft {
+    color: var(--gold);
+}
+
+.cer .cer-st-pend {
+    color: var(--aqua);
+}
+
+.cer .cer-st-live {
+    color: var(--teal);
+}
+
+.cer .cer-dash {
+    display: flex;
+    gap: 7px;
+    flex-wrap: wrap;
+    margin-top: 10px;
+}
+
+.cer .cer-dchip {
+    font-size: 9px;
+    font-weight: 800;
+    border-radius: 99px;
+    padding: 5px 12px;
+    background: var(--teal-soft);
+    color: var(--teal);
+}
+
+.cer .cer-bigbtn {
+    display: block;
+    width: 100%;
+    border: 0;
+    border-radius: 14px;
+    padding: 15px;
+    font-size: 13.5px;
+    font-weight: 800;
+    cursor: pointer;
+    font-family: inherit;
+    background: var(--gold);
+    color: #fff;
+    margin-top: 13px;
+}
+
+.cer .cer-bigbtn:disabled {
+    background: #c7dcd9;
+    cursor: not-allowed;
+}
+
+.cer .cer-missing {
+    font-size: 10.5px;
+    color: var(--muted);
+    text-align: center;
+    margin-top: 8px;
+    line-height: 1.6;
+}

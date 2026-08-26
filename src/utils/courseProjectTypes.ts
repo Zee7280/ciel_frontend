@@ -190,6 +190,8 @@ export interface CourseProjectEntry {
     facultyApprovalStatus?: "pending" | "approved" | "rejected" | null;
     facultyApprovalNote?: string | null;
     facultyApprovalAt?: string | null;
+    /** Pinned by the analyzer after a ranked run — shown on My Impact Wall. */
+    meritRibbon?: { rank: number; of: number; scope: string; total?: number; at: string } | null;
     createdAt?: string;
     updatedAt?: string;
     /** False when this entry is showing because the viewer was named as a group member on someone else's
