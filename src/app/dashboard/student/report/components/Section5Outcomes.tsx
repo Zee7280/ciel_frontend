@@ -630,7 +630,7 @@ export default function Section5Outcomes() {
                     </div>
                     <div>
                         <h2 className="text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl">
-                            <span className="text-indigo-600">SECTION 5:</span> Outcomes &amp; results
+                            <span className="text-indigo-600">SECTION 4 · Part B:</span> Outcomes &amp; results
                         </h2>
                         <p className="mt-1 text-sm text-slate-500">
                             What changed because of your project, measured with data, and its limitations.

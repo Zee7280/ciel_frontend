@@ -279,7 +279,7 @@ export default function Section9Reflection() {
                     </div>
                     <div>
                         <h2 className="text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl">
-                            <span className="text-indigo-600">SECTION 9:</span> Reflection
+                            <span className="text-indigo-600">SECTION 8:</span> Reflection
                         </h2>
                     </div>
                 </div>

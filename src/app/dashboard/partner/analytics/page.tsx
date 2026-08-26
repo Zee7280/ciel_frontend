@@ -10,7 +10,7 @@ export default function PartnerAnalyticsPage() {
                 <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">BI workspace</p>
                 <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Analytics</h1>
                 <p className="mt-1 text-sm text-slate-500">
-                    Organization-wide participation and verification by report section.
+                    Organization-wide participation and verification by form section (4A/4B for activities and outcomes).
                 </p>
             </header>
 

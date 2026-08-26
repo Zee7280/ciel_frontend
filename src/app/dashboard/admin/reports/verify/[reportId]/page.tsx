@@ -72,6 +72,7 @@ import {
 } from "@/utils/reportPartnerApprovalDisplay";
 import RedFlagsSummaryList from "@/components/RedFlagsSummaryList";
 import { summarizeAuditIssueText } from "@/lib/summarizeRedFlagDetails";
+import { REVIEW_DOSSIER_FLASH_NAV, REVIEW_DOSSIER_FORM_NAV } from "../../../../student/report/utils/reportWizardNav";
 
 function normalizeAuditMeta(raw: unknown, summaryText: string): ReportCIIauditMeta | null {
     const fallback = summaryText ? parseSection11AuditSummary(summaryText) : null;
@@ -220,22 +221,40 @@ type AdminBlueprintRow = {
 };
 
 const DOSSIER_NAV_SECTIONS = [
-    { id: "section1", label: "Participation Profile", icon: Users },
-    { id: "section2", label: "Project Context", icon: FileText },
-    { id: "section3", label: "SDG Mapping", icon: Target },
-    { id: "section4", label: "Activities & Outputs", icon: Activity },
-    { id: "section5", label: "Outcomes", icon: TrendingUp },
-    { id: "section6", label: "Resources", icon: Package },
-    { id: "section7", label: "Partnerships", icon: Handshake },
-    { id: "section8", label: "Evidence", icon: FileText },
-    { id: "section9", label: "Reflection", icon: MessageSquare },
-    { id: "section10", label: "Sustainability", icon: Activity },
-    { id: "section11", label: "Print dossier", icon: FileText },
+    ...REVIEW_DOSSIER_FORM_NAV.map((item) => ({
+        id: item.id,
+        label: item.label,
+        wizard: item.wizard,
+        icon:
+            item.id === "section1"
+                ? Users
+                : item.id === "section2"
+                  ? FileText
+                  : item.id === "section3"
+                    ? Target
+                    : item.id === "section4"
+                      ? Activity
+                      : item.id === "section6"
+                        ? Package
+                        : item.id === "section7"
+                          ? Handshake
+                          : item.id === "section8"
+                            ? FileText
+                            : item.id === "section9"
+                              ? MessageSquare
+                              : Activity,
+    })),
+    {
+        id: REVIEW_DOSSIER_FLASH_NAV.id,
+        label: REVIEW_DOSSIER_FLASH_NAV.label,
+        wizard: REVIEW_DOSSIER_FLASH_NAV.wizard,
+        icon: FileText,
+    },
 ] as const;
 
-/** Sections 1–10: structured admin review fields. Section 11: full print layout (collapsed by default). */
-const REPORT_REVIEW_NAV_SECTIONS = DOSSIER_NAV_SECTIONS.slice(0, 10);
-const PRINT_DOSSIER_NAV_SECTION = DOSSIER_NAV_SECTIONS[10];
+/** Sections 1–9: structured admin review fields. Flash/print: full print layout (collapsed by default). */
+const REPORT_REVIEW_NAV_SECTIONS = DOSSIER_NAV_SECTIONS.slice(0, 9);
+const PRINT_DOSSIER_NAV_SECTION = DOSSIER_NAV_SECTIONS[9];
 const ALL_SECTION_IDS = DOSSIER_NAV_SECTIONS.map((s) => s.id);
 
 /** Admin verify dossier: indigo accent + slate neutrals (matches `--color-report-*` in globals). */
@@ -651,7 +670,12 @@ export default function AdminReportDetailPage() {
 
     const sectionCardClass = useCallback(
         (sectionId: string) =>
-            clsx(adminDossier.cardLg, "scroll-mt-8 p-6 sm:p-8", activeSectionId === sectionId && adminDossier.sectionCardActive),
+            clsx(
+                adminDossier.cardLg,
+                "scroll-mt-8 p-6 sm:p-8",
+                (activeSectionId === sectionId || (sectionId === "section4" && activeSectionId === "section5")) &&
+                    adminDossier.sectionCardActive,
+            ),
         [activeSectionId],
     );
 
@@ -1159,7 +1183,7 @@ export default function AdminReportDetailPage() {
                     </div>
                 </div>
 
-                {/* Report sections (1–10) + optional print dossier (11) */}
+                {/* Report sections (form tabs 1–9) + flash/print (10) */}
                 <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-12 lg:gap-8">
                     {/* Sticky table of contents */}
                     <div className="space-y-4 lg:sticky lg:top-8 lg:col-span-3">
@@ -1186,9 +1210,9 @@ export default function AdminReportDetailPage() {
                                     </button>
                                 </div>
                             </div>
-                            <p className={clsx(adminDossier.microLabel, "mb-2 text-slate-400")}>Sections 1–10</p>
+                            <p className={clsx(adminDossier.microLabel, "mb-2 text-slate-400")}>Sections 1–9</p>
                             <div className="space-y-0.5">
-                                {REPORT_REVIEW_NAV_SECTIONS.map((section, index) => {
+                                {REPORT_REVIEW_NAV_SECTIONS.map((section) => {
                                     const isActive = activeSectionId === section.id;
                                     return (
                                         <button
@@ -1202,7 +1226,7 @@ export default function AdminReportDetailPage() {
                                                 strokeWidth={2}
                                             />
                                             <span className={clsx(adminDossier.navText, isActive && adminDossier.navTextActive)}>
-                                                {index + 1}. {section.label}
+                                                {section.wizard}. {section.label}
                                             </span>
                                         </button>
                                     );
@@ -1231,7 +1255,7 @@ export default function AdminReportDetailPage() {
                                         activeSectionId === PRINT_DOSSIER_NAV_SECTION.id && adminDossier.navTextActive,
                                     )}
                                 >
-                                    11. {PRINT_DOSSIER_NAV_SECTION.label}
+                                    {PRINT_DOSSIER_NAV_SECTION.wizard}. {PRINT_DOSSIER_NAV_SECTION.label}
                                     {!sectionOpen.section11 ? (
                                         <span className="ml-1 text-xs font-normal text-slate-400">(collapsed)</span>
                                     ) : null}
@@ -1723,27 +1747,16 @@ export default function AdminReportDetailPage() {
                                     <LabelValue label="Project implementation explanation" value={report.section4?.project_summary?.project_implementation_explanation} fullWidth />
                                     <LabelValue label="Section summary" value={report.section4?.summary_text} fullWidth />
                                 </div>
-                            </div>
-                            ) : null}
-                        </div>
-
-                        {/* Section 5 */}
-                        <div id="section5" className={sectionCardClass("section5")}>
-                            <div className="mb-5 flex items-start justify-between gap-3 border-b border-slate-100 pb-4">
-                                <div className="flex min-w-0 flex-1 items-center gap-3">
-                                    <div className={adminDossier.sectionIcon}>
-                                        <TrendingUp className="h-6 w-6" strokeWidth={1.75} />
+                                <div id="section5" className="scroll-mt-8 space-y-6 border-t border-slate-100 pt-6">
+                                    <div className="flex items-center gap-3">
+                                        <div className={adminDossier.sectionIcon}>
+                                            <TrendingUp className="h-6 w-6" strokeWidth={1.75} />
+                                        </div>
+                                        <div>
+                                            <p className={clsx(adminDossier.microLabel, "text-indigo-600")}>Section 4 · Part B</p>
+                                            <h3 className="text-lg font-bold tracking-tight text-slate-900">Outcomes & results</h3>
+                                        </div>
                                     </div>
-                                    <h2 className={adminDossier.sectionTitle}>05. Outcomes</h2>
-                                </div>
-                                <SectionCollapseTrigger
-                                    sectionId="section5"
-                                    isOpen={Boolean(sectionOpen.section5)}
-                                    onToggle={() => toggleSection("section5")}
-                                />
-                            </div>
-                            {sectionOpen.section5 ? (
-                            <div id="section5-panel" className="space-y-6">
                                 {Array.isArray(report.section5?.measurable_outcomes) && report.section5.measurable_outcomes.length > 0 ? (
                                     <div className="space-y-4">
                                         <h3 className={clsx(adminDossier.microLabel, "border-b border-slate-100 pb-2 text-slate-400")}>
@@ -1784,18 +1797,19 @@ export default function AdminReportDetailPage() {
                                     <LabelValue label="Challenges" value={report.section5?.challenges} fullWidth />
                                     <LabelValue label="Section Summary" value={report.section5?.summary_text} fullWidth />
                                 </div>
+                                </div>
                             </div>
                             ) : null}
                         </div>
 
-                        {/* Section 6 */}
+                        {/* Section 6 — wizard 5 */}
                         <div id="section6" className={sectionCardClass("section6")}>
                             <div className="mb-5 flex items-start justify-between gap-3 border-b border-slate-100 pb-4">
                                 <div className="flex min-w-0 flex-1 items-center gap-3">
                                     <div className={adminDossier.sectionIcon}>
                                         <Package className="h-6 w-6" strokeWidth={1.75} />
                                     </div>
-                                    <h2 className={adminDossier.sectionTitle}>06. Resources</h2>
+                                    <h2 className={adminDossier.sectionTitle}>05. Resources</h2>
                                 </div>
                                 <SectionCollapseTrigger
                                     sectionId="section6"
@@ -1851,7 +1865,7 @@ export default function AdminReportDetailPage() {
                                     <div className={adminDossier.sectionIcon}>
                                         <Handshake className="h-6 w-6" strokeWidth={1.75} />
                                     </div>
-                                    <h2 className={adminDossier.sectionTitle}>07. Partnerships</h2>
+                                    <h2 className={adminDossier.sectionTitle}>06. Partnerships</h2>
                                 </div>
                                 <SectionCollapseTrigger
                                     sectionId="section7"
@@ -1914,7 +1928,7 @@ export default function AdminReportDetailPage() {
                                     <div className={adminDossier.sectionIcon}>
                                         <FileText className="h-6 w-6" strokeWidth={1.75} />
                                     </div>
-                                    <h2 className={adminDossier.sectionTitle}>08. Evidence</h2>
+                                    <h2 className={adminDossier.sectionTitle}>07. Evidence</h2>
                                 </div>
                                 <SectionCollapseTrigger
                                     sectionId="section8"
@@ -2000,7 +2014,7 @@ export default function AdminReportDetailPage() {
                                     <div className={adminDossier.sectionIcon}>
                                         <MessageSquare className="h-6 w-6" strokeWidth={1.75} />
                                     </div>
-                                    <h2 className={adminDossier.sectionTitle}>09. Reflection & growth</h2>
+                                    <h2 className={adminDossier.sectionTitle}>08. Reflection & growth</h2>
                                 </div>
                                 <SectionCollapseTrigger
                                     sectionId="section9"
@@ -2054,7 +2068,7 @@ export default function AdminReportDetailPage() {
                                     <div className={adminDossier.sectionIcon}>
                                         <Activity className="h-6 w-6" strokeWidth={1.75} />
                                     </div>
-                                    <h2 className={adminDossier.sectionTitle}>10. Sustainability</h2>
+                                    <h2 className={adminDossier.sectionTitle}>09. Sustainability</h2>
                                 </div>
                                 <SectionCollapseTrigger
                                     sectionId="section10"
@@ -2088,9 +2102,9 @@ export default function AdminReportDetailPage() {
                                     </div>
                                     <div className="min-w-0">
                                         <p className={clsx(adminDossier.microLabel, "mb-1 text-indigo-600")}>Print dossier</p>
-                                        <h2 className={adminDossier.sectionTitle}>11. Executive impact dossier</h2>
+                                        <h2 className={adminDossier.sectionTitle}>10. Executive impact dossier</h2>
                                         <p className="mt-1 text-sm text-slate-500">
-                                            Full print layout — separate from sections 1–10. Open only when you need the executive summary view.
+                                            Full print layout — flash card view, separate from sections 1–9. Open only when you need the executive summary.
                                         </p>
                                     </div>
                                 </div>

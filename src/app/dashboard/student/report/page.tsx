@@ -16,7 +16,19 @@ import {
 } from "./components/ui/dialog";
 import { canStudentAccessReportForProjectPayload } from '@/utils/studentJoinApplication';
 import { mergeReportSection1TeamScope, mergeReportSection1TeamScopeForCertificate } from '@/utils/reportTeamScope';
-import { getIncompleteSectionsSummary } from './utils/validation';
+import { getIncompleteSectionsSummary, validateSection4, validateSection5 } from './utils/validation';
+import {
+    dataSectionsToSummarize,
+    FLASH_CARD_STEP,
+    formatIncompleteSectionHeading,
+    isFlashCardStep,
+    isMergedActivitiesStep,
+    REPORT_UI_SECTION_TOTAL,
+    tabIsComplete,
+    tabMatchesStep,
+    uiSectionsCompleteCount,
+    uiStepLabel,
+} from './utils/reportWizardNav';
 import { pickImpactVerifyUrlFromPayload } from '@/utils/reportVerificationUrl';
 import { prepareReportEvidenceForSave } from './utils/evidenceUpload';
 import { normalizeEngagementAttendanceLog } from '@/utils/engagementAttendanceMap';
@@ -412,7 +424,7 @@ function ReportFormContent() {
                     } else if (isSubmitted) {
                         // Report already submitted — skip guide, go straight to summary
                         setShowGuide(false);
-                        setStep(11);
+                        setStep(FLASH_CARD_STEP);
                         setReadOnly(true);
                     } else if (shouldSkipPreReportGuide(reportForState)) {
                         setShowGuide(false);
@@ -443,7 +455,7 @@ function ReportFormContent() {
 
         const isValid = validateCurrentSection();
         
-        if (activeStep < 11) {
+        if (activeStep < FLASH_CARD_STEP) {
             if (isTeamMemberAttendanceOnly) {
                 toast.info("Only your team lead advances report sections. Update your attendance in Section 1.");
                 return;
@@ -452,26 +464,38 @@ function ReportFormContent() {
             let updatedData = { ...data };
 
             // Auto-generate AI Summary for specific sections (non-blocking for navigation if save succeeds)
-            const sectionsToSummarize = [2, 3, 4, 5, 8, 9, 10];
+            const dataNums = dataSectionsToSummarize(activeStep);
             let aiSummaryIssue: string | null = null;
-            if (sectionsToSummarize.includes(activeStep) && isValid) {
+            const stepsForAi = dataNums.filter((n) => {
+                if (n === 4) return validateSection4(data.section4).isValid;
+                if (n === 5) return validateSection5(data.section5).isValid;
+                return isValid;
+            });
+            if (stepsForAi.length) {
                 setAiStatus('Analyzing Data & Writing Summary...');
                 try {
                     const { generateAISummary } = await import('./utils/aiSummarizer');
-                    const sectionKey = `section${activeStep}` as Exclude<keyof typeof data, 'project_id'>;
-                    const summaryRes = await generateAISummary(sectionKey, data[sectionKey]);
-
-                    if (summaryRes.summary) {
-                        updatedData = {
-                            ...updatedData,
-                            [sectionKey]: {
-                                ...(updatedData[sectionKey] as Record<string, unknown>),
-                                summary_text: summaryRes.summary
+                    for (const stepNum of stepsForAi) {
+                        const sectionKey = `section${stepNum}` as Exclude<keyof typeof data, 'project_id'>;
+                        try {
+                            const summaryRes = await generateAISummary(sectionKey, data[sectionKey]);
+                            if (summaryRes.summary) {
+                                updatedData = {
+                                    ...updatedData,
+                                    [sectionKey]: {
+                                        ...(updatedData[sectionKey] as Record<string, unknown>),
+                                        summary_text: summaryRes.summary
+                                    }
+                                };
+                                updateSection(sectionKey, { summary_text: summaryRes.summary });
+                            } else if (summaryRes.error) {
+                                aiSummaryIssue = summaryRes.error;
                             }
-                        };
-                        updateSection(sectionKey, { summary_text: summaryRes.summary });
-                    } else if (summaryRes.error) {
-                        aiSummaryIssue = summaryRes.error;
+                        } catch (error) {
+                            console.error('Failed to auto-generate summary', error);
+                            aiSummaryIssue =
+                                error instanceof Error ? error.message : 'Auto-summary request failed.';
+                        }
                     }
                 } catch (error) {
                     console.error('Failed to auto-generate summary', error);
@@ -510,7 +534,7 @@ function ReportFormContent() {
                         `Minimum verified hours not met (${data.section1.metrics?.total_verified_hours || 0}/${data.required_hours || 16}). Complete Section 1 first.`,
                     );
                 } else {
-                    toast.error('Complete all required fields in steps 1–10 before submitting.');
+                    toast.error('Complete all required fields in every section before submitting.');
                 }
                 setBlockedSubmitOpen(true);
                 return;
@@ -737,7 +761,7 @@ function ReportFormContent() {
     React.useEffect(() => {
         if (isLoading || showGuide) return;
         if (!summaryOnlyWorkspace && !ciiVerifiedSummaryLock) return;
-        if (activeStep !== 11) setStep(11);
+        if (activeStep !== FLASH_CARD_STEP) setStep(FLASH_CARD_STEP);
     }, [isLoading, showGuide, summaryOnlyWorkspace, ciiVerifiedSummaryLock, activeStep, setStep]);
 
     if (isLoading) {
@@ -749,9 +773,8 @@ function ReportFormContent() {
     }
 
     const incompleteStepNums = new Set(incompleteSectionsSummary.map((block) => block.section));
-    const sectionsCompleteCount = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].filter(
-        (n) => !incompleteStepNums.has(n),
-    ).length;
+    const sectionsCompleteCount = uiSectionsCompleteCount(incompleteStepNums);
+    const progressPct = Math.round((sectionsCompleteCount / REPORT_UI_SECTION_TOTAL) * 100);
     const projectSubtitle = [
         projectDetails?.title,
         (projectDetails as { organization_name?: string } | null)?.organization_name,
@@ -798,9 +821,9 @@ function ReportFormContent() {
                         </button>
                     ) : null}
                     <div className="cer-prog">
-                        <span className="cer-pt">{sectionsCompleteCount}/10</span>
+                        <span className="cer-pt">{sectionsCompleteCount}/{REPORT_UI_SECTION_TOTAL}</span>
                         <span className="cer-pb">
-                            <i style={{ width: `${sectionsCompleteCount * 10}%` }} />
+                            <i style={{ width: `${progressPct}%` }} />
                         </span>
                     </div>
                 </div>
@@ -813,10 +836,10 @@ function ReportFormContent() {
 
                 <div className="cer-tabs">
                     {REPORT_TAB_ITEMS.map((tab) => {
-                        const isActive = activeStep === tab.step;
+                        const isActive = tabMatchesStep(tab.step, activeStep);
                         const isCompleted = activeStep > tab.step;
-                        const isDone = tab.step <= 10 && !incompleteStepNums.has(tab.step);
-                        const lockedSummary = stepperLockedToSummaryOnly && tab.step !== 11;
+                        const isDone = tabIsComplete(tab.step, incompleteStepNums);
+                        const lockedSummary = stepperLockedToSummaryOnly && tab.step !== FLASH_CARD_STEP;
                         const lockedSection1 = stepperLockedToSection1Only && tab.step !== 1;
                         return (
                             <button
@@ -833,7 +856,7 @@ function ReportFormContent() {
                                     .join(" ")}
                                 onClick={() => {
                                     if (lockedSummary || lockedSection1) return;
-                                    if (isCompleted || isReadOnly || activeStep < 11) {
+                                    if (isCompleted || isReadOnly || activeStep < FLASH_CARD_STEP) {
                                         setStep(tab.step);
                                     } else if (!isActive && validateCurrentSection()) {
                                         setStep(tab.step);
@@ -860,20 +883,28 @@ function ReportFormContent() {
                     {activeStep === 1 && <Section1Participation projectData={projectDetails} />}
                     {activeStep === 2 && <Section2ProjectContext projectData={projectDetails} />}
                     {activeStep === 3 && <Section3SDGMapping projectData={projectDetails} />}
-                    {activeStep === 4 && <Section4Activities />}
-                    {activeStep === 5 && <Section5Outcomes />}
-                    {activeStep === 6 && <Section6Resources projectData={projectDetails} />}
-                    {activeStep === 7 && <Section7Partnerships projectData={projectDetails} />}
-                    {activeStep === 8 && <Section8Evidence />}
-                    {activeStep === 9 && <Section9Reflection />}
-                    {activeStep === 10 && <Section10Sustainability />}
-                    {activeStep === 11 && (
+                    {isMergedActivitiesStep(activeStep) && (
+                        <>
+                            <div className="cer-partk">PART A · WHAT WE DID — ACTIVITY BY ACTIVITY</div>
+                            <Section4Activities />
+                            <div className="cer-partk">PART B · WHAT CHANGED BECAUSE OF IT</div>
+                            <Section5Outcomes />
+                        </>
+                    )}
+                    {activeStep === 5 && <Section6Resources projectData={projectDetails} />}
+                    {activeStep === 6 && <Section7Partnerships projectData={projectDetails} />}
+                    {activeStep === 7 && <Section8Evidence />}
+                    {activeStep === 8 && <Section9Reflection />}
+                    {activeStep === 9 && <Section10Sustainability />}
+                    {isFlashCardStep(activeStep) && (
                         <>
                             <ReportFlashCard
                                 data={data}
                                 projectData={projectDetails}
                                 sectionsComplete={sectionsCompleteCount}
-                                missingLabels={incompleteSectionsSummary.map((block) => `Section ${block.section}`)}
+                                missingLabels={incompleteSectionsSummary.map((block) =>
+                                    formatIncompleteSectionHeading(block.section, block.label),
+                                )}
                                 canSend={(canFinalizeSubmit || needsRevision) && !isReadOnly && !isTeamMemberAttendanceOnly}
                                 onSend={!isReadOnly && !isTeamMemberAttendanceOnly ? handleSubmit : undefined}
                                 sending={isSaving}
@@ -887,7 +918,7 @@ function ReportFormContent() {
                         </>
                     )}
                 </div>
-                {activeStep >= 1 && activeStep <= 10 ? (
+                {activeStep >= 1 && activeStep < FLASH_CARD_STEP ? (
                     <ReportLiveBanner step={activeStep} data={data} projectData={projectDetails} />
                 ) : null}
 
@@ -906,32 +937,32 @@ function ReportFormContent() {
                         )}
                     </div>
 
-                    {!isReadOnly && activeStep < 11 && !isTeamMemberAttendanceOnly && (
+                    {!isReadOnly && activeStep < FLASH_CARD_STEP && !isTeamMemberAttendanceOnly && (
                         <button
                             type="button"
                             className="cer-save"
                             onClick={() => handleSave(false)}
                             disabled={isSaving}
                         >
-                            {isSaving ? "Saving…" : `Save section ${activeStep}`}
+                            {isSaving ? "Saving…" : `Save section ${uiStepLabel(activeStep)}`}
                         </button>
                     )}
 
                     <div>
-                        {!(activeStep === 11 && postSubmitAwaitingReview) && (
+                        {!(isFlashCardStep(activeStep) && postSubmitAwaitingReview) && (
                             <button
                                 type="button"
                                 className="cer-next"
                                 onClick={handleNext}
                                 disabled={
                                     isSaving ||
-                                    (activeStep === 11 && !canFinalizeSubmit && !needsRevision) ||
+                                    (isFlashCardStep(activeStep) && !canFinalizeSubmit && !needsRevision) ||
                                     (isTeamMemberAttendanceOnly && activeStep === 1)
                                 }
                             >
                                 {isSaving ? (
                                     "Working…"
-                                ) : activeStep === 11 ? (
+                                ) : isFlashCardStep(activeStep) ? (
                                     needsRevision ? "Resubmit report" : "Submit report"
                                 ) : (
                                     aiStatus || "Next step"
@@ -991,7 +1022,7 @@ function ReportFormContent() {
                                     {incompleteSectionsSummary.map((block) => (
                                         <li key={block.section} className="text-sm">
                                             <span className="font-bold text-slate-900">
-                                                Step {block.section} — {block.label}
+                                                {formatIncompleteSectionHeading(block.section, block.label)}
                                             </span>
                                             <ul className="mt-1.5 ml-3 list-disc text-slate-600 space-y-1">
                                                 {block.errors.map((err, i) => (

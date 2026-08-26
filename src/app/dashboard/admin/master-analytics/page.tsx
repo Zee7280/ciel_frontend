@@ -48,9 +48,9 @@ export default function AdminMasterAnalyticsPage() {
                         All Analytics Live Here First
                     </h2>
                     <p className="mt-1 max-w-2xl text-[12.5px] text-slate-500">
-                        Every field across Sections 1–10 belongs primarily to the Super Admin. Stakeholders
+                        Every field across form tabs 1–9 (activities/outcomes as 4A/4B) belongs primarily to the Super Admin. Stakeholders
                         see mapped copies. Use <b>View as</b> to open exactly what any stakeholder sees —
-                        all 5 roles × 10 sections — or open the <b>Field Ownership Registry</b>. Looking for
+                        all 5 roles × form sections — or open the <b>Field Ownership Registry</b>. Looking for
                         KPI charts and trends instead? See{" "}
                         <Link href="/dashboard/admin/analytics" className="font-bold underline">
                             Analytics &amp; Impact

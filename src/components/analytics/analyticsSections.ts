@@ -11,6 +11,12 @@ import {
     Users,
     type LucideIcon,
 } from "lucide-react";
+import { dataSectionUiMark } from "@/app/dashboard/student/report/utils/reportWizardNav";
+
+/** Form-tab mark for a stored analytics section id (4A/4B, then 5–9, flash 10). */
+export function analyticsSectionUiMark(dataSectionId: number): string {
+    return dataSectionUiMark(dataSectionId);
+}
 
 export type ReportAnalyticsSectionId = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11;
 
@@ -51,7 +57,7 @@ export const REPORT_ANALYTICS_SECTIONS: ReportAnalyticsSection[] = [
     {
         id: 4,
         shortLabel: "Activities",
-        title: "Activities & outputs",
+        title: "Activities & outputs (Part A)",
         description: "Deliverables, beneficiary reach, and activity intensity.",
         icon: ClipboardCheck,
         status: "live",
@@ -59,7 +65,7 @@ export const REPORT_ANALYTICS_SECTIONS: ReportAnalyticsSection[] = [
     {
         id: 5,
         shortLabel: "Outcomes",
-        title: "Outcomes & change",
+        title: "Outcomes & change (Part B)",
         description: "Measured change, confidence, baseline/endline, and challenges.",
         icon: FileText,
         status: "live",
@@ -106,8 +112,8 @@ export const REPORT_ANALYTICS_SECTIONS: ReportAnalyticsSection[] = [
     },
     {
         id: 11,
-        shortLabel: "Intelligence",
-        title: "Impact intelligence",
+        shortLabel: "Flash / CII",
+        title: "Flash card / impact intelligence",
         description: "CII score, cross-section audit, and institutional verification summary.",
         icon: Brain,
         status: "coming_soon",

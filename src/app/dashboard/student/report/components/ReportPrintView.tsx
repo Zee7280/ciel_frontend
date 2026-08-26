@@ -11,6 +11,7 @@ import {
 } from "../utils/engagementMetrics";
 import { formatSection7PakistanDialForDisplay } from "@/utils/reportSection7PakistanDial";
 import { buildSection1ParticipationDisplay, resolveReportAuthorParticipationSnapshot } from "@/utils/reportSection1ParticipationDisplay";
+import { dataSectionUiMark } from "../utils/reportWizardNav";
 import { parseSection11AuditSummary } from "@/lib/parseCIIauditSummary";
 import ReportVerificationQr from "@/components/ReportVerificationQr";
 import { CompetencyScoresTable } from "@/components/verify/CompetencyScoresTable";
@@ -1511,8 +1512,8 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
                 {/* Section 4: Operational Metrics */}
                 <SectionHeader
                     number={4}
-                    title="Operational metrics"
-                    question="What were the measurable outputs and beneficiary reach of the project?"
+                    title="Activities & outputs"
+                    question="What was done, delivered, and reached — and what measurable change followed?"
                 />
                 <div className={dossierSectionStack}>
                     <div className={dossierMetricStrip}>
@@ -1601,8 +1602,8 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
 
                 {/* Section 5: Measurable Outcomes */}
                 <SectionHeader
-                    number={5}
-                    title="Systemic outcomes"
+                    number={4}
+                    title="Part B · Measurable outcomes"
                     question="What specific measurable changes were observed at the end of the project?"
                 />
                 <div className={dossierSectionStack}>
@@ -1663,7 +1664,7 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
 
                 {/* Section 6: Resources */}
                 <SectionHeader
-                    number={6}
+                    number={5}
                     title="Resource utilization"
                     question="What resources were deployed and how were they sourced?"
                 />
@@ -1702,7 +1703,7 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
 
                 {/* Section 7: Strategic Partnerships */}
                 <SectionHeader
-                    number={7}
+                    number={6}
                     title="Strategic partnerships"
                     question="Which organizations or partners collaborated in the project?"
                 />
@@ -1750,7 +1751,7 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
 
                 {/* Section 8: Evidence & Ethics */}
                 <SectionHeader
-                    number={8}
+                    number={7}
                     title="Evidence & ethics"
                     question="What evidence was captured and how were ethical standards maintained?"
                 />
@@ -1779,7 +1780,7 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
 
                 {/* Section 9: Reflection */}
                 <SectionHeader
-                    number={9}
+                    number={8}
                     title="Reflection & synthesis"
                     question="How has this project influenced your professional growth and academic understanding?"
                 />
@@ -1801,7 +1802,7 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
 
                 {/* Section 10: Sustainability */}
                 <SectionHeader
-                    number={10}
+                    number={9}
                     title="Sustainability & roadmap"
                     question="How will the impact of this project be sustained after your involvement concludes?"
                 />
@@ -1818,7 +1819,7 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
 
                 {/* Section 11: Impact Intelligence breakdown */}
                 <SectionHeader
-                    number={11}
+                    number={10}
                     title="Impact intelligence analysis"
                     question="What is the detailed breakdown of the CII index score performance?"
                 />
@@ -1888,7 +1889,7 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
                         <p className="mb-1 text-[10px] font-black uppercase tracking-[0.25em] text-slate-500">
                             CII AI audit — section-wise review
                         </p>
-                        <h3 className="report-h3 mb-4 text-slate-900">Red flags by section (1–10)</h3>
+                        <h3 className="report-h3 mb-4 text-slate-900">Red flags by form section</h3>
                         <div className="space-y-5 text-xs leading-relaxed text-slate-800">
                             {dossierSectionWiseAuditBlocks.map((sec) => {
                                 const rows = extractIssueFields(sec.body, sec.sectionNum);
@@ -1898,7 +1899,7 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
                                         className="break-inside-avoid rounded-xl border border-slate-200 bg-white p-4 sm:p-5"
                                     >
                                         <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">
-                                            Section {sec.sectionNum}
+                                            Section {dataSectionUiMark(sec.sectionNum)}
                                         </p>
                                         <h4 className="mt-0.5 text-sm font-black text-slate-900">{sec.title}</h4>
                                         <div className="mt-3 space-y-2.5">
@@ -1923,7 +1924,7 @@ export default function ReportPrintView({ projectData, reportData }: Props) {
                         <p className="mb-1 text-[10px] font-black uppercase tracking-[0.25em] text-slate-500">
                             Cross-section audit — CII transparency
                         </p>
-                        <h3 className="report-h3 mb-4 text-slate-900">Red flags and required fixes (Section 11)</h3>
+                        <h3 className="report-h3 mb-4 text-slate-900">Red flags and required fixes (flash card / CII)</h3>
                         <div className="space-y-4 text-xs leading-relaxed text-slate-800">
                             {dossierAuditMeta.credibility ? (
                                 <p>

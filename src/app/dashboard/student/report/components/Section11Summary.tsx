@@ -9,6 +9,7 @@ import CertificateView from "./CertificateView";
 import CIIDashboardMeter from "./CIIDashboardMeter";
 import RedFlagsAuditModal from "./RedFlagsAuditModal";
 import CIIauditInsightsPanel from "./CIIauditInsightsPanel";
+import { formatIncompleteSectionHeading } from "../utils/reportWizardNav";
 import { calculateCII } from "../utils/calculateCII";
 import { getRedFlagsModalSections } from "@/lib/redFlagsModalMerge";
 import { parseSection11AuditSummary, type ReportCIIauditMeta } from "@/lib/parseCIIauditSummary";
@@ -363,7 +364,7 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                     </div>
                     <div className="min-w-0">
                         <h2 className="text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl">
-                            <span className="text-indigo-600">SECTION 11:</span> Institutional impact dashboard
+                            <span className="text-indigo-600">SECTION 10:</span> Institutional impact dashboard
                         </h2>
                         <p className="mt-0.5 text-sm text-slate-500">
                             Final preview, compliance signals, and submission readiness
@@ -465,7 +466,7 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                         </div>
                         <div className="px-6 py-6 md:px-8 md:py-7 border-t border-slate-100/80 space-y-4 text-left">
                             <p className="text-sm font-medium text-slate-600 leading-relaxed">
-                                Update the sections flagged below, then save and resubmit. Steps 1–10 are editable again;
+                                Update the sections flagged below, then save and resubmit. Form tabs 1–9 are editable again;
                                 CII scores and certificates unlock only after admin approval.
                             </p>
                             {revisionFeedback ? (
@@ -926,7 +927,7 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                             <div>
                                 <h3 className="text-xl font-semibold text-slate-900 tracking-tight mb-2">Hours met — finish all sections</h3>
                                 <p className="text-sm font-semibold text-slate-400">
-                                    Use the steps above to complete and validate sections 1–10. Submit appears only when every section is complete.
+                                    Use the steps above to complete and validate form tabs 1–9. Submit appears only when every section is complete.
                                 </p>
                             </div>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -946,7 +947,7 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                                         </div>
                                         <div className="space-y-0.5 min-w-0">
                                             <p className="text-[10px] font-semibold uppercase tracking-[0.14em] leading-none text-amber-900">
-                                                Sections 1–10
+                                                Form tabs 1–9
                                             </p>
                                             <p className="text-xs font-semibold text-amber-800">
                                                 Fix the items below, then return to this step to submit.
@@ -958,7 +959,7 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                                             {incompleteSectionsSummary.map((block) => (
                                                 <li key={block.section} className="rounded-lg bg-white/70 px-2.5 py-2 border border-amber-100/90">
                                                     <span className="font-semibold text-amber-900">
-                                                        Step {block.section} — {block.label}
+                                                        {formatIncompleteSectionHeading(block.section, block.label)}
                                                     </span>
                                                     <ul className="mt-1 ml-3 list-disc text-amber-900/85 font-medium space-y-0.5">
                                                         {block.errors.map((err, j) => (

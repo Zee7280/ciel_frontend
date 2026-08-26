@@ -535,7 +535,7 @@ export default function Section7Partnerships({ projectData }: { projectData?: an
                             Measurable multi-stakeholder engagement (SDG 17)
                         </p>
                         <h2 className="mt-1 text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl">
-                            <span className="text-indigo-600">SECTION 7:</span> Partnerships &amp; collaboration
+                            <span className="text-indigo-600">SECTION 6:</span> Partnerships &amp; collaboration
                         </h2>
                     </div>
                 </div>

@@ -233,7 +233,7 @@ export default function Section4Activities() {
                     </div>
                     <div>
                         <h2 className="text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl">
-                            <span className="text-indigo-600">SECTION 4:</span> Activities, outputs &amp; scale
+                            <span className="text-indigo-600">SECTION 4 · Part A:</span> Activities, outputs &amp; scale
                         </h2>
                     </div>
                 </div>

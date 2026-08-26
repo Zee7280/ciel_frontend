@@ -1,0 +1,530 @@
+/* Scoped copy of student-guide-final.html — Community Engagement student guide. */
+.scg {
+    --ink: #0d2b33;
+    --muted: #7a919a;
+    --line: #dcebee;
+    --bg: #f8fcfd;
+    --teal: #0e7d74;
+    --teal-soft: #e6f6f4;
+    --aqua: #0891b2;
+    --gold: #b45309;
+    --gold-soft: #fbf0d7;
+    --red: #e11d48;
+    --vio: #6d28d9;
+    --vio-soft: #f1ebfd;
+    color: var(--ink);
+    font-family: "Segoe UI", system-ui, sans-serif;
+}
+
+.scg .logo {
+    font-size: 15px;
+    font-weight: 800;
+}
+.scg .logo span {
+    color: var(--teal);
+}
+.scg .hero {
+    border-radius: 22px;
+    color: #fff;
+    padding: 20px 24px;
+    margin: 12px 0 14px;
+    background: linear-gradient(120deg, #04252b, #0e5f63 55%, #12a5a0 130%);
+}
+.scg .hero .k {
+    font-size: 9px;
+    letter-spacing: 0.2em;
+    font-weight: 800;
+    color: #99f6e4;
+}
+.scg .hero h1 {
+    font-size: 20px;
+    margin: 5px 0 3px;
+    font-weight: 800;
+    line-height: 1.25;
+}
+.scg .hero p {
+    font-size: 11px;
+    opacity: 0.9;
+    line-height: 1.6;
+    max-width: 640px;
+}
+.scg .rail {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(86px, 1fr));
+    gap: 7px;
+    margin-bottom: 14px;
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    background: var(--bg);
+    padding: 6px 0;
+}
+.scg .rb {
+    border: 1.5px solid var(--line);
+    background: #fff;
+    border-radius: 14px;
+    padding: 9px 5px;
+    cursor: pointer;
+    font-family: inherit;
+    text-align: center;
+    transition: 0.14s;
+    color: var(--ink);
+}
+.scg .rb:hover {
+    transform: translateY(-2px);
+    border-color: var(--teal);
+}
+.scg .rb.on {
+    background: var(--teal);
+    border-color: var(--teal);
+    color: #fff;
+    box-shadow: 0 8px 18px rgba(14, 125, 116, 0.25);
+}
+.scg .rb .re {
+    font-size: 16px;
+}
+.scg .rb b {
+    display: block;
+    font-size: 8px;
+    margin-top: 2px;
+    line-height: 1.25;
+    font-weight: 800;
+}
+.scg .rb .rw {
+    font-size: 6.5px;
+    font-weight: 800;
+    opacity: 0.7;
+    margin-top: 1px;
+}
+.scg .rb.fcb {
+    border-color: #e2d9f7;
+}
+.scg .rb.fcb.on {
+    background: var(--vio);
+    border-color: var(--vio);
+    box-shadow: 0 8px 18px rgba(109, 40, 217, 0.3);
+}
+.scg .view {
+    animation: scg-pop 0.3s ease;
+}
+@keyframes scg-pop {
+    from {
+        opacity: 0;
+        transform: translateY(8px);
+    }
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
+.scg .shero {
+    border-radius: 18px;
+    color: #fff;
+    padding: 15px 20px;
+    margin-bottom: 12px;
+    display: flex;
+    gap: 13px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+.scg .shero .se {
+    font-size: 30px;
+}
+.scg .shero h2 {
+    font-size: 16px;
+    font-weight: 800;
+}
+.scg .shero .sm {
+    font-size: 10px;
+    opacity: 0.9;
+    line-height: 1.5;
+    width: 100%;
+    max-width: 600px;
+}
+.scg .shero .wpill {
+    margin-left: auto;
+    background: rgba(255, 255, 255, 0.16);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 99px;
+    padding: 6px 13px;
+    font-size: 9px;
+    font-weight: 800;
+    white-space: nowrap;
+}
+.scg .card {
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 14px 17px;
+    margin-bottom: 11px;
+}
+.scg .ct {
+    font-size: 8.5px;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    margin-bottom: 8px;
+}
+.scg .c-how {
+    color: var(--aqua);
+}
+.scg .c-ex {
+    color: var(--teal);
+}
+.scg .c-no {
+    color: var(--red);
+}
+.scg .c-tip {
+    color: var(--gold);
+}
+.scg .c-ai {
+    color: var(--vio);
+}
+.scg .tl {
+    border-left: 2px solid #cbe7e3;
+    margin-left: 9px;
+    padding-left: 16px;
+}
+.scg .step {
+    position: relative;
+    padding-bottom: 9px;
+    font-size: 10.5px;
+    line-height: 1.55;
+}
+.scg .step:last-child {
+    padding-bottom: 0;
+}
+.scg .step:before {
+    content: attr(data-n);
+    position: absolute;
+    left: -27px;
+    top: 0;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--teal);
+    color: #fff;
+    font-weight: 800;
+    font-size: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.scg .mock {
+    border: 1.5px solid #bfe6e2;
+    border-radius: 14px;
+    background: #fbfefd;
+    padding: 12px 14px;
+    position: relative;
+}
+.scg .mock:before {
+    content: "ZAIN'S FORM — FILLED EXACTLY LIKE THIS";
+    position: absolute;
+    top: -8px;
+    left: 12px;
+    background: var(--teal);
+    color: #fff;
+    font-size: 6.5px;
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    border-radius: 99px;
+    padding: 3px 10px;
+}
+.scg .ml {
+    font-size: 6.5px;
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    margin: 9px 0 3px;
+}
+.scg .mv {
+    font-size: 10px;
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 9px;
+    padding: 7px 10px;
+    line-height: 1.55;
+}
+.scg .mv i {
+    color: var(--teal);
+    font-weight: 800;
+    font-style: normal;
+}
+.scg .mv.auto {
+    border-style: dashed;
+    background: var(--teal-soft);
+    color: #0f5e57;
+    font-weight: 700;
+}
+.scg .g2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+}
+@media (max-width: 700px) {
+    .scg .g2 {
+        grid-template-columns: 1fr;
+    }
+}
+.scg .chips {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+    margin-top: 3px;
+}
+.scg .chip {
+    font-size: 7.5px;
+    font-weight: 800;
+    background: var(--teal-soft);
+    color: var(--teal);
+    border-radius: 99px;
+    padding: 4px 9px;
+    border: 1px solid #bfe6e2;
+}
+.scg .chip.off {
+    background: #fff;
+    color: var(--muted);
+    border-color: var(--line);
+    font-weight: 700;
+}
+.scg .gal {
+    display: flex;
+    gap: 5px;
+    flex-wrap: wrap;
+    margin-top: 5px;
+}
+.scg .ph {
+    width: 42px;
+    height: 42px;
+    border-radius: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    position: relative;
+}
+.scg .ph .b {
+    position: absolute;
+    bottom: 2px;
+    right: 2px;
+    font-size: 4.5px;
+    font-weight: 800;
+    color: #fff;
+    background: rgba(0, 0, 0, 0.45);
+    border-radius: 99px;
+    padding: 1px 4px;
+}
+.scg .meterrow {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    font-size: 9.5px;
+    font-weight: 800;
+    margin-top: 4px;
+}
+.scg .meter {
+    flex: 1;
+    height: 8px;
+    border-radius: 99px;
+    background: #eef4f6;
+    overflow: hidden;
+}
+.scg .meter i {
+    display: block;
+    height: 100%;
+    border-radius: 99px;
+    background: linear-gradient(90deg, #0e7d74, #2dd4bf);
+}
+.scg .ban {
+    border-radius: 13px;
+    overflow: hidden;
+    border: 1px solid var(--line);
+    margin-top: 11px;
+}
+.scg .banh {
+    background: linear-gradient(115deg, #04252b, #0e5f63 75%, #12a5a0);
+    color: #fff;
+    padding: 8px 13px;
+    font-size: 8px;
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+.scg .banh .live {
+    margin-left: auto;
+    color: #99f6e4;
+    font-size: 7px;
+}
+.scg .banb {
+    background: #f6fcfb;
+    padding: 9px 13px;
+    font-size: 10px;
+    font-style: italic;
+    color: #1d3a3d;
+    line-height: 1.6;
+}
+.scg .banb b {
+    font-style: normal;
+}
+.scg .irow {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 9px;
+}
+@media (max-width: 760px) {
+    .scg .irow {
+        grid-template-columns: 1fr;
+    }
+}
+.scg .no {
+    border-left: 3px solid #fda4af;
+    background: #fff1f2;
+    border-radius: 0 10px 10px 0;
+    padding: 9px 12px;
+    font-size: 9.5px;
+    color: #9f1239;
+    line-height: 1.55;
+}
+.scg .tip {
+    border-left: 3px solid #f3d9a0;
+    background: #fffbeb;
+    border-radius: 0 10px 10px 0;
+    padding: 9px 12px;
+    font-size: 9.5px;
+    color: #854d0e;
+    line-height: 1.55;
+}
+.scg .ai {
+    border-left: 3px solid #c4b5fd;
+    background: var(--vio-soft);
+    border-radius: 0 10px 10px 0;
+    padding: 9px 12px;
+    font-size: 9.5px;
+    color: #4c3a78;
+    line-height: 1.55;
+}
+.scg .navrow {
+    display: flex;
+    gap: 8px;
+    margin-top: 4px;
+    flex-wrap: wrap;
+}
+.scg .nv {
+    border: 1px solid var(--line);
+    background: #fff;
+    color: var(--teal);
+    border-radius: 99px;
+    padding: 10px 18px;
+    font-size: 10.5px;
+    font-weight: 800;
+    cursor: pointer;
+    font-family: inherit;
+}
+.scg .nv.next {
+    background: var(--teal);
+    color: #fff;
+    border-color: var(--teal);
+    margin-left: auto;
+}
+.scg .runbtn {
+    border: 0;
+    border-radius: 12px;
+    padding: 13px 24px;
+    font-size: 12px;
+    font-weight: 800;
+    cursor: pointer;
+    font-family: inherit;
+    background: var(--vio);
+    color: #fff;
+    margin-bottom: 11px;
+}
+.scg .rstage {
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: #fff;
+    padding: 11px 14px;
+    margin-bottom: 9px;
+    opacity: 0.3;
+    transition: 0.4s;
+}
+.scg .rstage.on {
+    opacity: 1;
+    border-color: #bfe6e2;
+    box-shadow: 0 8px 20px rgba(14, 125, 116, 0.08);
+}
+.scg .rstage .rl {
+    font-size: 8px;
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    color: var(--teal);
+    margin-bottom: 5px;
+}
+.scg .rstage .rc {
+    font-size: 10px;
+    color: #3c5a5c;
+    line-height: 1.6;
+}
+.scg .fc {
+    border-radius: 15px;
+    overflow: hidden;
+    border: 1px solid var(--line);
+    background: #fff;
+    max-width: 390px;
+    margin-top: 7px;
+}
+.scg .fch {
+    background: linear-gradient(130deg, #04252b, #0e5f63 55%, #12a5a0 120%);
+    color: #fff;
+    padding: 11px 14px;
+}
+.scg .fch .uni {
+    font-size: 6.5px;
+    font-weight: 800;
+    letter-spacing: 0.13em;
+    color: #99f6e4;
+}
+.scg .fch b {
+    font-size: 11px;
+    display: block;
+    margin-top: 2px;
+}
+.scg .fch .who {
+    font-size: 8.5px;
+    color: #cdf5f0;
+    margin-top: 2px;
+}
+.scg .ach {
+    background: #f0fbfa;
+    padding: 7px 12px;
+    border-bottom: 1px solid var(--line);
+}
+.scg .mrow {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+}
+.scg .mtag {
+    font-size: 6.5px;
+    font-weight: 800;
+    background: var(--teal-soft);
+    color: var(--teal);
+    border-radius: 99px;
+    padding: 3px 7px;
+}
+.scg .big {
+    font-size: 22px;
+    font-weight: 800;
+    color: var(--vio);
+}
+.scg .dchip {
+    display: inline-block;
+    font-size: 7px;
+    font-weight: 800;
+    background: #fff;
+    border: 1px solid #bfe6e2;
+    color: var(--teal);
+    border-radius: 99px;
+    padding: 3px 9px;
+    margin: 3px 3px 0 0;
+}

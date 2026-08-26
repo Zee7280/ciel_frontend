@@ -33,7 +33,7 @@ import {
     section1FieldLabel,
     type Section1AnalyticsPayload,
 } from "@/utils/section1Analytics";
-import { REPORT_ANALYTICS_SECTIONS } from "@/components/analytics/analyticsSections";
+import { analyticsSectionUiMark, REPORT_ANALYTICS_SECTIONS } from "@/components/analytics/analyticsSections";
 
 type ConsoleRole = "student" | "faculty" | "university" | "partner" | "unhec";
 
@@ -205,7 +205,7 @@ export function AllFieldsConsolePanel({
     onModeChange,
     showModeTabs = true,
     title = "All-Fields Analytics Console",
-    subtitle = "Every KPI and field across Sections 1–10 is owned by Super Admin. Stakeholders see mapped copies.",
+    subtitle = "Every KPI and field across form tabs 1–9 (activities/outcomes as 4A/4B) is owned by Super Admin. Stakeholders see mapped copies.",
 }: AllFieldsConsolePanelProps) {
     const [internalMode, setInternalMode] = useState<"view" | "reg">("view");
     const mode = controlledMode ?? internalMode;
@@ -354,7 +354,7 @@ export function AllFieldsConsolePanel({
     const sections = REPORT_ANALYTICS_SECTIONS.filter((s) => s.id <= 10);
 
     const viewTitle = viewAs
-        ? `${viewAs.role_label} — ${viewAs.section_title}`
+        ? `${viewAs.role_label} — §${analyticsSectionUiMark(viewAs.section)} ${viewAs.section_title}`
         : null;
 
     return (
@@ -484,7 +484,7 @@ export function AllFieldsConsolePanel({
                                         : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
                                 }`}
                             >
-                                S{s.id} · {s.shortLabel}
+                                S{analyticsSectionUiMark(s.id)} · {s.shortLabel}
                             </button>
                         ))}
                     </div>
@@ -735,7 +735,7 @@ export function AllFieldsConsolePanel({
             ) : (
                 <div className="rounded-2xl border border-slate-200 bg-white p-5">
                     <h3 className="text-xs font-extrabold uppercase tracking-[0.1em] text-slate-900">
-                        Field Ownership Registry — Sections 1–10
+                        Field Ownership Registry — form tabs 1–9 (4A/4B)
                     </h3>
                     <p className="mb-4 text-[11px] text-slate-400">
                         {registry?.note ??

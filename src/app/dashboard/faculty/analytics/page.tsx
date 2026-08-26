@@ -660,7 +660,7 @@ export default function FacultyAnalyticsPage() {
                 <div className="mt-10 border-t border-slate-200 pt-10">
                     <h2 className="mb-2 text-lg font-bold text-slate-900">Report analytics by section</h2>
                     <p className="mb-4 text-sm text-slate-500">
-                        Drill into Sections 1–10 for the same faculty/university scope.
+                        Drill into form tabs 1–9 (activities/outcomes as 4A/4B) for the same faculty/university scope.
                     </p>
                     <AnalyticsHub
                         views={[

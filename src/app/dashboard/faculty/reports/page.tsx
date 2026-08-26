@@ -158,7 +158,7 @@ export default function FacultyStudentReportsPage() {
                     </h1>
                     <p className="mt-1.5 max-w-3xl text-sm text-slate-500">
                         AI evaluation console for your supervised students, visible after CIEL Admin final
-                        approval. Full 10-section dossier remains available from each report.
+                        approval. The 9-section dossier plus flash card remains available from each report.
                     </p>
                 </div>
 

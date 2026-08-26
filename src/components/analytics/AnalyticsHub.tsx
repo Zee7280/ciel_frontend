@@ -26,6 +26,7 @@ import {
     type AnalyticsCategory,
 } from "@/components/analytics/analyticsCategoryStyles";
 import {
+    analyticsSectionUiMark,
     getAnalyticsSection,
     REPORT_ANALYTICS_SECTIONS,
     resolveSectionAnalyticsApiPath,
@@ -289,7 +290,7 @@ export default function AnalyticsHub({
                             <h2 className="truncate text-base font-semibold tracking-tight text-slate-900">{displayTitle}</h2>
                             <span className="text-xs text-slate-400">·</span>
                             <span className="text-xs text-slate-600">
-                                §{activeSection} {sectionDef?.shortLabel ?? sectionDef?.title}
+                                §{analyticsSectionUiMark(activeSection)} {sectionDef?.shortLabel ?? sectionDef?.title}
                             </span>
                             <span className="text-[11px] text-slate-400">({stakeholderLabel})</span>
                         </div>
@@ -372,7 +373,7 @@ export default function AnalyticsHub({
                                     }`}
                                 >
                                     <p className={`text-[9px] font-semibold uppercase tracking-wide ${selected ? "text-slate-300" : "text-slate-400"}`}>
-                                        §{section.id}
+                                        §{analyticsSectionUiMark(section.id)}
                                     </p>
                                     <p className="text-xs font-semibold">{section.shortLabel}</p>
                                     <p className={`mt-0.5 text-[10px] tabular-nums ${selected ? "text-slate-300" : "text-slate-500"}`}>

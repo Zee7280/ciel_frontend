@@ -482,7 +482,7 @@ export default function Section6Resources({ projectData }: { projectData?: unkno
                     </div>
                     <div>
                         <h2 className="text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl">
-                            <span className="text-indigo-600">SECTION 6:</span> Resources &amp; implementation support
+                            <span className="text-indigo-600">SECTION 5:</span> Resources &amp; implementation support
                         </h2>
                     </div>
                 </div>

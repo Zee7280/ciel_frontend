@@ -384,13 +384,13 @@ export function validateSection10(data: any): ValidationResult {
     return { isValid: errors.length === 0, errors };
 }
 
-/** Step labels aligned with the report wizard (steps 1–10; step 11 is summary). */
+/** Labels for data sections 1–10. UI merges 4+5 into one tab and renumbers 6–10 as 5–9. */
 export const REPORT_SECTION_LABELS: Record<number, string> = {
     1: 'Participation',
     2: 'Context',
     3: 'SDG Mapping',
-    4: 'Activities',
-    5: 'Outcomes',
+    4: 'Activities & Outputs (Part A)',
+    5: 'Activities & Outputs (Part B)',
     6: 'Resources',
     7: 'Partnerships',
     8: 'Evidence',

@@ -18,16 +18,16 @@ export const CII_SECTION_MAX = {
 export type CIIBreakdownKey = keyof typeof CII_SECTION_MAX;
 
 export const CII_SECTION_LABELS: Record<CIIBreakdownKey, string> = {
-    participation: "Identity & Participation",
-    context: "Project Context & Discipline",
-    sdg: "SDG Strategy & Intent",
-    outputs: "Activities & Output Scale",
-    outcomes: "Outcomes & Measurable Change",
-    resources: "Resource Mobilization",
-    partnerships: "Partnerships & Collaboration",
-    evidence: "Evidence & Verification",
-    learning: "Personal & Academic Reflection",
-    sustainability: "Sustainability & Continuation",
+    participation: "§1 Identity & Participation",
+    context: "§2 Project Context & Discipline",
+    sdg: "§3 SDG Strategy & Intent",
+    outputs: "§4A Activities & Output Scale",
+    outcomes: "§4B Outcomes & Measurable Change",
+    resources: "§5 Resource Mobilization",
+    partnerships: "§6 Partnerships & Collaboration",
+    evidence: "§7 Evidence & Verification",
+    learning: "§8 Personal & Academic Reflection",
+    sustainability: "§9 Sustainability & Continuation",
 };
 
 export const CII_BREAKDOWN_ORDER: CIIBreakdownKey[] = [
@@ -44,16 +44,16 @@ export const CII_BREAKDOWN_ORDER: CIIBreakdownKey[] = [
 ];
 
 export const CII_SECTION_SHORT_LABELS: Record<CIIBreakdownKey, string> = {
-    participation: "Participation",
-    context: "Context",
-    sdg: "SDG Alignment",
-    outputs: "Activities",
-    outcomes: "Outcomes",
-    resources: "Resources",
-    partnerships: "Partnerships",
-    evidence: "Evidence",
-    learning: "Reflection",
-    sustainability: "Sustainability",
+    participation: "§1 Participation",
+    context: "§2 Context",
+    sdg: "§3 SDG Alignment",
+    outputs: "§4A Activities",
+    outcomes: "§4B Outcomes",
+    resources: "§5 Resources",
+    partnerships: "§6 Partnerships",
+    evidence: "§7 Evidence",
+    learning: "§8 Reflection",
+    sustainability: "§9 Sustainability",
 };
 
 export function ciiSectionWeightLabel(max: number): string {

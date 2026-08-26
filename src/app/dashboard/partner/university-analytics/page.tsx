@@ -278,9 +278,9 @@ export default function PartnerUniversityAnalyticsPage() {
             </div>
 
             <div className="border-t border-slate-200 pt-10">
-                <h2 className="mb-2 text-lg font-bold text-slate-900">Report analytics (Sections 1–10)</h2>
+                <h2 className="mb-2 text-lg font-bold text-slate-900">Report analytics (form tabs 1–9 · 4A/4B)</h2>
                 <p className="mb-4 text-sm text-slate-500">
-                    Institution-scoped metrics from student reports — same hub as partner/admin/faculty analytics.
+                    Institution-scoped metrics from student reports. Activities and outcomes stay separate as 4A and 4B.
                 </p>
                 <AnalyticsHub
                     views={[

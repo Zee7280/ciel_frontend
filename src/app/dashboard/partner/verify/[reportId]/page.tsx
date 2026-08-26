@@ -373,17 +373,16 @@ export default function ReportDetailPage() {
     };
 
     const sections = [
-        { id: 'section1', label: 'Participation Profile', icon: Users },
-        { id: 'section2', label: 'Project Context', icon: FileText },
-        { id: 'section3', label: 'SDG Mapping', icon: Target },
-        { id: 'section4', label: 'Activities & Outputs', icon: Activity },
-        { id: 'section5', label: 'Outcomes', icon: TrendingUp },
-        { id: 'section6', label: 'Resources', icon: Package },
-        { id: 'section7', label: 'Partnerships', icon: Handshake },
-        { id: 'section8', label: 'Evidence', icon: FileText },
-        { id: 'section9', label: 'Reflection', icon: MessageSquare },
-        { id: 'section10', label: 'Sustainability', icon: Activity },
-        { id: 'section11', label: 'Summary / Print View', icon: FileText },
+        { id: 'section1', wizard: 1, label: 'Participation Profile', icon: Users },
+        { id: 'section2', wizard: 2, label: 'Project Context', icon: FileText },
+        { id: 'section3', wizard: 3, label: 'SDG Mapping', icon: Target },
+        { id: 'section4', wizard: 4, label: 'Activities & Outputs', icon: Activity },
+        { id: 'section6', wizard: 5, label: 'Resources', icon: Package },
+        { id: 'section7', wizard: 6, label: 'Partnerships', icon: Handshake },
+        { id: 'section8', wizard: 7, label: 'Evidence', icon: FileText },
+        { id: 'section9', wizard: 8, label: 'Reflection', icon: MessageSquare },
+        { id: 'section10', wizard: 9, label: 'Sustainability', icon: Activity },
+        { id: 'section11', wizard: 10, label: 'Flash card / Print', icon: FileText },
     ];
 
     const LabelValue = ({ label, value, fullWidth = false }: { label: string, value: unknown, fullWidth?: boolean }) => (
@@ -573,7 +572,7 @@ export default function ReportDetailPage() {
                                         className="w-full flex items-center gap-3 p-3 rounded-xl transition-all hover:bg-slate-50 group text-left"
                                     >
                                         <section.icon className="w-4 h-4 text-slate-400 group-hover:text-indigo-500 transition-colors" />
-                                        <span className="text-sm font-bold text-slate-600 group-hover:text-slate-900 transition-colors">{section.label}</span>
+                                        <span className="text-sm font-bold text-slate-600 group-hover:text-slate-900 transition-colors">{section.wizard}. {section.label}</span>
                                     </button>
                                 ))}
                             </div>
@@ -994,17 +993,15 @@ export default function ReportDetailPage() {
                                     <LabelValue label="Project Implementation Explanation" value={report.section4?.project_summary?.project_implementation_explanation} fullWidth />
                                     <LabelValue label="Section Summary" value={report.section4?.summary_text} fullWidth />
                                 </div>
-                            </div>
-                        </div>
-
-                        {/* Section 5 */}
-                        <div id="section5" className="scroll-mt-8 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-8">
-                            <div className="space-y-6">
+                                <div id="section5" className="scroll-mt-8 space-y-6 border-t border-slate-100 pt-8">
                                 <div className="flex items-center gap-4">
                                     <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
                                         <TrendingUp className="w-6 h-6" />
                                     </div>
-                                    <h2 className="text-3xl font-black text-slate-900">05. Outcomes</h2>
+                                    <div>
+                                        <p className="text-[10px] font-black uppercase tracking-widest text-indigo-600">Section 4 · Part B</p>
+                                        <h2 className="text-2xl font-black text-slate-900">Outcomes & results</h2>
+                                    </div>
                                 </div>
                                 <div className="space-y-6">
                                     {Array.isArray(report.section5?.measurable_outcomes) && report.section5.measurable_outcomes.length > 0 ? (
@@ -1048,6 +1045,7 @@ export default function ReportDetailPage() {
                                         <LabelValue label="Section Summary" value={report.section5?.summary_text} fullWidth />
                                     </div>
                                 </div>
+                                </div>
                             </div>
                         </div>
 
@@ -1058,7 +1056,7 @@ export default function ReportDetailPage() {
                                     <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center">
                                         <Package className="w-6 h-6" />
                                     </div>
-                                    <h2 className="text-3xl font-black text-slate-900">06. Resources</h2>
+                                    <h2 className="text-3xl font-black text-slate-900">05. Resources</h2>
                                 </div>
                                 <LabelValue label="Used External Resources" value={report.section6?.use_resources} />
                                 {report.section6?.resources && report.section6.resources.length > 0 && (
@@ -1105,7 +1103,7 @@ export default function ReportDetailPage() {
                                     <div className="w-12 h-12 rounded-2xl bg-cyan-50 text-cyan-600 flex items-center justify-center">
                                         <Handshake className="w-6 h-6" />
                                     </div>
-                                    <h2 className="text-3xl font-black text-slate-900">07. Partnerships</h2>
+                                    <h2 className="text-3xl font-black text-slate-900">06. Partnerships</h2>
                                 </div>
                                 <LabelValue label="Has Partners" value={report.section7?.has_partners} />
                                 {report.section7?.partners && report.section7.partners.length > 0 && (
@@ -1150,7 +1148,7 @@ export default function ReportDetailPage() {
                                     <div className="w-12 h-12 rounded-2xl bg-slate-100 text-slate-600 flex items-center justify-center">
                                         <FileText className="w-6 h-6" />
                                     </div>
-                                    <h2 className="text-3xl font-black text-slate-900">08. Evidence</h2>
+                                    <h2 className="text-3xl font-black text-slate-900">07. Evidence</h2>
                                 </div>
                                 <div className={VERIFY_DOSSIER_FIELD_GRID}>
                                     <LabelValue label="Has Evidence" value={report.section8?.has_evidence} />
@@ -1202,7 +1200,7 @@ export default function ReportDetailPage() {
                                     <div className="w-12 h-12 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center">
                                         <MessageSquare className="w-6 h-6" />
                                     </div>
-                                    <h2 className="text-3xl font-black text-slate-900">09. Reflection & Growth</h2>
+                                    <h2 className="text-3xl font-black text-slate-900">08. Reflection & Growth</h2>
                                 </div>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div className="p-5 bg-indigo-50 border border-indigo-100 rounded-2xl">
@@ -1249,7 +1247,7 @@ export default function ReportDetailPage() {
                                     <div className="w-12 h-12 rounded-2xl bg-teal-50 text-teal-600 flex items-center justify-center">
                                         <Activity className="w-6 h-6" />
                                     </div>
-                                    <h2 className="text-3xl font-black text-slate-900">10. Sustainability</h2>
+                                    <h2 className="text-3xl font-black text-slate-900">09. Sustainability</h2>
                                 </div>
                                 <div className={VERIFY_DOSSIER_FIELD_GRID}>
                                     <LabelValue label="Continuation Status" value={report.section10?.continuation_status} />

@@ -259,7 +259,7 @@ export default function Section10Sustainability() {
                         </div>
                         <div>
                             <h2 className="text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl">
-                                <span className="text-indigo-600">SECTION 10:</span> Sustainability
+                                <span className="text-indigo-600">SECTION 9:</span> Sustainability
                             </h2>
                         </div>
                     </div>

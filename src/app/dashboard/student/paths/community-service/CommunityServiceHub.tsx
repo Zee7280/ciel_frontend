@@ -107,7 +107,7 @@ export default function CommunityServiceHub({
                     badge="GUIDE INSIDE"
                     emoji="📝"
                     title="My Report"
-                    subtitle="The 10 sections, decoded — with examples & tips for each."
+                    subtitle="Nine form sections plus the flash card — decoded with examples & tips."
                     background="linear-gradient(135deg,#6d28d9,#a78bfa)"
                 />
                 <HubTile
@@ -169,7 +169,7 @@ export default function CommunityServiceHub({
                             <p className="text-[8.5px] font-extrabold tracking-[0.13em] text-[#0891b2]">📋 THE JOURNEY</p>
                             <p className="rounded-[11px] bg-[#e3f4fa] px-3.5 py-2.5 text-[11.5px] leading-relaxed text-[#0f5e57]">
                                 <b>Create</b> your own opportunity or <b>browse</b> and join one → do the work,{" "}
-                                <b>logging hours inside My Projects</b> as you go → fill the <b>10 report sections</b> →
+                                <b>logging hours inside My Projects</b> as you go → fill the <b>9 report sections plus flash card</b> →
                                 your flash card goes to faculty, the <b>AI scores it</b>, faculty approves → it hangs on
                                 your <b>Impact Wall</b> forever.
                             </p>

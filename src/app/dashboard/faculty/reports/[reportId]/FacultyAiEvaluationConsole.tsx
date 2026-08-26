@@ -16,7 +16,7 @@ import {
 import "./faculty-ai-evaluation.css";
 
 const PIPE = [
-    { id: 0, label: "STUDENT COMPLETES 10 SECTIONS — AI BANNER PER SECTION" },
+    { id: 0, label: "STUDENT COMPLETES 9 SECTIONS — FLASH CARD IS 10" },
     { id: 1, label: "SUMMARIES ACCUMULATE → FLASH CARD" },
     { id: 2, label: "SENT TO FACULTY" },
     { id: 3, label: "AI EVALUATOR v8.2 SCORES AUTOMATICALLY" },
@@ -263,14 +263,14 @@ export default function FacultyAiEvaluationConsole() {
                             <div className="fae-k">HOW EACH SECTION FED THIS CARD</div>
                             <p style={{ fontSize: 10.5, color: "#3c5a5c", lineHeight: 1.8, marginTop: 7 }}>
                                 Every section summary already stored on this report accumulates into
-                                the flash card. The AI Evaluator on the right reads the same Section 11
-                                record — scores are not rewritten on this screen.
+                                the flash card. The AI Evaluator on the right reads the same flash-card
+                                CII record — scores are not rewritten on this screen.
                             </p>
                             {model.sectionBanners.length ? (
                                 <ul className="fae-acts" style={{ marginTop: 8 }}>
                                     {model.sectionBanners.map((row) => (
-                                        <li key={row.n}>
-                                            <b>S{row.n}:</b> {row.text}
+                                        <li key={`${row.label}-${row.n}`}>
+                                            <b>S{row.label}:</b> {row.text}
                                         </li>
                                     ))}
                                 </ul>
@@ -286,7 +286,7 @@ export default function FacultyAiEvaluationConsole() {
                                     <span className="fae-t1">CIEL PK AI Evaluator</span>
                                     <br />
                                     <span className="fae-t2">
-                                        COMPOSITE IMPACT INDEX · 10 SECTIONS · 7 BADGE LEVELS
+                                        COMPOSITE IMPACT INDEX · 9 FORM SECTIONS + FLASH CARD · 7 BADGE LEVELS
                                     </span>
                                 </span>
                                 <span className="fae-vtag">{model.frameworkVersion}</span>
@@ -428,7 +428,7 @@ export default function FacultyAiEvaluationConsole() {
                                 </>
                             ) : (
                                 <p className="fae-sub" style={{ marginTop: 12 }}>
-                                    This report does not yet have a stored Section 11 / CII evaluation.
+                                    This report does not yet have a stored flash-card / CII evaluation.
                                     Open the full dossier to review the ten sections. Faculty can still
                                     record a decision below.
                                 </p>

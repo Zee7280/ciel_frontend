@@ -71,8 +71,7 @@ export default function StudentProgressTracker({ projectId }: StudentProgressTra
         { label: 'Participation', completed: s1 },
         { label: 'Context', completed: s2 },
         { label: 'SDG Alignment', completed: s3 },
-        { label: 'Activities', completed: s4 },
-        { label: 'Outcomes', completed: s5 },
+        { label: 'Activities & Outputs', completed: s4 && s5 },
     ];
 
     const completedCount = sections.filter(s => s.completed).length;

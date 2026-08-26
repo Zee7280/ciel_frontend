@@ -17,6 +17,7 @@ import { findSdgById } from "@/utils/sdgData";
 import { readPersistedCiiSnapshot } from "@/utils/reportCiiSnapshot";
 import { resolveCiiLevelRecognition } from "@/utils/ciiLevelBadge";
 import { getReportProjectContextDisplay } from "@/utils/reportProjectContext";
+import { dataSectionReviewBannerLabel } from "@/app/dashboard/student/report/utils/reportWizardNav";
 
 export const CONDITIONAL_REMARK_PREFIX = "[Conditional badge]";
 export const ADMIN_REVIEW_REMARK_PREFIX = "[Admin review requested]";
@@ -58,7 +59,7 @@ export type FacultyAiEvaluationModel = {
     evidenceCount: number;
     evidence: FacultyEvidenceItem[];
     aiQuote: string;
-    sectionBanners: Array<{ n: number; text: string }>;
+    sectionBanners: Array<{ n: number; label: string; text: string }>;
     cii: number | null;
     ciiMax: number;
     levelTitle: string;
@@ -422,7 +423,11 @@ export function buildFacultyAiEvaluationModel(raw: unknown): FacultyAiEvaluation
     const sectionBanners = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
         .map((n) => {
             const rec = asRecord(report[`section${n}`]);
-            return { n, text: pickString(rec.summary_text) };
+            return {
+                n,
+                label: dataSectionReviewBannerLabel(n),
+                text: pickString(rec.summary_text),
+            };
         })
         .filter((row) => row.text);
 
@@ -454,7 +459,7 @@ export function buildFacultyAiEvaluationModel(raw: unknown): FacultyAiEvaluation
             pickString(feedback?.opening_praise) ||
             pickString(section5.summary_text) ||
             pickString(section11.summary_text).split("\n")[0] ||
-            "AI evaluation will appear here once Section 11 scoring is stored on this report.",
+            "AI evaluation will appear here once flash-card CII scoring is stored on this report.",
         sectionBanners,
         cii,
         ciiMax: snapshot?.cii_score_max || 100,

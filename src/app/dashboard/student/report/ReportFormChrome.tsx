@@ -5,19 +5,19 @@ import type { ReportData } from "./context/ReportContext";
 import { mergeReportSdgSnapshotRows } from "./utils/reportSdgMerge";
 import { findSdgById } from "@/utils/sdgData";
 import { getReportProjectContextDisplay } from "@/utils/reportProjectContext";
+import { REPORT_UI_SECTION_TOTAL, FLASH_CARD_STEP, canonicalReportStep, isMergedActivitiesStep, wizardStepToDataSections } from "./utils/reportWizardNav";
 
 export const REPORT_TAB_ITEMS: Array<{ step: number; label: string; flash?: boolean }> = [
     { step: 1, label: "1 PARTICIPATION" },
     { step: 2, label: "2 CONTEXT" },
     { step: 3, label: "3 SDG MAPPING" },
-    { step: 4, label: "4 ACTIVITIES" },
-    { step: 5, label: "5 OUTCOMES" },
-    { step: 6, label: "6 RESOURCES" },
-    { step: 7, label: "7 PARTNERSHIPS" },
-    { step: 8, label: "8 EVIDENCE" },
-    { step: 9, label: "9 REFLECTION" },
-    { step: 10, label: "10 SUSTAINABILITY" },
-    { step: 11, label: "⭐ FLASH CARD", flash: true },
+    { step: 4, label: "4 ACTIVITIES & OUTPUTS" },
+    { step: 5, label: "5 RESOURCES" },
+    { step: 6, label: "6 PARTNERSHIPS" },
+    { step: 7, label: "7 EVIDENCE" },
+    { step: 8, label: "8 REFLECTION" },
+    { step: 9, label: "9 SUSTAINABILITY" },
+    { step: 10, label: "⭐ FLASH CARD", flash: true },
 ];
 
 const SECTION_BRIDGES: Record<number, { kicker: string; title: string; note?: string }> = {
@@ -29,29 +29,24 @@ const SECTION_BRIDGES: Record<number, { kicker: string; title: string; note?: st
     2: {
         kicker: "YOUR ACHIEVEMENTS SO FAR · CARRIED AUTOMATICALLY",
         title: "What was the situation before you started?",
-        note: "Describe things before the project — activities and results stay in Sections 4 and 5.",
+        note: "Describe things before the project — activities and results stay in Section 4.",
     },
     3: { kicker: "YOUR ACHIEVEMENTS SO FAR · CARRIED AUTOMATICALLY", title: "Pick your goals off the wall" },
     4: {
         kicker: "YOUR ACHIEVEMENTS SO FAR · CARRIED AUTOMATICALLY",
-        title: "What we did — activity by activity",
-        note: "Record what you did and delivered. What changed goes in Section 5.",
+        title: "What we did — and what changed because of it",
+        note: "One section, two parts: Part A is what you did (counts). Part B is what changed (before → after). Both still save as their own fields.",
     },
-    5: {
-        kicker: "YOUR ACHIEVEMENTS SO FAR · CARRIED AUTOMATICALLY",
-        title: "What changed because of us",
-        note: "Only what changed. Session counts belong in Section 4.",
-    },
-    6: { kicker: "YOUR ACHIEVEMENTS SO FAR · CARRIED AUTOMATICALLY", title: "What the project ran on" },
-    7: { kicker: "YOUR ACHIEVEMENTS SO FAR · CARRIED AUTOMATICALLY", title: "Who stood with us" },
-    8: { kicker: "YOUR ACHIEVEMENTS SO FAR · CARRIED AUTOMATICALLY", title: "Every claim, backed by evidence" },
-    9: { kicker: "YOUR ACHIEVEMENTS SO FAR · CARRIED AUTOMATICALLY", title: "What it did to you" },
-    10: {
+    5: { kicker: "YOUR ACHIEVEMENTS SO FAR · CARRIED AUTOMATICALLY", title: "What the project ran on" },
+    6: { kicker: "YOUR ACHIEVEMENTS SO FAR · CARRIED AUTOMATICALLY", title: "Who stood with us" },
+    7: { kicker: "YOUR ACHIEVEMENTS SO FAR · CARRIED AUTOMATICALLY", title: "Every claim, backed by evidence" },
+    8: { kicker: "YOUR ACHIEVEMENTS SO FAR · CARRIED AUTOMATICALLY", title: "What it did to you" },
+    9: {
         kicker: "YOUR ACHIEVEMENTS SO FAR · CARRIED AUTOMATICALLY",
         title: "What survives after you leave",
         note: "Not all projects continue — a candid answer is stronger than an optimistic one.",
     },
-    11: {
+    10: {
         kicker: "FLASH CARD · ONE RECORD, THREE VIEWS",
         title: "Your accumulated report — summary, CII, and submit",
     },
@@ -84,25 +79,23 @@ const BANNER_KICKERS: Record<number, string> = {
     2: "SECTION 2 · PROJECT CONTEXT",
     3: "SECTION 3 · SDG MAPPING",
     4: "SECTION 4 · ACTIVITIES & OUTPUTS",
-    5: "SECTION 5 · OUTCOMES & RESULTS",
-    6: "SECTION 6 · RESOURCES",
-    7: "SECTION 7 · PARTNERSHIPS",
-    8: "SECTION 8 · EVIDENCE",
-    9: "SECTION 9 · REFLECTION",
-    10: "SECTION 10 · SUSTAINABILITY",
+    5: "SECTION 5 · RESOURCES",
+    6: "SECTION 6 · PARTNERSHIPS",
+    7: "SECTION 7 · EVIDENCE",
+    8: "SECTION 8 · REFLECTION",
+    9: "SECTION 9 · SUSTAINABILITY",
 };
 
 const BANNER_FOOT: Record<number, string> = {
     1: "No extra approval here — attendance locks when faculty approves your flash card at the end.",
-    2: "Sections 4 & 5 measure everything against this exact line.",
+    2: "Section 4 · Part B measures everything against this exact line.",
     3: "Section 4 activities must align with these exact targets.",
-    4: "Counts only — the change these produced lives in Section 5.",
-    5: "Measured against the Section 2 baseline and Section 3 targets.",
-    6: "Every rupee and every item traced to what it made possible.",
-    7: "Linked since Section 1 — verification is one click on their side.",
-    8: "Files map to claims — gaps are named honestly, never hidden.",
-    9: "Honest middle scores with strong proof outrank a row of 5s.",
-    10: "A candid “partial” with named mechanisms outranks a hollow “yes”.",
+    4: "Part A counts what was done; Part B proves what it changed — one section, one story.",
+    5: "Every rupee and every item traced to what it made possible.",
+    6: "Linked since Section 1 — verification is one click on their side.",
+    7: "Files map to claims — gaps are named honestly, never hidden.",
+    8: "Honest middle scores with strong proof outrank a row of 5s.",
+    9: "A candid “partial” with named mechanisms outranks a hollow “yes”.",
 };
 
 const AVATAR_COLORS = ["#0e7d74,#2dd4bf", "#0f5e63,#22d3ee", "#0891b2,#67e8f9", "#0e5f63,#5eead4"];
@@ -192,23 +185,24 @@ export function ReportSectionBridge({
     projectData?: unknown;
     onOpenHelp?: () => void;
 }) {
-    const meta = SECTION_BRIDGES[step];
+    const uiStep = canonicalReportStep(step);
+    const meta = SECTION_BRIDGES[uiStep];
     if (!meta) return null;
 
     const a = chromeAgg(data, projectData);
     const { context, title, sdgs, hours, members, acts, reach, evidence, competency, bestPct, pkr } = a;
 
     const pills: Array<[string, string]> = [];
-    if (step > 1 && hours) pills.push([`${Math.round(hours * 10) / 10}h`, "VERIFIED HOURS"]);
-    if (step > 1) pills.push([String(members), "MEMBERS"]);
-    if (step > 2 && data.section2?.problem_statement) pills.push(["📍", "BASELINE SET"]);
-    if (step > 3 && sdgs.length) pills.push([String(sdgs.length), "SDGs MAPPED"]);
-    if (step > 4 && acts.length) pills.push([String(acts.length), "ACTIVITIES"]);
-    if (step > 4 && reach) pills.push([reach, "REACHED"]);
-    if (step > 5 && bestPct != null) pills.push([`${bestPct >= 0 ? "+" : ""}${bestPct}%`, "BEST MEASURED CHANGE"]);
-    if (step > 6 && pkr) pills.push([`PKR ${pkr.toLocaleString()}`, "RESOURCES TRACED"]);
-    if (step > 8 && evidence) pills.push([String(evidence), "EVIDENCE FILES"]);
-    if (step > 9 && competency) pills.push([`${competency}/5`, "COMPETENCY"]);
+    if (uiStep > 1 && hours) pills.push([`${Math.round(hours * 10) / 10}h`, "VERIFIED HOURS"]);
+    if (uiStep > 1) pills.push([String(members), "MEMBERS"]);
+    if (uiStep > 2 && data.section2?.problem_statement) pills.push(["📍", "BASELINE SET"]);
+    if (uiStep > 3 && sdgs.length) pills.push([String(sdgs.length), "SDGs MAPPED"]);
+    if (uiStep > 4 && acts.length) pills.push([String(acts.length), "ACTIVITIES"]);
+    if (uiStep > 4 && reach) pills.push([reach, "REACHED"]);
+    if (uiStep > 4 && bestPct != null) pills.push([`${bestPct >= 0 ? "+" : ""}${bestPct}%`, "BEST MEASURED CHANGE"]);
+    if (uiStep > 5 && pkr) pills.push([`PKR ${pkr.toLocaleString()}`, "RESOURCES TRACED"]);
+    if (uiStep > 7 && evidence) pills.push([String(evidence), "EVIDENCE FILES"]);
+    if (uiStep > 8 && competency) pills.push([`${competency}/5`, "COMPETENCY"]);
 
     return (
         <>
@@ -225,7 +219,7 @@ export function ReportSectionBridge({
                         ? ` · ${context.timelineLabel}`
                         : ""}
                 </p>
-                {step > 3 && sdgs.length ? (
+                {uiStep > 3 && sdgs.length ? (
                     <div className="cer-sdgrow">
                         {sdgs.map((row) => {
                             const sdg = findSdgById(row.goalNumber);
@@ -253,7 +247,7 @@ export function ReportSectionBridge({
                         ))}
                     </div>
                 ) : null}
-                {onOpenHelp && step <= 10 ? (
+                {onOpenHelp && uiStep < FLASH_CARD_STEP ? (
                     <button type="button" className="cer-hchip" onClick={onOpenHelp}>
                         How to fill this section — with examples
                     </button>
@@ -311,11 +305,20 @@ export function ReportLiveBanner({
     data: ReportData;
     projectData?: unknown;
 }) {
-    if (step < 1 || step > 10) return null;
+    const uiStep = canonicalReportStep(step);
+    if (uiStep < 1 || uiStep >= FLASH_CARD_STEP) return null;
     const a = chromeAgg(data, projectData);
+    const mergedAi = [data.section4?.summary_text, data.section5?.summary_text]
+        .filter((text): text is string => typeof text === "string" && text.trim().length > 0)
+        .join("\n\n");
+    const dataSecs = wizardStepToDataSections(uiStep);
+    const primaryDataKey = dataSecs.length === 1 ? `section${dataSecs[0]}` : "";
     const ai = pickString(
-        step === 1 ? data.section1?.verified_summary : undefined,
-        (data as unknown as Record<string, { summary_text?: string }>)[`section${step}`]?.summary_text,
+        uiStep === 1 ? data.section1?.verified_summary : undefined,
+        isMergedActivitiesStep(uiStep) ? mergedAi : undefined,
+        primaryDataKey
+            ? (data as unknown as Record<string, { summary_text?: string }>)[primaryDataKey]?.summary_text
+            : undefined,
     );
     const baseline = firstSentence(data.section2?.problem_statement || "");
 
@@ -390,36 +393,31 @@ export function ReportLiveBanner({
         );
     }
 
-    if (step === 4) {
+    if (isMergedActivitiesStep(uiStep)) {
+        const challengeTags = Array.isArray(data.section5?.challenge_tags) ? data.section5.challenge_tags : [];
         return (
             <BannerShell
                 step={4}
-                title={`${a.acts.length} activities · ${a.outputs} outputs · ${a.reach || "—"} reached`}
+                title={`${a.acts.length} activities · ${a.outputs} outputs · ${a.reach || "—"} reached${a.measured.length ? ` → ${a.measured.length} measured change${a.measured.length === 1 ? "" : "s"}${a.bestPct != null ? ` · best ${a.bestPct >= 0 ? "+" : ""}${a.bestPct}%` : ""}` : ""}`}
                 ai={ai}
             >
-                {a.acts.map((block, i) => (
-                    <div key={block.id || i} className="cer-row">
-                        <b>
-                            {i + 1}. {block.title || "Unnamed"}
-                        </b>
-                        <span style={{ color: "#7a919a" }}>{block.primary_category}</span>
-                        <span style={{ marginLeft: "auto", color: "#0e7d74", fontWeight: 800 }}>{block.status}</span>
-                    </div>
-                ))}
-            </BannerShell>
-        );
-    }
-
-    if (step === 5) {
-        return (
-            <BannerShell
-                step={5}
-                title={`${a.measured.length} outcomes measured${a.bestPct != null ? ` · best ${a.bestPct >= 0 ? "+" : ""}${a.bestPct}%` : ""}`}
-                ai={ai}
-            >
+                {a.acts.length ? (
+                    <>
+                        <div className="cer-bsec">PART A · WHAT WE DID</div>
+                        {a.acts.map((block, i) => (
+                            <div key={block.id || i} className="cer-row">
+                                <b>
+                                    {i + 1}. {block.title || "Unnamed"}
+                                </b>
+                                <span style={{ color: "#7a919a" }}>{block.primary_category}</span>
+                                <span style={{ marginLeft: "auto", color: "#0e7d74", fontWeight: 800 }}>{block.status}</span>
+                            </div>
+                        ))}
+                    </>
+                ) : null}
                 {data.section5?.observed_change ? (
                     <>
-                        <div className="cer-bsec">THE CHANGE, IN OUR WORDS</div>
+                        <div className="cer-bsec">PART B · THE CHANGE, IN OUR WORDS</div>
                         <div className="cer-quote">{data.section5.observed_change}</div>
                     </>
                 ) : null}
@@ -436,16 +434,28 @@ export function ReportLiveBanner({
                         ))}
                     </>
                 ) : null}
+                {challengeTags.length ? (
+                    <>
+                        <div className="cer-bsec">WHAT WAS HARD</div>
+                        <div className="cer-mrow">
+                            {challengeTags.map((tag) => (
+                                <span key={tag} className="cer-mtag">
+                                    {tag}
+                                </span>
+                            ))}
+                        </div>
+                    </>
+                ) : null}
             </BannerShell>
         );
     }
 
-    if (step === 6) {
+    if (uiStep === 5) {
         const timeOnly = data.section6?.use_resources === "no";
         const resources = data.section6?.resources || [];
         return (
             <BannerShell
-                step={6}
+                step={5}
                 title={
                     timeOnly
                         ? "Ran on time & effort alone"
@@ -470,12 +480,12 @@ export function ReportLiveBanner({
         );
     }
 
-    if (step === 7) {
+    if (uiStep === 6) {
         const partners = data.section7?.partners || [];
         const roles = partners.flatMap((p) => p.role || []);
         return (
             <BannerShell
-                step={7}
+                step={6}
                 title={`${a.context.partnerOrganization || "Your partner"}${roles.length ? ` · ${roles.length} roles` : ""}`}
                 ai={ai}
             >
@@ -500,9 +510,9 @@ export function ReportLiveBanner({
         );
     }
 
-    if (step === 8) {
+    if (uiStep === 7) {
         return (
-            <BannerShell step={8} title={`${a.evidence} evidence files on record`} ai={ai}>
+            <BannerShell step={7} title={`${a.evidence} evidence files on record`} ai={ai}>
                 {(data.section8?.evidence_types || []).length ? (
                     <div className="cer-mrow">
                         {data.section8.evidence_types.map((t) => (
@@ -516,11 +526,11 @@ export function ReportLiveBanner({
         );
     }
 
-    if (step === 9) {
+    if (uiStep === 8) {
         const skills = data.section9?.skills_grown || [];
         return (
             <BannerShell
-                step={9}
+                step={8}
                 title={`${skills.length ? `${skills.length} skills grown` : "Your reflection"}${a.competency ? ` · ${a.competency}/5 self-rated` : ""}`}
                 ai={ai}
             >
@@ -540,10 +550,12 @@ export function ReportLiveBanner({
         );
     }
 
+    if (uiStep !== 9) return null;
+
     const mechs = data.section10?.mechanisms || [];
     return (
         <BannerShell
-            step={10}
+            step={9}
             title={
                 data.section10?.continuation_status
                     ? `Continues: ${data.section10.continuation_status}${mechs.length ? ` · ${mechs.length} mechanisms` : ""}`
@@ -736,7 +748,7 @@ export function ReportFlashCard({
                 <div className="cer-fbody">
                     <div className="cer-qsig">
                         <div className="cer-qs">
-                            <div className="v">{sectionsComplete}/10</div>
+                            <div className="v">{sectionsComplete}/{REPORT_UI_SECTION_TOTAL}</div>
                             <div className="k">SECTIONS COMPLETE</div>
                         </div>
                         <div className="cer-qs">
@@ -760,7 +772,7 @@ export function ReportFlashCard({
                             </div>
                             <span className="mid">➜</span>
                             <div className="a">
-                                <b>AFTER · SECTION 5</b>
+                                <b>AFTER · SECTION 4 · PART B</b>
                                 {firstMeas.metric || firstMeas.outcome_area}: {firstMeas.baseline} → {firstMeas.endline}
                             </div>
                         </div>
@@ -787,7 +799,7 @@ export function ReportFlashCard({
                     {st === "draft" ? (
                         <>
                             <div className="cer-status cer-st-draft">
-                                DRAFT — {sectionsComplete}/10 sections complete
+                                DRAFT — {sectionsComplete}/{REPORT_UI_SECTION_TOTAL} sections complete
                             </div>
                             {onSend ? (
                                 <button

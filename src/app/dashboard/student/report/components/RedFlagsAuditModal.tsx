@@ -38,7 +38,7 @@ export default function RedFlagsAuditModal({ open, onOpenChange, sections, usedS
                             <DialogDescription className="text-left text-xs font-medium text-slate-600 leading-relaxed">
                                 {usedSystemFallback
                                     ? "No full AI audit is stored yet. Below: your section validation gaps, CII score drivers, and any saved summary text — all without ChatGPT."
-                                    : "Issues and gaps from your stored Section 11 audit narrative (cross-section review)."}
+                                    : "Issues and gaps from your stored flash-card audit narrative (cross-section review)."}
                             </DialogDescription>
                         </div>
                     </div>

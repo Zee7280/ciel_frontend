@@ -15,7 +15,6 @@ import {
   Users,
   Globe,
   Activity,
-  Target,
   Package,
   Link,
   Image,
@@ -36,14 +35,13 @@ const SECTIONS = [
   { id: 1, title: "Participation & Identity", icon: Users, description: "Student details, team composition, and verified attendance logs." },
   { id: 2, title: "Project Context", icon: ClipboardList, description: "Problem statement, discipline relevance, and baseline evidence." },
   { id: 3, title: "SDG Mapping", icon: Globe, description: "Primary and secondary Sustainable Development Goals alignment." },
-  { id: 4, title: "Activities & Outputs", icon: Activity, description: "Delivery mode, total sessions, and beneficiary details." },
-  { id: 5, title: "Outcomes & Metrics", icon: Target, description: "Measurable changes, baseline vs endline data, and impact areas." },
-  { id: 6, title: "Resources Used", icon: Package, description: "Financial and material resources utilized during implementation." },
-  { id: 7, title: "Partnerships", icon: Link, description: "Collaborations with external organizations and formalization status." },
-  { id: 8, title: "Photo & Video Evidence", icon: Image, description: "Visual proof of activities with ethical compliance checks." },
-  { id: 9, title: "Reflection & Learning", icon: Lightbulb, description: "Personal and academic growth, competency scores, and insights." },
-  { id: 10, title: "Sustainability", icon: RefreshCw, description: "Scaling potential, policy influence, and continuation plan." },
-  { id: 11, title: "Intelligence Summary", icon: FileText, description: "AI-assisted executive overview of the entire project impact." },
+  { id: 4, title: "Activities & Outputs", icon: Activity, description: "Part A: what you did and delivered. Part B: measurable change and outcomes." },
+  { id: 5, title: "Resources Used", icon: Package, description: "Financial and material resources utilized during implementation." },
+  { id: 6, title: "Partnerships", icon: Link, description: "Collaborations with external organizations and formalization status." },
+  { id: 7, title: "Photo & Video Evidence", icon: Image, description: "Visual proof of activities with ethical compliance checks." },
+  { id: 8, title: "Reflection & Learning", icon: Lightbulb, description: "Personal and academic growth, competency scores, and insights." },
+  { id: 9, title: "Sustainability", icon: RefreshCw, description: "Scaling potential, policy influence, and continuation plan." },
+  { id: 10, title: "Flash card", icon: FileText, description: "AI-assisted preview, CII intelligence, and submission readiness." },
 ];
 
 export default function ReportSummaryPopup({ isOpen, onClose }: ReportSummaryPopupProps) {
@@ -63,7 +61,7 @@ export default function ReportSummaryPopup({ isOpen, onClose }: ReportSummaryPop
               CIEL Reporting Framework
             </DialogTitle>
             <DialogDescription className="text-slate-600 font-medium text-sm leading-relaxed">
-              Review the 11-section reporting structure required for project completion and HEC verification.
+              Review the 9 form sections plus flash card required for project completion and HEC verification.
             </DialogDescription>
           </DialogHeader>
         </div>

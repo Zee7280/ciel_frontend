@@ -406,7 +406,7 @@ export default function Section8Evidence() {
                     </div>
                     <div>
                         <h2 className="text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl">
-                            <span className="text-indigo-600">SECTION 8:</span> Evidence &amp; verification
+                            <span className="text-indigo-600">SECTION 7:</span> Evidence &amp; verification
                         </h2>
                     </div>
                 </div>

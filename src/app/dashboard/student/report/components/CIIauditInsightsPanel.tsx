@@ -71,7 +71,7 @@ export default function CIIauditInsightsPanel({ audit, ciiTotalScore, className 
                             Why your score may be lower — audit red flags
                         </h3>
                         <p className="text-[11px] font-medium text-slate-600 leading-snug">
-                            Pulled from your Section 11 AI cross-check (hours, activities, outcomes, evidence, SDGs). This
+                            Pulled from your flash-card AI cross-check (hours, activities, outcomes, evidence, SDGs). This
                             does not replace formal review; it explains common gaps that drag the CII index down.
                         </p>
                     </div>

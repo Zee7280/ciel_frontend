@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { ValidationError, validateSection1, validateSection2, validateSection3, validateSection4, validateSection5, validateSection6, validateSection7, validateSection8, validateSection9, validateSection10, getIncompleteSectionsSummary, type SectionIncompleteInfo } from '../utils/validation';
+import { canonicalReportStep, isMergedActivitiesStep, nextReportStep, prevReportStep, wizardStepToDataSections, FLASH_CARD_STEP } from '../utils/reportWizardNav';
 import { calculateEngagementMetrics, buildIndividualRosterFromSection1 } from '../utils/engagementMetrics';
 import type { ReportCIIauditMeta } from '@/lib/parseCIIauditSummary';
 import { pickImpactVerifyUrlFromPayload } from '@/utils/reportVerificationUrl';
@@ -780,23 +781,35 @@ export function ReportProvider({ children }: { children: React.ReactNode }) {
     const validateCurrentSection = useCallback((): boolean => {
         // Validation implicitly passes in read-only mode to allow navigation without errors
         if (isReadOnly) return true;
-        if (isTeamMemberAttendanceOnly && activeStep >= 2 && activeStep <= 10) return true;
+        if (isTeamMemberAttendanceOnly && activeStep >= 2 && activeStep < FLASH_CARD_STEP) return true;
 
         let validationResult: { isValid: boolean; errors: ValidationError[] } = { isValid: true, errors: [] };
-        const sectionKey = `section${activeStep}`;
+        const dataSections = wizardStepToDataSections(activeStep);
+        if (!dataSections.length) return true;
 
-        switch (activeStep) {
+        if (isMergedActivitiesStep(activeStep)) {
+            const r4 = validateSection4(data.section4);
+            const r5 = validateSection5(data.section5);
+            setValidationErrors((prev) => ({
+                ...prev,
+                section4: r4.errors,
+                section5: r5.errors,
+            }));
+            return r4.isValid && r5.isValid;
+        }
+
+        const dataSection = dataSections[0];
+        const sectionKey = `section${dataSection}`;
+
+        switch (dataSection) {
             case 1: validationResult = validateSection1(data.section1); break;
             case 2: validationResult = validateSection2(data.section2); break;
             case 3: validationResult = validateSection3(data.section3); break;
-            case 4: validationResult = validateSection4(data.section4); break;
-            case 5: validationResult = validateSection5(data.section5); break;
             case 6: validationResult = validateSection6(data.section6); break;
             case 7: validationResult = validateSection7(data.section7); break;
             case 8: validationResult = validateSection8(data.section8); break;
             case 9: validationResult = validateSection9(data.section9); break;
             case 10: validationResult = validateSection10(data.section10); break;
-            case 11: return true;
             default: return true;
         }
 
@@ -813,15 +826,18 @@ export function ReportProvider({ children }: { children: React.ReactNode }) {
     }, [isReadOnly, isTeamMemberAttendanceOnly, activeStep, data, clearValidationErrors]);
 
     const getFieldError = useCallback((fieldPath: string): string | undefined => {
-        const sectionKey = `section${activeStep}`;
-        const errors = validationErrors[sectionKey] || [];
-        const error = errors.find(e => e.field === fieldPath || e.field.endsWith(`.${fieldPath}`));
-        return error?.message;
+        const keys = wizardStepToDataSections(activeStep).map((n) => `section${n}`);
+        for (const sectionKey of keys) {
+            const errors = validationErrors[sectionKey] || [];
+            const error = errors.find((e) => e.field === fieldPath || e.field.endsWith(`.${fieldPath}`));
+            if (error) return error.message;
+        }
+        return undefined;
     }, [activeStep, validationErrors]);
 
-    const nextStep = useCallback(() => setActiveStep(prev => Math.min(prev + 1, 11)), []);
-    const prevStep = useCallback(() => setActiveStep(prev => Math.max(prev - 1, 1)), []);
-    const setStep = useCallback((step: number) => setActiveStep(step), []);
+    const nextStep = useCallback(() => setActiveStep((prev) => nextReportStep(prev)), []);
+    const prevStep = useCallback(() => setActiveStep((prev) => prevReportStep(prev)), []);
+    const setStep = useCallback((step: number) => setActiveStep(canonicalReportStep(step)), []);
 
     const saveReport = useCallback(async (silent: boolean = false): Promise<boolean> => {
         if (isReadOnly) return false;
