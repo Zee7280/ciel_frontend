@@ -9,6 +9,7 @@ import EmptyState from "@/components/ciel/EmptyState";
 import CourseworkCard from "@/components/ciel/CourseworkCard";
 import { type CourseProjectEntry } from "@/utils/courseProjectTypes";
 import { readStoredCurrentUser } from "@/utils/currentUser";
+import { namedTimeGreeting } from "@/utils/timeGreeting";
 import { isFacultyApproved } from "@/utils/courseworkSectionReview";
 import { CourseworkCrumb, CourseworkHero, HubBackButton, HubTile } from "@/components/ciel/coursework/CourseworkHubChrome";
 import CourseworkSectionGuide from "@/components/ciel/coursework/CourseworkSectionGuide";
@@ -83,7 +84,7 @@ function CourseProjectHub() {
             <CourseworkCrumb role="Student" view={view === "home" ? undefined : view} />
             <CourseworkHero
                 kicker="MY PATHS · COURSEWORK"
-                title={`Salaam, ${name} 📘`}
+                title={namedTimeGreeting(name, "📘")}
                 subtitle="Three doors: start new coursework, learn every section, and visit the wall where approved work hangs."
                 gradient="linear-gradient(115deg,#04252b,#0e5f63 55%,#12a5a0 110%)"
                 stats={[

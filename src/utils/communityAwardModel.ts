@@ -87,3 +87,101 @@ export const BADGE_CLASS: Record<CommunityAwardKind, string> = {
 };
 
 export const BADGE_ICON: Record<CommunityAwardKind, string> = { uni: "🏛️", par: "🤝", ciel: "🌍", fac: "🧑‍🏫" };
+
+export function reportRowToAwardCard(row: {
+    id: string;
+    student_name: string;
+    project_title: string;
+    organization_name?: string;
+    faculty_status?: string;
+    status?: string;
+    hours?: number;
+}): CommunityAwardCard {
+    return {
+        id: row.id,
+        student_name: row.student_name || "Student",
+        project_title: row.project_title || "Community service",
+        organization_name: row.organization_name || "Partner",
+        university: "—",
+        department: "—",
+        faculty_name: "Faculty",
+        hours: row.hours || 0,
+        sdg: "—",
+        evidenceCount: 0,
+        story: "",
+        change: "",
+        semester: "—",
+        year: "",
+        month: "",
+        teamSize: 1,
+        faculty_status: row.faculty_status || "pending",
+        status: row.status || "submitted",
+        cii: null,
+        pts: [],
+        total: 0,
+    };
+}
+
+export type CommunityPipelineRow = {
+    id: string;
+    student_name: string;
+    project_title: string;
+    organization_name?: string;
+    faculty_status?: string;
+    status?: string;
+    partner_status?: string;
+    admin_status?: string;
+    hours?: number;
+};
+
+function pickStr(item: Record<string, unknown>, ...keys: string[]): string | undefined {
+    for (const key of keys) {
+        const value = item[key];
+        if (typeof value === "string" && value.trim()) return value;
+    }
+    return undefined;
+}
+
+export function mapCommunityPipelineRow(item: Record<string, unknown>): CommunityPipelineRow | null {
+    const id = String(item.id || item.report_id || "");
+    if (!id) return null;
+    const metrics =
+        item.metrics && typeof item.metrics === "object"
+            ? (item.metrics as Record<string, unknown>)
+            : item.section1 && typeof item.section1 === "object"
+              ? ((item.section1 as { metrics?: Record<string, unknown> }).metrics ?? {})
+              : {};
+    const student = item.student && typeof item.student === "object" ? (item.student as Record<string, unknown>) : {};
+    const opportunity =
+        item.opportunity && typeof item.opportunity === "object" ? (item.opportunity as Record<string, unknown>) : {};
+    const hoursRaw = metrics.total_verified_hours ?? metrics.total_hours ?? item.hours;
+    const hours = typeof hoursRaw === "number" ? hoursRaw : Number(hoursRaw || 0);
+    return {
+        id,
+        student_name: pickStr(item, "student_name", "studentName") || pickStr(student, "name") || "Student",
+        project_title:
+            pickStr(item, "project_title", "projectTitle") || pickStr(opportunity, "title") || "Report",
+        organization_name: pickStr(item, "organization_name", "organizationName"),
+        faculty_status: pickStr(item, "faculty_status", "facultyStatus"),
+        status: pickStr(item, "status"),
+        partner_status: pickStr(item, "partner_status", "partnerStatus"),
+        admin_status: pickStr(item, "admin_status", "adminStatus"),
+        hours: Number.isFinite(hours) ? hours : 0,
+    };
+}
+
+export function mergeCommunityLiveDeck(
+    cards: CommunityAwardCard[],
+    liveRows: CommunityPipelineRow[],
+    isLive: (row: CommunityPipelineRow | CommunityAwardCard) => boolean,
+): CommunityAwardCard[] {
+    const liveIds = new Set(liveRows.map((r) => r.id));
+    const byId = new Map<string, CommunityAwardCard>();
+    for (const card of cards) {
+        if (liveIds.has(card.id) || isLive(card)) byId.set(card.id, card);
+    }
+    for (const row of liveRows) {
+        if (!byId.has(row.id)) byId.set(row.id, reportRowToAwardCard(row));
+    }
+    return Array.from(byId.values());
+}

@@ -18,6 +18,30 @@ import {
     readFacultyScopeSession,
     type FacultyScopeSessionPayload,
 } from "@/utils/facultyScopeSession";
+import { namedTimeGreeting } from "@/utils/timeGreeting";
+
+function studentPageKicker(pathname: string): string {
+    const p = pathname.replace(/\/+$/, "") || pathname;
+    if (p === "/dashboard/student") return "Overview";
+    if (p.startsWith("/dashboard/student/browse")) return "Browse opportunities";
+    if (p.startsWith("/dashboard/student/impact")) return "Impact";
+    if (p.startsWith("/dashboard/student/payments") || p.startsWith("/dashboard/student/payment")) return "Payments";
+    if (p.startsWith("/dashboard/student/messages")) return "Messages";
+    if (p.startsWith("/dashboard/student/notifications")) return "Notifications";
+    if (p.startsWith("/dashboard/student/tutorials")) return "Platform tutorial";
+    if (p.startsWith("/dashboard/student/help")) return "Help";
+    if (p.startsWith("/dashboard/student/settings")) return "Settings";
+    if (p.startsWith("/dashboard/student/profile")) return "Profile";
+    if (p.startsWith("/dashboard/student/report")) return "Impact report";
+    if (p.startsWith("/dashboard/student/create-opportunity")) return "Create opportunity";
+    if (p.startsWith("/dashboard/student/paths/community-service")) return "Community Service";
+    if (p.startsWith("/dashboard/student/paths/course-project")) return "Course Project";
+    if (p.startsWith("/dashboard/student/paths/fyp-thesis")) return "FYP / Thesis";
+    if (p.startsWith("/dashboard/student/paths/startup-business")) return "Startup / Business";
+    if (p.startsWith("/dashboard/student/engagement")) return "Engagement";
+    if (p.startsWith("/dashboard/student/projects")) return "My projects";
+    return "Student";
+}
 
 type HeaderNotification = {
     id: number;
@@ -70,8 +94,9 @@ export default function DashboardHeader() {
         return "Dashboard";
     };
 
-    const isStudentHome = navRole === "student" && pathname === "/dashboard/student";
-    const firstName = user?.name?.split(/\s+/)[0] || "User";
+    const isStudent = navRole === "student";
+    const firstName = user?.name?.trim().split(/\s+/)[0] || "";
+    const greeting = namedTimeGreeting(firstName);
 
     useEffect(() => {
         const loadUserFromStorage = () => {
@@ -252,11 +277,11 @@ export default function DashboardHeader() {
     };
 
     return (
-        <header className="ciel-transition sticky top-0 z-30 flex min-h-16 items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 py-3 font-sans sm:px-6 lg:ml-[var(--ciel-sidebar-width)] lg:h-20 lg:px-8">
+        <header className="ciel-transition sticky top-0 z-30 flex min-h-16 items-center justify-between gap-3 border-b border-ciel-border bg-white px-4 py-3 font-sans sm:px-6 lg:ml-[var(--ciel-sidebar-width)] lg:h-20 lg:px-8">
             <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
-                    <h1 className="truncate text-base font-black tracking-tight text-slate-900 sm:text-xl">
-                        {isStudentHome ? `Welcome back, ${firstName}!` : getTitle()}
+                    <h1 className="truncate text-base font-black tracking-tight text-ciel-text sm:text-xl">
+                        {isStudent ? greeting : getTitle()}
                     </h1>
                     {navRole === "faculty" && facultyDelegatedScope?.organization_name ? (
                         <span
@@ -268,18 +293,18 @@ export default function DashboardHeader() {
                         </span>
                     ) : null}
                 </div>
-                <p className="truncate text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                    {isStudentHome ? "Overview" : `Welcome back, ${firstName}`}
+                <p className="truncate text-[10px] font-bold uppercase tracking-wider text-ciel-text-soft">
+                    {isStudent ? studentPageKicker(pathname) : greeting}
                 </p>
             </div>
 
             <div className="flex shrink-0 items-center gap-2 sm:gap-4 lg:gap-6">
                 <div className="relative hidden md:block">
-                    <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-ciel-text-soft" />
                     <input
                         type="text"
                         placeholder="Search dashboard..."
-                        className="pl-10 pr-4 py-2 rounded-xl border border-slate-100 bg-slate-50/50 text-sm focus:outline-none focus:ring-4 focus:ring-blue-50 focus:border-blue-400 w-64 transition-all font-medium"
+                        className="w-64 rounded-xl border border-ciel-border bg-ciel-page/50 py-2 pl-10 pr-4 text-sm font-medium text-ciel-text transition-all focus:border-ciel-green focus:outline-none focus:ring-4 focus:ring-ciel-green/15"
                     />
                 </div>
 
@@ -288,7 +313,7 @@ export default function DashboardHeader() {
                         <button
                             type="button"
                             onClick={() => setNotifOpen((o) => !o)}
-                            className="relative p-2.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all group"
+                            className="group relative rounded-xl p-2.5 text-ciel-text-soft transition-all hover:bg-ciel-green-soft hover:text-ciel-green-deep"
                             aria-expanded={notifOpen}
                             aria-haspopup="dialog"
                             aria-label="Notifications"
@@ -390,7 +415,7 @@ export default function DashboardHeader() {
                         ) : null}
                     </div>
                 ) : (
-                    <button type="button" className="relative p-2.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all group">
+                    <button type="button" className="group relative rounded-xl p-2.5 text-ciel-text-soft transition-all hover:bg-ciel-green-soft hover:text-ciel-green-deep">
                         <Bell className="w-5 h-5 group-hover:scale-110 transition-transform" />
                         {(user?.notifications_count ?? 0) > 0 ? (
                             <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-blue-600 rounded-full border-2 border-white"></span>
@@ -398,10 +423,10 @@ export default function DashboardHeader() {
                     </button>
                 )}
 
-                <div className="flex items-center gap-2 border-l border-slate-100 pl-2 sm:gap-4 sm:pl-4 lg:pl-6">
+                <div className="flex items-center gap-2 border-l border-ciel-border pl-2 sm:gap-4 sm:pl-4 lg:pl-6">
                     <div className="text-right hidden md:block">
-                        <div className="text-sm font-black text-slate-900 leading-none mb-1">{user?.name || "Guest User"}</div>
-                        <div className="text-[10px] text-slate-400 font-bold uppercase tracking-widest leading-none">{user?.role || "Visitor"}</div>
+                        <div className="mb-1 text-sm font-black leading-none text-ciel-text">{user?.name || "Guest User"}</div>
+                        <div className="text-[10px] font-bold uppercase leading-none tracking-widest text-ciel-text-soft">{user?.role || "Visitor"}</div>
                     </div>
                     <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl border-2 border-slate-50 bg-slate-100 shadow-sm transition-all hover:border-blue-200 sm:h-11 sm:w-11">
                         {getProfileImage() ? (

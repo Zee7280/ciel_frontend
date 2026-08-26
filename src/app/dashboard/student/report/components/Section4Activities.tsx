@@ -17,6 +17,7 @@ import {
     GEOGRAPHIC_REACH_OPTIONS, GEOGRAPHIC_SUB_CATEGORIES,
     COUNTING_METHODS
 } from '../utils/section4Constants';
+import { REPORT_TEXT_RANGE_LABEL, reportTextWordMeter } from '../utils/validation';
 
 const inputClasses =
     "h-11 w-full min-w-0 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-800 shadow-sm outline-none transition-colors placeholder:text-slate-400 focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100";
@@ -35,6 +36,23 @@ const badgeNeutral =
 
 function wordCount(text: string): number {
     return (text || "").trim().split(/\s+/).filter(Boolean).length;
+}
+
+function WordMeterBar({ count, extra }: { count: number; extra?: string }) {
+    const meter = reportTextWordMeter(count);
+    return (
+        <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="h-1.5 w-40 overflow-hidden rounded-full bg-slate-100 sm:w-48">
+                <div
+                    className={clsx("h-full rounded-full transition-all", meter.barClass)}
+                    style={{ width: `${meter.widthPct}%` }}
+                />
+            </div>
+            <p className={clsx("text-[11px] tabular-nums", meter.textClass)}>
+                {count} / 200 words{extra ? ` · ${extra}` : ""}
+            </p>
+        </div>
+    );
 }
 
 function PillToggle({
@@ -376,40 +394,14 @@ export default function Section4Activities() {
 
                         <div className="space-y-2">
                             <Label className={fieldLabel}>Project implementation explanation</Label>
-                            <p className="text-xs text-slate-500">50–100 words · how activities integrated to achieve goals.</p>
+                            <p className="text-xs text-slate-500">{REPORT_TEXT_RANGE_LABEL} · how activities integrated to achieve goals.</p>
                             <Textarea
                                 placeholder="Explain the project synergy…"
                                 value={section4.project_summary?.project_implementation_explanation || ''}
                                 onChange={e => updateProjectSummary('project_implementation_explanation', e.target.value)}
                                 className={textareaClasses}
                             />
-                            <div className="flex flex-wrap items-center justify-between gap-2">
-                                <div className="h-1.5 w-40 overflow-hidden rounded-full bg-slate-100 sm:w-48">
-                                    <div
-                                        className={clsx(
-                                            "h-full rounded-full transition-all",
-                                            implementationWords < 50
-                                                ? "bg-amber-400"
-                                                : implementationWords > 100
-                                                  ? "bg-red-500"
-                                                  : "bg-emerald-500",
-                                        )}
-                                        style={{ width: `${Math.min((implementationWords / 100) * 100, 100)}%` }}
-                                    />
-                                </div>
-                                <p
-                                    className={clsx(
-                                        "text-[11px] tabular-nums",
-                                        implementationWords >= 50 && implementationWords <= 100
-                                            ? "text-emerald-600"
-                                            : implementationWords > 100
-                                              ? "text-red-500"
-                                              : "text-slate-400",
-                                    )}
-                                >
-                                    {implementationWords} / 100 words
-                                </p>
-                            </div>
+                            <WordMeterBar count={implementationWords} extra="if filled" />
                         </div>
                     </div>
                 </div>
@@ -759,33 +751,7 @@ function ActivityBlockComponent({ activity, index, updateActivity, removeActivit
                             onChange={e => update('description', e.target.value)}
                             className={textareaClasses}
                         />
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                            <div className="h-1.5 w-40 overflow-hidden rounded-full bg-slate-100 sm:w-48">
-                                <div
-                                    className={clsx(
-                                        "h-full rounded-full transition-all",
-                                        descWords < 50
-                                            ? "bg-amber-400"
-                                            : descWords > 100
-                                              ? "bg-red-500"
-                                              : "bg-emerald-500",
-                                    )}
-                                    style={{ width: `${Math.min((descWords / 100) * 100, 100)}%` }}
-                                />
-                            </div>
-                            <p
-                                className={clsx(
-                                    "text-[11px] tabular-nums",
-                                    descWords >= 50 && descWords <= 100
-                                        ? "text-emerald-600"
-                                        : descWords > 100
-                                          ? "text-red-500"
-                                          : "text-slate-400",
-                                )}
-                            >
-                                {descWords} / 100 words · 50–100 required
-                            </p>
-                        </div>
+                        <WordMeterBar count={descWords} extra={`${REPORT_TEXT_RANGE_LABEL} required`} />
                         <FieldError message={getFieldError(`section4.activity_blocks.${index}.description`)} />
                     </div>
 
@@ -838,33 +804,7 @@ function ActivityBlockComponent({ activity, index, updateActivity, removeActivit
                                     onChange={e => update('delivery_explanation', e.target.value)}
                                     className={clsx(textareaClasses, "min-h-[88px]")}
                                 />
-                                <div className="flex flex-wrap items-center justify-between gap-2">
-                                    <div className="h-1.5 w-40 overflow-hidden rounded-full bg-slate-100 sm:w-48">
-                                        <div
-                                            className={clsx(
-                                                "h-full rounded-full transition-all",
-                                                deliveryWords < 30
-                                                    ? "bg-amber-400"
-                                                    : deliveryWords > 80
-                                                      ? "bg-red-500"
-                                                      : "bg-emerald-500",
-                                            )}
-                                            style={{ width: `${Math.min((deliveryWords / 80) * 100, 100)}%` }}
-                                        />
-                                    </div>
-                                    <p
-                                        className={clsx(
-                                            "text-[11px] tabular-nums",
-                                            deliveryWords >= 30 && deliveryWords <= 80
-                                                ? "text-emerald-600"
-                                                : deliveryWords > 80
-                                                  ? "text-red-500"
-                                                  : "text-slate-400",
-                                        )}
-                                    >
-                                        {deliveryWords} words · 30–80 suggested
-                                    </p>
-                                </div>
+                                <WordMeterBar count={deliveryWords} extra="if filled" />
                             </div>
                         </div>
                     </div>
@@ -1077,33 +1017,7 @@ function ActivityBlockComponent({ activity, index, updateActivity, removeActivit
                                         onChange={e => update('beneficiary_description', e.target.value)}
                                         className={clsx(textareaClasses, "min-h-[88px]")}
                                     />
-                                    <div className="flex flex-wrap items-center justify-between gap-2">
-                                        <div className="h-1.5 w-40 overflow-hidden rounded-full bg-slate-100 sm:w-48">
-                                            <div
-                                                className={clsx(
-                                                    "h-full rounded-full transition-all",
-                                                    beneficiaryDescWords < 30
-                                                        ? "bg-amber-400"
-                                                        : beneficiaryDescWords > 80
-                                                          ? "bg-red-500"
-                                                          : "bg-emerald-500",
-                                                )}
-                                                style={{ width: `${Math.min((beneficiaryDescWords / 80) * 100, 100)}%` }}
-                                            />
-                                        </div>
-                                        <p
-                                            className={clsx(
-                                                "text-[11px] tabular-nums",
-                                                beneficiaryDescWords >= 30 && beneficiaryDescWords <= 80
-                                                    ? "text-emerald-600"
-                                                    : beneficiaryDescWords > 80
-                                                      ? "text-red-500"
-                                                      : "text-slate-400",
-                                            )}
-                                        >
-                                            {beneficiaryDescWords} words · 30–80 suggested
-                                        </p>
-                                    </div>
+                                    <WordMeterBar count={beneficiaryDescWords} extra="if filled" />
                                 </div>
                             </div>
                         ) : null}

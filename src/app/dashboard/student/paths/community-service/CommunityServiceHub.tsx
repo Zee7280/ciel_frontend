@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { authenticatedFetch } from "@/utils/api";
 import { readStoredCurrentUser } from "@/utils/currentUser";
+import { namedTimeGreeting } from "@/utils/timeGreeting";
 import type { ActiveProject } from "@/app/dashboard/student/types";
 
 const CREATE_HREF = "/dashboard/student/create-opportunity";
@@ -50,7 +51,7 @@ export default function CommunityServiceHub({
         return typeof h === "number" && h > max ? h : max;
     }, 0);
     const hoursLabel = hoursTarget > 0 ? `${Math.round(verifiedHours)} / ${hoursTarget}h` : `${Math.round(verifiedHours)}h`;
-    const greeting = name ? `Salaam, ${name}` : "Salaam";
+    const greeting = namedTimeGreeting(name);
     const browseBadge = openCount === null ? "OPEN NOW" : openCount > 0 ? `${openCount} OPEN NOW` : "BROWSE";
 
     return (
@@ -85,6 +86,7 @@ export default function CommunityServiceHub({
                     title="Create an Opportunity"
                     subtitle="Your idea, your crew — open the form and lead it."
                     background="linear-gradient(135deg,#0e7d74,#2dd4bf)"
+                    badgeClass="text-[#0e7d74]"
                 />
                 <HubTile
                     href={BROWSE_HREF}
@@ -93,6 +95,7 @@ export default function CommunityServiceHub({
                     title="Browse Opportunities"
                     subtitle="Join what's already moving on campus."
                     background="linear-gradient(135deg,#0e5f63,#38bdf8)"
+                    badgeClass="text-[#0369a1]"
                 />
                 <HubTile
                     href={PROJECTS_HREF}
@@ -101,6 +104,7 @@ export default function CommunityServiceHub({
                     title="My Projects"
                     subtitle="Your live work — log hours right inside each project."
                     background="linear-gradient(135deg,#b45309,#f59e0b)"
+                    badgeClass="text-[#b45309]"
                 />
                 <HubTile
                     href={REPORT_HREF}
@@ -109,6 +113,7 @@ export default function CommunityServiceHub({
                     title="My Report"
                     subtitle="Nine form sections plus the flash card — decoded with examples & tips."
                     background="linear-gradient(135deg,#6d28d9,#a78bfa)"
+                    badgeClass="text-[#6d28d9]"
                 />
                 <HubTile
                     href={WALL_HREF}
@@ -118,6 +123,7 @@ export default function CommunityServiceHub({
                     subtitle="Every approved project hangs here, forever — with every badge others award you."
                     background="linear-gradient(135deg,#04252b,#0e7d74)"
                     className="sm:col-span-2"
+                    badgeClass="text-[#0e7d74]"
                 />
             </div>
 
@@ -222,6 +228,7 @@ function HubTile({
     subtitle,
     background,
     className = "",
+    badgeClass = "text-[#0d2b33]",
 }: {
     href: string;
     badge: string;
@@ -230,6 +237,7 @@ function HubTile({
     subtitle: string;
     background: string;
     className?: string;
+    badgeClass?: string;
 }) {
     return (
         <Link
@@ -237,11 +245,13 @@ function HubTile({
             style={{ background }}
             className={`relative flex min-h-[140px] flex-col overflow-hidden rounded-[22px] p-5 text-left text-white shadow-sm transition duration-150 hover:-translate-y-1 hover:scale-[1.015] hover:shadow-[0_16px_36px_rgba(13,43,51,0.18)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0e7d74] focus-visible:ring-offset-2 ${className}`}
         >
-            <span className="absolute right-3.5 top-3 rounded-full bg-white/22 px-2.5 py-1 text-[8px] font-extrabold">
+            <span
+                className={`absolute right-3.5 top-3 z-10 rounded-full bg-white px-2.5 py-1 text-[8px] font-extrabold tracking-wide shadow-sm ${badgeClass}`}
+            >
                 {badge}
             </span>
             <span className="text-[32px] leading-none">{emoji}</span>
-            <span className="mt-2 text-[15.5px] font-extrabold">{title}</span>
+            <span className="mt-2 pr-24 text-[15.5px] font-extrabold">{title}</span>
             <span className="mt-1 text-[10.5px] leading-relaxed opacity-85">{subtitle}</span>
             <span className="pointer-events-none absolute -bottom-5 -right-3 text-[80px] opacity-15" aria-hidden>
                 {emoji}

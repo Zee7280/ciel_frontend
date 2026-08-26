@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "../report/components/u
 import { Badge } from "../report/components/ui/badge";
 import { authenticatedFetch } from "@/utils/api";
 import { Loader2 } from "lucide-react";
+import StudentImpactAnalytics from "./StudentImpactAnalytics";
 
 interface Activity {
     id: string;
@@ -169,8 +170,10 @@ export default function ImpactHistoryPage() {
     return (
         <div className="space-y-8">
             <div>
-                <h1 className="text-2xl font-bold text-slate-900">Impact History</h1>
-                <p className="text-slate-500">Track your verified contributions and volunteering hours.</p>
+                <h1 className="text-2xl font-bold text-slate-900">Impact</h1>
+                <p className="text-slate-500">
+                    Your hours, score, paths, and verified contribution history — in one place.
+                </p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -202,6 +205,11 @@ export default function ImpactHistoryPage() {
                     </CardContent>
                 </Card>
             </div>
+
+            <StudentImpactAnalytics
+                activities={stats?.activities ?? []}
+                hoursThisMonth={stats?.hours_this_month ?? 0}
+            />
 
             <Card>
                 <CardHeader>

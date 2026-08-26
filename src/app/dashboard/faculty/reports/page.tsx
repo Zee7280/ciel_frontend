@@ -6,6 +6,7 @@ import { authenticatedFetch } from "@/utils/api";
 import { CheckCircle2, Clock, Eye, FileText, Loader2, Search } from "lucide-react";
 import { toast } from "sonner";
 import clsx from "clsx";
+import { isFacultyCommunityLiveCard, isFacultyCommunityWaiting } from "@/utils/reviewQueue";
 
 interface FacultyReportRow {
     id: string;
@@ -15,11 +16,12 @@ interface FacultyReportRow {
     organization_name?: string;
     status: string;
     faculty_status?: string;
+    hours?: number;
     submission_date?: string;
     report_submitted_at?: string;
 }
 
-type ReportStatusFilter = "all" | "verified";
+type ReportStatusFilter = "waiting" | "approved" | "all";
 
 const TABLE_HEAD =
     "px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500 whitespace-nowrap";
@@ -31,8 +33,8 @@ function normalizeStatus(value: string | null | undefined): string {
 
 function reportMatchesTab(report: FacultyReportRow, tab: ReportStatusFilter): boolean {
     if (tab === "all") return true;
-    const overall = normalizeStatus(report.status);
-    return overall === "verified" || overall === "paid" || overall === "partner_verified";
+    if (tab === "approved") return isFacultyCommunityLiveCard(report);
+    return isFacultyCommunityWaiting(report);
 }
 
 function formatOrganizationLabel(name?: string): string {
@@ -46,7 +48,7 @@ export default function FacultyStudentReportsPage() {
     const router = useRouter();
     const [reports, setReports] = useState<FacultyReportRow[]>([]);
     const [loading, setLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState<ReportStatusFilter>("all");
+    const [activeTab, setActiveTab] = useState<ReportStatusFilter>("waiting");
     const [searchQuery, setSearchQuery] = useState("");
 
     useEffect(() => {
@@ -59,7 +61,14 @@ export default function FacultyStudentReportsPage() {
             const response = await authenticatedFetch("/api/v1/faculty/reports");
             if (response?.ok) {
                 const data = await response.json();
-                setReports(Array.isArray(data.data) ? data.data : []);
+                const list = Array.isArray(data.data) ? data.data : [];
+                setReports(
+                    list.map((item: FacultyReportRow & { metrics?: { total_verified_hours?: number }; hours?: number }) => {
+                        const hoursRaw = item.hours ?? item.metrics?.total_verified_hours;
+                        const hours = typeof hoursRaw === "number" ? hoursRaw : Number(hoursRaw || 0);
+                        return { ...item, hours: Number.isFinite(hours) ? hours : 0 };
+                    }),
+                );
             } else {
                 toast.error("Failed to load student reports");
                 setReports([]);
@@ -144,8 +153,9 @@ export default function FacultyStudentReportsPage() {
     });
 
     const statusOptions = [
+        { id: "waiting", label: "Waiting for approval" },
+        { id: "approved", label: "Approved" },
         { id: "all", label: "All admin-verified" },
-        { id: "verified", label: "Verified only" },
     ] as const;
 
     return (

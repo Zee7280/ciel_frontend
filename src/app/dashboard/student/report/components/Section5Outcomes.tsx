@@ -10,6 +10,7 @@ import { Button } from "./ui/button";
 import { FieldError } from "./ui/FieldError";
 import { useReportForm } from "../context/ReportContext";
 import clsx from "clsx";
+import { REPORT_TEXT_RANGE_LABEL, reportTextWordMeter } from "../utils/validation";
 
 type MeasurableOutcome = {
     id: string;
@@ -163,6 +164,23 @@ const badgeMandatory =
 
 function wordCount(text: string): number {
     return (text || "").trim().split(/\s+/).filter(Boolean).length;
+}
+
+function WordMeterBar({ count }: { count: number }) {
+    const meter = reportTextWordMeter(count);
+    return (
+        <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="h-1.5 w-40 overflow-hidden rounded-full bg-slate-100 sm:w-48">
+                <div
+                    className={clsx("h-full rounded-full transition-all", meter.barClass)}
+                    style={{ width: `${meter.widthPct}%` }}
+                />
+            </div>
+            <p className={clsx("text-[11px] tabular-nums", meter.textClass)}>
+                {count} / 200 words
+            </p>
+        </div>
+    );
 }
 
 function lowerFirst(text: string): string {
@@ -465,35 +483,7 @@ function OutcomeCard({
                                 "border-red-300",
                         )}
                     />
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                        <div className="h-1.5 w-40 overflow-hidden rounded-full bg-slate-100 sm:w-48">
-                            <div
-                                className={clsx(
-                                    "h-full rounded-full transition-all",
-                                    explanationWords < 50
-                                        ? "bg-amber-400"
-                                        : explanationWords > 100
-                                          ? "bg-red-500"
-                                          : "bg-emerald-500",
-                                )}
-                                style={{
-                                    width: `${Math.min((explanationWords / 100) * 100, 100)}%`,
-                                }}
-                            />
-                        </div>
-                        <p
-                            className={clsx(
-                                "text-[11px] tabular-nums",
-                                explanationWords >= 50 && explanationWords <= 100
-                                    ? "text-emerald-600"
-                                    : explanationWords > 100
-                                      ? "text-red-500"
-                                      : "text-slate-400",
-                            )}
-                        >
-                            {explanationWords} / 50–100 words
-                        </p>
-                    </div>
+                    <WordMeterBar count={explanationWords} />
                     <FieldError
                         message={getFieldError(`measurable_outcomes.${index}.measurement_explanation`)}
                     />
@@ -679,7 +669,7 @@ export default function Section5Outcomes() {
                         5.1
                     </span>
                     <h3 className="text-base font-semibold text-slate-900">Observed change (narrative)</h3>
-                    <span className={clsx(badgeMandatory, "ml-auto")}>Mandatory · 100–200 words</span>
+                    <span className={clsx(badgeMandatory, "ml-auto")}>Mandatory · {REPORT_TEXT_RANGE_LABEL}</span>
                 </div>
 
                 <div className="space-y-5 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
@@ -767,40 +757,12 @@ export default function Section5Outcomes() {
                             and what beneficiaries can now do differently.
                         </p>
                         <Textarea
-                            placeholder="Explain the direction and nature of change (100–200 words)…"
+                            placeholder="Explain the direction and nature of change (20–200 words)…"
                             className={clsx(textareaClasses, "min-h-[160px]")}
                             value={section5.observed_change}
                             onChange={e => update("observed_change", e.target.value)}
                         />
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                            <div className="h-1.5 w-40 overflow-hidden rounded-full bg-slate-100 sm:w-48">
-                                <div
-                                    className={clsx(
-                                        "h-full rounded-full transition-all",
-                                        observedWords < 100
-                                            ? "bg-amber-400"
-                                            : observedWords > 200
-                                              ? "bg-red-500"
-                                              : "bg-emerald-500",
-                                    )}
-                                    style={{
-                                        width: `${Math.min((observedWords / 200) * 100, 100)}%`,
-                                    }}
-                                />
-                            </div>
-                            <p
-                                className={clsx(
-                                    "text-[11px] tabular-nums",
-                                    observedWords >= 100 && observedWords <= 200
-                                        ? "text-emerald-600"
-                                        : observedWords > 200
-                                          ? "text-red-500"
-                                          : "text-slate-400",
-                                )}
-                            >
-                                {observedWords} / 200 words
-                            </p>
-                        </div>
+                            <WordMeterBar count={observedWords} />
                     </div>
                 </div>
             </section>
@@ -848,7 +810,7 @@ export default function Section5Outcomes() {
                         5.3
                     </span>
                     <h3 className="text-base font-semibold text-slate-900">Challenges &amp; limitations</h3>
-                    <span className={clsx(badgeMandatory, "ml-auto")}>Mandatory · 100–200 words</span>
+                    <span className={clsx(badgeMandatory, "ml-auto")}>Mandatory · {REPORT_TEXT_RANGE_LABEL}</span>
                 </div>
 
                 <div className="space-y-5 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
@@ -910,35 +872,7 @@ export default function Section5Outcomes() {
                             value={section5.challenges}
                             onChange={e => update("challenges", e.target.value)}
                         />
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                            <div className="h-1.5 w-40 overflow-hidden rounded-full bg-slate-100 sm:w-48">
-                                <div
-                                    className={clsx(
-                                        "h-full rounded-full transition-all",
-                                        challengeWords < 100
-                                            ? "bg-amber-400"
-                                            : challengeWords > 200
-                                              ? "bg-red-500"
-                                              : "bg-emerald-500",
-                                    )}
-                                    style={{
-                                        width: `${Math.min((challengeWords / 200) * 100, 100)}%`,
-                                    }}
-                                />
-                            </div>
-                            <p
-                                className={clsx(
-                                    "text-[11px] tabular-nums",
-                                    challengeWords >= 100 && challengeWords <= 200
-                                        ? "text-emerald-600"
-                                        : challengeWords > 200
-                                          ? "text-red-500"
-                                          : "text-slate-400",
-                                )}
-                            >
-                                {challengeWords} / 200 words
-                            </p>
-                        </div>
+                            <WordMeterBar count={challengeWords} />
                     </div>
                 </div>
 

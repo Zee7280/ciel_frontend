@@ -6,7 +6,6 @@ import { ArrowRight, Award, Clock, Compass, ListChecks, CheckCircle2, Circle } f
 import clsx from "clsx";
 import { fetchStudentDashboardData } from "@/utils/student-dashboard-fetch";
 import { fetchImpactSummary, readImpactSummaryCache, type CielImpactSummary } from "@/utils/cielImpactSummary";
-import { readStoredCurrentUser } from "@/utils/currentUser";
 import { authenticatedFetch } from "@/utils/api";
 import type { DashboardData } from "@/app/dashboard/student/types";
 import { CIEL_PATHS, pathStateLabel } from "@/utils/cielPaths";
@@ -23,13 +22,6 @@ interface RecommendedOpportunity {
     organization_name?: string;
     /** Backend returns the raw Organization entity here, not a string — always read .name. */
     organization?: { name?: string } | null;
-}
-
-function greeting(): string {
-    const hour = new Date().getHours();
-    if (hour < 12) return "Good morning";
-    if (hour < 17) return "Good afternoon";
-    return "Good evening";
 }
 
 const CERT_LADDER = [
@@ -64,12 +56,8 @@ export default function StudentDashboardPage() {
     const [dashboard, setDashboard] = useState<DashboardData | null>(null);
     const [summary, setSummary] = useState<CielImpactSummary | null>(() => readImpactSummaryCache());
     const [opportunities, setOpportunities] = useState<RecommendedOpportunity[]>([]);
-    const [name, setName] = useState("");
 
     useEffect(() => {
-        const user = readStoredCurrentUser();
-        setName(typeof user?.name === "string" ? user.name.split(" ")[0] : "");
-
         Promise.all([
             fetchStudentDashboardData({ redirectToLogin: false }),
             fetchImpactSummary({ redirectToLogin: false }),
@@ -97,7 +85,7 @@ export default function StudentDashboardPage() {
             items.push({ id: "cs-verify", title: "Send logged hours for verification", detail: "You have hours waiting to be sent to a supervisor.", href: "/dashboard/student/paths/community-service?tab=log-hours" });
         }
         if (summary?.pathsStatus.startupBusiness.needsAction) {
-            items.push({ id: "sb-visible", title: "Your venture is ready to publish", detail: "You've reached the completeness threshold — make it visible.", href: "/dashboard/student/paths/startup-business" });
+            items.push({ id: "sb-visible", title: "Your venture is ready to publish", detail: "You've reached the completeness threshold — make it visible.", href: "/dashboard/student/paths/startup-business?view=workspace" });
         }
         return items.slice(0, 4);
     }, [dashboard, summary]);
@@ -109,8 +97,7 @@ export default function StudentDashboardPage() {
     return (
         <div className="mx-auto max-w-[1440px] space-y-8">
             <div>
-                <h1 className="text-2xl font-black text-ciel-text">{greeting()}{name ? `, ${name}` : ""}.</h1>
-                <p className="mt-1 text-sm text-ciel-text-mid">Here&apos;s where your impact stands today.</p>
+                <p className="text-sm text-ciel-text-mid">Here&apos;s where your impact stands today.</p>
             </div>
 
             {/* Hero */}

@@ -8,6 +8,7 @@ import { Textarea } from "./ui/textarea";
 import { useReportForm } from "../context/ReportContext";
 import { FieldError } from "./ui/FieldError";
 import clsx from "clsx";
+import { REPORT_TEXT_RANGE_LABEL, countWords, reportTextWordMeter } from "../utils/validation";
 
 // ─── Static configuration ───────────────────────────────────────────────────
 const continuationOptions = [
@@ -86,6 +87,8 @@ export default function Section10Sustainability() {
         continuation_keep_going = "",
         continuation_risk = "",
     } = section10;
+    const continuationWords = countWords(continuation_details || "");
+    const continuationMeter = reportTextWordMeter(continuationWords);
 
     const update = (field: string, val: unknown) => updateSection("section10", { [field]: val });
 
@@ -329,7 +332,7 @@ export default function Section10Sustainability() {
                         <StepHeader n="10.2" title="Step 2 — Tell us in two lines" status="mandatory" />
 
                         <div className="space-y-5 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-                            <p className="text-sm text-slate-500">We build the explanation — no 100-word minimum.</p>
+                            <p className="text-sm text-slate-500">{REPORT_TEXT_RANGE_LABEL} — we still draft it from the two lines below.</p>
 
                             <div className="space-y-1.5">
                                 <Label className={fieldLabel}>
@@ -368,6 +371,14 @@ export default function Section10Sustainability() {
                                             "border-red-200 focus:border-red-300 focus:ring-red-100",
                                     )}
                                 />
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                    <div className="h-1.5 w-40 overflow-hidden rounded-full bg-slate-100 sm:w-48">
+                                        <div className={clsx("h-full rounded-full transition-all", continuationMeter.barClass)} style={{ width: `${continuationMeter.widthPct}%` }} />
+                                    </div>
+                                    <p className={clsx("text-[11px] tabular-nums", continuationMeter.textClass)}>
+                                        {continuationWords} / 200 words
+                                    </p>
+                                </div>
                             </div>
 
                             <FieldError message={getFieldError("section10.continuation_details")} />

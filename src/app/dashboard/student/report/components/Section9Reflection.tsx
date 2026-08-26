@@ -9,6 +9,7 @@ import { Textarea } from "./ui/textarea";
 import { useReportForm } from "../context/ReportContext";
 import { FieldError } from "./ui/FieldError";
 import clsx from "clsx";
+import { reportTextWordMeter } from "../utils/validation";
 
 // ─── Static configuration ───────────────────────────────────────────────────
 const integrationOptions = [
@@ -132,34 +133,17 @@ function StepHeader({
 }
 
 function WordCount({ count }: { count: number }) {
+    const meter = reportTextWordMeter(count);
     return (
         <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="h-1.5 w-40 overflow-hidden rounded-full bg-slate-100 sm:w-48">
                 <div
-                    className={clsx(
-                        "h-full rounded-full transition-all",
-                        count < 100
-                            ? "bg-amber-400"
-                            : count > 200
-                                ? "bg-red-500"
-                                : "bg-emerald-500",
-                    )}
-                    style={{
-                        width: `${Math.min((count / 200) * 100, 100)}%`,
-                    }}
+                    className={clsx("h-full rounded-full transition-all", meter.barClass)}
+                    style={{ width: `${meter.widthPct}%` }}
                 />
             </div>
-            <p
-                className={clsx(
-                    "text-[11px] tabular-nums",
-                    count >= 100 && count <= 200
-                        ? "text-emerald-600"
-                        : count > 200
-                            ? "text-red-500"
-                            : "text-slate-400",
-                )}
-            >
-                {count} / 200 words (min 100)
+            <p className={clsx("text-[11px] tabular-nums", meter.textClass)}>
+                {count} / 200 words (min 20)
             </p>
         </div>
     );

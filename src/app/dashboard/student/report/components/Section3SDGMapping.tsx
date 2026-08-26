@@ -7,6 +7,7 @@ import { FieldError } from "./ui/FieldError";
 import { sdgData } from "@/utils/sdgData";
 import clsx from "clsx";
 import { listOpportunityReportSdgs } from "../utils/reportSdgMerge";
+import { REPORT_TEXT_MAX_WORDS, reportTextWordMeter } from "../utils/validation";
 
 interface Section3Props {
     projectData: any;
@@ -48,26 +49,17 @@ const dropdownClass =
 const fieldLabelClass =
     "text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500";
 
-function WordCountBar({ count, max = 200, text }: { count: number; max?: number; text?: string }) {
-    const ok = count >= 100 && count <= max;
-    const over = count > max;
+function WordCountBar({ count, max = REPORT_TEXT_MAX_WORDS, text }: { count: number; max?: number; text?: string }) {
+    const meter = reportTextWordMeter(count);
     return (
         <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="h-1.5 w-40 overflow-hidden rounded-full bg-slate-100 sm:w-48">
                 <div
-                    className={clsx(
-                        "h-full rounded-full transition-all",
-                        count < 100 ? "bg-amber-400" : over ? "bg-red-500" : "bg-emerald-500",
-                    )}
+                    className={clsx("h-full rounded-full transition-all", meter.barClass)}
                     style={{ width: `${Math.min((count / max) * 100, 100)}%` }}
                 />
             </div>
-            <span
-                className={clsx(
-                    "text-[11px] tabular-nums",
-                    ok ? "text-emerald-600" : over ? "text-red-500" : "text-slate-400",
-                )}
-            >
+            <span className={clsx("text-[11px] tabular-nums", meter.textClass)}>
                 {count} / {max} words{typeof text === "string" ? ` · ${text.length} characters` : ""}
             </span>
         </div>

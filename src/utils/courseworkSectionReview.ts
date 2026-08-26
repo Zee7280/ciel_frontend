@@ -1,4 +1,5 @@
 import { type CourseProjectEntry, stripEmoji } from "./courseProjectTypes";
+import { isPathEntryApproved, isPathEntryWaiting } from "./reviewQueue";
 
 export type SectionCheck = {
     label: string;
@@ -104,9 +105,9 @@ export function reviewCourseProjectSections(entry: CourseProjectEntry): SectionC
 }
 
 export function pendingFacultyReview(entry: { status?: string; facultyApprovalStatus?: string | null }) {
-    return entry.status === "submitted" && entry.facultyApprovalStatus !== "approved";
+    return isPathEntryWaiting(entry);
 }
 
 export function isFacultyApproved(entry: { status?: string; facultyApprovalStatus?: string | null }) {
-    return entry.status === "submitted" && entry.facultyApprovalStatus === "approved";
+    return isPathEntryApproved(entry);
 }

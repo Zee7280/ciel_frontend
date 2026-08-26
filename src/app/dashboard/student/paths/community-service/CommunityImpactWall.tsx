@@ -5,6 +5,7 @@ import Link from "next/link";
 import { authenticatedFetch } from "@/utils/api";
 import { CommunityCrumb, HubBackButton } from "@/components/ciel/community-service/CommunityServiceHubChrome";
 import { BADGE_CLASS, BADGE_ICON, type CommunityAwardBadge } from "@/utils/communityAwardModel";
+import { isCommunityReportOnLiveDeck } from "@/utils/reviewQueue";
 
 type WallRow = {
     id: string;
@@ -31,11 +32,7 @@ export default function CommunityImpactWall() {
             if (cancelled) return;
             const list = Array.isArray(reports?.data) ? reports.data : [];
             setRows(
-                list.filter((r: WallRow) => {
-                    const fac = String(r.faculty_status || "").toLowerCase();
-                    const st = String(r.status || "").toLowerCase();
-                    return fac === "approved" || st === "verified" || st === "paid";
-                }),
+                list.filter((r: WallRow) => isCommunityReportOnLiveDeck(r)),
             );
             const inbox = Array.isArray(notifs?.data) ? notifs.data : [];
             setNotes(
@@ -88,15 +85,27 @@ export default function CommunityImpactWall() {
                 {rows.length === 0 ? (
                     <p className="mt-3 text-[10px] text-[#7a919a]">Approved community-service reports will hang here.</p>
                 ) : (
-                    <div className="mt-3 space-y-2">
+                    <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
                         {rows.map((r) => (
-                            <div key={r.id} className="rounded-[14px] border border-[#dcebee] px-3.5 py-3">
-                                <b className="text-[12px]">{r.project_title || "Community service"}</b>
-                                <p className="mt-0.5 text-[9px] text-[#7a919a]">
-                                    {r.organization_name || "—"}
-                                    {r.cii_score != null ? ` · CII ${r.cii_score}/100` : ""}
-                                    {r.section1?.metrics?.total_verified_hours ? ` · ${r.section1.metrics.total_verified_hours}h` : ""}
-                                </p>
+                            <div key={r.id} className="overflow-hidden rounded-[17px] border border-[#dcebee] bg-white">
+                                <div className="relative bg-[linear-gradient(130deg,#04252b,#0e5f63_55%,#12a5a0_120%)] px-4 py-3 text-white">
+                                    <span className="absolute right-2.5 top-2.5 rounded-full bg-[linear-gradient(90deg,#6d28d9,#a78bfa)] px-2 py-0.5 text-[8px] font-extrabold">
+                                        {r.cii_score != null ? `CII ${r.cii_score}` : "LIVE"}
+                                    </span>
+                                    <div className="pr-16 text-[7px] font-extrabold tracking-[0.13em] text-[#99f6e4]">
+                                        {(r.organization_name || "Community service").toUpperCase()}
+                                    </div>
+                                    <b className="mt-1 block text-[11.5px] leading-snug">{r.project_title || "Community service"}</b>
+                                    <div className="mt-0.5 text-[9px] text-[#cdf5f0]">
+                                        {r.section1?.metrics?.total_verified_hours ? `${r.section1.metrics.total_verified_hours} verified hrs` : "Faculty-approved flash card"}
+                                    </div>
+                                </div>
+                                <div className="flex flex-wrap gap-1 px-3 py-2">
+                                    <span className="rounded-full bg-[#e6f6f4] px-2 py-0.5 text-[7px] font-extrabold text-[#0e7d74]">✅ FACULTY-APPROVED</span>
+                                    {r.cii_score != null ? (
+                                        <span className="rounded-full bg-[#f1ebfd] px-2 py-0.5 text-[7px] font-extrabold text-[#6d28d9]">🧠 CII {r.cii_score}/100</span>
+                                    ) : null}
+                                </div>
                             </div>
                         ))}
                     </div>

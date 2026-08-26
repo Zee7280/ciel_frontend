@@ -19,7 +19,7 @@
 }
 
 .fae .fae-wrap {
-    max-width: 1020px;
+    max-width: 1280px;
     margin: 0 auto;
 }
 
@@ -122,14 +122,28 @@
 
 .fae .fae-cols {
     display: grid;
-    grid-template-columns: 1fr 1.25fr;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.15fr);
     gap: 15px;
     align-items: start;
+}
+
+@media (max-width: 1100px) {
+    .fae .fae-cols {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .fae .fae-cols > :last-child {
+        grid-column: 1 / -1;
+    }
 }
 
 @media (max-width: 860px) {
     .fae .fae-cols {
         grid-template-columns: 1fr;
+    }
+
+    .fae .fae-cols > :last-child {
+        grid-column: auto;
     }
 }
 

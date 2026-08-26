@@ -2,9 +2,22 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { Info, MapPin, Clock, CheckCircle, AlertCircle, ChevronDown, ChevronUp, Users, Loader2, Plus } from "lucide-react";
+import { Info, MapPin, Clock, AlertCircle, ChevronDown, Loader2, Plus, Users } from "lucide-react";
 import { X } from "lucide-react";
 import { authenticatedFetch } from "@/utils/api";
+import {
+    ACTIVITY_TYPE_EMOJI,
+    BENEFICIARY_EMOJI,
+    CoChip,
+    CoFormHero,
+    CoLivePreview,
+    CoSectionHead,
+    MODE_EMOJI,
+    SKILL_EMOJI,
+    TIMELINE_EMOJI,
+    VERIFICATION_EMOJI,
+} from "@/components/opportunities/CreateOpportunityChrome";
+import "@/components/opportunities/create-opportunity.css";
 import { toast } from "sonner";
 import dynamic from "next/dynamic";
 import { findSdgById, opportunityFormSdgList } from "@/utils/sdgData";
@@ -714,87 +727,77 @@ export default function FacultyOpportunityCreationPage() {
         );
     };
 
+    const previewType = formData.opportunityType[0] || "";
+    const previewEmoji = ACTIVITY_TYPE_EMOJI[previewType] || "✨";
+    const previewBits = [
+        formData.mode || "",
+        formData.capacity.hours.trim() ? `${formData.capacity.hours}h per student` : "",
+        formData.capacity.volunteers.trim() ? `${formData.capacity.volunteers} students` : "",
+        formData.objectives.beneficiariesCount.trim() ? `~${formData.objectives.beneficiariesCount} beneficiaries` : "",
+        facultyDetails.name.trim() ? `led by ${facultyDetails.name}` : "",
+    ].filter(Boolean);
+    const previewPrimarySdg = formData.sdg ? findSdgById(formData.sdg) : null;
+    const previewSecondarySdg = formData.secondarySdgs[0] ? findSdgById(formData.secondarySdgs[0].sdgId) : null;
+
     return (
-        <div className="mx-auto max-w-[96rem] p-4 space-y-4 pb-24">
-            <div className="mb-4">
-                <h1 className="text-3xl font-bold text-slate-900">
-                    {editingOpportunityId ? "Edit faculty opportunity" : "Create Faculty Opportunity"}
-                </h1>
-                <p className="text-slate-500">
-                    {editingOpportunityId
+        <div className="co-form">
+            <CoFormHero
+                crumb={
+                    <>
+                        Community Service → <b className="text-[#0e7d74]">Create an Opportunity</b>
+                    </>
+                }
+                backHref="/dashboard/faculty/community-service"
+                kicker={editingOpportunityId ? "EDIT FACULTY OPPORTUNITY · SDG-ALIGNED" : "CREATE FACULTY OPPORTUNITY · SDG-ALIGNED"}
+                title={editingOpportunityId ? "Update your listing" : "Post for your students — let’s build it 🚀"}
+                subtitle={
+                    editingOpportunityId
                         ? "Update your posting. Some fields may be restricted after approval."
-                        : "Post an SDG-aligned opportunity for students. After you submit: if you added an external partner, they confirm first; then CIEL Admin gives final approval. When admin approves, the listing goes LIVE."}
-                </p>
-                {isLoadingEdit ? (
-                    <div className="mt-3 flex items-center gap-2 text-sm text-slate-600">
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        Loading opportunity…
-                    </div>
-                ) : null}
-            </div>
+                        : "Same form as students. Your profile is already filled. If you add an external partner they confirm first, then CIEL Admin publishes it live."
+                }
+                loading={isLoadingEdit}
+            />
 
             {/* SECTION A: FACULTY DETAILS */}
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                <div className="bg-slate-50 p-6 border-b border-slate-100 flex justify-between items-center">
-                    <div>
-                        <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                            Section A: Faculty Details
-                        </h2>
-                        <p className="text-xs text-slate-500 mt-1">From your profile (read-only). Update under My Profile if needed.</p>
+            <div className="co-card">
+                <CoSectionHead letter="A" title="Faculty details" tag="✅ FROM YOUR PROFILE — NOTHING TO TYPE" tagAuto color="#0d2b33" />
+                {isLoadingProfile ? (
+                    <div className="py-4 text-center text-[#7a919a]">
+                        <Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" /> Loading details...
                     </div>
-                    {isLoadingProfile ? <Loader2 className="w-5 h-5 animate-spin text-slate-400" /> : <CheckCircle className="w-5 h-5 text-green-500" />}
-                </div>
-                <div className="grid grid-cols-1 gap-6 p-5 opacity-75 pointer-events-none grayscale-[0.5] sm:p-6 md:grid-cols-2">
-                    {isLoadingProfile ? (
-                        <div className="col-span-2 text-center py-4 text-slate-400">Loading your details...</div>
-                    ) : (
-                        <>
-                            <div>
-                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Faculty name</label>
-                                <input type="text" value={facultyDetails.name} readOnly className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2 text-slate-700 font-medium" />
-                            </div>
-                            <div>
-                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Institution</label>
-                                <input type="text" value={facultyDetails.institution} readOnly className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2 text-slate-700 font-medium" />
-                            </div>
-                            <div>
-                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">City</label>
-                                <input type="text" value={facultyDetails.city} readOnly className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2 text-slate-700 font-medium" />
-                            </div>
-                            <div>
-                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Contact <span className="text-red-500">*</span></label>
-                                <PhoneConnectivityRow
-                                    phoneCountryKey={displayFacultyContact.phoneCountryKey}
-                                    nationalDigits={displayFacultyContact.national}
-                                    readOnly
-                                    placeholderNational="—"
-                                    selectClassName="rounded-lg border border-slate-200 bg-slate-50 py-2 text-xs font-medium text-slate-700"
-                                    inputClassName="rounded-lg border border-slate-200 bg-slate-50 py-2 text-sm font-medium text-slate-700"
-                                />
-                            </div>
-                        </>
-                    )}
-                </div>
+                ) : (
+                    <div className="mt-2 flex flex-wrap gap-2">
+                        <span className="co-locked">🧑‍🏫 <b>{facultyDetails.name || "—"}</b><span className="co-lock-badge">🔒</span></span>
+                        <span className="co-locked">🏛️ {facultyDetails.institution || "—"}<span className="co-lock-badge">🔒</span></span>
+                        {facultyDetails.city ? <span className="co-locked">📍 {facultyDetails.city}</span> : null}
+                        {facultyDetails.email ? <span className="co-locked">📧 {facultyDetails.email}</span> : null}
+                        <span className="co-locked pointer-events-none">
+                            📱
+                            <PhoneConnectivityRow
+                                phoneCountryKey={displayFacultyContact.phoneCountryKey}
+                                nationalDigits={displayFacultyContact.national}
+                                readOnly
+                                placeholderNational="—"
+                                selectClassName="rounded-lg border border-transparent bg-transparent py-0 text-xs font-medium text-[#0d2b33]"
+                                inputClassName="rounded-lg border-transparent bg-transparent py-0 text-sm font-medium text-[#0d2b33]"
+                            />
+                        </span>
+                    </div>
+                )}
             </div>
 
             {/* SECTION B: OPPORTUNITY OVERVIEW */}
-            <div className={`bg-white rounded-2xl border transition-all duration-300 ${expandedSections.includes('B') ? 'border-blue-500 shadow-xl ring-1 ring-blue-500' : 'border-slate-200 shadow-sm'}`}>
-                <div
-                    className="p-6 border-b border-slate-100 flex justify-between items-center cursor-pointer hover:bg-slate-50 transition-colors"
-                >
-                    <div onClick={() => toggleSection("B")}>
-                        <h2 className={`text-lg font-bold flex items-center gap-2 ${expandedSections.includes('B') ? 'text-blue-600' : 'text-slate-800'}`}>
-                            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${expandedSections.includes('B') ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-600'}`}>B</div>
-                            Section B: Opportunity overview
-                        </h2>
-                        <p className="text-xs text-slate-500 mt-1 pl-8">Basic details about the activity and commitment.</p>
-                    </div>
-                    <div onClick={() => toggleSection("B")}>
-                        {expandedSections.includes('B') ? <ChevronUp className="w-5 h-5 text-slate-400" /> : <ChevronDown className="w-5 h-5 text-slate-400" />}
-                    </div>
-                </div>
+            <div className="co-card co-accent" style={{ borderTopColor: "#0891b2" }}>
+                <CoSectionHead
+                    letter="B"
+                    title="Project overview"
+                    tag="THE BASICS"
+                    color="#0891b2"
+                    expanded={expandedSections.includes("B")}
+                    onToggle={() => toggleSection("B")}
+                />
 
-                <div className="space-y-8 p-5 sm:p-8">
+                <div className={`${!expandedSections.includes("B") ? "hidden" : ""}`}>
                     {/* B1. Title */}
                     <div>
                         <label className="block text-sm font-bold text-slate-900 mb-2">B1. Opportunity Title <span className="text-red-500">*</span></label>
@@ -810,36 +813,26 @@ export default function FacultyOpportunityCreationPage() {
 
                     {/* B2. Type */}
                     <div>
-                        <label className="block text-sm font-bold text-slate-900 mb-3">B2. Opportunity Type <span className="text-red-500">*</span></label>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            {["Community Service", "Volunteer Activity", "Awareness Campaign", "Training / Teaching", "Research / Survey Support", "Technical / Professional Support", "Environmental Action", "Corporate CSR Activity"].map(type => (
-                                <label key={type} className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${formData.opportunityType.includes(type) ? 'bg-blue-50 border-blue-200' : 'border-slate-100 hover:border-slate-300'}`}>
-                                    <input
-                                        type="checkbox"
-                                        className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                                        checked={formData.opportunityType.includes(type)}
-                                        onChange={() => toggleType(type)}
-                                    />
-                                    <span className={`text-sm font-medium ${formData.opportunityType.includes(type) ? 'text-blue-700' : 'text-slate-600'}`}>{type}</span>
-                                </label>
+                        <label className="co-label">B2 · Activity type · tap one or more</label>
+                        <div className="co-chips">
+                            {["Community Service", "Volunteer Activity", "Awareness Campaign", "Training / Teaching", "Research / Survey Support", "Technical / Professional Support", "Environmental Action", "Corporate CSR Activity"].map((type) => (
+                                <CoChip key={type} selected={formData.opportunityType.includes(type)} onClick={() => toggleType(type)}>
+                                    {ACTIVITY_TYPE_EMOJI[type] || ""} {type}
+                                </CoChip>
                             ))}
+                            <CoChip
+                                selected={formData.isOtherTypeChecked}
+                                onClick={() =>
+                                    setFormData({
+                                        ...formData,
+                                        isOtherTypeChecked: !formData.isOtherTypeChecked,
+                                        ...(!formData.isOtherTypeChecked ? {} : { otherTypeSpecs: [""] }),
+                                    })
+                                }
+                            >
+                                ✏️ Other
+                            </CoChip>
                         </div>
-                        <div className="mt-3">
-                            <label className={`flex items-center gap-2 p-3 border rounded-xl hover:bg-slate-50 cursor-pointer w-full md:w-1/3 mb-2 transition-all ${formData.isOtherTypeChecked ? 'bg-blue-50 border-blue-200' : 'border-slate-100'}`}>
-                                <input
-                                    type="checkbox"
-                                    className="rounded text-blue-600 focus:ring-blue-500"
-                                    checked={formData.isOtherTypeChecked}
-                                    onChange={(e) =>
-                                        setFormData({
-                                            ...formData,
-                                            isOtherTypeChecked: e.target.checked,
-                                            ...(e.target.checked ? {} : { otherTypeSpecs: [""] }),
-                                        })
-                                    }
-                                />
-                                <span className={`text-sm font-medium ${formData.isOtherTypeChecked ? 'text-blue-700' : 'text-slate-600'}`}>Other</span>
-                            </label>
                             {formData.isOtherTypeChecked && (
                                 <div className="mt-4 space-y-3 pl-4 border-l-2 border-blue-100">
                                     <p className="text-xs font-bold text-slate-500 uppercase">Add one or more other types</p>
@@ -885,32 +878,28 @@ export default function FacultyOpportunityCreationPage() {
                                     </button>
                                 </div>
                             )}
-                        </div>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                         {/* B3. Mode */}
                         <div>
-                            <label className="block text-sm font-bold text-slate-900 mb-3">B3. Mode of Engagement <span className="text-red-500">*</span></label>
-                            <div className="space-y-3">
-                                {['On site', 'Remote', 'Hybrid'].map((m) => (
-                                    <label key={m} className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${formData.mode === m ? 'bg-blue-50 border-blue-200 ring-1 ring-blue-200' : 'border-slate-100 hover:border-slate-300'}`}>
-                                        <input
-                                            type="radio"
-                                            name="mode"
-                                            className="w-4 h-4 text-blue-600 border-slate-300 focus:ring-blue-500"
-                                            checked={formData.mode === m}
-                                            onChange={() => setFormData({ ...formData, mode: m })}
-                                        />
-                                        <div>
-                                            <span className="block text-sm font-bold text-slate-700">{m}</span>
-                                            <span className="text-xs text-slate-500">
-                                                {m === 'On site' && 'Fieldwork, training, camps'}
-                                                {m === 'Remote' && 'Data analysis, content, research'}
-                                                {m === 'Hybrid' && 'Planning online + field execution'}
-                                            </span>
-                                        </div>
-                                    </label>
+                            <label className="co-label">B3 · Mode of engagement</label>
+                            <div className="grid grid-cols-3 gap-2">
+                                {(["On site", "Remote", "Hybrid"] as const).map((m) => (
+                                    <button
+                                        key={m}
+                                        type="button"
+                                        className={`co-choice${formData.mode === m ? " on" : ""}`}
+                                        onClick={() => setFormData({ ...formData, mode: m })}
+                                    >
+                                        <span className="text-lg">{MODE_EMOJI[m]}</span>
+                                        <b className="mt-1 block text-[11px]">{m}</b>
+                                        <span className="mt-0.5 block text-[9px] text-[#7a919a]">
+                                            {m === "On site" && "Fieldwork, training, camps"}
+                                            {m === "Remote" && "Data analysis, content, research"}
+                                            {m === "Hybrid" && "Planning online + field execution"}
+                                        </span>
+                                    </button>
                                 ))}
                             </div>
                         </div>
@@ -989,15 +978,11 @@ export default function FacultyOpportunityCreationPage() {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                             <div>
                                 <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Timeline Type</label>
-                                <div className="flex gap-2 mb-4">
-                                    {['Fixed dates', 'Flexible', 'Ongoing'].map((t) => (
-                                        <button
-                                            key={t}
-                                            onClick={() => setFormData({ ...formData, timelineType: t })}
-                                            className={`px-3 py-2 rounded-lg text-xs font-bold border transition-all ${formData.timelineType === t ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'}`}
-                                        >
-                                            {t}
-                                        </button>
+                                <div className="co-chips mb-4">
+                                    {(["Fixed dates", "Flexible", "Ongoing"] as const).map((t) => (
+                                        <CoChip key={t} selected={formData.timelineType === t} onClick={() => setFormData({ ...formData, timelineType: t })}>
+                                            {TIMELINE_EMOJI[t]} {t}
+                                        </CoChip>
                                     ))}
                                 </div>
 
@@ -1093,20 +1078,15 @@ export default function FacultyOpportunityCreationPage() {
             </div>
 
             {/* SECTION C: SDG SELECTION */}
-            <div className={`bg-white rounded-2xl border transition-all duration-300 ${expandedSections.includes('C') ? 'border-purple-500 shadow-xl ring-1 ring-purple-500' : 'border-slate-200 shadow-sm'}`}>
-                <div
-                    className="p-6 border-b border-slate-100 flex justify-between items-center cursor-pointer hover:bg-slate-50 transition-colors"
-                    onClick={() => toggleSection("C")}
-                >
-                    <div>
-                        <h2 className={`text-lg font-bold flex items-center gap-2 ${expandedSections.includes('C') ? 'text-purple-600' : 'text-slate-800'}`}>
-                            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${expandedSections.includes('C') ? 'bg-purple-600 text-white' : 'bg-slate-200 text-slate-600'}`}>C</div>
-                            Section C: SDG Selection
-                        </h2>
-                        <p className="text-xs text-slate-500 mt-1 pl-8">Critical Linkage (Locked for students)</p>
-                    </div>
-                    {expandedSections.includes('C') ? <ChevronUp className="w-5 h-5 text-slate-400" /> : <ChevronDown className="w-5 h-5 text-slate-400" />}
-                </div>
+            <div className="co-card co-accent" style={{ borderTopColor: "#6d28d9" }}>
+                <CoSectionHead
+                    letter="C"
+                    title="SDG selection"
+                    tag="LOCKED FOR STUDENTS"
+                    color="#6d28d9"
+                    expanded={expandedSections.includes("C")}
+                    onToggle={() => toggleSection("C")}
+                />
 
                 <div className={`space-y-6 p-5 sm:p-8 ${!expandedSections.includes('C') ? 'hidden' : ''}`}>
                     <div className="bg-amber-50 p-4 rounded-xl border border-amber-100 flex gap-3 text-sm text-amber-800 mb-6">
@@ -1298,20 +1278,15 @@ export default function FacultyOpportunityCreationPage() {
                 </div>
             </div>
             {/* SECTION D: SDG ALIGNED OBJECTIVES */}
-            <div className={`bg-white rounded-2xl border transition-all duration-300 ${expandedSections.includes('D') ? 'border-teal-500 shadow-xl ring-1 ring-teal-500' : 'border-slate-200 shadow-sm'}`}>
-                <div
-                    className="p-6 border-b border-slate-100 flex justify-between items-center cursor-pointer hover:bg-slate-50 transition-colors"
-                    onClick={() => toggleSection("D")}
-                >
-                    <div>
-                        <h2 className={`text-lg font-bold flex items-center gap-2 ${expandedSections.includes('D') ? 'text-teal-600' : 'text-slate-800'}`}>
-                            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${expandedSections.includes('D') ? 'bg-teal-600 text-white' : 'bg-slate-200 text-slate-600'}`}>D</div>
-                            Section D: SDG Aligned Objectives
-                        </h2>
-                        <p className="text-xs text-slate-500 mt-1 pl-8">Translate global SDGs into clear local action.</p>
-                    </div>
-                    {expandedSections.includes('D') ? <ChevronUp className="w-5 h-5 text-slate-400" /> : <ChevronDown className="w-5 h-5 text-slate-400" />}
-                </div>
+            <div className="co-card co-accent" style={{ borderTopColor: "#0e7d74" }}>
+                <CoSectionHead
+                    letter="D"
+                    title="SDG-aligned objectives"
+                    tag="LOCAL ACTION"
+                    color="#0e7d74"
+                    expanded={expandedSections.includes("D")}
+                    onToggle={() => toggleSection("D")}
+                />
 
                 <div className={`space-y-6 p-5 sm:p-8 ${!expandedSections.includes('D') ? 'hidden' : ''}`}>
                     {/* D1. Project Objective */}
@@ -1341,24 +1316,23 @@ export default function FacultyOpportunityCreationPage() {
                                 />
                             </div>
                             <div>
-                                <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Type of Beneficiaries</label>
-                                <div className="h-40 overflow-y-auto border border-slate-200 rounded-lg bg-white p-2 space-y-2">
-                                    {["Children", "Youth", "Women", "Elderly", "Persons with disabilities", "Students", "Community members"].map(b => (
-                                        <label key={b} className="flex items-center gap-2 text-sm text-slate-600">
-                                            <input
-                                                type="checkbox"
-                                                className="rounded text-teal-600 focus:ring-teal-500"
-                                                checked={formData.objectives.beneficiariesType.includes(b)}
-                                                onChange={() => {
-                                                    const types = formData.objectives.beneficiariesType.includes(b)
-                                                        ? formData.objectives.beneficiariesType.filter(t => t !== b)
-                                                        : [...formData.objectives.beneficiariesType, b];
-                                                    setFormData({ ...formData, objectives: { ...formData.objectives, beneficiariesType: types } });
-                                                }}
-                                            /> {b}
-                                        </label>
+                                <label className="co-label">Type of beneficiaries</label>
+                                <div className="co-chips">
+                                    {["Children", "Youth", "Women", "Elderly", "Persons with disabilities", "Students", "Community members"].map((b) => (
+                                        <CoChip
+                                            key={b}
+                                            selected={formData.objectives.beneficiariesType.includes(b)}
+                                            onClick={() => {
+                                                const types = formData.objectives.beneficiariesType.includes(b)
+                                                    ? formData.objectives.beneficiariesType.filter((t) => t !== b)
+                                                    : [...formData.objectives.beneficiariesType, b];
+                                                setFormData({ ...formData, objectives: { ...formData.objectives, beneficiariesType: types } });
+                                            }}
+                                        >
+                                            {BENEFICIARY_EMOJI[b] || ""} {b}
+                                        </CoChip>
                                     ))}
-                               
+                                </div>
                                     {formData.objectives.beneficiariesType.some(t => !["Children", "Youth", "Women", "Elderly", "Persons with disabilities", "Students", "Community members"].includes(t)) && (
                                         <div className="pl-6 animate-in fade-in slide-in-from-top-2">
                                             <input
@@ -1382,7 +1356,6 @@ export default function FacultyOpportunityCreationPage() {
                                             />
                                         </div>
                                     )}
-                                </div>
                                 <div className="mt-3">
                                     <label className={`flex items-center gap-2 p-3 border rounded-xl hover:bg-slate-50 cursor-pointer transition-all ${formData.objectives.isOtherBeneficiaryChecked ? 'bg-teal-50 border-teal-200' : 'border-slate-100'}`}>
                                         <input
@@ -1472,20 +1445,15 @@ export default function FacultyOpportunityCreationPage() {
             </div>
 
             {/* SECTION E: ACTIVITY DETAILS */}
-            <div className={`bg-white rounded-2xl border transition-all duration-300 ${expandedSections.includes('E') ? 'border-indigo-500 shadow-xl ring-1 ring-indigo-500' : 'border-slate-200 shadow-sm'}`}>
-                <div
-                    className="p-6 border-b border-slate-100 flex justify-between items-center cursor-pointer hover:bg-slate-50 transition-colors"
-                    onClick={() => toggleSection("E")}
-                >
-                    <div>
-                        <h2 className={`text-lg font-bold flex items-center gap-2 ${expandedSections.includes('E') ? 'text-indigo-600' : 'text-slate-800'}`}>
-                            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${expandedSections.includes('E') ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-600'}`}>E</div>
-                            Section E: Activity Details
-                        </h2>
-                        <p className="text-xs text-slate-500 mt-1 pl-8">What students will actually do.</p>
-                    </div>
-                    {expandedSections.includes('E') ? <ChevronUp className="w-5 h-5 text-slate-400" /> : <ChevronDown className="w-5 h-5 text-slate-400" />}
-                </div>
+            <div className="co-card co-accent" style={{ borderTopColor: "#6d28d9" }}>
+                <CoSectionHead
+                    letter="E"
+                    title="Activity details"
+                    tag="WHAT STUDENTS DO"
+                    color="#6d28d9"
+                    expanded={expandedSections.includes("E")}
+                    onToggle={() => toggleSection("E")}
+                />
 
                 <div className={`space-y-6 p-5 sm:p-8 ${!expandedSections.includes('E') ? 'hidden' : ''}`}>
                     <div>
@@ -1498,23 +1466,21 @@ export default function FacultyOpportunityCreationPage() {
                         ></textarea>
                     </div>
                     <div>
-                        <label className="block text-sm font-bold text-slate-900 mb-2">E2. Skills Gained</label>
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                            {["Leadership", "Communication", "Teaching", "Teamwork", "Digital Skills", "Research", "Problem Solving"].map(s => (
-                                <label key={s} className="flex items-center gap-2 p-3 border border-slate-100 rounded-lg hover:bg-slate-50 cursor-pointer">
-                                    <input
-                                        type="checkbox"
-                                        className="rounded text-indigo-600 focus:ring-indigo-500"
-                                        checked={formData.activity.skills.includes(s)}
-                                        onChange={() => {
-                                            const skills = formData.activity.skills.includes(s)
-                                                ? formData.activity.skills.filter(i => i !== s)
-                                                : [...formData.activity.skills, s];
-                                            setFormData({ ...formData, activity: { ...formData.activity, skills: skills } });
-                                        }}
-                                    />
-                                    <span className="text-sm font-medium text-slate-700">{s}</span>
-                                </label>
+                        <label className="co-label">E2 · Skills gained · tap what applies</label>
+                        <div className="co-chips">
+                            {["Leadership", "Communication", "Teaching", "Teamwork", "Digital Skills", "Research", "Problem Solving"].map((s) => (
+                                <CoChip
+                                    key={s}
+                                    selected={formData.activity.skills.includes(s)}
+                                    onClick={() => {
+                                        const skills = formData.activity.skills.includes(s)
+                                            ? formData.activity.skills.filter((i) => i !== s)
+                                            : [...formData.activity.skills, s];
+                                        setFormData({ ...formData, activity: { ...formData.activity, skills } });
+                                    }}
+                                >
+                                    {SKILL_EMOJI[s] || ""} {s}
+                                </CoChip>
                             ))}
                         </div>
                         <div className="mt-3">
@@ -1602,17 +1568,15 @@ export default function FacultyOpportunityCreationPage() {
             </div>
 
             {/* SECTION F: VERIFICATION & SAFETY (FACULTY-CREATED) */}
-            <div className={`bg-white rounded-2xl border transition-all duration-300 ${expandedSections.includes('F') ? 'border-orange-500 shadow-xl ring-1 ring-orange-500' : 'border-slate-200 shadow-sm'}`}>
-                <div
-                    className="p-6 border-b border-slate-100 flex justify-between items-center cursor-pointer hover:bg-slate-50 transition-colors"
-                    onClick={() => toggleSection("F")}
-                >
-                    <h2 className={`text-lg font-bold flex items-center gap-2 ${expandedSections.includes('F') ? 'text-orange-600' : 'text-slate-800'}`}>
-                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${expandedSections.includes('F') ? 'bg-orange-600 text-white' : 'bg-slate-200 text-slate-600'}`}>F</div>
-                        Section F — Verification &amp; Safety
-                    </h2>
-                    {expandedSections.includes('F') ? <ChevronUp className="w-5 h-5 text-slate-400" /> : <ChevronDown className="w-5 h-5 text-slate-400" />}
-                </div>
+            <div className="co-card co-accent" style={{ borderTopColor: "#b45309" }}>
+                <CoSectionHead
+                    letter="F"
+                    title="Verification & safety"
+                    tag="ACADEMIC LEAD"
+                    color="#b45309"
+                    expanded={expandedSections.includes("F")}
+                    onToggle={() => toggleSection("F")}
+                />
                 <div className={`space-y-10 p-5 sm:p-8 ${!expandedSections.includes('F') ? 'hidden' : ''}`}>
                     <p className="text-sm text-slate-600">
                         Academic validity, supervision, and optional external collaboration. The opportunity is treated as institutionally verified from your official credentials as Academic Lead.
@@ -1834,34 +1798,32 @@ export default function FacultyOpportunityCreationPage() {
             </div>
 
             {/* SECTION G: VERIFICATION */}
-            <div className={`bg-white rounded-2xl border transition-all duration-300 ${expandedSections.includes('G') ? 'border-cyan-500 shadow-xl ring-1 ring-cyan-500' : 'border-slate-200 shadow-sm'}`}>
-                <div
-                    className="p-6 border-b border-slate-100 flex justify-between items-center cursor-pointer hover:bg-slate-50 transition-colors"
-                    onClick={() => toggleSection("G")}
-                >
-                    <h2 className={`text-lg font-bold flex items-center gap-2 ${expandedSections.includes('G') ? 'text-cyan-600' : 'text-slate-800'}`}>
-                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${expandedSections.includes('G') ? 'bg-cyan-600 text-white' : 'bg-slate-200 text-slate-600'}`}>G</div>
-                        Section G: Verification
-                    </h2>
-                    {expandedSections.includes('G') ? <ChevronUp className="w-5 h-5 text-slate-400" /> : <ChevronDown className="w-5 h-5 text-slate-400" />}
-                </div>
+            <div className="co-card co-accent" style={{ borderTopColor: "#f472b6" }}>
+                <CoSectionHead
+                    letter="G"
+                    title="Evidence & verification"
+                    tag="SET EXPECTATIONS NOW"
+                    tagAuto
+                    color="#f472b6"
+                    expanded={expandedSections.includes("G")}
+                    onToggle={() => toggleSection("G")}
+                />
                 <div className={`space-y-6 p-5 sm:p-8 ${!expandedSections.includes('G') ? 'hidden' : ''}`}>
-                    <label className="block text-sm font-bold text-slate-900 mb-2">G1. How will student participation be verified?</label>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        {["Attendance sheets", "Supervisor sign-off", "Photos of activities", "Assessment sheets", "Digital logs"].map(v => (
-                            <label key={v} className="flex items-center gap-2 text-sm font-medium text-slate-700">
-                                <input
-                                    type="checkbox"
-                                    className="rounded text-cyan-600 focus:ring-cyan-500"
-                                    checked={formData.verification.includes(v)}
-                                    onChange={() => {
-                                        const vers = formData.verification.includes(v)
-                                            ? formData.verification.filter(i => i !== v)
-                                            : [...formData.verification, v];
-                                        setFormData({ ...formData, verification: vers });
-                                    }}
-                                /> {v}
-                            </label>
+                    <label className="co-label">G1 · How will student participation be verified?</label>
+                    <div className="co-chips">
+                        {["Attendance sheets", "Supervisor sign-off", "Photos of activities", "Assessment sheets", "Digital logs"].map((v) => (
+                            <CoChip
+                                key={v}
+                                selected={formData.verification.includes(v)}
+                                onClick={() => {
+                                    const vers = formData.verification.includes(v)
+                                        ? formData.verification.filter((i) => i !== v)
+                                        : [...formData.verification, v];
+                                    setFormData({ ...formData, verification: vers });
+                                }}
+                            >
+                                {VERIFICATION_EMOJI[v] || ""} {v}
+                            </CoChip>
                         ))}
                     </div>
                     <div className="mt-4">
@@ -1888,17 +1850,15 @@ export default function FacultyOpportunityCreationPage() {
             </div>
 
             {/* SECTION H: VISIBILITY & INSTITUTIONAL ACCESS (F5) */}
-            <div className={`bg-white rounded-2xl border transition-all duration-300 ${expandedSections.includes('H') ? 'border-pink-500 shadow-xl ring-1 ring-pink-500' : 'border-slate-200 shadow-sm'}`}>
-                <div
-                    className="p-6 border-b border-slate-100 flex justify-between items-center cursor-pointer hover:bg-slate-50 transition-colors"
-                    onClick={() => toggleSection("H")}
-                >
-                    <h2 className={`text-lg font-bold flex items-center gap-2 ${expandedSections.includes('H') ? 'text-pink-600' : 'text-slate-800'}`}>
-                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${expandedSections.includes('H') ? 'bg-pink-600 text-white' : 'bg-slate-200 text-slate-600'}`}>H</div>
-                        Section H — Visibility &amp; institutional access (F5)
-                    </h2>
-                    {expandedSections.includes('H') ? <ChevronUp className="w-5 h-5 text-slate-400" /> : <ChevronDown className="w-5 h-5 text-slate-400" />}
-                </div>
+            <div className="co-card co-accent" style={{ borderTopColor: "#db2777" }}>
+                <CoSectionHead
+                    letter="H"
+                    title="Visibility & institutional access"
+                    tag="WHO CAN JOIN"
+                    color="#db2777"
+                    expanded={expandedSections.includes("H")}
+                    onToggle={() => toggleSection("H")}
+                />
                 <div className={`space-y-6 p-5 sm:p-8 ${!expandedSections.includes('H') ? 'hidden' : ''}`}>
                     <div>
                         <h3 className="text-sm font-black text-pink-700 uppercase tracking-wide mb-1">F5.1 Participation scope</h3>
@@ -2172,77 +2132,87 @@ export default function FacultyOpportunityCreationPage() {
             </div>
 
             {/* SECTION I: F6 REQUIRED CONFIRMATIONS */}
-            <div className="rounded-2xl bg-slate-900 p-5 text-white sm:p-8">
-                <h2 className="text-xl font-bold mb-2 flex items-center gap-2">
-                    <CheckCircle className="w-6 h-6 text-green-400" /> Section I — Required confirmations (F6)
-                </h2>
-                <p className="text-sm text-slate-400 mb-6">By submitting, you confirm the following:</p>
-                <div className="space-y-4">
-                    {(
-                        [
-                            {
-                                key: "academicallyValid" as const,
-                                label: "The opportunity is academically valid and accurately described.",
-                            },
-                            {
-                                key: "properlySupervised" as const,
-                                label: "The activity will be properly supervised.",
-                            },
-                            {
-                                key: "safeEnvironment" as const,
-                                label: "The environment is safe and appropriate for students.",
-                            },
-                            {
-                                key: "correctVerifiable" as const,
-                                label: "All provided information is correct and verifiable.",
-                            },
-                        ] as const
-                    ).map(({ key, label }) => (
-                        <label key={key} className="flex items-start gap-4 cursor-pointer opacity-90 hover:opacity-100">
-                            <input
-                                type="checkbox"
-                                className="mt-1 w-5 h-5 rounded border-slate-600 text-green-500 focus:ring-offset-slate-900 focus:ring-green-500 shrink-0"
-                                checked={formData.finalConfirmations[key]}
-                                onChange={(e) =>
-                                    setFormData({
-                                        ...formData,
-                                        finalConfirmations: {
-                                            ...formData.finalConfirmations,
-                                            [key]: e.target.checked,
-                                        },
-                                    })
-                                }
-                            />
-                            <span className="text-sm leading-relaxed">{label}</span>
-                        </label>
-                    ))}
+            <div className="co-final mb-3 rounded-[20px] bg-[#0d2b33] p-5 text-white">
+                <div className="mb-1 flex items-center gap-2.5">
+                    <span className="flex h-[26px] min-w-[28px] items-center justify-center rounded-[9px] bg-[#2dd4bf] px-2 text-[11px] font-extrabold text-[#04252b]">✓</span>
+                    <h2 className="text-[14.5px] font-extrabold text-white">Final confirmations</h2>
+                </div>
+                <p className="mb-2 text-[11px] leading-relaxed text-[#a5e8de]">By submitting, you confirm the following — tap each:</p>
+                {(
+                    [
+                        { key: "academicallyValid" as const, label: "The opportunity is academically valid and accurately described." },
+                        { key: "properlySupervised" as const, label: "The activity will be properly supervised." },
+                        { key: "safeEnvironment" as const, label: "The environment is safe and appropriate for students." },
+                        { key: "correctVerifiable" as const, label: "All provided information is correct and verifiable." },
+                    ] as const
+                ).map(({ key, label }) => (
+                    <button
+                        key={key}
+                        type="button"
+                        className={`co-confirm${formData.finalConfirmations[key] ? " on" : ""}`}
+                        onClick={() =>
+                            setFormData({
+                                ...formData,
+                                finalConfirmations: {
+                                    ...formData.finalConfirmations,
+                                    [key]: !formData.finalConfirmations[key],
+                                },
+                            })
+                        }
+                    >
+                        <span className="co-tick">{formData.finalConfirmations[key] ? "✓" : ""}</span>
+                        <span>{label}</span>
+                    </button>
+                ))}
+                <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2">
+                    <span className="co-locked" style={{ background: "rgba(255,255,255,.08)", borderColor: "rgba(255,255,255,.25)", color: "#fff" }}>
+                        🧑‍🏫 <b style={{ color: "#fff" }}>{facultyDetails.name || "—"}</b><span className="co-lock-badge">🔒</span>
+                    </span>
+                    <span className="co-locked" style={{ background: "rgba(255,255,255,.08)", borderColor: "rgba(255,255,255,.25)", color: "#fff" }}>
+                        🏛️ {facultyDetails.institution || "—"}<span className="co-lock-badge">🔒</span>
+                    </span>
+                </div>
+                <div className="mt-3.5 flex gap-2.5">
+                    <button
+                        type="button"
+                        onClick={handleSaveDraft}
+                        className="flex-1 rounded-[13px] border border-white/30 bg-transparent py-3 text-xs font-extrabold text-[#d9f7f2] disabled:opacity-50"
+                        disabled={isSubmitting || isLoadingEdit}
+                    >
+                        💾 Save draft
+                    </button>
+                    <button
+                        type="button"
+                        onClick={handleSubmit}
+                        disabled={isSubmitting || isLoadingEdit}
+                        className="flex-[2] rounded-[13px] bg-[linear-gradient(90deg,#0e7d74,#2dd4bf)] py-3 text-[13px] font-extrabold text-white disabled:opacity-70"
+                    >
+                        {isSubmitting ? <Loader2 className="mx-auto h-4 w-4 animate-spin" /> : null}
+                        {isSubmitting ? "Submitting..." : editingOpportunityId ? "Save changes" : "🚀 Submit opportunity"}
+                    </button>
                 </div>
             </div>
 
-            <div className="fixed bottom-24 left-0 right-0 z-50 flex flex-wrap justify-end gap-2 border-t border-slate-200 bg-white p-3 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] sm:gap-3 sm:p-4 lg:bottom-0 lg:left-[var(--ciel-sidebar-width)] lg:gap-4">
-                <button
-                    type="button"
-                    onClick={() => router.push("/dashboard/faculty")}
-                    className="flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2 font-bold text-slate-600 hover:bg-slate-50 sm:px-6"
-                >
-                    <X className="w-4 h-4" /> Cancel
-                </button>
-                <button
-                    onClick={handleSaveDraft}
-                    className="rounded-xl border border-slate-200 px-4 py-2 font-bold text-slate-600 hover:bg-slate-50 sm:px-6"
-                    disabled={isSubmitting}
-                >
-                    Save Draft
-                </button>
-                <button
-                    onClick={handleSubmit}
-                    disabled={isSubmitting}
-                    className="flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 font-bold text-white shadow-lg shadow-blue-500/30 hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-70 sm:px-6"
-                >
-                    {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-                    {isSubmitting ? "Submitting..." : "Submit Opportunity"}
-                </button>
-            </div>
+            <CoLivePreview
+                emoji={previewEmoji}
+                title={formData.title}
+                bits={previewBits}
+                sdgs={
+                    <>
+                        {previewPrimarySdg ? (
+                            <span className="co-sdg" style={{ background: previewPrimarySdg.color ?? "#0e7d74" }}>
+                                SDG {previewPrimarySdg.number}
+                                {formData.target ? ` · ${formData.target}` : ""}
+                            </span>
+                        ) : null}
+                        {previewSecondarySdg ? (
+                            <span className="co-sdg" style={{ background: previewSecondarySdg.color ?? "#6d28d9" }}>
+                                SDG {previewSecondarySdg.number}
+                            </span>
+                        ) : null}
+                    </>
+                }
+            />
         </div>
     );
 }

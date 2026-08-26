@@ -94,16 +94,21 @@ export default function ThesisCard({
                         <span className="text-[10px] font-black uppercase tracking-widest text-ciel-text-soft">➖ No SDG applies — flagged for review</span>
                     </div>
                 ) : (sm.entries?.length ?? 0) > 0 && (
-                    <div className="mt-4 flex flex-wrap items-center gap-2">
-                        <span className="text-[10px] font-black uppercase tracking-widest text-ciel-text-soft">SDGs</span>
+                    <div className="mt-4 flex min-w-0 items-center gap-1.5 overflow-x-auto">
+                        <span className="shrink-0 text-[10px] font-black uppercase tracking-widest text-ciel-text-soft">SDGs</span>
                         {(sm.entries || []).map((en, i) => {
                             const sdg = sdgData.find((s) => s.number === en.goalNumber);
                             if (!sdg) return null;
                             return (
-                                <span key={en.goalNumber} className="flex items-center gap-1.5 rounded-ciel-xs px-2 py-1 text-[10px] font-black text-white" style={{ backgroundColor: sdg.color }}>
-                                    {i === 0 ? <span aria-hidden>★</span> : null}
-                                    <span>{sdg.number}</span>
-                                    <span className="hidden sm:inline">{sdg.title.toUpperCase()}</span>
+                                <span
+                                    key={en.goalNumber}
+                                    title={`${sdg.number} ${sdg.title}`}
+                                    className="inline-flex min-w-0 max-w-[9.75rem] shrink-0 items-center gap-1 whitespace-nowrap rounded-ciel-xs px-2 py-1 text-[10px] font-black text-white"
+                                    style={{ backgroundColor: sdg.color }}
+                                >
+                                    {i === 0 ? <span aria-hidden className="shrink-0">★</span> : null}
+                                    <span className="shrink-0">{sdg.number}</span>
+                                    <span className="min-w-0 truncate">{sdg.title.toUpperCase()}</span>
                                 </span>
                             );
                         })}

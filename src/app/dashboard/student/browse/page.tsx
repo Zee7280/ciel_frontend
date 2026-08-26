@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "../report/components/ui/button";
-import { Badge } from "../report/components/ui/badge";
 import { authenticatedFetch } from "@/utils/api";
 import { resolveAttendanceApproverType, type AttendanceApproverType } from "@/utils/attendanceApproverRouting";
 import { getStoredCurrentUserId } from "@/utils/currentUser";
@@ -24,9 +23,9 @@ import {
     resolveStudentUniversityApplyEligibility,
 } from "@/utils/studentOpportunityApplyEligibility";
 import {
+    isJoinApplicationPendingStatus,
     isJoinApplicationRejectedStatus,
     joinApplicationLocksApplyButton,
-    joinApplicationPendingLabel,
     mergeHasAppliedFields,
     pickJoinApplicationId,
     pickJoinApplicationStage,
@@ -36,12 +35,15 @@ import {
     pickReportStatusFromCheckRow,
     resolveStudentBrowseReportCta,
 } from "@/utils/studentBrowseReportCta";
-import { Loader2, MapPin, Calendar, Clock, Globe, CheckCircle2, LayoutGrid, List, Users, Mail, Phone, GraduationCap, Share2, SlidersHorizontal, Building2, ChevronDown, Compass } from "lucide-react";
+import { Loader2, MapPin, Calendar, Clock, Globe, CheckCircle2, LayoutGrid, List, Users, Mail, Phone, GraduationCap, Share2, Building2, ChevronDown, Search } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import ApplicationDialog from "./components/ApplicationDialog";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "../report/components/ui/dialog";
-import { ScoringLevelsButton, ScoringLevelsDialog } from "@/components/scoring/ScoringLevelsDialog";
+import { ScoringLevelsDialog } from "@/components/scoring/ScoringLevelsDialog";
+import { fetchImpactSummary, readImpactSummaryCache } from "@/utils/cielImpactSummary";
+import { fetchStudentDashboardData } from "@/utils/student-dashboard-fetch";
+import ProgressBar from "@/components/ciel/ProgressBar";
 
 interface TeamMember {
     name: string;
@@ -83,7 +85,10 @@ interface BrowseOpportunity {
     };
     organization?: {
         city?: string;
+        name?: string;
     };
+    createdAt?: string;
+    seatsTotal?: number | null;
     /** Normalized for listing filters */
     universityLabel?: string;
     modeBucket?: ModeBucket;
@@ -185,11 +190,29 @@ function normalizeOpportunity(op: BrowseOpportunity): BrowseOpportunity {
     const application_id = pickJoinApplicationId(raw) || op.application_id;
     const application_stage = (pickJoinApplicationStage(raw) ?? op.application_stage ?? null) as string | null;
 
+    const org = raw.organization;
+    const orgName =
+        op.organization_name ||
+        (org && typeof org === "object" && typeof (org as { name?: unknown }).name === "string"
+            ? (org as { name: string }).name
+            : undefined);
+
+    const timeline = raw.timeline && typeof raw.timeline === "object" ? (raw.timeline as Record<string, unknown>) : null;
+    const needed = Number(
+        raw.volunteers_needed ?? raw.volunteersNeeded ?? timeline?.volunteers_required ?? raw.volunteers_count ?? op.volunteersNeeded,
+    );
+    const seatsTotal = Number.isFinite(needed) && needed > 0 ? needed : null;
+    const createdRaw = raw.created_at ?? raw.createdAt ?? raw.published_at;
+    const createdAt = typeof createdRaw === "string" && createdRaw.trim() ? createdRaw : undefined;
+
     return {
         ...op,
         hours: pickBrowseCreditHours(raw, op),
+        organization_name: orgName,
         city,
         category,
+        createdAt,
+        seatsTotal,
         hasApplied,
         has_applied: hasApplied,
         applyLocked,
@@ -250,6 +273,36 @@ function shouldShowInBrowse(op: BrowseOpportunity): boolean {
     );
 }
 
+function scheduleLabel(op: BrowseOpportunity): string {
+    if (op.start_date) {
+        const d = new Date(op.start_date);
+        if (!Number.isNaN(d.getTime())) {
+            return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+        }
+    }
+    return "Flexible";
+}
+
+function hoursCreditLabel(op: BrowseOpportunity): string {
+    const n = typeof op.hours === "number" ? op.hours : Number(op.hours);
+    const shown = Number.isFinite(n) ? n : op.hours || "0";
+    return `${shown} hours credit`;
+}
+
+function seatsLeftLabel(op: BrowseOpportunity): string {
+    const left = op.seatsRemaining ?? op.remaining_seats ?? 0;
+    if (op.seatsTotal && op.seatsTotal > 0) return `${left} of ${op.seatsTotal} seats left`;
+    return `${left} seats left`;
+}
+
+function pathTagLabel(op: BrowseOpportunity): string {
+    return op.opportunityTypes?.[0] || op.category || "Community service";
+}
+
+function isPendingJoin(op: BrowseOpportunity): boolean {
+    return isJoinApplicationPendingStatus(op.application_status || "");
+}
+
 export default function StudentBrowseOpportunitiesPage() {
     const [opportunities, setOpportunities] = useState<BrowseOpportunity[]>([]);
     const [studentInstitution, setStudentInstitution] = useState("");
@@ -263,6 +316,14 @@ export default function StudentBrowseOpportunitiesPage() {
     const [selectedTeamOpp, setSelectedTeamOpp] = useState<BrowseOpportunity | null>(null);
     const [isTeamDialogOpen, setIsTeamDialogOpen] = useState(false);
     const [isScoringLevelsOpen, setIsScoringLevelsOpen] = useState(false);
+    const [searchQuery, setSearchQuery] = useState("");
+    const [onlyOpenSeats, setOnlyOpenSeats] = useState(false);
+    const [sortNewest, setSortNewest] = useState(true);
+    const [moreOpen, setMoreOpen] = useState(false);
+    const moreWrapRef = useRef<HTMLDivElement>(null);
+    const [withdrawingId, setWithdrawingId] = useState<string | null>(null);
+    const [hoursLogged, setHoursLogged] = useState(0);
+    const [hoursTarget, setHoursTarget] = useState(16);
 
     // Filters & View State
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
@@ -288,7 +349,7 @@ export default function StudentBrowseOpportunitiesPage() {
         a.localeCompare(b),
     );
 
-    const filteredOpportunities = opportunities.filter((op) => {
+    const afterListingFilters = opportunities.filter((op) => {
         if (universityFilter !== "all" && (op.universityLabel || "Unspecified") !== universityFilter) return false;
         if (modeFilter !== "all" && (op.modeBucket || "unspecified") !== modeFilter) return false;
         if (oppTypeFilter !== "all" && !(op.opportunityTypes || []).includes(oppTypeFilter)) return false;
@@ -298,6 +359,22 @@ export default function StudentBrowseOpportunitiesPage() {
         if (visibilityFilter !== "all" && (op.visibilityBucket || "unspecified") !== visibilityFilter) return false;
         return true;
     });
+    const needle = searchQuery.trim().toLowerCase();
+    const fullHiddenCount = afterListingFilters.filter((op) => op.seatsRemaining != null && op.seatsRemaining <= 0).length;
+    const filteredOpportunities = afterListingFilters
+        .filter((op) => {
+            if (onlyOpenSeats && op.seatsRemaining != null && op.seatsRemaining <= 0) return false;
+            if (!needle) return true;
+            const hay = `${op.title ?? ""} ${op.organization_name ?? ""} ${op.description ?? ""}`.toLowerCase();
+            return hay.includes(needle);
+        })
+        .sort((a, b) => {
+            const ta = new Date(a.createdAt || a.start_date || 0).getTime();
+            const tb = new Date(b.createdAt || b.start_date || 0).getTime();
+            const na = Number.isFinite(ta) ? ta : 0;
+            const nb = Number.isFinite(tb) ? tb : 0;
+            return sortNewest ? nb - na : na - nb;
+        });
 
     const clearListingFilters = () => {
         setUniversityFilter("all");
@@ -307,10 +384,13 @@ export default function StudentBrowseOpportunitiesPage() {
         setLocationFilter("all");
         setSeatsFilter("all");
         setVisibilityFilter("all");
+        setSearchQuery("");
+        setOnlyOpenSeats(false);
+        setSortNewest(true);
     };
 
     const filterSelectClass =
-        "h-10 w-full min-w-0 appearance-none px-3 pr-9 text-sm rounded-ciel-xs border border-ciel-border bg-white text-ciel-text shadow-sm transition-colors hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-ciel-green/30 focus:border-ciel-green";
+        "h-10 min-w-[8.5rem] appearance-none rounded-lg border border-ciel-border bg-white px-3 pr-8 text-sm text-ciel-text transition-colors hover:border-slate-300 focus:border-ciel-green focus:outline-none focus:ring-2 focus:ring-ciel-green/20";
 
     const activeFilterCount = [
         universityFilter,
@@ -320,7 +400,11 @@ export default function StudentBrowseOpportunitiesPage() {
         locationFilter,
         seatsFilter,
         visibilityFilter,
-    ].filter((v) => v !== "all").length;
+    ].filter((v) => v !== "all").length + (onlyOpenSeats ? 1 : 0) + (needle ? 1 : 0);
+
+    const pendingApplicationsCount = opportunities.filter((op) => op.applyLocked && isPendingJoin(op)).length;
+    const hoursRemaining = Math.max(0, hoursTarget - hoursLogged);
+    const hoursPct = hoursTarget > 0 ? Math.min(100, Math.round((hoursLogged / hoursTarget) * 100)) : 0;
 
     const openApplicationDialog = (opportunity: BrowseOpportunity) => {
         const title = opportunity.title ?? "Opportunity";
@@ -351,14 +435,66 @@ export default function StudentBrowseOpportunitiesPage() {
         void fetchOpportunities({ silent: true });
     };
 
+    const handleWithdraw = async (opportunity: BrowseOpportunity) => {
+        const applicationId = opportunity.application_id;
+        if (!applicationId) {
+            toast.error("No application to withdraw");
+            return;
+        }
+        if (!window.confirm("Withdraw this application? You can apply again if seats are still open.")) {
+            return;
+        }
+        setWithdrawingId(opportunity.id);
+        try {
+            const res = await authenticatedFetch(`/api/v1/students/applications/${encodeURIComponent(applicationId)}`, {
+                method: "DELETE",
+            });
+            if (res?.ok) {
+                toast.success("Application withdrawn");
+                void fetchOpportunities({ silent: true });
+            } else {
+                toast.error("Could not withdraw this application");
+            }
+        } catch {
+            toast.error("Could not withdraw this application");
+        } finally {
+            setWithdrawingId(null);
+        }
+    };
+
     useEffect(() => {
         setStudentInstitution(readStudentInstitutionFromBrowserStorage());
         void fetchOpportunities();
+        void (async () => {
+            const cached = readImpactSummaryCache();
+            const [summary, dashboard] = await Promise.all([
+                fetchImpactSummary({ redirectToLogin: false }),
+                fetchStudentDashboardData({ redirectToLogin: false }),
+            ]);
+            const verified =
+                summary?.verifiedHours ?? cached?.verifiedHours ?? dashboard?.overview?.totalVerifiedHours ?? 0;
+            const required = (dashboard?.activeProjects ?? []).reduce(
+                (sum, p) => sum + (Number(p.required_hours_per_student) || 0),
+                0,
+            );
+            const pendingH = summary?.pendingHours ?? cached?.pendingHours ?? 0;
+            setHoursLogged(Math.round(verified));
+            setHoursTarget(required > 0 ? Math.round(required) : Math.max(Math.round(verified + pendingH), 16));
+        })();
         const intervalId = window.setInterval(() => {
             void fetchOpportunities({ silent: true });
         }, 30000);
         return () => window.clearInterval(intervalId);
     }, []);
+
+    useEffect(() => {
+        if (!moreOpen) return;
+        const onDoc = (e: MouseEvent) => {
+            if (!moreWrapRef.current?.contains(e.target as Node)) setMoreOpen(false);
+        };
+        document.addEventListener("mousedown", onDoc);
+        return () => document.removeEventListener("mousedown", onDoc);
+    }, [moreOpen]);
 
     const fetchOpportunities = async (options?: { silent?: boolean }) => {
         if (!options?.silent) {
@@ -411,211 +547,198 @@ export default function StudentBrowseOpportunitiesPage() {
     }
 
     return (
-        <div className="max-w-7xl mx-auto space-y-8 pb-20">
-            <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-                <div className="flex items-start gap-3.5">
-                    <div className="hidden h-12 w-12 shrink-0 items-center justify-center rounded-ciel-sm bg-ciel-green-soft text-ciel-green-deep sm:flex">
-                        <Compass className="h-6 w-6" />
-                    </div>
-                    <div className="space-y-1">
-                        <h1 className="text-3xl font-bold tracking-tight text-ciel-navy">Browse Opportunities</h1>
-                        <p className="text-sm text-ciel-text-mid max-w-2xl leading-relaxed">
-                            Discover and apply to volunteer projects from our partners.
-                        </p>
-                    </div>
+        <div className="mx-auto max-w-7xl space-y-5 pb-20">
+            <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                    <h1 className="text-[28px] font-bold tracking-tight text-ciel-text">Browse opportunities</h1>
+                    <p className="mt-1 text-sm text-ciel-text-mid">
+                        Volunteer projects from CIEL partners. Apply, get accepted, then log your hours.
+                    </p>
                 </div>
-                <ScoringLevelsButton
-                    size="default"
-                    className="h-9 w-fit shrink-0 gap-1.5 rounded-full border-amber-200/90 bg-amber-50/50 px-3 text-sm font-medium text-amber-900 hover:bg-amber-50"
+                <button
+                    type="button"
                     onClick={() => setIsScoringLevelsOpen(true)}
-                />
+                    className="h-9 shrink-0 rounded-lg border border-ciel-border bg-white px-3.5 text-sm font-medium text-ciel-text hover:bg-slate-50"
+                >
+                    How scoring works
+                </button>
             </header>
 
-            <section
-                className="rounded-ciel-lg border border-ciel-border bg-white p-5 shadow-sm sm:p-6"
-                aria-label="Filters"
-            >
-                <div className="mb-4 flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2 text-sm font-semibold text-ciel-navy">
-                        <SlidersHorizontal className="h-4 w-4 text-ciel-text-soft" />
-                        Filters
-                        {activeFilterCount > 0 && (
-                            <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-ciel-green-soft px-1.5 text-[11px] font-bold text-ciel-green-deep">
-                                {activeFilterCount}
-                            </span>
-                        )}
-                    </div>
-                    <div className="flex rounded-ciel-xs border border-ciel-border bg-slate-50 p-1 shadow-sm">
-                        <button
-                            type="button"
-                            onClick={() => setViewMode("grid")}
-                            className={`rounded-[6px] p-2 transition-colors ${viewMode === "grid" ? "bg-white text-ciel-navy shadow-sm" : "text-ciel-text-soft hover:text-ciel-navy"}`}
-                            title="Grid view"
-                        >
-                            <LayoutGrid className="h-4 w-4" />
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setViewMode("list")}
-                            className={`rounded-[6px] p-2 transition-colors ${viewMode === "list" ? "bg-white text-ciel-navy shadow-sm" : "text-ciel-text-soft hover:text-ciel-navy"}`}
-                            title="List view"
-                        >
-                            <List className="h-4 w-4" />
-                        </button>
-                    </div>
-                </div>
+            <div className="flex flex-col gap-3 rounded-xl border border-ciel-border bg-white px-4 py-3 sm:flex-row sm:items-center sm:gap-5">
+                <p className="shrink-0 text-sm font-bold text-ciel-text">
+                    {hoursLogged} of {hoursTarget} hours logged
+                </p>
+                <ProgressBar value={hoursPct} className="h-2 flex-1" barClassName="bg-[#0e7d74]" trackClassName="bg-slate-200" />
+                <p className="shrink-0 text-sm text-ciel-text-mid">
+                    {hoursRemaining} hours to go · {pendingApplicationsCount} application{pendingApplicationsCount === 1 ? "" : "s"} pending
+                </p>
+            </div>
 
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-                    <div className="relative">
-                        <select
-                            value={universityFilter}
-                            onChange={(e) => setUniversityFilter(e.target.value)}
-                            className={filterSelectClass}
-                            title="University"
-                        >
-                            <option value="all">All universities</option>
-                            {universityOptions.map((u) => (
-                                <option key={u} value={u}>
-                                    {u}
-                                </option>
-                            ))}
-                        </select>
-                        <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ciel-text-soft" />
+            <section className="rounded-xl border border-ciel-border bg-white p-3" aria-label="Filters">
+                <div className="flex flex-col gap-2 lg:flex-row lg:items-center">
+                    <div className="relative min-w-0 flex-1">
+                        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ciel-text-soft" />
+                        <input
+                            type="search"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            placeholder="Search projects or organisations"
+                            className="h-10 w-full rounded-lg border border-ciel-border bg-white pl-9 pr-3 text-sm text-ciel-text placeholder:text-ciel-text-soft focus:border-ciel-green focus:outline-none focus:ring-2 focus:ring-ciel-green/20"
+                        />
                     </div>
-                    <div className="relative">
-                        <select
-                            value={modeFilter}
-                            onChange={(e) => setModeFilter(e.target.value as "all" | ModeBucket)}
-                            className={filterSelectClass}
-                            title="Mode"
-                        >
-                            <option value="all">All modes</option>
-                            {(["on-site", "hybrid", "remote", "unspecified"] as const).map((b) => (
-                                <option key={b} value={b}>
-                                    {modeMenuLabel(b)}
-                                </option>
-                            ))}
-                        </select>
-                        <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ciel-text-soft" />
-                    </div>
-                    <div className="relative">
-                        <select
-                            value={oppTypeFilter}
-                            onChange={(e) => setOppTypeFilter(e.target.value)}
-                            className={filterSelectClass}
-                            title="Opportunity type"
-                        >
-                            <option value="all">All types</option>
-                            {oppTypeOptions.map((t) => (
-                                <option key={t} value={t}>
-                                    {t}
-                                </option>
-                            ))}
-                        </select>
-                        <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ciel-text-soft" />
-                    </div>
-                    <div className="relative">
-                        <select
-                            value={sdgFilter}
-                            onChange={(e) => setSdgFilter(e.target.value)}
-                            className={filterSelectClass}
-                            title="SDG"
-                        >
-                            <option value="all">All SDGs</option>
-                            {sdgOptions.map((s) => (
-                                <option key={s} value={s}>
-                                    {s}
-                                </option>
-                            ))}
-                        </select>
-                        <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ciel-text-soft" />
-                    </div>
-                    <div className="relative">
-                        <select
-                            value={locationFilter}
-                            onChange={(e) => setLocationFilter(e.target.value)}
-                            className={filterSelectClass}
-                            title="Location"
-                        >
-                            <option value="all">All locations</option>
-                            {locationOptions.map((loc) => (
-                                <option key={loc} value={loc}>
-                                    {loc}
-                                </option>
-                            ))}
-                        </select>
-                        <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ciel-text-soft" />
-                    </div>
-                </div>
-
-                <div className="mt-3 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:max-w-lg lg:flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
                         <div className="relative">
                             <select
-                                value={seatsFilter}
-                                onChange={(e) => setSeatsFilter(e.target.value as "all" | "1" | "5" | "10")}
+                                value={oppTypeFilter}
+                                onChange={(e) => setOppTypeFilter(e.target.value)}
                                 className={filterSelectClass}
-                                title="Seats available"
+                                title="Path"
                             >
-                                <option value="all">Any seats</option>
-                                <option value="1">1+ seats</option>
-                                <option value="5">5+ seats</option>
-                                <option value="10">10+ seats</option>
-                            </select>
-                            <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ciel-text-soft" />
-                        </div>
-                        <div className="relative">
-                            <select
-                                value={visibilityFilter}
-                                onChange={(e) => setVisibilityFilter(e.target.value as "all" | VisibilityBucket)}
-                                className={filterSelectClass}
-                                title="Visibility"
-                            >
-                                <option value="all">All visibility</option>
-                                {(["open", "restricted", "unspecified"] as const).map((b) => (
-                                    <option key={b} value={b}>
-                                        {visibilityMenuLabel(b)}
+                                <option value="all">All paths</option>
+                                {oppTypeOptions.map((t) => (
+                                    <option key={t} value={t}>
+                                        {t}
                                     </option>
                                 ))}
                             </select>
-                            <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ciel-text-soft" />
+                            <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ciel-text-soft" />
+                        </div>
+                        <div className="relative">
+                            <select
+                                value={modeFilter}
+                                onChange={(e) => setModeFilter(e.target.value as "all" | ModeBucket)}
+                                className={filterSelectClass}
+                                title="Mode"
+                            >
+                                <option value="all">Any mode</option>
+                                {(["on-site", "hybrid", "remote", "unspecified"] as const).map((b) => (
+                                    <option key={b} value={b}>
+                                        {modeMenuLabel(b)}
+                                    </option>
+                                ))}
+                            </select>
+                            <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ciel-text-soft" />
+                        </div>
+                        <label className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-lg border border-ciel-border bg-white px-3 text-sm text-ciel-text">
+                            <input
+                                type="checkbox"
+                                checked={onlyOpenSeats}
+                                onChange={(e) => setOnlyOpenSeats(e.target.checked)}
+                                className="h-4 w-4 rounded border-ciel-border text-[#0e7d74] focus:ring-[#0e7d74]"
+                            />
+                            Only show projects with seats
+                        </label>
+                        <div className="relative" ref={moreWrapRef}>
+                            <button
+                                type="button"
+                                onClick={() => setMoreOpen((o) => !o)}
+                                className="inline-flex h-10 items-center gap-1 rounded-lg border border-ciel-border bg-white px-3 text-sm text-ciel-text hover:bg-slate-50"
+                            >
+                                More
+                                {activeFilterCount > 0 ? (
+                                    <span className="ml-0.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-ciel-green-soft px-1 text-[11px] font-bold text-ciel-green-deep">
+                                        {activeFilterCount}
+                                    </span>
+                                ) : null}
+                                <ChevronDown className="h-4 w-4 text-ciel-text-soft" />
+                            </button>
+                            {moreOpen ? (
+                                <div className="absolute right-0 z-20 mt-2 w-[min(22rem,calc(100vw-2rem))] space-y-3 rounded-xl border border-ciel-border bg-white p-3 shadow-lg">
+                                    <div className="relative">
+                                        <select value={universityFilter} onChange={(e) => setUniversityFilter(e.target.value)} className={`${filterSelectClass} w-full`} title="University">
+                                            <option value="all">All universities</option>
+                                            {universityOptions.map((u) => (
+                                                <option key={u} value={u}>{u}</option>
+                                            ))}
+                                        </select>
+                                        <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ciel-text-soft" />
+                                    </div>
+                                    <div className="relative">
+                                        <select value={sdgFilter} onChange={(e) => setSdgFilter(e.target.value)} className={`${filterSelectClass} w-full`} title="SDG">
+                                            <option value="all">All SDGs</option>
+                                            {sdgOptions.map((s) => (
+                                                <option key={s} value={s}>{s}</option>
+                                            ))}
+                                        </select>
+                                        <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ciel-text-soft" />
+                                    </div>
+                                    <div className="relative">
+                                        <select value={locationFilter} onChange={(e) => setLocationFilter(e.target.value)} className={`${filterSelectClass} w-full`} title="Location">
+                                            <option value="all">All locations</option>
+                                            {locationOptions.map((loc) => (
+                                                <option key={loc} value={loc}>{loc}</option>
+                                            ))}
+                                        </select>
+                                        <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ciel-text-soft" />
+                                    </div>
+                                    <div className="relative">
+                                        <select value={visibilityFilter} onChange={(e) => setVisibilityFilter(e.target.value as "all" | VisibilityBucket)} className={`${filterSelectClass} w-full`} title="Visibility">
+                                            <option value="all">All visibility</option>
+                                            {(["open", "restricted", "unspecified"] as const).map((b) => (
+                                                <option key={b} value={b}>{visibilityMenuLabel(b)}</option>
+                                            ))}
+                                        </select>
+                                        <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ciel-text-soft" />
+                                    </div>
+                                    <div className="relative">
+                                        <select value={seatsFilter} onChange={(e) => setSeatsFilter(e.target.value as "all" | "1" | "5" | "10")} className={`${filterSelectClass} w-full`} title="Seats available">
+                                            <option value="all">Any seats</option>
+                                            <option value="1">1+ seats</option>
+                                            <option value="5">5+ seats</option>
+                                            <option value="10">10+ seats</option>
+                                        </select>
+                                        <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ciel-text-soft" />
+                                    </div>
+                                    <div className="flex items-center justify-between gap-2 border-t border-ciel-border pt-2">
+                                        <div className="flex rounded-lg border border-ciel-border p-0.5">
+                                            <button type="button" onClick={() => setViewMode("grid")} className={`rounded-md p-1.5 ${viewMode === "grid" ? "bg-slate-100 text-ciel-text" : "text-ciel-text-soft"}`} title="Grid view">
+                                                <LayoutGrid className="h-4 w-4" />
+                                            </button>
+                                            <button type="button" onClick={() => setViewMode("list")} className={`rounded-md p-1.5 ${viewMode === "list" ? "bg-slate-100 text-ciel-text" : "text-ciel-text-soft"}`} title="List view">
+                                                <List className="h-4 w-4" />
+                                            </button>
+                                        </div>
+                                        <button type="button" onClick={clearListingFilters} className="text-sm font-medium text-ciel-text-mid hover:text-ciel-text">
+                                            Clear filters
+                                        </button>
+                                    </div>
+                                </div>
+                            ) : null}
+                        </div>
+                        <div className="relative ml-auto">
+                            <select
+                                value={sortNewest ? "newest" : "oldest"}
+                                onChange={(e) => setSortNewest(e.target.value === "newest")}
+                                className={filterSelectClass}
+                                title="Sort"
+                            >
+                                <option value="newest">Newest first</option>
+                                <option value="oldest">Oldest first</option>
+                            </select>
+                            <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ciel-text-soft" />
                         </div>
                     </div>
-
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-10 shrink-0 self-start rounded-ciel-xs border-ciel-border px-4 text-sm text-ciel-text-mid hover:bg-slate-50 hover:text-ciel-navy lg:self-auto"
-                        onClick={clearListingFilters}
-                    >
-                        Clear filters
-                    </Button>
                 </div>
             </section>
 
-            {filteredOpportunities.length > 0 ? (
-                <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-ciel-text-soft">
-                    <span className="text-sm font-bold text-ciel-navy">{filteredOpportunities.length}</span>
-                    {filteredOpportunities.length === 1 ? "opportunity" : "opportunities"} found
-                </p>
-            ) : null}
+            <p className="text-sm text-ciel-text-mid">
+                {filteredOpportunities.length} {filteredOpportunities.length === 1 ? "opportunity" : "opportunities"}
+                {onlyOpenSeats && fullHiddenCount > 0 ? ` · ${fullHiddenCount} full project${fullHiddenCount === 1 ? "" : "s"} hidden` : ""}
+            </p>
 
             {filteredOpportunities.length === 0 ? (
-                <div className="rounded-ciel-lg border border-dashed border-ciel-border bg-slate-50/40 py-16 text-center">
+                <div className="rounded-xl border border-dashed border-ciel-border bg-white py-16 text-center">
                     <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-ciel-green-soft">
                         <Globe className="h-8 w-8 text-ciel-green-deep" />
                     </div>
-                    <h3 className="text-lg font-semibold text-ciel-navy">No opportunities match</h3>
+                    <h3 className="text-lg font-semibold text-ciel-text">No opportunities match</h3>
                     <p className="mt-1 text-sm text-ciel-text-mid">Try adjusting your filters or check back later.</p>
-                    <Button variant="outline" className="mt-6 rounded-full border-ciel-border" onClick={clearListingFilters}>
+                    <Button variant="outline" className="mt-6 rounded-lg border-ciel-border" onClick={clearListingFilters}>
                         Clear filters
                     </Button>
                 </div>
             ) : (
-                <div className={viewMode === 'grid'
-                    ? "grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3"
-                    : "space-y-4"
-                }>
+                <div className={viewMode === "grid" ? "grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3" : "space-y-4"}>
                     {filteredOpportunities.map((op) => {
                         const applyEligibility = resolveStudentUniversityApplyEligibility(
                             op as unknown as Record<string, unknown>,
@@ -625,290 +748,141 @@ export default function StudentBrowseOpportunitiesPage() {
                             op.application_status != null && ["approved", "verified"].includes(op.application_status)
                                 ? resolveStudentBrowseReportCta(op.id, op.report_status)
                                 : null;
-                        return viewMode === 'grid' ? (
-                            // GRID VIEW CARD
-                            <div key={op.id} className="group flex h-full flex-col overflow-hidden rounded-ciel-lg border border-ciel-border bg-white shadow-sm ciel-transition hover:-translate-y-0.5 hover:border-ciel-green/40 hover:shadow-lg">
-                                <div className="h-1 w-full bg-gradient-to-r from-ciel-green to-ciel-indigo opacity-70" />
-                                <div className="flex flex-1 flex-col space-y-4 p-5">
-                                    <div className="flex flex-wrap items-start justify-between gap-2">
-                                        <div className="flex min-w-0 flex-wrap items-center gap-2">
-                                            <span className="rounded-full bg-ciel-green-soft px-2.5 py-1 text-xs font-semibold text-ciel-green-deep">
-                                                {op.category || "Social Impact"}
+                        const modeLabel =
+                            op.modeBucket && op.modeBucket !== "unspecified"
+                                ? modeMenuLabel(op.modeBucket)
+                                : op.mode || "On-site";
+                        const visibilityTag =
+                            applyEligibility.listingRestrictionLabel ||
+                            (op.visibilityBucket === "open" ? "Open to all" : null);
+                        const showWithdraw = op.applyLocked && isPendingJoin(op) && !!op.application_id;
+                        return (
+                            <article
+                                key={op.id}
+                                className="flex h-full flex-col rounded-xl border border-ciel-border bg-white p-5"
+                            >
+                                <h3 className="text-lg font-bold leading-snug text-ciel-text">{op.title}</h3>
+                                <p className="mt-1.5 flex items-center gap-1.5 text-sm text-ciel-text-mid">
+                                    <Building2 className="h-3.5 w-3.5 shrink-0" />
+                                    <span className="truncate">{op.organization_name || "Partner Organization"}</span>
+                                </p>
+                                {op.description ? (
+                                    <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-ciel-text-mid">{op.description}</p>
+                                ) : null}
+
+                                <div className="mt-3 flex flex-wrap gap-2">
+                                    <span className="inline-flex items-center gap-1.5 rounded-md bg-[#e7f4f2] px-2 py-1 text-xs font-medium text-[#0e7d74]">
+                                        <Clock className="h-3.5 w-3.5" />
+                                        {hoursCreditLabel(op)}
+                                    </span>
+                                    <span className="inline-flex items-center gap-1.5 rounded-md bg-[#fff1e6] px-2 py-1 text-xs font-medium text-[#c2410c]">
+                                        <Users className="h-3.5 w-3.5" />
+                                        {seatsLeftLabel(op)}
+                                    </span>
+                                </div>
+
+                                <div className="mt-2.5 flex flex-wrap gap-x-4 gap-y-1 text-sm text-ciel-text-mid">
+                                    <span className="inline-flex items-center gap-1.5">
+                                        <MapPin className="h-3.5 w-3.5 text-ciel-text-soft" />
+                                        {op.city || "Remote"}
+                                    </span>
+                                    <span className="inline-flex items-center gap-1.5">
+                                        <Calendar className="h-3.5 w-3.5 text-ciel-text-soft" />
+                                        {scheduleLabel(op)}
+                                    </span>
+                                </div>
+
+                                <div className="mt-3 flex flex-wrap gap-1.5">
+                                    <span className="rounded-md bg-[#e7f4f2] px-2 py-0.5 text-xs font-medium text-[#0e7d74]">
+                                        {pathTagLabel(op)}
+                                    </span>
+                                    <span className="rounded-md bg-[#e8f6f8] px-2 py-0.5 text-xs font-medium text-[#0f766e]">
+                                        {modeLabel}
+                                    </span>
+                                    {visibilityTag ? (
+                                        <span
+                                            className={
+                                                applyEligibility.listingRestrictionLabel
+                                                    ? "rounded-md bg-[#fff1e6] px-2 py-0.5 text-xs font-medium text-[#c2410c]"
+                                                    : "rounded-md bg-[#e7f4f2] px-2 py-0.5 text-xs font-medium text-[#0e7d74]"
+                                            }
+                                        >
+                                            {visibilityTag}
+                                        </span>
+                                    ) : null}
+                                </div>
+
+                                <div className="mt-auto flex flex-wrap items-center justify-end gap-2 pt-4">
+                                    {op.applyLocked && isPendingJoin(op) ? (
+                                        <span className="mr-auto inline-flex items-center gap-1 text-sm font-medium text-[#0e7d74]">
+                                            <CheckCircle2 className="h-4 w-4" /> Applied
+                                        </span>
+                                    ) : op.applyLocked && reportCta ? (
+                                        <Link href={reportCta.href} className="mr-auto text-sm font-medium text-[#0e7d74] hover:underline">
+                                            {reportCta.label}
+                                        </Link>
+                                    ) : op.hasApplied && op.application_status && isJoinApplicationRejectedStatus(op.application_status) ? (
+                                        <span className="mr-auto text-xs font-medium text-rose-700">Application not approved</span>
+                                    ) : null}
+
+                                    {op.teamMembers && op.teamMembers.length > 0 ? (
+                                        <button
+                                            type="button"
+                                            onClick={() => openTeamDialog(op)}
+                                            className="text-sm font-medium text-ciel-text-mid hover:text-ciel-text"
+                                        >
+                                            Team
+                                        </button>
+                                    ) : null}
+
+                                    <Link
+                                        href={`/dashboard/student/browse/${op.id}`}
+                                        className="text-sm font-medium text-[#0e7d74] hover:underline"
+                                    >
+                                        Details
+                                    </Link>
+                                    <button
+                                        type="button"
+                                        className="text-ciel-text-soft hover:text-ciel-text"
+                                        aria-label="Copy share link"
+                                        title="Copy share link"
+                                        onClick={() => void copyBrowseOpportunityShareLink(op.id)}
+                                    >
+                                        <Share2 className="h-4 w-4" />
+                                    </button>
+
+                                    {op.applyLocked ? (
+                                        showWithdraw ? (
+                                            <button
+                                                type="button"
+                                                onClick={() => void handleWithdraw(op)}
+                                                disabled={withdrawingId === op.id}
+                                                className="rounded-md border border-slate-800 bg-white px-3 py-1.5 text-sm font-semibold text-slate-800 hover:bg-slate-50 disabled:opacity-50"
+                                            >
+                                                {withdrawingId === op.id ? "Withdrawing…" : "Withdraw"}
+                                            </button>
+                                        ) : !reportCta && !isPendingJoin(op) ? (
+                                            <span className="inline-flex items-center gap-1 text-sm font-medium text-[#0e7d74]">
+                                                <CheckCircle2 className="h-4 w-4" /> Applied
                                             </span>
-                                            {applyEligibility.listingRestrictionLabel ? (
-                                                <Badge className="max-w-full whitespace-normal border border-amber-200 bg-amber-50 text-left text-amber-900 shadow-none hover:bg-amber-50 leading-snug">
-                                                    {applyEligibility.listingRestrictionLabel}
-                                                </Badge>
-                                            ) : null}
-                                        </div>
-                                        <span className="shrink-0 rounded-full bg-ciel-indigo-soft px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-ciel-indigo">
-                                            {op.modeBucket && op.modeBucket !== "unspecified"
-                                                ? modeMenuLabel(op.modeBucket)
-                                                : op.mode || "On Site"}
-                                        </span>
-                                    </div>
-
-                                    <div>
-                                        <h3 className="line-clamp-2 text-lg font-semibold tracking-tight text-ciel-navy ciel-transition group-hover:text-ciel-green-deep">
-                                            {op.title}
-                                        </h3>
-                                        <p className="mt-1.5 flex items-center gap-1.5 line-clamp-1 text-sm text-ciel-text-mid">
-                                            <Building2 className="h-3.5 w-3.5 shrink-0 text-ciel-text-soft" />
-                                            {op.organization_name || "Partner Organization"}
-                                        </p>
-                                    </div>
-
-                                    <p className="line-clamp-3 text-sm leading-relaxed text-ciel-text-mid">
-                                        {op.description}
-                                    </p>
-
-                                    <div className="grid grid-cols-2 gap-x-3 gap-y-2.5 border-t border-ciel-border pt-3.5">
-                                        <div className="flex items-center gap-1.5 text-xs text-ciel-text-mid">
-                                            <MapPin className="h-3.5 w-3.5 shrink-0 text-ciel-text-soft" />
-                                            <span className="truncate">{op.city || "Remote"}</span>
-                                        </div>
-                                        <div className="flex items-center gap-1.5 text-xs text-ciel-text-mid">
-                                            <Calendar className="h-3.5 w-3.5 shrink-0 text-ciel-text-soft" />
-                                            <span className="truncate">{op.start_date ? new Date(op.start_date).toLocaleDateString() : "Flexible Dates"}</span>
-                                        </div>
-                                        <div className="flex items-center gap-1.5 text-xs text-ciel-text-mid">
-                                            <Clock className="h-3.5 w-3.5 shrink-0 text-ciel-text-soft" />
-                                            {op.hours || "0"} hrs credit
-                                        </div>
-                                        <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-700">
-                                            <Users className="h-3.5 w-3.5 shrink-0 text-amber-600/80" />
-                                            {op.seatsRemaining ?? op.remaining_seats ?? op.volunteersNeeded ?? 0} seats left
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="flex items-center justify-between gap-2 border-t border-ciel-border bg-slate-50/60 px-5 py-4">
-                                    <div className="flex min-w-0 flex-wrap items-center gap-2">
-                                        <Link href={`/dashboard/student/browse/${op.id}`} className="text-sm font-medium text-ciel-text-mid underline-offset-4 hover:text-ciel-navy hover:underline">
-                                            View details
-                                        </Link>
+                                        ) : null
+                                    ) : (
                                         <button
                                             type="button"
-                                            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-ciel-border bg-white text-ciel-text-mid ciel-transition hover:bg-slate-50 hover:text-ciel-navy"
-                                            aria-label="Copy share link"
-                                            title="Copy share link"
-                                            onClick={() => void copyBrowseOpportunityShareLink(op.id)}
-                                        >
-                                            <Share2 className="h-4 w-4" />
-                                        </button>
-                                        <ScoringLevelsButton onClick={() => setIsScoringLevelsOpen(true)} />
-                                    </div>
-                                    {op.applyLocked ? (
-                                        <div className="flex items-center gap-2">
-                                            {/* Report Button - Only show if APPLICATION is approved/active */}
-                                            {reportCta ? (
-                                                <Link href={reportCta.href}>
-                                                    <Button
-                                                        size="sm"
-                                                        variant="outline"
-                                                        className="h-8 rounded-full border-ciel-border text-xs font-medium"
-                                                    >
-                                                        {reportCta.label}
-                                                    </Button>
-                                                </Link>
-                                            ) : null}
-
-                                            {(!op.application_status ||
-                                                ["pending", "pending_approval", "applied"].includes(
-                                                    op.application_status,
-                                                )) && (
-                                                    <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-1 rounded-full border border-amber-100 italic">
-                                                        {joinApplicationPendingLabel(op as unknown as Record<string, unknown>)}
-                                                    </span>
-                                                )}
-
-                                            {/* Team Button */}
-                                            {op.teamMembers && op.teamMembers.length > 0 && (
-                                                <Button size="sm" variant="outline" className="h-8 rounded-full border-ciel-border text-xs font-medium" onClick={() => openTeamDialog(op)}>
-                                                    <Users className="mr-1 h-3.5 w-3.5" /> Team
-                                                </Button>
-                                            )}
-
-                                            <Button size="sm" variant="ghost" className="pointer-events-none rounded-full text-ciel-green-deep hover:bg-ciel-green-soft hover:text-ciel-green-deep">
-                                                <CheckCircle2 className="mr-1 h-4 w-4" /> Applied
-                                            </Button>
-                                        </div>
-                                    ) : op.hasApplied ? (
-                                        <div className="flex items-center gap-2 flex-wrap justify-end max-w-[min(100%,14rem)] sm:max-w-none">
-                                            {op.application_status &&
-                                                isJoinApplicationRejectedStatus(op.application_status) && (
-                                                    <span className="text-[10px] font-bold text-rose-700 bg-rose-50 px-2 py-1 rounded-full border border-rose-100 italic">
-                                                        Application not approved
-                                                    </span>
-                                                )}
-                                            <Button
-                                                size="sm"
-                                                className={
-                                                    applyEligibility.canApply
-                                                        ? "rounded-full bg-ciel-navy font-medium text-white ciel-transition hover:bg-ciel-navy/90"
-                                                        : "cursor-not-allowed rounded-full bg-slate-200 text-slate-600 hover:bg-slate-200"
-                                                }
-                                                onClick={() =>
-                                                    applyEligibility.canApply &&
-                                                    openApplicationDialog(op)
-                                                }
-                                                disabled={!applyEligibility.canApply}
-                                                title={applyEligibility.blockedReason || undefined}
-                                            >
-                                                {applyEligibility.canApply ? "Apply again" : "Not eligible"}
-                                            </Button>
-                                        </div>
-                                    ) : (
-                                        <Button
-                                            size="sm"
-                                            className={
-                                                applyEligibility.canApply
-                                                    ? "rounded-full bg-ciel-navy font-medium text-white ciel-transition hover:bg-ciel-navy/90"
-                                                    : "cursor-not-allowed rounded-full bg-slate-200 text-slate-600 hover:bg-slate-200"
-                                            }
-                                            onClick={() =>
-                                                applyEligibility.canApply &&
-                                                openApplicationDialog(op)
-                                            }
+                                            onClick={() => applyEligibility.canApply && openApplicationDialog(op)}
                                             disabled={!applyEligibility.canApply}
                                             title={applyEligibility.blockedReason || undefined}
-                                        >
-                                            {applyEligibility.canApply ? "Apply Now" : "Not eligible"}
-                                        </Button>
-                                    )}
-                                </div>
-                            </div>
-                        ) : (
-                            // LIST VIEW CARD
-                            <div key={op.id} className="group flex flex-col items-start gap-6 rounded-ciel-lg border border-ciel-border bg-white p-5 shadow-sm ciel-transition hover:border-ciel-green/40 hover:shadow-md md:flex-row md:items-center">
-                                <div className="min-w-0 flex-1">
-                                    <div className="mb-2 flex flex-wrap items-center gap-2">
-                                        <span className="rounded-full bg-ciel-green-soft px-2.5 py-1 text-xs font-semibold text-ciel-green-deep">
-                                            {op.category || "Social Impact"}
-                                        </span>
-                                        {applyEligibility.listingRestrictionLabel ? (
-                                            <Badge className="border border-amber-200 bg-amber-50 text-amber-900 shadow-none hover:bg-amber-50">
-                                                {applyEligibility.listingRestrictionLabel}
-                                            </Badge>
-                                        ) : null}
-                                        <span className="rounded-full bg-ciel-indigo-soft px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-ciel-indigo">
-                                            {op.modeBucket && op.modeBucket !== "unspecified"
-                                                ? modeMenuLabel(op.modeBucket)
-                                                : op.mode || "On Site"}
-                                        </span>
-                                    </div>
-
-                                    <h3 className="truncate text-lg font-semibold tracking-tight text-ciel-navy ciel-transition group-hover:text-ciel-green-deep">
-                                        {op.title}
-                                    </h3>
-
-                                    <div className="mt-3 flex flex-wrap gap-x-6 gap-y-2 text-sm text-ciel-text-mid">
-                                        <span className="flex items-center gap-1.5 font-medium text-ciel-text-mid"><Building2 className="h-3.5 w-3.5 text-ciel-text-soft" /> {op.organization_name || "Partner Organization"}</span>
-                                        <span className="flex items-center gap-1"><MapPin className="h-3.5 w-3.5 text-ciel-text-soft" /> {op.city || "Remote"}</span>
-                                        <span className="flex items-center gap-1"><Calendar className="h-3.5 w-3.5 text-ciel-text-soft" /> {op.start_date ? new Date(op.start_date).toLocaleDateString() : "Flexible Dates"}</span>
-                                        <span className="flex items-center gap-1"><Clock className="h-3.5 w-3.5 text-ciel-text-soft" /> {op.hours || "0"} hours</span>
-                                        <span className="flex items-center gap-1 font-semibold text-amber-700"><Users className="h-3.5 w-3.5 text-amber-600/80" /> {op.seatsRemaining ?? op.remaining_seats ?? op.volunteersNeeded ?? 0} seats left</span>
-                                    </div>
-                                </div>
-
-                                <div className="mt-2 flex w-full flex-wrap items-center gap-3 md:mt-0 md:w-auto">
-                                    <div className="flex flex-1 flex-wrap items-center gap-2 md:flex-none">
-                                        <Link href={`/dashboard/student/browse/${op.id}`} className="min-w-0 flex-1 md:flex-none">
-                                            <Button variant="outline" className="w-full rounded-full border-ciel-border font-medium">Details</Button>
-                                        </Link>
-                                        <button
-                                            type="button"
-                                            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-ciel-border text-ciel-text-mid ciel-transition hover:bg-slate-50 hover:text-ciel-navy"
-                                            aria-label="Copy share link"
-                                            title="Copy share link"
-                                            onClick={() => void copyBrowseOpportunityShareLink(op.id)}
-                                        >
-                                            <Share2 className="h-4 w-4" />
-                                        </button>
-                                        <ScoringLevelsButton
-                                            size="default"
-                                            className="h-9 gap-1.5 rounded-full border-amber-200/90 bg-amber-50/50 px-3 text-sm font-medium text-amber-900 hover:bg-amber-50"
-                                            onClick={() => setIsScoringLevelsOpen(true)}
-                                        />
-                                    </div>
-                                    {op.applyLocked ? (
-                                        <div className="flex items-center gap-2 flex-1 md:flex-none justify-end">
-                                            {/* Report Button - Only show if APPLICATION is approved/active */}
-                                            {reportCta ? (
-                                                <Link href={reportCta.href}>
-                                                    <Button
-                                                        size="sm"
-                                                        variant="outline"
-                                                        className="h-9 rounded-full border-ciel-border text-xs font-medium"
-                                                    >
-                                                        {reportCta.label}
-                                                    </Button>
-                                                </Link>
-                                            ) : null}
-
-                                            {(!op.application_status ||
-                                                ["pending", "pending_approval", "applied"].includes(
-                                                    op.application_status,
-                                                )) && (
-                                                    <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-3 py-1.5 rounded-full border border-amber-100 italic">
-                                                        {joinApplicationPendingLabel(op as unknown as Record<string, unknown>)}
-                                                    </span>
-                                                )}
-
-                                            {/* Team Button */}
-                                            {op.teamMembers && op.teamMembers.length > 0 && (
-                                                <Button size="sm" variant="outline" className="h-9 rounded-full border-ciel-border text-xs font-medium" onClick={() => openTeamDialog(op)}>
-                                                    <Users className="mr-1 h-3.5 w-3.5" /> Team
-                                                </Button>
-                                            )}
-
-                                            <Button variant="ghost" className="pointer-events-none rounded-full bg-ciel-green-soft text-ciel-green-deep">
-                                                <CheckCircle2 className="mr-2 h-4 w-4" /> Applied
-                                            </Button>
-                                        </div>
-                                    ) : op.hasApplied ? (
-                                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 flex-1 md:flex-none justify-end">
-                                            {op.application_status &&
-                                                isJoinApplicationRejectedStatus(op.application_status) && (
-                                                    <span className="text-[10px] font-bold text-rose-700 bg-rose-50 px-3 py-1.5 rounded-full border border-rose-100 italic text-center sm:text-left">
-                                                        Application not approved
-                                                    </span>
-                                                )}
-                                            <Button
-                                                className={
-                                                    applyEligibility.canApply
-                                                        ? "flex-1 rounded-full bg-ciel-navy font-medium text-white ciel-transition hover:bg-ciel-navy/90 md:flex-none"
-                                                        : "flex-1 cursor-not-allowed rounded-full bg-slate-200 text-slate-600 hover:bg-slate-200 md:flex-none"
-                                                }
-                                                onClick={() =>
-                                                    applyEligibility.canApply &&
-                                                    openApplicationDialog(op)
-                                                }
-                                                disabled={!applyEligibility.canApply}
-                                                title={applyEligibility.blockedReason || undefined}
-                                            >
-                                                {applyEligibility.canApply ? "Apply again" : "Not eligible"}
-                                            </Button>
-                                        </div>
-                                    ) : (
-                                        <Button
                                             className={
                                                 applyEligibility.canApply
-                                                    ? "flex-1 rounded-full bg-ciel-navy font-medium text-white ciel-transition hover:bg-ciel-navy/90 md:flex-none"
-                                                    : "flex-1 cursor-not-allowed rounded-full bg-slate-200 text-slate-600 hover:bg-slate-200 md:flex-none"
+                                                    ? "rounded-md bg-[#0e7d74] px-3.5 py-1.5 text-sm font-semibold text-white hover:bg-[#0c6b64]"
+                                                    : "cursor-not-allowed rounded-md bg-slate-200 px-3.5 py-1.5 text-sm font-semibold text-slate-500"
                                             }
-                                            onClick={() =>
-                                                applyEligibility.canApply &&
-                                                openApplicationDialog(op)
-                                            }
-                                            disabled={!applyEligibility.canApply}
-                                            title={applyEligibility.blockedReason || undefined}
                                         >
-                                            {applyEligibility.canApply ? "Apply Now" : "Not eligible"}
-                                        </Button>
+                                            {applyEligibility.canApply ? (op.hasApplied ? "Apply again" : "Apply") : "Not eligible"}
+                                        </button>
                                     )}
                                 </div>
-                            </div>
+                            </article>
                         );
                     })}
                 </div>

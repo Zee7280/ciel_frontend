@@ -157,8 +157,8 @@ function reportMatchesTab(report: Report, tab: ReportStatusFilter): boolean {
 
     if (tab === 'pending') {
         if (isReportAdminVerified(report)) return false;
+        if (overall === 'draft' || overall === '' || overall === 'continue') return false;
         return (
-            overall === 'draft' ||
             overall === 'submitted' ||
             overall === 'pending' ||
             overall.includes('under_review') ||

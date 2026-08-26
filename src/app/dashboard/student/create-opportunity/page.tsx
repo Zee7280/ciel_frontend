@@ -28,8 +28,8 @@ import {
     SKILL_EMOJI,
     TIMELINE_EMOJI,
     VERIFICATION_EMOJI,
-} from "./CreateOpportunityChrome";
-import "./create-opportunity.css";
+} from "@/components/opportunities/CreateOpportunityChrome";
+import "@/components/opportunities/create-opportunity.css";
 
 // Dynamically import LocationPicker to avoid SSR issues with Google Maps.
 const LocationPicker = dynamic(() => import('@/components/ui/LocationPicker'), {

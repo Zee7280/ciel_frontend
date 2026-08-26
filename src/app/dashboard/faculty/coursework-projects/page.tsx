@@ -90,7 +90,7 @@ export default function FacultyCourseworkProjectsPage() {
                     kicker="FACULTY · COURSEWORK"
                     title="Your cohort, your call 🧑‍🏫"
                     subtitle="Flash cards arrive with evidence; each section is analysed — no scores. You approve, then run the Analyzer."
-                    gradient="linear-gradient(115deg,#3b1c00,#b45309 60%,#f59e0b 115%)"
+                    gradient="linear-gradient(115deg,#04252b,#0e5f63 55%,#0e7d74 115%)"
                     stats={[
                         { value: String(pending.length), label: "TO REVIEW" },
                         { value: String(approved.length), label: "APPROVED" },
@@ -144,10 +144,10 @@ export default function FacultyCourseworkProjectsPage() {
                 {view === "rank" && (
                     loading ? (
                         <div className="h-40 animate-pulse rounded-2xl bg-slate-100" />
-                    ) : entries.length === 0 ? (
-                        <EmptyDeck />
+                    ) : approved.length === 0 ? (
+                        <EmptyDeck message="Approve at least one submitted card to run the Analyzer." />
                     ) : (
-                        <MeritModelPanel entries={entries} meritEndpoint="/api/v1/paths/course-projects/merit-model" scopeName="Your cohort" />
+                        <MeritModelPanel entries={approved} meritEndpoint="/api/v1/paths/course-projects/merit-model" scopeName="Your cohort" />
                     )
                 )}
 

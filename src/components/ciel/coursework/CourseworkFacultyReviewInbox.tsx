@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import CourseworkCard from "@/components/ciel/CourseworkCard";
 import { type MeritEntry } from "@/components/ciel/MeritModelPanel";
 import { pendingFacultyReview, reviewCourseProjectSections } from "@/utils/courseworkSectionReview";
+import { isReviewApprovedStatus } from "@/utils/reviewQueue";
 
 export default function CourseworkFacultyReviewInbox({
     entries,
@@ -33,7 +34,7 @@ export default function CourseworkFacultyReviewInbox({
     const approval = current?.facultyApprovalStatus;
 
     return (
-        <div className="grid grid-cols-1 items-start gap-3 lg:grid-cols-[300px_1fr]">
+        <div className="grid grid-cols-1 items-start gap-3 lg:grid-cols-[240px_1fr]">
             <div className="rounded-[18px] border border-[#dcebee] bg-white p-4">
                 <p className="text-[8.5px] font-extrabold tracking-[0.14em] text-[#7a919a]">REVIEW INBOX</p>
                 <div className="mt-2 space-y-2">
@@ -74,7 +75,7 @@ export default function CourseworkFacultyReviewInbox({
             </div>
 
             {current && (
-                <div className="space-y-3">
+                <div className="grid grid-cols-1 items-start gap-3 xl:grid-cols-2">
                     <div className="rounded-[18px] border border-[#dcebee] bg-white p-4">
                         <p className="text-[8.5px] font-extrabold tracking-[0.14em] text-[#7a919a]">
                             FLASH CARD · {(current.projectTitle || "UNTITLED").toUpperCase()}
@@ -110,7 +111,7 @@ export default function CourseworkFacultyReviewInbox({
                                 ? `🧠 ${issues} issue${issues === 1 ? "" : "s"} to consider — approve anyway, or return with notes.`
                                 : "🧠 All 8 sections check out. Ready for your approval."}
                         </div>
-                        {approval !== "approved" && (
+                        {isReviewApprovedStatus(approval) ? null : (
                             <>
                                 <label className="mt-3 block text-[8px] font-extrabold tracking-[0.12em] text-[#7a919a]">
                                     NOTES FOR THE STUDENT (OPTIONAL)

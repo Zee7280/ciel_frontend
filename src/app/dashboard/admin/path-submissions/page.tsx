@@ -12,6 +12,7 @@ import CourseworkCard from "@/components/ciel/CourseworkCard";
 import CourseworkAnalyticsPanel from "@/components/ciel/coursework/CourseworkAnalyticsPanel";
 import { CourseworkCrumb, CourseworkHero, HubBackButton, HubTile } from "@/components/ciel/coursework/CourseworkHubChrome";
 import { isFacultyApproved } from "@/utils/courseworkSectionReview";
+import { isPathEntryApproved, isPathEntryWaiting } from "@/utils/reviewQueue";
 
 type PathTab = "course-project" | "fyp-thesis" | "startup-business";
 
@@ -91,6 +92,7 @@ interface AdminFypRow {
     wizardStepsComplete: number | null;
     wizardStepsTotal: number | null;
     status?: "draft" | "submitted";
+    supervisorApprovalStatus?: "pending" | "approved" | "rejected" | null;
     sectionSummaries?: FypSectionSummaries | null;
     updatedAt: string;
     student: AdminStudent | null;
@@ -170,9 +172,9 @@ export default function AdminPathSubmissionsPage() {
     const [courseRows, setCourseRows] = useState<AdminCourseProjectRow[]>([]);
     const [fypRows, setFypRows] = useState<AdminFypRow[]>([]);
     const [ventureRows, setVentureRows] = useState<AdminVentureRow[]>([]);
-    const [courseFilter, setCourseFilter] = useState<"all" | "draft" | "submitted">("all");
-    const [fypFilter, setFypFilter] = useState<"all" | "in_progress" | "complete">("all");
-    const [ventureFilter, setVentureFilter] = useState<"all" | "visible" | "private">("all");
+    const [courseFilter, setCourseFilter] = useState<"all" | "waiting" | "approved" | "draft">("all");
+    const [fypFilter, setFypFilter] = useState<"all" | "waiting" | "approved" | "in_progress" | "complete">("waiting");
+    const [ventureFilter, setVentureFilter] = useState<"all" | "waiting" | "submitted" | "visible" | "private">("all");
     const [search, setSearch] = useState("");
     const [loading, setLoading] = useState(true);
     const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -234,21 +236,18 @@ export default function AdminPathSubmissionsPage() {
         const load = async () => {
             try {
                 if (pathTab === "course-project") {
-                    const qs = courseFilter === "all" ? "" : `?status=${courseFilter}`;
-                    const res = await authenticatedFetch(`/api/v1/admin/paths/course-projects${qs}`);
+                    const res = await authenticatedFetch(`/api/v1/admin/paths/course-projects`);
                     const payload = res?.ok ? await res.json() : null;
                     if (!cancelled) setCourseRows(Array.isArray(payload?.data) ? payload.data : []);
                     return;
                 }
                 if (pathTab === "fyp-thesis") {
-                    const qs = fypFilter === "all" ? "" : `?progress=${fypFilter}`;
-                    const res = await authenticatedFetch(`/api/v1/admin/paths/fyp-thesis${qs}`);
+                    const res = await authenticatedFetch(`/api/v1/admin/paths/fyp-thesis`);
                     const payload = res?.ok ? await res.json() : null;
                     if (!cancelled) setFypRows(Array.isArray(payload?.data) ? payload.data : []);
                     return;
                 }
-                const qs = ventureFilter === "all" ? "" : `?visibility=${ventureFilter}`;
-                const res = await authenticatedFetch(`/api/v1/admin/paths/startup-business${qs}`);
+                const res = await authenticatedFetch(`/api/v1/admin/paths/startup-business`);
                 const payload = res?.ok ? await res.json() : null;
                 if (!cancelled) setVentureRows(Array.isArray(payload?.data) ? payload.data : []);
             } finally {
@@ -260,25 +259,32 @@ export default function AdminPathSubmissionsPage() {
         return () => {
             cancelled = true;
         };
-    }, [pathTab, courseFilter, fypFilter, ventureFilter]);
+    }, [pathTab]);
 
     const q = search.trim().toLowerCase();
 
     const filteredCourse = useMemo(() => {
-        if (!q) return courseRows;
-        return courseRows.filter((row) =>
-            [row.projectTitle, row.course, row.projectDescription, row.student?.name, row.student?.email, row.student?.institution]
+        return courseRows.filter((row) => {
+            if (courseFilter === "waiting" && !isPathEntryWaiting(row)) return false;
+            if (courseFilter === "approved" && !isPathEntryApproved(row)) return false;
+            if (courseFilter === "draft" && row.status !== "draft") return false;
+            if (!q) return true;
+            return [row.projectTitle, row.course, row.projectDescription, row.student?.name, row.student?.email, row.student?.institution]
                 .filter(Boolean)
                 .join(" ")
                 .toLowerCase()
-                .includes(q),
-        );
-    }, [courseRows, q]);
+                .includes(q);
+        });
+    }, [courseRows, courseFilter, q]);
 
     const filteredFyp = useMemo(() => {
-        if (!q) return fypRows;
-        return fypRows.filter((row) =>
-            [
+        return fypRows.filter((row) => {
+            if (fypFilter === "waiting" && !isPathEntryWaiting(row)) return false;
+            if (fypFilter === "approved" && !isPathEntryApproved(row)) return false;
+            if (fypFilter === "in_progress" && row.progressStatus !== "in_progress") return false;
+            if (fypFilter === "complete" && row.progressStatus !== "complete") return false;
+            if (!q) return true;
+            return [
                 row.projectTitle,
                 row.overview,
                 row.communityLinkage?.orgName,
@@ -289,20 +295,24 @@ export default function AdminPathSubmissionsPage() {
                 .filter(Boolean)
                 .join(" ")
                 .toLowerCase()
-                .includes(q),
-        );
-    }, [fypRows, q]);
+                .includes(q);
+        });
+    }, [fypRows, fypFilter, q]);
 
     const filteredVentures = useMemo(() => {
-        if (!q) return ventureRows;
-        return ventureRows.filter((row) =>
-            [row.ventureName, row.description, row.stage, row.student?.name, row.student?.email, row.student?.institution]
+        return ventureRows.filter((row) => {
+            if (ventureFilter === "waiting" && row.status === "submitted") return false;
+            if (ventureFilter === "submitted" && row.status !== "submitted") return false;
+            if (ventureFilter === "visible" && !row.isVisible) return false;
+            if (ventureFilter === "private" && row.isVisible) return false;
+            if (!q) return true;
+            return [row.ventureName, row.description, row.stage, row.student?.name, row.student?.email, row.student?.institution]
                 .filter(Boolean)
                 .join(" ")
                 .toLowerCase()
-                .includes(q),
-        );
-    }, [ventureRows, q]);
+                .includes(q);
+        });
+    }, [ventureRows, ventureFilter, q]);
 
     const sdgTitle = (num: number) => sdgData.find((s) => s.number === num)?.title ?? `SDG ${num}`;
 
@@ -324,6 +334,10 @@ export default function AdminPathSubmissionsPage() {
         () => (courseRows as unknown as MeritEntry[]).filter(isFacultyApproved),
         [courseRows],
     );
+    const waitingCourse = useMemo(
+        () => courseRows.filter(isPathEntryWaiting),
+        [courseRows],
+    );
     const uniCount = useMemo(
         () => new Set(approvedCourse.map((e) => e.student?.institution || e.studentInfo?.universityName).filter(Boolean)).size,
         [approvedCourse],
@@ -334,17 +348,19 @@ export default function AdminPathSubmissionsPage() {
             {pathTab === "course-project" ? (
                 <div className="mx-auto max-w-[1040px] space-y-4">
                     <CourseworkCrumb role="CIEL PK Master" view={courseView === "home" ? undefined : courseView} />
+                    {courseView === "home" && (
                     <CourseworkHero
                         kicker="CIEL PK MASTER · COURSEWORK"
                         title="The national deck 🌍"
                         subtitle="Every university, every filter, the standard Analyzer — plus the analytics only the Master sees."
                         gradient="linear-gradient(115deg,#04252b,#0e7d74 55%,#2dd4bf 115%)"
                         stats={[
+                            { value: String(waitingCourse.length), label: "WAITING" },
                             { value: String(approvedCourse.length), label: "APPROVED CARDS" },
                             { value: String(uniCount || "—"), label: "UNIVERSITIES" },
-                            { value: String(courseRows.length), label: "ALL ENTRIES" },
                         ]}
                     />
+                    )}
                 </div>
             ) : (
                 <header className="space-y-2">
@@ -390,54 +406,73 @@ export default function AdminPathSubmissionsPage() {
             </div>
 
             {pathTab === "course-project" && courseView === "home" ? (
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    <HubTile
+                        onClick={() => {
+                            setCourseFilter("waiting");
+                            setCourseView("submissions");
+                        }}
+                        badge={`${waitingCourse.length} IN QUEUE`}
+                        badgeClass="text-[#b45309]"
+                        emoji="⏳"
+                        title="Waiting for Approval"
+                        subtitle="Submitted reports still waiting for faculty — not on the national deck yet."
+                        background="linear-gradient(135deg,#b45309,#fbbf24)"
+                    />
                     <HubTile
                         onClick={() => setCourseView("deck")}
-                        badge="ALL UNIVERSITIES"
+                        badge={`${approvedCourse.length} LIVE`}
+                        badgeClass="text-[#0e7d74]"
                         emoji="⭐"
                         title="National deck"
-                        subtitle="Every approved card, every filter."
+                        subtitle="Every faculty-approved card, every filter."
                         background="linear-gradient(135deg,#0e7d74,#2dd4bf)"
                     />
                     <HubTile
                         onClick={() => setCourseView("rank")}
                         badge="STANDARD RUBRIC"
+                        badgeClass="text-[#6d28d9]"
                         emoji="🧠"
                         title="AI Analyzer — rank the nation"
-                        subtitle="All disciplines, all universities — reasons no one can question."
+                        subtitle="Approved cards only — reasons no one can question."
                         background="linear-gradient(135deg,#6d28d9,#a78bfa)"
                     />
                     <HubTile
                         onClick={() => setCourseView("stats")}
                         badge="MASTER ONLY"
+                        badgeClass="text-[#04252b]"
                         emoji="📊"
                         title="Analytics"
                         subtitle="Universities, criteria and formats — the intelligence layer."
                         background="linear-gradient(135deg,#04252b,#0e7d74)"
                     />
                     <HubTile
-                        onClick={() => setCourseView("submissions")}
+                        onClick={() => {
+                            setCourseFilter("all");
+                            setCourseView("submissions");
+                        }}
                         badge={`${courseRows.length} ENTRIES`}
+                        badgeClass="text-[#b45309]"
                         emoji="🗂️"
                         title="All submissions"
-                        subtitle="Drafts and submitted reports — the existing admin list."
+                        subtitle="Drafts, waiting, and approved — the existing admin list."
                         background="linear-gradient(135deg,#b45309,#f59e0b)"
                     />
                 </div>
             ) : pathTab === "course-project" && courseView === "rank" ? (
                 <>
-                    <HubBackButton onClick={() => setCourseView("home")} />
+                    <HubBackButton onClick={() => setCourseView("home")} label="← Back to path submissions" />
                     {meritLoading ? (
                         <div className="flex justify-center py-20">
                             <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
                         </div>
                     ) : (
-                        <MeritModelPanel entries={meritEntries} showDepartmentFilter showFacultyFilter showUniversityFilter meritEndpoint="/api/v1/paths/course-projects/merit-model" scopeName="CIEL PK — all universities" />
+                        <MeritModelPanel entries={meritEntries.filter(isFacultyApproved)} showDepartmentFilter showFacultyFilter showUniversityFilter meritEndpoint="/api/v1/paths/course-projects/merit-model" scopeName="CIEL PK — all universities" />
                     )}
                 </>
             ) : pathTab === "course-project" && courseView === "stats" ? (
                 <>
-                    <HubBackButton onClick={() => setCourseView("home")} />
+                    <HubBackButton onClick={() => setCourseView("home")} label="← Back to path submissions" />
                     {meritLoading ? (
                         <div className="flex justify-center py-20">
                             <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
@@ -448,7 +483,7 @@ export default function AdminPathSubmissionsPage() {
                 </>
             ) : pathTab === "course-project" && courseView === "deck" ? (
                 <>
-                    <HubBackButton onClick={() => setCourseView("home")} />
+                    <HubBackButton onClick={() => setCourseView("home")} label="← Back to path submissions" />
                     {meritLoading ? (
                         <div className="flex justify-center py-20">
                             <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
@@ -469,15 +504,15 @@ export default function AdminPathSubmissionsPage() {
                         <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
                     </div>
                 ) : (
-                    <FypMeritPanel entries={fypMeritEntries} showSchoolFilter showUniversityFilter meritEndpoint="/api/v1/paths/fyp-thesis/merit-model" />
+                    <FypMeritPanel entries={fypMeritEntries.filter(isPathEntryApproved)} showSchoolFilter showUniversityFilter meritEndpoint="/api/v1/paths/fyp-thesis/merit-model" />
                 )
             ) : (
             <>
-            {pathTab === "course-project" && <HubBackButton onClick={() => setCourseView("home")} />}
+            {pathTab === "course-project" && <HubBackButton onClick={() => setCourseView("home")} label="← Back to path submissions" />}
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex flex-wrap gap-2">
                     {pathTab === "course-project"
-                        ? (["all", "submitted", "draft"] as const).map((tab) => (
+                        ? (["waiting", "approved", "draft", "all"] as const).map((tab) => (
                               <button
                                   key={tab}
                                   type="button"
@@ -488,12 +523,12 @@ export default function AdminPathSubmissionsPage() {
                                           : "border border-slate-200 bg-white text-slate-600"
                                   }`}
                               >
-                                  {tab}
+                                  {tab === "waiting" ? "Waiting for approval" : tab}
                               </button>
                           ))
                         : null}
                     {pathTab === "fyp-thesis"
-                        ? (["all", "in_progress", "complete"] as const).map((tab) => (
+                        ? (["waiting", "approved", "in_progress", "complete", "all"] as const).map((tab) => (
                               <button
                                   key={tab}
                                   type="button"
@@ -502,12 +537,12 @@ export default function AdminPathSubmissionsPage() {
                                       fypFilter === tab ? "bg-slate-900 text-white" : "border border-slate-200 bg-white text-slate-600"
                                   }`}
                               >
-                                  {tab.replace("_", " ")}
+                                  {tab === "waiting" ? "Waiting for approval" : tab.replace("_", " ")}
                               </button>
                           ))
                         : null}
                     {pathTab === "startup-business"
-                        ? (["all", "visible", "private"] as const).map((tab) => (
+                        ? (["waiting", "submitted", "visible", "private", "all"] as const).map((tab) => (
                               <button
                                   key={tab}
                                   type="button"
@@ -516,7 +551,7 @@ export default function AdminPathSubmissionsPage() {
                                       ventureFilter === tab ? "bg-slate-900 text-white" : "border border-slate-200 bg-white text-slate-600"
                                   }`}
                               >
-                                  {tab}
+                                  {tab === "waiting" ? "Waiting (draft)" : tab}
                               </button>
                           ))
                         : null}
@@ -561,6 +596,18 @@ export default function AdminPathSubmissionsPage() {
                                                   >
                                                       {row.status}
                                                   </Badge>
+                                                  {row.status === "submitted" ? (
+                                                      <Badge
+                                                          variant="outline"
+                                                          className={
+                                                              isPathEntryApproved(row)
+                                                                  ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                                                                  : "border-amber-200 bg-amber-50 text-amber-900"
+                                                          }
+                                                      >
+                                                          {isPathEntryApproved(row) ? "Faculty approved" : "Waiting for approval"}
+                                                      </Badge>
+                                                  ) : null}
                                                   <Badge variant="outline" className="border-slate-200 text-slate-600">
                                                       Step {row.stepCompleted}/4
                                                   </Badge>
@@ -666,6 +713,18 @@ export default function AdminPathSubmissionsPage() {
                                                           ? `Step ${row.wizardStepsComplete}/${row.wizardStepsTotal}`
                                                           : `${row.milestonesComplete}/${row.milestonesTotal} milestones`}
                                                   </Badge>
+                                                  {row.status === "submitted" ? (
+                                                      <Badge
+                                                          variant="outline"
+                                                          className={
+                                                              isPathEntryApproved(row)
+                                                                  ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                                                                  : "border-amber-200 bg-amber-50 text-amber-900"
+                                                          }
+                                                      >
+                                                          {isPathEntryApproved(row) ? "Supervisor approved" : "Waiting for approval"}
+                                                      </Badge>
+                                                  ) : null}
                                               </div>
                                               <p className="text-sm text-slate-600 break-words">{studentLine(row.student)}</p>
                                               <p className="line-clamp-2 text-sm text-slate-500">

@@ -182,100 +182,98 @@ export default function FacultyAiEvaluationConsole() {
                 </div>
 
                 <div className="fae-cols">
-                    <div>
-                        <div className="fae-card" style={{ padding: 0, overflow: "hidden" }}>
-                            <div className="fae-fc">
-                                <div className="fae-fch">
-                                    <span className="fae-rb">FLASH CARD · IN FACULTY INBOX</span>
-                                    <h1>{model.title}</h1>
-                                    <div className="m">
-                                        {model.studentsLine}
-                                        {model.university ? ` · ${model.university}` : ""}
-                                        {model.discipline ? ` · ${model.discipline}` : ""}
-                                        {model.partnerLine ? ` · ${model.partnerLine}` : ""}
-                                        {model.timelineLine ? ` · ${model.timelineLine}` : ""}
-                                    </div>
-                                    {model.sdgs.length > 0 ? (
-                                        <div className="fae-sdgrow">
-                                            {model.sdgs.map((sdg) => (
-                                                <span
-                                                    key={`${sdg.goalNumber}-${sdg.label}`}
-                                                    className="fae-sdgc"
-                                                    style={{ background: sdg.color }}
-                                                >
-                                                    {sdg.primary ? "★ " : ""}
-                                                    {sdg.label}
-                                                </span>
-                                            ))}
-                                        </div>
-                                    ) : null}
+                    <div className="fae-card" style={{ padding: 0, overflow: "hidden" }}>
+                        <div className="fae-fc">
+                            <div className="fae-fch">
+                                <span className="fae-rb">FLASH CARD · IN FACULTY INBOX</span>
+                                <h1>{model.title}</h1>
+                                <div className="m">
+                                    {model.studentsLine}
+                                    {model.university ? ` · ${model.university}` : ""}
+                                    {model.discipline ? ` · ${model.discipline}` : ""}
+                                    {model.partnerLine ? ` · ${model.partnerLine}` : ""}
+                                    {model.timelineLine ? ` · ${model.timelineLine}` : ""}
                                 </div>
-                                <div className="fae-fstats">
-                                    <div className="fae-fs">
-                                        <div className="v">{model.hoursLabel}</div>
-                                        <div className="kk">VERIFIED HOURS</div>
+                                {model.sdgs.length > 0 ? (
+                                    <div className="fae-sdgrow">
+                                        {model.sdgs.map((sdg) => (
+                                            <span
+                                                key={`${sdg.goalNumber}-${sdg.label}`}
+                                                className="fae-sdgc"
+                                                style={{ background: sdg.color }}
+                                            >
+                                                {sdg.primary ? "★ " : ""}
+                                                {sdg.label}
+                                            </span>
+                                        ))}
                                     </div>
-                                    <div className="fae-fs">
-                                        <div className="v">{model.reachedLabel}</div>
-                                        <div className="kk">REACHED</div>
-                                    </div>
-                                    <div className="fae-fs">
-                                        <div className="v">{model.attendanceLabel}</div>
-                                        <div className="kk">ATTENDANCE</div>
-                                    </div>
-                                    <div className="fae-fs">
-                                        <div className="v">{model.evidenceCount}</div>
-                                        <div className="kk">EVIDENCE FILES</div>
-                                    </div>
+                                ) : null}
+                            </div>
+                            <div className="fae-fstats">
+                                <div className="fae-fs">
+                                    <div className="v">{model.hoursLabel}</div>
+                                    <div className="kk">VERIFIED HOURS</div>
                                 </div>
-                                <div className="fae-fbody">
-                                    <div className="fae-k">EVIDENCE — TAP TO ENLARGE</div>
-                                    {model.evidence.length ? (
-                                        <div className="fae-gal" style={{ marginTop: 8 }}>
-                                            {model.evidence.map((item) => (
-                                                <button
-                                                    key={item.url}
-                                                    type="button"
-                                                    className="fae-ph"
-                                                    onClick={() => setLightbox(item)}
-                                                    title={item.label}
-                                                >
-                                                    {item.isImage ? (
-                                                        // eslint-disable-next-line @next/next/no-img-element
-                                                        <img src={item.url} alt={item.label} />
-                                                    ) : (
-                                                        item.ext
-                                                    )}
-                                                    <span className="b">{item.ext}</span>
-                                                </button>
-                                            ))}
-                                        </div>
-                                    ) : (
-                                        <p className="fae-sub" style={{ marginTop: 8 }}>
-                                            No evidence files attached to this report.
-                                        </p>
-                                    )}
-                                    <div className="fae-dq">{model.aiQuote}</div>
+                                <div className="fae-fs">
+                                    <div className="v">{model.reachedLabel}</div>
+                                    <div className="kk">REACHED</div>
+                                </div>
+                                <div className="fae-fs">
+                                    <div className="v">{model.attendanceLabel}</div>
+                                    <div className="kk">ATTENDANCE</div>
+                                </div>
+                                <div className="fae-fs">
+                                    <div className="v">{model.evidenceCount}</div>
+                                    <div className="kk">EVIDENCE FILES</div>
                                 </div>
                             </div>
+                            <div className="fae-fbody">
+                                <div className="fae-k">EVIDENCE — TAP TO ENLARGE</div>
+                                {model.evidence.length ? (
+                                    <div className="fae-gal" style={{ marginTop: 8 }}>
+                                        {model.evidence.map((item) => (
+                                            <button
+                                                key={item.url}
+                                                type="button"
+                                                className="fae-ph"
+                                                onClick={() => setLightbox(item)}
+                                                title={item.label}
+                                            >
+                                                {item.isImage ? (
+                                                    // eslint-disable-next-line @next/next/no-img-element
+                                                    <img src={item.url} alt={item.label} />
+                                                ) : (
+                                                    item.ext
+                                                )}
+                                                <span className="b">{item.ext}</span>
+                                            </button>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <p className="fae-sub" style={{ marginTop: 8 }}>
+                                        No evidence files attached to this report.
+                                    </p>
+                                )}
+                                <div className="fae-dq">{model.aiQuote}</div>
+                            </div>
                         </div>
-                        <div className="fae-card">
-                            <div className="fae-k">HOW EACH SECTION FED THIS CARD</div>
-                            <p style={{ fontSize: 10.5, color: "#3c5a5c", lineHeight: 1.8, marginTop: 7 }}>
-                                Every section summary already stored on this report accumulates into
-                                the flash card. The AI Evaluator on the right reads the same flash-card
-                                CII record — scores are not rewritten on this screen.
-                            </p>
-                            {model.sectionBanners.length ? (
-                                <ul className="fae-acts" style={{ marginTop: 8 }}>
-                                    {model.sectionBanners.map((row) => (
-                                        <li key={`${row.label}-${row.n}`}>
-                                            <b>S{row.label}:</b> {row.text}
-                                        </li>
-                                    ))}
-                                </ul>
-                            ) : null}
-                        </div>
+                    </div>
+                    <div className="fae-card">
+                        <div className="fae-k">PROJECT DETAIL · HOW EACH SECTION FED THIS CARD</div>
+                        <p style={{ fontSize: 10.5, color: "#3c5a5c", lineHeight: 1.8, marginTop: 7 }}>
+                            Every section summary already stored on this report accumulates into
+                            the flash card. The AI Evaluator on the right reads the same flash-card
+                            CII record — scores are not rewritten on this screen.
+                        </p>
+                        {model.sectionBanners.length ? (
+                            <ul className="fae-acts" style={{ marginTop: 8 }}>
+                                {model.sectionBanners.map((row) => (
+                                    <li key={`${row.label}-${row.n}`}>
+                                        <b>S{row.label}:</b> {row.text}
+                                    </li>
+                                ))}
+                            </ul>
+                        ) : null}
                     </div>
 
                     <div>

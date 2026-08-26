@@ -16,6 +16,7 @@ import {
     ClipboardList,
     Building2,
     GraduationCap,
+    BookOpen,
 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import Link from "next/link";
@@ -58,6 +59,13 @@ const shortcutLinks = [
         description: "Hours, SDGs, HEC / Gov / UN",
         icon: BarChart3,
         className: "bg-emerald-50 text-emerald-800 ring-emerald-100 hover:bg-emerald-100/80",
+    },
+    {
+        href: "/dashboard/admin/community-service",
+        label: "Community service",
+        description: "National vault, award run, HEC lens",
+        icon: BookOpen,
+        className: "bg-teal-50 text-teal-800 ring-teal-100 hover:bg-teal-100/80",
     },
     {
         href: "/dashboard/admin/join-applications",

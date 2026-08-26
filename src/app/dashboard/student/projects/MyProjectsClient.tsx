@@ -942,7 +942,7 @@ export default function MyProjectsPage() {
                         subtitle: null,
                         status: fypStatusLabel(fypEntry),
                         stepCompleted: fypEntry.stepCompleted,
-                        href: "/dashboard/student/paths/fyp-thesis",
+                        href: "/dashboard/student/paths/fyp-thesis?view=workspace",
                     },
                     ventureEntry && {
                         key: "startup-business",
@@ -952,7 +952,7 @@ export default function MyProjectsPage() {
                         subtitle: null,
                         status: ventureStatusLabel(ventureEntry),
                         stepCompleted: ventureEntry.stepCompleted,
-                        href: "/dashboard/student/paths/startup-business",
+                        href: "/dashboard/student/paths/startup-business?view=workspace",
                     },
                 ].filter(Boolean) as {
                     key: string;

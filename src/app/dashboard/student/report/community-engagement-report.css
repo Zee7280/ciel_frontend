@@ -23,10 +23,39 @@
 
 .cer .cer-apph {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     gap: 14px;
     margin-bottom: 14px;
     flex-wrap: wrap;
+    justify-content: space-between;
+}
+
+.cer .cer-back {
+    display: inline-block;
+    border: 0;
+    background: transparent;
+    padding: 0;
+    margin-bottom: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--teal);
+    cursor: pointer;
+    font-family: inherit;
+}
+
+.cer .cer-htitle {
+    font-size: 28px;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    line-height: 1.15;
+    color: var(--ink);
+}
+
+.cer .cer-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
 }
 
 .cer .cer-logo {
@@ -40,8 +69,9 @@
 }
 
 .cer .cer-proj {
-    font-size: 11px;
+    font-size: 13px;
     color: var(--muted);
+    margin-top: 4px;
 }
 
 .cer .cer-prog {
@@ -80,10 +110,10 @@
     border: 1px solid var(--line);
     background: #fff;
     color: var(--ink);
-    border-radius: 99px;
-    padding: 8px 15px;
-    font-size: 10.5px;
-    font-weight: 800;
+    border-radius: 10px;
+    padding: 8px 14px;
+    font-size: 13px;
+    font-weight: 600;
     cursor: pointer;
     font-family: inherit;
 }
@@ -99,11 +129,11 @@
     border: 1px solid var(--line);
     background: #fff;
     color: var(--muted);
-    border-radius: 99px;
-    padding: 8px 14px;
-    font-size: 10px;
-    font-weight: 800;
-    letter-spacing: 0.05em;
+    border-radius: 10px;
+    padding: 8px 12px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0;
     cursor: pointer;
     font-family: inherit;
     position: relative;
@@ -115,32 +145,32 @@
 }
 
 .cer .cer-tb.on {
-    background: var(--teal);
-    border-color: var(--teal);
-    color: #fff;
+    background: #e6f6f4;
+    border-color: #bfe6e2;
+    color: #0f5e57;
 }
 
 .cer .cer-tb.done::after {
     content: "✓";
     margin-left: 5px;
-    color: #2dd4bf;
+    color: #0e7d74;
     font-weight: 800;
 }
 
 .cer .cer-tb.on.done::after {
-    color: #99f6e4;
+    color: #0e7d74;
 }
 
 .cer .cer-tb.fc {
-    border-color: #f3d9a0;
-    background: var(--gold-soft);
-    color: var(--gold);
+    border-color: #bfe6e2;
+    background: #fff;
+    color: var(--muted);
 }
 
 .cer .cer-tb.fc.on {
-    background: var(--gold);
-    border-color: var(--gold);
-    color: #fff;
+    background: #e6f6f4;
+    border-color: #bfe6e2;
+    color: #0f5e57;
 }
 
 .cer .cer-tb:disabled {
@@ -501,22 +531,21 @@
 }
 
 .cer .cer-fcwrap {
-    max-width: 640px;
-    margin: 0 auto 18px;
+    max-width: none;
+    margin: 0 0 18px;
 }
 
 .cer .cer-fcard {
-    border-radius: 26px;
+    border-radius: 16px;
     overflow: hidden;
     border: 1px solid var(--line);
     background: #fff;
-    box-shadow: 0 24px 60px rgba(4, 37, 43, 0.16);
 }
 
 .cer .cer-fch {
-    background: linear-gradient(130deg, #04252b, #0e5f63 55%, #12a5a0 120%);
+    background: #064e3b;
     color: #fff;
-    padding: 24px 26px;
+    padding: 22px 24px 8px;
     position: relative;
     overflow: hidden;
 }
@@ -534,10 +563,21 @@
 }
 
 .cer .cer-fch h1 {
-    font-size: 21px;
+    font-size: 26px;
     margin: 10px 0 4px;
-    line-height: 1.3;
+    line-height: 1.25;
     font-weight: 800;
+}
+
+.cer .cer-fch .cer-sdgrow {
+    margin-top: 12px;
+}
+
+.cer .cer-fch .cer-sdgc {
+    font-size: 11px;
+    font-weight: 700;
+    border-radius: 99px;
+    padding: 5px 10px;
 }
 
 .cer .cer-fm {
@@ -560,7 +600,7 @@
     justify-content: center;
     font-size: 13px;
     font-weight: 800;
-    border: 2px solid #0e5f63;
+    border: 2px solid #064e3b;
     margin: 0 -8px 0 0;
 }
 
@@ -568,6 +608,28 @@
     display: grid;
     grid-template-columns: repeat(4, 1fr);
     border-bottom: 1px solid var(--line);
+}
+
+.cer .cer-fstats-onhero {
+    border-bottom: 0;
+    margin: 16px -24px 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.cer .cer-fstats-onhero .cer-fs {
+    border-right: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.cer .cer-fstats-onhero .cer-fs .v {
+    color: #fff;
+    font-size: 22px;
+}
+
+.cer .cer-fstats-onhero .cer-fs .k {
+    color: rgba(255, 255, 255, 0.65);
+    font-size: 8px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
 }
 
 @media (max-width: 560px) {
@@ -606,33 +668,176 @@
 
 .cer .cer-arrow {
     display: flex;
-    align-items: center;
+    align-items: stretch;
     gap: 12px;
-    background: #f6fcfb;
-    border: 1px solid var(--line);
-    border-radius: 14px;
-    padding: 13px 16px;
-    margin-bottom: 13px;
+    margin-bottom: 18px;
 }
 
 .cer .cer-arrow .a {
     flex: 1;
-    font-size: 11px;
+    font-size: 13px;
     line-height: 1.55;
     color: #1d3a3d;
+    background: #f4f6f6;
+    border-radius: 10px;
+    padding: 14px 16px;
+}
+
+.cer .cer-record-k {
+    font-size: 15px;
+    font-weight: 800;
+    color: var(--ink);
+    margin: 4px 0 10px;
+}
+
+.cer .cer-dr {
+    display: grid;
+    grid-template-columns: 150px 1fr auto;
+    gap: 16px;
+    border: 0;
+    border-bottom: 1px solid var(--line);
+    border-radius: 0;
+    padding: 14px 0;
+    margin-bottom: 0;
+    align-items: start;
+    background: #fff;
+}
+
+.cer .cer-dr .crit {
+    font-size: 14px;
+    font-weight: 800;
+    letter-spacing: 0;
+    color: var(--ink);
+}
+
+.cer .cer-dr .sub {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 2px;
+}
+
+.cer .cer-dr .txt {
+    font-size: 13px;
+    line-height: 1.55;
+    color: #334155;
+}
+
+.cer .cer-dr .ev {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0;
+    background: #e6f6f4;
+    color: #0f5e57;
+    border-radius: 99px;
+    padding: 4px 10px;
+    white-space: nowrap;
+}
+
+.cer .cer-life {
+    border-radius: 14px;
+    padding: 14px 16px;
+    margin-bottom: 14px;
+}
+
+.cer .cer-life-fee {
+    background: #fbf0d7;
+    border: 1px solid #f3d9a0;
+}
+
+.cer .cer-life-wait,
+.cer .cer-life-draft {
+    background: #f4f6f6;
+    border: 1px solid var(--line);
+}
+
+.cer .cer-life-ok {
+    background: #e6f6f4;
+    border: 1px solid #bfe6e2;
+}
+
+.cer .cer-life-row {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    justify-content: space-between;
+    flex-wrap: wrap;
+}
+
+.cer .cer-life-k {
+    font-size: 14px;
+    font-weight: 800;
+    color: var(--ink);
+}
+
+.cer .cer-life-t {
+    font-size: 13px;
+    color: #475569;
+    margin-top: 2px;
+}
+
+.cer .cer-pay {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 10px;
+    background: #064e3b;
+    color: #fff;
+    font-size: 13px;
+    font-weight: 700;
+    padding: 8px 14px;
+    text-decoration: none;
+}
+
+.cer .cer-pipe {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 12px;
+}
+
+.cer .cer-pip {
+    font-size: 11px;
+    font-weight: 700;
+    border-radius: 99px;
+    padding: 5px 10px;
+    background: #fff;
+    color: #64748b;
+}
+
+.cer .cer-pip.done {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+.cer .cer-pip.current {
+    background: #fdba74;
+    color: #7c2d12;
+}
+
+@media (max-width: 700px) {
+    .cer .cer-dr {
+        grid-template-columns: 1fr;
+    }
 }
 
 .cer .cer-arrow .mid {
-    font-size: 20px;
-    color: var(--teal);
+    align-self: center;
+    font-size: 16px;
+    color: var(--muted);
 }
 
 .cer .cer-arrow b {
     display: block;
-    font-size: 8.5px;
-    letter-spacing: 0.1em;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
     color: var(--muted);
-    margin-bottom: 3px;
+    margin-bottom: 6px;
+}
+
+.cer .cer-arrow .hl {
+    color: #0e7d74;
+    font-weight: 800;
 }
 
 .cer .cer-qsig {
@@ -663,52 +868,6 @@
     font-weight: 800;
     letter-spacing: 0.12em;
     color: var(--muted);
-    margin-top: 2px;
-}
-
-.cer .cer-dr {
-    display: flex;
-    gap: 11px;
-    border: 1px solid var(--line);
-    border-radius: 13px;
-    padding: 11px 13px;
-    margin-bottom: 8px;
-    align-items: flex-start;
-    background: #fff;
-}
-
-.cer .cer-dr .ic {
-    font-size: 17px;
-    margin-top: 1px;
-}
-
-.cer .cer-dr .bx {
-    flex: 1;
-}
-
-.cer .cer-dr .crit {
-    font-size: 8.5px;
-    font-weight: 800;
-    letter-spacing: 0.12em;
-    color: var(--teal);
-}
-
-.cer .cer-dr .txt {
-    font-size: 11.5px;
-    line-height: 1.6;
-    color: #1d3a3d;
-    margin-top: 3px;
-}
-
-.cer .cer-dr .ev {
-    font-size: 7.5px;
-    font-weight: 800;
-    letter-spacing: 0.06em;
-    background: var(--aqua-soft);
-    color: var(--aqua);
-    border-radius: 99px;
-    padding: 3px 9px;
-    white-space: nowrap;
     margin-top: 2px;
 }
 
@@ -780,4 +939,555 @@
     text-align: center;
     margin-top: 8px;
     line-height: 1.6;
+}
+
+.cer .cer-unlock {
+    border: 1px dashed #cbd5e1;
+    border-radius: 14px;
+    padding: 16px 18px;
+    background: #fafbfb;
+    margin-bottom: 8px;
+}
+
+.cer .cer-unlock:not(.cer-unlock-locked) {
+    border-style: solid;
+    background: #fff;
+}
+
+.cer .cer-unlock-h {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    margin-bottom: 14px;
+}
+
+.cer .cer-unlock-ico {
+    width: 18px;
+    height: 18px;
+    color: #64748b;
+    margin-top: 2px;
+    flex-shrink: 0;
+}
+
+.cer .cer-unlock-h h3 {
+    font-size: 16px;
+    font-weight: 800;
+    color: var(--ink);
+    margin: 0;
+}
+
+.cer .cer-unlock-h p {
+    font-size: 13px;
+    color: #64748b;
+    margin: 4px 0 0;
+    line-height: 1.5;
+}
+
+.cer .cer-unlock-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 10px;
+}
+
+.cer .cer-ulock {
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 16px 12px;
+    text-align: center;
+    min-height: 110px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+
+.cer .cer-ulock.open {
+    background: #fff;
+}
+
+.cer .cer-ulock-lock {
+    width: 16px;
+    height: 16px;
+    color: #94a3b8;
+}
+
+.cer .cer-ulock-k {
+    font-size: 12px;
+    font-weight: 700;
+    color: #64748b;
+}
+
+.cer .cer-ulock-dots {
+    font-size: 18px;
+    letter-spacing: 0.12em;
+    color: #94a3b8;
+    font-weight: 700;
+}
+
+.cer .cer-ulock-v {
+    font-size: 18px;
+    font-weight: 800;
+    color: var(--ink);
+}
+
+.cer .cer-ulock-v span {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--muted);
+}
+
+.cer .cer-comp {
+    margin-top: 8px;
+}
+
+.cer .cer-comp-k {
+    font-size: 16px;
+    font-weight: 800;
+    color: var(--ink);
+    margin: 0;
+}
+
+.cer .cer-comp-t {
+    font-size: 13px;
+    color: #64748b;
+    margin: 4px 0 14px;
+}
+
+.cer .cer-comp-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+}
+
+.cer .cer-comp-card {
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 14px 16px;
+}
+
+.cer .cer-comp-label {
+    font-size: 13px;
+    font-weight: 800;
+    color: var(--ink);
+}
+
+.cer .cer-comp-desc {
+    font-size: 12px;
+    color: #64748b;
+    margin: 4px 0 12px;
+    line-height: 1.45;
+}
+
+.cer .cer-comp-st.pass {
+    font-size: 13px;
+    font-weight: 700;
+    color: #0f5e57;
+}
+
+.cer .cer-comp-st.pend {
+    font-size: 13px;
+    font-weight: 700;
+    color: #94a3b8;
+}
+
+@media (max-width: 800px) {
+    .cer .cer-unlock-grid,
+    .cer .cer-comp-grid {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+
+@media (max-width: 520px) {
+    .cer .cer-unlock-grid,
+    .cer .cer-comp-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.cer .cer-appr {
+    border-radius: 14px;
+    padding: 16px 18px;
+    margin-bottom: 4px;
+}
+
+.cer .cer-appr.cond {
+    background: #fbf0d7;
+    border: 1px solid #f3d9a0;
+}
+
+.cer .cer-appr.ok {
+    background: #e6f6f4;
+    border: 1px solid #bfe6e2;
+}
+
+.cer .cer-appr-row {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    justify-content: space-between;
+    flex-wrap: wrap;
+}
+
+.cer .cer-appr h2 {
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    color: #064e3b;
+    margin: 0;
+}
+
+.cer .cer-appr p {
+    font-size: 13px;
+    color: #475569;
+    margin: 6px 0 0;
+    line-height: 1.5;
+    max-width: 640px;
+}
+
+.cer .cer-appr-fix {
+    border: 0;
+    background: #0e7d74;
+    color: #fff;
+    border-radius: 10px;
+    padding: 9px 14px;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: inherit;
+    white-space: nowrap;
+}
+
+.cer .cer-mbar {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.cer .cer-mbar-i {
+    padding: 14px 12px;
+    text-align: center;
+    border-right: 1px solid var(--line);
+}
+
+.cer .cer-mbar-i:last-child {
+    border-right: 0;
+}
+
+.cer .cer-mbar-i .v {
+    font-size: 20px;
+    font-weight: 800;
+    color: var(--ink);
+}
+
+.cer .cer-mbar-i .k {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-top: 4px;
+}
+
+.cer .cer-cii {
+    display: grid;
+    grid-template-columns: minmax(200px, 0.9fr) 1.4fr;
+    gap: 28px;
+    align-items: center;
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 20px 22px;
+}
+
+.cer .cer-cii-gauge {
+    text-align: center;
+}
+
+.cer .cer-cii-arc {
+    position: relative;
+    max-width: 220px;
+    margin: 0 auto;
+}
+
+.cer .cer-cii-svg {
+    width: 100%;
+    height: auto;
+}
+
+.cer .cer-cii-score {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 8px;
+    font-size: 28px;
+    font-weight: 800;
+    color: var(--ink);
+    margin: 0;
+}
+
+.cer .cer-cii-score span {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--muted);
+}
+
+.cer .cer-cii-band {
+    font-size: 15px;
+    font-weight: 800;
+    color: var(--ink);
+    margin: 8px 0 0;
+}
+
+.cer .cer-cii-band-sub {
+    font-size: 12px;
+    color: var(--muted);
+    margin: 2px 0 0;
+}
+
+.cer .cer-cii-bars {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.cer .cer-cii-row {
+    display: grid;
+    grid-template-columns: 130px 1fr 52px;
+    gap: 10px;
+    align-items: center;
+}
+
+.cer .cer-cii-lab {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ink);
+}
+
+.cer .cer-cii-row.weak .cer-cii-lab,
+.cer .cer-cii-row.weak .cer-cii-n {
+    color: #c2410c;
+}
+
+.cer .cer-cii-track {
+    height: 8px;
+    border-radius: 99px;
+    background: #e8eeed;
+    overflow: hidden;
+}
+
+.cer .cer-cii-track i {
+    display: block;
+    height: 100%;
+    border-radius: 99px;
+    background: #0e7d74;
+}
+
+.cer .cer-cii-row.weak .cer-cii-track i {
+    background: #ea580c;
+}
+
+.cer .cer-cii-n {
+    font-size: 12px;
+    font-weight: 700;
+    color: #475569;
+    text-align: right;
+}
+
+.cer .cer-hold {
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 16px 18px;
+}
+
+.cer .cer-hold-h {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 12px;
+}
+
+.cer .cer-hold-h h3 {
+    font-size: 16px;
+    font-weight: 800;
+    color: var(--ink);
+    margin: 0;
+}
+
+.cer .cer-hold-tech {
+    border: 1px solid var(--line);
+    background: #fff;
+    color: #475569;
+    border-radius: 8px;
+    padding: 6px 10px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+}
+
+.cer .cer-hold-item {
+    display: grid;
+    grid-template-columns: 88px 1fr;
+    gap: 12px;
+    padding: 12px 0;
+    border-top: 1px solid var(--line);
+}
+
+.cer .cer-hold-sev {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 28px;
+    border-radius: 8px;
+    font-size: 11px;
+    font-weight: 800;
+}
+
+.cer .cer-hold-sev.critical {
+    background: #ffe4e6;
+    color: #9f1239;
+}
+
+.cer .cer-hold-sev.moderate {
+    background: #ffedd5;
+    color: #c2410c;
+}
+
+.cer .cer-hold-sev.minor {
+    background: #f1f5f9;
+    color: #64748b;
+}
+
+.cer .cer-hold-title {
+    font-size: 14px;
+    font-weight: 800;
+    color: var(--ink);
+    margin: 0;
+}
+
+.cer .cer-hold-body {
+    font-size: 13px;
+    color: #475569;
+    margin: 4px 0 0;
+    line-height: 1.5;
+}
+
+.cer .cer-hold-fix {
+    font-size: 13px;
+    font-weight: 600;
+    color: #0e7d74;
+    margin: 6px 0 0;
+    font-style: italic;
+}
+
+.cer .cer-hold-note {
+    margin-top: 12px;
+    background: #e8f4f2;
+    border-radius: 10px;
+    padding: 12px 14px;
+}
+
+.cer .cer-hold-note-k {
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #0f5e57;
+    margin: 0 0 4px;
+}
+
+.cer .cer-hold-note-t {
+    font-size: 13px;
+    color: #334155;
+    margin: 0;
+    line-height: 1.55;
+}
+
+.cer .cer-cert {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    flex-wrap: wrap;
+    background: #064e3b;
+    color: #fff;
+    border-radius: 14px;
+    padding: 22px 24px;
+}
+
+.cer .cer-cert-copy {
+    flex: 1;
+    min-width: 220px;
+}
+
+.cer .cer-cert h3 {
+    font-size: 20px;
+    font-weight: 800;
+    margin: 0;
+}
+
+.cer .cer-cert p {
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.78);
+    margin: 6px 0 14px;
+    line-height: 1.5;
+    max-width: 520px;
+}
+
+.cer .cer-cert-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.cer .cer-cert-solid,
+.cer .cer-cert-ghost {
+    border-radius: 10px;
+    padding: 9px 14px;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: inherit;
+}
+
+.cer .cer-cert-solid {
+    border: 0;
+    background: #fff;
+    color: #064e3b;
+}
+
+.cer .cer-cert-ghost {
+    border: 1px solid rgba(255, 255, 255, 0.45);
+    background: transparent;
+    color: #fff;
+}
+
+.cer .cer-cert-qr p {
+    color: rgba(255, 255, 255, 0.7) !important;
+}
+
+.cer .cer-cert-qr > div > div {
+    background: #fff;
+}
+
+@media (max-width: 800px) {
+    .cer .cer-cii,
+    .cer .cer-mbar {
+        grid-template-columns: 1fr;
+    }
+    .cer .cer-mbar-i {
+        border-right: 0;
+        border-bottom: 1px solid var(--line);
+    }
+    .cer .cer-hold-item {
+        grid-template-columns: 1fr;
+    }
 }

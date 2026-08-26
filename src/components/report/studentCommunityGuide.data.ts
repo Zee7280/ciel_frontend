@@ -151,9 +151,9 @@ export const STUDENT_GUIDE_SECTIONS: StudentGuideSection[] = [
             "PART A — one card per major effort: title, status, category → sub-category, who did what.",
             "Count the countable: outputs with quantity + unit; people reached + how you counted; who they were; where.",
             "Declare overlap honestly if two activities served the same people.",
-            "PART B — finish: Before… / Now… / We know because… — the story drafts itself, edit freely (60–150 words).",
+            "PART B — finish: Before… / Now… / We know because… — the story drafts itself, edit freely (20–200 words).",
             "Add measurable outcomes: same metric BEFORE and NOW; improvement computes itself.",
-            "Name the challenges and write your limitations (20–60 words) — honesty scores.",
+            "Name the challenges and write your limitations (20–200 words) — honesty scores.",
         ],
         ex:
             L("PART A · ACTIVITY 1") +
@@ -301,14 +301,14 @@ export const STUDENT_GUIDE_SECTIONS: StudentGuideSection[] = [
         how: [
             "Unlocks only when Section 1 is complete AND your hours clock strikes the target.",
             "Answer: 🌿 Yes / ♻️ Partial / ⏸️ No — a candid Partial outranks a hollow Yes.",
-            "Explain what continues, what stops, what support is needed (min 100, aim 100–180 words).",
+            "Explain what continues, what stops, what support is needed (20–200 words).",
             "Tap the mechanisms that keep it alive — or honestly say none do. Then scaling + system influence.",
             "Read the 🧠 AI review of all nine sections and the delivery map — then SUBMIT. That click runs the CII automatically.",
         ],
         ex:
             L("10.1 WILL IT CONTINUE?") +
             CH(["♻️ Partial — some elements continue with support"], ["🌿 Yes", "⏸️ No"]) +
-            L("WHAT CONTINUES, WHAT STOPS · 110 WORDS") +
+            L("WHAT CONTINUES, WHAT STOPS · 20–200 WORDS") +
             V(
                 "“The renovated classroom and furniture stay in daily use — that continues on its own. <i>Weekly tutoring stops unless SOS staff take it over</i>; we handed over session plans and trained two staff members…”",
             ) +

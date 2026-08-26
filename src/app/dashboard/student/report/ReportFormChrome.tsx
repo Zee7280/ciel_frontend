@@ -8,16 +8,16 @@ import { getReportProjectContextDisplay } from "@/utils/reportProjectContext";
 import { REPORT_UI_SECTION_TOTAL, FLASH_CARD_STEP, canonicalReportStep, isMergedActivitiesStep, wizardStepToDataSections } from "./utils/reportWizardNav";
 
 export const REPORT_TAB_ITEMS: Array<{ step: number; label: string; flash?: boolean }> = [
-    { step: 1, label: "1 PARTICIPATION" },
-    { step: 2, label: "2 CONTEXT" },
-    { step: 3, label: "3 SDG MAPPING" },
-    { step: 4, label: "4 ACTIVITIES & OUTPUTS" },
-    { step: 5, label: "5 RESOURCES" },
-    { step: 6, label: "6 PARTNERSHIPS" },
-    { step: 7, label: "7 EVIDENCE" },
-    { step: 8, label: "8 REFLECTION" },
-    { step: 9, label: "9 SUSTAINABILITY" },
-    { step: 10, label: "⭐ FLASH CARD", flash: true },
+    { step: 1, label: "1 Participation" },
+    { step: 2, label: "2 Context" },
+    { step: 3, label: "3 SDG mapping" },
+    { step: 4, label: "4 Activities" },
+    { step: 5, label: "5 Resources" },
+    { step: 6, label: "6 Partnerships" },
+    { step: 7, label: "7 Evidence" },
+    { step: 8, label: "8 Reflection" },
+    { step: 9, label: "9 Sustainability" },
+    { step: 10, label: "Summary card", flash: true },
 ];
 
 const SECTION_BRIDGES: Record<number, { kicker: string; title: string; note?: string }> = {
@@ -47,7 +47,7 @@ const SECTION_BRIDGES: Record<number, { kicker: string; title: string; note?: st
         note: "Not all projects continue — a candid answer is stronger than an optimistic one.",
     },
     10: {
-        kicker: "FLASH CARD · ONE RECORD, THREE VIEWS",
+        kicker: "SUMMARY CARD · ONE RECORD",
         title: "Your accumulated report — summary, CII, and submit",
     },
 };
@@ -579,6 +579,115 @@ export function ReportLiveBanner({
     );
 }
 
+export function ReportLifecycleBanner({
+    data,
+    sectionsComplete,
+    paymentHref,
+}: {
+    data: ReportData;
+    sectionsComplete: number;
+    paymentHref?: string;
+}) {
+    const reportSt = String(data.status || "").toLowerCase();
+    const reportRs = String(data.report_status || "").toLowerCase();
+    const paymentSt = String(data.payment_status || "").toLowerCase();
+    const adminSt = String(data.admin_status || data.admin_approval_status || "").toLowerCase();
+    const submitted = [
+        "submitted",
+        "under_review",
+        "payment_pending",
+        "pending_payment",
+        "payment_under_review",
+        "paid",
+        "approved",
+        "verified",
+        "partner_verified",
+        "finalized",
+    ].includes(reportSt) || ["pending_payment", "payment_under_review", "paid"].includes(reportRs);
+    const feeDone =
+        reportSt === "paid" ||
+        reportSt === "payment_under_review" ||
+        reportSt === "verified" ||
+        reportSt === "approved" ||
+        reportRs === "paid" ||
+        reportRs === "payment_under_review" ||
+        paymentSt === "paid" ||
+        paymentSt === "approved" ||
+        data.payment_verified === true;
+    const feeWaiting = submitted && !feeDone;
+    const approved =
+        reportSt === "verified" ||
+        reportSt === "approved" ||
+        adminSt === "verified" ||
+        adminSt === "approved";
+    const allDone = sectionsComplete >= REPORT_UI_SECTION_TOTAL;
+    const steps: Array<{ label: string; state: "done" | "current" | "pending" }> = [
+        { label: `${sectionsComplete}/${REPORT_UI_SECTION_TOTAL} sections`, state: allDone ? "done" : "current" },
+        { label: "Submitted", state: flagsSubmitted(submitted, approved) },
+        { label: "Reporting fee", state: flagsFee(feeDone, approved, feeWaiting, submitted) },
+        { label: "Admin approval", state: approved ? "done" : feeDone ? "current" : "pending" },
+        { label: "Scores & certificate", state: approved ? "done" : "pending" },
+    ];
+
+    const tone = approved ? "ok" : feeWaiting ? "fee" : submitted ? "wait" : "draft";
+    const heading = approved
+        ? "Approved"
+        : feeWaiting
+          ? "Sent — waiting on your reporting fee"
+          : submitted
+            ? "Sent — waiting on review"
+            : allDone
+              ? "Ready to send"
+              : "Draft — finish the remaining sections";
+    const copy = approved
+        ? "Scores, certificate and the public card are unlocked."
+        : feeWaiting
+          ? "Pay the reporting fee so admin can verify hours, CII and your certificate."
+          : submitted
+            ? "CIEL admin reviews after the fee is on file."
+            : "Complete all 9 sections, then send from the summary card.";
+
+    return (
+        <div className={`cer-life cer-life-${tone}`}>
+            <div className="cer-life-row">
+                <div>
+                    <p className="cer-life-k">{heading}</p>
+                    <p className="cer-life-t">{copy}</p>
+                </div>
+                {feeWaiting && paymentHref ? (
+                    <a href={paymentHref} className="cer-pay">
+                        Pay the fee
+                    </a>
+                ) : null}
+            </div>
+            <div className="cer-pipe">
+                {steps.map((step) => (
+                    <span key={step.label} className={`cer-pip ${step.state}`}>
+                        {step.state === "done" ? "✓ " : ""}
+                        {step.label}
+                    </span>
+                ))}
+            </div>
+        </div>
+    );
+}
+
+function flagsSubmitted(submitted: boolean, approved: boolean): "done" | "current" | "pending" {
+    if (submitted || approved) return "done";
+    return "pending";
+}
+
+function flagsFee(
+    feeDone: boolean,
+    approved: boolean,
+    feeWaiting: boolean,
+    submitted: boolean,
+): "done" | "current" | "pending" {
+    if (feeDone || approved) return "done";
+    if (feeWaiting || submitted) return "current";
+    return "pending";
+}
+
 function flashStatus(data: ReportData): "draft" | "pending" | "live" {
     const status = `${data.status || ""} ${data.admin_status || ""} ${data.report_status || ""}`.toLowerCase();
     if (/(verified|approved|live)/.test(status)) return "live";
@@ -611,67 +720,67 @@ export function ReportFlashCard({
 
     if (baseline) {
         dossier.push([
-            "🎯",
-            "PURPOSE & BASELINE · why this mattered",
+            "Purpose",
+            "Why this mattered",
             `“${baseline}” ${data.section2?.affected_group ? `Around ${data.section2.affected_group} lived this daily.` : ""} Anchored to ${a.sdgs.length || 0} SDG target${a.sdgs.length === 1 ? "" : "s"}.`,
-            "BASELINE ON RECORD",
+            "Baseline on record",
         ]);
     }
     if (a.acts.length) {
         dossier.push([
-            "🛠️",
-            "EXECUTION & SCALE · what was actually done",
+            "What was done",
+            "Execution and scale",
             `${a.members} students · ${Math.round(a.hours * 10) / 10} verified-track hours · ${a.logs.length} session${a.logs.length === 1 ? "" : "s"} → ${a.acts.length} activit${a.acts.length === 1 ? "y" : "ies"} delivering ${a.outputs} counted outputs${a.reach ? ` and serving ${a.reach}` : ""}.`,
-            "COUNTED · LOGGED SESSIONS",
+            "Counted",
         ]);
     }
     if (firstMeas) {
         dossier.push([
-            "📈",
-            "MEASURED CHANGE · before → after, with proof",
+            "Measured change",
+            "Before → after, with proof",
             a.measured
                 .map((o) => `${o.metric || o.outcome_area}: ${o.baseline} → ${o.endline}`)
                 .join(" · "),
-            "MEASURED",
+            "Measured",
         ]);
     }
     if (data.section6?.use_resources === "no") {
         dossier.push([
-            "💵",
-            "RESOURCE INTEGRITY · every input accounted for",
+            "Resources",
+            "Every rupee traced",
             `Zero budget — this ran on time and effort alone. ${Math.round(a.hours * 10) / 10} verified hours were the resource base.`,
-            "ZERO-BUDGET · DECLARED",
+            "On file",
         ]);
     } else if ((data.section6?.resources || []).length) {
         dossier.push([
-            "💵",
-            "RESOURCE INTEGRITY · every rupee traced",
+            "Resources",
+            "Every rupee traced",
             `${a.pkr ? `PKR ${a.pkr.toLocaleString()} in cash` : "In-kind and other support"} across ${data.section6.resources.length} resource ${data.section6.resources.length === 1 ? "entry" : "entries"}.`,
-            "ON FILE",
+            "On file",
         ]);
     }
     if ((data.section7?.partners || []).length) {
         dossier.push([
-            "🤝",
-            "PARTNERSHIP & VERIFICATION · who vouches",
+            "Who vouches",
+            "Partnership and verification",
             `${a.context.partnerOrganization || data.section7.partners[0]?.name || "Partner"} stood with the team. ${a.evidence} evidence files back the record.`,
-            `${a.evidence} FILES`,
+            `${a.evidence} files`,
         ]);
     }
     if (a.competency || (data.section9?.skills_grown || []).length) {
         dossier.push([
-            "🪞",
-            "LEARNING & GROWTH · the academic return",
+            "Learning",
+            "The academic return",
             `${(data.section9?.skills_grown || []).join(", ")}${a.competency ? ` Self-rated ${a.competency}/5 across 12 competencies.` : ""}`,
-            a.competency ? `HONEST SPREAD · ${a.competency}/5` : "REFLECTED",
+            a.competency ? `Honest spread` : "Reflected",
         ]);
     }
     if (data.section10?.continuation_status) {
         dossier.push([
-            "🌱",
-            "CONTINUITY · what survives the team leaving",
+            "Continuity",
+            "What survives the team leaving",
             `Continuation: ${data.section10.continuation_status}. ${(data.section10.mechanisms || []).length ? `Held in place by ${(data.section10.mechanisms || []).join(", ")}.` : ""}`,
-            `${(data.section10.mechanisms || []).length} MECHANISMS NAMED`,
+            `${(data.section10.mechanisms || []).length || 1} mechanism${(data.section10.mechanisms || []).length === 1 ? "" : "s"}`,
         ]);
     }
 
@@ -682,14 +791,33 @@ export function ReportFlashCard({
                     <span className="cer-ribbon">CIEL PK · COMMUNITY ENGAGEMENT</span>
                     <h1>{a.title}</h1>
                     <div className="cer-fm">
-                        {a.context.partnerOrganization ? `🏛️ ${a.context.partnerOrganization}` : ""}
-                        {a.context.projectLocation && a.context.projectLocation !== "N/A"
-                            ? ` · 📍 ${a.context.projectLocation}`
-                            : ""}
-                        {a.context.timelineLabel && a.context.timelineLabel !== "—"
-                            ? ` · 📅 ${a.context.timelineLabel}`
-                            : ""}
+                        {[
+                            a.context.projectLocation && a.context.projectLocation !== "N/A"
+                                ? a.context.projectLocation
+                                : a.context.partnerOrganization,
+                            `${a.members} student${a.members === 1 ? "" : "s"}`,
+                        ]
+                            .filter(Boolean)
+                            .join(" • ")}
                     </div>
+                    {a.sdgs.length ? (
+                        <div className="cer-sdgrow">
+                            {a.sdgs.map((row) => {
+                                const sdg = findSdgById(row.goalNumber);
+                                return (
+                                    <span
+                                        key={`${row.goalNumber}-${row.targetId}`}
+                                        className="cer-sdgc"
+                                        style={{ background: "rgba(255,255,255,0.16)" }}
+                                        title={sdg?.title}
+                                    >
+                                        SDG {row.goalNumber}
+                                        {row.targetId ? ` - target ${row.targetId}` : ""}
+                                    </span>
+                                );
+                            })}
+                        </div>
+                    ) : null}
                     {a.names.length ? (
                         <div className="cer-avrow">
                             {a.names.slice(0, 6).map((name, i) => (
@@ -706,88 +834,51 @@ export function ReportFlashCard({
                             ))}
                         </div>
                     ) : null}
-                    {a.sdgs.length ? (
-                        <div className="cer-sdgrow">
-                            {a.sdgs.map((row) => {
-                                const sdg = findSdgById(row.goalNumber);
-                                return (
-                                    <span
-                                        key={`${row.goalNumber}-${row.targetId}`}
-                                        className="cer-sdgc"
-                                        style={{ background: sdg?.color || "#0e7d74" }}
-                                    >
-                                        {row.role === "primary" ? "★ " : ""}
-                                        SDG {row.goalNumber}
-                                        {row.targetId ? ` · ${row.targetId}` : ""}
-                                    </span>
-                                );
-                            })}
+                    <div className="cer-fstats cer-fstats-onhero">
+                        <div className="cer-fs">
+                            <div className="v">{Math.round(a.hours * 10) / 10} h</div>
+                            <div className="k">Hours logged</div>
                         </div>
-                    ) : null}
-                </div>
-                <div className="cer-fstats">
-                    <div className="cer-fs">
-                        <div className="v">{Math.round(a.hours * 10) / 10}h</div>
-                        <div className="k">VERIFIED HOURS</div>
-                    </div>
-                    <div className="cer-fs">
-                        <div className="v">{a.reach || "—"}</div>
-                        <div className="k">PEOPLE REACHED</div>
-                    </div>
-                    <div className="cer-fs">
-                        <div className="v">
-                            {a.bestPct != null ? `${a.bestPct >= 0 ? "+" : ""}${a.bestPct}%` : "—"}
+                        <div className="cer-fs">
+                            <div className="v">{a.reach || "—"}</div>
+                            <div className="k">People reached</div>
                         </div>
-                        <div className="k">MEASURED CHANGE</div>
-                    </div>
-                    <div className="cer-fs">
-                        <div className="v">{a.evidence}</div>
-                        <div className="k">EVIDENCE FILES</div>
+                        <div className="cer-fs">
+                            <div className="v">
+                                {a.bestPct != null ? `${a.bestPct >= 0 ? "+" : ""}${a.bestPct}%` : "—"}
+                            </div>
+                            <div className="k">Measured change</div>
+                        </div>
+                        <div className="cer-fs">
+                            <div className="v">{a.evidence}</div>
+                            <div className="k">Evidence files</div>
+                        </div>
                     </div>
                 </div>
                 <div className="cer-fbody">
-                    <div className="cer-qsig">
-                        <div className="cer-qs">
-                            <div className="v">{sectionsComplete}/{REPORT_UI_SECTION_TOTAL}</div>
-                            <div className="k">SECTIONS COMPLETE</div>
-                        </div>
-                        <div className="cer-qs">
-                            <div className="v">{a.measured.length}</div>
-                            <div className="k">OUTCOMES MEASURED</div>
-                        </div>
-                        <div className="cer-qs">
-                            <div className="v">{a.evidence}</div>
-                            <div className="k">EVIDENCE ON FILE</div>
-                        </div>
-                        <div className="cer-qs">
-                            <div className="v">{a.ethicsOk ? "✅" : "⏳"}</div>
-                            <div className="k">ETHICS CONFIRMED</div>
-                        </div>
-                    </div>
                     {baseline && firstMeas ? (
                         <div className="cer-arrow">
                             <div className="a">
-                                <b>BEFORE · SECTION 2</b>
+                                <b>Before · section 2</b>
                                 {baseline}
                             </div>
-                            <span className="mid">➜</span>
+                            <span className="mid">→</span>
                             <div className="a">
-                                <b>AFTER · SECTION 4 · PART B</b>
-                                {firstMeas.metric || firstMeas.outcome_area}: {firstMeas.baseline} → {firstMeas.endline}
+                                <b>After · section 4</b>
+                                {firstMeas.metric || firstMeas.outcome_area}: {firstMeas.baseline} →{" "}
+                                <span className="hl">{firstMeas.endline}</span>
                             </div>
                         </div>
                     ) : null}
-                    <div className="cer-bsec" style={{ marginTop: 13 }}>
-                        THE RUBRIC DOSSIER — FROM YOUR EXISTING SECTIONS
-                    </div>
+                    <p className="cer-record-k">The record behind the numbers</p>
                     {dossier.length ? (
                         dossier.map((row) => (
-                            <div key={row[1]} className="cer-dr">
-                                <span className="ic">{row[0]}</span>
+                            <div key={row[0]} className="cer-dr">
                                 <div className="bx">
-                                    <div className="crit">{row[1]}</div>
-                                    <div className="txt">{row[2]}</div>
+                                    <div className="crit">{row[0]}</div>
+                                    <div className="sub">{row[1]}</div>
                                 </div>
+                                <div className="txt">{row[2]}</div>
                                 <span className="ev">{row[3]}</span>
                             </div>
                         ))
@@ -795,6 +886,7 @@ export function ReportFlashCard({
                         <div className="cer-missing">Fill the sections — each one becomes a scored criterion row here.</div>
                     )}
                 </div>
+                {st === "draft" || st === "live" ? (
                 <div className="cer-fcfoot">
                     {st === "draft" ? (
                         <>
@@ -819,9 +911,6 @@ export function ReportFlashCard({
                             ) : null}
                         </>
                     ) : null}
-                    {st === "pending" ? (
-                        <div className="cer-status cer-st-pend">SENT — awaiting review</div>
-                    ) : null}
                     {st === "live" ? (
                         <>
                             <div className="cer-status cer-st-live">APPROVED & LIVE</div>
@@ -834,6 +923,7 @@ export function ReportFlashCard({
                         </>
                     ) : null}
                 </div>
+                ) : null}
             </div>
         </div>
     );

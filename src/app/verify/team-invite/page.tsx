@@ -24,8 +24,8 @@ type Preview = {
 
 function destinationHref(kind: Preview["kind"], entryId: string): string {
     if (kind === "course_project") return `/dashboard/student/paths/course-project/${entryId}`;
-    if (kind === "fyp") return "/dashboard/student/paths/fyp-thesis";
-    return "/dashboard/student/paths/startup-business";
+    if (kind === "fyp") return "/dashboard/student/paths/fyp-thesis?view=workspace";
+    return "/dashboard/student/paths/startup-business?view=workspace";
 }
 
 function TeamInviteContent() {

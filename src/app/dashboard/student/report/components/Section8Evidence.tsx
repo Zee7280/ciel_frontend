@@ -11,6 +11,7 @@ import { FieldError } from "./ui/FieldError";
 import clsx from "clsx";
 import { MAX_REPORT_UPLOAD_LABEL, splitReportFilesByImageSize } from "../utils/fileUploadLimits";
 import { REPORT_ATTACHMENT_ACCEPT } from "@/utils/reportAttachmentAccept";
+import { REPORT_TEXT_RANGE_LABEL, countWords, reportTextWordMeter } from "../utils/validation";
 
 // ─── Static configuration ───────────────────────────────────────────────────
 const evidenceOptions = [
@@ -308,6 +309,8 @@ export default function Section8Evidence() {
         partner_verification_type = "",
         partner_verification_files = [],
     } = section8;
+    const descriptionWords = countWords(description);
+    const descriptionMeter = reportTextWordMeter(descriptionWords);
 
     const update = (field: string, val: unknown) => updateSection("section8", { [field]: val });
     const toggleEvidenceType = (type: string) => {
@@ -711,7 +714,7 @@ export default function Section8Evidence() {
                     <div>
                         <Label className={fieldLabel}>A few lines is enough</Label>
                         <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-slate-500">
-                            What do these files show, and what do they verify — attendance, outputs, outcomes, resource use? No 100-word essay needed.
+                            What do these files show, and what do they verify — attendance, outputs, outcomes, resource use? {REPORT_TEXT_RANGE_LABEL}.
                         </p>
                     </div>
 
@@ -723,6 +726,14 @@ export default function Section8Evidence() {
                         rows={3}
                         className={textareaClasses}
                     />
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="h-1.5 w-40 overflow-hidden rounded-full bg-slate-100 sm:w-48">
+                            <div className={clsx("h-full rounded-full transition-all", descriptionMeter.barClass)} style={{ width: `${descriptionMeter.widthPct}%` }} />
+                        </div>
+                        <p className={clsx("text-[11px] tabular-nums", descriptionMeter.textClass)}>
+                            {descriptionWords} / 200 words
+                        </p>
+                    </div>
 
                     <FieldError message={getFieldError("section8.description")} />
                 </div>

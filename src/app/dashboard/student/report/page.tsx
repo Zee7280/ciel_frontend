@@ -50,7 +50,7 @@ import Section10Sustainability from './components/Section10Sustainability'; // R
 import Section11Summary from './components/Section11Summary'; // New
 import PreReportGuide from './components/PreReportGuide';
 import { ReportSectionGuideFloat } from '@/components/report/ReportSectionGuideFloat';
-import { REPORT_TAB_ITEMS, ReportSectionBridge, ReportLiveBanner, ReportFlashCard } from './ReportFormChrome';
+import { REPORT_TAB_ITEMS, ReportSectionBridge, ReportLiveBanner, ReportFlashCard, ReportLifecycleBanner } from './ReportFormChrome';
 import "./community-engagement-report.css";
 
 type ProjectDetails = { title?: string } & Record<string, unknown>;
@@ -155,7 +155,8 @@ function ReportFormContent() {
         isTeamLeadForSubmit,
         isTeamMemberAttendanceOnly,
         setMyParticipationIsTeamLead,
-        incompleteSectionsSummary
+        incompleteSectionsSummary,
+        showVerifiedImpactScores,
     } = useReportForm();
 
     const [isSaving, setIsSaving] = React.useState(false);
@@ -775,13 +776,31 @@ function ReportFormContent() {
     const incompleteStepNums = new Set(incompleteSectionsSummary.map((block) => block.section));
     const sectionsCompleteCount = uiSectionsCompleteCount(incompleteStepNums);
     const progressPct = Math.round((sectionsCompleteCount / REPORT_UI_SECTION_TOTAL) * 100);
-    const projectSubtitle = [
-        projectDetails?.title,
-        (projectDetails as { organization_name?: string } | null)?.organization_name,
-        (projectDetails as { partner_name?: string } | null)?.partner_name,
-    ]
-        .filter((part): part is string => typeof part === "string" && part.trim().length > 0)
-        .join(" · ");
+    const projectTitle = String(projectDetails?.title || data?.project_title || "").trim() || "Community engagement report";
+    const projectPaymentId = String(
+        data?.project_id ||
+            (data as { projectId?: string } | null)?.projectId ||
+            (data as { opportunityId?: string } | null)?.opportunityId ||
+            "",
+    ).trim();
+    const paymentHref = projectPaymentId
+        ? `/dashboard/student/payment?projectId=${encodeURIComponent(projectPaymentId)}`
+        : "";
+    const onFlash = isFlashCardStep(activeStep);
+
+    const shareReport = async () => {
+        const url = typeof window !== "undefined" ? window.location.href : "";
+        try {
+            if (navigator.share) {
+                await navigator.share({ title: projectTitle, url });
+                return;
+            }
+            await navigator.clipboard.writeText(url);
+            toast.success("Link copied");
+        } catch {
+            toast.error("Could not share this report");
+        }
+    };
 
     if (showGuide) {
         return (
@@ -801,30 +820,55 @@ function ReportFormContent() {
         <div className="cer">
             <div className="cer-wrap">
                 <div className="cer-apph">
-                    <div>
-                        <button type="button" className="cer-ghost" onClick={() => router.back()} style={{ marginBottom: 8 }}>
-                            ← Back
-                        </button>
-                        <div className="cer-logo">
-                            CIEL <span>PK</span> · Community Engagement Report
-                        </div>
-                        <div className="cer-proj">{projectSubtitle || "Loading project…"}</div>
-                    </div>
-                    {!isReadOnly && !isTeamMemberAttendanceOnly ? (
+                    <div className="min-w-0 flex-1">
                         <button
                             type="button"
-                            className="cer-ghost"
-                            onClick={() => handleSave(false)}
-                            disabled={isSaving}
+                            className="cer-back"
+                            onClick={() => router.push("/dashboard/student/projects")}
                         >
-                            {isSaving ? "Saving…" : "Save draft"}
+                            ← Back to my reports
                         </button>
-                    ) : null}
-                    <div className="cer-prog">
-                        <span className="cer-pt">{sectionsCompleteCount}/{REPORT_UI_SECTION_TOTAL}</span>
-                        <span className="cer-pb">
-                            <i style={{ width: `${progressPct}%` }} />
-                        </span>
+                        <h1 className="cer-htitle">{projectTitle}</h1>
+                        <p className="cer-proj">
+                            Community engagement report
+                            {onFlash
+                                ? ` • ${
+                                      sectionsCompleteCount >= REPORT_UI_SECTION_TOTAL
+                                          ? "all 9 sections complete"
+                                          : `${sectionsCompleteCount}/${REPORT_UI_SECTION_TOTAL} sections complete`
+                                  }`
+                                : ""}
+                        </p>
+                    </div>
+                    <div className="cer-actions">
+                        {onFlash ? (
+                            <>
+                                <button type="button" className="cer-ghost" onClick={() => window.print()}>
+                                    Download
+                                </button>
+                                <button type="button" className="cer-ghost" onClick={() => void shareReport()}>
+                                    Share
+                                </button>
+                            </>
+                        ) : null}
+                        {!isReadOnly && !isTeamMemberAttendanceOnly && !onFlash ? (
+                            <button
+                                type="button"
+                                className="cer-ghost"
+                                onClick={() => handleSave(false)}
+                                disabled={isSaving}
+                            >
+                                {isSaving ? "Saving…" : "Save draft"}
+                            </button>
+                        ) : null}
+                        {!onFlash ? (
+                            <div className="cer-prog">
+                                <span className="cer-pt">{sectionsCompleteCount}/{REPORT_UI_SECTION_TOTAL}</span>
+                                <span className="cer-pb">
+                                    <i style={{ width: `${progressPct}%` }} />
+                                </span>
+                            </div>
+                        ) : null}
                     </div>
                 </div>
 
@@ -832,6 +876,14 @@ function ReportFormContent() {
                     <div className="cer-note">
                         Team member — attendance only. Your team lead files this report. You may update Section 1 only.
                     </div>
+                ) : null}
+
+                {onFlash && !showVerifiedImpactScores ? (
+                    <ReportLifecycleBanner
+                        data={data}
+                        sectionsComplete={sectionsCompleteCount}
+                        paymentHref={paymentHref || undefined}
+                    />
                 ) : null}
 
                 <div className="cer-tabs">
@@ -872,12 +924,14 @@ function ReportFormContent() {
                     })}
                 </div>
 
-                <ReportSectionBridge
-                    step={activeStep}
-                    data={data}
-                    projectData={projectDetails}
-                    onOpenHelp={() => setHelpSignal((n) => n + 1)}
-                />
+                {!onFlash ? (
+                    <ReportSectionBridge
+                        step={activeStep}
+                        data={data}
+                        projectData={projectDetails}
+                        onOpenHelp={() => setHelpSignal((n) => n + 1)}
+                    />
+                ) : null}
 
                 <div>
                     {activeStep === 1 && <Section1Participation projectData={projectDetails} />}
@@ -898,6 +952,7 @@ function ReportFormContent() {
                     {activeStep === 9 && <Section10Sustainability />}
                     {isFlashCardStep(activeStep) && (
                         <>
+                            {!showVerifiedImpactScores ? (
                             <ReportFlashCard
                                 data={data}
                                 projectData={projectDetails}
@@ -909,6 +964,7 @@ function ReportFormContent() {
                                 onSend={!isReadOnly && !isTeamMemberAttendanceOnly ? handleSubmit : undefined}
                                 sending={isSaving}
                             />
+                            ) : null}
                             <Section11Summary
                                 onRequestFinalSubmit={
                                     summaryOnlyWorkspace || (needsRevision && !isReadOnly) ? handleSubmit : undefined

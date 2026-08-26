@@ -1,4 +1,4 @@
-import { BarChart3, ShieldAlert, Quote, Award, Clock, Users, Target, ShieldCheck, Download, TrendingUp, X, Printer, CheckCircle, Eye, AlertTriangle, Lock, CreditCard, Flag, MessageSquareQuote, ChevronDown, ChevronUp } from "lucide-react";
+import { ShieldAlert, Award, Clock, Users, Target, ShieldCheck, Download, TrendingUp, X, Printer, CheckCircle, AlertTriangle, Lock, CreditCard, MessageSquareQuote } from "lucide-react";
 import { Button } from "./ui/button";
 import { useReportForm } from "../context/ReportContext";
 import React, { useState, useMemo, useEffect } from "react";
@@ -8,7 +8,7 @@ import ReportPrintView from "./ReportPrintView";
 import CertificateView from "./CertificateView";
 import CIIDashboardMeter from "./CIIDashboardMeter";
 import RedFlagsAuditModal from "./RedFlagsAuditModal";
-import CIIauditInsightsPanel from "./CIIauditInsightsPanel";
+import CIIauditInsightsPanel, { buildHoldingItems } from "./CIIauditInsightsPanel";
 import { formatIncompleteSectionHeading } from "../utils/reportWizardNav";
 import { calculateCII } from "../utils/calculateCII";
 import { getRedFlagsModalSections } from "@/lib/redFlagsModalMerge";
@@ -293,22 +293,22 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
 
     const stats = [
         {
-            label: "CII Index Score",
+            label: "CII Index",
             icon: Award,
             display: `${Math.round(ciiResult.totalScore)} / 100`,
             suffix: "" as string,
         },
         {
-            label: "Verified Hours",
+            label: "Verified hours",
             icon: Clock,
             display: `${verifiedHours}`,
-            suffix: "HRS",
+            suffix: "hrs",
         },
         {
             label: "Beneficiaries",
             icon: Users,
             display: `${beneficiaries}`,
-            suffix: "PAX",
+            suffix: "",
         },
         {
             label: "SDG alignment",
@@ -319,30 +319,65 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                 mergedSdgNarrative ||
                 (mergedSdgNums.length ? mergedSdgNums.map((n) => `Goal ${n}`).join(", ") : undefined),
         },
+        {
+            label: "Auditor narrative",
+            icon: MessageSquareQuote,
+            display: storedAuditText ? "On file" : "Pending",
+            suffix: "",
+        },
     ];
 
     const complianceItems = [
         {
-            label: "Partner Validation",
-            status: section8.partner_verification ? "PASS" : "PENDING",
-            desc: "Formal recognition from external entities.",
+            label: "Partner validation",
+            status: section8.partner_verification ? "Passed" : "Pending",
+            desc: "Formal recognition from the partner on record.",
             icon: ShieldCheck,
-            check: section8.partner_verification,
+            check: Boolean(section8.partner_verification),
         },
         {
-            label: "Ethical Safeguards",
-            status: Object.values(section8.ethical_compliance || {}).every(Boolean) ? "CERTIFIED" : "PENDING",
-            desc: "Adherence to CIEL ethical declaration protocol.",
+            label: "Ethical safeguards",
+            status: Object.values(section8.ethical_compliance || {}).every(Boolean) ? "Passed" : "Pending",
+            desc: "CIEL ethical declaration completed.",
             icon: ShieldAlert,
             check: Object.values(section8.ethical_compliance || {}).every(Boolean),
         },
         {
-            label: "Sustainability Proof",
-            status: section10.mechanisms?.length > 0 ? "SECURED" : "VOLUNTARY",
-            desc: "Documented project legacy and roadmap.",
+            label: "Sustainability proof",
+            status: section10.mechanisms?.length > 0 ? "Passed" : "Pending",
+            desc: "Named mechanisms for what continues after the team.",
             icon: TrendingUp,
             check: section10.mechanisms?.length > 0,
         },
+    ];
+
+    const holdingItems = useMemo(
+        () => (section11AuditMeta ? buildHoldingItems(section11AuditMeta) : []),
+        [section11AuditMeta],
+    );
+    const gapCount = holdingItems.filter((item) => item.severity !== "Minor").length;
+    const recText = `${section11DashboardView?.highlights.recommendedAction || ""} ${section11DashboardView?.highlights.band || ""} ${section11AuditMeta?.risk_level || ""}`.toLowerCase();
+    const isConditional =
+        recText.includes("conditional") || (showVerifiedImpactScores && gapCount > 0);
+
+    const outcomes = Array.isArray(section5?.measurable_outcomes) ? section5.measurable_outcomes : [];
+    const measuredPcts = outcomes
+        .map((o) => {
+            const b = Number(String(o.baseline ?? "").replace(/,/g, ""));
+            const e = Number(String(o.endline ?? "").replace(/,/g, ""));
+            if (!Number.isFinite(b) || !Number.isFinite(e) || b === 0) return null;
+            return Math.round(((e - b) / b) * 100);
+        })
+        .filter((n): n is number => n != null);
+    const bestPct = measuredPcts.length ? Math.max(...measuredPcts) : null;
+    const sdgStrip = hasMergedSdgs ? `SDG ${mergedSdgNums.join(" • ")}` : "—";
+
+    const approvedSteps: Array<{ label: string; state: "done" | "current" | "pending" }> = [
+        { label: "Submitted", state: "done" },
+        { label: "Fee paid", state: "done" },
+        { label: "Admin approved", state: "done" },
+        { label: "Conditional badge", state: isConditional ? "current" : "done" },
+        { label: "Full badge", state: isConditional ? "pending" : "done" },
     ];
 
     const surfaceCard =
@@ -351,85 +386,98 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
 
     return (
         <div className="space-y-5 md:space-y-6 pb-10">
-            {/* ── Section Header — Intelligence strip ── */}
+            {/* Locked metrics (draft) or approved banner (after admin verify) */}
             <div className="space-y-4 md:space-y-5">
-                <div
-                    className={clsx(
-                        "cer-dup-head flex items-center gap-3.5 min-w-0 p-5 md:p-6",
-                        surfaceCard,
-                    )}
-                >
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-indigo-600 text-white shadow-sm">
-                        <BarChart3 className="h-5 w-5" />
-                    </div>
-                    <div className="min-w-0">
-                        <h2 className="text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl">
-                            <span className="text-indigo-600">SECTION 10:</span> Institutional impact dashboard
-                        </h2>
-                        <p className="mt-0.5 text-sm text-slate-500">
-                            Final preview, compliance signals, and submission readiness
-                        </p>
-                    </div>
-                </div>
-                {!showVerifiedImpactScores && (
-                    <div className="flex items-start gap-2.5 rounded-xl border border-amber-200/70 bg-amber-50/80 px-4 py-3 text-left w-full">
-                        <Lock className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
-                        <p className="text-[11px] font-semibold text-amber-900 leading-snug">
-                            Quantified scores (CII index, hours, beneficiaries, SDG priority) unlock after your reporting fee is confirmed and an administrator verifies your submission.
-                        </p>
-                    </div>
-                )}
-
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-5">
-                    {stats.map((stat, i) => (
-                        <div
-                            key={i}
-                            title={stat.tooltip}
-                            className={clsx(
-                                "group relative overflow-hidden rounded-xl border bg-white p-6 flex flex-col gap-4 shadow-sm transition-colors duration-200",
-                                showVerifiedImpactScores
-                                    ? "border-slate-200/80 hover:border-indigo-300"
-                                    : "border-slate-200/60 bg-slate-50/40",
-                            )}
-                        >
-                            <div
-                                className={clsx(
-                                    "w-10 h-10 rounded-lg flex items-center justify-center",
-                                    showVerifiedImpactScores
-                                        ? "bg-indigo-50 text-indigo-600"
-                                        : "bg-slate-100 text-slate-400",
-                                )}
-                            >
-                                <stat.icon className="w-[18px] h-[18px]" />
-                            </div>
-                            <div className="space-y-1.5">
-                                {showVerifiedImpactScores ? (
-                                    <p className="text-xl md:text-2xl font-semibold tracking-tight text-slate-900">
-                                        {stat.display}
-                                        {stat.suffix ? (
-                                            <span className="text-[10px] md:text-xs font-semibold text-slate-500 ml-1.5 uppercase tracking-wide align-middle">
-                                                {stat.suffix}
-                                            </span>
-                                        ) : null}
+                {showVerifiedImpactScores ? (
+                    <>
+                        <div className={clsx("cer-appr", isConditional ? "cond" : "ok")}>
+                            <div className="cer-appr-row">
+                                <div className="min-w-0">
+                                    <h2>
+                                        {isConditional
+                                            ? `Conditionally approved — ${Math.round(ciiResult.totalScore)} / 100`
+                                            : `Approved — ${Math.round(ciiResult.totalScore)} / 100`}
+                                    </h2>
+                                    <p>
+                                        {isConditional
+                                            ? `The report is live. The badge stays conditional until ${gapCount} evidence gap${gapCount === 1 ? "" : "s"} ${gapCount === 1 ? "is" : "are"} closed.`
+                                            : "Scores, certificate and the public record are unlocked."}
                                     </p>
-                                ) : (
-                                    <div className="flex flex-col gap-1">
-                                        <span className="inline-flex items-center gap-2 text-sm font-semibold text-slate-400">
-                                            <Lock className="w-3.5 h-3.5" />
-                                            Locked
-                                        </span>
-                                        <span className="text-[10px] font-semibold text-slate-400 leading-snug">
-                                            Available after payment + admin verification
-                                        </span>
-                                    </div>
-                                )}
-                                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
-                                    {stat.label}
-                                </p>
+                                </div>
+                                {isConditional ? (
+                                    <button
+                                        type="button"
+                                        className="cer-appr-fix"
+                                        onClick={() => {
+                                            const el = document.getElementById("cer-holding");
+                                            if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+                                            else openRedFlagsModal();
+                                        }}
+                                    >
+                                        {gapCount === 2
+                                            ? "Fix the two gaps"
+                                            : gapCount > 0
+                                              ? `Fix the ${gapCount} gap${gapCount === 1 ? "" : "s"}`
+                                              : "Review gaps"}
+                                    </button>
+                                ) : null}
+                            </div>
+                            <div className="cer-pipe">
+                                {approvedSteps.map((step) => (
+                                    <span key={step.label} className={`cer-pip ${step.state}`}>
+                                        {step.state === "done" ? "✓ " : ""}
+                                        {step.label}
+                                    </span>
+                                ))}
                             </div>
                         </div>
-                    ))}
+                        <div className="cer-mbar">
+                            <div className="cer-mbar-i">
+                                <div className="v">{verifiedHours || 0} h</div>
+                                <div className="k">Verified hours</div>
+                            </div>
+                            <div className="cer-mbar-i">
+                                <div className="v">{beneficiaries}</div>
+                                <div className="k">Beneficiaries</div>
+                            </div>
+                            <div className="cer-mbar-i">
+                                <div className="v">
+                                    {bestPct != null ? `${bestPct >= 0 ? "+" : ""}${bestPct}%` : "—"}
+                                </div>
+                                <div className="k">Measured change</div>
+                            </div>
+                            <div className="cer-mbar-i">
+                                <div className="v">{sdgStrip}</div>
+                                <div className="k">Goals aligned</div>
+                            </div>
+                        </div>
+                    </>
+                ) : (
+                <div className={clsx("cer-unlock", "cer-unlock-locked")}>
+                    <div className="cer-unlock-h">
+                        <Lock className="cer-unlock-ico" />
+                        <div className="min-w-0">
+                            <h3>Five things unlock together</h3>
+                            <p>
+                                CII, hours, beneficiaries, SDG alignment, and the auditor narrative stay locked until your reporting fee is confirmed and an administrator verifies this submission.
+                            </p>
+                        </div>
+                    </div>
+                    <div className="cer-unlock-grid">
+                        {stats.map((stat, i) => (
+                            <div
+                                key={i}
+                                title={stat.tooltip}
+                                className="cer-ulock"
+                            >
+                                <Lock className="cer-ulock-lock" />
+                                <p className="cer-ulock-k">{stat.label}</p>
+                                <p className="cer-ulock-dots">...</p>
+                            </div>
+                        ))}
+                    </div>
                 </div>
+                )}
             </div>
 
             {showVerifiedImpactScores && (
@@ -486,133 +534,35 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                     ) : null}
                 </>
             ) : showVerifiedImpactScores ? (
-                <>
-                    <div
-                        id="report-section11-audit-review"
-                        className={clsx("scroll-mt-24 md:scroll-mt-28 overflow-hidden relative group", surfaceCard)}
-                    >
-                        <div className="absolute -bottom-8 -right-8 opacity-[0.04] group-hover:opacity-[0.07] transition-opacity duration-1000 rotate-12 pointer-events-none">
-                            <BarChart3 className="w-64 h-64 md:w-80 md:h-80 text-slate-900" />
-                        </div>
-                        <div
-                            className={clsx(
-                                "flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 px-6 py-4 md:px-8 md:py-5",
-                                surfaceHeaderRow,
-                            )}
-                        >
-                            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4 w-full min-w-0">
-                                <div className="flex items-center gap-3 min-w-0">
-                                    <div className="w-9 h-9 shrink-0 rounded-lg bg-indigo-600 text-white flex items-center justify-center shadow-sm">
-                                        <Quote className="w-4 h-4" />
-                                    </div>
-                                    <div className="min-w-0">
-                                        <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-[0.14em]">
-                                            {data.section11?.is_ai_generated ? "AI-Generated" : "System-Generated"}
-                                        </p>
-                                        <h3 className="text-sm font-semibold text-slate-900 tracking-tight">
-                                            Executive audit summary
-                                        </h3>
-                                        <p className="text-[10px] font-semibold text-slate-500 leading-snug mt-0.5">
-                                            Short overview only — section scores, red flags, and fixes are below.
-                                        </p>
-                                    </div>
-                                </div>
-                                <button
-                                    type="button"
-                                    onClick={openRedFlagsModal}
-                                    className="inline-flex items-center justify-center gap-2 self-stretch sm:self-center rounded-lg border border-amber-200 bg-amber-50/70 px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wide text-amber-900 transition-colors hover:bg-amber-100 hover:border-amber-300 focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:ring-offset-2 shrink-0"
-                                >
-                                    <Flag className="w-3.5 h-3.5 shrink-0" />
-                                    Section-wise red flags
-                                </button>
-                            </div>
-                        </div>
-                        <div className="px-6 py-8 md:px-8 md:py-10 space-y-6 relative z-10">
-                            {section11DashboardView?.highlights &&
-                            (section11DashboardView.highlights.finalScore ||
-                                section11DashboardView.highlights.band ||
-                                section11DashboardView.highlights.recommendedAction) ? (
-                                <div className="flex flex-wrap gap-2 relative z-10">
-                                    {section11DashboardView.highlights.finalScore ? (
-                                        <span className="inline-flex items-center rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-700">
-                                            Score: {section11DashboardView.highlights.finalScore}
-                                        </span>
-                                    ) : null}
-                                    {section11DashboardView.highlights.band ? (
-                                        <span className="inline-flex items-center rounded-lg border border-indigo-100 bg-indigo-50 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-indigo-600">
-                                            {section11DashboardView.highlights.band}
-                                        </span>
-                                    ) : null}
-                                    {section11DashboardView.highlights.recommendedAction ? (
-                                        <span className="inline-flex items-center rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-amber-900">
-                                            {section11DashboardView.highlights.recommendedAction}
-                                        </span>
-                                    ) : null}
-                                </div>
-                            ) : null}
-                            <span className="absolute top-4 left-3 md:left-5 text-6xl md:text-7xl text-slate-100 select-none leading-none pointer-events-none">
-                                “
-                            </span>
-                            <div className="space-y-4 md:space-y-5 relative">
-                                {executiveSummary.split("\n\n").map((paragraph: string, idx: number) => (
-                                    <p key={idx} className="text-base md:text-lg leading-relaxed text-slate-700">
-                                        {paragraph.trim()}
-                                    </p>
-                                ))}
-                            </div>
-                            {showExpandFullAudit ? (
-                                <div className="relative z-10 rounded-xl border border-slate-200 bg-slate-50/80 overflow-hidden">
-                                    <button
-                                        type="button"
-                                        onClick={() => setShowFullAuditNarrative((open) => !open)}
-                                        className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-wide text-slate-600 hover:bg-slate-100/80 transition-colors"
-                                    >
-                                        <span>
-                                            {showFullAuditNarrative
-                                                ? "Hide full technical audit"
-                                                : "View full technical audit report"}
-                                        </span>
-                                        {showFullAuditNarrative ? (
-                                            <ChevronUp className="w-4 h-4 shrink-0" />
-                                        ) : (
-                                            <ChevronDown className="w-4 h-4 shrink-0" />
-                                        )}
-                                    </button>
-                                    {showFullAuditNarrative ? (
-                                        <div className="max-h-80 overflow-y-auto border-t border-slate-200 px-4 py-4 space-y-3 bg-white">
-                                            {storedAuditText.split("\n\n").map((paragraph: string, idx: number) => (
-                                                <p
-                                                    key={idx}
-                                                    className="text-xs font-medium text-slate-700 leading-relaxed whitespace-pre-wrap"
-                                                >
-                                                    {paragraph.trim()}
-                                                </p>
-                                            ))}
-                                        </div>
-                                    ) : null}
-                                </div>
-                            ) : null}
-                            <span className="absolute bottom-2 right-3 md:right-6 text-6xl md:text-7xl text-slate-100 select-none rotate-180 leading-none pointer-events-none">
-                                “
-                            </span>
-                            <div className="flex flex-wrap items-center gap-2.5 pt-5 border-t border-slate-100">
-                                <span className="inline-flex items-center gap-1.5 rounded-full border border-indigo-100 bg-indigo-50 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-indigo-700">
-                                    <ShieldCheck className="w-3 h-3 shrink-0" /> Integrity Verified
-                                </span>
-                                <span className="inline-flex items-center gap-1.5 rounded-full border border-indigo-100 bg-indigo-50 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-indigo-700">
-                                    <TrendingUp className="w-3 h-3 shrink-0" /> Growth Documented
-                                </span>
-                            </div>
-                        </div>
-                    </div>
-
+                <div id="report-section11-audit-review" className="scroll-mt-24 md:scroll-mt-28 space-y-3">
                     {section11AuditMeta ? (
                         <CIIauditInsightsPanel
                             audit={section11AuditMeta}
                             ciiTotalScore={ciiResult.totalScore}
+                            onTechnicalDetail={openRedFlagsModal}
                         />
                     ) : null}
-                </>
+                    {showExpandFullAudit ? (
+                        <div className="cer-hold">
+                            <button
+                                type="button"
+                                onClick={() => setShowFullAuditNarrative((open) => !open)}
+                                className="cer-hold-tech"
+                            >
+                                {showFullAuditNarrative ? "Hide full technical audit" : "View full technical audit report"}
+                            </button>
+                            {showFullAuditNarrative ? (
+                                <div className="cer-hold-note mt-3 space-y-3 max-h-80 overflow-y-auto">
+                                    {storedAuditText.split("\n\n").map((paragraph: string, idx: number) => (
+                                        <p key={idx} className="cer-hold-note-t whitespace-pre-wrap">
+                                            {paragraph.trim()}
+                                        </p>
+                                    ))}
+                                </div>
+                            ) : null}
+                        </div>
+                    ) : null}
+                </div>
             ) : (
                 <div
                     id="report-section11-audit-review"
@@ -648,50 +598,17 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                 </div>
             )}
 
-            <div className="space-y-5 md:space-y-6">
-                <div className="flex items-center gap-3">
-                    <div className="w-1 h-6 rounded-full bg-indigo-600 shrink-0" />
-                    <div className="min-w-0">
-                        <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-indigo-600">Compliance</p>
-                        <h3 className="text-base font-semibold text-slate-900">
-                            Institutional compliance matrix
-                        </h3>
-                    </div>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-5">
+            <div className="cer-comp">
+                <p className="cer-comp-k">Institutional compliance</p>
+                <p className="cer-comp-t">CIEL certification checks against the record you already filed.</p>
+                <div className="cer-comp-grid">
                     {complianceItems.map((item, idx) => (
-                        <div
-                            key={idx}
-                            className={clsx(
-                                "group flex flex-col gap-6 p-6 md:p-7 rounded-xl border border-slate-200/80 bg-white shadow-sm transition-colors duration-200 hover:border-indigo-300",
-                                item.check ? "ring-2 ring-indigo-100" : "",
-                            )}
-                        >
-                            <div
-                                className={clsx(
-                                    "w-10 h-10 rounded-lg flex items-center justify-center",
-                                    item.check ? "bg-indigo-50 text-indigo-600" : "bg-slate-50 text-slate-300 group-hover:bg-slate-100",
-                                )}
-                            >
-                                <item.icon className="w-5 h-5" />
-                            </div>
-                            <div className="flex-1 space-y-1.5">
-                                <p className="text-sm font-semibold text-slate-900 leading-tight">{item.label}</p>
-                                <p className="text-[11px] font-medium text-slate-500 leading-relaxed">{item.desc}</p>
-                            </div>
-                            <div className="flex items-center justify-between pt-4 border-t border-slate-100">
-                                <span
-                                    className={clsx(
-                                        "rounded-full border px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
-                                        item.check
-                                            ? "bg-indigo-50 text-indigo-600 border-indigo-100"
-                                            : "bg-slate-50 text-slate-500 border-slate-100",
-                                    )}
-                                >
-                                    {item.status}
-                                </span>
-                                {item.check && <CheckCircle className="w-4 h-4 text-indigo-600 shrink-0" />}
-                            </div>
+                        <div key={idx} className={clsx("cer-comp-card", item.check ? "ok" : "wait")}>
+                            <p className="cer-comp-label">{item.label}</p>
+                            <p className="cer-comp-desc">{item.desc}</p>
+                            <p className={clsx("cer-comp-st", item.check ? "pass" : "pend")}>
+                                {item.check ? "✓ Passed" : item.status}
+                            </p>
                         </div>
                     ))}
                 </div>
@@ -700,11 +617,15 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
             {/* ── Final Action Hub ── */}
             <div
                 className={clsx(
-                    "flex flex-col items-center gap-6 text-center p-8 md:p-10 relative overflow-hidden group",
-                    surfaceCard,
+                    showVerifiedImpactScores && !needsAdminRevision
+                        ? ""
+                        : "flex flex-col items-center gap-6 text-center p-8 md:p-10 relative overflow-hidden group",
+                    showVerifiedImpactScores && !needsAdminRevision ? "" : surfaceCard,
                 )}
             >
+                {!(showVerifiedImpactScores && !needsAdminRevision) ? (
                 <div className="absolute right-0 top-0 w-40 h-40 bg-indigo-600/5 rounded-full -mr-20 -mt-20 blur-3xl pointer-events-none" />
+                ) : null}
 
                 {needsAdminRevision ? (
                     <>
@@ -753,58 +674,43 @@ export default function Section11Summary({ onRequestFinalSubmit, projectData }: 
                         </div>
                     </>
                 ) : showVerifiedImpactScores ? (
-                    <>
-                        <div className="w-16 h-16 bg-emerald-50 rounded-xl flex items-center justify-center shadow-sm">
-                            <CheckCircle className="w-7 h-7 text-emerald-600" />
-                        </div>
-                        <div className="w-full max-w-3xl space-y-5 px-0 sm:px-1">
-                            <h3 className="text-lg font-semibold text-slate-900">Report approved & impact verified</h3>
-                            <p className="text-sm font-medium text-slate-400 leading-relaxed">
-                                Congratulations! Your social impact has been verified by CIEL Admin. You can now download your official CII.
+                    <div className="cer-cert">
+                        <div className="cer-cert-copy">
+                            <h3>Your certificate is ready</h3>
+                            <p>
+                                {isConditional
+                                    ? "Download the certificate — the badge stays conditional until the listed gaps are closed. Scan the QR to verify on a CV."
+                                    : "Download the certificate or scan the QR to verify this record on a CV."}
                             </p>
-                            {resolvedImpactVerifyUrl ? (
-                                <div className="flex justify-center pt-1">
-                                    <ReportVerificationQr
-                                        impactVerifyUrl={resolvedImpactVerifyUrl}
-                                        size={104}
-                                        caption="Share — scan to verify authenticity"
-                                    />
-                                </div>
-                            ) : null}
-                            <div className="grid w-full grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-3">
-                                <Button
-                                    onClick={() => setShowPreview(true)}
-                                    className="bg-indigo-600 hover:bg-indigo-700 focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-2 text-white rounded-xl text-xs font-semibold transition-colors w-full min-h-12 px-3 py-3 whitespace-normal leading-snug"
-                                >
-                                    <span className="inline-flex items-center justify-center gap-2">
-                                        <Eye className="h-4 w-4 shrink-0" aria-hidden />
-                                        <span>Preview report & CII score</span>
-                                    </span>
-                                </Button>
-                                <Button
-                                    variant="outline"
-                                    onClick={() => setShowCertificate(true)}
-                                    className="border border-slate-200 text-slate-900 rounded-xl text-xs font-semibold transition-colors hover:bg-slate-50 hover:border-slate-300 focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 w-full min-h-12 px-3 py-3 whitespace-normal leading-snug"
-                                >
-                                    <span className="inline-flex items-center justify-center gap-2">
-                                        <Download className="h-4 w-4 shrink-0" aria-hidden />
-                                        <span>Download CIEL certificate</span>
-                                    </span>
-                                </Button>
-                                <Button
+                            <div className="cer-cert-actions">
+                                <button type="button" className="cer-cert-solid" onClick={() => setShowCertificate(true)}>
+                                    Download certificate
+                                </button>
+                                <button
                                     type="button"
-                                    variant="outline"
-                                    onClick={openRedFlagsModal}
-                                    className="border border-amber-200 bg-amber-50/60 text-amber-900 rounded-xl text-xs font-semibold transition-colors hover:bg-amber-50 hover:border-amber-300 focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:ring-offset-2 w-full min-h-12 px-3 py-3 whitespace-normal leading-snug"
+                                    className="cer-cert-ghost"
+                                    onClick={() => {
+                                        if (resolvedImpactVerifyUrl) {
+                                            window.open(resolvedImpactVerifyUrl, "_blank", "noopener,noreferrer");
+                                            return;
+                                        }
+                                        setShowPreview(true);
+                                    }}
                                 >
-                                    <span className="inline-flex items-center justify-center gap-2">
-                                        <Flag className="h-4 w-4 shrink-0" aria-hidden />
-                                        <span>Red flags & audit</span>
-                                    </span>
-                                </Button>
+                                    View public record
+                                </button>
                             </div>
                         </div>
-                    </>
+                        {resolvedImpactVerifyUrl ? (
+                            <div className="cer-cert-qr">
+                                <ReportVerificationQr
+                                    impactVerifyUrl={resolvedImpactVerifyUrl}
+                                    size={112}
+                                    caption="Scan to verify"
+                                />
+                            </div>
+                        ) : null}
+                    </div>
                 ) : inPostSubmitLifecycle ? (
                     !feeOrSlipRecorded && paymentHref ? (
                         <>

@@ -104,7 +104,7 @@ export const SECTION_GUIDE_CONTENT: Partial<Record<number, SectionGuideContent>>
                     "Describe the baseline condition before your project began.",
                     "Explain the specific issue, who was affected, and what gap existed.",
                     "Mention why a structured intervention was needed.",
-                    "Write clearly and factually in 100–200 words.",
+                    "Write clearly and factually in 20–200 words.",
                 ],
                 avoid: ["Do not describe activities", "Do not describe results or outcomes"],
             },
@@ -233,7 +233,7 @@ export const SECTION_GUIDE_CONTENT: Partial<Record<number, SectionGuideContent>>
                 code: "4.1",
                 title: "Activity Blocks",
                 bullets: [
-                    "Add one major activity at a time with title, status, category, and a 50–100 word description.",
+                    "Add one major activity at a time with title, status, category, and a 20–200 word description.",
                     "Answer: what was done, who was involved, how it was done, and why it mattered.",
                 ],
                 tip: "Strong activity writing is specific, measurable, and realistic.",
@@ -315,7 +315,7 @@ export const SECTION_GUIDE_CONTENT: Partial<Record<number, SectionGuideContent>>
                 code: "5.1",
                 title: "Observed Change (Narrative)",
                 bullets: [
-                    "Write 100–200 words covering before (baseline), after (change), who changed, link to Section 4, and field observations.",
+                    "Write 20–200 words covering before (baseline), after (change), who changed, link to Section 4, and field observations.",
                 ],
             },
             {
@@ -383,7 +383,7 @@ export const SECTION_GUIDE_CONTENT: Partial<Record<number, SectionGuideContent>>
                 code: "Step 2",
                 title: "Resource Contribution Details",
                 bullets: [
-                    "Add one entry per major resource: Type · Amount · Unit · Source · Verification · Purpose (50–200 words).",
+                    "Add one entry per major resource: Type · Amount · Unit · Source · Verification · Purpose (one clear line).",
                     "Explain what it was, who provided it, how it was used, which activity it supported, and what benefit it enabled.",
                 ],
             },
@@ -500,7 +500,7 @@ export const SECTION_GUIDE_CONTENT: Partial<Record<number, SectionGuideContent>>
                 steps: [
                     "Step 1 — Upload evidence (or mark that you do not have evidence).",
                     "Step 2 — Classify evidence types (photos, attendance, letters, surveys, etc.).",
-                    "Step 3 — Describe evidence in 100–200 words (what it shows, date, location, numbers).",
+                    "Step 3 — Describe evidence in 20–200 words (what it shows, date, location, numbers).",
                     "Step 4 — Confirm ethics & consent checkboxes.",
                     "Step 5 — Choose media visibility (Public / Limited / Internal).",
                     "Step 6 — Optional partner verification.",
@@ -641,7 +641,7 @@ export const SECTION_GUIDE_CONTENT: Partial<Record<number, SectionGuideContent>>
                 code: "Step 2",
                 title: "Explanation of Continuation (2 marks)",
                 bullets: [
-                    "100–200 words: what continues, who continues it, support needed, what may stop, and how this ensures long-term impact.",
+                    "20–200 words: what continues, who continues it, support needed, what may stop, and how this ensures long-term impact.",
                 ],
             },
             {

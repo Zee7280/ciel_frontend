@@ -9,6 +9,7 @@ import { useReportForm } from "../context/ReportContext";
 import { FieldError } from "./ui/FieldError";
 import { SingleSelect } from "./ui/SingleSelect";
 import clsx from "clsx";
+import { REPORT_TEXT_MIN_WORDS, REPORT_TEXT_RANGE_LABEL, reportTextWordMeter } from "../utils/validation";
 
 /** Internal tokens for multiple "Other" rows in Q4 evidence (must not match human-readable option labels). */
 const OTHER_SLOT_RE = /^__o_(\d+)$/;
@@ -139,8 +140,8 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
 
     const handleGenerateAISummary = async () => {
         const words = (sectionData.problem_statement || "").trim().split(/\s+/).filter(w => w).length;
-        if (words < 100) {
-            toast.error("Please provide at least 100 words in Question 1 first.");
+        if (words < REPORT_TEXT_MIN_WORDS) {
+            toast.error(`Please provide at least ${REPORT_TEXT_MIN_WORDS} words in Question 1 first.`);
             return;
         }
         if (!sectionData.discipline) {
@@ -482,7 +483,7 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
                         <div className="flex flex-wrap items-center gap-2">
                             <p className="text-sm font-semibold text-slate-900">1 · What problem did you see?</p>
                             <span className="ml-auto shrink-0 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700">
-                                100–200 words
+                                {REPORT_TEXT_RANGE_LABEL}
                             </span>
                         </div>
                         <p className="text-xs text-slate-500">Be specific — what issue, gap, or challenge existed, and why did it need a structured response?</p>
@@ -497,14 +498,11 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
                         <div className="flex items-center justify-between">
                             <div className="h-1.5 w-32 overflow-hidden rounded-full bg-slate-100">
                                 <div
-                                    className={clsx(
-                                        "h-full rounded-full transition-all",
-                                        wordCount < 100 ? "bg-amber-400" : wordCount > 200 ? "bg-red-500" : "bg-emerald-500",
-                                    )}
-                                    style={{ width: `${Math.min((wordCount / 200) * 100, 100)}%` }}
+                                    className={clsx("h-full rounded-full transition-all", reportTextWordMeter(wordCount).barClass)}
+                                    style={{ width: `${reportTextWordMeter(wordCount).widthPct}%` }}
                                 />
                             </div>
-                            <p className={clsx("text-[11px] tabular-nums", wordCount >= 100 && wordCount <= 200 ? "text-emerald-600" : wordCount > 200 ? "text-red-500" : "text-slate-400")}>
+                            <p className={clsx("text-[11px] tabular-nums", reportTextWordMeter(wordCount).textClass)}>
                                 {wordCount} / 200 words · {charCount} chars
                             </p>
                         </div>
@@ -627,7 +625,7 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
                         <div className="flex flex-wrap items-center gap-2">
                             <p className="text-sm font-semibold text-slate-900">5 · Your field of study &amp; how it helped</p>
                             <span className="ml-auto shrink-0 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700">
-                                100–200 words
+                                {REPORT_TEXT_RANGE_LABEL}
                             </span>
                         </div>
                         <SingleSelect
@@ -650,14 +648,11 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
                         <div className="flex items-center justify-between">
                             <div className="h-1.5 w-32 overflow-hidden rounded-full bg-slate-100">
                                 <div
-                                    className={clsx(
-                                        "h-full rounded-full transition-all",
-                                        disciplineWordCount < 100 ? "bg-amber-400" : disciplineWordCount > 200 ? "bg-red-500" : "bg-emerald-500",
-                                    )}
-                                    style={{ width: `${Math.min((disciplineWordCount / 200) * 100, 100)}%` }}
+                                    className={clsx("h-full rounded-full transition-all", reportTextWordMeter(disciplineWordCount).barClass)}
+                                    style={{ width: `${reportTextWordMeter(disciplineWordCount).widthPct}%` }}
                                 />
                             </div>
-                            <p className={clsx("text-[11px] tabular-nums", disciplineWordCount >= 100 && disciplineWordCount <= 200 ? "text-emerald-600" : disciplineWordCount > 200 ? "text-red-500" : "text-slate-400")}>
+                            <p className={clsx("text-[11px] tabular-nums", reportTextWordMeter(disciplineWordCount).textClass)}>
                                 {disciplineWordCount} / 200 words · {disciplineCharCount} chars
                             </p>
                         </div>
@@ -709,16 +704,16 @@ export default function Section2ProjectContext({ projectData }: Section2Props) {
                             <div
                                 className={clsx(
                                     "h-full rounded-full transition-all",
-                                    summaryWordCount >= 100 && summaryWordCount <= 200 ? "bg-emerald-500" : "bg-indigo-400",
+                                    reportTextWordMeter(summaryWordCount).ok ? "bg-emerald-500" : "bg-indigo-400",
                                 )}
-                                style={{ width: `${Math.min(100, (summaryWordCount / 200) * 100)}%` }}
+                                style={{ width: `${reportTextWordMeter(summaryWordCount).widthPct}%` }}
                             />
                         </div>
                         <div className="mt-1.5 flex items-center justify-between text-[11px] text-slate-500">
-                            <span className={clsx("font-semibold tabular-nums", summaryWordCount >= 100 && summaryWordCount <= 200 && "text-emerald-600")}>
-                                {summaryWordCount} words{summaryWordCount >= 100 && summaryWordCount <= 200 ? " ✓" : ""}
+                            <span className={clsx("font-semibold tabular-nums", reportTextWordMeter(summaryWordCount).ok && "text-emerald-600")}>
+                                {summaryWordCount} words{reportTextWordMeter(summaryWordCount).ok ? " ✓" : ""}
                             </span>
-                            <span>aim for 100–200</span>
+                            <span>aim for {REPORT_TEXT_RANGE_LABEL}</span>
                         </div>
                     </div>
 

@@ -17,8 +17,57 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const CNIC_REGEX = /^(\d{13}|\d{5}-\d{7}-\d{1})$/;
 const MOBILE_REGEX = /^03\d{9}$/;
 
-function countWords(str: string): number {
+/** Community report narrative textareas — one rule for every essay field. */
+export const REPORT_TEXT_MIN_WORDS = 20;
+export const REPORT_TEXT_MAX_WORDS = 200;
+export const REPORT_TEXT_RANGE_LABEL = "20–200 words";
+
+export function countWords(str: string): number {
     return str.trim().split(/\s+/).filter(w => w.length > 0).length;
+}
+
+export function reportTextWordMeter(count: number): {
+    ok: boolean;
+    over: boolean;
+    barClass: string;
+    textClass: string;
+    widthPct: number;
+} {
+    const over = count > REPORT_TEXT_MAX_WORDS;
+    const ok = count >= REPORT_TEXT_MIN_WORDS && !over;
+    return {
+        ok,
+        over,
+        barClass: count < REPORT_TEXT_MIN_WORDS ? "bg-amber-400" : over ? "bg-red-500" : "bg-emerald-500",
+        textClass: ok ? "text-emerald-600" : over ? "text-red-500" : "text-slate-400",
+        widthPct: Math.min((count / REPORT_TEXT_MAX_WORDS) * 100, 100),
+    };
+}
+
+function pushWordRange(
+    errors: ValidationError[],
+    field: string,
+    value: unknown,
+    label: string,
+    required = true,
+) {
+    const text = typeof value === "string" ? value : "";
+    if (!text.trim()) {
+        if (required) {
+            errors.push({
+                field,
+                message: `${label} must be ${REPORT_TEXT_RANGE_LABEL} (0 current)`,
+            });
+        }
+        return;
+    }
+    const n = countWords(text);
+    if (n < REPORT_TEXT_MIN_WORDS || n > REPORT_TEXT_MAX_WORDS) {
+        errors.push({
+            field,
+            message: `${label} must be ${REPORT_TEXT_RANGE_LABEL} (${n} current)`,
+        });
+    }
 }
 
 /**
@@ -51,23 +100,13 @@ export function validateSection1(data: any): ValidationResult {
 export function validateSection2(data: any): ValidationResult {
     const errors: ValidationError[] = [];
 
-    const words = countWords(data.problem_statement || '');
-    if (words < 100) {
-        errors.push({ field: 'problem_statement', message: `Problem statement is too short (${words}/100 words min)` });
-    } else if (words > 200) {
-        errors.push({ field: 'problem_statement', message: `Problem statement is too long (${words}/200 words max)` });
-    }
+    pushWordRange(errors, 'problem_statement', data.problem_statement, 'Problem statement');
 
     if (!data.discipline) {
         errors.push({ field: 'discipline', message: 'Academic discipline is required' });
     }
 
-    const discWords = countWords(data.discipline_contribution || '');
-    if (discWords < 100) {
-        errors.push({ field: 'discipline_contribution', message: `Discipline contribution explanation is too short (${discWords}/100 words min)` });
-    } else if (discWords > 200) {
-        errors.push({ field: 'discipline_contribution', message: `Explanation is too long (${discWords}/200 words max)` });
-    }
+    pushWordRange(errors, 'discipline_contribution', data.discipline_contribution, 'Discipline contribution explanation');
 
     if (!data.baseline_evidence || data.baseline_evidence.length === 0) {
         errors.push({ field: 'baseline_evidence', message: 'At least one baseline evidence type is required' });
@@ -99,19 +138,13 @@ export function validateSection2(data: any): ValidationResult {
  */
 export function validateSection3(data: any): ValidationResult {
     const errors: ValidationError[] = [];
-    const intentWords = countWords(data.contribution_intent_statement || '');
     const hasStudentMappingSelection = Boolean(
         data.primary_sdg?.goal_number ||
         data.primary_sdg?.target_id ||
         data.primary_sdg?.indicator_id
     );
-    const studentIntentWords = countWords(data.student_contribution_intent_statement || '');
 
-    if (intentWords < 100) {
-        errors.push({ field: 'contribution_intent_statement', message: `Contribution logic is too short (${intentWords}/100 words min)` });
-    } else if (intentWords > 200) {
-        errors.push({ field: 'contribution_intent_statement', message: `Contribution logic is too long (${intentWords}/200 words max)` });
-    }
+    pushWordRange(errors, 'contribution_intent_statement', data.contribution_intent_statement, 'Contribution logic');
 
     const forbiddenPhrases = ["achieved", "solved", "eliminated"];
     forbiddenPhrases.forEach(phrase => {
@@ -121,11 +154,7 @@ export function validateSection3(data: any): ValidationResult {
     });
 
     if (hasStudentMappingSelection) {
-        if (studentIntentWords < 100) {
-            errors.push({ field: 'student_contribution_intent_statement', message: `Student contribution logic is too short (${studentIntentWords}/100 words min)` });
-        } else if (studentIntentWords > 200) {
-            errors.push({ field: 'student_contribution_intent_statement', message: `Student contribution logic is too long (${studentIntentWords}/200 words max)` });
-        }
+        pushWordRange(errors, 'student_contribution_intent_statement', data.student_contribution_intent_statement, 'Student contribution logic');
 
         forbiddenPhrases.forEach(phrase => {
             if (data.student_contribution_intent_statement?.toLowerCase().includes(phrase.toLowerCase())) {
@@ -136,10 +165,7 @@ export function validateSection3(data: any): ValidationResult {
 
     if (data.secondary_sdgs && data.secondary_sdgs.length > 0) {
         data.secondary_sdgs.forEach((sdg: any, index: number) => {
-            const justWords = countWords(sdg.justification_text || '');
-            if (justWords < 100 || justWords > 200) {
-                errors.push({ field: `secondary_sdgs.${index}.justification_text`, message: `Justification must be 100-200 words (${justWords} current)` });
-            }
+            pushWordRange(errors, `secondary_sdgs.${index}.justification_text`, sdg.justification_text, 'Justification');
         });
     }
 
@@ -160,10 +186,9 @@ export function validateSection4(data: any): ValidationResult {
             if (!block.primary_category) errors.push({ field: `activity_blocks.${index}.primary_category`, message: `Activity ${index + 1}: Primary category is required` });
             if (!block.sub_category) errors.push({ field: `activity_blocks.${index}.sub_category`, message: `Activity ${index + 1}: Sub-category is required` });
             
-            const descWords = countWords(block.description || '');
-            if (descWords < 50 || descWords > 100) {
-                errors.push({ field: `activity_blocks.${index}.description`, message: `Activity ${index + 1}: Description must be 50-100 words (${descWords} current)` });
-            }
+            pushWordRange(errors, `activity_blocks.${index}.description`, block.description, `Activity ${index + 1} description`);
+            pushWordRange(errors, `activity_blocks.${index}.delivery_explanation`, block.delivery_explanation, `Activity ${index + 1} delivery explanation`, false);
+            pushWordRange(errors, `activity_blocks.${index}.beneficiary_description`, block.beneficiary_description, `Activity ${index + 1} beneficiary description`, false);
             
             if (!block.delivery_mode) errors.push({ field: `activity_blocks.${index}.delivery_mode`, message: `Activity ${index + 1}: Delivery mode is required` });
             if (!block.sessions_count) errors.push({ field: `activity_blocks.${index}.sessions_count`, message: `Activity ${index + 1}: Number of sessions is required` });
@@ -188,6 +213,14 @@ export function validateSection4(data: any): ValidationResult {
         errors.push({ field: 'project_summary.counting_method', message: 'Beneficiary counting method is required' });
     }
 
+    pushWordRange(
+        errors,
+        'project_summary.project_implementation_explanation',
+        data.project_summary?.project_implementation_explanation,
+        'Project implementation explanation',
+        false,
+    );
+
     return { isValid: errors.length === 0, errors };
 }
 
@@ -196,11 +229,7 @@ export function validateSection4(data: any): ValidationResult {
  */
 export function validateSection5(data: any): ValidationResult {
     const errors: ValidationError[] = [];
-    const changeWords = countWords(data.observed_change || '');
-
-    if (changeWords < 100 || changeWords > 200) {
-        errors.push({ field: 'observed_change', message: `Observed change narrative must be 100-200 words (${changeWords} current)` });
-    }
+    pushWordRange(errors, 'observed_change', data.observed_change, 'Observed change narrative');
 
     if (!data.measurable_outcomes || data.measurable_outcomes.length === 0) {
         errors.push({ field: 'measurable_outcomes', message: 'At least one measurable outcome is required' });
@@ -215,21 +244,11 @@ export function validateSection5(data: any): ValidationResult {
             if (!outcome.unit) errors.push({ field: `measurable_outcomes.${index}.unit`, message: 'Unit of measurement is required' });
             if (!outcome.confidence_level || outcome.confidence_level.length === 0) errors.push({ field: `measurable_outcomes.${index}.confidence_level`, message: 'At least one confidence level is required' });
             
-            const explanationWords = countWords(outcome.measurement_explanation || '');
-            if (explanationWords < 50) {
-                errors.push({ field: `measurable_outcomes.${index}.measurement_explanation`, message: `Measurement explanation is too short (${explanationWords}/50 words min)` });
-            } else if (explanationWords > 100) {
-                errors.push({ field: `measurable_outcomes.${index}.measurement_explanation`, message: `Measurement explanation is too long (${explanationWords}/100 words max)` });
-            }
+            pushWordRange(errors, `measurable_outcomes.${index}.measurement_explanation`, outcome.measurement_explanation, 'Measurement explanation');
         });
     }
 
-    const challengeWords = countWords(data.challenges || '');
-    if (challengeWords < 100) {
-        errors.push({ field: 'challenges', message: `Challenges description too short (${challengeWords}/100 words min)` });
-    } else if (challengeWords > 200) {
-        errors.push({ field: 'challenges', message: `Challenges description too long (${challengeWords}/200 words max)` });
-    }
+    pushWordRange(errors, 'challenges', data.challenges, 'Challenges description');
 
     return { isValid: errors.length === 0, errors };
 }
@@ -329,9 +348,7 @@ export function validateSection8(data: any): ValidationResult {
     if (!data.evidence_types?.length) {
         errors.push({ field: 'evidence_types', message: 'At least one evidence type is mandatory' });
     }
-    if (!String(data.description || '').trim()) {
-        errors.push({ field: 'description', message: 'Say what your evidence shows' });
-    }
+    pushWordRange(errors, 'description', data.description, 'Evidence description');
     if (!data.media_visible) {
         errors.push({ field: 'media_visible', message: 'Media visibility preference is required' });
     }
@@ -352,19 +369,8 @@ export function validateSection9(data: any): ValidationResult {
         errors.push({ field: 'academic_integration', message: 'Please select an academic integration level' });
     }
 
-    const personalWords = countWords(data.personal_learning || '');
-    if (personalWords < 100) {
-        errors.push({ field: 'personal_learning', message: `Personal growth statement is too short (${personalWords}/100 words min)` });
-    } else if (personalWords > 200) {
-        errors.push({ field: 'personal_learning', message: `Personal growth statement is too long (${personalWords}/200 words max)` });
-    }
-
-    const appWords = countWords(data.academic_application || '');
-    if (appWords < 100) {
-        errors.push({ field: 'academic_application', message: `Academic application explanation is too short (${appWords}/100 words min)` });
-    } else if (appWords > 200) {
-        errors.push({ field: 'academic_application', message: `Academic application explanation is too long (${appWords}/200 words max)` });
-    }
+    pushWordRange(errors, 'personal_learning', data.personal_learning, 'Personal growth statement');
+    pushWordRange(errors, 'academic_application', data.academic_application, 'Academic application explanation');
 
     return { isValid: errors.length === 0, errors };
 }
@@ -374,9 +380,7 @@ export function validateSection9(data: any): ValidationResult {
  */
 export function validateSection10(data: any): ValidationResult {
     const errors: ValidationError[] = [];
-    if (!String(data.continuation_details || '').trim()) {
-        errors.push({ field: 'continuation_details', message: 'Say what will keep going, or what will happen next' });
-    }
+    pushWordRange(errors, 'continuation_details', data.continuation_details, 'Continuation explanation');
 
     if (data.continuation_status !== 'no' && !data.mechanisms?.length) {
         errors.push({ field: 'mechanisms', message: 'Identify at least one sustainability mechanism' });

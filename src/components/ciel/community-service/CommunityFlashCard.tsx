@@ -1,9 +1,18 @@
 "use client";
 
+import Link from "next/link";
 import type { CommunityAwardCard } from "@/utils/communityAwardModel";
 
-export default function CommunityFlashCard({ card, rank }: { card: CommunityAwardCard; rank?: number }) {
-    return (
+export default function CommunityFlashCard({
+    card,
+    rank,
+    href,
+}: {
+    card: CommunityAwardCard;
+    rank?: number;
+    href?: string;
+}) {
+    const body = (
         <div className="overflow-hidden rounded-[17px] border border-[#dcebee] bg-white">
             <div className="relative bg-[linear-gradient(130deg,#04252b,#0e5f63_55%,#12a5a0_120%)] px-4 py-3 text-white">
                 <span className="absolute right-2.5 top-2.5 rounded-full bg-[linear-gradient(90deg,#6d28d9,#a78bfa)] px-2 py-0.5 text-[8px] font-extrabold">
@@ -29,5 +38,11 @@ export default function CommunityFlashCard({ card, rank }: { card: CommunityAwar
                 <span className="rounded-full bg-[#e3f4fa] px-2 py-0.5 text-[7px] font-extrabold text-[#0891b2]">📸 {card.evidenceCount} EVIDENCE</span>
             </div>
         </div>
+    );
+    if (!href) return body;
+    return (
+        <Link href={href} className="block transition hover:-translate-y-0.5 hover:shadow-md">
+            {body}
+        </Link>
     );
 }

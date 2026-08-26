@@ -3,21 +3,16 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
-    Users,
-    Clock,
-    Award,
-    Loader2,
-    ShieldCheck,
-    User,
-    UsersRound,
-    BookOpen,
-    PieChart as PieChartIcon,
-    ArrowLeft,
+    AlertTriangle,
+    ChevronDown,
+    Download,
     Filter,
+    Loader2,
+    RefreshCw,
     RotateCcw,
+    X,
 } from "lucide-react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/app/dashboard/student/report/components/ui/card";
-import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, PieChart, Pie, Cell, Legend } from "recharts";
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell } from "recharts";
 import { authenticatedFetch, resolveSameOriginApiPath } from "@/utils/api";
 import AnalyticsHub from "@/components/analytics/AnalyticsHub";
 import UnifiedAnalyticsOverview from "@/components/analytics/UnifiedAnalyticsOverview";
@@ -73,7 +68,7 @@ function normalizeDistribution(raw?: DistributionPoint[]) {
     }));
 }
 
-const COLORS = ["#3b82f6", "#8b5cf6", "#10b981", "#f59e0b", "#64748b", "#ec4899", "#06b6d4"];
+const SDG_BAR_COLORS = ["#e11d48", "#f97316", "#0f766e", "#84cc16", "#2563eb", "#7c3aed", "#0891b2", "#b45309"];
 
 const YEAR_OF_STUDY_OPTIONS = [
     "1st Year",
@@ -128,6 +123,18 @@ const EMPTY_FILTERS: FacultyAnalyticsFilters = {
     period_end: "",
 };
 
+const FILTER_CHIP_LABELS: Record<keyof FacultyAnalyticsFilters, string> = {
+    project_id: "Project",
+    course_section: "Course",
+    degree_program: "Programme",
+    year_of_study: "Year",
+    academic_integration_type: "Integration",
+    participation_type: "Participation",
+    verification_status: "Verification",
+    period_start: "From",
+    period_end: "To",
+};
+
 function facultyAnalyticsApiUrl(view: FacultyDashboardViewClient, filters: FacultyAnalyticsFilters): string {
     const pathBase = resolveSameOriginApiPath("/api/v1/faculty/analytics");
     const u = new URL(pathBase);
@@ -139,12 +146,41 @@ function facultyAnalyticsApiUrl(view: FacultyDashboardViewClient, filters: Facul
     return u.toString();
 }
 
-function ChartEmpty({ message }: { message: string }) {
-    return (
-        <div className="flex h-[260px] items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50/80 px-6 text-center text-sm font-medium text-slate-500">
-            {message}
-        </div>
-    );
+function n(x: unknown) {
+    return typeof x === "number" && Number.isFinite(x) ? x : 0;
+}
+
+function formatNum(x: number, digits = 0) {
+    return x.toLocaleString("en-US", { maximumFractionDigits: digits, minimumFractionDigits: 0 });
+}
+
+type KpiCard = {
+    label: string;
+    value: string;
+    hint: string;
+    warn?: boolean;
+};
+
+function buildContradictions(data: FacultyAnalyticsPayload): string[] {
+    const notes: string[] = [];
+    const students = n(data.total_students_under_faculty);
+    const enrolments = n(data.individual_participants) + n(data.team_participants);
+    if (students > 0 && enrolments > 0 && students !== enrolments) {
+        const gap = Math.abs(enrolments - students);
+        notes.push(
+            `Students: ${formatNum(students)} in scope vs ${formatNum(enrolments)} enrolments — ${formatNum(gap)} unaccounted.`,
+        );
+    }
+    const required = n(data.total_required_hours);
+    const verified = n(data.hours_verified);
+    if (required > 0 && verified === 0) {
+        notes.push(`Hours: required total is ${formatNum(required, 1)} h but verified hours are 0.`);
+    }
+    const score = n(data.avg_impact_score);
+    if (score > 10) {
+        notes.push(`Impact score averages ${score} (this is not a /10 scale).`);
+    }
+    return notes;
 }
 
 export default function FacultyAnalyticsPage() {
@@ -155,6 +191,7 @@ export default function FacultyAnalyticsPage() {
     const [appliedFilters, setAppliedFilters] = useState<FacultyAnalyticsFilters>(() => ({ ...EMPTY_FILTERS }));
     const [draftFilters, setDraftFilters] = useState<FacultyAnalyticsFilters>(() => ({ ...EMPTY_FILTERS }));
     const [courseOptions, setCourseOptions] = useState<{ id: string; label: string }[]>([]);
+    const [filtersOpen, setFiltersOpen] = useState(false);
 
     const loadAnalytics = useCallback(async () => {
         if (typeof window !== "undefined") {
@@ -236,6 +273,7 @@ export default function FacultyAnalyticsPage() {
 
     const applyDraft = () => {
         setAppliedFilters({ ...draftFilters });
+        setFiltersOpen(false);
     };
 
     const clearFilters = () => {
@@ -245,446 +283,493 @@ export default function FacultyAnalyticsPage() {
     };
 
     const hoursChart = useMemo(() => normalizeHoursTrend(data?.hours_trend), [data?.hours_trend]);
-    const sdgChart = useMemo(() => normalizeDistribution(data?.impact_distribution), [data?.impact_distribution]);
-
-    const n = (x: unknown) => (typeof x === "number" && Number.isFinite(x) ? x : 0);
+    const sdgChart = useMemo(() => {
+        const rows = normalizeDistribution(data?.impact_distribution).filter((d) => d.value > 0);
+        return [...rows].sort((a, b) => b.value - a.value);
+    }, [data?.impact_distribution]);
 
     const viewLabel =
         view === "personal" ? "My supervision" : view === "university" ? "University scope" : "All activity";
 
-    const filtersActive = Boolean(data?.filter_meta && data.filter_meta.active === true);
-    const appliedSummary =
-        data?.filter_meta && data.filter_meta.active === true ? data.filter_meta.params : null;
+    const activeFilterChips = useMemo(() => {
+        return (Object.entries(appliedFilters) as [keyof FacultyAnalyticsFilters, string][])
+            .filter(([, value]) => value.trim())
+            .map(([key, value]) => ({
+                key,
+                label: `${FILTER_CHIP_LABELS[key]}: ${
+                    key === "project_id" ? courseOptions.find((c) => c.id === value)?.label || value : value
+                }`,
+            }));
+    }, [appliedFilters, courseOptions]);
+
+    const contradictions = useMemo(() => (data ? buildContradictions(data) : []), [data]);
+
+    const kpis: KpiCard[] = data
+        ? [
+              {
+                  label: "Students in scope",
+                  value: formatNum(n(data.total_students_under_faculty)),
+                  hint: (() => {
+                      const enrol = n(data.individual_participants) + n(data.team_participants);
+                      const students = n(data.total_students_under_faculty);
+                      if (enrol > 0 && students !== enrol) {
+                          return `Enrolments total ${formatNum(enrol)} — ${formatNum(Math.abs(enrol - students))} unaccounted`;
+                      }
+                      return enrol > 0 ? `${formatNum(enrol)} enrolments in this scope` : "Distinct students on assigned opportunities";
+                  })(),
+                  warn:
+                      n(data.total_students_under_faculty) > 0 &&
+                      n(data.individual_participants) + n(data.team_participants) > 0 &&
+                      n(data.total_students_under_faculty) !==
+                          n(data.individual_participants) + n(data.team_participants),
+              },
+              {
+                  label: "Verified hours",
+                  value: formatNum(Math.round(n(data.hours_verified))),
+                  hint:
+                      n(data.total_required_hours) > 0
+                          ? `Required across enrolments: ${formatNum(n(data.total_required_hours), 1)} h`
+                          : "Verified timesheet hours in scope",
+                  warn: n(data.total_required_hours) > 0 && n(data.hours_verified) === 0,
+              },
+              {
+                  label: "Identity verified",
+                  value: `${n(data.verification_rate_percent)}%`,
+                  hint: `${formatNum(n(data.verified_students))} of ${formatNum(n(data.total_students_under_faculty))} students`,
+              },
+              {
+                  label: "Projects with hours",
+                  value: formatNum(n(data.projects_completed)),
+                  hint: "Opportunities that already have verified hours",
+              },
+              {
+                  label: "Required hours",
+                  value: formatNum(n(data.total_required_hours), 1),
+                  hint: "Summed across active enrolments",
+              },
+              {
+                  label: "Teams",
+                  value: formatNum(n(data.total_teams)),
+                  hint: `${formatNum(n(data.team_participants))} team enrolments · avg ${n(data.average_team_size)} students`,
+              },
+              {
+                  label: "Course-linked",
+                  value: `${n(data.course_linked_ce_ratio_percent)}%`,
+                  hint: "of enrolments carry course credit",
+              },
+              {
+                  label: "Avg impact score",
+                  value: n(data.avg_impact_score) > 0 ? String(n(data.avg_impact_score)) : "—",
+                  hint: n(data.avg_impact_score) > 10 ? "Cohort mean from AI impact score" : "Cohort mean from submitted reports",
+              },
+          ]
+        : [];
+
+    const exportCsv = () => {
+        if (!data) return;
+        const lines = [
+            ["Metric", "Value"],
+            ["Scope", viewLabel],
+            ...kpis.map((k) => [k.label, `${k.value} (${k.hint})`]),
+        ];
+        const csv = lines.map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(",")).join("\n");
+        const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `faculty-analytics-${view}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+    };
 
     const selectCls =
-        "mt-1 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500";
-    const inputCls =
-        "mt-1 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500";
+        "mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-600/20";
+    const inputCls = selectCls;
+    const btnGhost =
+        "inline-flex h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60";
+
+    const sdgMax = Math.max(...sdgChart.map((d) => d.value), 1);
+    const hubSubtitle = [
+        data?.university_scope?.organization_name,
+        viewLabel,
+        appliedFilters.project_id ? "project filter" : "aggregate cohort",
+    ]
+        .filter(Boolean)
+        .join(" · ");
 
     return (
-        <div className="mx-auto max-w-7xl space-y-6 p-0 pb-20 sm:p-4">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="mx-auto max-w-6xl space-y-5 p-0 pb-20 sm:p-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div>
-                    <Link
-                        href="/dashboard/faculty"
-                        className="mb-3 inline-flex items-center gap-1 text-sm font-bold text-indigo-600 hover:text-indigo-700"
-                    >
-                        <ArrowLeft className="h-4 w-4" />
-                        Faculty dashboard
-                    </Link>
-                    <h1 className="text-2xl font-bold text-slate-900 sm:text-3xl">Analytics</h1>
-                    <p className="text-slate-500">Track student engagement, verification, and SDG contribution.</p>
+                    <h1 className="text-[28px] font-bold tracking-tight text-slate-900">Analytics</h1>
+                    <p className="mt-1 text-sm text-slate-500">
+                        Engagement, verification and SDG contribution across your assigned opportunities.
+                    </p>
                     {data?.university_scope?.organization_name ? (
-                        <p className="mt-2 text-xs font-semibold text-indigo-700">
+                        <p className="mt-1 text-xs font-medium text-teal-800">
                             Delegated org: {data.university_scope.organization_name}
                         </p>
                     ) : null}
-                    <p className="mt-1 text-xs text-slate-500">
-                        Current scope: <strong className="text-slate-700">{viewLabel}</strong> — change it on the main faculty
-                        dashboard; this page refreshes when you switch views.
-                    </p>
+                </div>
+                <div className="flex shrink-0 gap-2">
+                    <button type="button" onClick={exportCsv} disabled={!data} className={btnGhost}>
+                        <Download className="h-4 w-4" />
+                        Export
+                    </button>
+                    <button type="button" onClick={() => void loadAnalytics()} disabled={loading} className={btnGhost}>
+                        <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+                        Refresh
+                    </button>
                 </div>
             </div>
 
-            {error ? (
-                <Card className="border-rose-200 bg-rose-50/70">
-                    <CardContent className="p-4 text-sm text-rose-700">
-                        Engagement overview could not be loaded ({error}). Report analytics below still work independently.
-                    </CardContent>
-                </Card>
-            ) : null}
-
-            {loading && !data ? (
-                <div className="flex min-h-[120px] items-center justify-center gap-2 text-slate-600">
-                    <Loader2 className="h-6 w-6 animate-spin text-indigo-600" />
-                    <span className="text-sm font-medium">Loading engagement overview…</span>
+            <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+                <div className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex min-w-0 flex-wrap items-center gap-2">
+                        <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Scope</span>
+                        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
+                            {viewLabel}
+                        </span>
+                        {activeFilterChips.map((chip) => (
+                            <span
+                                key={chip.key}
+                                className="inline-flex items-center gap-1 rounded-full bg-teal-50 px-2.5 py-1 text-xs font-medium text-teal-900"
+                            >
+                                {chip.label}
+                                <button
+                                    type="button"
+                                    aria-label={`Remove ${chip.label}`}
+                                    onClick={() => {
+                                        const next = { ...appliedFilters, [chip.key]: "" };
+                                        setDraftFilters(next);
+                                        setAppliedFilters(next);
+                                    }}
+                                    className="rounded-full p-0.5 hover:bg-teal-100"
+                                >
+                                    <X className="h-3 w-3" />
+                                </button>
+                            </span>
+                        ))}
+                    </div>
+                    <button type="button" onClick={() => setFiltersOpen((open) => !open)} className={btnGhost}>
+                        <Filter className="h-4 w-4" />
+                        {filtersOpen ? "Hide filters" : "Add filters"}
+                        <ChevronDown className={`h-3.5 w-3.5 transition ${filtersOpen ? "rotate-180" : ""}`} />
+                    </button>
                 </div>
-            ) : null}
 
-            <Card className="border-slate-200 shadow-sm">
-                <CardHeader className="pb-4">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                        <div className="flex items-center gap-2">
-                            <Filter className="h-5 w-5 text-slate-600" />
-                            <CardTitle className="text-lg">Analytics filters</CardTitle>
+                {filtersOpen ? (
+                    <div className="border-t border-slate-100 bg-slate-50/70 px-4 py-4">
+                        <p className="mb-3 text-xs text-slate-500">
+                            Narrow metrics within your faculty-assigned opportunities. Leave empty for no constraint.
+                            A specific project ignores the course/section search.
+                        </p>
+                        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                            <label className="block text-sm font-medium text-slate-700">
+                                Course / section search
+                                <input
+                                    className={inputCls}
+                                    placeholder="Code, term, or title contains…"
+                                    value={draftFilters.course_section}
+                                    onChange={(e) => setDraftFilters((f) => ({ ...f, course_section: e.target.value }))}
+                                    disabled={Boolean(draftFilters.project_id.trim())}
+                                />
+                            </label>
+                            <label className="block text-sm font-medium text-slate-700">
+                                Project
+                                <select
+                                    className={selectCls}
+                                    value={draftFilters.project_id}
+                                    onChange={(e) => setDraftFilters((f) => ({ ...f, project_id: e.target.value }))}
+                                >
+                                    <option value="">Any in scope</option>
+                                    {courseOptions.map((c) => (
+                                        <option key={c.id} value={c.id}>
+                                            {c.label}
+                                        </option>
+                                    ))}
+                                </select>
+                            </label>
+                            <label className="block text-sm font-medium text-slate-700">
+                                Degree program
+                                <input
+                                    className={inputCls}
+                                    placeholder="Exact programme on enrolment"
+                                    value={draftFilters.degree_program}
+                                    onChange={(e) => setDraftFilters((f) => ({ ...f, degree_program: e.target.value }))}
+                                />
+                            </label>
+                            <label className="block text-sm font-medium text-slate-700">
+                                Year of study
+                                <select
+                                    className={selectCls}
+                                    value={draftFilters.year_of_study}
+                                    onChange={(e) => setDraftFilters((f) => ({ ...f, year_of_study: e.target.value }))}
+                                >
+                                    <option value="">Any</option>
+                                    {YEAR_OF_STUDY_OPTIONS.map((y) => (
+                                        <option key={y} value={y}>
+                                            {y}
+                                        </option>
+                                    ))}
+                                </select>
+                            </label>
+                            <label className="block text-sm font-medium text-slate-700">
+                                Academic integration type
+                                <select
+                                    className={selectCls}
+                                    value={draftFilters.academic_integration_type}
+                                    onChange={(e) =>
+                                        setDraftFilters((f) => ({ ...f, academic_integration_type: e.target.value }))
+                                    }
+                                >
+                                    <option value="">Any</option>
+                                    {ACADEMIC_INTEGRATION_OPTIONS.map((x) => (
+                                        <option key={x} value={x}>
+                                            {x}
+                                        </option>
+                                    ))}
+                                </select>
+                            </label>
+                            <label className="block text-sm font-medium text-slate-700">
+                                Participation type
+                                <select
+                                    className={selectCls}
+                                    value={draftFilters.participation_type}
+                                    onChange={(e) => setDraftFilters((f) => ({ ...f, participation_type: e.target.value }))}
+                                >
+                                    {PARTICIPATION_TYPE_OPTIONS.map((o) => (
+                                        <option key={o.value || "any"} value={o.value}>
+                                            {o.label}
+                                        </option>
+                                    ))}
+                                </select>
+                            </label>
+                            <label className="block text-sm font-medium text-slate-700">
+                                Verification status
+                                <select
+                                    className={selectCls}
+                                    value={draftFilters.verification_status}
+                                    onChange={(e) => setDraftFilters((f) => ({ ...f, verification_status: e.target.value }))}
+                                >
+                                    {VERIFICATION_OPTIONS.map((o) => (
+                                        <option key={o.value || "any"} value={o.value}>
+                                            {o.label}
+                                        </option>
+                                    ))}
+                                </select>
+                            </label>
+                            <label className="block text-sm font-medium text-slate-700">
+                                Period start
+                                <input
+                                    type="date"
+                                    className={inputCls}
+                                    value={draftFilters.period_start}
+                                    onChange={(e) => setDraftFilters((f) => ({ ...f, period_start: e.target.value }))}
+                                />
+                            </label>
+                            <label className="block text-sm font-medium text-slate-700">
+                                Period end
+                                <input
+                                    type="date"
+                                    className={inputCls}
+                                    value={draftFilters.period_end}
+                                    onChange={(e) => setDraftFilters((f) => ({ ...f, period_end: e.target.value }))}
+                                />
+                            </label>
                         </div>
-                        <div className="flex flex-wrap gap-2">
+                        <div className="mt-4 flex flex-wrap gap-2">
                             <button
                                 type="button"
                                 onClick={applyDraft}
                                 disabled={loading}
-                                className="inline-flex items-center gap-2 rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+                                className="inline-flex h-9 items-center gap-2 rounded-lg bg-slate-900 px-4 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-60"
                             >
                                 {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
                                 Apply filters
                             </button>
-                            <button
-                                type="button"
-                                onClick={clearFilters}
-                                disabled={loading}
-                                className="inline-flex items-center gap-2 rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
-                            >
+                            <button type="button" onClick={clearFilters} disabled={loading} className={btnGhost}>
                                 <RotateCcw className="h-4 w-4" />
                                 Clear
                             </button>
                         </div>
                     </div>
-                    <CardDescription>
-                        Narrow metrics within your faculty-assigned opportunities (AND). Leave empty for no constraint.
-                        Selecting a specific project ignores the course/section search (matches backend).
-                    </CardDescription>
-                    {filtersActive && appliedSummary ? (
-                        <p className="text-xs font-medium text-indigo-700">
-                            Active:{" "}
-                            {Object.entries(appliedSummary)
-                                .map(([k, v]) => `${k}=${v}`)
-                                .join(" · ")}
-                        </p>
-                    ) : null}
-                </CardHeader>
-                <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                    <label className="block text-sm font-medium text-slate-700">
-                        Course / section search
-                        <input
-                            className={inputCls}
-                            placeholder="Code, term, or title contains…"
-                            value={draftFilters.course_section}
-                            onChange={(e) => setDraftFilters((f) => ({ ...f, course_section: e.target.value }))}
-                            disabled={Boolean(draftFilters.project_id.trim())}
-                        />
-                    </label>
-                    <label className="block text-sm font-medium text-slate-700">
-                        Project
-                        <select
-                            className={selectCls}
-                            value={draftFilters.project_id}
-                            onChange={(e) => setDraftFilters((f) => ({ ...f, project_id: e.target.value }))}
-                        >
-                            <option value="">Any in scope</option>
-                            {courseOptions.map((c) => (
-                                <option key={c.id} value={c.id}>
-                                    {c.label}
-                                </option>
-                            ))}
-                        </select>
-                    </label>
-                    <label className="block text-sm font-medium text-slate-700">
-                        Degree program
-                        <input
-                            className={inputCls}
-                            placeholder="Exact programme on enrolment"
-                            value={draftFilters.degree_program}
-                            onChange={(e) => setDraftFilters((f) => ({ ...f, degree_program: e.target.value }))}
-                        />
-                    </label>
-                    <label className="block text-sm font-medium text-slate-700">
-                        Year of study
-                        <select
-                            className={selectCls}
-                            value={draftFilters.year_of_study}
-                            onChange={(e) => setDraftFilters((f) => ({ ...f, year_of_study: e.target.value }))}
-                        >
-                            <option value="">Any</option>
-                            {YEAR_OF_STUDY_OPTIONS.map((y) => (
-                                <option key={y} value={y}>
-                                    {y}
-                                </option>
-                            ))}
-                        </select>
-                    </label>
-                    <label className="block text-sm font-medium text-slate-700">
-                        Academic integration type
-                        <select
-                            className={selectCls}
-                            value={draftFilters.academic_integration_type}
-                            onChange={(e) =>
-                                setDraftFilters((f) => ({ ...f, academic_integration_type: e.target.value }))
-                            }
-                        >
-                            <option value="">Any</option>
-                            {ACADEMIC_INTEGRATION_OPTIONS.map((x) => (
-                                <option key={x} value={x}>
-                                    {x}
-                                </option>
-                            ))}
-                        </select>
-                    </label>
-                    <label className="block text-sm font-medium text-slate-700">
-                        Participation type
-                        <select
-                            className={selectCls}
-                            value={draftFilters.participation_type}
-                            onChange={(e) => setDraftFilters((f) => ({ ...f, participation_type: e.target.value }))}
-                        >
-                            {PARTICIPATION_TYPE_OPTIONS.map((o) => (
-                                <option key={o.value || "any"} value={o.value}>
-                                    {o.label}
-                                </option>
-                            ))}
-                        </select>
-                    </label>
-                    <label className="block text-sm font-medium text-slate-700">
-                        Verification status
-                        <select
-                            className={selectCls}
-                            value={draftFilters.verification_status}
-                            onChange={(e) => setDraftFilters((f) => ({ ...f, verification_status: e.target.value }))}
-                        >
-                            {VERIFICATION_OPTIONS.map((o) => (
-                                <option key={o.value || "any"} value={o.value}>
-                                    {o.label}
-                                </option>
-                            ))}
-                        </select>
-                    </label>
-                    <label className="block text-sm font-medium text-slate-700">
-                        Period start
-                        <input
-                            type="date"
-                            className={inputCls}
-                            value={draftFilters.period_start}
-                            onChange={(e) => setDraftFilters((f) => ({ ...f, period_start: e.target.value }))}
-                        />
-                    </label>
-                    <label className="block text-sm font-medium text-slate-700">
-                        Period end
-                        <input
-                            type="date"
-                            className={inputCls}
-                            value={draftFilters.period_end}
-                            onChange={(e) => setDraftFilters((f) => ({ ...f, period_end: e.target.value }))}
-                        />
-                    </label>
-                </CardContent>
-            </Card>
+                ) : null}
+            </div>
 
-            {loading && data ? (
-                <div className="flex items-center gap-2 text-sm text-slate-600">
-                    <Loader2 className="h-5 w-5 animate-spin text-indigo-600" />
-                    Updating analytics…
+            {error ? (
+                <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+                    Engagement overview could not be loaded ({error}). Report analytics below still work independently.
                 </div>
             ) : null}
 
-            <>
-                {data ? (
-                    <>
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-                    {[
-                        {
-                            title: "Total students",
-                            value: n(data?.total_students_under_faculty).toLocaleString(),
-                            icon: Users,
-                            color: "bg-blue-50 text-blue-600",
-                            sub: filtersActive ? "Distinct students in filtered enrolments." : undefined,
-                        },
-                        {
-                            title: "Hours contributed",
-                            value: Math.round(n(data?.hours_verified)).toLocaleString(),
-                            icon: Clock,
-                            color: "bg-purple-50 text-purple-600",
-                            sub: filtersActive ? "Verified timesheets matching enrolment filters." : undefined,
-                        },
-                        {
-                            title: "Projects (verified hours)",
-                            value: n(data?.projects_completed).toLocaleString(),
-                            icon: PieChartIcon,
-                            color: "bg-green-50 text-green-600",
-                            sub: filtersActive ? "Projects with verified hours in cohort." : undefined,
-                        },
-                        {
-                            title: "Avg impact score",
-                            value: n(data?.avg_impact_score) > 0 ? `${data?.avg_impact_score}/10` : "—",
-                            icon: Award,
-                            color: "bg-amber-50 text-amber-600",
-                            sub: filtersActive ? "Reports matching enrolment filters." : undefined,
-                        },
-                    ].map((stat, i) => (
-                        <Card key={i}>
-                            <CardContent className="flex items-center justify-between gap-3 p-5 sm:p-6">
-                                <div>
-                                    <p className="text-sm font-medium text-slate-500">{stat.title}</p>
-                                    <h3 className="mt-1 text-2xl font-bold text-slate-900">{stat.value}</h3>
-                                    {stat.sub ? <p className="mt-1 text-xs text-slate-500">{stat.sub}</p> : null}
-                                </div>
-                                <div
-                                    className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${stat.color}`}
-                                >
-                                    <stat.icon className="h-6 w-6" />
-                                </div>
-                            </CardContent>
-                        </Card>
-                    ))}
-                </div>
-
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                    {[
-                        {
-                            title: "Verified students",
-                            value: n(data?.verified_students).toLocaleString(),
-                            sub: "Profile + identity verified",
-                            icon: ShieldCheck,
-                            color: "bg-emerald-50 text-emerald-700",
-                        },
-                        {
-                            title: "Verification rate",
-                            value: `${n(data?.verification_rate_percent)}%`,
-                            sub: filtersActive ? "Within filtered cohort." : "Of students in this scope",
-                            icon: ShieldCheck,
-                            color: "bg-teal-50 text-teal-700",
-                        },
-                        {
-                            title: "Individual enrollments",
-                            value: n(data?.individual_participants).toLocaleString(),
-                            sub: "Participation mode: individual",
-                            icon: User,
-                            color: "bg-slate-50 text-slate-700",
-                        },
-                        {
-                            title: "Team enrollments",
-                            value: n(data?.team_participants).toLocaleString(),
-                            sub: `${n(data?.total_teams)} teams · avg size ${n(data?.average_team_size)}`,
-                            icon: UsersRound,
-                            color: "bg-indigo-50 text-indigo-700",
-                        },
-                        {
-                            title: "Total required hours",
-                            value: n(data?.total_required_hours).toLocaleString(),
-                            sub: "Sum over active enrollments in scope",
-                            icon: Clock,
-                            color: "bg-orange-50 text-orange-700",
-                        },
-                        {
-                            title: "Course-linked CE ratio",
-                            value: `${n(data?.course_linked_ce_ratio_percent)}%`,
-                            sub: "Students with course-linked / CE enrollment types",
-                            icon: BookOpen,
-                            color: "bg-cyan-50 text-cyan-700",
-                        },
-                    ].map((stat, i) => (
-                        <Card key={i} className="border-slate-200/80">
-                            <CardContent className="flex items-start justify-between gap-3 p-4 sm:p-5">
-                                <div className="min-w-0">
-                                    <p className="text-xs font-bold uppercase tracking-wide text-slate-500">{stat.title}</p>
-                                    <h3 className="mt-1 text-xl font-black text-slate-900">{stat.value}</h3>
-                                    <p className="mt-1 text-[11px] leading-snug text-slate-500">{stat.sub}</p>
-                                </div>
-                                <div
-                                    className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${stat.color}`}
-                                >
-                                    <stat.icon className="h-5 w-5" />
-                                </div>
-                            </CardContent>
-                        </Card>
-                    ))}
-                </div>
-
-                <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>SDG distribution</CardTitle>
-                            <CardDescription>
-                                Which global goals show up in scoped projects and reports?
-                                {filtersActive ? " Shown for the filtered cohort." : ""}
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent className="h-[300px]">
-                            {sdgChart.length ? (
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <PieChart>
-                                        <Pie
-                                            data={sdgChart}
-                                            cx="50%"
-                                            cy="50%"
-                                            innerRadius={60}
-                                            outerRadius={80}
-                                            paddingAngle={5}
-                                            dataKey="value"
-                                            nameKey="name"
-                                        >
-                                            {sdgChart.map((entry, index) => (
-                                                <Cell
-                                                    key={`cell-${index}`}
-                                                    fill={entry.color || COLORS[index % COLORS.length]}
-                                                />
-                                            ))}
-                                        </Pie>
-                                        <Tooltip />
-                                        <Legend />
-                                    </PieChart>
-                                </ResponsiveContainer>
-                            ) : (
-                                <ChartEmpty message="No SDG distribution data for this scope yet." />
-                            )}
-                        </CardContent>
-                    </Card>
-
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Volunteer hours (monthly)</CardTitle>
-                            <CardDescription>
-                                Verified timesheet hours in scoped opportunities.
-                                {filtersActive ? " Filtered by enrolment where applicable." : ""}
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent className="h-[300px]">
-                            {hoursChart.length ? (
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <BarChart data={hoursChart}>
-                                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                                        <XAxis dataKey="name" fontSize={12} tickLine={false} axisLine={false} />
-                                        <YAxis fontSize={12} tickLine={false} axisLine={false} />
-                                        <Tooltip cursor={{ fill: "#f1f5f9" }} />
-                                        <Bar dataKey="hours" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                                    </BarChart>
-                                </ResponsiveContainer>
-                            ) : (
-                                <ChartEmpty message="No verified hours in the last months for this scope." />
-                            )}
-                        </CardContent>
-                    </Card>
-                </div>
-                    </>
-                ) : null}
-
-                <div className="mt-10 border-t border-slate-200 pt-10">
-                    <UnifiedAnalyticsOverview
-                        apiPath="/api/v1/faculty/analytics/overview"
-                        query={{
-                            project_id: appliedFilters.project_id || undefined,
-                            scope: appliedFilters.project_id ? "project" : "aggregate",
-                        }}
-                        title="Report overview"
-                    />
-                </div>
-
-                <div className="mt-10 border-t border-slate-200 pt-10">
-                    <h2 className="mb-2 text-lg font-bold text-slate-900">Report analytics by section</h2>
-                    <p className="mb-4 text-sm text-slate-500">
-                        Drill into form tabs 1–9 (activities/outcomes as 4A/4B) for the same faculty/university scope.
+            {contradictions.length > 0 ? (
+                <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3">
+                    <p className="flex items-center gap-2 text-sm font-semibold text-rose-950">
+                        <AlertTriangle className="h-4 w-4 text-rose-600" />
+                        Some numbers on this page contradict each other
                     </p>
-                    <AnalyticsHub
-                        views={[
-                            {
-                                id: "faculty",
-                                label: "University",
-                                apiPath: "/api/v1/faculty/analytics/section1",
-                                query: {
-                                    project_id: appliedFilters.project_id,
-                                    degree_program: appliedFilters.degree_program,
-                                    year_of_study: appliedFilters.year_of_study,
-                                    academic_integration_type: appliedFilters.academic_integration_type,
-                                    participation_type: appliedFilters.participation_type,
-                                    verification_status: appliedFilters.verification_status,
-                                    period_start: appliedFilters.period_start,
-                                    period_end: appliedFilters.period_end,
-                                    scope: appliedFilters.project_id ? "project" : "aggregate",
-                                },
-                            },
-                        ]}
-                        hideOnError={false}
-                    />
+                    <ul className="mt-2 list-disc space-y-1 pl-6 text-sm text-rose-800">
+                        {contradictions.map((note) => (
+                            <li key={note}>{note}</li>
+                        ))}
+                    </ul>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                        <Link href="/dashboard/faculty/attendance-review" className={btnGhost}>
+                            Reconcile hours
+                        </Link>
+                        <Link href="/dashboard/faculty/join-applications" className={btnGhost}>
+                            Check the data source
+                        </Link>
+                    </div>
                 </div>
-            </>
+            ) : null}
+
+            {loading && !data ? (
+                <div className="flex min-h-[120px] items-center justify-center gap-2 text-slate-600">
+                    <Loader2 className="h-6 w-6 animate-spin text-teal-700" />
+                    <span className="text-sm font-medium">Loading engagement overview…</span>
+                </div>
+            ) : null}
+
+            {loading && data ? (
+                <p className="flex items-center gap-2 text-sm text-slate-500">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Updating analytics…
+                </p>
+            ) : null}
+
+            {data ? (
+                <>
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                        {kpis.map((stat) => (
+                            <article key={stat.label} className="rounded-xl border border-slate-200 bg-white px-4 py-4">
+                                <p className="text-xs font-medium text-slate-500">{stat.label}</p>
+                                <p className="mt-1 text-[28px] font-bold leading-none tabular-nums tracking-tight text-slate-900">
+                                    {stat.value}
+                                </p>
+                                <p className={`mt-2 text-xs leading-snug ${stat.warn ? "font-medium text-rose-600" : "text-slate-500"}`}>
+                                    {stat.hint}
+                                </p>
+                            </article>
+                        ))}
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+                        <article className="rounded-xl border border-slate-200 bg-white p-4">
+                            <h2 className="text-sm font-semibold text-slate-900">SDG distribution</h2>
+                            <p className="mt-0.5 text-xs text-slate-500">Goals appearing in scoped projects and reports.</p>
+                            {sdgChart.length ? (
+                                <ul className="mt-4 space-y-2.5">
+                                    {sdgChart.map((row, index) => (
+                                        <li key={row.name} className="flex items-center gap-3">
+                                            <span className="w-36 shrink-0 truncate text-[13px] text-slate-600" title={row.name}>
+                                                {row.name}
+                                            </span>
+                                            <div className="h-2.5 min-w-0 flex-1 overflow-hidden rounded-full bg-slate-100">
+                                                <div
+                                                    className="h-full rounded-full"
+                                                    style={{
+                                                        width: `${Math.max(4, (row.value / sdgMax) * 100)}%`,
+                                                        background: row.color || SDG_BAR_COLORS[index % SDG_BAR_COLORS.length],
+                                                    }}
+                                                />
+                                            </div>
+                                            <span className="w-8 shrink-0 text-right text-[13px] font-semibold tabular-nums text-slate-800">
+                                                {row.value}
+                                            </span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            ) : (
+                                <p className="mt-8 text-center text-sm text-slate-500">No SDG tags in this scope yet.</p>
+                            )}
+                        </article>
+
+                        <article className="rounded-xl border border-slate-200 bg-white p-4">
+                            <h2 className="text-sm font-semibold text-slate-900">Verified hours by month</h2>
+                            <p className="mt-0.5 text-xs text-slate-500">Timesheet hours on assigned opportunities.</p>
+                            {hoursChart.some((p) => p.hours > 0) ? (
+                                <div className="mt-2 h-[260px]">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <BarChart data={hoursChart}>
+                                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                                            <XAxis dataKey="name" fontSize={12} tickLine={false} axisLine={false} tick={{ fill: "#64748b" }} />
+                                            <YAxis fontSize={12} tickLine={false} axisLine={false} tick={{ fill: "#64748b" }} width={36} />
+                                            <Tooltip
+                                                contentStyle={{
+                                                    borderRadius: 8,
+                                                    border: "1px solid #e2e8f0",
+                                                    fontSize: 12,
+                                                }}
+                                            />
+                                            <Bar dataKey="hours" radius={[4, 4, 0, 0]}>
+                                                {hoursChart.map((entry) => (
+                                                    <Cell key={entry.name} fill="#0f766e" />
+                                                ))}
+                                            </Bar>
+                                        </BarChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            ) : (
+                                <div className="mt-10 px-4 py-8 text-center">
+                                    <p className="text-sm font-medium text-slate-700">Nothing to plot yet</p>
+                                    <p className="mt-1 text-xs text-slate-500">
+                                        Verified hours appear after attendance is approved. Check{" "}
+                                        <Link href="/dashboard/faculty/join-applications" className="font-semibold text-teal-800 hover:underline">
+                                            Applications &amp; reports
+                                        </Link>
+                                        {" "}or{" "}
+                                        <Link href="/dashboard/faculty/attendance-review" className="font-semibold text-teal-800 hover:underline">
+                                            Attendance review
+                                        </Link>
+                                        .
+                                    </p>
+                                </div>
+                            )}
+                        </article>
+                    </div>
+                </>
+            ) : null}
+
+            <div className="rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
+                <UnifiedAnalyticsOverview
+                    apiPath="/api/v1/faculty/analytics/overview"
+                    query={{
+                        project_id: appliedFilters.project_id || undefined,
+                        scope: appliedFilters.project_id ? "project" : "aggregate",
+                    }}
+                    title="Report overview"
+                />
+            </div>
+
+            <div className="rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
+                <div className="mb-4">
+                    <h2 className="text-base font-semibold tracking-tight text-slate-900">Report analytics by section</h2>
+                    <p className="mt-0.5 text-sm text-slate-500">{hubSubtitle || "Aggregate cohort"}</p>
+                </div>
+                <AnalyticsHub
+                    views={[
+                        {
+                            id: "faculty",
+                            label: "Faculty",
+                            apiPath: "/api/v1/faculty/analytics/section1",
+                            query: {
+                                project_id: appliedFilters.project_id,
+                                degree_program: appliedFilters.degree_program,
+                                year_of_study: appliedFilters.year_of_study,
+                                academic_integration_type: appliedFilters.academic_integration_type,
+                                participation_type: appliedFilters.participation_type,
+                                verification_status: appliedFilters.verification_status,
+                                period_start: appliedFilters.period_start,
+                                period_end: appliedFilters.period_end,
+                                scope: appliedFilters.project_id ? "project" : "aggregate",
+                            },
+                        },
+                    ]}
+                    hideOnError={false}
+                />
+            </div>
         </div>
     );
 }

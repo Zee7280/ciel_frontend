@@ -2,10 +2,18 @@
 
 import Link from "next/link";
 
-export function CourseworkCrumb({ role, view }: { role: string; view?: string }) {
+export function CourseworkCrumb({
+    role,
+    view,
+    pathLabel = "Coursework",
+}: {
+    role: string;
+    view?: string;
+    pathLabel?: string;
+}) {
     return (
         <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#7a919a]">
-            {role} Dashboard → <span className="text-[#0e7d74]">Coursework</span>
+            {role} Dashboard → <span className="text-[#0e7d74]">{pathLabel}</span>
             {view ? <> → {view}</> : null}
         </p>
     );
@@ -65,6 +73,7 @@ export function HubTile({
     onClick,
     disabled,
     badge,
+    badgeClass = "text-[#0d2b33]",
     emoji,
     title,
     subtitle,
@@ -75,6 +84,7 @@ export function HubTile({
     onClick?: () => void;
     disabled?: boolean;
     badge: string;
+    badgeClass?: string;
     emoji: string;
     title: string;
     subtitle: string;
@@ -84,9 +94,13 @@ export function HubTile({
     const shared = `relative flex min-h-[140px] flex-col overflow-hidden rounded-[22px] p-5 text-left text-white shadow-sm transition duration-150 hover:-translate-y-1 hover:shadow-[0_16px_36px_rgba(13,43,51,0.18)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0e7d74] focus-visible:ring-offset-2 disabled:cursor-wait disabled:opacity-70 ${className}`;
     const inner = (
         <>
-            <span className="absolute right-3.5 top-3 rounded-full bg-white/22 px-2.5 py-1 text-[8px] font-extrabold">{badge}</span>
+            <span
+                className={`absolute right-3.5 top-3 z-10 rounded-full bg-white px-2.5 py-1 text-[8px] font-extrabold tracking-wide shadow-sm ${badgeClass}`}
+            >
+                {badge}
+            </span>
             <span className="text-[32px] leading-none">{emoji}</span>
-            <span className="mt-2 text-[15.5px] font-extrabold">{title}</span>
+            <span className="mt-2 pr-24 text-[15.5px] font-extrabold">{title}</span>
             <span className="mt-1 text-[10.5px] leading-relaxed opacity-85">{subtitle}</span>
             <span className="pointer-events-none absolute -bottom-5 -right-3 text-[80px] opacity-15" aria-hidden>
                 {emoji}

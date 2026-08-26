@@ -109,17 +109,30 @@ export default function CourseworkCard({
                 </div>
 
                 {sdgEntries.length > 0 && (
-                    <div className="mt-4 flex flex-wrap items-center gap-2">
-                        <span className="text-[10px] font-black uppercase tracking-widest text-ciel-text-soft">SDGs</span>
+                    <div className="mt-4 flex min-w-0 items-center gap-1.5 overflow-x-auto">
+                        <span className="shrink-0 text-[10px] font-black uppercase tracking-widest text-ciel-text-soft">SDGs</span>
                         {sdgEntries.map((en, i) => {
                             const sdg = sdgData.find((s) => s.number === en.goalNumber);
                             if (!sdg) return null;
+                            const hint = [
+                                `${sdg.number} ${sdg.title}`,
+                                en.targets.length ? en.targets.join(", ") : "",
+                            ]
+                                .filter(Boolean)
+                                .join(" · ");
                             return (
-                                <span key={en.goalNumber} className="flex items-center gap-1.5 rounded-ciel-xs px-2 py-1 text-[10px] font-black text-white" style={{ backgroundColor: sdg.color }}>
-                                    {i === 0 ? <Star className="h-2.5 w-2.5 fill-current" /> : null}
-                                    <span>{sdg.number}</span>
-                                    <span className="hidden sm:inline">{sdg.title.toUpperCase()}</span>
-                                    {en.targets.length ? <span className="font-semibold opacity-90">· {en.targets.join(", ")}</span> : null}
+                                <span
+                                    key={en.goalNumber}
+                                    title={hint}
+                                    className="inline-flex min-w-0 max-w-[9.75rem] shrink-0 items-center gap-1 whitespace-nowrap rounded-ciel-xs px-2 py-1 text-[10px] font-black text-white"
+                                    style={{ backgroundColor: sdg.color }}
+                                >
+                                    {i === 0 ? <Star className="h-2.5 w-2.5 shrink-0 fill-current" /> : null}
+                                    <span className="shrink-0">{sdg.number}</span>
+                                    <span className="min-w-0 truncate">{sdg.title.toUpperCase()}</span>
+                                    {en.targets.length ? (
+                                        <span className="shrink-0 font-semibold opacity-90">· {en.targets.join(", ")}</span>
+                                    ) : null}
                                 </span>
                             );
                         })}

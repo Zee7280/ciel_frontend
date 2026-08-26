@@ -1,9 +1,8 @@
 "use client";
 
-import React from "react";
+import React, { useMemo } from "react";
 import type { ReportCIIauditMeta } from "@/lib/parseCIIauditSummary";
 import { summarizeAuditIssueText } from "@/lib/summarizeRedFlagDetails";
-import { AlertOctagon, AlertTriangle, Info, ListChecks, MessageSquareQuote, ShieldAlert } from "lucide-react";
 import clsx from "clsx";
 
 type Props = {
@@ -11,169 +10,113 @@ type Props = {
     /** When set, shows a short line relating audit to numeric CII. */
     ciiTotalScore?: number;
     className?: string;
+    onTechnicalDetail?: () => void;
 };
 
-function riskStyles(risk: string | null, needsRevision: boolean) {
-    const r = (risk || "").toLowerCase();
-    if (needsRevision || r.includes("reject")) {
-        return {
-            wrap: "border-rose-200 bg-rose-50/90",
-            badge: "bg-rose-600 text-white border-rose-700",
-            label: "text-rose-900",
-        };
-    }
-    if (r.includes("needs revision") || r.includes("needs-revision")) {
-        return {
-            wrap: "border-amber-200 bg-amber-50/90",
-            badge: "bg-amber-600 text-white border-amber-700",
-            label: "text-amber-950",
-        };
-    }
-    if (r.includes("safe")) {
-        return {
-            wrap: "border-emerald-200 bg-emerald-50/80",
-            badge: "bg-emerald-600 text-white border-emerald-700",
-            label: "text-emerald-950",
-        };
-    }
-    return {
-        wrap: "border-slate-200 bg-slate-50/90",
-        badge: "bg-slate-700 text-white border-slate-800",
-        label: "text-slate-900",
-    };
+type HoldingItem = {
+    severity: "Critical" | "Moderate" | "Minor";
+    title: string;
+    body: string;
+    fix?: string;
+};
+
+function splitChunks(text: string | null | undefined): string[] {
+    const summarized = summarizeAuditIssueText(text);
+    if (!summarized) return [];
+    return summarized
+        .split("\n")
+        .map((line) => line.replace(/^\d+\.\s*/, "").trim())
+        .filter(Boolean);
 }
 
-export default function CIIauditInsightsPanel({ audit, ciiTotalScore, className }: Props) {
-    const rs = riskStyles(audit.risk_level, audit.needs_revision);
-    const showCiiHint =
-        typeof ciiTotalScore === "number" &&
-        !Number.isNaN(ciiTotalScore) &&
-        ciiTotalScore < 72;
+function splitTitle(raw: string): { title: string; body: string } {
+    const trimmed = raw.replace(/^[-*•]\s*/, "").trim();
+    const colon = trimmed.match(/^([^:]{8,72}):\s+(.+)$/);
+    if (colon) return { title: colon[1].trim(), body: colon[2].trim() };
+    const sentence = trimmed.match(/^(.{12,90}?[.!?])\s+(.+)$/);
+    if (sentence) return { title: sentence[1].replace(/[.!?]$/, "").trim(), body: sentence[2].trim() };
+    if (trimmed.length > 96) {
+        const cut = trimmed.slice(0, 88);
+        const sp = cut.lastIndexOf(" ");
+        return { title: (sp > 40 ? cut.slice(0, sp) : cut).trim(), body: trimmed };
+    }
+    return { title: trimmed, body: "" };
+}
+
+function extractFix(text: string): { body: string; fix?: string } {
+    const m = text.match(/^(.*?)\s*(?:Fix:\s*)(.+)$/i);
+    if (m) return { body: m[1].trim(), fix: m[2].trim() };
+    return { body: text };
+}
+
+export function buildHoldingItems(audit: ReportCIIauditMeta): HoldingItem[] {
+    const buckets: Array<{ severity: HoldingItem["severity"]; lines: string[] }> = [
+        { severity: "Critical", lines: splitChunks(audit.critical_red_flags) },
+        { severity: "Moderate", lines: splitChunks(audit.moderate_issues) },
+        { severity: "Minor", lines: splitChunks(audit.minor_issues) },
+    ];
+    const fixes = audit.top_fixes.filter((f) => typeof f === "string" && f.trim());
+    const items: HoldingItem[] = [];
+    let fixIdx = 0;
+    for (const bucket of buckets) {
+        for (const line of bucket.lines) {
+            const split = splitTitle(line);
+            const withFix = extractFix(split.body || split.title);
+            const item: HoldingItem = {
+                severity: bucket.severity,
+                title: split.title,
+                body: split.body && withFix.body !== split.title ? withFix.body : withFix.body === split.title ? "" : withFix.body,
+                fix: withFix.fix || (fixes[fixIdx] ? fixes[fixIdx] : undefined),
+            };
+            if (item.fix) fixIdx += 1;
+            items.push(item);
+        }
+    }
+    if (items.length === 0 && fixes.length) {
+        return fixes.map((fix) => ({
+            severity: "Moderate" as const,
+            title: "Recommended fix",
+            body: "",
+            fix,
+        }));
+    }
+    return items;
+}
+
+export default function CIIauditInsightsPanel({ audit, className, onTechnicalDetail }: Props) {
+    const items = useMemo(() => buildHoldingItems(audit), [audit]);
+    if (items.length === 0 && !audit.final_remark) return null;
 
     return (
-        <div
-            className={clsx(
-                "rounded-2xl border shadow-sm overflow-hidden",
-                rs.wrap,
-                className,
-            )}
-        >
-            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 px-5 py-4 border-b border-black/5 bg-white/60">
-                <div className="flex items-start gap-3 min-w-0">
-                    <div className="w-10 h-10 shrink-0 rounded-xl bg-white border border-black/10 flex items-center justify-center text-rose-600 shadow-sm">
-                        <ShieldAlert className="w-5 h-5" />
-                    </div>
-                    <div className="min-w-0 space-y-1">
-                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">
-                            CII transparency
-                        </p>
-                        <h3 className={clsx("text-sm font-black tracking-tight", rs.label)}>
-                            Why your score may be lower — audit red flags
-                        </h3>
-                        <p className="text-[11px] font-medium text-slate-600 leading-snug">
-                            Pulled from your flash-card AI cross-check (hours, activities, outcomes, evidence, SDGs). This
-                            does not replace formal review; it explains common gaps that drag the CII index down.
-                        </p>
-                    </div>
-                </div>
-                <div className="flex flex-wrap items-center gap-2 shrink-0">
-                    {audit.credibility ? (
-                        <span className="inline-flex items-center rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[9px] font-black uppercase tracking-widest text-slate-600">
-                            Credibility: {audit.credibility}
-                        </span>
-                    ) : null}
-                    {audit.risk_level ? (
-                        <span
-                            className={clsx(
-                                "inline-flex items-center rounded-lg border px-2.5 py-1 text-[9px] font-black uppercase tracking-widest",
-                                rs.badge,
-                            )}
-                        >
-                            Risk: {audit.risk_level}
-                        </span>
-                    ) : null}
-                </div>
+        <div id="cer-holding" className={clsx("cer-hold", className)}>
+            <div className="cer-hold-h">
+                <h3>What&apos;s holding the score back</h3>
+                {onTechnicalDetail ? (
+                    <button type="button" className="cer-hold-tech" onClick={onTechnicalDetail}>
+                        Technical detail
+                    </button>
+                ) : null}
             </div>
-
-            {showCiiHint ? (
-                <div className="px-5 py-2.5 border-b border-black/5 bg-white/40 text-[11px] font-semibold text-slate-600 flex gap-2 items-start">
-                    <Info className="w-4 h-4 shrink-0 text-slate-400 mt-0.5" />
-                    <span>
-                        Your current CII-style total is on the lower side ({Math.round(ciiTotalScore)}/100). The items
-                        below are the most likely narrative or evidence mismatches flagged by the auditor prompt.
-                    </span>
+            {items.length ? (
+                <div className="cer-hold-list">
+                    {items.map((item, i) => (
+                        <div key={`${item.severity}-${i}`} className="cer-hold-item">
+                            <span className={clsx("cer-hold-sev", item.severity.toLowerCase())}>{item.severity}</span>
+                            <div className="cer-hold-copy">
+                                <p className="cer-hold-title">{item.title}</p>
+                                {item.body ? <p className="cer-hold-body">{item.body}</p> : null}
+                                {item.fix ? <p className="cer-hold-fix">Fix: {item.fix}</p> : null}
+                            </div>
+                        </div>
+                    ))}
                 </div>
             ) : null}
-
-            <div className="p-5 space-y-4 bg-white/40">
-                {audit.critical_red_flags ? (
-                    <div className="rounded-xl border border-rose-100 bg-rose-50/50 p-4">
-                        <p className="text-[10px] font-black uppercase tracking-widest text-rose-800 mb-2 flex items-center gap-2">
-                            <AlertOctagon className="w-3.5 h-3.5" /> Critical red flags
-                        </p>
-                        <p className="text-xs font-medium text-rose-950/90 leading-relaxed whitespace-pre-wrap">
-                            {summarizeAuditIssueText(audit.critical_red_flags) ?? audit.critical_red_flags}
-                        </p>
-                    </div>
-                ) : null}
-
-                {audit.moderate_issues ? (
-                    <div className="rounded-xl border border-amber-100 bg-amber-50/40 p-4">
-                        <p className="text-[10px] font-black uppercase tracking-widest text-amber-900 mb-2 flex items-center gap-2">
-                            <AlertTriangle className="w-3.5 h-3.5" /> Moderate issues
-                        </p>
-                        <p className="text-xs font-medium text-amber-950/90 leading-relaxed whitespace-pre-wrap">
-                            {summarizeAuditIssueText(audit.moderate_issues) ?? audit.moderate_issues}
-                        </p>
-                    </div>
-                ) : null}
-
-                {audit.minor_issues ? (
-                    <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-4">
-                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-600 mb-2 flex items-center gap-2">
-                            <Info className="w-3.5 h-3.5" /> Minor issues
-                        </p>
-                        <p className="text-xs font-medium text-slate-700 leading-relaxed whitespace-pre-wrap">
-                            {summarizeAuditIssueText(audit.minor_issues) ?? audit.minor_issues}
-                        </p>
-                    </div>
-                ) : null}
-
-                {audit.top_fixes.length > 0 ? (
-                    <div className="rounded-xl border border-slate-200 bg-white p-4">
-                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-3 flex items-center gap-2">
-                            <ListChecks className="w-3.5 h-3.5" /> Top fixes before a stronger CII
-                        </p>
-                        <ol className="list-decimal pl-4 space-y-2 text-xs font-medium text-slate-800 leading-relaxed">
-                            {audit.top_fixes.map((fix, i) => (
-                                <li key={i}>{fix}</li>
-                            ))}
-                        </ol>
-                    </div>
-                ) : null}
-
-                {audit.final_remark ? (
-                    <div className="rounded-xl border border-slate-200 bg-white/80 p-4">
-                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">
-                            Auditor remark
-                        </p>
-                        <p className="text-xs font-medium text-slate-700 leading-relaxed whitespace-pre-wrap">
-                            {audit.final_remark}
-                        </p>
-                    </div>
-                ) : null}
-
-                {audit.student_feedback ? (
-                    <div className="rounded-xl border border-indigo-200 bg-indigo-50/60 p-4">
-                        <p className="text-[10px] font-black uppercase tracking-widest text-indigo-900 mb-2 flex items-center gap-2">
-                            <MessageSquareQuote className="w-3.5 h-3.5" /> Student feedback (revision focus)
-                        </p>
-                        <p className="text-xs font-medium text-indigo-950/90 leading-relaxed whitespace-pre-wrap">
-                            {audit.student_feedback}
-                        </p>
-                    </div>
-                ) : null}
-            </div>
+            {audit.final_remark ? (
+                <div className="cer-hold-note">
+                    <p className="cer-hold-note-k">Auditor&apos;s note</p>
+                    <p className="cer-hold-note-t">{audit.final_remark}</p>
+                </div>
+            ) : null}
         </div>
     );
 }
