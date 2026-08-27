@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { authApiErrorMessage } from "@/utils/authApiError";
 
 export async function POST(request: Request) {
     try {
@@ -19,8 +20,8 @@ export async function POST(request: Request) {
 
         if (!response.ok) {
             return NextResponse.json(
-                { error: data.message || "OTP verification failed" },
-                { status: response.status }
+                { error: authApiErrorMessage(data, "OTP verification failed") },
+                { status: response.status },
             );
         }
 

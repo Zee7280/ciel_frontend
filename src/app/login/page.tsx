@@ -28,6 +28,7 @@ import {
     fetchAndPersistUnreadNotificationsCount,
     roleHasNotificationInbox,
 } from "@/utils/cielNotificationsUnread";
+import { authApiErrorMessage } from "@/utils/authApiError";
 
 function toRecord(value: unknown): Record<string, unknown> | null {
     if (!value || typeof value !== "object" || Array.isArray(value)) return null;
@@ -298,9 +299,9 @@ function LoginContent() {
             // or legacy format which might return data directly
             const isStandardResponse = jsonResponse.success !== undefined;
 
-            if (!response.ok || (isStandardResponse && !jsonResponse.success) || jsonResponse.error) {
+            if (!response.ok || (isStandardResponse && jsonResponse.success === false)) {
                 console.error("Login failed response:", jsonResponse);
-                setError(jsonResponse.message || jsonResponse.error || "Invalid email or password");
+                setError(authApiErrorMessage(jsonResponse, "Invalid email or password"));
                 return;
             }
 
@@ -531,6 +532,14 @@ function LoginContent() {
                                         <span>
                                             Your university or corporate account was created. After you sign in, you will
                                             complete the one-time membership fee (or wait for an admin to activate you).
+                                        </span>
+                                    </div>
+                                )}
+                                {searchParams.get("signup") === "success" && (
+                                    <div className="mb-6 flex items-start gap-3 rounded-2xl border border-emerald-100 bg-emerald-50/90 p-4 text-left text-xs font-semibold text-emerald-900">
+                                        <CheckCircle className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
+                                        <span>
+                                            Account created. Sign in with the same email and password to continue.
                                         </span>
                                     </div>
                                 )}

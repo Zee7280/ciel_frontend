@@ -17,6 +17,7 @@ import { LEGAL_REGISTRATION_TYPES, ORGANIZATION_CATEGORIES } from "@/utils/organ
 import { isPersonalEmailDomain } from "@/utils/personalEmailDomains";
 import RoleTile from "@/components/ciel/RoleTile";
 import PasswordStrengthMeter from "@/components/ciel/PasswordStrengthMeter";
+import { authApiErrorMessage, isSignupEmailUnverifiedMessage } from "@/utils/authApiError";
 
 import { Suspense } from "react";
 
@@ -118,7 +119,7 @@ function SignUpContent() {
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
         if (isOrgRole) {
-            if (!formData.orgName.trim()) newErrors.orgName = "Organization name is required";
+            if (!formData.orgName.trim()) newErrors.orgName = "Org name is required";
             if (!formData.contactPerson.trim()) newErrors.contactPerson = "Contact person is required";
             if (!formData.organizationCategory.trim()) newErrors.organizationCategory = "Organization type is required";
             if (!formData.legalRegistrationType.trim()) newErrors.legalRegistrationType = "Legal registration type is required";
@@ -200,7 +201,7 @@ function SignUpContent() {
                 body: JSON.stringify({ email: normalizedEmail }),
             });
             const data = await res.json();
-            if (!res.ok) throw new Error(data.error || "Failed to send code");
+            if (!res.ok) throw new Error(authApiErrorMessage(data, "Failed to send code"));
 
             setOtpDigits(["", "", "", "", "", ""]);
             setOtpError(null);
@@ -229,10 +230,12 @@ function SignUpContent() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ email: normalizedEmail, otp }),
             });
-            const verifyData = await verifyRes.json();
-            if (!verifyRes.ok) throw new Error(verifyData.error || "That code is invalid or expired");
+            const verifyData = await verifyRes.json().catch(() => ({}));
+            const verifyFailedMessage = verifyRes.ok
+                ? ""
+                : authApiErrorMessage(verifyData, "That code is invalid or expired");
 
-            const { phoneCountryKey, ...signupFields } = formData;
+            const { phoneCountryKey, token: _inviteToken, ...signupFields } = formData;
             const signupRes = await fetch("/api/v1/auth/signup", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -241,11 +244,23 @@ function SignUpContent() {
                     countryCode: dialFromPhoneCountryKey(phoneCountryKey),
                     email: normalizedEmail,
                     role,
+                    name: isOrgRole ? formData.contactPerson.trim() : formData.name.trim(),
+                    orgName: formData.orgName.trim(),
+                    contactPerson: isOrgRole ? formData.contactPerson.trim() : formData.contactPerson,
+                    university:
+                        role === "student" || role === "faculty"
+                            ? formData.institution.trim()
+                            : undefined,
+                    faculty_department: role === "faculty" ? formData.department.trim() : undefined,
                 }),
             });
             if (!signupRes.ok) {
-                const err = await signupRes.json();
-                throw new Error(err.message || err.error || "Signup failed");
+                const err = await signupRes.json().catch(() => ({}));
+                const signupMsg = authApiErrorMessage(err, "Signup failed");
+                if (verifyFailedMessage && isSignupEmailUnverifiedMessage(signupMsg)) {
+                    throw new Error(verifyFailedMessage);
+                }
+                throw new Error(signupMsg);
             }
             const signupData = await signupRes.json();
             const createdUser = signupData?.data?.user ?? signupData?.user;
@@ -414,18 +429,18 @@ function SignUpContent() {
                                         <div key={role} className="ciel-crossfade-enter space-y-5">
                                             <div className="space-y-1.5">
                                                 <label className="text-[11px] font-bold uppercase tracking-widest text-ciel-text-soft ml-1">
-                                                    {role === "university" ? "Institution name" : role === "corporate" ? "Company name" : "Organization name"}
+                                                    Org name
                                                 </label>
                                                 {role === "university" ? (
                                                     <div className="relative">
-                                                        <select value={formData.orgName} onChange={(e) => handleGenericChange("orgName", e.target.value)} aria-invalid={!!errors.orgName} aria-label="Institution name" className={selectClass(!!errors.orgName)}>
-                                                            <option value="">Select institution</option>
+                                                        <select value={formData.orgName} onChange={(e) => handleGenericChange("orgName", e.target.value)} aria-invalid={!!errors.orgName} aria-label="Org name" className={selectClass(!!errors.orgName)}>
+                                                            <option value="">Select org name</option>
                                                             {pakistaniUniversities.map((u) => <option key={u} value={u}>{u}</option>)}
                                                         </select>
                                                         <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-ciel-text-soft" aria-hidden />
                                                     </div>
                                                 ) : (
-                                                    <input type="text" value={formData.orgName} onChange={(e) => handleGenericChange("orgName", e.target.value)} className={fieldClass(!!errors.orgName)} placeholder="e.g. Hope Foundation" />
+                                                    <input type="text" value={formData.orgName} onChange={(e) => handleGenericChange("orgName", e.target.value)} className={fieldClass(!!errors.orgName)} placeholder="e.g. Hope Foundation" aria-label="Org name" />
                                                 )}
                                                 {errors.orgName && <p className="text-[11px] text-red-500 font-semibold ml-1">{errors.orgName}</p>}
                                             </div>

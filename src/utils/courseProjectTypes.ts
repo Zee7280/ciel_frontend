@@ -281,7 +281,6 @@ export function stripBoldMarkup(text: string): string {
 
 /** Composed from the student's own answers — not a generic template. Shared by the wizard's review step and the flash card. */
 export function composeCourseProjectSummaries(entry: CourseProjectEntry): CourseProjectSectionSummaries {
-    const inc: CourseProjectModuleInclusion = entry.moduleInclusion || {};
     const si = entry.studentInfo || {};
     const ai = entry.assignmentInfo || {};
     const am = entry.aimsInfo || {};
@@ -315,7 +314,7 @@ export function composeCourseProjectSummaries(entry: CourseProjectEntry): Course
     // BENEFICIARY_OPTIONS carry no emoji prefix — no stripEmoji (it would mistake "Environment" in
     // "Environment / ecosystems" for an emoji token and strip it).
     const benef = (am.beneficiaries || []).filter((b) => b && !/no specific/i.test(b)).map((b) => b.toLowerCase());
-    s.aims = inc.aim && (am.aimStatement || objs.length)
+    s.aims = (am.aimStatement || objs.length)
         ? `${cap(My)} aim was to <b>${am.aimStatement ? lc(am.aimStatement) : "—"}</b>${objs.length ? `. ${W} set out to: ${objs.map((o, i) => `(${i + 1}) ${lc(o)}`).join("; ")}` : ""}${benef.length ? `. ${W} hoped it would benefit ${benef.join(", ").toLowerCase()}` : ""}.${note(am.notes)}`
         : "";
 
@@ -324,21 +323,21 @@ export function composeCourseProjectSummaries(entry: CourseProjectEntry): Course
     const noFormalMethod = (pr.methods || []).some((m) => /not applicable/i.test(m));
     // STAKEHOLDER_OPTIONS carry no emoji prefix — no stripEmoji, same reasoning as beneficiaries above.
     const stakeholders = (pr.stakeholders || []).filter((x) => !/no external/i.test(x)).map((x) => x.toLowerCase());
-    s.process = (inc.act && acts.length) || (inc.meth && (meths.length || pr.sampleScale || noFormalMethod))
-        ? `${inc.act && acts.length ? `${W} worked through <b>${joinList(acts)}</b>. ` : ""}${inc.meth && meths.length ? `${cap(My)} methods: ${joinList(meths)}. ` : inc.meth && noFormalMethod ? `${W} used no formal research method — this was practice-led work. ` : ""}${inc.meth && pr.sampleScale ? `The scale of ${My} work: <b>${pr.sampleScale}</b>. ` : ""}${stakeholders.length ? `Along the way ${Wl} engaged ${stakeholders.join(", ").toLowerCase()}.` : ""}${note(pr.notes)}`
+    s.process = acts.length || meths.length || pr.sampleScale || noFormalMethod || stakeholders.length
+        ? `${acts.length ? `${W} worked through <b>${joinList(acts)}</b>. ` : ""}${meths.length ? `${cap(My)} methods: ${joinList(meths)}. ` : noFormalMethod ? `${W} used no formal research method — this was practice-led work. ` : ""}${pr.sampleScale ? `The scale of ${My} work: <b>${pr.sampleScale}</b>. ` : ""}${stakeholders.length ? `Along the way ${Wl} engaged ${stakeholders.join(", ").toLowerCase()}.` : ""}${note(pr.notes)}`
         : "";
 
     const outs = (re.outputs || []).map(stripEmoji).map((x) => x.toLowerCase());
     const finds = (re.findings || []).filter(Boolean);
     const metricLines = (re.metrics || []).map(courseProjectMetricLine).filter(Boolean);
-    const legacyEvidenceLine = (inc.res ?? inc.imp) && !metricLines.length && re.evidenceStatus
+    const legacyEvidenceLine = !metricLines.length && re.evidenceStatus
         ? ` ${W} noted evidence status: ${re.evidenceStatus}${re.metricName && re.metricValue ? ` — ${re.metricName}: ${re.metricValue}${re.metricUnit || ""}${re.numberRepresents ? ` (${re.numberRepresents.toLowerCase()})` : ""}` : ""}.`
         : "";
     const resultsLine = metricLines.length ? ` ${cap(My)} results: ${metricLines.join(" · ")}.` : legacyEvidenceLine;
     const recs = (re.recommendations || []).filter(Boolean);
     const limitationLabel = re.limitationType === "Other — describe below" ? re.limitationOther : re.limitationType;
     s.results = outs.length || re.outputDescription
-        ? `${W} produced <b>${outs.length ? joinList(outs) : "—"}</b>${re.outputDescription ? ` — ${lc(re.outputDescription)}` : ""}.${inc.find && finds.length ? ` ${W} found that ${finds.map((f, i) => `(${i + 1}) ${lc(f)}`).join("; ")}.` : ""}${resultsLine}${(inc.res ?? inc.imp) && re.measurableImpact ? ` Measured impact: ${lc(re.measurableImpact)}.` : ""}${inc.lim && limitationLabel ? ` ${W} acknowledge the main limitation honestly: ${lc(limitationLabel)}${re.limitationDetail ? ` — ${lc(re.limitationDetail)}` : ""}${re.limitationInterpretation ? ` — ${lc(re.limitationInterpretation)}` : ""}.` : ""}${recs.length ? ` Based on this, ${Wl} recommend: ${recs.map(lc).join("; ")}.` : ""}${re.resultsSummary ? ` <b>In ${My} own words:</b> ${stripPeriod(re.resultsSummary)}.` : ""}${note(re.notes)}`
+        ? `${W} produced <b>${outs.length ? joinList(outs) : "—"}</b>${re.outputDescription ? ` — ${lc(re.outputDescription)}` : ""}.${finds.length ? ` ${W} found that ${finds.map((f, i) => `(${i + 1}) ${lc(f)}`).join("; ")}.` : ""}${resultsLine}${re.measurableImpact ? ` Measured impact: ${lc(re.measurableImpact)}.` : ""}${limitationLabel ? ` ${W} acknowledge the main limitation honestly: ${lc(limitationLabel)}${re.limitationDetail ? ` — ${lc(re.limitationDetail)}` : ""}${re.limitationInterpretation ? ` — ${lc(re.limitationInterpretation)}` : ""}.` : ""}${recs.length ? ` Based on this, ${Wl} recommend: ${recs.map(lc).join("; ")}.` : ""}${re.resultsSummary ? ` <b>In ${My} own words:</b> ${stripPeriod(re.resultsSummary)}.` : ""}${note(re.notes)}`
         : "";
 
     const entries = sm.entries || [];
@@ -395,13 +394,8 @@ export const SECTION_LABELS: Record<keyof CourseProjectSectionSummaries, { emoji
     reflection: { emoji: "💡", label: "Reflection" },
 };
 
-export function activeSectionKeys(entry: CourseProjectEntry): (keyof CourseProjectSectionSummaries)[] {
-    const inc = entry.moduleInclusion || {};
-    const keys: (keyof CourseProjectSectionSummaries)[] = ["course", "assignment"];
-    if (inc.aim) keys.push("aims");
-    if (inc.act || inc.meth) keys.push("process");
-    keys.push("results", "sdg", "reflection");
-    return keys;
+export function activeSectionKeys(_entry?: CourseProjectEntry): (keyof CourseProjectSectionSummaries)[] {
+    return ["course", "assignment", "aims", "process", "results", "sdg", "reflection"];
 }
 
 /** Primary SDG is always entries[0] — helper for display code that wants it explicitly. */

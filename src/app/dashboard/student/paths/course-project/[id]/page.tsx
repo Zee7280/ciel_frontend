@@ -68,13 +68,13 @@ const FORMAT_OPTIONS = [
     "✍️ Other",
 ];
 
-const INC_TILES: { key: keyof CourseProjectModuleInclusion; emoji: string; label: string }[] = [
-    { key: "aim", emoji: "🎯", label: "Aim & objectives" },
-    { key: "act", emoji: "🛠️", label: "Activities" },
-    { key: "meth", emoji: "🔬", label: "Method / research" },
-    { key: "find", emoji: "📊", label: "Findings" },
-    { key: "res", emoji: "📏", label: "Results & evidence" },
-    { key: "lim", emoji: "⚠️", label: "Limitations" },
+const INC_TILES: { key: keyof CourseProjectModuleInclusion; emoji: string; label: string; idleClass: string; onClass: string }[] = [
+    { key: "aim", emoji: "🎯", label: "Aim & objectives", idleClass: "border-ciel-green/35 bg-ciel-green-soft/50 text-ciel-green-deep", onClass: "border-ciel-green bg-ciel-green-soft text-ciel-green-deep" },
+    { key: "act", emoji: "🛠️", label: "Activities", idleClass: "border-ciel-purple/35 bg-ciel-purple-soft/70 text-ciel-purple-deep", onClass: "border-ciel-purple bg-ciel-purple-soft text-ciel-purple-deep" },
+    { key: "meth", emoji: "🔬", label: "Method / research", idleClass: "border-ciel-indigo/35 bg-ciel-indigo-soft/70 text-ciel-indigo", onClass: "border-ciel-indigo bg-ciel-indigo-soft text-ciel-indigo" },
+    { key: "find", emoji: "📊", label: "Findings", idleClass: "border-ciel-green/35 bg-ciel-green-soft/50 text-ciel-green-deep", onClass: "border-ciel-green bg-ciel-green-soft text-ciel-green-deep" },
+    { key: "res", emoji: "📏", label: "Results & evidence", idleClass: "border-ciel-purple/35 bg-ciel-purple-soft/70 text-ciel-purple-deep", onClass: "border-ciel-purple bg-ciel-purple-soft text-ciel-purple-deep" },
+    { key: "lim", emoji: "⚠️", label: "Limitations", idleClass: "border-ciel-gold/40 bg-ciel-gold-soft/70 text-ciel-gold-deep", onClass: "border-ciel-gold bg-ciel-gold-soft text-ciel-gold-deep" },
 ];
 
 const ACTIVITY_OPTIONS = ["🔍 Research & reading", "📊 Data collection", "🎨 Designing / creating", "🧩 Ideation / concepts", "🧪 Testing / experimenting", "🧱 Building / making", "🖥 Coding / development", "👀 Observation / site visit", "🤝 Working with an organisation", "📣 Running a campaign / event", "🎤 Presenting / pitching", "✍️ Drafting & editing", "🎬 Filming / recording", "📐 Modelling / simulation", "🔬 Lab / practical work", "👥 Stakeholder engagement", "🎭 Performance / exhibition", "📚 Teaching / facilitating", "🧠 Analysis / evaluation"];
@@ -711,17 +711,15 @@ export default function CourseProjectWizardPage() {
         ["Course", [entry.course, entry.studentInfo?.programme, entry.studentInfo?.semester].filter(Boolean).join(" · ") || "—"],
         ["Coursework", [entry.projectTitle, allFormats.join(" + "), teamMode].filter(Boolean).join(" · ") || "—"],
         ["Format", allFormats.join(" + ") || "—"],
-        ["Aim", inc.aim ? entry.aimsInfo?.aimStatement || "—" : "Not applicable to this format"],
-        ["Activities", inc.act ? (entry.processInfo?.activities ?? []).join(" · ") || "—" : "Not applicable to this format"],
+        ["Aim", entry.aimsInfo?.aimStatement || "—"],
+        ["Activities", (entry.processInfo?.activities ?? []).join(" · ") || "—"],
         ["Main output", entry.resultsInfo?.outputDescription || "—"],
         ["Key insight", entry.resultsInfo?.findings?.[0] || "—"],
         [
             "Evidence status",
-            (inc.res ?? inc.imp)
-                ? metricLines.join(" · ") ||
-                  entry.resultsInfo?.evidenceStatus ||
-                  (/Yes|Partly/.test(entry.resultsInfo?.measured ?? "") ? "—" : entry.resultsInfo?.measured ? "Findings only — no measured result claimed" : "—")
-                : "Not applicable to this format",
+            metricLines.join(" · ") ||
+              entry.resultsInfo?.evidenceStatus ||
+              (/Yes|Partly/.test(entry.resultsInfo?.measured ?? "") ? "—" : entry.resultsInfo?.measured ? "Findings only — no measured result claimed" : "—"),
         ],
         ["Limitation", entry.resultsInfo?.limitationType || "—"],
         [
@@ -784,37 +782,50 @@ export default function CourseProjectWizardPage() {
             ) : null}
 
             {!showCard && (
-            <div className="rounded-ciel-lg border border-ciel-border bg-white p-5 sm:p-6">
+            <>
                 {entry.facultyApprovalStatus !== "approved" && entry.facultyApprovalNote ? (
-                    <div className="mb-5 rounded-ciel-sm border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-relaxed text-amber-900">
+                    <div className="mb-4 rounded-ciel-sm border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-relaxed text-amber-900">
                         <b>Changes requested by {entry.studentInfo?.teacherName || "your supervisor"}.</b>{" "}
                         {entry.facultyApprovalNote} Fix and resubmit — nothing is penalised.
                     </div>
                 ) : null}
-                <div className="flex flex-wrap items-center gap-2">
-                    {STEPS.map((s, i) => (
-                        <div key={s.key} className="flex flex-1 items-center gap-2">
-                            <button
-                                type="button"
-                                onClick={() => i <= entry.stepCompleted && setStep(i)}
-                                disabled={i > entry.stepCompleted}
-                                className={clsx(
-                                    "flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-xs font-black ciel-transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ciel-gold",
-                                    i === step ? "bg-ciel-gold text-white" : i < entry.stepCompleted ? "bg-ciel-green-soft text-ciel-green-deep" : "bg-ciel-page text-ciel-text-soft",
-                                )}
-                                title={stepLabels[i]}
-                            >
-                                {i < entry.stepCompleted ? <CheckCircle2 className="h-4 w-4" /> : i + 1}
-                            </button>
-                            <span className={clsx("hidden text-xs font-bold sm:block", i === step ? "text-ciel-text" : "text-ciel-text-soft")}>
-                                {s.emoji} {stepLabels[i]}
-                            </span>
-                            {i < STEPS.length - 1 && <div className="h-px flex-1 bg-ciel-border" />}
-                        </div>
-                    ))}
+                <div className="sticky top-16 z-20 -mx-1 mb-4 bg-slate-50/95 py-2 backdrop-blur-md lg:top-20">
+                    <div className="flex gap-1.5 overflow-x-auto pb-1 [scrollbar-width:thin]">
+                        {STEPS.map((s, i) => {
+                            const isCurrent = i === step;
+                            const isDone = i < entry.stepCompleted && !isCurrent;
+                            return (
+                                <button
+                                    key={s.key}
+                                    type="button"
+                                    onClick={() => setStep(i)}
+                                    title={stepLabels[i]}
+                                    className={clsx(
+                                        "min-w-[5.35rem] flex-1 rounded-[11px] border-[1.5px] px-1.5 py-2 text-center ciel-transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ciel-gold",
+                                        isCurrent
+                                            ? "border-ciel-gold bg-ciel-gold-soft"
+                                            : isDone
+                                              ? "border-[#bfe8cc] bg-ciel-green-soft"
+                                              : "border-ciel-border bg-white hover:border-ciel-gold/50",
+                                    )}
+                                >
+                                    <div className="text-[15px] leading-none">{isDone ? "✓" : s.emoji}</div>
+                                    <div
+                                        className={clsx(
+                                            "mt-1 text-[8.5px] font-extrabold uppercase tracking-wide",
+                                            isCurrent ? "text-ciel-gold-deep" : "text-ciel-text-soft",
+                                        )}
+                                    >
+                                        {stepLabels[i]}
+                                    </div>
+                                </button>
+                            );
+                        })}
+                    </div>
                 </div>
 
-                <div className="mt-6 space-y-5">
+            <div className="rounded-ciel-lg border border-ciel-border bg-white p-5 sm:p-6">
+                <div className="space-y-5">
                     {step === 0 && (
                         <>
                             <Field label="Your name">
@@ -970,11 +981,12 @@ export default function CourseProjectWizardPage() {
                                             type="button"
                                             onClick={() => setEntry((e) => ({ ...e, moduleInclusion: { ...e.moduleInclusion, [t.key]: !e.moduleInclusion?.[t.key] } }))}
                                             className={clsx(
-                                                "ciel-transition flex items-center gap-2 rounded-ciel-sm border-2 px-3 py-2.5 text-xs font-bold",
-                                                inc[t.key] ? "border-ciel-teal bg-ciel-teal-soft text-ciel-teal" : "border-ciel-border text-ciel-text-mid",
+                                                "ciel-transition rounded-[11px] border-[1.5px] px-3 py-3 text-center",
+                                                inc[t.key] ? `${t.onClass} shadow-sm ring-2 ring-current/15` : t.idleClass,
                                             )}
                                         >
-                                            <span>{t.emoji}</span> {t.label}
+                                            <span className="block text-[15px] leading-none">{t.emoji}</span>
+                                            <span className="mt-1.5 block text-[11px] font-extrabold leading-snug">{t.label}</span>
                                         </button>
                                     ))}
                                 </div>
@@ -993,7 +1005,6 @@ export default function CourseProjectWizardPage() {
                     )}
 
                     {step === 2 && (
-                        inc.aim ? (
                             <>
                                 <Field label={`${routeMode?.aimL ?? "The overall aim"} (one line)`}>
                                     <input type="text" value={entry.aimsInfo?.aimStatement ?? ""} onChange={(e) => patchGroup("aimsInfo", { aimStatement: e.target.value })} placeholder={routeMode?.aimPh ?? "e.g. Develop a practical strategy to reduce cafeteria waste"} className={fieldClass} />
@@ -1037,50 +1048,36 @@ export default function CourseProjectWizardPage() {
                                 </Field>
                                 <SectionSummaryBox text={sums.aims} />
                             </>
-                        ) : (
-                            <p className="rounded-ciel-sm bg-ciel-page px-4 py-6 text-center text-sm font-semibold text-ciel-text-soft">
-                                Not applicable for this format — go back to step 2 to turn it on if that&apos;s wrong.
-                            </p>
-                        )
                     )}
 
                     {step === 3 && (
                         <>
-                            {inc.act && (
-                                <Field label="Activities conducted" hint="Tap all that apply.">
-                                    <ChipGroup
-                                        options={ACTIVITY_OPTIONS}
-                                        selected={entry.processInfo?.activities ?? []}
-                                        onToggle={(v) => {
-                                            const cur = entry.processInfo?.activities ?? [];
-                                            patchGroup("processInfo", { activities: cur.includes(v) ? cur.filter((x) => x !== v) : [...cur, v] });
-                                        }}
-                                        otherValue={entry.processInfo?.activitiesOther}
-                                        onOtherChange={(v) => patchGroup("processInfo", { activitiesOther: v })}
-                                        otherPlaceholder="What else did you do?"
-                                    />
-                                </Field>
-                            )}
-                            {inc.meth && (
-                                <Field label="🔬 Research / method used" hint="Tap all that apply — “Not applicable” is a valid answer.">
-                                    <ChipGroup
-                                        options={METHOD_OPTIONS}
-                                        selected={entry.processInfo?.methods ?? []}
-                                        onToggle={(v) => {
-                                            const cur = entry.processInfo?.methods ?? [];
-                                            patchGroup("processInfo", { methods: cur.includes(v) ? cur.filter((x) => x !== v) : [...cur, v] });
-                                        }}
-                                        otherValue={entry.processInfo?.methodsOther}
-                                        onOtherChange={(v) => patchGroup("processInfo", { methodsOther: v })}
-                                        otherPlaceholder="Your method"
-                                    />
-                                </Field>
-                            )}
-                            {!inc.act && !inc.meth && (
-                                <p className="rounded-ciel-sm bg-ciel-page px-4 py-3 text-center text-xs font-semibold text-ciel-text-soft">
-                                    Activities and methods aren&apos;t usually needed for this format — go back to step 2 to turn them on if that&apos;s wrong.
-                                </p>
-                            )}
+                            <Field label="Activities conducted" hint="Tap all that apply.">
+                                <ChipGroup
+                                    options={ACTIVITY_OPTIONS}
+                                    selected={entry.processInfo?.activities ?? []}
+                                    onToggle={(v) => {
+                                        const cur = entry.processInfo?.activities ?? [];
+                                        patchGroup("processInfo", { activities: cur.includes(v) ? cur.filter((x) => x !== v) : [...cur, v] });
+                                    }}
+                                    otherValue={entry.processInfo?.activitiesOther}
+                                    onOtherChange={(v) => patchGroup("processInfo", { activitiesOther: v })}
+                                    otherPlaceholder="What else did you do?"
+                                />
+                            </Field>
+                            <Field label="🔬 Research / method used" hint="Tap all that apply — “Not applicable” is a valid answer.">
+                                <ChipGroup
+                                    options={METHOD_OPTIONS}
+                                    selected={entry.processInfo?.methods ?? []}
+                                    onToggle={(v) => {
+                                        const cur = entry.processInfo?.methods ?? [];
+                                        patchGroup("processInfo", { methods: cur.includes(v) ? cur.filter((x) => x !== v) : [...cur, v] });
+                                    }}
+                                    otherValue={entry.processInfo?.methodsOther}
+                                    onOtherChange={(v) => patchGroup("processInfo", { methodsOther: v })}
+                                    otherPlaceholder="Your method"
+                                />
+                            </Field>
                             <Field label="Scale / scope of the work" hint="Taps only — this is a class assignment, not a PhD; “not applicable” is a complete answer.">
                                 <ScaleBuilder value={entry.processInfo?.sampleScale ?? ""} onChange={(v) => patchGroup("processInfo", { sampleScale: v })} />
                             </Field>
@@ -1135,9 +1132,8 @@ export default function CourseProjectWizardPage() {
                                 </Field>
                             </div>
 
-                            {inc.find && (
-                                <div className="space-y-3">
-                                    <p className="text-xs font-black uppercase tracking-widest text-ciel-text-soft">B · What you found <span className="normal-case font-semibold text-ciel-text-soft/80">(up to 5 — a finding doesn&apos;t have to be numerical)</span></p>
+                            <div className="space-y-3">
+                                <p className="text-xs font-black uppercase tracking-widest text-ciel-text-soft">B · What you found <span className="normal-case font-semibold text-ciel-text-soft/80">(up to 5 — a finding doesn&apos;t have to be numerical)</span></p>
                                     <Field label={routeMode?.fndL ?? "Most important findings, conclusions or insights"}>
                                         <div className="space-y-2">
                                             {(entry.resultsInfo?.findings ?? [""]).map((f, i) => (
@@ -1161,23 +1157,19 @@ export default function CourseProjectWizardPage() {
                                             )}
                                         </div>
                                     </Field>
-                                </div>
-                            )}
+                            </div>
 
-                            {(inc.res ?? inc.imp) && (
-                                <div className="space-y-3">
-                                    <p className="text-xs font-black uppercase tracking-widest text-ciel-text-soft">C · Your numbers — did anything countable come out of this work? <span className="font-semibold normal-case tracking-normal text-ciel-text-soft">(most class assignments have one number at most — that&apos;s normal)</span></p>
-                                    <ChipSingle options={MEASURED_OPTIONS} value={entry.resultsInfo?.measured} onChange={(v) => patchGroup("resultsInfo", { measured: v })} />
-                                    <p className="text-xs text-ciel-text-soft">💡 &ldquo;Yes&rdquo; means something was really counted or observed — a survey %, a temperature, attendance. A hope or a plan isn&apos;t a result yet, and &ldquo;findings only&rdquo; is an honest, full answer. Each number needs just 3 taps: what, how much, real-or-planned. Everything else is optional.</p>
-                                    {/Yes|Partly/.test(entry.resultsInfo?.measured ?? "") && (
-                                        <MetricsBuilder metrics={entry.resultsInfo?.metrics ?? []} onChange={(next) => patchGroup("resultsInfo", { metrics: next })} />
-                                    )}
-                                </div>
-                            )}
+                            <div className="space-y-3">
+                                <p className="text-xs font-black uppercase tracking-widest text-ciel-text-soft">C · Your numbers — did anything countable come out of this work? <span className="font-semibold normal-case tracking-normal text-ciel-text-soft">(most class assignments have one number at most — that&apos;s normal)</span></p>
+                                <ChipSingle options={MEASURED_OPTIONS} value={entry.resultsInfo?.measured} onChange={(v) => patchGroup("resultsInfo", { measured: v })} />
+                                <p className="text-xs text-ciel-text-soft">💡 &ldquo;Yes&rdquo; means something was really counted or observed — a survey %, a temperature, attendance. A hope or a plan isn&apos;t a result yet, and &ldquo;findings only&rdquo; is an honest, full answer. Each number needs just 3 taps: what, how much, real-or-planned. Everything else is optional.</p>
+                                {/Yes|Partly/.test(entry.resultsInfo?.measured ?? "") && (
+                                    <MetricsBuilder metrics={entry.resultsInfo?.metrics ?? []} onChange={(next) => patchGroup("resultsInfo", { metrics: next })} />
+                                )}
+                            </div>
 
-                            {inc.lim && (
-                                <div className="space-y-3">
-                                    <p className="text-xs font-black uppercase tracking-widest text-ciel-text-soft">D · Limitations — what could and couldn&apos;t be concluded?</p>
+                            <div className="space-y-3">
+                                <p className="text-xs font-black uppercase tracking-widest text-ciel-text-soft">D · Limitations — what could and couldn&apos;t be concluded?</p>
                                     <Field label="Main limitation">
                                         <select
                                             value={LIMITATION_OPTIONS.includes(entry.resultsInfo?.limitationType ?? "") ? entry.resultsInfo?.limitationType : entry.resultsInfo?.limitationType ? "Other — describe below" : ""}
@@ -1199,8 +1191,7 @@ export default function CourseProjectWizardPage() {
                                     <Field label="How should this limitation be considered when reading your results?" hint="One sentence.">
                                         <input type="text" value={entry.resultsInfo?.limitationInterpretation ?? ""} onChange={(e) => patchGroup("resultsInfo", { limitationInterpretation: e.target.value })} placeholder="e.g. The findings show interest in change but can't confirm actual plastic use decreased" className={fieldClass} />
                                     </Field>
-                                </div>
-                            )}
+                            </div>
 
                             <div className="space-y-3">
                                 <p className="text-xs font-black uppercase tracking-widest text-ciel-text-soft">E · Recommendations — what should happen next? <span className="normal-case font-semibold text-ciel-text-soft/80">(optional, up to 3)</span></p>
@@ -1352,7 +1343,7 @@ export default function CourseProjectWizardPage() {
                                         ↻ Regenerate all
                                     </button>
                                 </div>
-                                <p className="text-xs text-ciel-text-soft">🗣️ Everything below is assembled <b>from what you wrote — in your voice, not the computer&apos;s</b>. Read it as your teacher will; edit any section until it sounds like you. Only the sections your format used appear below. Accept each, edit inline, or reset — your teacher sees only what you approve.</p>
+                                <p className="text-xs text-ciel-text-soft">🗣️ Everything below is assembled <b>from what you wrote — in your voice, not the computer&apos;s</b>. Read it as your teacher will; edit any section until it sounds like you. Accept each, edit inline, or reset — your teacher sees only what you approve.</p>
 
                                 <div className="flex items-center gap-3">
                                     <div className="h-2 flex-1 overflow-hidden rounded-full bg-ciel-border">
@@ -1459,6 +1450,7 @@ export default function CourseProjectWizardPage() {
                     </div>
                 </div>
             </div>
+            </>
             )}
 
             {!showCard && (
