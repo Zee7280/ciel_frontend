@@ -5,7 +5,7 @@ function resolveBackendStudentCreateUrl(): string | null {
     if (!raw) return null;
     const base = raw.replace(/\/+$/, "");
     const withV1 = base.endsWith("/api/v1") ? base : `${base}/api/v1`;
-    return `${withV1}/student/opportunities`;
+    return `${withV1}/student/opportunity`;
 }
 
 export async function POST(request: Request) {

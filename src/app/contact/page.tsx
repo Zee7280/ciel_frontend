@@ -27,7 +27,7 @@ export default function ContactPage() {
 
         try {
             const backendUrl = process.env.NEXT_PUBLIC_BACKEND_BASE_URL;
-            const response = await fetch(`${backendUrl}/public/contact/send`, {
+            const response = await fetch(`${backendUrl}/contact/send`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(formData)
