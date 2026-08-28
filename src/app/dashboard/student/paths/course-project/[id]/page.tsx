@@ -15,6 +15,7 @@ import SearchableSelect from "@/components/ui/SearchableSelect";
 import CourseworkCard from "@/components/ciel/CourseworkCard";
 import { TeamInviteBadge } from "@/components/ciel/TeamInviteBadge";
 import RichSummaryText from "@/components/ciel/RichSummaryText";
+import { courseworkStatusLabel } from "@/utils/courseworkSectionReview";
 import {
     type CourseProjectEntry,
     type CourseProjectModuleInclusion,
@@ -785,7 +786,7 @@ export default function CourseProjectWizardPage() {
             <>
                 {entry.facultyApprovalStatus !== "approved" && entry.facultyApprovalNote ? (
                     <div className="mb-4 rounded-ciel-sm border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-relaxed text-amber-900">
-                        <b>Changes requested by {entry.studentInfo?.teacherName || "your supervisor"}.</b>{" "}
+                        <b>{courseworkStatusLabel(entry).label} by {entry.studentInfo?.teacherName || "your supervisor"}.</b>{" "}
                         {entry.facultyApprovalNote} Fix and resubmit — nothing is penalised.
                     </div>
                 ) : null}

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { CheckCircle2, Sparkles, Users, ChevronDown, Star, Paperclip, ShieldAlert, Clock } from "lucide-react";
+import { CheckCircle2, Sparkles, Users, ChevronDown, Star, Paperclip, ShieldAlert, AlertTriangle, Clock } from "lucide-react";
 import clsx from "clsx";
 import { sdgData } from "@/utils/sdgData";
 import RichSummaryText from "@/components/ciel/RichSummaryText";
@@ -13,7 +13,11 @@ import {
     SECTION_LABELS,
     stripEmoji,
     normalizeGroupMembers,
+    rankMovement,
 } from "@/utils/courseProjectTypes";
+import { courseworkStatusLabel } from "@/utils/courseworkSectionReview";
+
+const BADGE_EMOJI: Record<string, string> = { Gold: "🥇", Silver: "🥈", Bronze: "🥉", Participant: "🎖️" };
 
 function formatBadgeEmoji(format?: string) {
     if (!format) return "📄";
@@ -34,7 +38,7 @@ export default function CourseworkCard({
     /** Override for the ribbon's student name display (e.g. on a faculty/university deck showing someone else's card). */
     studentName?: string;
     /** Supplying this renders Approve/Reject actions in the footer — the faculty-review gate that makes a submitted entry "go live" for Merit Model ranking. */
-    onFacultyReview?: (action: "approve" | "reject") => void;
+    onFacultyReview?: (action: "approve" | "reject" | "revision") => void;
     reviewing?: boolean;
 }) {
     const [open, setOpen] = useState(defaultOpen);
@@ -58,6 +62,8 @@ export default function CourseworkCard({
     const evidenceLabel = re.metrics?.length ? (re.metrics.some((m) => m.status === "Actual — measured") ? "Actual measured result" : re.metrics[0].status || "Result declared") : re.measured ? stripEmoji(re.measured) : re.evidenceStatus;
     const approval = entry.facultyApprovalStatus;
     const ribbon = entry.meritRibbon;
+    const statusLabel = courseworkStatusLabel(entry);
+    const movement = rankMovement(ribbon);
     // A brand-new, still-empty draft reads as a broken/orphaned record if labelled "Untitled" —
     // it's just not started yet. Once anything's been typed, fall back to the generic label instead.
     const displayTitle = entry.projectTitle || (entry.status === "draft" ? "New coursework report — tap to continue" : "Untitled coursework");
@@ -70,6 +76,8 @@ export default function CourseworkCard({
                     Ranked #{ribbon.rank} of {ribbon.of}
                     {ribbon.scope ? ` · ${ribbon.scope}` : ""}
                     {ribbon.total != null ? ` · ${ribbon.total}/100` : ""}
+                    {ribbon.badgeLevel ? ` · ${BADGE_EMOJI[ribbon.badgeLevel]} ${ribbon.badgeLevel}` : ""}
+                    {movement ? ` · ${movement.symbol} ${movement.label}` : ""}
                 </div>
             ) : null}
             {/* Ribbon */}
@@ -89,15 +97,19 @@ export default function CourseworkCard({
                             </p>
                         </div>
                     </div>
-                    {entry.status === "submitted" && approval === "approved" ? (
+                    {statusLabel.tone === "approved" ? (
                         <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-emerald-700">
                             <CheckCircle2 className="h-3 w-3" /> Approved & live
                         </span>
-                    ) : entry.status === "submitted" && approval === "rejected" ? (
+                    ) : statusLabel.tone === "rejected" ? (
                         <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-red-200 bg-red-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-red-700">
-                            <ShieldAlert className="h-3 w-3" /> Changes requested
+                            <ShieldAlert className="h-3 w-3" /> Rejected
                         </span>
-                    ) : entry.status === "submitted" ? (
+                    ) : statusLabel.tone === "revision_requested" ? (
+                        <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-amber-300 bg-amber-100 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-amber-800">
+                            <AlertTriangle className="h-3 w-3" /> Revision requested
+                        </span>
+                    ) : statusLabel.tone === "under_review" ? (
                         <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-amber-700">
                             <Clock className="h-3 w-3" /> Awaiting faculty approval
                         </span>
@@ -251,11 +263,13 @@ export default function CourseworkCard({
                     {initials || "?"}
                 </span>
                 <p className="min-w-0 flex-1 text-xs leading-relaxed text-ciel-text-mid">
-                    {entry.status === "submitted" && approval === "approved" ? (
+                    {statusLabel.tone === "approved" ? (
                         <>Approved by <b className="text-ciel-text">{si.teacherName || "supervisor"}</b>{si.teacherEmail ? ` · ${si.teacherEmail}` : ""} — live in Merit Model rankings</>
-                    ) : entry.status === "submitted" && approval === "rejected" ? (
-                        <>Changes requested by <b className="text-ciel-text">{si.teacherName || "supervisor"}</b>{entry.facultyApprovalNote ? `: "${entry.facultyApprovalNote}"` : ""}</>
-                    ) : entry.status === "submitted" ? (
+                    ) : statusLabel.tone === "rejected" ? (
+                        <>Rejected by <b className="text-ciel-text">{si.teacherName || "supervisor"}</b>{entry.facultyApprovalNote ? `: "${entry.facultyApprovalNote}"` : ""}</>
+                    ) : statusLabel.tone === "revision_requested" ? (
+                        <>Revision requested by <b className="text-ciel-text">{si.teacherName || "supervisor"}</b>{entry.facultyApprovalNote ? `: "${entry.facultyApprovalNote}"` : ""}</>
+                    ) : statusLabel.tone === "under_review" ? (
                         <>Awaiting approval by <b className="text-ciel-text">{si.teacherName || "supervisor"}</b>{si.teacherEmail ? ` · ${si.teacherEmail}` : ""} — not yet ranked</>
                     ) : (
                         <>Draft — not yet submitted to <b className="text-ciel-text">{si.teacherName || "supervisor"}</b></>
@@ -271,7 +285,15 @@ export default function CourseworkCard({
                             disabled={reviewing}
                             className="ciel-transition rounded-ciel-xs border-2 border-red-200 bg-white px-3 py-2 text-xs font-bold text-red-700 hover:bg-red-50 disabled:opacity-50"
                         >
-                            Request changes
+                            Reject
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => onFacultyReview("revision")}
+                            disabled={reviewing}
+                            className="ciel-transition rounded-ciel-xs border-2 border-amber-300 bg-white px-3 py-2 text-xs font-bold text-amber-800 hover:bg-amber-50 disabled:opacity-50"
+                        >
+                            Request revision
                         </button>
                         <button
                             type="button"

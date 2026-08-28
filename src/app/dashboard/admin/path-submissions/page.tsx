@@ -41,7 +41,7 @@ interface AdminCourseProjectRow {
     evidenceUrls: string[] | null;
     stepCompleted: number;
     status: "draft" | "submitted";
-    facultyApprovalStatus?: "pending" | "approved" | "rejected" | null;
+    facultyApprovalStatus?: "pending" | "approved" | "rejected" | "revision_requested" | null;
     updatedAt: string;
     student: AdminStudent | null;
     studentInfo?: { groupMembers?: (string | AdminGroupMember)[] } | null;
@@ -179,7 +179,7 @@ export default function AdminPathSubmissionsPage() {
     const [loading, setLoading] = useState(true);
     const [expandedId, setExpandedId] = useState<string | null>(null);
     const [meritView, setMeritView] = useState(false);
-    const [courseView, setCourseView] = useState<"home" | "deck" | "rank" | "stats" | "submissions">("home");
+    const [courseView, setCourseView] = useState<"home" | "deck" | "rank" | "stats" | "submissions" | "hec">("home");
     const [meritEntries, setMeritEntries] = useState<MeritEntry[]>([]);
     const [meritLoading, setMeritLoading] = useState(false);
     const [fypMeritEntries, setFypMeritEntries] = useState<FypMeritEntry[]>([]);
@@ -192,7 +192,7 @@ export default function AdminPathSubmissionsPage() {
 
     useEffect(() => {
         if (pathTab !== "course-project") return;
-        if (courseView !== "rank" && courseView !== "deck" && courseView !== "stats") return;
+        if (courseView !== "rank" && courseView !== "deck" && courseView !== "stats" && courseView !== "hec") return;
         let cancelled = false;
         setMeritLoading(true);
         authenticatedFetch("/api/v1/admin/paths/course-projects")
@@ -458,7 +458,38 @@ export default function AdminPathSubmissionsPage() {
                         subtitle="Drafts, waiting, and approved — the existing admin list."
                         background="linear-gradient(135deg,#b45309,#f59e0b)"
                     />
+                    <HubTile
+                        onClick={() => setCourseView("hec")}
+                        badge="READ-ONLY"
+                        badgeClass="text-[#0f172a]"
+                        emoji="🎓"
+                        title="HEC / Government lens"
+                        subtitle="Flash cards and analytics only — no review actions, no edits."
+                        background="linear-gradient(135deg,#334155,#64748b)"
+                    />
                 </div>
+            ) : pathTab === "course-project" && courseView === "hec" ? (
+                <>
+                    <HubBackButton onClick={() => setCourseView("home")} label="← Back to path submissions" />
+                    {meritLoading ? (
+                        <div className="flex justify-center py-20">
+                            <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
+                        </div>
+                    ) : (
+                        <div className="space-y-4">
+                            <CourseworkAnalyticsPanel entries={meritEntries} />
+                            {meritEntries.filter(isFacultyApproved).length === 0 ? (
+                                <Card className="border-dashed p-10 text-center text-slate-500">No faculty-approved coursework cards yet.</Card>
+                            ) : (
+                                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                                    {meritEntries.filter(isFacultyApproved).map((entry) => (
+                                        <CourseworkCard key={entry.id} entry={entry} studentName={entry.student?.name} />
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </>
             ) : pathTab === "course-project" && courseView === "rank" ? (
                 <>
                     <HubBackButton onClick={() => setCourseView("home")} label="← Back to path submissions" />

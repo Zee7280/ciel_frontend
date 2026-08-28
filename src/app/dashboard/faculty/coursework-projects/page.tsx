@@ -42,7 +42,7 @@ export default function FacultyCourseworkProjectsPage() {
         }
     };
 
-    const reviewEntry = async (id: string, action: "approve" | "reject", note?: string) => {
+    const reviewEntry = async (id: string, action: "approve" | "reject" | "revision", note?: string) => {
         setReviewingId(id);
         try {
             const response = await authenticatedFetch(`/api/v1/paths/course-projects/${id}/faculty-review`, {
@@ -55,7 +55,9 @@ export default function FacultyCourseworkProjectsPage() {
                 toast.success(
                     action === "approve"
                         ? "Approved — reflected on student, university and CIEL decks. No score given."
-                        : "Returned to the student with notes — fix & resubmit, nothing penalised.",
+                        : action === "revision"
+                          ? "Sent back for revision — student can fix and resubmit."
+                          : "Rejected — student can fix and resubmit if allowed.",
                 );
             } else {
                 toast.error("Could not save your review");

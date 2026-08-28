@@ -187,11 +187,20 @@ export interface CourseProjectEntry {
     stepCompleted: number;
     status: "draft" | "submitted";
     /** Faculty review gate — only "approved" entries count toward Merit Model rankings/AI picks/showcase, mirroring FYP's eligibility gate. Unset/"pending" once submitted, until the named instructor reviews it. */
-    facultyApprovalStatus?: "pending" | "approved" | "rejected" | null;
+    facultyApprovalStatus?: "pending" | "approved" | "rejected" | "revision_requested" | null;
     facultyApprovalNote?: string | null;
     facultyApprovalAt?: string | null;
-    /** Pinned by the analyzer after a ranked run — shown on My Impact Wall. */
-    meritRibbon?: { rank: number; of: number; scope: string; total?: number; at: string } | null;
+    /** Pinned by the analyzer after a ranked run — shown on My Impact Wall. badgeLevel is a rank-percentile
+     * tier; previousRank is this card's rank the last time it was ranked (null/undefined = first run). */
+    meritRibbon?: {
+        rank: number;
+        of: number;
+        scope: string;
+        total?: number;
+        badgeLevel?: "Gold" | "Silver" | "Bronze" | "Participant";
+        previousRank?: number | null;
+        at: string;
+    } | null;
     createdAt?: string;
     updatedAt?: string;
     /** False when this entry is showing because the viewer was named as a group member on someone else's
@@ -270,6 +279,18 @@ export function courseProjectMetricLine(m: CourseProjectMetric): string {
     const unit = m.unit === "Percentage (%)" ? "%" : m.unit === "Other" ? (m.unitOther ? ` ${m.unitOther}` : "") : m.unit ? ` ${m.unit}` : "";
     const statusTag = m.status ? ` (${m.status.split(" — ")[0].toLowerCase()})` : "";
     return `${m.name}: ${m.value ?? ""}${unit}${statusTag}`;
+}
+
+/** Rank-movement arrow for a ribbon vs its previous run — `previousRank` unset/null means this is the
+ * card's first-ever ranked run. */
+export function rankMovement(
+    ribbon?: { rank: number; previousRank?: number | null } | null,
+): { symbol: "↑" | "↓" | "—" | "•"; label: string } | null {
+    if (!ribbon) return null;
+    if (ribbon.previousRank == null) return { symbol: "•", label: "First ranked run" };
+    if (ribbon.previousRank > ribbon.rank) return { symbol: "↑", label: `Up from #${ribbon.previousRank}` };
+    if (ribbon.previousRank < ribbon.rank) return { symbol: "↓", label: `Down from #${ribbon.previousRank}` };
+    return { symbol: "—", label: "Unchanged" };
 }
 
 /** Section summaries embed literal `<b>...</b>` markers for emphasis (rendered via RichSummaryText

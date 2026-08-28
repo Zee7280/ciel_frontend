@@ -111,3 +111,25 @@ export function pendingFacultyReview(entry: { status?: string; facultyApprovalSt
 export function isFacultyApproved(entry: { status?: string; facultyApprovalStatus?: string | null }) {
     return isPathEntryApproved(entry);
 }
+
+export type CourseworkStatusTone = "draft" | "under_review" | "revision_requested" | "rejected" | "approved";
+
+/** Single source of truth for how a coursework entry's lifecycle status reads to a human — every
+ * card/pill/badge across student/faculty/university/admin views should call this instead of
+ * re-deriving its own copy from status+facultyApprovalStatus. */
+export function courseworkStatusLabel(entry: {
+    status?: string;
+    facultyApprovalStatus?: string | null;
+}): { tone: CourseworkStatusTone; label: string } {
+    if (entry.status !== "submitted") return { tone: "draft", label: "Draft" };
+    switch (entry.facultyApprovalStatus) {
+        case "approved":
+            return { tone: "approved", label: "Approved" };
+        case "rejected":
+            return { tone: "rejected", label: "Rejected" };
+        case "revision_requested":
+            return { tone: "revision_requested", label: "Revision requested" };
+        default:
+            return { tone: "under_review", label: "Under review" };
+    }
+}

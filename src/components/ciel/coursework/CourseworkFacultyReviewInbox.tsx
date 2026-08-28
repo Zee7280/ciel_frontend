@@ -13,7 +13,7 @@ export default function CourseworkFacultyReviewInbox({
 }: {
     entries: MeritEntry[];
     reviewingId: string | null;
-    onReview: (id: string, action: "approve" | "reject", note?: string) => void;
+    onReview: (id: string, action: "approve" | "reject" | "revision", note?: string) => void;
 }) {
     const queue = useMemo(() => entries.filter(pendingFacultyReview), [entries]);
     const [sel, setSel] = useState(0);
@@ -41,6 +41,7 @@ export default function CourseworkFacultyReviewInbox({
                     {queue.map((q, i) => {
                         const qIssues = reviewCourseProjectSections(q).filter((c) => !c.ok).length;
                         const rejected = q.facultyApprovalStatus === "rejected";
+                        const revision = q.facultyApprovalStatus === "revision_requested";
                         return (
                             <button
                                 key={q.id}
@@ -57,12 +58,14 @@ export default function CourseworkFacultyReviewInbox({
                                     className={`absolute right-2.5 top-2 rounded-full px-2 py-0.5 text-[7px] font-extrabold ${
                                         rejected
                                             ? "bg-[#fdf1f4] text-[#e11d48]"
-                                            : qIssues
-                                              ? "bg-[#fdf1f4] text-[#e11d48]"
-                                              : "bg-[#e3f4fa] text-[#0891b2]"
+                                            : revision
+                                              ? "bg-[#fef3e2] text-[#b45309]"
+                                              : qIssues
+                                                ? "bg-[#fdf1f4] text-[#e11d48]"
+                                                : "bg-[#e3f4fa] text-[#0891b2]"
                                     }`}
                                 >
-                                    {rejected ? "RETURNED" : qIssues ? `⚠️ ${qIssues} ISSUES` : "ALL CLEAR"}
+                                    {rejected ? "REJECTED" : revision ? "REVISION" : qIssues ? `⚠️ ${qIssues} ISSUES` : "ALL CLEAR"}
                                 </span>
                                 <b className="block pr-20 text-[11px] text-[#0d2b33]">{q.projectTitle || "Untitled"}</b>
                                 <span className="mt-0.5 block text-[8.5px] text-[#7a919a]">
@@ -135,10 +138,18 @@ export default function CourseworkFacultyReviewInbox({
                                     <button
                                         type="button"
                                         disabled={reviewingId === current.id}
-                                        onClick={() => current.id && onReview(current.id, "reject", note.trim() || undefined)}
+                                        onClick={() => current.id && onReview(current.id, "revision", note.trim() || undefined)}
                                         className="min-w-[140px] flex-1 rounded-[10px] border border-[#f3d9a0] bg-white px-3 py-2.5 text-[10px] font-extrabold text-[#b45309] disabled:opacity-50"
                                     >
-                                        ↩️ Return with notes
+                                        🔁 Request revision
+                                    </button>
+                                    <button
+                                        type="button"
+                                        disabled={reviewingId === current.id}
+                                        onClick={() => current.id && onReview(current.id, "reject", note.trim() || undefined)}
+                                        className="min-w-[140px] flex-1 rounded-[10px] border border-[#f3c6d1] bg-white px-3 py-2.5 text-[10px] font-extrabold text-[#e11d48] disabled:opacity-50"
+                                    >
+                                        ❌ Reject
                                     </button>
                                 </div>
                             </>
