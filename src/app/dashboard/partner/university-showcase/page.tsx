@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { ArrowLeft, Search } from "lucide-react";
 import { authenticatedFetch } from "@/utils/api";
 import { toast } from "sonner";
-import { Search } from "lucide-react";
 import clsx from "clsx";
 import CourseworkCard from "@/components/ciel/CourseworkCard";
 import MeritModelPanel, { type MeritEntry } from "@/components/ciel/MeritModelPanel";
@@ -25,6 +26,7 @@ export default function UniversityShowcasePage() {
     const [fypLoading, setFypLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState("");
     const [view, setView] = useState<UniView>("home");
+    const [forbidden, setForbidden] = useState(false);
 
     useEffect(() => {
         void fetchEntries();
@@ -35,7 +37,10 @@ export default function UniversityShowcasePage() {
         try {
             setLoading(true);
             const response = await authenticatedFetch("/api/v1/paths/course-projects/university");
-            if (response?.ok) {
+            if (response?.status === 403) {
+                setForbidden(true);
+                setEntries([]);
+            } else if (response?.ok) {
                 const data = await response.json();
                 setEntries(Array.isArray(data.data) ? data.data : []);
             } else {
@@ -104,6 +109,23 @@ export default function UniversityShowcasePage() {
 
     const crumbView = mode === "fyp-thesis" ? (view === "home" ? "FYP / Thesis" : `FYP / Thesis · ${view}`) : view === "home" ? undefined : view;
     const activeLoading = mode === "course-project" ? loading : fypLoading;
+
+    if (forbidden) {
+        return (
+            <div className="mx-auto max-w-2xl space-y-4 p-4">
+                <Link
+                    href="/dashboard/partner"
+                    className="inline-flex items-center gap-1 text-sm font-bold text-indigo-600 hover:text-indigo-700"
+                >
+                    <ArrowLeft className="h-4 w-4" />
+                    Partner dashboard
+                </Link>
+                <div className="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-sm text-amber-900">
+                    The university showcase is only available for university partner accounts.
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen bg-[#f8fcfd] px-4 py-6 sm:px-6 lg:px-8">
