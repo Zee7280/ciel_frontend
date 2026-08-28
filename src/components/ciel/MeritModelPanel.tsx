@@ -108,7 +108,9 @@ export default function MeritModelPanel({
     const [backendCards, setBackendCards] = useState<Map<string, BackendMeritCard>>(new Map());
     const [meritLoading, setMeritLoading] = useState(false);
     const [notifiedIds, setNotifiedIds] = useState<string[]>([]);
-    const [notifyState, setNotifyState] = useState<"idle" | "sending" | "sent" | "failed">("idle");
+    const [notifyState, setNotifyState] = useState<"idle" | "sending" | "sent" | "failed" | "exhausted">("idle");
+    const [notifyErrorMessage, setNotifyErrorMessage] = useState<string | null>(null);
+    const [graderRuns, setGraderRuns] = useState<{ unlimited: boolean; used: number; limit: number } | null>(null);
     const [rubOpen, setRubOpen] = useState<MeritCriterionResult["key"] | null>(null);
     const requestIdRef = useRef(0);
     const lastNotified = useRef("");
@@ -164,12 +166,14 @@ export default function MeritModelPanel({
         setRanked(false);
         setNotifiedIds([]);
         setNotifyState("idle");
+        setNotifyErrorMessage(null);
     };
 
     const runMeritModel = () => {
         setRanked(true);
         setNotifiedIds([]);
         setNotifyState("idle");
+        setNotifyErrorMessage(null);
         lastNotified.current = "";
         if (!meritEndpoint) return;
         const requestId = ++requestIdRef.current;
@@ -184,6 +188,7 @@ export default function MeritModelPanel({
                       ? result.data.groups.flatMap((g: { entries: BackendMeritCard[] }) => g.entries)
                       : [];
                 setBackendCards(new Map(cards.filter((c) => c.id).map((c) => [c.id, c])));
+                if (result?.data?.graderRuns) setGraderRuns(result.data.graderRuns);
             })
             .catch(() => {})
             .finally(() => {
@@ -213,15 +218,27 @@ export default function MeritModelPanel({
     const notifyTop = (ids: string[], picks: { entryId: string; rank: number; of: number; total: number }[]) => {
         if (!meritEndpoint || !ids.length) return;
         setNotifyState("sending");
+        setNotifyErrorMessage(null);
         authenticatedFetch(`${meritEndpoint.replace(/\/merit-model\/?$/, "")}/merit-model/notify`, {
             method: "POST",
             body: JSON.stringify({ entryIds: ids, picks, scopeLabel: scopeName }),
         })
-            .then((res) => (res?.ok ? res.json() : null))
-            .then((result) => {
-                if (result?.success) {
+            .then(async (res) => {
+                if (!res) {
+                    setNotifyState("failed");
+                    return;
+                }
+                const body = await res.json().catch(() => null);
+                if (res.ok && body?.success) {
                     setNotifiedIds(ids);
                     setNotifyState("sent");
+                    if (body?.data?.graderRuns) setGraderRuns(body.data.graderRuns);
+                    return;
+                }
+                if (res.status === 403 && body?.code === "GRADER_RUNS_EXHAUSTED") {
+                    setNotifyState("exhausted");
+                    setNotifyErrorMessage(typeof body?.message === "string" ? body.message : "No AI Grader runs left this year.");
+                    setGraderRuns({ unlimited: false, used: body.used ?? 3, limit: body.limit ?? 3 });
                     return;
                 }
                 setNotifyState("failed");
@@ -233,15 +250,16 @@ export default function MeritModelPanel({
     const topPicks = top3
         .filter((x) => x.entry.id)
         .map((x, i) => ({ entryId: x.entry.id as string, rank: i + 1, of: scored.length, total: x.scorecard.total }));
+    const runsExhausted = !!graderRuns && !graderRuns.unlimited && graderRuns.used >= graderRuns.limit;
     const notifiedKey = topIds.join(",");
     useEffect(() => {
-        if (!ranked || meritLoading || !topIds.length || notifyState !== "idle") return;
+        if (!ranked || meritLoading || !topIds.length || notifyState !== "idle" || runsExhausted) return;
         if (lastNotified.current === notifiedKey) return;
         lastNotified.current = notifiedKey;
         notifyTop(topIds, topPicks);
         // notify once per unique top-3 set after scores settle
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [ranked, meritLoading, notifiedKey, notifyState]);
+    }, [ranked, meritLoading, notifiedKey, notifyState, runsExhausted]);
 
     const filterLabel = [
         showUniversityFilter ? "UNIVERSITY" : null,
@@ -404,19 +422,37 @@ export default function MeritModelPanel({
                 </div>
             )}
 
-            <button
-                type="button"
-                onClick={runMeritModel}
-                disabled={!pool.length}
-                className="rounded-[12px] bg-[#6d28d9] px-6 py-3 text-[12.5px] font-extrabold text-white transition hover:-translate-y-0.5 disabled:opacity-50"
-            >
-                ▶ Run the AI model — best → least, reasoned, cards attached
-            </button>
+            <div className="flex flex-wrap items-center gap-2.5">
+                <button
+                    type="button"
+                    onClick={runMeritModel}
+                    disabled={!pool.length || runsExhausted}
+                    className="rounded-[12px] bg-[#6d28d9] px-6 py-3 text-[12.5px] font-extrabold text-white transition hover:-translate-y-0.5 disabled:opacity-50"
+                >
+                    ▶ Run the AI model — best → least, reasoned, cards attached
+                </button>
+                {graderRuns && (
+                    <span
+                        className={clsx(
+                            "rounded-full px-3 py-1.5 text-[9.5px] font-extrabold",
+                            graderRuns.unlimited
+                                ? "bg-[#e6f6f4] text-[#0e7d74]"
+                                : runsExhausted
+                                  ? "bg-[#fdf1f4] text-[#e11d48]"
+                                  : "bg-[#f1ebfd] text-[#6d28d9]",
+                        )}
+                    >
+                        {graderRuns.unlimited ? "♾️ Unlimited runs" : `Runs used this year: ${graderRuns.used} of ${graderRuns.limit}`}
+                    </span>
+                )}
+            </div>
 
             {ranked && (
                 <div className="rounded-[13px] border border-[#e2d9f7] bg-[#f1ebfd] px-3.5 py-2.5 text-[10px] leading-relaxed text-[#4c3a78]">
                     {meritLoading ? (
                         <>⏳ <b>Syncing official scores…</b> — showing a provisional local ranking while the real Merit Model results load.</>
+                    ) : runsExhausted ? (
+                        <>🚫 <b>{notifyErrorMessage || "No AI Grader runs left this year."}</b> The ranking above is still visible, but it could not be pinned/notified.</>
                     ) : (
                         <>
                             🧮 <b>Model run complete</b> — {scored.length} approved cards · scope: <b>{scopeName}</b> · cohort average{" "}
@@ -460,7 +496,7 @@ export default function MeritModelPanel({
                                     <span className="text-[8px] font-extrabold text-[#0e7d74]">
                                         {notifiedIds.includes(x.entry.id!)
                                             ? "✓ SENT · DASHBOARD"
-                                            : notifyState === "failed"
+                                            : notifyState === "failed" || runsExhausted
                                               ? "NOT SENT"
                                               : "SENDING…"}
                                     </span>

@@ -201,6 +201,8 @@ export interface CourseProjectEntry {
         previousRank?: number | null;
         at: string;
     } | null;
+    /** Unique public key for the badge's QR/share verify link — see /coursework/verify/[key]. */
+    verificationPublicSlug?: string | null;
     createdAt?: string;
     updatedAt?: string;
     /** False when this entry is showing because the viewer was named as a group member on someone else's

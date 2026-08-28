@@ -1,10 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { CheckCircle2, Sparkles, Users, ChevronDown, Star, Paperclip, ShieldAlert, AlertTriangle, Clock } from "lucide-react";
+import { CheckCircle2, Sparkles, Users, ChevronDown, Star, Paperclip, ShieldAlert, AlertTriangle, Clock, Share2 } from "lucide-react";
 import clsx from "clsx";
+import { toast } from "sonner";
 import { sdgData } from "@/utils/sdgData";
 import RichSummaryText from "@/components/ciel/RichSummaryText";
+import ReportVerificationQr from "@/components/ReportVerificationQr";
 import {
     type CourseProjectEntry,
     resolveSectionSummaries,
@@ -42,6 +44,7 @@ export default function CourseworkCard({
     reviewing?: boolean;
 }) {
     const [open, setOpen] = useState(defaultOpen);
+    const [shareOpen, setShareOpen] = useState(false);
 
     const si = entry.studentInfo || {};
     const ai = entry.assignmentInfo || {};
@@ -64,6 +67,28 @@ export default function CourseworkCard({
     const ribbon = entry.meritRibbon;
     const statusLabel = courseworkStatusLabel(entry);
     const movement = rankMovement(ribbon);
+    const verifyPath = entry.verificationPublicSlug ? `/coursework/verify/${entry.verificationPublicSlug}` : null;
+    const canShareBadge = statusLabel.tone === "approved" && !!verifyPath;
+
+    const shareBadge = async () => {
+        if (typeof window === "undefined" || !verifyPath) return;
+        const url = new URL(verifyPath, window.location.origin).href;
+        const title = `${displayTitle} — CIEL coursework badge`;
+        try {
+            if (navigator.share) {
+                await navigator.share({ title, url });
+                return;
+            }
+        } catch {
+            // user cancelled the native share sheet — fall through to clipboard
+        }
+        try {
+            await navigator.clipboard.writeText(url);
+            toast.success("Link copied");
+        } catch {
+            toast.error("Could not copy the link");
+        }
+    };
     // A brand-new, still-empty draft reads as a broken/orphaned record if labelled "Untitled" —
     // it's just not started yet. Once anything's been typed, fall back to the generic label instead.
     const displayTitle = entry.projectTitle || (entry.status === "draft" ? "New coursework report — tap to continue" : "Untitled coursework");
@@ -277,6 +302,15 @@ export default function CourseworkCard({
                     <br />
                     Live on: 🧑‍🎓 student portfolio · 🧑‍🏫 faculty deck
                 </p>
+                {canShareBadge && (
+                    <button
+                        type="button"
+                        onClick={() => setShareOpen((o) => !o)}
+                        className="ciel-transition flex shrink-0 items-center gap-1.5 rounded-ciel-xs border-2 border-ciel-border bg-white px-3 py-2 text-xs font-bold text-ciel-text-mid hover:border-ciel-gold/40"
+                    >
+                        <Share2 className="h-3.5 w-3.5" /> Share badge
+                    </button>
+                )}
                 {onFacultyReview && entry.status === "submitted" && approval !== "approved" && (
                     <div className="flex shrink-0 gap-2">
                         <button
@@ -306,6 +340,19 @@ export default function CourseworkCard({
                     </div>
                 )}
             </div>
+
+            {canShareBadge && shareOpen && (
+                <div className="flex flex-col items-center gap-3 border-t border-ciel-border bg-white px-5 py-4">
+                    <ReportVerificationQr impactVerifyUrl={verifyPath} caption="Scan to verify on CIEL" />
+                    <button
+                        type="button"
+                        onClick={() => void shareBadge()}
+                        className="ciel-transition rounded-ciel-xs border-2 border-ciel-border bg-white px-3 py-2 text-xs font-bold text-ciel-text-mid hover:border-ciel-gold/40"
+                    >
+                        🔗 Copy / share link
+                    </button>
+                </div>
+            )}
         </div>
     );
 }
