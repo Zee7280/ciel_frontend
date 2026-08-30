@@ -3,6 +3,8 @@
  * Safe for partial / missing nested objects.
  */
 
+import { parsePhoneForDisplay } from "@/utils/countryCallingCodes";
+
 type ParticipationRule =
     | "open_all_universities"
     | "restricted_specific_universities"
@@ -185,6 +187,10 @@ export function mapOpportunityDetailToFacultyForm(d: Record<string, unknown>): {
             designation: typeof sup.role === "string" ? sup.role : "",
             department: typeof sup.faculty_department === "string" ? sup.faculty_department : "",
             officialEmail: typeof sup.contact === "string" ? sup.contact : "",
+            ...(() => {
+                const parsed = parsePhoneForDisplay(typeof sup.whatsapp_e164 === "string" ? sup.whatsapp_e164 : "");
+                return { whatsappCountryKey: parsed.phoneCountryKey, whatsappNational: parsed.national };
+            })(),
         },
         partnerCollaboration: {
             hasPartner,

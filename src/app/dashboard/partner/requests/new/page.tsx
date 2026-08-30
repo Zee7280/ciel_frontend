@@ -23,6 +23,8 @@ import { findSdgById, opportunityFormSdgList } from "@/utils/sdgData";
 import { pakistaniUniversities } from "@/utils/universityData";
 import { PAKISTAN_REGION_OPTIONS } from "@/utils/pakistanRegions";
 import { isPartnerOrganizationComplete } from "@/utils/profileCompletion";
+import PhoneConnectivityRow from "@/components/ui/PhoneConnectivityRow";
+import { composeInternationalPhone, DEFAULT_PHONE_COUNTRY_KEY } from "@/utils/countryCallingCodes";
 
 function isValidEmail(value: string) {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
@@ -91,6 +93,8 @@ export default function OpportunityPostingPage() {
             executingOrg: {
                 contactPersonName: "",
                 officialEmail: "",
+                whatsappCountryKey: DEFAULT_PHONE_COUNTRY_KEY,
+                whatsappNational: "",
             },
             partnerOrg: {
                 hasPartner: false,
@@ -311,6 +315,17 @@ export default function OpportunityPostingPage() {
                     contact: formData.verificationSafety.executingOrg.officialEmail.trim(),
                     safe_environment: formData.verificationSafety.safety.siteSafeSuitable,
                     supervised: formData.verificationSafety.safety.supervisedThroughout,
+                    ...(composeInternationalPhone(
+                        formData.verificationSafety.executingOrg.whatsappCountryKey,
+                        formData.verificationSafety.executingOrg.whatsappNational,
+                    )
+                        ? {
+                              whatsapp_e164: composeInternationalPhone(
+                                  formData.verificationSafety.executingOrg.whatsappCountryKey,
+                                  formData.verificationSafety.executingOrg.whatsappNational,
+                              ),
+                          }
+                        : {}),
                 },
                 executing_organization: {
                     name: orgDetails.organizationName.trim(),
@@ -511,6 +526,7 @@ export default function OpportunityPostingPage() {
                             verificationSafety: {
                                 ...prev.verificationSafety,
                                 executingOrg: {
+                                    ...prev.verificationSafety.executingOrg,
                                     contactPersonName:
                                         apiData.contactName?.trim() ||
                                         prev.verificationSafety.executingOrg.contactPersonName,
@@ -1400,6 +1416,35 @@ export default function OpportunityPostingPage() {
                                         })
                                     }
                                 />
+                            </div>
+                            <div className="md:col-span-2">
+                                <label className="block text-sm font-bold text-slate-900 mb-1">WhatsApp number (optional)</label>
+                                <PhoneConnectivityRow
+                                    phoneCountryKey={formData.verificationSafety.executingOrg.whatsappCountryKey}
+                                    nationalDigits={formData.verificationSafety.executingOrg.whatsappNational}
+                                    placeholderNational="3001234567"
+                                    selectClassName="rounded-xl border-slate-200 focus:border-orange-500 py-3"
+                                    inputClassName="rounded-xl border-slate-200 focus:border-orange-500 py-3"
+                                    onPhoneCountryKeyChange={(key) =>
+                                        setFormData({
+                                            ...formData,
+                                            verificationSafety: {
+                                                ...formData.verificationSafety,
+                                                executingOrg: { ...formData.verificationSafety.executingOrg, whatsappCountryKey: key },
+                                            },
+                                        })
+                                    }
+                                    onNationalDigitsChange={(digits) =>
+                                        setFormData({
+                                            ...formData,
+                                            verificationSafety: {
+                                                ...formData.verificationSafety,
+                                                executingOrg: { ...formData.verificationSafety.executingOrg, whatsappNational: digits },
+                                            },
+                                        })
+                                    }
+                                />
+                                <p className="mt-1 text-[11px] text-slate-400">Shown to students on the opportunity so they can message you directly. Leave blank to skip.</p>
                             </div>
                         </div>
                     </div>

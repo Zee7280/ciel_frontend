@@ -718,6 +718,16 @@ export default function OpportunityDetailsPage() {
                                                 {stakeholders.faculty?.email ? (
                                                     <div className="text-xs text-indigo-700 mt-1">{stakeholders.faculty.email}</div>
                                                 ) : null}
+                                                {stakeholders.faculty?.whatsapp ? (
+                                                    <a
+                                                        href={`https://wa.me/${stakeholders.faculty.whatsapp.replace(/\D/g, "")}`}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="inline-flex items-center gap-1 text-xs font-semibold text-green-700 mt-1 hover:underline"
+                                                    >
+                                                        💬 WhatsApp
+                                                    </a>
+                                                ) : null}
                                             </div>
                                             {(stakeholders.partner?.organization || opportunity.supervision?.partner_org_name) ? (
                                                 <div className="pt-3 border-t border-slate-200">

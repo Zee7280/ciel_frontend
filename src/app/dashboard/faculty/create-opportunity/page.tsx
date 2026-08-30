@@ -26,7 +26,7 @@ import { PAKISTAN_REGION_OPTIONS } from "@/utils/pakistanRegions";
 import { isFacultyProfileComplete, pickProfileEmail } from "@/utils/profileCompletion";
 import { mapOpportunityDetailToFacultyForm } from "./mapDetailToForm";
 import PhoneConnectivityRow from "@/components/ui/PhoneConnectivityRow";
-import { parsePhoneForDisplay } from "@/utils/countryCallingCodes";
+import { composeInternationalPhone, DEFAULT_PHONE_COUNTRY_KEY, parsePhoneForDisplay } from "@/utils/countryCallingCodes";
 
 const LocationPicker = dynamic(() => import("@/components/ui/LocationPicker"), {
     ssr: false,
@@ -113,6 +113,8 @@ export default function FacultyOpportunityCreationPage() {
             designation: "",
             department: "",
             officialEmail: "",
+            whatsappCountryKey: DEFAULT_PHONE_COUNTRY_KEY,
+            whatsappNational: "",
         },
         partnerCollaboration: {
             hasPartner: false,
@@ -404,6 +406,14 @@ export default function FacultyOpportunityCreationPage() {
                     contact: formData.academicLead.officialEmail.trim(),
                     faculty_department: formData.academicLead.department.trim(),
                     faculty_university_name: ownInstitution,
+                    ...(composeInternationalPhone(formData.academicLead.whatsappCountryKey, formData.academicLead.whatsappNational)
+                        ? {
+                              whatsapp_e164: composeInternationalPhone(
+                                  formData.academicLead.whatsappCountryKey,
+                                  formData.academicLead.whatsappNational,
+                              ),
+                          }
+                        : {}),
                     ...(formData.partnerCollaboration.hasPartner
                         ? {
                               external_partner_org_name: formData.partnerCollaboration.orgName.trim(),
@@ -1651,6 +1661,29 @@ export default function FacultyOpportunityCreationPage() {
                                         })
                                     }
                                 />
+                            </div>
+                            <div className="md:col-span-2">
+                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">WhatsApp number (optional)</label>
+                                <PhoneConnectivityRow
+                                    phoneCountryKey={formData.academicLead.whatsappCountryKey}
+                                    nationalDigits={formData.academicLead.whatsappNational}
+                                    placeholderNational="3001234567"
+                                    selectClassName="rounded-xl border-slate-200 focus:border-orange-500 py-3"
+                                    inputClassName="rounded-xl border-slate-200 focus:border-orange-500 py-3"
+                                    onPhoneCountryKeyChange={(key) =>
+                                        setFormData({
+                                            ...formData,
+                                            academicLead: { ...formData.academicLead, whatsappCountryKey: key },
+                                        })
+                                    }
+                                    onNationalDigitsChange={(digits) =>
+                                        setFormData({
+                                            ...formData,
+                                            academicLead: { ...formData.academicLead, whatsappNational: digits },
+                                        })
+                                    }
+                                />
+                                <p className="mt-1 text-[11px] text-slate-400">Shown to students on the opportunity so they can message you directly. Leave blank to skip.</p>
                             </div>
                         </div>
                     </div>

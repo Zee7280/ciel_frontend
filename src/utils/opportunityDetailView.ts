@@ -43,6 +43,7 @@ export type OpportunityDetailViewPayload = {
             email?: string | null;
             department?: string | null;
             university?: string | null;
+            whatsapp?: string | null;
         };
         partner?: {
             organization?: string | null;
@@ -187,6 +188,7 @@ export function readSupervisionStakeholders(raw: Record<string, unknown>) {
             email: typeof sup?.contact === "string" ? sup.contact : null,
             department: typeof sup?.faculty_department === "string" ? sup.faculty_department : null,
             university: typeof sup?.faculty_university_name === "string" ? sup.faculty_university_name : null,
+            whatsapp: typeof sup?.whatsapp_e164 === "string" ? sup.whatsapp_e164 : null,
         },
         partner: {
             organization: typeof sup?.partner_org_name === "string" ? sup.partner_org_name : null,
