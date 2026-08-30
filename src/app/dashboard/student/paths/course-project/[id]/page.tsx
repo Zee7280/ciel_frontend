@@ -671,6 +671,12 @@ export default function CourseProjectWizardPage() {
 
     const acceptedCount = activeStepIdx.filter((k) => review[k]?.accepted).length;
     const allAccepted = activeStepIdx.length > 0 && acceptedCount === activeStepIdx.length;
+    // Accepting a section's summary doesn't itself validate its underlying fields — a few load-bearing
+    // ones are checked explicitly so a card can't reach faculty missing its title, its SDG stance, or
+    // any honest read of how integrated the sustainability angle actually was.
+    const hasSdgStance = !!(entry.sdgMapping?.entries?.length || entry.sdgMapping?.notApplicable);
+    const hasIntegrationLevel = !!(entry.reflectionInfo?.integrationLevel || entry.reflectionInfo?.sdgLinkHonesty);
+    const missingRequiredFields = !entry.course?.trim() || !entry.projectTitle?.trim() || !hasSdgStance || !hasIntegrationLevel;
     const finalSectionSummaries = (): CourseProjectSectionSummaries => {
         const out: CourseProjectSectionSummaries = {};
         for (const key of activeStepIdx) out[key] = review[key]?.text ?? stripBoldMarkup(sums[key] || "");
@@ -712,7 +718,7 @@ export default function CourseProjectWizardPage() {
         ["Course", [entry.course, entry.studentInfo?.programme, entry.studentInfo?.semester].filter(Boolean).join(" · ") || "—"],
         ["Coursework", [entry.projectTitle, allFormats.join(" + "), teamMode].filter(Boolean).join(" · ") || "—"],
         ["Format", allFormats.join(" + ") || "—"],
-        ["Aim", entry.aimsInfo?.aimStatement || "—"],
+        ["Aim", entry.aimsInfo?.aimStatement || (inc.aim === false ? "Not applicable to this format" : "—")],
         ["Activities", (entry.processInfo?.activities ?? []).join(" · ") || "—"],
         ["Main output", entry.resultsInfo?.outputDescription || "—"],
         ["Key insight", entry.resultsInfo?.findings?.[0] || "—"],
@@ -1005,7 +1011,12 @@ export default function CourseProjectWizardPage() {
                         </>
                     )}
 
-                    {step === 2 && (
+                    {step === 2 && inc.aim === false && (
+                        <div className="rounded-ciel-sm border border-dashed border-ciel-green/40 bg-ciel-green-soft/40 px-4 py-3.5 text-sm text-ciel-green-deep">
+                            🎯 Your format doesn&apos;t usually need formal aims — <b>skipped.</b> Tap the 🎯 tile in the Format step to bring it back.
+                        </div>
+                    )}
+                    {step === 2 && inc.aim !== false && (
                             <>
                                 <Field label={`${routeMode?.aimL ?? "The overall aim"} (one line)`}>
                                     <input type="text" value={entry.aimsInfo?.aimStatement ?? ""} onChange={(e) => patchGroup("aimsInfo", { aimStatement: e.target.value })} placeholder={routeMode?.aimPh ?? "e.g. Develop a practical strategy to reduce cafeteria waste"} className={fieldClass} />
@@ -1053,32 +1064,36 @@ export default function CourseProjectWizardPage() {
 
                     {step === 3 && (
                         <>
-                            <Field label="Activities conducted" hint="Tap all that apply.">
-                                <ChipGroup
-                                    options={ACTIVITY_OPTIONS}
-                                    selected={entry.processInfo?.activities ?? []}
-                                    onToggle={(v) => {
-                                        const cur = entry.processInfo?.activities ?? [];
-                                        patchGroup("processInfo", { activities: cur.includes(v) ? cur.filter((x) => x !== v) : [...cur, v] });
-                                    }}
-                                    otherValue={entry.processInfo?.activitiesOther}
-                                    onOtherChange={(v) => patchGroup("processInfo", { activitiesOther: v })}
-                                    otherPlaceholder="What else did you do?"
-                                />
-                            </Field>
-                            <Field label="🔬 Research / method used" hint="Tap all that apply — “Not applicable” is a valid answer.">
-                                <ChipGroup
-                                    options={METHOD_OPTIONS}
-                                    selected={entry.processInfo?.methods ?? []}
-                                    onToggle={(v) => {
-                                        const cur = entry.processInfo?.methods ?? [];
-                                        patchGroup("processInfo", { methods: cur.includes(v) ? cur.filter((x) => x !== v) : [...cur, v] });
-                                    }}
-                                    otherValue={entry.processInfo?.methodsOther}
-                                    onOtherChange={(v) => patchGroup("processInfo", { methodsOther: v })}
-                                    otherPlaceholder="Your method"
-                                />
-                            </Field>
+                            {inc.act !== false && (
+                                <Field label="Activities conducted" hint="Tap all that apply.">
+                                    <ChipGroup
+                                        options={ACTIVITY_OPTIONS}
+                                        selected={entry.processInfo?.activities ?? []}
+                                        onToggle={(v) => {
+                                            const cur = entry.processInfo?.activities ?? [];
+                                            patchGroup("processInfo", { activities: cur.includes(v) ? cur.filter((x) => x !== v) : [...cur, v] });
+                                        }}
+                                        otherValue={entry.processInfo?.activitiesOther}
+                                        onOtherChange={(v) => patchGroup("processInfo", { activitiesOther: v })}
+                                        otherPlaceholder="What else did you do?"
+                                    />
+                                </Field>
+                            )}
+                            {inc.meth !== false && (
+                                <Field label="🔬 Research / method used" hint="Tap all that apply — “Not applicable” is a valid answer.">
+                                    <ChipGroup
+                                        options={METHOD_OPTIONS}
+                                        selected={entry.processInfo?.methods ?? []}
+                                        onToggle={(v) => {
+                                            const cur = entry.processInfo?.methods ?? [];
+                                            patchGroup("processInfo", { methods: cur.includes(v) ? cur.filter((x) => x !== v) : [...cur, v] });
+                                        }}
+                                        otherValue={entry.processInfo?.methodsOther}
+                                        onOtherChange={(v) => patchGroup("processInfo", { methodsOther: v })}
+                                        otherPlaceholder="Your method"
+                                    />
+                                </Field>
+                            )}
                             <Field label="Scale / scope of the work" hint="Taps only — this is a class assignment, not a PhD; “not applicable” is a complete answer.">
                                 <ScaleBuilder value={entry.processInfo?.sampleScale ?? ""} onChange={(v) => patchGroup("processInfo", { sampleScale: v })} />
                             </Field>
@@ -1133,6 +1148,7 @@ export default function CourseProjectWizardPage() {
                                 </Field>
                             </div>
 
+                            {inc.find !== false && (
                             <div className="space-y-3">
                                 <p className="text-xs font-black uppercase tracking-widest text-ciel-text-soft">B · What you found <span className="normal-case font-semibold text-ciel-text-soft/80">(up to 5 — a finding doesn&apos;t have to be numerical)</span></p>
                                     <Field label={routeMode?.fndL ?? "Most important findings, conclusions or insights"}>
@@ -1159,7 +1175,9 @@ export default function CourseProjectWizardPage() {
                                         </div>
                                     </Field>
                             </div>
+                            )}
 
+                            {inc.res !== false && (
                             <div className="space-y-3">
                                 <p className="text-xs font-black uppercase tracking-widest text-ciel-text-soft">C · Your numbers — did anything countable come out of this work? <span className="font-semibold normal-case tracking-normal text-ciel-text-soft">(most class assignments have one number at most — that&apos;s normal)</span></p>
                                 <ChipSingle options={MEASURED_OPTIONS} value={entry.resultsInfo?.measured} onChange={(v) => patchGroup("resultsInfo", { measured: v })} />
@@ -1168,7 +1186,9 @@ export default function CourseProjectWizardPage() {
                                     <MetricsBuilder metrics={entry.resultsInfo?.metrics ?? []} onChange={(next) => patchGroup("resultsInfo", { metrics: next })} />
                                 )}
                             </div>
+                            )}
 
+                            {inc.lim !== false && (
                             <div className="space-y-3">
                                 <p className="text-xs font-black uppercase tracking-widest text-ciel-text-soft">D · Limitations — what could and couldn&apos;t be concluded?</p>
                                     <Field label="Main limitation">
@@ -1193,6 +1213,7 @@ export default function CourseProjectWizardPage() {
                                         <input type="text" value={entry.resultsInfo?.limitationInterpretation ?? ""} onChange={(e) => patchGroup("resultsInfo", { limitationInterpretation: e.target.value })} placeholder="e.g. The findings show interest in change but can't confirm actual plastic use decreased" className={fieldClass} />
                                     </Field>
                             </div>
+                            )}
 
                             <div className="space-y-3">
                                 <p className="text-xs font-black uppercase tracking-widest text-ciel-text-soft">E · Recommendations — what should happen next? <span className="normal-case font-semibold text-ciel-text-soft/80">(optional, up to 3)</span></p>
@@ -1437,8 +1458,16 @@ export default function CourseProjectWizardPage() {
                         ) : (
                             <button
                                 type="button"
-                                disabled={saving || !allAccepted || !declarationChecked}
-                                title={!allAccepted ? "Accept every section above first" : !declarationChecked ? "Confirm the final declaration first" : undefined}
+                                disabled={saving || !allAccepted || !declarationChecked || missingRequiredFields}
+                                title={
+                                    !allAccepted
+                                        ? "Accept every section above first"
+                                        : missingRequiredFields
+                                          ? "Go back and fill in the course name, title, SDG stance and sustainability integration level first"
+                                          : !declarationChecked
+                                            ? "Confirm the final declaration first"
+                                            : undefined
+                                }
                                 onClick={async () => {
                                     await save({ ...saveAllFields(), status: "submitted", sectionSummaries: finalSectionSummaries() }, 8);
                                     router.push("/dashboard/student/paths/course-project");

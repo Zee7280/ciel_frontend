@@ -337,9 +337,13 @@ export function composeCourseProjectSummaries(entry: CourseProjectEntry): Course
     // BENEFICIARY_OPTIONS carry no emoji prefix — no stripEmoji (it would mistake "Environment" in
     // "Environment / ecosystems" for an emoji token and strip it).
     const benef = (am.beneficiaries || []).filter((b) => b && !/no specific/i.test(b)).map((b) => b.toLowerCase());
-    s.aims = (am.aimStatement || objs.length)
-        ? `${cap(My)} aim was to <b>${am.aimStatement ? lc(am.aimStatement) : "—"}</b>${objs.length ? `. ${W} set out to: ${objs.map((o, i) => `(${i + 1}) ${lc(o)}`).join("; ")}` : ""}${benef.length ? `. ${W} hoped it would benefit ${benef.join(", ").toLowerCase()}` : ""}.${note(am.notes)}`
-        : "";
+    // The student can manually switch the "Aim & objectives" tile off in the Format step — say so
+    // plainly rather than showing a blank review row for a section they never saw.
+    s.aims = entry.moduleInclusion?.aim === false
+        ? "Not applicable — skipped for this format."
+        : (am.aimStatement || objs.length)
+          ? `${cap(My)} aim was to <b>${am.aimStatement ? lc(am.aimStatement) : "—"}</b>${objs.length ? `. ${W} set out to: ${objs.map((o, i) => `(${i + 1}) ${lc(o)}`).join("; ")}` : ""}${benef.length ? `. ${W} hoped it would benefit ${benef.join(", ").toLowerCase()}` : ""}.${note(am.notes)}`
+          : "";
 
     const acts = (pr.activities || []).map(stripEmoji).map((x) => x.toLowerCase());
     const meths = (pr.methods || []).filter((m) => !/not applicable/i.test(m)).map(stripEmoji).map((x) => x.toLowerCase());
