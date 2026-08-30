@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import clsx from "clsx";
 import { authenticatedFetch } from "@/utils/api";
 import CourseworkCard from "@/components/ciel/CourseworkCard";
@@ -113,7 +113,6 @@ export default function MeritModelPanel({
     const [graderRuns, setGraderRuns] = useState<{ unlimited: boolean; used: number; limit: number } | null>(null);
     const [rubOpen, setRubOpen] = useState<MeritCriterionResult["key"] | null>(null);
     const requestIdRef = useRef(0);
-    const lastNotified = useRef("");
 
     const [department, setDepartment] = useState("all");
     const [faculty, setFaculty] = useState("all");
@@ -174,7 +173,6 @@ export default function MeritModelPanel({
         setNotifiedIds([]);
         setNotifyState("idle");
         setNotifyErrorMessage(null);
-        lastNotified.current = "";
         if (!meritEndpoint) return;
         const requestId = ++requestIdRef.current;
         setMeritLoading(true);
@@ -251,15 +249,6 @@ export default function MeritModelPanel({
         .filter((x) => x.entry.id)
         .map((x, i) => ({ entryId: x.entry.id as string, rank: i + 1, of: scored.length, total: x.scorecard.total }));
     const runsExhausted = !!graderRuns && !graderRuns.unlimited && graderRuns.used >= graderRuns.limit;
-    const notifiedKey = topIds.join(",");
-    useEffect(() => {
-        if (!ranked || meritLoading || !topIds.length || notifyState !== "idle" || runsExhausted) return;
-        if (lastNotified.current === notifiedKey) return;
-        lastNotified.current = notifiedKey;
-        notifyTop(topIds, topPicks);
-        // notify once per unique top-3 set after scores settle
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [ranked, meritLoading, notifiedKey, notifyState, runsExhausted]);
 
     const filterLabel = [
         showUniversityFilter ? "UNIVERSITY" : null,
@@ -426,7 +415,7 @@ export default function MeritModelPanel({
                 <button
                     type="button"
                     onClick={runMeritModel}
-                    disabled={!pool.length || runsExhausted}
+                    disabled={!pool.length}
                     className="rounded-[12px] bg-[#6d28d9] px-6 py-3 text-[12.5px] font-extrabold text-white transition hover:-translate-y-0.5 disabled:opacity-50"
                 >
                     ▶ Run the AI model — best → least, reasoned, cards attached
@@ -442,7 +431,7 @@ export default function MeritModelPanel({
                                   : "bg-[#f1ebfd] text-[#6d28d9]",
                         )}
                     >
-                        {graderRuns.unlimited ? "♾️ Unlimited runs" : `Runs used this year: ${graderRuns.used} of ${graderRuns.limit}`}
+                        {graderRuns.unlimited ? "♾️ Unlimited publishes" : `Publishes used this year: ${graderRuns.used} of ${graderRuns.limit}`}
                     </span>
                 )}
             </div>
@@ -451,8 +440,6 @@ export default function MeritModelPanel({
                 <div className="rounded-[13px] border border-[#e2d9f7] bg-[#f1ebfd] px-3.5 py-2.5 text-[10px] leading-relaxed text-[#4c3a78]">
                     {meritLoading ? (
                         <>⏳ <b>Syncing official scores…</b> — showing a provisional local ranking while the real Merit Model results load.</>
-                    ) : runsExhausted ? (
-                        <>🚫 <b>{notifyErrorMessage || "No AI Grader runs left this year."}</b> The ranking above is still visible, but it could not be pinned/notified.</>
                     ) : (
                         <>
                             🧮 <b>Model run complete</b> — {scored.length} approved cards · scope: <b>{scopeName}</b> · cohort average{" "}
@@ -460,10 +447,14 @@ export default function MeritModelPanel({
                             anywhere. Evidence re-checked before any card could place.{" "}
                             {notifyState === "sent" ? (
                                 <b>Top-ranked students have been notified.</b>
+                            ) : notifyState === "sending" ? (
+                                <b>Publishing to top-ranked students…</b>
                             ) : notifyState === "failed" ? (
                                 <b>Ranking is saved on this screen — student notifications did not send. Retry below.</b>
+                            ) : runsExhausted ? (
+                                <b>{notifyErrorMessage || "No publishes left this year."} This run is a free preview only — nothing is pinned or sent to students.</b>
                             ) : (
-                                <b>Notifying top-ranked students…</b>
+                                <b>This is a free preview — running the model again won&apos;t cost a run. Nothing is sent to students until you publish.</b>
                             )}
                         </>
                     )}
@@ -472,19 +463,27 @@ export default function MeritModelPanel({
 
             {ranked && top3.length > 0 && (
                 <div className="rounded-[18px] border-2 border-[#f3d9a0] bg-white px-4 py-4">
-                    <p className="text-[10px] font-extrabold tracking-[0.12em] text-[#b45309]">🔔 STUDENT NOTIFICATIONS — DISPATCHED TO THEIR DASHBOARDS</p>
-                    {notifyState === "failed" && (
+                    <div className="flex flex-wrap items-center justify-between gap-2.5">
+                        <p className="text-[10px] font-extrabold tracking-[0.12em] text-[#b45309]">
+                            🔔 TOP 3 — PREVIEW ONLY, NOT SENT UNTIL PUBLISHED
+                        </p>
                         <button
                             type="button"
-                            onClick={() => {
-                                lastNotified.current = "";
-                                setNotifyState("idle");
-                            }}
-                            className="mt-2 rounded-full bg-[#fdf1f4] px-3 py-1 text-[9px] font-extrabold text-[#e11d48]"
+                            onClick={() => notifyTop(topIds, topPicks)}
+                            disabled={notifyState === "sending" || notifyState === "sent" || runsExhausted}
+                            className="rounded-full bg-[#b45309] px-3.5 py-1.5 text-[9.5px] font-extrabold text-white disabled:opacity-50"
                         >
-                            Retry notify
+                            {notifyState === "sent"
+                                ? "✓ Published"
+                                : notifyState === "sending"
+                                  ? "Publishing…"
+                                  : notifyState === "failed"
+                                    ? "Retry publish"
+                                    : runsExhausted
+                                      ? "No publishes left this year"
+                                      : "🔔 Publish & notify top students"}
                         </button>
-                    )}
+                    </div>
                     {top3.map((x, i) => (
                         <div key={x.entry.id} className="flex gap-2.5 border-b border-dashed border-[#dcebee] py-2.5 last:border-0">
                             <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[linear-gradient(135deg,#0e5f63,#f59e0b)] text-xs font-extrabold text-white">
@@ -496,9 +495,9 @@ export default function MeritModelPanel({
                                     <span className="text-[8px] font-extrabold text-[#0e7d74]">
                                         {notifiedIds.includes(x.entry.id!)
                                             ? "✓ SENT · DASHBOARD"
-                                            : notifyState === "failed" || runsExhausted
-                                              ? "NOT SENT"
-                                              : "SENDING…"}
+                                            : notifyState === "sending"
+                                              ? "SENDING…"
+                                              : "PREVIEW ONLY"}
                                     </span>
                                 </div>
                                 <p className="mt-1 rounded-r-[11px] rounded-bl-[11px] bg-[#e6f6f4] px-3 py-2 text-[10.5px] leading-relaxed text-[#1d3a3d]">
