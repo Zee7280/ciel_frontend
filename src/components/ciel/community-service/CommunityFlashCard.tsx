@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import type { CommunityAwardCard } from "@/utils/communityAwardModel";
+import clsx from "clsx";
+import { COMMUNITY_LEVEL_CLASS, COMMUNITY_LEVEL_LABEL, type CommunityAwardCard } from "@/utils/communityAwardModel";
 
 export default function CommunityFlashCard({
     card,
@@ -33,6 +34,11 @@ export default function CommunityFlashCard({
                 </p>
             ) : null}
             <div className="flex flex-wrap gap-1 px-3 py-2">
+                {card.level && (
+                    <span className={clsx("rounded-full px-2 py-0.5 text-[7px] font-extrabold uppercase tracking-wide", COMMUNITY_LEVEL_CLASS[card.level])}>
+                        {COMMUNITY_LEVEL_LABEL[card.level]}
+                    </span>
+                )}
                 <span className="rounded-full bg-[#e6f6f4] px-2 py-0.5 text-[7px] font-extrabold text-[#0e7d74]">✅ FACULTY-APPROVED</span>
                 <span className="rounded-full bg-[#f1ebfd] px-2 py-0.5 text-[7px] font-extrabold text-[#6d28d9]">🧠 CII EVALUATED</span>
                 <span className="rounded-full bg-[#e3f4fa] px-2 py-0.5 text-[7px] font-extrabold text-[#0891b2]">📸 {card.evidenceCount} EVIDENCE</span>

@@ -167,6 +167,12 @@ function memberStatusLabel(member: { email?: string; inviteStatus?: "pending" | 
     return member.inviteStatus === "accepted" ? "✅ confirmed" : "✉️ invited, unconfirmed";
 }
 
+function tabFromLocation(): PathTab {
+    if (typeof window === "undefined") return "course-project";
+    const tab = new URLSearchParams(window.location.search).get("tab");
+    return tab === "fyp-thesis" || tab === "startup-business" || tab === "course-project" ? tab : "course-project";
+}
+
 export default function AdminPathSubmissionsPage() {
     const [pathTab, setPathTab] = useState<PathTab>("course-project");
     const [courseRows, setCourseRows] = useState<AdminCourseProjectRow[]>([]);
@@ -184,6 +190,10 @@ export default function AdminPathSubmissionsPage() {
     const [meritLoading, setMeritLoading] = useState(false);
     const [fypMeritEntries, setFypMeritEntries] = useState<FypMeritEntry[]>([]);
     const [fypMeritLoading, setFypMeritLoading] = useState(false);
+
+    useEffect(() => {
+        setPathTab(tabFromLocation());
+    }, []);
 
     useEffect(() => {
         if (pathTab !== "course-project") setCourseView("home");

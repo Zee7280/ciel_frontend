@@ -16,6 +16,26 @@ export const AWARD_PHRASE: Record<number, [string, string, string]> = {
 
 export type CommunityAwardKind = "fac" | "par" | "uni" | "ciel";
 
+/** Automatic score-band standing grade shown on every approved record regardless of ranking —
+ * distinct from awardBadges below, which only appear when a record is explicitly picked as a
+ * top-N award winner. Mirrors ciel_backend's communityServiceLevel() exactly — trust the backend
+ * value, never recompute here. */
+export type CommunityServiceLevel = "Transformative" | "Distinguished" | "Strong" | "Developing";
+
+export const COMMUNITY_LEVEL_CLASS: Record<CommunityServiceLevel, string> = {
+    Transformative: "bg-[linear-gradient(135deg,#4c1d95,#8b5cf6)] text-white",
+    Distinguished: "bg-ciel-green-soft text-ciel-green-deep",
+    Strong: "bg-ciel-purple-soft text-ciel-purple",
+    Developing: "bg-ciel-page text-ciel-text-soft",
+};
+
+export const COMMUNITY_LEVEL_LABEL: Record<CommunityServiceLevel, string> = {
+    Transformative: "🌟 Transformative",
+    Distinguished: "🏅 Distinguished",
+    Strong: "✅ Strong",
+    Developing: "🌱 Developing & below",
+};
+
 export type CommunityAwardBadge = {
     kind: CommunityAwardKind;
     label: string;
@@ -49,6 +69,7 @@ export type CommunityAwardCard = {
     cii: number | null;
     pts: number[];
     total: number;
+    level?: CommunityServiceLevel;
     awardBadges?: CommunityAwardBadge[];
 };
 

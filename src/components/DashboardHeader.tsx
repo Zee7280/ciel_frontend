@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useLayoutEffect, useRef, useCallback } from "react";
 import { usePathname } from "next/navigation";
-import { AlertCircle, Bell, CheckCircle, Clock, GraduationCap, Info, Loader2, LogOut, Search, User } from "lucide-react";
+import { AlertCircle, Bell, CheckCircle, Clock, GraduationCap, Info, Loader2, LogOut, Search } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
     dashboardNavRoleFromPathname,
@@ -18,13 +18,54 @@ import {
     readFacultyScopeSession,
     type FacultyScopeSessionPayload,
 } from "@/utils/facultyScopeSession";
-import { namedTimeGreeting } from "@/utils/timeGreeting";
+function facultyPageKicker(pathname: string): string {
+    const p = pathname.replace(/\/+$/, "") || pathname;
+    if (p === "/dashboard/faculty") return "Overview";
+    if (p.startsWith("/dashboard/faculty/community-service")) return "Community Service";
+    if (p.startsWith("/dashboard/faculty/coursework-projects")) return "Coursework Project";
+    if (p.startsWith("/dashboard/faculty/fyp-thesis")) return "FYP / Thesis";
+    if (p.startsWith("/dashboard/faculty/startup-business")) return "Startup / Business";
+    if (p.startsWith("/dashboard/faculty/impact")) return "My Impact Wall";
+    if (p.startsWith("/dashboard/faculty/approvals")) return "Opportunity Approvals";
+    if (p.startsWith("/dashboard/faculty/join-applications")) return "Applications";
+    if (p.startsWith("/dashboard/faculty/reports")) return "Student Reports";
+    if (p.startsWith("/dashboard/faculty/analytics")) return "Analytics";
+    if (p.startsWith("/dashboard/faculty/my-opportunities")) return "My Opportunities";
+    if (p.startsWith("/dashboard/faculty/create-opportunity")) return "Create Opportunity";
+    if (p.startsWith("/dashboard/faculty/attendance-review")) return "Attendance";
+    if (p.startsWith("/dashboard/faculty/messages")) return "Messages";
+    if (p.startsWith("/dashboard/faculty/notifications")) return "Notifications";
+    if (p.startsWith("/dashboard/faculty/tutorials")) return "Platform tutorial";
+    if (p.startsWith("/dashboard/faculty/profile")) return "Profile";
+    if (p.startsWith("/dashboard/faculty/settings")) return "Settings";
+    if (p.startsWith("/dashboard/faculty/help")) return "Help";
+    return "Faculty";
+}
+
+function universityPageKicker(pathname: string): string {
+    const p = pathname.replace(/\/+$/, "") || pathname;
+    if (p === "/dashboard/partner") return "Overview";
+    if (p.startsWith("/dashboard/partner/community-service")) return "Community Service";
+    if (p.startsWith("/dashboard/partner/university-showcase")) return "Coursework / FYP";
+    if (p.startsWith("/dashboard/partner/impact")) return "My Impact Wall";
+    if (p.startsWith("/dashboard/partner/university-analytics")) return "Institution analytics";
+    if (p.startsWith("/dashboard/partner/analytics")) return "Analytics";
+    if (p.startsWith("/dashboard/partner/requests/new")) return "Create Opportunity";
+    if (p.startsWith("/dashboard/partner/requests")) return "My Opportunities";
+    if (p.startsWith("/dashboard/partner/organization")) return "My Organization";
+    if (p.startsWith("/dashboard/partner/verification") || p.startsWith("/dashboard/partner/verify")) return "Verify Work";
+    if (p.startsWith("/dashboard/partner/reports")) return "Reports";
+    if (p.startsWith("/dashboard/partner/attendance-review")) return "Attendance";
+    if (p.startsWith("/dashboard/partner/messages")) return "Messages";
+    if (p.startsWith("/dashboard/partner/notifications")) return "Notifications";
+    return "University";
+}
 
 function studentPageKicker(pathname: string): string {
     const p = pathname.replace(/\/+$/, "") || pathname;
-    if (p === "/dashboard/student") return "Overview";
-    if (p.startsWith("/dashboard/student/browse")) return "Browse opportunities";
-    if (p.startsWith("/dashboard/student/impact")) return "Impact";
+    if (p === "/dashboard/student") return "Home";
+    if (p.startsWith("/dashboard/student/browse")) return "Browse Opportunities";
+    if (p.startsWith("/dashboard/student/impact")) return "My Impact Portfolio";
     if (p.startsWith("/dashboard/student/payments") || p.startsWith("/dashboard/student/payment")) return "Payments";
     if (p.startsWith("/dashboard/student/messages")) return "Messages";
     if (p.startsWith("/dashboard/student/notifications")) return "Notifications";
@@ -35,12 +76,30 @@ function studentPageKicker(pathname: string): string {
     if (p.startsWith("/dashboard/student/report")) return "Impact report";
     if (p.startsWith("/dashboard/student/create-opportunity")) return "Create opportunity";
     if (p.startsWith("/dashboard/student/paths/community-service")) return "Community Service";
-    if (p.startsWith("/dashboard/student/paths/course-project")) return "Course Project";
-    if (p.startsWith("/dashboard/student/paths/fyp-thesis")) return "FYP / Thesis";
-    if (p.startsWith("/dashboard/student/paths/startup-business")) return "Startup / Business";
+    if (p.startsWith("/dashboard/student/paths/course-project")) return "Coursework";
+    if (p.startsWith("/dashboard/student/paths/fyp-thesis")) return "FYP / Final Year Project";
+    if (p.startsWith("/dashboard/student/paths/startup-business")) return "Startup / Venture";
     if (p.startsWith("/dashboard/student/engagement")) return "Engagement";
     if (p.startsWith("/dashboard/student/projects")) return "My projects";
     return "Student";
+}
+
+function adminPageKicker(pathname: string): string {
+    const p = pathname.replace(/\/+$/, "") || pathname;
+    if (p === "/dashboard/admin") return "Overview";
+    if (p.startsWith("/dashboard/admin/community-service")) return "Community Service";
+    if (p.startsWith("/dashboard/admin/path-submissions")) return "Path submissions";
+    if (p.startsWith("/dashboard/admin/analytics")) return "Impact Intelligence Hub";
+    if (p.startsWith("/dashboard/admin/master-analytics")) return "CIEL Master";
+    if (p.startsWith("/dashboard/admin/approvals")) return "Opportunity Review";
+    if (p.startsWith("/dashboard/admin/join-applications")) return "Applications";
+    if (p.startsWith("/dashboard/admin/users")) return "Users";
+    if (p.startsWith("/dashboard/admin/organizations")) return "Organizations";
+    if (p.startsWith("/dashboard/admin/reports")) return "Reports";
+    if (p.startsWith("/dashboard/admin/notifications")) return "Notifications";
+    if (p.startsWith("/dashboard/admin/messages")) return "Messages";
+    if (p.startsWith("/dashboard/admin/settings")) return "Settings";
+    return "Super Admin";
 }
 
 type HeaderNotification = {
@@ -86,17 +145,51 @@ export default function DashboardHeader() {
         return () => window.removeEventListener(CIEL_FACULTY_SCOPE_EVENT, sync);
     }, [navRole, pathname]);
 
-    const getTitle = () => {
-        if (navRole === "student") return "Student Dashboard";
-        if (navRole === "partner") return "Partner Portal";
-        if (navRole === "faculty") return "Faculty Hub";
-        if (navRole === "admin") return "Platform Admin";
-        return "Dashboard";
-    };
+    const [isUniversityPartnerOrg, setIsUniversityPartnerOrg] = useState(false);
+    useEffect(() => {
+        if (navRole !== "partner") {
+            setIsUniversityPartnerOrg(false);
+            return;
+        }
+        try {
+            const raw = localStorage.getItem("ciel_user") || localStorage.getItem("user");
+            const u = raw ? (JSON.parse(raw) as { orgType?: string; organization_type?: string; type?: string }) : null;
+            const t = String(u?.orgType || u?.organization_type || u?.type || "").toLowerCase();
+            setIsUniversityPartnerOrg(t.includes("university"));
+        } catch {
+            setIsUniversityPartnerOrg(false);
+        }
+    }, [navRole, pathname]);
 
-    const isStudent = navRole === "student";
-    const firstName = user?.name?.trim().split(/\s+/)[0] || "";
-    const greeting = namedTimeGreeting(firstName);
+    const roleCrumb =
+        navRole === "student"
+            ? "Student Dashboard"
+            : navRole === "faculty"
+              ? "Faculty Dashboard"
+              : navRole === "partner" && isUniversityPartnerOrg
+                ? "University Dashboard"
+                : navRole === "partner"
+                  ? "Partner Portal"
+                  : navRole === "admin"
+                    ? "Super Admin"
+                    : "Dashboard";
+
+    const pageCrumb =
+        navRole === "student"
+            ? studentPageKicker(pathname)
+            : navRole === "faculty"
+              ? facultyPageKicker(pathname)
+              : navRole === "partner" && isUniversityPartnerOrg
+                ? universityPageKicker(pathname)
+                : navRole === "admin"
+                  ? adminPageKicker(pathname)
+                  : "Overview";
+
+    const initials = (user?.name || "CIEL")
+        .split(/\s+/)
+        .slice(0, 2)
+        .map((p) => p[0]?.toUpperCase() || "")
+        .join("") || "CI";
 
     useEffect(() => {
         const loadUserFromStorage = () => {
@@ -277,12 +370,12 @@ export default function DashboardHeader() {
     };
 
     return (
-        <header className="ciel-transition sticky top-0 z-30 flex min-h-16 items-center justify-between gap-3 border-b border-ciel-border bg-white px-4 py-3 font-sans sm:px-6 lg:ml-[var(--ciel-sidebar-width)] lg:h-20 lg:px-8">
+        <header className="ciel-transition sticky top-0 z-30 flex h-[72px] items-center justify-between gap-3 border-b border-[#dde5ea] bg-white px-4 font-sans sm:px-7 lg:ml-[var(--ciel-sidebar-width)]">
             <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
-                    <h1 className="truncate text-base font-black tracking-tight text-ciel-text sm:text-xl">
-                        {isStudent ? greeting : getTitle()}
-                    </h1>
+                    <p className="truncate text-[13px] text-[#70808a]">
+                        CIEL PK / {roleCrumb} / <b className="font-semibold text-[#16313d]">{pageCrumb}</b>
+                    </p>
                     {navRole === "faculty" && facultyDelegatedScope?.organization_name ? (
                         <span
                             className="inline-flex max-w-[min(100%,14rem)] items-center gap-1 rounded-full border border-indigo-300 bg-indigo-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-indigo-900 shadow-sm sm:max-w-[20rem]"
@@ -293,18 +386,15 @@ export default function DashboardHeader() {
                         </span>
                     ) : null}
                 </div>
-                <p className="truncate text-[10px] font-bold uppercase tracking-wider text-ciel-text-soft">
-                    {isStudent ? studentPageKicker(pathname) : greeting}
-                </p>
             </div>
 
-            <div className="flex shrink-0 items-center gap-2 sm:gap-4 lg:gap-6">
+            <div className="flex shrink-0 items-center gap-2.5">
                 <div className="relative hidden md:block">
-                    <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-ciel-text-soft" />
+                    <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#70808a]" />
                     <input
                         type="text"
                         placeholder="Search dashboard..."
-                        className="w-64 rounded-xl border border-ciel-border bg-ciel-page/50 py-2 pl-10 pr-4 text-sm font-medium text-ciel-text transition-all focus:border-ciel-green focus:outline-none focus:ring-4 focus:ring-ciel-green/15"
+                        className="w-56 rounded-[10px] border border-[#dde5ea] bg-white py-2 pl-10 pr-3 text-xs font-extrabold text-[#435660] transition-all focus:border-[#15988b] focus:outline-none"
                     />
                 </div>
 
@@ -313,14 +403,15 @@ export default function DashboardHeader() {
                         <button
                             type="button"
                             onClick={() => setNotifOpen((o) => !o)}
-                            className="group relative rounded-xl p-2.5 text-ciel-text-soft transition-all hover:bg-ciel-green-soft hover:text-ciel-green-deep"
+                            className="group relative inline-flex items-center gap-1.5 rounded-[10px] border border-[#dde5ea] bg-white px-3 py-2 text-[12px] font-extrabold text-[#435660] transition-all hover:bg-[#f4f7fa]"
                             aria-expanded={notifOpen}
                             aria-haspopup="dialog"
                             aria-label="Notifications"
                         >
-                            <Bell className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                            <Bell className="w-4 h-4" />
+                            <span className="hidden sm:inline">{headerUnreadBellCount > 0 ? `${headerUnreadBellCount} Updates` : "Updates"}</span>
                             {headerUnreadBellCount > 0 ? (
-                                <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-blue-600 rounded-full border-2 border-white" />
+                                <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-[#15988b]" />
                             ) : null}
                         </button>
                         {notifOpen ? (
@@ -415,8 +506,8 @@ export default function DashboardHeader() {
                         ) : null}
                     </div>
                 ) : (
-                    <button type="button" className="group relative rounded-xl p-2.5 text-ciel-text-soft transition-all hover:bg-ciel-green-soft hover:text-ciel-green-deep">
-                        <Bell className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                    <button type="button" className="group relative rounded-[10px] border border-[#dde5ea] bg-white px-3 py-2 text-[12px] font-extrabold text-[#435660]">
+                        <Bell className="w-4 h-4" />
                         {(user?.notifications_count ?? 0) > 0 ? (
                             <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-blue-600 rounded-full border-2 border-white"></span>
                         ) : null}
@@ -428,11 +519,11 @@ export default function DashboardHeader() {
                         <div className="mb-1 text-sm font-black leading-none text-ciel-text">{user?.name || "Guest User"}</div>
                         <div className="text-[10px] font-bold uppercase leading-none tracking-widest text-ciel-text-soft">{user?.role || "Visitor"}</div>
                     </div>
-                    <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl border-2 border-slate-50 bg-slate-100 shadow-sm transition-all hover:border-blue-200 sm:h-11 sm:w-11">
+                    <div className="grid h-[38px] w-[38px] place-items-center overflow-hidden rounded-full bg-[#dff1ed] text-[13px] font-black text-[#145a4f]">
                         {getProfileImage() ? (
-                            <img src={getProfileImage()} alt="Profile" className="w-full h-full object-cover" />
+                            <img src={getProfileImage()} alt="Profile" className="h-full w-full object-cover" />
                         ) : (
-                            <User className="w-6 h-6 text-slate-400" />
+                            initials
                         )}
                     </div>
                     <button

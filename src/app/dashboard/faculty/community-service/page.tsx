@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { authenticatedFetch } from "@/utils/api";
 import { CommunityCrumb, CommunityHero, HubBackButton, HubTile } from "@/components/ciel/community-service/CommunityServiceHubChrome";
+import { ActionKpiGrid, PathSectionHead, WorkflowSteps } from "@/components/ciel/coursework/CourseworkHubChrome";
 import CommunityAwardPanel from "@/components/ciel/community-service/CommunityAwardPanel";
 import CommunityAwardAnalytics from "@/components/ciel/community-service/CommunityAwardAnalytics";
 import CommunityFlashCard from "@/components/ciel/community-service/CommunityFlashCard";
@@ -11,8 +12,6 @@ import {
     reportRowToAwardCard,
     type CommunityAwardCard,
 } from "@/utils/communityAwardModel";
-import { readStoredCurrentUser } from "@/utils/currentUser";
-import { namedTimeGreeting } from "@/utils/timeGreeting";
 import { isFacultyCommunityLiveCard, isFacultyCommunityWaiting } from "@/utils/reviewQueue";
 
 type FacView = "home" | "pending" | "approved" | "run" | "analytics";
@@ -42,10 +41,6 @@ export default function FacultyCommunityServicePage() {
     const [rows, setRows] = useState<FacultyReportRow[]>([]);
     const [cards, setCards] = useState<CommunityAwardCard[]>([]);
     const [loading, setLoading] = useState(true);
-    const name =
-        (typeof readStoredCurrentUser()?.name === "string"
-            ? String(readStoredCurrentUser()?.name).split(" ")[0]
-            : "") || "there";
 
     useEffect(() => {
         let cancelled = false;
@@ -117,19 +112,19 @@ export default function FacultyCommunityServicePage() {
     const hours = deckCards.reduce((s, c) => s + (c.hours || 0), 0);
 
     return (
-        <div className="mx-auto max-w-[1040px] px-4 py-6 sm:px-6">
+        <div className="mx-auto max-w-[1240px]">
             <CommunityCrumb role="Faculty" view={view === "home" ? undefined : view} />
 
             {view === "home" ? (
                 <CommunityHero
-                    kicker="FACULTY · COMMUNITY SERVICE"
-                    title={namedTimeGreeting(name, "🧑‍🏫")}
-                    subtitle="Supervise, approve once, and the card goes live everywhere. Your award run grants the Faculty Choice badge."
+                    kicker="FACULTY IMPACT DASHBOARD"
+                    title="Community Service"
+                    subtitle="Monitor service opportunities, participation, reports and verified community impact."
                     gradient={FACULTY_HERO}
                     stats={[
-                        { value: String(pending.length), label: "WAITING FOR YOU" },
-                        { value: String(deckCards.length), label: "APPROVED & LIVE" },
-                        { value: `${hours}h`, label: "COHORT HOURS" },
+                        { value: String(pending.length), label: "Pending Review" },
+                        { value: String(deckCards.length), label: "Approved" },
+                        { value: `${hours}h`, label: "In Impact Wall" },
                     ]}
                 />
             ) : (
@@ -139,7 +134,13 @@ export default function FacultyCommunityServicePage() {
             )}
 
             {view === "home" && (
-                <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                <>
+                <PathSectionHead
+                    title="Community Service Management"
+                    subtitle="Approve student/community service submissions, monitor active reports and review verified evidence."
+                    pill="FACULTY VIEW"
+                />
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                     <HubTile
                         href="/dashboard/faculty/create-opportunity"
                         badge="FOR YOUR COHORT"
@@ -186,6 +187,20 @@ export default function FacultyCommunityServicePage() {
                         background="linear-gradient(135deg,#0369a1,#38bdf8)"
                     />
                 </div>
+                <ActionKpiGrid
+                    items={[
+                        { value: String(pending.length), label: "Reports Awaiting Review" },
+                        { value: String(deckCards.length), label: "Approved This Term" },
+                        { value: `${hours}h`, label: "Cohort Hours" },
+                        { value: String(liveRows.length), label: "On Impact Wall" },
+                    ]}
+                />
+                <WorkflowSteps
+                    title="Community Service Workflow"
+                    subtitle="Approved work flows into the same unified Faculty Impact Wall."
+                    steps={["Opportunity Submitted", "Faculty Opportunity Approval", "Activity + Report", "Faculty Report Approval", "Impact Wall + AI Badge"]}
+                />
+                </>
             )}
 
             {view === "pending" && (

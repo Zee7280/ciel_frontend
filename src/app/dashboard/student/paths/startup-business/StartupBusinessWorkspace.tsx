@@ -53,7 +53,8 @@ interface VentureEvidenceInfo {
 }
 interface VentureReviewPipeline {
     declarationWork?: boolean; declarationConsent?: boolean; studentDeclaredAt?: string;
-    supervisorStatus?: "not_started" | "pending" | "approved" | "revisions_requested";
+    supervisorStatus?: "not_started" | "pending" | "approved" | "revisions_requested" | "rejected";
+    supervisorNote?: string | null;
     universityStatus?: "not_started" | "pending" | "approved";
     sdgReviewStatus?: "not_started" | "pending" | "approved";
 }
@@ -87,6 +88,17 @@ interface VentureEntry {
     stepCompleted: number;
     status: "draft" | "submitted";
     gates?: VentureGates;
+    /** Pinned by the analyzer after a ranked merit-model run. badgeLevel is a rank-percentile tier;
+     * previousRank is this venture's rank the last time it was ranked (null/undefined = first run). */
+    meritRibbon?: {
+        rank: number;
+        of: number;
+        scope: string;
+        total?: number;
+        badgeLevel?: "Gold" | "Silver" | "Bronze" | "Participant";
+        previousRank?: number | null;
+        at: string;
+    } | null;
     /** False when this entry is showing because the viewer accepted a team invite on someone
      * else's submitted venture, not because they own it — gates edit/submit access on the frontend. */
     isOwner?: boolean;
@@ -881,16 +893,46 @@ export default function StartupBusinessWorkspace() {
                             <div className="divide-y divide-ciel-border rounded-ciel-sm border border-ciel-border">
                                 {[
                                     { label: "Student declaration", status: entry.status === "submitted" ? "Declared" : "Waiting" },
-                                    { label: "Supervisor review", status: entry.reviewPipeline?.supervisorStatus === "approved" ? "Approved" : entry.status === "submitted" ? "Pending" : "Not started" },
+                                    {
+                                        label: "Supervisor review",
+                                        status:
+                                            entry.reviewPipeline?.supervisorStatus === "approved"
+                                                ? "Approved"
+                                                : entry.reviewPipeline?.supervisorStatus === "rejected"
+                                                  ? "Rejected"
+                                                  : entry.reviewPipeline?.supervisorStatus === "revisions_requested"
+                                                    ? "Revision requested"
+                                                    : entry.status === "submitted"
+                                                      ? "Pending"
+                                                      : "Not started",
+                                    },
                                     { label: "Department / university verification", status: entry.reviewPipeline?.universityStatus === "approved" ? "Verified" : entry.status === "submitted" ? "Pending" : "Not started" },
                                     { label: "SDG review", status: entry.reviewPipeline?.sdgReviewStatus === "approved" ? "Reviewed" : entry.sdgMapping?.mode !== "map" ? "Not applicable" : entry.status === "submitted" ? "Pending" : "Not started" },
                                 ].map((row) => (
                                     <div key={row.label} className="flex items-center justify-between px-4 py-2.5 text-sm">
                                         <span className="text-ciel-text-mid">{row.label}</span>
-                                        <span className={clsx("rounded-full px-2.5 py-0.5 text-[11px] font-bold", row.status === "Approved" || row.status === "Verified" || row.status === "Reviewed" || row.status === "Declared" ? "bg-ciel-green-soft text-ciel-green-deep" : row.status === "Pending" ? "bg-amber-50 text-amber-700" : "bg-ciel-border text-ciel-text-soft")}>{row.status}</span>
+                                        <span
+                                            className={clsx(
+                                                "rounded-full px-2.5 py-0.5 text-[11px] font-bold",
+                                                row.status === "Approved" || row.status === "Verified" || row.status === "Reviewed" || row.status === "Declared"
+                                                    ? "bg-ciel-green-soft text-ciel-green-deep"
+                                                    : row.status === "Rejected"
+                                                      ? "bg-red-50 text-red-700"
+                                                      : row.status === "Pending" || row.status === "Revision requested"
+                                                        ? "bg-amber-50 text-amber-700"
+                                                        : "bg-ciel-border text-ciel-text-soft",
+                                            )}
+                                        >
+                                            {row.status}
+                                        </span>
                                     </div>
                                 ))}
                             </div>
+                            {entry.reviewPipeline?.supervisorNote && (entry.reviewPipeline?.supervisorStatus === "rejected" || entry.reviewPipeline?.supervisorStatus === "revisions_requested") && (
+                                <p className="rounded-ciel-xs border border-dashed border-amber-300 bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-800">
+                                    📝 Supervisor note: “{entry.reviewPipeline.supervisorNote}”
+                                </p>
+                            )}
                             <button
                                 type="button"
                                 disabled={!declared || saving}

@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { Search } from "lucide-react";
 import ThesisCard from "@/components/ciel/ThesisCard";
 import FypMeritPanel, { type FypMeritEntry } from "@/components/ciel/FypMeritPanel";
-import { CourseworkCrumb, CourseworkHero, HubBackButton, HubTile } from "@/components/ciel/coursework/CourseworkHubChrome";
+import { ActionKpiGrid, CourseworkCrumb, CourseworkHero, HubBackButton, HubTile, PathSectionHead, WorkflowSteps } from "@/components/ciel/coursework/CourseworkHubChrome";
 import { isPathEntryApproved, isPathEntryWaiting } from "@/utils/reviewQueue";
 
 type FacView = "home" | "pending" | "approved" | "rank";
@@ -41,17 +41,23 @@ export default function FacultyFypThesisPage() {
         }
     };
 
-    const reviewEntry = async (id: string, action: "approve" | "reject") => {
+    const reviewEntry = async (id: string, action: "approve" | "reject" | "revision", note?: string) => {
         setReviewingId(id);
         try {
             const response = await authenticatedFetch(`/api/v1/paths/fyp-thesis/${id}/supervisor-review`, {
                 method: "PATCH",
-                body: JSON.stringify({ action }),
+                body: JSON.stringify({ action, note }),
             });
             if (response?.ok) {
                 const data = await response.json();
                 setEntries((prev) => prev.map((e) => (e.id === id ? { ...e, ...data.data } : e)));
-                toast.success(action === "approve" ? "Approved — now live in Merit Model rankings" : "Changes requested — student will see this on their draft");
+                toast.success(
+                    action === "approve"
+                        ? "Approved — now live in Merit Model rankings"
+                        : action === "revision"
+                          ? "Revision requested — student can fix and resubmit."
+                          : "Rejected — student can fix and resubmit if allowed.",
+                );
             } else {
                 toast.error("Could not save your review");
             }
@@ -79,25 +85,30 @@ export default function FacultyFypThesisPage() {
     const filteredApproved = approved.filter(matchesSearch);
 
     return (
-        <div className="min-h-screen bg-[#f7f9fc] px-4 py-6 sm:px-6 lg:px-8">
-            <div className="mx-auto max-w-[1040px] space-y-4">
+        <div>
+            <div className="mx-auto max-w-[1240px] space-y-4">
                 <CourseworkCrumb role="Faculty" view={view === "home" ? undefined : view} pathLabel="FYP / Thesis" />
                 <CourseworkHero
-                    kicker="FACULTY · FYP / THESIS"
-                    title="Supervise, then make it live 🧑‍🎓"
-                    subtitle="Submitted records wait here until you approve. Approved cards move to the live deck and merit rankings."
-                    gradient="linear-gradient(115deg,#04252b,#0e5f63 55%,#0e7d74 115%)"
+                    kicker="FACULTY IMPACT DASHBOARD"
+                    title="FYP / Thesis"
+                    subtitle="Monitor final-year projects, research evidence, supervisor review and verified impact outcomes."
                     stats={[
-                        { value: String(waiting.length), label: "WAITING FOR YOU" },
-                        { value: String(approved.length), label: "APPROVED & LIVE" },
-                        { value: String(entries.length), label: "ALL RECORDS" },
+                        { value: String(waiting.length), label: "Awaiting Review" },
+                        { value: String(approved.length), label: "Approved FYPs" },
+                        { value: String(approved.length), label: "On Impact Wall" },
                     ]}
                 />
 
                 {view !== "home" && <HubBackButton onClick={() => setView("home")} />}
 
                 {view === "home" && (
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                    <>
+                    <PathSectionHead
+                        title="FYP / Thesis Management"
+                        subtitle="Review final-year research impact records, evidence, SDG linkage and supervisor/faculty verification."
+                        pill="FACULTY VIEW"
+                    />
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                         <HubTile
                             onClick={() => setView("pending")}
                             badge={waiting.length ? `${waiting.length} IN QUEUE` : "INBOX"}
@@ -123,6 +134,20 @@ export default function FacultyFypThesisPage() {
                             background="linear-gradient(135deg,#6d28d9,#a78bfa)"
                         />
                     </div>
+                    <ActionKpiGrid
+                        items={[
+                            { value: String(waiting.length), label: "Awaiting Review" },
+                            { value: String(Math.max(0, entries.length - waiting.length - approved.length)), label: "Other Status" },
+                            { value: String(approved.length), label: "Approved This Year" },
+                            { value: String(entries.length), label: "All Records" },
+                        ]}
+                    />
+                    <WorkflowSteps
+                        title="FYP / Thesis Workflow"
+                        subtitle="Approved work flows into the same unified Faculty Impact Wall."
+                        steps={["FYP Record Submitted", "Faculty / Supervisor Review", "Verified Approval", "AI Ranking", "Impact Wall + Badge"]}
+                    />
+                    </>
                 )}
 
                 {(view === "pending" || view === "approved") && (
@@ -156,7 +181,7 @@ export default function FacultyFypThesisPage() {
                                     key={entry.id}
                                     entry={entry}
                                     studentName={entry.student?.name}
-                                    onSupervisorReview={entry.id ? (action) => reviewEntry(entry.id!, action) : undefined}
+                                    onSupervisorReview={entry.id ? (action, note) => reviewEntry(entry.id!, action, note) : undefined}
                                     reviewing={reviewingId === entry.id}
                                 />
                             ))}

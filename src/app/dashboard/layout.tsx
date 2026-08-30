@@ -9,7 +9,7 @@ export default function DashboardLayout({
     children: React.ReactNode;
 }) {
     return (
-        <div className="min-h-screen bg-slate-50 font-sans">
+        <div className="min-h-screen bg-[#f4f7fa] font-sans text-[#16313d]">
             <div className="print:hidden">
                 <Suspense fallback={null}>
                     <Sidebar />
@@ -19,7 +19,7 @@ export default function DashboardLayout({
                 <div className="print:hidden">
                     <DashboardHeader />
                 </div>
-                <main className="flex-1 p-4 pb-24 sm:p-6 lg:ml-[var(--ciel-sidebar-width)] lg:p-8 lg:pb-8 print:ml-0 print:p-0 print:w-full ciel-transition">
+                <main className="mx-auto w-full max-w-[1500px] flex-1 px-[18px] py-7 pb-24 sm:px-[30px] sm:pb-12 lg:ml-[var(--ciel-sidebar-width)] lg:pb-12 print:ml-0 print:max-w-none print:p-0 print:w-full ciel-transition">
                     <ProfileCompletionGate>{children}</ProfileCompletionGate>
                 </main>
             </div>

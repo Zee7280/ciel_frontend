@@ -7,7 +7,7 @@ import { authenticatedFetch } from "@/utils/api";
 import PendingActionCards, { type PendingSummary } from "@/components/dashboard/PendingActionCards";
 import Section1AnalyticsPanel from "@/components/analytics/Section1AnalyticsPanel";
 import PendingAttendanceModal from "@/components/engagement/PendingAttendanceModal";
-import { HubTile } from "@/components/ciel/coursework/CourseworkHubChrome";
+import { MOCKUP_GRADIENTS, MockupActionCard, MockupHero, MockupKpiGrid, MockupPanel, MockupSectionHead } from "@/components/ciel/dashboard/MockupChrome";
 import { readStoredCurrentUser } from "@/utils/currentUser";
 
 type PartnerProject = {
@@ -112,59 +112,105 @@ export default function PartnerDashboard() {
     return (
         <div className="space-y-8">
             <PendingAttendanceModal variant="partner" />
-            {/* Welcome Section */}
+            {isUni ? (
+                <MockupHero
+                    title="University Impact Dashboard"
+                    subtitle="Monitor approved impact across Community Service, Coursework, FYP / Final Year Project and Startup / Venture — all in one institutional view."
+                    stats={[
+                        { value: String(stats?.stats?.reportsSubmitted ?? stats?.stats?.activeOpportunities ?? 0), label: "Approved Projects" },
+                        { value: String(stats?.stats?.studentsEngaged ?? 0), label: "Students Engaged" },
+                        { value: String(pendingVerifications), label: "Pending Review" },
+                    ]}
+                    rightStat={{ value: String(stats?.stats?.activeOpportunities ?? 0), label: "active opportunities across the university" }}
+                />
+            ) : (
             <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-blue-900 to-indigo-800 p-5 text-white sm:p-8">
                 <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -mr-16 -mt-16"></div>
                 <div className="relative z-10">
-                    <h2 className="mb-2 text-2xl font-bold sm:text-3xl">
-                        {isUni ? "Welcome, University" : "Welcome, Partner"}
-                    </h2>
+                    <h2 className="mb-2 text-2xl font-bold sm:text-3xl">Welcome, Partner</h2>
                     <p className="text-blue-100 max-w-xl">
-                        {isUni
-                            ? "Review community service, the coursework showcase, and institutional analytics from one place."
-                            : "Manage your project requests, track volunteer engagement, and report impact directly through the CIEL Partner Portal."}
+                        Manage your project requests, track volunteer engagement, and report impact directly through the CIEL Partner Portal.
                     </p>
                     <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:gap-4">
                         <Link href="/dashboard/partner/requests/new" className="inline-flex justify-center rounded-xl bg-white px-6 py-2.5 text-sm font-bold text-blue-900 transition-colors hover:bg-blue-50">Post New Request</Link>
-                        <Link href={isUni ? "/dashboard/partner/community-service" : "/dashboard/partner/reports"} className="inline-flex justify-center rounded-xl border border-blue-700 bg-blue-800 px-6 py-2.5 text-sm font-bold text-white transition-colors hover:bg-blue-700">
-                            {isUni ? "Community service" : "View reports"}
+                        <Link href="/dashboard/partner/reports" className="inline-flex justify-center rounded-xl border border-blue-700 bg-blue-800 px-6 py-2.5 text-sm font-bold text-white transition-colors hover:bg-blue-700">
+                            View reports
                         </Link>
                     </div>
                 </div>
             </div>
+            )}
 
             <PendingActionCards summary={pendingSummary} emptyMessage="No partner reviews or approval follow-ups are pending." />
 
             {isUni ? (
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                    <HubTile
-                        href="/dashboard/partner/community-service"
-                        badge="LIVE DECK"
-                        badgeClass="text-[#0e7d74]"
-                        emoji="🤝"
-                        title="Community service"
-                        subtitle="Waiting reports, approved flash cards, and the university award run."
-                        background="linear-gradient(135deg,#0e7d74,#2dd4bf)"
+                <>
+                    <MockupSectionHead
+                        title="University Overview"
+                        subtitle="Institution-wide snapshot across all four impact areas."
                     />
-                    <HubTile
-                        href="/dashboard/partner/university-showcase"
-                        badge="SHOWCASE"
-                        badgeClass="text-[#1e1b4b]"
-                        emoji="🎓"
-                        title="Showcase deck"
-                        subtitle="Coursework and FYP waiting vs approved — faculty sign-off still happens on the existing screens."
-                        background="linear-gradient(135deg,#1e1b4b,#818cf8)"
-                    />
-                    <HubTile
-                        href="/dashboard/partner/university-analytics"
-                        badge="NUMBERS"
-                        badgeClass="text-[#0369a1]"
-                        emoji="📊"
-                        title="Institution analytics"
-                        subtitle="Hours, departments, and the existing university analytics page."
-                        background="linear-gradient(135deg,#0369a1,#38bdf8)"
-                    />
-                </div>
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        <MockupActionCard
+                            href="/dashboard/partner/community-service"
+                            emoji="🏕️"
+                            title="Community Service"
+                            subtitle="Create opportunities, view approved Community Service work, assess impact and unlock analytics."
+                            badge="OPEN"
+                            background={MOCKUP_GRADIENTS.teal}
+                        />
+                        <MockupActionCard
+                            href="/dashboard/partner/university-showcase?mode=course-project"
+                            emoji="📚"
+                            title="Coursework"
+                            subtitle="All faculty-approved sustainability-linked coursework flows automatically into the university view."
+                            badge="OPEN"
+                            background={MOCKUP_GRADIENTS.blue}
+                        />
+                        <MockupActionCard
+                            href="/dashboard/partner/university-showcase?mode=fyp-thesis"
+                            emoji="🎓"
+                            title="FYP / Final Year Project"
+                            subtitle="Approved Final Year Projects from all departments flow automatically into the university view."
+                            badge="OPEN"
+                            background={MOCKUP_GRADIENTS.orange}
+                        />
+                        <MockupActionCard
+                            href="/dashboard/partner/impact"
+                            emoji="💼"
+                            title="Startup / Venture"
+                            subtitle="View approved ventures, run AI Rankings and identify investor-ready student ventures."
+                            badge="OPEN"
+                            background={MOCKUP_GRADIENTS.purple}
+                        />
+                        <MockupActionCard
+                            href="/dashboard/partner/impact"
+                            emoji="🏆"
+                            title="University Impact Portfolio"
+                            subtitle="Open the combined institutional portfolio across all four areas."
+                            badge="PORTFOLIO"
+                            background={MOCKUP_GRADIENTS.green}
+                        />
+                        <MockupActionCard
+                            href="/dashboard/partner/university-analytics"
+                            emoji="📊"
+                            ghost="🔒"
+                            title="Overall Impact Analytics"
+                            subtitle="Unlock cross-module trends, comparisons, rankings and downloadable institutional intelligence."
+                            badge="ANALYTICS"
+                            background={MOCKUP_GRADIENTS.gold}
+                        />
+                    </div>
+                    <MockupPanel title="University Snapshot" subtitle="Filtered institutional performance across all four impact areas.">
+                        <MockupKpiGrid
+                            items={[
+                                { label: "ACTIVE OPPORTUNITIES", value: String(stats?.stats?.activeOpportunities ?? 0), hint: "Live listings" },
+                                { label: "STUDENTS ENGAGED", value: String(stats?.stats?.studentsEngaged ?? 0), hint: "Across impact areas" },
+                                { label: "VERIFIED HOURS", value: String(stats?.stats?.verifiedHours ?? 0), hint: "Institutional total" },
+                                { label: "REPORTS SUBMITTED", value: String(stats?.stats?.reportsSubmitted ?? 0), hint: "Awaiting or complete" },
+                            ]}
+                        />
+                    </MockupPanel>
+                </>
             ) : null}
 
             {/* Pending Verifications Alert */}

@@ -7,6 +7,8 @@ import CommunityFlashCard from "@/components/ciel/community-service/CommunityFla
 import {
     AWARD_PHRASE,
     COMMUNITY_AWARD_CRITERIA,
+    COMMUNITY_LEVEL_CLASS,
+    COMMUNITY_LEVEL_LABEL,
     awardTier,
     awardTopN,
     whyThisCommunityRank,
@@ -226,7 +228,14 @@ export default function CommunityAwardPanel({
                         <div className="flex items-start gap-2.5">
                             <span className="w-7 text-center text-[21px]">{MEDALS[i] || `#${i + 1}`}</span>
                             <div className="min-w-0 flex-1">
-                                <b className="text-[12.5px] text-[#0d2b33]">{c.project_title}</b>
+                                <div className="flex flex-wrap items-center gap-1.5">
+                                    <b className="text-[12.5px] text-[#0d2b33]">{c.project_title}</b>
+                                    {c.level && (
+                                        <span className={clsx("rounded-full px-2 py-0.5 text-[8px] font-extrabold uppercase tracking-wide", COMMUNITY_LEVEL_CLASS[c.level])}>
+                                            {COMMUNITY_LEVEL_LABEL[c.level]}
+                                        </span>
+                                    )}
+                                </div>
                                 <p className="mt-0.5 text-[9px] text-[#7a919a]">
                                     {c.student_name} · {c.university} · {c.organization_name} · {c.semester} {c.year}
                                 </p>

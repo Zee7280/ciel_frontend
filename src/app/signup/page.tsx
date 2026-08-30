@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import Link from "next/link";
-import { ArrowRight, Mail, Lock, AlertCircle, Loader2, ArrowLeft, Eye, EyeOff, ShieldCheck, ChevronDown, BadgeCheck, Info } from "lucide-react";
+import { ArrowRight, Mail, Lock, AlertCircle, Loader2, ArrowLeft, Eye, EyeOff, ShieldCheck, ChevronDown, BadgeCheck, Info, Upload, GraduationCap, User, Building2, Handshake, Briefcase, Landmark, Check } from "lucide-react";
 import Image from "next/image";
 import clsx from "clsx";
 import PhoneConnectivityRow from "@/components/ui/PhoneConnectivityRow";
@@ -13,21 +13,40 @@ import { pakistaniUniversities } from "@/utils/universityData";
 import { hecPrograms } from "@/utils/hecProgramsData";
 import SearchableSelect from "@/components/ui/SearchableSelect";
 import { isSafeInternalReturnPath } from "@/utils/verificationReturnUrl";
-import { LEGAL_REGISTRATION_TYPES, ORGANIZATION_CATEGORIES } from "@/utils/organizationTaxonomy";
 import { isPersonalEmailDomain } from "@/utils/personalEmailDomains";
-import RoleTile from "@/components/ciel/RoleTile";
 import PasswordStrengthMeter from "@/components/ciel/PasswordStrengthMeter";
 import { authApiErrorMessage, isSignupEmailUnverifiedMessage } from "@/utils/authApiError";
 
 import { Suspense } from "react";
 
 const ROLES = [
-    { id: "student", label: "Student", emoji: "🎓", desc: "Join verified projects, document your community impact, and earn SDG-aligned records." },
-    { id: "faculty", label: "Faculty", emoji: "🧑‍🏫", desc: "Oversee student engagement, validate learning and impact, and support SDG-ready reporting." },
-    { id: "university", label: "University", emoji: "🏛️", desc: "Monitor engagement, aggregate verified impact data, and generate institutional SDG reports." },
-    { id: "ngo", label: "NGO", emoji: "🤝", desc: "Post SDG-aligned opportunities, engage students, and receive verified impact reports." },
-    { id: "corporate", label: "Company", emoji: "🏢", desc: "Support impactful projects and track CSR goals aligned with SDGs." },
+    { id: "student", label: "Student", emoji: "🎓", desc: "Quick registration. Create coursework projects and build your Impact Wall.", formTitle: "Student Registration", formSub: "Quick and easy registration.", submitLabel: "Create Student Account" },
+    { id: "faculty", label: "Faculty", emoji: "👤", desc: "Quick registration. Review coursework and verify student impact.", formTitle: "Faculty Registration", formSub: "Quick and easy registration.", submitLabel: "Create Faculty Account" },
+    { id: "university", label: "University", emoji: "🏛️", desc: "Institutional account verified by CIEL PK Admin.", formTitle: "Institution / Organization Registration", formSub: "Requires verification by CIEL PK Admin.", submitLabel: "Submit for Verification" },
+    { id: "ngo", label: "NGO / Partner", emoji: "🤝", desc: "Partner account verified by CIEL PK Admin.", formTitle: "Institution / Organization Registration", formSub: "Requires verification by CIEL PK Admin.", submitLabel: "Submit for Verification" },
+    { id: "corporate", label: "Company", emoji: "💼", desc: "Corporate / CSR account verified by CIEL PK Admin.", formTitle: "Institution / Organization Registration", formSub: "Requires verification by CIEL PK Admin.", submitLabel: "Submit for Verification" },
+    { id: "government", label: "HEC / Government", emoji: "🏢", desc: "Official representative account verified by CIEL PK Admin.", formTitle: "Institution / Organization Registration", formSub: "Requires verification by CIEL PK Admin.", submitLabel: "Submit for Verification" },
 ] as const;
+
+const ORG_KIND_OPTIONS = [
+    { kind: "university", label: "University", role: "university", category: "Educational Institution", legal: "Educational Institution" },
+    { kind: "ngo", label: "NGO / Partner Organization", role: "ngo", category: "Nonprofit Organization (NGO)", legal: "Nonprofit Organization (NGO)" },
+    { kind: "corporate", label: "Company / Corporate Partner", role: "corporate", category: "Corporate Organization", legal: "Private Limited Company" },
+    { kind: "government", label: "HEC / Government", role: "ngo", category: "Government Organization", legal: "Government Department" },
+    { kind: "international", label: "UN / International Organization", role: "ngo", category: "Development Organization", legal: "International Organization" },
+] as const;
+
+const PROOF_LINK_TYPES = [
+    "Official Website Profile",
+    "University / Organization Staff Directory",
+    "LinkedIn Profile",
+    "Official Organization Announcement",
+    "Other Public Verification Link",
+] as const;
+
+function signupApiRole(selectedRoleId: string) {
+    return selectedRoleId === "government" ? "ngo" : selectedRoleId;
+}
 
 const CURRENT_YEAR = 2026;
 const ENROLLMENT_YEARS = Array.from({ length: 8 }, (_, i) => String(CURRENT_YEAR - i));
@@ -44,6 +63,11 @@ function SignUpContent() {
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [consent, setConsent] = useState(false);
     const [dismissedEmailWarning, setDismissedEmailWarning] = useState(false);
+    const [orgKind, setOrgKind] = useState<(typeof ORG_KIND_OPTIONS)[number]["kind"]>("university");
+    const [proofMethod, setProofMethod] = useState<"upload" | "link">("upload");
+    const [proofFileName, setProofFileName] = useState("");
+    const [proofLinkType, setProofLinkType] = useState<(typeof PROOF_LINK_TYPES)[number]>(PROOF_LINK_TYPES[0]);
+    const [proofUrl, setProofUrl] = useState("");
     const searchParams = useSearchParams();
 
     // OTP states
@@ -73,11 +97,9 @@ function SignUpContent() {
     });
 
     const orgRoleDefaults = (roleId: string) => {
-        const base = { orgType: roleId, organizationCategory: "", legalRegistrationType: "" };
-        if (roleId === "university") return { ...base, organizationCategory: "Educational Institution", legalRegistrationType: "Educational Institution" };
-        if (roleId === "ngo") return { ...base, organizationCategory: "Nonprofit Organization (NGO)", legalRegistrationType: "Nonprofit Organization (NGO)" };
-        if (roleId === "corporate") return { ...base, organizationCategory: "Corporate Organization" };
-        return base;
+        const match = ORG_KIND_OPTIONS.find((o) => o.kind === roleId) ?? ORG_KIND_OPTIONS.find((o) => o.role === roleId);
+        if (!match) return { orgType: roleId, organizationCategory: "", legalRegistrationType: "" };
+        return { orgType: match.role, organizationCategory: match.category, legalRegistrationType: match.legal };
     };
 
     useEffect(() => {
@@ -90,9 +112,11 @@ function SignUpContent() {
         }
         if (roleParam && ROLES.find((r) => r.id === roleParam)) {
             setRole(roleParam);
+            const kindMatch = ORG_KIND_OPTIONS.find((o) => o.kind === roleParam);
+            if (kindMatch) setOrgKind(kindMatch.kind);
             setFormData((prev) => ({
                 ...prev,
-                ...(["university", "ngo", "corporate"].includes(roleParam) ? orgRoleDefaults(roleParam) : {}),
+                ...(["university", "ngo", "corporate", "government"].includes(roleParam) ? orgRoleDefaults(roleParam) : {}),
                 ...(emailParam || tokenParam ? { email: emailParam || prev.email, token: tokenParam || prev.token } : {}),
             }));
         }
@@ -100,9 +124,15 @@ function SignUpContent() {
 
     const handleRoleSelect = (selectedRole: string) => {
         setRole(selectedRole);
-        if (["university", "ngo", "corporate"].includes(selectedRole)) {
-            setFormData((prev) => ({ ...prev, ...orgRoleDefaults(selectedRole) }));
-        }
+        const kindMatch = ORG_KIND_OPTIONS.find((o) => o.kind === selectedRole);
+        if (kindMatch) setOrgKind(kindMatch.kind);
+        setFormData((prev) => ({
+            ...prev,
+            registrationNumber: "",
+            ...(["university", "ngo", "corporate", "government"].includes(selectedRole) ? orgRoleDefaults(selectedRole) : {}),
+            orgName:
+                kindMatch?.role === "university" && !pakistaniUniversities.includes(prev.orgName) ? "" : prev.orgName,
+        }));
         setErrors({});
     };
 
@@ -111,7 +141,8 @@ function SignUpContent() {
         if (errors[field]) setErrors((prev) => ({ ...prev, [field]: "" }));
     };
 
-    const isOrgRole = ["university", "ngo", "corporate"].includes(role);
+    const isOrgRole = ["university", "ngo", "corporate", "government"].includes(role);
+    const apiRole = signupApiRole(role);
     const isPersonalEmail = useMemo(() => isPersonalEmailDomain(formData.email), [formData.email]);
 
     const validateForm = () => {
@@ -119,10 +150,15 @@ function SignUpContent() {
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
         if (isOrgRole) {
-            if (!formData.orgName.trim()) newErrors.orgName = "Org name is required";
-            if (!formData.contactPerson.trim()) newErrors.contactPerson = "Contact person is required";
+            if (!formData.orgName.trim()) newErrors.orgName = "Organization name is required";
+            if (!formData.contactPerson.trim()) newErrors.contactPerson = "Your designation is required";
             if (!formData.organizationCategory.trim()) newErrors.organizationCategory = "Organization type is required";
             if (!formData.legalRegistrationType.trim()) newErrors.legalRegistrationType = "Legal registration type is required";
+            if (proofMethod === "link") {
+                const url = proofUrl.trim();
+                if (!url) newErrors.proofUrl = "Please add a public verification link before submitting.";
+                else if (!/^https?:\/\/.+\..+/.test(url)) newErrors.proofUrl = "Enter a valid public URL starting with http";
+            }
         } else {
             if (!formData.name.trim()) newErrors.name = "Full name is required";
         }
@@ -178,13 +214,42 @@ function SignUpContent() {
         if (!formData.phone.trim() || formData.phone.length < 10) return false;
         if (isOrgRole) {
             if (!formData.orgName.trim() || !formData.contactPerson.trim() || !formData.organizationCategory.trim() || !formData.legalRegistrationType.trim()) return false;
+            if (proofMethod === "link") {
+                const url = proofUrl.trim();
+                if (!url || !/^https?:\/\/.+\..+/.test(url)) return false;
+            }
         } else if (!formData.name.trim()) {
             return false;
         }
         if ((role === "student" || role === "faculty") && (!formData.institution.trim() || !formData.department.trim())) return false;
         if (role === "student" && !formData.enrollmentYear.trim()) return false;
         return true;
-    }, [formData, role, isOrgRole, consent]);
+    }, [formData, role, isOrgRole, consent, proofMethod, proofUrl]);
+
+    const firstIncompleteHint = useMemo(() => {
+        if (isFormValid) return "";
+        if (isOrgRole) {
+            if (!formData.contactPerson.trim()) return "Enter your designation to continue";
+            if (!formData.orgName.trim()) return "Enter the organisation name to continue";
+            if (!formData.email.trim()) return "Enter your official email to continue";
+            if (!formData.phone.trim() || formData.phone.length < 10) return "Enter your mobile number to continue";
+            if (!formData.password || formData.password.length < 8) return "Create a password to continue";
+            if (proofMethod === "link" && !proofUrl.trim()) return "Add a verification link to continue";
+            if (!consent) return "Accept the terms to continue";
+            return "Complete the remaining fields to continue";
+        }
+        if (!formData.name.trim()) return "Enter your full name to continue";
+        if ((role === "student" || role === "faculty") && !formData.institution.trim()) return "Select your university to continue";
+        if ((role === "student" || role === "faculty") && !formData.department.trim()) {
+            return role === "student" ? "Select your programme to continue" : "Enter your department to continue";
+        }
+        if (!formData.email.trim()) return "Enter your email to continue";
+        if (!formData.phone.trim() || formData.phone.length < 10) return "Enter your mobile number to continue";
+        if (role === "student" && !formData.enrollmentYear.trim()) return "Select your enrolment year to continue";
+        if (!formData.password || formData.password.length < 8) return "Create a password to continue";
+        if (!consent) return "Accept the terms to continue";
+        return "Complete the remaining fields to continue";
+    }, [isFormValid, isOrgRole, formData, role, proofMethod, proofUrl, consent]);
 
     // Step 1: Validate form, then send OTP — swaps the form into the "check your inbox" state.
     const handleSubmit = async (e: React.FormEvent) => {
@@ -243,10 +308,16 @@ function SignUpContent() {
                     ...signupFields,
                     countryCode: dialFromPhoneCountryKey(phoneCountryKey),
                     email: normalizedEmail,
-                    role,
+                    role: apiRole,
                     name: isOrgRole ? formData.contactPerson.trim() : formData.name.trim(),
                     orgName: formData.orgName.trim(),
+                    orgType: isOrgRole ? signupApiRole(role) : formData.orgType,
                     contactPerson: isOrgRole ? formData.contactPerson.trim() : formData.contactPerson,
+                    affiliationProofKind: isOrgRole ? proofMethod : undefined,
+                    affiliationProofUrl: isOrgRole && proofMethod === "link" ? proofUrl.trim() : undefined,
+                    affiliationProofLabel: isOrgRole
+                        ? (proofMethod === "link" ? proofLinkType : proofFileName || "Document upload selected")
+                        : undefined,
                     university:
                         role === "student" || role === "faculty"
                             ? formData.institution.trim()
@@ -327,212 +398,247 @@ function SignUpContent() {
 
     const fieldClass = (hasError: boolean, extra?: string) =>
         clsx(
-            "w-full px-5 py-4 rounded-ciel-md border-2 bg-ciel-page/50 focus:bg-white outline-none transition-all font-semibold text-ciel-text placeholder:text-ciel-text-soft focus-visible:ring-2 focus-visible:ring-ciel-green focus-visible:ring-offset-1",
-            hasError ? "border-red-500 focus:border-red-500" : "border-ciel-border focus:border-ciel-green",
+            "w-full min-w-0 rounded-xl border bg-white px-3.5 py-3 text-sm font-medium text-ciel-text outline-none transition-all placeholder:text-ciel-text-soft focus-visible:ring-2 focus-visible:ring-ciel-green/40",
+            hasError ? "border-red-400 focus:border-red-500" : "border-slate-200 focus:border-ciel-green",
             extra,
         );
 
-    const selectClass = (hasError: boolean) => clsx(fieldClass(hasError), "pr-12 cursor-pointer appearance-none");
-
-    const activeRole = ROLES.find((r) => r.id === role);
+    const selectClass = (hasError: boolean) => clsx(fieldClass(hasError), "pr-11 cursor-pointer appearance-none");
+    const labelClass = "mb-1.5 block text-[13px] font-semibold text-ciel-text";
+    const orgButtons = [
+        { id: "university", label: "University", icon: Building2 },
+        { id: "ngo", label: "NGO", icon: Handshake },
+        { id: "corporate", label: "Company", icon: Briefcase },
+        { id: "government", label: "HEC / Gov", icon: Landmark },
+    ] as const;
 
     return (
-        <div className="min-h-screen bg-ciel-page flex items-center justify-center p-4 md:p-8 font-sans antialiased text-ciel-text">
-            <div className="w-full max-w-6xl grid grid-cols-1 lg:grid-cols-2 bg-white rounded-ciel-xl shadow-[0_32px_64px_-16px_rgba(0,0,0,0.15)] overflow-hidden border border-ciel-border min-h-[700px]">
-
-                {/* Left: navy rail — unchanged branding + stepper pattern */}
-                <div className="relative bg-ciel-navy p-6 sm:p-8 lg:p-12 text-white flex flex-col justify-between overflow-hidden order-2 lg:order-1">
-                    <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-ciel-green/10 rounded-full blur-[120px] -mr-48 -mt-48" />
-                    <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-white/5 rounded-full blur-[100px] -ml-40 -mb-40" />
-
-                    <div className="relative z-10">
-                        <Link href="/" className="inline-flex items-center gap-5 ciel-transition hover:scale-105">
-                            <div className="relative w-24 h-24 p-3 bg-white rounded-ciel-lg flex items-center justify-center shadow-2xl shadow-black/20">
-                                <Image src="/iel-pk-logo.png" alt="IEL PK" width={200} height={200} className="object-contain" />
+        <div className="min-h-dvh bg-white font-sans antialiased text-ciel-text">
+            <div className="grid min-h-dvh grid-cols-1 lg:grid-cols-[minmax(280px,34%)_1fr]">
+                <aside className="relative flex flex-col justify-between overflow-hidden bg-[#12303F] px-6 py-6 text-white sm:px-8 lg:px-10 lg:py-8">
+                    <div className="absolute -right-24 -top-24 h-72 w-72 rounded-full bg-ciel-green/10 blur-3xl" />
+                    <div>
+                        <Link href="/" className="relative z-10 inline-flex items-center gap-3">
+                            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white p-1.5">
+                                <Image src="/iel-pk-logo.png" alt="CIEL" width={80} height={80} className="object-contain" />
                             </div>
-                            <div className="flex flex-col">
-                                <span className="text-2xl font-black tracking-tighter text-white leading-none uppercase">
-                                    Community Impact <br /> Education Lab
-                                </span>
-                                <span className="text-[10px] font-black text-ciel-green mt-2 tracking-[0.3em] uppercase opacity-80">
-                                    Youth Empowered Community Impact
-                                </span>
+                            <div className="min-w-0">
+                                <p className="text-[11px] font-black uppercase leading-tight tracking-[0.14em] text-white">Community Impact Education Lab</p>
+                                <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-ciel-green">Youth Empowered Impact</p>
                             </div>
                         </Link>
-                    </div>
 
-                    <div className="relative z-10 py-12">
-                        <div className="space-y-8" key={step}>
-                            <h2 className="text-3xl md:text-4xl font-black leading-[1.1] tracking-tight mb-8">
-                                {step === "form" ? (
-                                    <>Empowering <br /><span className="text-ciel-green">Pakistan&apos;s Youth</span><br />for impact.</>
+                        <div className="relative z-10 mt-10 hidden lg:block">
+                            <h2 className="text-[1.75rem] font-semibold leading-tight tracking-tight">
+                                {step === "otp" ? (
+                                    <>Verify <span className="text-ciel-green">your email.</span></>
                                 ) : (
-                                    <>Verify <br /><span className="text-ciel-green">your identity.</span></>
+                                    <>Turn your volunteering into a <span className="text-ciel-green">verified record.</span></>
                                 )}
                             </h2>
-                            <div className="space-y-3">
-                                <h3 className="text-sm font-bold text-white/90">
-                                    {step === "otp" ? "Check your inbox" : `Registering as ${activeRole?.label}`}
-                                </h3>
-                                <p className="text-white/60 text-sm font-medium leading-relaxed max-w-sm">
-                                    {step === "otp"
-                                        ? `A 6-digit code was sent to ${formData.email}. Enter it to activate your account.`
-                                        : "Join Pakistan's leading platform for university-led community impact and SDG-aligned growth."}
-                                </p>
-                            </div>
+                            <p className="mt-4 max-w-sm text-sm leading-relaxed text-white/70">
+                                {step === "otp"
+                                    ? `A 6-digit code was sent to ${formData.email}. Enter it to activate your account.`
+                                    : "CIEL helps Pakistani students turn campus and community work into a record employers and universities can trust."}
+                            </p>
+                            {step === "form" && (
+                                <ul className="mt-8 space-y-5">
+                                    {[
+                                        { title: "Find real projects", body: "Browse opportunities from vetted NGOs and campus societies." },
+                                        { title: "Log your hours", body: "Your supervisor verifies them, so the record holds up." },
+                                        { title: "Get a verified certificate", body: "Scored against the CII index and scannable by anyone." },
+                                    ].map((item) => (
+                                        <li key={item.title} className="flex gap-3">
+                                            <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-ciel-green text-[10px] font-black text-[#12303F]">✓</span>
+                                            <div>
+                                                <p className="text-sm font-semibold">{item.title}</p>
+                                                <p className="mt-0.5 text-sm leading-relaxed text-white/60">{item.body}</p>
+                                            </div>
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
                         </div>
                     </div>
 
-                    <div className="relative z-10 flex flex-col gap-10">
+                    <div className="relative z-10 mt-8">
                         {step === "otp" && (
                             <button
+                                type="button"
                                 onClick={() => setStep("form")}
-                                className="group flex items-center gap-3 text-xs font-black uppercase tracking-widest text-white/50 hover:text-ciel-green ciel-transition w-fit focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ciel-green rounded-ciel-xs"
+                                className="mb-6 inline-flex items-center gap-2 text-xs font-semibold text-white/60 hover:text-ciel-green"
                             >
-                                <div className="w-10 h-10 rounded-ciel-sm border border-white/10 flex items-center justify-center group-hover:border-ciel-green/50 group-hover:bg-ciel-green/5 ciel-transition">
-                                    <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 ciel-transition" />
-                                </div>
-                                Back to details
+                                <ArrowLeft className="h-3.5 w-3.5" /> Back to details
                             </button>
                         )}
-
-                        <div className="flex items-center justify-between pt-10 border-t border-white/5">
-                            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40 italic">© 2026 CIEL Global</p>
-                            <div className="flex gap-4 items-center">
-                                <div className={clsx("w-2 h-2 rounded-full ciel-transition", step === "form" ? "bg-ciel-green shadow-[0_0_15px_rgba(76,195,138,0.6)] scale-125" : "bg-white/10")} />
-                                <div className={clsx("w-2 h-2 rounded-full ciel-transition", step === "otp" ? "bg-ciel-green shadow-[0_0_15px_rgba(76,195,138,0.6)] scale-125" : "bg-white/10")} />
-                            </div>
+                        <div className="hidden gap-6 text-xs font-medium text-white/80 lg:flex">
+                            <span>156 live projects</span>
+                            <span>2,400+ students</span>
+                            <span>40+ partners</span>
                         </div>
+                        <p className="mt-5 text-[10px] uppercase tracking-[0.16em] text-white/35">© 2026 CIEL Global</p>
                     </div>
-                </div>
+                </aside>
 
-                {/* Right: form / check-inbox state */}
-                <div className="p-8 md:p-14 flex flex-col justify-center order-1 lg:order-2 bg-white overflow-y-auto max-h-screen">
-                    <div className="w-full max-w-md mx-auto">
+                <main className="min-w-0 overflow-y-auto bg-white px-5 py-8 sm:px-10 lg:px-16 lg:py-12">
+                    <div className="mx-auto w-full max-w-[34rem]">
 
                         {step === "form" && (
                             <form onSubmit={handleSubmit} className="space-y-6">
-                                <div className="mb-2 text-center lg:text-left">
-                                    <h3 className="text-3xl font-black text-ciel-text tracking-tight mb-2">Create your CIEL account</h3>
-                                    <p className="text-ciel-text-mid font-medium text-sm">Tell us how you&apos;ll be using CIEL, then fill in your details.</p>
+                                <div>
+                                    <h1 className="text-[2rem] font-semibold tracking-tight text-ciel-text">Create your account</h1>
+                                    <p className="mt-1.5 text-sm text-ciel-text-mid">Takes about a minute. You&apos;ll verify your email at the end.</p>
                                 </div>
 
-                                <div role="radiogroup" aria-label="Account category" className="grid grid-cols-3 sm:grid-cols-5 gap-2">
-                                    {ROLES.map((r) => (
-                                        <RoleTile key={r.id} label={r.label} emoji={r.emoji} selected={role === r.id} onSelect={() => handleRoleSelect(r.id)} />
-                                    ))}
+                                <div>
+                                    <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.14em] text-ciel-text-soft">I&apos;m joining as</p>
+                                    <div role="radiogroup" aria-label="Account category" className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                                        {([
+                                            { id: "student", label: "Student", desc: "Find projects, log hours, build your impact record.", Icon: GraduationCap },
+                                            { id: "faculty", label: "Faculty", desc: "Post opportunities, review reports, verify student hours.", Icon: User },
+                                        ] as const).map((item) => {
+                                            const selected = role === item.id;
+                                            return (
+                                                <button
+                                                    key={item.id}
+                                                    type="button"
+                                                    role="radio"
+                                                    aria-checked={selected}
+                                                    onClick={() => handleRoleSelect(item.id)}
+                                                    className={clsx(
+                                                        "relative rounded-2xl border px-4 py-4 text-left transition-colors",
+                                                        selected ? "border-ciel-green bg-ciel-green-soft" : "border-slate-200 bg-white hover:border-ciel-green/40",
+                                                    )}
+                                                >
+                                                    {selected && (
+                                                        <span className="absolute right-3 top-3 flex h-5 w-5 items-center justify-center rounded-full bg-ciel-green-deep text-white">
+                                                            <Check className="h-3 w-3" strokeWidth={3} />
+                                                        </span>
+                                                    )}
+                                                    <item.Icon className={clsx("h-5 w-5", selected ? "text-ciel-green-deep" : "text-ciel-text-mid")} />
+                                                    <p className="mt-2 text-sm font-semibold text-ciel-text">{item.label}</p>
+                                                    <p className="mt-1 text-[12px] leading-snug text-ciel-text-mid">{item.desc}</p>
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                    <p className="mb-2 mt-4 text-[11px] font-bold uppercase tracking-[0.14em] text-ciel-text-soft">or register an organisation</p>
+                                    <div className="grid grid-cols-4 gap-2">
+                                        {orgButtons.map((item) => {
+                                            const selected = role === item.id;
+                                            return (
+                                                <button
+                                                    key={item.id}
+                                                    type="button"
+                                                    onClick={() => handleRoleSelect(item.id)}
+                                                    className={clsx(
+                                                        "flex flex-col items-center gap-1.5 rounded-xl border px-1 py-3 text-center transition-colors",
+                                                        selected ? "border-ciel-green bg-ciel-green-soft text-ciel-green-deep" : "border-slate-200 bg-white text-ciel-text-mid hover:border-ciel-green/40",
+                                                    )}
+                                                >
+                                                    <item.icon className="h-4 w-4" />
+                                                    <span className="text-[10px] font-semibold leading-tight">{item.label}</span>
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                    <p className="mt-2 text-[12px] italic leading-relaxed text-ciel-text-soft">
+                                        Organisation accounts need a short CIEL admin check. Students and faculty activate after email verification.
+                                    </p>
                                 </div>
-                                <p className="text-xs text-ciel-text-soft -mt-2">{activeRole?.desc}</p>
 
-                                <div className="space-y-5">
+                                <div className="space-y-4">
                                     {isOrgRole ? (
-                                        <div key={role} className="ciel-crossfade-enter space-y-5">
-                                            <div className="space-y-1.5">
-                                                <label className="text-[11px] font-bold uppercase tracking-widest text-ciel-text-soft ml-1">
-                                                    Org name
-                                                </label>
-                                                {role === "university" ? (
+                                        <div key={role} className="ciel-crossfade-enter space-y-4">
+                                            <div>
+                                                <label className={labelClass}>Organization name</label>
+                                                {orgKind === "university" ? (
                                                     <div className="relative">
-                                                        <select value={formData.orgName} onChange={(e) => handleGenericChange("orgName", e.target.value)} aria-invalid={!!errors.orgName} aria-label="Org name" className={selectClass(!!errors.orgName)}>
-                                                            <option value="">Select org name</option>
+                                                        <select value={formData.orgName} onChange={(e) => handleGenericChange("orgName", e.target.value)} aria-invalid={!!errors.orgName} aria-label="Organization name" className={selectClass(!!errors.orgName)}>
+                                                            <option value="">Select organization name</option>
                                                             {pakistaniUniversities.map((u) => <option key={u} value={u}>{u}</option>)}
                                                         </select>
                                                         <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-ciel-text-soft" aria-hidden />
                                                     </div>
                                                 ) : (
-                                                    <input type="text" value={formData.orgName} onChange={(e) => handleGenericChange("orgName", e.target.value)} className={fieldClass(!!errors.orgName)} placeholder="e.g. Hope Foundation" aria-label="Org name" />
+                                                    <input type="text" value={formData.orgName} onChange={(e) => handleGenericChange("orgName", e.target.value)} className={fieldClass(!!errors.orgName)} placeholder="e.g. Beaconhouse National University" aria-label="Organization name" />
                                                 )}
                                                 {errors.orgName && <p className="text-[11px] text-red-500 font-semibold ml-1">{errors.orgName}</p>}
                                             </div>
 
-                                            {role === "corporate" && (
-                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                                    <div className="space-y-1.5">
-                                                        <label className="text-[11px] font-bold uppercase tracking-widest text-ciel-text-soft ml-1">Organization type</label>
-                                                        <div className="relative">
-                                                            <select value={formData.organizationCategory} onChange={(e) => handleGenericChange("organizationCategory", e.target.value)} aria-invalid={!!errors.organizationCategory} aria-label="Organization type" className={selectClass(!!errors.organizationCategory)}>
-                                                                <option value="">Select organization type</option>
-                                                                {ORGANIZATION_CATEGORIES.map((o) => <option key={o} value={o}>{o}</option>)}
-                                                            </select>
-                                                            <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-ciel-text-soft" aria-hidden />
-                                                        </div>
-                                                        {errors.organizationCategory && <p className="text-[11px] text-red-500 font-semibold ml-1">{errors.organizationCategory}</p>}
-                                                    </div>
-                                                    <div className="space-y-1.5">
-                                                        <label className="text-[11px] font-bold uppercase tracking-widest text-ciel-text-soft ml-1">Legal registration type</label>
-                                                        <div className="relative">
-                                                            <select value={formData.legalRegistrationType} onChange={(e) => handleGenericChange("legalRegistrationType", e.target.value)} aria-invalid={!!errors.legalRegistrationType} aria-label="Legal registration type" className={selectClass(!!errors.legalRegistrationType)}>
-                                                                <option value="">Select legal registration type</option>
-                                                                {LEGAL_REGISTRATION_TYPES.map((o) => <option key={o} value={o}>{o}</option>)}
-                                                            </select>
-                                                            <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-ciel-text-soft" aria-hidden />
-                                                        </div>
-                                                        {errors.legalRegistrationType && <p className="text-[11px] text-red-500 font-semibold ml-1">{errors.legalRegistrationType}</p>}
-                                                    </div>
-                                                </div>
-                                            )}
-
-                                            <div className="space-y-1.5">
-                                                <label className="text-[11px] font-bold uppercase tracking-widest text-ciel-text-soft ml-1">Lead official</label>
-                                                <input type="text" value={formData.contactPerson} onChange={(e) => handleGenericChange("contactPerson", e.target.value)} className={fieldClass(!!errors.contactPerson)} placeholder="Full name" />
-                                                {errors.contactPerson && <p className="text-[11px] text-red-500 font-semibold ml-1">{errors.contactPerson}</p>}
+                                            <div>
+                                                <label className={labelClass}>Your designation</label>
+                                                <input type="text" value={formData.contactPerson} onChange={(e) => handleGenericChange("contactPerson", e.target.value)} className={fieldClass(!!errors.contactPerson)} placeholder="e.g. Coordinator Community Engagement" />
+                                                {errors.contactPerson && <p className="mt-1 text-[11px] font-semibold text-red-500">{errors.contactPerson}</p>}
                                             </div>
                                         </div>
                                     ) : (
-                                        <div key={role} className="ciel-crossfade-enter space-y-1.5">
-                                            <label className="text-[11px] font-bold uppercase tracking-widest text-ciel-text-soft ml-1">Full name</label>
-                                            <input type="text" value={formData.name} onChange={(e) => handleGenericChange("name", e.target.value)} className={fieldClass(!!errors.name)} placeholder="Full name" />
-                                            {errors.name && <p className="text-[11px] text-red-500 font-semibold ml-1">{errors.name}</p>}
+                                        <div key={`${role}-name`} className="ciel-crossfade-enter">
+                                            <label className={labelClass}>Full name</label>
+                                            <input type="text" value={formData.name} onChange={(e) => handleGenericChange("name", e.target.value)} className={fieldClass(!!errors.name)} placeholder={role === "faculty" ? "As it appears on your faculty record" : "As it appears on your student record"} />
+                                            {errors.name && <p className="mt-1 text-[11px] font-semibold text-red-500">{errors.name}</p>}
                                         </div>
                                     )}
 
                                     {(role === "student" || role === "faculty") && (
-                                        <div key={`${role}-inst`} className="ciel-crossfade-enter grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                            <div className="space-y-1.5">
-                                                <label className="text-[11px] font-bold uppercase tracking-widest text-ciel-text-soft ml-1">Institution</label>
+                                        <div key={`${role}-inst`} className="ciel-crossfade-enter grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                            <div>
+                                                <label className={labelClass}>University</label>
                                                 <div className="relative">
-                                                    <select value={formData.institution} onChange={(e) => handleGenericChange("institution", e.target.value)} aria-invalid={!!errors.institution} aria-label="Institution" className={selectClass(!!errors.institution)}>
-                                                        <option value="">Select institution</option>
+                                                    <select value={formData.institution} onChange={(e) => handleGenericChange("institution", e.target.value)} aria-invalid={!!errors.institution} aria-label="University" className={selectClass(!!errors.institution)}>
+                                                        <option value="">Select university</option>
                                                         {pakistaniUniversities.map((u) => <option key={u} value={u}>{u}</option>)}
                                                     </select>
-                                                    <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-ciel-text-soft" aria-hidden />
+                                                    <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ciel-text-soft" aria-hidden />
                                                 </div>
-                                                {errors.institution && <p className="text-[11px] text-red-500 font-semibold ml-1">{errors.institution}</p>}
+                                                {errors.institution && <p className="mt-1 text-[11px] font-semibold text-red-500">{errors.institution}</p>}
                                             </div>
-                                            <div className="space-y-1.5">
-                                                <label className="text-[11px] font-bold uppercase tracking-widest text-ciel-text-soft ml-1">{role === "student" ? "Program" : "Department"}</label>
+                                            <div>
+                                                <label className={labelClass}>{role === "student" ? "Programme" : "Department"}</label>
                                                 {role === "student" ? (
-                                                    <SearchableSelect value={formData.department} onChange={(v) => handleGenericChange("department", v)} options={hecPrograms} placeholder="Select program" searchPlaceholder="Search HEC programs..." hasError={!!errors.department} ariaLabel="Degree program" />
+                                                    <SearchableSelect value={formData.department} onChange={(v) => handleGenericChange("department", v)} options={hecPrograms} placeholder={formData.institution ? "Select programme" : "Select university first"} searchPlaceholder="Search HEC programs..." hasError={!!errors.department} ariaLabel="Programme" disabled={!formData.institution} />
                                                 ) : (
-                                                    <input type="text" value={formData.department} onChange={(e) => handleGenericChange("department", e.target.value)} className={fieldClass(!!errors.department)} placeholder="Department" />
+                                                    <input type="text" value={formData.department} onChange={(e) => handleGenericChange("department", e.target.value)} className={fieldClass(!!errors.department)} placeholder="e.g. School of Management Sciences" />
                                                 )}
-                                                {errors.department && <p className="text-[11px] text-red-500 font-semibold ml-1">{errors.department}</p>}
+                                                {errors.department && <p className="mt-1 text-[11px] font-semibold text-red-500">{errors.department}</p>}
                                             </div>
                                         </div>
                                     )}
 
-                                    {role === "student" && (
-                                        <div key="student-extra" className="ciel-crossfade-enter grid grid-cols-2 gap-4">
-                                            <div className="space-y-1.5">
-                                                <label className="text-[11px] font-bold uppercase tracking-widest text-ciel-text-soft ml-1">Enrollment year</label>
-                                                <div className="relative">
-                                                    <select value={formData.enrollmentYear} onChange={(e) => handleGenericChange("enrollmentYear", e.target.value)} aria-invalid={!!errors.enrollmentYear} aria-label="Enrollment year" className={selectClass(!!errors.enrollmentYear)}>
-                                                        <option value="">Select year</option>
-                                                        {ENROLLMENT_YEARS.map((y) => <option key={y} value={y}>{y}</option>)}
-                                                    </select>
-                                                    <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-ciel-text-soft" aria-hidden />
+                                    <div>
+                                        <label className={labelClass}>{isOrgRole ? "Official email address" : "Email address"}</label>
+                                        <div className="group relative">
+                                            <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-ciel-text-soft" />
+                                            <input
+                                                type="email"
+                                                value={formData.email}
+                                                onChange={(e) => { handleGenericChange("email", e.target.value); setDismissedEmailWarning(false); }}
+                                                className={fieldClass(!!errors.email, "pl-11")}
+                                                placeholder={role === "faculty" ? "faculty@university.edu.pk" : role === "student" ? "you@university.edu.pk" : "official@organization.org"}
+                                            />
+                                        </div>
+                                        {errors.email && <p className="mt-1 text-[11px] font-semibold text-red-500">{errors.email}</p>}
+                                        {!errors.email && formData.email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email) && (
+                                            isPersonalEmail && !dismissedEmailWarning ? (
+                                                <div className="mt-2 flex items-start gap-2 rounded-xl bg-slate-50 px-3 py-2.5">
+                                                    <Info className="mt-0.5 h-4 w-4 shrink-0 text-ciel-text-mid" />
+                                                    <div className="flex-1">
+                                                        <p className="text-[12px] leading-relaxed text-ciel-text-mid">A personal email works. A university address skips extra checks — you&apos;d be active after verifying, instead of waiting on an admin.</p>
+                                                        <button type="button" onClick={() => setDismissedEmailWarning(true)} className="mt-1 text-[12px] font-semibold text-ciel-green-deep underline">
+                                                            Use it anyway
+                                                        </button>
+                                                    </div>
                                                 </div>
-                                                {errors.enrollmentYear && <p className="text-[11px] text-red-500 font-semibold ml-1">{errors.enrollmentYear}</p>}
-                                            </div>
-                                            <div className="space-y-1.5">
-                                                <label className="text-[11px] font-bold uppercase tracking-widest text-ciel-text-soft ml-1">Student ID <span className="text-ciel-text-soft normal-case font-medium">(optional)</span></label>
-                                                <input type="text" value={formData.registrationNumber} onChange={(e) => handleGenericChange("registrationNumber", e.target.value)} className={fieldClass(false)} placeholder="e.g. FA22-BCS-123" />
-                                            </div>
-                                        </div>
-                                    )}
+                                            ) : (
+                                                <p className="mt-2 flex items-center gap-1.5 text-[12px] font-medium text-ciel-green-deep">
+                                                    <BadgeCheck className="h-3.5 w-3.5" /> Looks good — we&apos;ll verify this at the end
+                                                </p>
+                                            )
+                                        )}
+                                    </div>
 
-                                    <div className="space-y-1.5">
-                                        <label className="text-[11px] font-bold uppercase tracking-widest text-ciel-text-soft ml-1">Phone (+92)</label>
+                                    <div>
+                                        <label className={labelClass}>Mobile number</label>
                                         <PhoneConnectivityRow
                                             phoneCountryKey={formData.phoneCountryKey}
                                             nationalDigits={formData.phone}
@@ -547,48 +653,112 @@ function SignUpContent() {
                                         />
                                     </div>
 
-                                    <div className="space-y-1.5">
-                                        <label className="text-[11px] font-bold uppercase tracking-widest text-ciel-text-soft ml-1">Email</label>
-                                        <div className="group relative">
-                                            <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-ciel-text-soft" />
-                                            <input
-                                                type="email"
-                                                value={formData.email}
-                                                onChange={(e) => { handleGenericChange("email", e.target.value); setDismissedEmailWarning(false); }}
-                                                className={fieldClass(!!errors.email, "pl-12")}
-                                                placeholder="you@university.edu.pk"
-                                            />
-                                        </div>
-                                        {errors.email && <p className="text-[11px] text-red-500 font-semibold ml-1">{errors.email}</p>}
-                                        {!errors.email && formData.email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email) && (
-                                            isPersonalEmail && !dismissedEmailWarning ? (
-                                                <div className="mt-1.5 flex items-start gap-2 rounded-ciel-sm bg-ciel-amber-soft border border-ciel-amber/20 px-3 py-2.5">
-                                                    <Info className="h-4 w-4 text-ciel-amber shrink-0 mt-0.5" />
-                                                    <div className="flex-1">
-                                                        <p className="text-xs font-semibold text-ciel-amber">This looks like a personal email. University or partner emails verify instantly.</p>
-                                                        <button type="button" onClick={() => setDismissedEmailWarning(true)} className="mt-1 text-xs font-bold underline text-ciel-amber hover:text-ciel-amber/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ciel-green rounded-ciel-xs">
-                                                            Use it anyway
-                                                        </button>
-                                                    </div>
+                                    {isOrgRole && (
+                                        <div className="ciel-crossfade-enter space-y-3">
+                                            <div>
+                                                <label className={labelClass}>Proof of affiliation</label>
+                                                <p className="mt-1 text-[12px] leading-relaxed text-ciel-text-soft">Upload a document or add a public verification link.</p>
+                                            </div>
+                                            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setProofMethod("upload")}
+                                                    className={clsx(
+                                                        "flex items-start gap-2 rounded-xl border px-3 py-3 text-left transition-colors",
+                                                        proofMethod === "upload" ? "border-ciel-green bg-ciel-green-soft" : "border-slate-200 bg-white hover:border-ciel-green/40",
+                                                    )}
+                                                >
+                                                    <span className={clsx("mt-0.5 h-3.5 w-3.5 shrink-0 rounded-full border-2", proofMethod === "upload" ? "border-ciel-green-deep bg-ciel-green-deep" : "border-slate-300")} />
+                                                    <span>
+                                                        <span className="block text-[13px] font-semibold text-ciel-text">Upload document</span>
+                                                        <span className="mt-0.5 block text-[12px] leading-snug text-ciel-text-soft">Employee ID, staff letter, or official proof.</span>
+                                                    </span>
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setProofMethod("link")}
+                                                    className={clsx(
+                                                        "flex items-start gap-2 rounded-xl border px-3 py-3 text-left transition-colors",
+                                                        proofMethod === "link" ? "border-ciel-green bg-ciel-green-soft" : "border-slate-200 bg-white hover:border-ciel-green/40",
+                                                    )}
+                                                >
+                                                    <span className={clsx("mt-0.5 h-3.5 w-3.5 shrink-0 rounded-full border-2", proofMethod === "link" ? "border-ciel-green-deep bg-ciel-green-deep" : "border-slate-300")} />
+                                                    <span>
+                                                        <span className="block text-[13px] font-semibold text-ciel-text">Add verification link</span>
+                                                        <span className="mt-0.5 block text-[12px] leading-snug text-ciel-text-soft">Staff directory, LinkedIn, or public profile.</span>
+                                                    </span>
+                                                </button>
+                                            </div>
+                                            {proofMethod === "upload" ? (
+                                                <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                                                    <label className="flex cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-slate-300 bg-white px-4 py-5 text-center">
+                                                        <Upload className="mb-2 h-4 w-4 text-ciel-text-mid" />
+                                                        <span className="text-sm font-semibold text-ciel-text">{proofFileName || "Upload ID / supporting document"}</span>
+                                                        <input
+                                                            type="file"
+                                                            className="sr-only"
+                                                            accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,application/pdf,image/*"
+                                                            onChange={(e) => setProofFileName(e.target.files?.[0]?.name ?? "")}
+                                                        />
+                                                    </label>
+                                                    <p className="mt-2 text-[12px] leading-relaxed text-ciel-text-soft">Accepted: university or employee ID, faculty card, or authorization letter.</p>
                                                 </div>
                                             ) : (
-                                                <p className="mt-1.5 flex items-center gap-1.5 text-xs font-semibold text-ciel-green-deep ml-1">
-                                                    <BadgeCheck className="h-3.5 w-3.5" /> Verifies instantly
-                                                </p>
-                                            )
-                                        )}
-                                    </div>
+                                                <div className="space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                                                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-[160px_1fr]">
+                                                        <div className="relative">
+                                                            <select value={proofLinkType} onChange={(e) => setProofLinkType(e.target.value as (typeof PROOF_LINK_TYPES)[number])} className={selectClass(false)} aria-label="Verification link type">
+                                                                {PROOF_LINK_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                                                            </select>
+                                                            <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ciel-text-soft" aria-hidden />
+                                                        </div>
+                                                        <input type="url" value={proofUrl} onChange={(e) => { setProofUrl(e.target.value); if (errors.proofUrl) setErrors((prev) => ({ ...prev, proofUrl: "" })); }} className={fieldClass(!!errors.proofUrl)} placeholder="https://example.org/staff/your-name" aria-label="Public verification link" />
+                                                    </div>
+                                                    {errors.proofUrl && <p className="text-[11px] font-semibold text-red-500">{errors.proofUrl}</p>}
+                                                    <p className="text-[12px] leading-relaxed text-ciel-text-soft">The link should show your name and connection to the organisation. CIEL admin reviews it before approval.</p>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
 
-                                    <div className="space-y-1.5">
-                                        <label className="text-[11px] font-bold uppercase tracking-widest text-ciel-text-soft ml-1">Password</label>
+                                    {role === "faculty" && (
+                                        <div key="faculty-id" className="ciel-crossfade-enter">
+                                            <label className={labelClass}>Faculty / Employee ID <span className="font-normal text-ciel-text-soft">(optional)</span></label>
+                                            <input type="text" value={formData.registrationNumber} onChange={(e) => handleGenericChange("registrationNumber", e.target.value)} className={fieldClass(false)} placeholder="Leave blank if unsure" aria-label="Faculty / Employee ID" />
+                                            <p className="mt-1 text-[12px] text-ciel-text-soft">Preferred, but not required.</p>
+                                        </div>
+                                    )}
+
+                                    {role === "student" && (
+                                        <div key="student-extra" className="ciel-crossfade-enter grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                            <div>
+                                                <label className={labelClass}>Enrolment year</label>
+                                                <div className="relative">
+                                                    <select value={formData.enrollmentYear} onChange={(e) => handleGenericChange("enrollmentYear", e.target.value)} aria-invalid={!!errors.enrollmentYear} aria-label="Enrolment year" className={selectClass(!!errors.enrollmentYear)}>
+                                                        <option value="">Select year</option>
+                                                        {ENROLLMENT_YEARS.map((y) => <option key={y} value={y}>{y}</option>)}
+                                                    </select>
+                                                    <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ciel-text-soft" aria-hidden />
+                                                </div>
+                                                {errors.enrollmentYear && <p className="mt-1 text-[11px] font-semibold text-red-500">{errors.enrollmentYear}</p>}
+                                            </div>
+                                            <div>
+                                                <label className={labelClass}>Student ID <span className="font-normal text-ciel-text-soft">(optional)</span></label>
+                                                <input type="text" value={formData.registrationNumber} onChange={(e) => handleGenericChange("registrationNumber", e.target.value)} className={fieldClass(false)} placeholder="Leave blank if unsure" />
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    <div>
+                                        <label className={labelClass}>Password</label>
                                         <div className="group relative">
                                             <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-ciel-text-soft" />
                                             <input
                                                 type={showPassword ? "text" : "password"}
                                                 value={formData.password}
                                                 onChange={(e) => handleGenericChange("password", e.target.value)}
-                                                className={fieldClass(!!errors.password, "pl-12 pr-12")}
-                                                placeholder="••••••••"
+                                                className={fieldClass(!!errors.password, "pl-11 pr-11")}
+                                                placeholder="At least 8 characters"
                                             />
                                             <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 p-2.5 text-ciel-text-soft hover:text-ciel-green ciel-transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ciel-green rounded-ciel-xs" tabIndex={-1}>
                                                 {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -599,8 +769,10 @@ function SignUpContent() {
                                                 <AlertCircle className="w-3 h-3 text-red-500 shrink-0 mt-0.5" />
                                                 <p className="text-[11px] text-red-500 font-semibold">{errors.password}</p>
                                             </div>
-                                        ) : (
+                                        ) : formData.password ? (
                                             <PasswordStrengthMeter password={formData.password} />
+                                        ) : (
+                                            <p className="mt-1.5 text-[12px] text-ciel-text-soft">Use 8 or more characters</p>
                                         )}
                                     </div>
                                 </div>
@@ -628,35 +800,43 @@ function SignUpContent() {
                                 <button
                                     type="submit"
                                     disabled={isLoading || !isFormValid}
-                                    className="w-full py-4 rounded-ciel-lg font-bold text-sm text-white bg-ciel-navy hover:bg-ciel-navy/90 ciel-transition disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-3 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ciel-green focus-visible:ring-offset-2"
+                                    className={clsx(
+                                        "flex w-full items-center justify-center gap-2 rounded-xl py-3.5 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ciel-green focus-visible:ring-offset-2",
+                                        isFormValid && !isLoading
+                                            ? "bg-[#12303F] text-white hover:bg-[#0d242f]"
+                                            : "cursor-not-allowed bg-slate-200 text-slate-500",
+                                    )}
                                 >
                                     {isLoading ? (
-                                        <><Loader2 className="w-4 h-4 animate-spin" /> Sending code...</>
+                                        <><Loader2 className="h-4 w-4 animate-spin" /> Sending code...</>
                                     ) : (
-                                        <>Create my account <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 ciel-transition" /></>
+                                        <>Create account <ArrowRight className="h-4 w-4" /></>
                                     )}
                                 </button>
+                                {!isFormValid && (
+                                    <p className="text-center text-[12px] text-ciel-text-soft">{firstIncompleteHint}</p>
+                                )}
+                                {isOrgRole && (
+                                    <p className="text-center text-[12px] text-ciel-text-soft">Organisation accounts stay pending until CIEL admin review.</p>
+                                )}
 
-                                <p className="text-center text-xs text-ciel-text-mid">
+                                <p className="text-center text-sm text-ciel-text-mid">
                                     Already a member?{" "}
-                                    <Link href="/login" className="font-bold text-ciel-green-deep hover:underline">Sign in</Link>
+                                    <Link href="/login" className="font-semibold text-ciel-green-deep hover:underline">Sign in</Link>
                                 </p>
                             </form>
                         )}
 
                         {step === "otp" && (
-                            <div>
-                                <div className="mb-8 text-center lg:text-left">
-                                    <div className="inline-flex items-center justify-center w-16 h-16 rounded-ciel-lg bg-ciel-green-soft mb-5">
-                                        <ShieldCheck className="w-8 h-8 text-ciel-green-deep" />
-                                    </div>
-                                    <h3 className="text-3xl font-black text-ciel-text tracking-tight mb-2">Check your inbox</h3>
-                                    <p className="text-ciel-text-mid font-medium text-sm">
-                                        We sent a 6-digit code to <span className="text-ciel-green-deep font-bold">{formData.email}</span>
+                            <div className="space-y-6">
+                                <div>
+                                    <h1 className="text-[2rem] font-semibold tracking-tight text-ciel-text">Check your inbox</h1>
+                                    <p className="mt-1.5 text-sm text-ciel-text-mid">
+                                        We sent a 6-digit code to <span className="font-semibold text-ciel-green-deep">{formData.email}</span>
                                     </p>
                                 </div>
 
-                                <div className="flex flex-wrap gap-2 sm:gap-3 justify-center mb-6" onPaste={handleOtpPaste}>
+                                <div className="flex flex-wrap justify-center gap-2 sm:gap-3" onPaste={handleOtpPaste}>
                                     {otpDigits.map((digit, i) => (
                                         <input
                                             key={i}
@@ -668,16 +848,16 @@ function SignUpContent() {
                                             onChange={(e) => handleOtpChange(i, e.target.value)}
                                             onKeyDown={(e) => handleOtpKeyDown(i, e)}
                                             className={clsx(
-                                                "w-10 h-12 sm:w-12 sm:h-14 text-center text-xl sm:text-2xl font-black rounded-ciel-md border-2 outline-none ciel-transition bg-ciel-page focus:bg-white focus-visible:ring-2 focus-visible:ring-ciel-green",
-                                                otpError ? "border-red-400 bg-red-50" : digit ? "border-ciel-green" : "border-ciel-border focus:border-ciel-green",
+                                                "h-12 w-10 rounded-xl border bg-white text-center text-xl font-semibold outline-none transition-all focus-visible:ring-2 focus-visible:ring-ciel-green/40 sm:h-14 sm:w-12 sm:text-2xl",
+                                                otpError ? "border-red-400 bg-red-50" : digit ? "border-ciel-green" : "border-slate-200 focus:border-ciel-green",
                                             )}
                                         />
                                     ))}
                                 </div>
 
                                 {otpError && (
-                                    <div className="flex items-center gap-2 mb-4 p-3 rounded-ciel-md bg-red-50 border border-red-100">
-                                        <AlertCircle className="w-4 h-4 text-red-500 shrink-0" />
+                                    <div className="flex items-center gap-2 rounded-xl border border-red-100 bg-red-50 p-3">
+                                        <AlertCircle className="h-4 w-4 shrink-0 text-red-500" />
                                         <p className="text-xs font-semibold text-red-600">{otpError}</p>
                                     </div>
                                 )}
@@ -685,24 +865,29 @@ function SignUpContent() {
                                 <button
                                     onClick={handleVerifyOtp}
                                     disabled={otpLoading || otpDigits.join("").length !== 6}
-                                    className="w-full py-4 rounded-ciel-lg font-bold text-sm text-white bg-ciel-navy hover:bg-ciel-green-deep ciel-transition disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-3 mb-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ciel-green focus-visible:ring-offset-2"
+                                    className={clsx(
+                                        "flex w-full items-center justify-center gap-2 rounded-xl py-3.5 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ciel-green focus-visible:ring-offset-2",
+                                        otpLoading || otpDigits.join("").length !== 6
+                                            ? "cursor-not-allowed bg-slate-200 text-slate-500"
+                                            : "bg-[#12303F] text-white hover:bg-[#0d242f]",
+                                    )}
                                 >
-                                    {otpLoading ? (<><Loader2 className="w-4 h-4 animate-spin" /> Verifying...</>) : (<><ShieldCheck className="w-4 h-4" /> Verify &amp; create account</>)}
+                                    {otpLoading ? (<><Loader2 className="h-4 w-4 animate-spin" /> Verifying...</>) : (<><ShieldCheck className="h-4 w-4" /> Verify &amp; create account</>)}
                                 </button>
 
-                                <div className="text-center">
+                                <p className="text-center">
                                     <button
                                         onClick={handleResendOtp}
                                         disabled={resendCooldown > 0}
-                                        className="text-xs font-bold text-ciel-text-mid hover:text-ciel-green-deep ciel-transition disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ciel-green rounded-ciel-xs"
+                                        className="text-sm font-semibold text-ciel-text-mid hover:text-ciel-green-deep disabled:cursor-not-allowed"
                                     >
                                         {resendCooldown > 0 ? `Resend code in ${resendCooldown}s` : "Didn't receive it? Resend code"}
                                     </button>
-                                </div>
+                                </p>
                             </div>
                         )}
                     </div>
-                </div>
+                </main>
             </div>
         </div>
     );

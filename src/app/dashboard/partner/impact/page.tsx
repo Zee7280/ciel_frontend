@@ -5,6 +5,8 @@ import { TrendingUp, Users, Clock, Target, BarChart3, PieChart, Loader2 } from "
 import { authenticatedFetch } from "@/utils/api";
 import { toast } from "sonner";
 import Section1AnalyticsPanel from "@/components/analytics/Section1AnalyticsPanel";
+import { CourseworkCrumb, CourseworkHero } from "@/components/ciel/coursework/CourseworkHubChrome";
+import { readStoredCurrentUser } from "@/utils/currentUser";
 
 interface ImpactMetrics {
     totalBeneficiaries: number;
@@ -67,13 +69,33 @@ export default function PartnerImpactPage() {
         17: "bg-blue-700",
     };
 
+    const stored = readStoredCurrentUser() as { orgType?: string; organization_type?: string; type?: string } | null;
+    const isUni = String(stored?.orgType || stored?.organization_type || stored?.type || "")
+        .toLowerCase()
+        .includes("university");
+
     return (
-        <div className="p-0 lg:p-8">
-            {/* Header */}
+        <div className={isUni ? "mx-auto max-w-[1240px]" : "p-0 lg:p-8"}>
+            {isUni ? (
+                <>
+                    <CourseworkCrumb role="University" pathLabel="My Impact Wall" />
+                    <CourseworkHero
+                        kicker="UNIFIED UNIVERSITY IMPACT PORTFOLIO"
+                        title="My Impact Wall 🏅"
+                        subtitle="Institutional impact metrics and verified records for this university."
+                        stats={[
+                            { value: String(metrics?.totalProjects || 0), label: "Total Verified Records" },
+                            { value: String(metrics?.totalBeneficiaries || 0), label: "Beneficiaries" },
+                            { value: String(metrics?.totalHours || 0), label: "Verified Hours" },
+                        ]}
+                    />
+                </>
+            ) : (
             <div className="mb-8">
                 <h1 className="text-2xl font-bold text-slate-900 sm:text-3xl">Impact Dashboard</h1>
                 <p className="text-slate-500">Track your organization's measurable impact and SDG alignment</p>
             </div>
+            )}
 
             {/* Key Metrics */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">

@@ -6,9 +6,14 @@ export { CourseworkHero as CommunityHero, HubBackButton, HubTile };
 
 export function CommunityCrumb({ role, view }: { role: string; view?: string }) {
     return (
-        <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#7a919a]">
-            {role} Dashboard → <span className="text-[#0e7d74]">Community Service</span>
-            {view ? <> → {view}</> : null}
+        <p className="text-[13px] text-[#71828e]">
+            {role} Dashboard / <b className="font-semibold text-[#183140]">Community Service</b>
+            {view ? (
+                <>
+                    {" / "}
+                    <b className="font-semibold text-[#183140]">{view}</b>
+                </>
+            ) : null}
         </p>
     );
 }

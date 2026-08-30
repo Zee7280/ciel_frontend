@@ -1,5 +1,6 @@
 import { type CourseProjectEntry, stripEmoji } from "./courseProjectTypes";
 import { isPathEntryApproved, isPathEntryWaiting } from "./reviewQueue";
+import { reviewStatusLabel } from "./pathReviewStatus";
 
 export type SectionCheck = {
     label: string;
@@ -121,15 +122,5 @@ export function courseworkStatusLabel(entry: {
     status?: string;
     facultyApprovalStatus?: string | null;
 }): { tone: CourseworkStatusTone; label: string } {
-    if (entry.status !== "submitted") return { tone: "draft", label: "Draft" };
-    switch (entry.facultyApprovalStatus) {
-        case "approved":
-            return { tone: "approved", label: "Approved" };
-        case "rejected":
-            return { tone: "rejected", label: "Rejected" };
-        case "revision_requested":
-            return { tone: "revision_requested", label: "Revision requested" };
-        default:
-            return { tone: "under_review", label: "Under review" };
-    }
+    return reviewStatusLabel(entry.status, entry.facultyApprovalStatus, "revision_requested");
 }

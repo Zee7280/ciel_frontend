@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { authenticatedFetch } from "@/utils/api";
 import { CommunityCrumb, CommunityHero, HubBackButton, HubTile } from "@/components/ciel/community-service/CommunityServiceHubChrome";
+import { ActionKpiGrid, PathSectionHead, WorkflowSteps } from "@/components/ciel/coursework/CourseworkHubChrome";
 import CommunityAwardPanel from "@/components/ciel/community-service/CommunityAwardPanel";
 import CommunityAwardAnalytics from "@/components/ciel/community-service/CommunityAwardAnalytics";
 import CommunityFlashCard from "@/components/ciel/community-service/CommunityFlashCard";
@@ -113,24 +114,24 @@ export default function PartnerCommunityServicePage() {
     const reviewHref = (id: string) => `/dashboard/partner/verify/${id}`;
 
     return (
-        <div className="mx-auto max-w-[1040px] px-4 py-6 sm:px-6">
+        <div className="mx-auto max-w-[1240px]">
             <CommunityCrumb role={isUni ? "University" : "Partner"} view={view === "home" ? undefined : view} />
             {view === "home" ? (
                 <CommunityHero
-                    kicker={`${isUni ? "UNIVERSITY" : "PARTNER"} · COMMUNITY SERVICE`}
-                    title={isUni ? `${orgName} — Community Service Command 🏛️` : namedTimeGreeting(orgName, "🤝")}
+                    kicker={isUni ? "UNIVERSITY IMPACT DASHBOARD" : "PARTNER · COMMUNITY SERVICE"}
+                    title={isUni ? "Community Service" : namedTimeGreeting(orgName, "🤝")}
                     subtitle={
                         isUni
-                            ? "Live flash cards for this university. Your award run turns top ranks into Community Honour badges."
+                            ? "Monitor service opportunities, participation, reports and verified community impact for this university."
                             : "Work done with you, by name. Your Best Project award lands on the student’s wall."
                     }
-                    gradient="linear-gradient(115deg,#04252b,#0e5f63 55%,#12a5a0 130%)"
+                    gradient="linear-gradient(120deg,#0a4c50 0%,#0e6e6b 56%,#12aaa0 100%)"
                     stats={
                         isUni
                             ? [
-                                  { value: String(waiting.length), label: "WAITING" },
-                                  { value: String(deckCards.length), label: "APPROVED & LIVE" },
-                                  { value: `${hours}h`, label: "VERIFIED HOURS" },
+                                  { value: String(waiting.length), label: "Pending Review" },
+                                  { value: String(deckCards.length), label: "Approved" },
+                                  { value: `${hours}h`, label: "In Impact Wall" },
                               ]
                             : [
                                   { value: String(waiting.length), label: "WAITING" },
@@ -149,7 +150,15 @@ export default function PartnerCommunityServicePage() {
             )}
 
             {view === "home" && (
-                <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                <>
+                {isUni ? (
+                    <PathSectionHead
+                        title="Community Service Management"
+                        subtitle="Approve community service submissions, monitor live cards and review verified evidence."
+                        pill="UNIVERSITY VIEW"
+                    />
+                ) : null}
+                <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                     <HubTile
                         href="/dashboard/partner/requests/new"
                         badge={isUni ? "UNI-LED" : "START HERE"}
@@ -223,6 +232,24 @@ export default function PartnerCommunityServicePage() {
                         background="linear-gradient(135deg,#0369a1,#38bdf8)"
                     />
                 </div>
+                {isUni ? (
+                    <>
+                        <ActionKpiGrid
+                            items={[
+                                { value: String(waiting.length), label: "Reports Awaiting Review" },
+                                { value: String(deckCards.length), label: "Approved This Term" },
+                                { value: `${hours}h`, label: "Verified Hours" },
+                                { value: String(opps.length), label: "Open Opportunities" },
+                            ]}
+                        />
+                        <WorkflowSteps
+                            title="Community Service Workflow"
+                            subtitle="Approved work flows into the same university Impact Wall."
+                            steps={["Opportunity Submitted", "Review / Approval", "Activity + Report", "Institutional Sign-off", "Impact Wall + Award"]}
+                        />
+                    </>
+                ) : null}
+                </>
             )}
 
             {view === "live" && (

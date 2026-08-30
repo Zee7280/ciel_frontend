@@ -132,36 +132,53 @@ export function CoFormHero({
     kicker,
     title,
     subtitle,
+    notice,
+    pill,
     loading,
 }: {
     crumb: ReactNode;
     backHref: string;
-    kicker: string;
+    kicker?: string;
     title: string;
     subtitle: string;
+    notice?: string;
+    pill?: string;
     loading?: boolean;
 }) {
     return (
         <>
             <div className="mb-3.5 flex items-center gap-3">
                 <div>
-                    <p className="text-[10px] text-[#7a919a]">{crumb}</p>
+                    <p className="text-[13px] text-[#70808a]">{crumb}</p>
                 </div>
                 <Link
                     href={backHref}
-                    className="ml-auto rounded-full border border-[#dcebee] bg-white px-4 py-2 text-[10.5px] font-extrabold text-[#0e7d74]"
+                    className="ml-auto rounded-[9px] bg-[#eef2f3] px-3 py-2 text-[10px] font-black text-[#29454f]"
                 >
                     ← Back
                 </Link>
             </div>
-            <div className="relative mb-4 overflow-hidden rounded-[24px] bg-[linear-gradient(115deg,#04252b,#0e5f63_55%,#12a5a0_110%)] px-[26px] py-[22px] text-white">
-                <div className="pointer-events-none absolute right-[-8px] top-2 text-[38px] tracking-[10px] opacity-[0.13]" aria-hidden>
-                    🚀 💡 🤝 🌱
+            <div className="mb-4 overflow-hidden rounded-[22px] border border-[#dde5ea] bg-white p-5 shadow-[0_8px_22px_rgba(24,52,64,.05)]">
+                <div className="flex flex-wrap items-end justify-between gap-3">
+                    <div>
+                        {kicker ? (
+                            <p className="text-[11px] font-black tracking-[0.13em] text-[#08756b]">{kicker}</p>
+                        ) : null}
+                        <h1 className="m-0 text-[21px] font-[950] text-[#16313d]">{title}</h1>
+                        <p className="mt-1 text-[12.5px] text-[#70808a]">{subtitle}</p>
+                    </div>
+                    {pill ? (
+                        <span className="rounded-[18px] bg-[#e8f5ef] px-2 py-1 text-[9.5px] font-black text-[#1d765d]">
+                            {pill}
+                        </span>
+                    ) : null}
                 </div>
-                <p className="text-[9.5px] font-extrabold tracking-[0.22em] text-[#99f6e4]">{kicker}</p>
-                <h1 className="mt-1.5 text-[21px] font-extrabold">{title}</h1>
-                <p className="mt-1 max-w-[560px] text-xs leading-relaxed text-[#cdf5f0]">{subtitle}</p>
-                {loading ? <p className="mt-2 text-sm text-[#cdf5f0]">Loading opportunity…</p> : null}
+                {notice ? (
+                    <div className="mt-3.5 rounded-xl border border-[#ead8b8] bg-[#fff8ec] p-3 text-[11.5px] leading-relaxed text-[#715a2d]">
+                        {notice}
+                    </div>
+                ) : null}
+                {loading ? <p className="mt-3 text-sm text-[#70808a]">Loading opportunity…</p> : null}
             </div>
         </>
     );

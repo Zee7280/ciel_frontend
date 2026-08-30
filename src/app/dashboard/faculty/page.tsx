@@ -11,7 +11,8 @@ import {
     type FacultyDashboardViewClient,
 } from "@/utils/facultyScopeSession";
 import PendingAttendanceModal from "@/components/engagement/PendingAttendanceModal";
-import { HubTile } from "@/components/ciel/coursework/CourseworkHubChrome";
+import { ActionKpiGrid, CourseworkHero, PathSectionHead, WorkflowSteps } from "@/components/ciel/coursework/CourseworkHubChrome";
+import { MOCKUP_GRADIENTS, MockupActionCard, MockupSectionHead } from "@/components/ciel/dashboard/MockupChrome";
 import { namedTimeGreeting } from "@/utils/timeGreeting";
 import { readStoredCurrentUser } from "@/utils/currentUser";
 
@@ -159,27 +160,19 @@ export default function FacultyDashboard() {
     const dash = (n: number) => (isLoading ? "—" : String(n));
 
     return (
-        <div className="mx-auto max-w-[1040px] px-4 py-6 sm:px-6">
+        <div className="mx-auto max-w-[1240px]">
             <PendingAttendanceModal variant="faculty" />
 
-            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#7a919a]">
-                Faculty Dashboard
-            </p>
-
-            <div className="relative mt-4 overflow-hidden rounded-[26px] bg-[linear-gradient(115deg,#04252b,#0e5f63_55%,#0e7d74_115%)] px-7 py-6 text-white">
-                <p className="text-[9.5px] font-extrabold tracking-[0.22em] text-white/80">FACULTY · COMMAND</p>
-                <h1 className="mt-1.5 text-[23px] font-extrabold leading-tight">
-                    {namedTimeGreeting(firstName, "🧑‍🏫")}
-                </h1>
-                <p className="mt-1 max-w-[640px] text-xs leading-relaxed text-white/90">
-                    Approve what’s waiting, then open the hub you need. Analytics stay on their own page.
-                </p>
-                <div className="mt-3.5 flex flex-wrap gap-2.5">
-                    <HeroStat value={dash(stats?.students_active ?? 0)} label="ACTIVE STUDENTS" />
-                    <HeroStat value={dash(stats?.hours_verified ?? 0)} label="HOURS VERIFIED" />
-                    <HeroStat value={dash(pendingApprovals)} label="PENDING APPROVALS" />
-                </div>
-            </div>
+            <CourseworkHero
+                kicker="FACULTY IMPACT DASHBOARD"
+                title={namedTimeGreeting(firstName, "🧑‍🏫")}
+                subtitle="Approve what’s waiting, then open the path you need. Verified work lands on your Faculty Impact Wall."
+                stats={[
+                    { value: dash(stats?.students_active ?? 0), label: "Active Students" },
+                    { value: dash(stats?.hours_verified ?? 0), label: "Hours Verified" },
+                    { value: dash(pendingApprovals), label: "Pending Review" },
+                ]}
+            />
 
             {viewModes.length > 1 ? (
                 <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -212,109 +205,112 @@ export default function FacultyDashboard() {
             </div>
 
             <div className="mt-4">
-                <p className="mb-3 text-[10px] font-extrabold uppercase tracking-[0.18em] text-[#7a919a]">Your cohorts</p>
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                <HubTile
+                <MockupSectionHead title="Community Service Management" subtitle="Approve student/community service submissions, monitor active reports and review verified evidence." />
+                <PathSectionHead title="Your paths" subtitle="Open a path to review submissions, run the grader, and publish to the Impact Wall." pill="FACULTY VIEW" />
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <MockupActionCard
                     href="/dashboard/faculty/community-service"
+                    emoji="⛺"
+                    title="Community Service"
+                    subtitle="Monitor service opportunities, participation, reports and verified community impact."
                     badge="REVIEW"
-                    badgeClass="text-[#0e7d74]"
-                    emoji="🤝"
-                    title="Community service"
-                    subtitle="Waiting reports, approved flash cards, and your award run."
-                    background="linear-gradient(135deg,#0e7d74,#2dd4bf)"
+                    background={MOCKUP_GRADIENTS.teal}
                 />
-                <HubTile
+                <MockupActionCard
                     href="/dashboard/faculty/coursework-projects"
-                    badge="FLASH CARDS"
-                    badgeClass="text-[#6d28d9]"
-                    emoji="📘"
-                    title="Coursework"
+                    emoji="📚"
+                    title="Coursework Project"
                     subtitle="Review submitted cards, then run the analyzer on approved work."
-                    background="linear-gradient(135deg,#6d28d9,#a78bfa)"
+                    badge="FLASH CARDS"
+                    background={MOCKUP_GRADIENTS.purple}
                 />
-                <HubTile
+                <MockupActionCard
                     href="/dashboard/faculty/fyp-thesis"
-                    badge="SIGN-OFF"
-                    badgeClass="text-[#1e1b4b]"
                     emoji="🎓"
                     title="FYP / Thesis"
                     subtitle="Supervisor approval that puts a record on the live deck."
-                    background="linear-gradient(135deg,#1e1b4b,#818cf8)"
-                />
-                <HubTile
-                    href="/dashboard/faculty/startup-business"
                     badge="SIGN-OFF"
-                    badgeClass="text-[#b45309]"
+                    background={MOCKUP_GRADIENTS.navy}
+                />
+                <MockupActionCard
+                    href="/dashboard/faculty/startup-business"
                     emoji="💼"
                     title="Startup / Business"
                     subtitle="Supervisor approval that puts a venture on the live deck."
-                    background="linear-gradient(135deg,#b45309,#f59e0b)"
+                    badge="SIGN-OFF"
+                    background={MOCKUP_GRADIENTS.orange}
                 />
                 </div>
             </div>
 
-            <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                <HubTile
+            <ActionKpiGrid
+                items={[
+                    { value: dash(pendingApprovals), label: "Opportunity Approvals" },
+                    { value: dash(pendingGrading), label: "Reports Awaiting Review" },
+                    { value: dash(pendingSummary.total), label: "Total Action Items" },
+                    { value: dash(stats?.hours_verified ?? 0), label: "Hours Verified" },
+                ]}
+            />
+
+            <WorkflowSteps
+                title="Faculty review workflow"
+                subtitle="Approved work flows into the same unified Faculty Impact Wall."
+                steps={["Opportunity Submitted", "Faculty Opportunity Approval", "Activity + Report", "Faculty Report Approval", "Impact Wall + AI Badge"]}
+            />
+
+            <PathSectionHead title="Workspace" subtitle="Approvals, enrolments, reports and new opportunities." />
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <MockupActionCard
                     href="/dashboard/faculty/approvals"
-                    badge={pendingApprovals ? `${pendingApprovals} WAITING` : "QUEUE"}
-                    badgeClass="text-[#b45309]"
                     emoji="✅"
-                    title="Opportunity approvals"
-                    subtitle="Student-created opportunities that named you as faculty."
-                    background="linear-gradient(135deg,#b45309,#fbbf24)"
+                    title="Approve Opportunities"
+                    subtitle="Review opportunities requiring faculty approval. Approve, request revision or reject."
+                    badge={pendingApprovals ? `${pendingApprovals} PENDING` : "QUEUE"}
+                    background={MOCKUP_GRADIENTS.teal}
                 />
-                <HubTile
+                <MockupActionCard
+                    href="/dashboard/faculty/reports"
+                    emoji="📄"
+                    title="Approve Reports"
+                    subtitle="Review submitted service reports with evidence, hours, SDGs and AI preliminary assessment."
+                    badge={pendingGrading ? `${pendingGrading} REPORTS` : "REVIEW"}
+                    background={MOCKUP_GRADIENTS.blue}
+                />
+                <MockupActionCard
                     href="/dashboard/faculty/join-applications"
-                    badge="ENROLMENTS"
-                    badgeClass="text-[#9f1239]"
                     emoji="📋"
                     title="Applications"
                     subtitle="Students asking to join your opportunities — approve or decline."
-                    background="linear-gradient(135deg,#9f1239,#fb7185)"
+                    badge="ENROLMENTS"
+                    background={MOCKUP_GRADIENTS.pink}
                 />
-                <HubTile
-                    href="/dashboard/faculty/reports"
-                    badge="AI CONSOLE"
-                    badgeClass="text-[#0369a1]"
-                    emoji="📝"
-                    title="Student impact reports"
-                    subtitle="Open the existing evaluation screen — approve once, card goes live."
-                    background="linear-gradient(135deg,#0369a1,#38bdf8)"
-                />
-                <HubTile
+                <MockupActionCard
                     href="/dashboard/faculty/create-opportunity"
-                    badge="PUBLISH"
-                    badgeClass="text-[#04252b]"
                     emoji="🚀"
                     title="Create an opportunity"
                     subtitle="A supervised listing your students can enrol on."
-                    background="linear-gradient(135deg,#04252b,#0e7d74)"
-                    className="sm:col-span-2 lg:col-span-1"
+                    badge="PUBLISH"
+                    background={MOCKUP_GRADIENTS.green}
                 />
             </div>
 
-            <p className="mt-4 text-center text-[11px] text-[#7a919a]">
-                <Link href="/dashboard/faculty/my-opportunities" className="font-extrabold text-[#0e7d74] hover:underline">
+            <p className="mt-6 text-center text-[11px] text-[#71828e]">
+                <Link href="/dashboard/faculty/my-opportunities" className="font-extrabold text-[#08756b] hover:underline">
                     My opportunities
                 </Link>
                 {" · "}
-                <Link href="/dashboard/faculty/attendance-review" className="font-extrabold text-[#0e7d74] hover:underline">
+                <Link href="/dashboard/faculty/attendance-review" className="font-extrabold text-[#08756b] hover:underline">
                     Attendance
                 </Link>
                 {" · "}
-                <Link href="/dashboard/faculty/analytics" className="font-extrabold text-[#0e7d74] hover:underline">
+                <Link href="/dashboard/faculty/analytics" className="font-extrabold text-[#08756b] hover:underline">
                     Analytics
                 </Link>
+                {" · "}
+                <Link href="/dashboard/faculty/impact" className="font-extrabold text-[#08756b] hover:underline">
+                    Impact Wall
+                </Link>
             </p>
-        </div>
-    );
-}
-
-function HeroStat({ value, label }: { value: string; label: string }) {
-    return (
-        <div className="min-w-[96px] rounded-[14px] border border-white/22 bg-white/10 px-4 py-2.5 text-center">
-            <div className="text-[15px] font-extrabold">{value}</div>
-            <div className="mt-0.5 text-[7px] font-extrabold tracking-[0.13em] text-white/85">{label}</div>
         </div>
     );
 }

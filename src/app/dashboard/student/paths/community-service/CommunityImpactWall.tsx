@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { authenticatedFetch } from "@/utils/api";
 import { CommunityCrumb, HubBackButton } from "@/components/ciel/community-service/CommunityServiceHubChrome";
-import { BADGE_CLASS, BADGE_ICON, type CommunityAwardBadge } from "@/utils/communityAwardModel";
+import clsx from "clsx";
+import { BADGE_CLASS, BADGE_ICON, COMMUNITY_LEVEL_CLASS, COMMUNITY_LEVEL_LABEL, type CommunityAwardBadge, type CommunityServiceLevel } from "@/utils/communityAwardModel";
 import { isCommunityReportOnLiveDeck } from "@/utils/reviewQueue";
 
 type WallRow = {
@@ -15,6 +16,7 @@ type WallRow = {
     status?: string;
     awardBadges?: CommunityAwardBadge[];
     cii_score?: number | null;
+    level?: CommunityServiceLevel;
     section1?: { metrics?: { total_verified_hours?: number } };
 };
 
@@ -101,6 +103,11 @@ export default function CommunityImpactWall() {
                                     </div>
                                 </div>
                                 <div className="flex flex-wrap gap-1 px-3 py-2">
+                                    {r.level && (
+                                        <span className={clsx("rounded-full px-2 py-0.5 text-[7px] font-extrabold uppercase tracking-wide", COMMUNITY_LEVEL_CLASS[r.level])}>
+                                            {COMMUNITY_LEVEL_LABEL[r.level]}
+                                        </span>
+                                    )}
                                     <span className="rounded-full bg-[#e6f6f4] px-2 py-0.5 text-[7px] font-extrabold text-[#0e7d74]">✅ FACULTY-APPROVED</span>
                                     {r.cii_score != null ? (
                                         <span className="rounded-full bg-[#f1ebfd] px-2 py-0.5 text-[7px] font-extrabold text-[#6d28d9]">🧠 CII {r.cii_score}/100</span>

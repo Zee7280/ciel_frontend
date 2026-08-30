@@ -10,7 +10,7 @@ import CourseworkCard from "@/components/ciel/CourseworkCard";
 import MeritModelPanel, { type MeritEntry } from "@/components/ciel/MeritModelPanel";
 import ThesisCard from "@/components/ciel/ThesisCard";
 import FypMeritPanel, { type FypMeritEntry } from "@/components/ciel/FypMeritPanel";
-import { CourseworkCrumb, CourseworkHero, HubBackButton, HubTile } from "@/components/ciel/coursework/CourseworkHubChrome";
+import { ActionKpiGrid, CourseworkCrumb, CourseworkHero, HubBackButton, HubTile, PathSectionHead, WorkflowSteps } from "@/components/ciel/coursework/CourseworkHubChrome";
 import { isFacultyApproved } from "@/utils/courseworkSectionReview";
 import { computeMeritScorecard } from "@/utils/courseworkMeritModel";
 import { isPathEntryApproved, isPathEntryWaiting } from "@/utils/reviewQueue";
@@ -20,6 +20,13 @@ type UniView = "home" | "pending" | "deck" | "rank";
 
 export default function UniversityShowcasePage() {
     const [mode, setMode] = useState<DeckMode>("course-project");
+
+    useEffect(() => {
+        const modeFromUrl = new URLSearchParams(window.location.search).get("mode");
+        if (modeFromUrl === "fyp-thesis" || modeFromUrl === "course-project") {
+            setMode(modeFromUrl);
+        }
+    }, []);
     const [entries, setEntries] = useState<MeritEntry[]>([]);
     const [fypEntries, setFypEntries] = useState<FypMeritEntry[]>([]);
     const [loading, setLoading] = useState(true);
@@ -128,31 +135,29 @@ export default function UniversityShowcasePage() {
     }
 
     return (
-        <div className="min-h-screen bg-[#f8fcfd] px-4 py-6 sm:px-6 lg:px-8">
-            <div className="mx-auto max-w-[1040px] space-y-4">
+        <div>
+            <div className="mx-auto max-w-[1240px] space-y-4">
                 <CourseworkCrumb role="University" view={crumbView} pathLabel={mode === "fyp-thesis" ? "FYP / Thesis" : "Coursework"} />
                 {view === "home" && (mode === "course-project" ? (
                     <CourseworkHero
-                        kicker="UNIVERSITY · COURSEWORK"
-                        title="Your coursework, verified & rankable 🏛️"
-                        subtitle="Submitted cards wait for faculty. Approved cards are the live institutional deck."
-                        gradient="linear-gradient(115deg,#1e1b4b,#4338ca 60%,#818cf8 115%)"
+                        kicker="UNIVERSITY IMPACT DASHBOARD"
+                        title="Coursework Project"
+                        subtitle="Review course-linked impact projects after faculty approval and run institutional rankings."
                         stats={[
-                            { value: String(waiting.length), label: "WAITING" },
-                            { value: String(approved.length), label: "APPROVED CARDS" },
-                            { value: approved.length ? String(avg) : "—", label: "AVG /100" },
+                            { value: String(waiting.length), label: "Awaiting Review" },
+                            { value: String(approved.length), label: "Approved Projects" },
+                            { value: String(approved.length), label: "On Impact Wall" },
                         ]}
                     />
                 ) : (
                     <CourseworkHero
-                        kicker="UNIVERSITY · FYP / THESIS"
-                        title="Your theses, verified & rankable 🏛️"
-                        subtitle="Submitted records wait for supervisor sign-off. Approved cards are the live university deck."
-                        gradient="linear-gradient(115deg,#1e1b4b,#4338ca 60%,#818cf8 115%)"
+                        kicker="UNIVERSITY IMPACT DASHBOARD"
+                        title="FYP / Thesis"
+                        subtitle="Monitor final-year research evidence, supervisor review and verified impact outcomes."
                         stats={[
-                            { value: String(waitingFyp.length), label: "WAITING" },
-                            { value: String(approvedFyp.length), label: "APPROVED & LIVE" },
-                            { value: String(fypSchools || "—"), label: "SCHOOLS" },
+                            { value: String(waitingFyp.length), label: "Awaiting Review" },
+                            { value: String(approvedFyp.length), label: "Approved FYPs" },
+                            { value: String(fypSchools || "—"), label: "Schools" },
                         ]}
                     />
                 ))}
@@ -185,7 +190,13 @@ export default function UniversityShowcasePage() {
                 {view !== "home" && <HubBackButton onClick={() => setView("home")} label="← Back to showcase" />}
 
                 {view === "home" && (
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                    <>
+                    <PathSectionHead
+                        title={mode === "course-project" ? "Coursework Management" : "FYP / Thesis Management"}
+                        subtitle="Faculty approval confirms completion; ranking and badges are generated later."
+                        pill="UNIVERSITY VIEW"
+                    />
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                         <HubTile
                             onClick={() => setView("pending")}
                             badge={`${mode === "course-project" ? waiting.length : waitingFyp.length} IN QUEUE`}
@@ -218,6 +229,33 @@ export default function UniversityShowcasePage() {
                             background="linear-gradient(135deg,#6d28d9,#a78bfa)"
                         />
                     </div>
+                    <ActionKpiGrid
+                        items={
+                            mode === "course-project"
+                                ? [
+                                      { value: String(waiting.length), label: "Submitted for Review" },
+                                      { value: String(approved.length), label: "Approved This Semester" },
+                                      { value: approved.length ? String(avg) : "—", label: "Avg /100" },
+                                      { value: String(entries.length), label: "All Records" },
+                                  ]
+                                : [
+                                      { value: String(waitingFyp.length), label: "Awaiting Review" },
+                                      { value: String(approvedFyp.length), label: "Approved This Year" },
+                                      { value: String(fypSchools || "—"), label: "Schools" },
+                                      { value: String(fypEntries.length), label: "All Records" },
+                                  ]
+                        }
+                    />
+                    <WorkflowSteps
+                        title={mode === "course-project" ? "Coursework Project Workflow" : "FYP / Thesis Workflow"}
+                        subtitle="Approved work flows into the same university Impact Wall."
+                        steps={
+                            mode === "course-project"
+                                ? ["Student Submits", "Faculty Reviews", "Faculty Approval = Complete", "Semester AI Grader", "Badge + Impact Wall Update"]
+                                : ["FYP Record Submitted", "Faculty / Supervisor Review", "Verified Approval", "AI Ranking", "Impact Wall + Badge"]
+                        }
+                    />
+                    </>
                 )}
 
                 {(view === "pending" || view === "deck") && (

@@ -124,9 +124,20 @@ export interface FypEntry {
     stepCompleted: number;
     status: "draft" | "submitted";
     /** Supervisor review gate — only "approved" entries count toward Merit Model rankings/showcase. */
-    supervisorApprovalStatus?: "pending" | "approved" | "rejected" | null;
+    supervisorApprovalStatus?: "pending" | "approved" | "rejected" | "revision_requested" | null;
     supervisorApprovalNote?: string | null;
     supervisorApprovalAt?: string | null;
+    /** Pinned by the analyzer after a ranked run — shown on the thesis card. badgeLevel is a rank-percentile
+     * tier; previousRank is this card's rank the last time it was ranked (null/undefined = first run). */
+    meritRibbon?: {
+        rank: number;
+        of: number;
+        scope: string;
+        total?: number;
+        badgeLevel?: "Gold" | "Silver" | "Bronze" | "Participant";
+        previousRank?: number | null;
+        at: string;
+    } | null;
     /** False when this entry is showing because the viewer was named as a co-author on someone else's
      * submitted record, not because they own it — gates edit/delete access on the frontend. */
     isOwner?: boolean;

@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { Search } from "lucide-react";
 import CourseworkCard from "@/components/ciel/CourseworkCard";
 import MeritModelPanel, { type MeritEntry } from "@/components/ciel/MeritModelPanel";
-import { CourseworkCrumb, CourseworkHero, HubBackButton, HubTile } from "@/components/ciel/coursework/CourseworkHubChrome";
+import { ActionKpiGrid, CourseworkCrumb, CourseworkHero, HubBackButton, HubTile, PathSectionHead, WorkflowSteps } from "@/components/ciel/coursework/CourseworkHubChrome";
 import CourseworkFacultyReviewInbox from "@/components/ciel/coursework/CourseworkFacultyReviewInbox";
 import { isFacultyApproved, pendingFacultyReview } from "@/utils/courseworkSectionReview";
 
@@ -85,25 +85,30 @@ export default function FacultyCourseworkProjectsPage() {
     const filteredApproved = approved.filter((entry) => filtered.includes(entry));
 
     return (
-        <div className="min-h-screen bg-[#f8fcfd] px-4 py-6 sm:px-6 lg:px-8">
-            <div className="mx-auto max-w-[1040px] space-y-4">
+        <div>
+            <div className="mx-auto max-w-[1240px] space-y-4">
                 <CourseworkCrumb role="Faculty" view={view === "home" ? undefined : view} />
                 <CourseworkHero
-                    kicker="FACULTY · COURSEWORK"
-                    title="Your cohort, your call 🧑‍🏫"
-                    subtitle="Flash cards arrive with evidence; each section is analysed — no scores. You approve, then run the Analyzer."
-                    gradient="linear-gradient(115deg,#04252b,#0e5f63 55%,#0e7d74 115%)"
+                    kicker="FACULTY IMPACT DASHBOARD"
+                    title="Coursework Project"
+                    subtitle="Review course-linked impact projects, approve completion and run semester rankings after approval."
                     stats={[
-                        { value: String(pending.length), label: "TO REVIEW" },
-                        { value: String(approved.length), label: "APPROVED" },
-                        { value: "🧠", label: "ASSISTS — NEVER SCORES" },
+                        { value: String(pending.length), label: "Awaiting Review" },
+                        { value: String(approved.length), label: "Approved Projects" },
+                        { value: String(approved.length), label: "On Impact Wall" },
                     ]}
                 />
 
                 {view !== "home" && <HubBackButton onClick={() => setView("home")} />}
 
                 {view === "home" && (
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                    <>
+                    <PathSectionHead
+                        title="Coursework Management"
+                        subtitle="Faculty approval confirms coursework completion; ranking and badges are generated later."
+                        pill="FACULTY VIEW"
+                    />
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                         <HubTile
                             onClick={() => setView("review")}
                             badge={pending.length ? `${pending.length} TO REVIEW` : "INBOX"}
@@ -129,6 +134,20 @@ export default function FacultyCourseworkProjectsPage() {
                             background="linear-gradient(135deg,#04252b,#0e7d74)"
                         />
                     </div>
+                    <ActionKpiGrid
+                        items={[
+                            { value: String(pending.length), label: "Submitted for Review" },
+                            { value: String(entries.filter((e) => e.facultyApprovalStatus === "revision_requested").length), label: "Revision Resubmissions" },
+                            { value: String(approved.length), label: "Approved This Semester" },
+                            { value: String(entries.length), label: "All Records" },
+                        ]}
+                    />
+                    <WorkflowSteps
+                        title="Coursework Project Workflow"
+                        subtitle="Approved work flows into the same unified Faculty Impact Wall."
+                        steps={["Student Submits", "Faculty Reviews", "Faculty Approval = Complete", "Semester AI Grader", "Badge + Impact Wall Update"]}
+                    />
+                    </>
                 )}
 
                 {view === "review" && (
