@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { CheckCircle2, Sparkles, Users, ChevronDown, Star, Paperclip, ShieldAlert, AlertTriangle, Clock, Share2 } from "lucide-react";
+import { CheckCircle2, Sparkles, Users, ChevronDown, Star, Paperclip, ShieldAlert, AlertTriangle, Clock, Share2, Mail, MessageCircle } from "lucide-react";
 import clsx from "clsx";
 import { toast } from "sonner";
 import { sdgData } from "@/utils/sdgData";
@@ -27,6 +27,14 @@ function formatBadgeEmoji(format?: string) {
     return m ? m[0] : "📄";
 }
 
+function mailtoHref(to: string, subject: string, body: string) {
+    return `mailto:${to}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+}
+
+function whatsappShareHref(text: string) {
+    return `https://wa.me/?text=${encodeURIComponent(text)}`;
+}
+
 /** One flash card per submitted (or draft) coursework report — closed shows a 5-second read, "View all" expands the full story. */
 export default function CourseworkCard({
     entry,
@@ -34,6 +42,7 @@ export default function CourseworkCard({
     studentName,
     onFacultyReview,
     reviewing = false,
+    studentReminder,
 }: {
     entry: CourseProjectEntry;
     defaultOpen?: boolean;
@@ -42,6 +51,8 @@ export default function CourseworkCard({
     /** Supplying this renders Approve/Reject actions in the footer — the faculty-review gate that makes a submitted entry "go live" for Merit Model ranking. */
     onFacultyReview?: (action: "approve" | "reject" | "revision") => void;
     reviewing?: boolean;
+    /** "team" renders Email/WhatsApp buttons to nudge teammates on a draft; "faculty" renders the same to nudge the reviewing teacher on a submitted record. */
+    studentReminder?: "team" | "faculty";
 }) {
     const [open, setOpen] = useState(defaultOpen);
     const [shareOpen, setShareOpen] = useState(false);
@@ -69,6 +80,22 @@ export default function CourseworkCard({
     const movement = rankMovement(ribbon);
     const verifyPath = entry.verificationPublicSlug ? `/coursework/verify/${entry.verificationPublicSlug}` : null;
     const canShareBadge = statusLabel.tone === "approved" && !!verifyPath;
+
+    const teamEmails = groupMembers.map((m) => m.email).filter((e): e is string => !!e);
+    const reminder: { to: string; subject: string; body: string } | null =
+        studentReminder === "faculty" && si.teacherEmail
+            ? {
+                  to: si.teacherEmail,
+                  subject: `Reminder: "${entry.projectTitle || "my coursework"}" is awaiting your review on CIEL PK`,
+                  body: `Hi ${si.teacherName || "there"},\n\nJust a friendly reminder that my coursework record "${entry.projectTitle || "coursework"}" (${entry.course || "coursework"}) has been submitted and is waiting for your approval on CIEL PK.\n\nThank you,\n${displayName}`,
+              }
+            : studentReminder === "team" && teamEmails.length
+              ? {
+                    to: teamEmails.join(","),
+                    subject: `Reminder: let's finish "${entry.projectTitle || "our coursework"}" on CIEL PK`,
+                    body: `Hi team,\n\nA quick reminder to help finish our coursework record "${entry.projectTitle || "coursework"}" on CIEL PK so we can submit it for faculty review.\n\nThanks,\n${displayName}`,
+                }
+              : null;
 
     const shareBadge = async () => {
         if (typeof window === "undefined" || !verifyPath) return;
@@ -302,6 +329,26 @@ export default function CourseworkCard({
                     <br />
                     Live on: 🧑‍🎓 student portfolio · 🧑‍🏫 faculty deck
                 </p>
+                {reminder && (
+                    <div className="flex shrink-0 gap-2">
+                        <a
+                            href={mailtoHref(reminder.to, reminder.subject, reminder.body)}
+                            onClick={(e) => e.stopPropagation()}
+                            className="ciel-transition flex items-center gap-1.5 rounded-ciel-xs border-2 border-ciel-border bg-white px-3 py-2 text-xs font-bold text-ciel-text-mid hover:border-ciel-gold/40"
+                        >
+                            <Mail className="h-3.5 w-3.5" /> Email
+                        </a>
+                        <a
+                            href={whatsappShareHref(`${reminder.subject}\n\n${reminder.body}`)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="ciel-transition flex items-center gap-1.5 rounded-ciel-xs border-2 border-ciel-border bg-white px-3 py-2 text-xs font-bold text-ciel-text-mid hover:border-ciel-gold/40"
+                        >
+                            <MessageCircle className="h-3.5 w-3.5" /> WhatsApp
+                        </a>
+                    </div>
+                )}
                 {canShareBadge && (
                     <button
                         type="button"

@@ -750,7 +750,7 @@ export default function CourseProjectWizardPage() {
 
     return (
         <PathWorkspaceShell
-            title="Course Project"
+            title="Coursework"
             stats={[
                 { label: "Status", value: entry.status === "submitted" ? "Submitted" : "Draft" },
                 { label: "Steps complete", value: `${entry.stepCompleted}/8`, hint: "Contributes to sections 2, 3 of your impact score" },

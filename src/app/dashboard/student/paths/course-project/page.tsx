@@ -11,6 +11,7 @@ import { type CourseProjectEntry } from "@/utils/courseProjectTypes";
 import { readStoredCurrentUser } from "@/utils/currentUser";
 import { namedTimeGreeting } from "@/utils/timeGreeting";
 import { isFacultyApproved } from "@/utils/courseworkSectionReview";
+import { isPathEntryWaiting } from "@/utils/reviewQueue";
 import { CourseworkCrumb, CourseworkHero, HubBackButton, HubTile } from "@/components/ciel/coursework/CourseworkHubChrome";
 import CourseworkSectionGuide from "@/components/ciel/coursework/CourseworkSectionGuide";
 
@@ -23,7 +24,11 @@ function firstName() {
 function CourseProjectHub() {
     const router = useRouter();
     const searchParams = useSearchParams();
-    const view = searchParams.get("view") === "guide" || searchParams.get("view") === "wall" ? searchParams.get("view")! : "home";
+    const rawView = searchParams.get("view");
+    const view =
+        rawView === "guide" || rawView === "wall" || rawView === "in-progress" || rawView === "under-review"
+            ? rawView
+            : "home";
     const [loading, setLoading] = useState(true);
     const [entries, setEntries] = useState<CourseProjectEntry[]>([]);
     const [creating, setCreating] = useState(false);
@@ -72,12 +77,10 @@ function CourseProjectHub() {
 
     if (loading) return <WorkspaceSkeleton />;
 
-    const submitted = entries.filter((e) => e.status === "submitted");
     const drafts = entries.filter((e) => e.status !== "submitted");
-    const ownedCount = entries.filter((e) => e.isOwner !== false).length;
-    const ownedSubmittedCount = submitted.filter((e) => e.isOwner !== false).length;
     const approved = entries.filter(isFacultyApproved);
     const inProgress = drafts.filter((e) => e.isOwner !== false).length;
+    const underReview = entries.filter((e) => e.isOwner !== false && isPathEntryWaiting(e));
 
     return (
         <div className="mx-auto max-w-[1040px] pb-16">
@@ -85,11 +88,11 @@ function CourseProjectHub() {
             <CourseworkHero
                 kicker="MY PATHS · COURSEWORK"
                 title={namedTimeGreeting(name, "📘")}
-                subtitle="Three doors: start new coursework, learn every section, and visit the wall where approved work hangs."
+                subtitle="Fill the coursework form section by section, submit your flashcard to faculty, and collect your approved coursework here."
                 gradient="linear-gradient(115deg,#04252b,#0e5f63 55%,#12a5a0 110%)"
                 stats={[
                     { value: String(approved.filter((e) => e.isOwner !== false).length), label: "APPROVED" },
-                    { value: String(ownedSubmittedCount), label: "SUBMITTED" },
+                    { value: String(underReview.length), label: "UNDER REVIEW" },
                     { value: String(inProgress), label: "IN PROGRESS" },
                 ]}
             />
@@ -134,37 +137,126 @@ function CourseProjectHub() {
                 </div>
             )}
 
+            {view === "in-progress" && (
+                <div className="mt-4">
+                    <HubBackButton href="/dashboard/student/paths/course-project" />
+                    {drafts.length === 0 ? (
+                        <EmptyState
+                            emoji="🧩"
+                            heading="Nothing in progress"
+                            line="Create a coursework record to start — your draft saves automatically as you go."
+                            actionLabel={creating ? "Creating…" : "+ New coursework report"}
+                            onAction={creating ? undefined : createNew}
+                        />
+                    ) : (
+                        <div className="space-y-3">
+                            {drafts.map((entry) => (
+                                <div key={entry.id} className="relative">
+                                    <CardOpenTarget entryId={entry.id!} router={router}>
+                                        <CourseworkCard entry={entry} studentReminder="team" />
+                                    </CardOpenTarget>
+                                    <button
+                                        type="button"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            deleteDraft(entry.id!);
+                                        }}
+                                        disabled={deletingId === entry.id}
+                                        aria-label="Delete draft"
+                                        className="ciel-transition absolute -right-2 -top-2 flex h-8 w-8 items-center justify-center rounded-full border border-ciel-border bg-white text-ciel-text-soft shadow-md hover:border-red-200 hover:text-red-600 disabled:opacity-50"
+                                    >
+                                        <Trash2 className="h-4 w-4" />
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {view === "under-review" && (
+                <div className="mt-4">
+                    <HubBackButton href="/dashboard/student/paths/course-project" />
+                    {underReview.length === 0 ? (
+                        <EmptyState
+                            emoji="📤"
+                            heading="Nothing under review"
+                            line="Submit a completed coursework record and it lands here while faculty reviews it."
+                            actionLabel={creating ? "Creating…" : "+ New coursework report"}
+                            onAction={creating ? undefined : createNew}
+                        />
+                    ) : (
+                        <div className="space-y-3">
+                            {underReview.map((entry) => (
+                                <div key={entry.id} className="space-y-1.5">
+                                    {entry.isOwner === false && (
+                                        <p className="px-1 text-[11px] font-bold uppercase tracking-wide text-ciel-indigo">
+                                            👥 Team project — led by {entry.studentInfo?.studentName || "a teammate"}
+                                        </p>
+                                    )}
+                                    <CardOpenTarget entryId={entry.id!} router={router}>
+                                        <CourseworkCard entry={entry} studentReminder="faculty" />
+                                    </CardOpenTarget>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            )}
+
             {view === "home" && (
                 <>
-                    <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                    <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
                         <HubTile
                             onClick={creating ? undefined : createNew}
                             disabled={creating}
-                            badge="THE FORM"
-                            emoji="📝"
-                            title={creating ? "Creating…" : "Create new coursework"}
-                            subtitle="8 friendly steps — your flash card builds itself at the end."
-                            background="linear-gradient(135deg,#0e7d74,#2dd4bf)"
+                            badge="START"
+                            badgeClass="text-[#15988b]"
+                            emoji="📚"
+                            title={creating ? "Creating…" : "Create Coursework Record"}
+                            subtitle="Open the Coursework Sustainability & SDG form. Seven short sections — each writes its own AI summary; no pre-approval needed."
+                            background="linear-gradient(135deg,#15988b,#2ec8bd)"
+                        />
+                        <HubTile
+                            href="/dashboard/student/paths/course-project?view=in-progress"
+                            badge={`${inProgress} IN PROGRESS`}
+                            badgeClass="text-[#c76000]"
+                            emoji="🧩"
+                            title="Coursework in Progress"
+                            subtitle="Records you're still filling in — completion bar, and Email / WhatsApp reminders for your team or your faculty."
+                            background="linear-gradient(135deg,#c76000,#f59a00)"
+                        />
+                        <HubTile
+                            href="/dashboard/student/paths/course-project?view=under-review"
+                            badge={`${underReview.length} UNDER REVIEW`}
+                            badgeClass="text-[#16798c]"
+                            emoji="📤"
+                            title="Coursework Under Review"
+                            subtitle="Submitted flashcards waiting for faculty approval — with Email / WhatsApp buttons to remind your faculty."
+                            background="linear-gradient(135deg,#16798c,#38b8e6)"
+                        />
+                        <HubTile
+                            href="/dashboard/student/paths/course-project?view=wall"
+                            badge={`${approved.length} APPROVED`}
+                            badgeClass="text-[#0e4d4e]"
+                            emoji="🏅"
+                            title="My Coursework Impact"
+                            subtitle="Your approved coursework files. Approved flashcards also appear on your University's Impact Wall and CIEL PK."
+                            background="linear-gradient(135deg,#0e4d4e,#117669)"
                         />
                         <HubTile
                             href="/dashboard/student/paths/course-project?view=guide"
                             badge="GUIDE INSIDE"
-                            emoji="📖"
-                            title="Section guidelines"
-                            subtitle="How to fill all 8 sections — steps, examples, one don’t and a tip each."
-                            background="linear-gradient(135deg,#6d28d9,#a78bfa)"
-                        />
-                        <HubTile
-                            href="/dashboard/student/paths/course-project?view=wall"
-                            badge={approved.length ? `${approved.length} HANGING` : "THE WALL"}
-                            emoji="🏅"
-                            title="My Impact Wall"
-                            subtitle="Approved coursework hangs here forever — rank, score and story."
-                            background="linear-gradient(135deg,#04252b,#0e7d74)"
+                            badgeClass="text-[#6b2bd9]"
+                            emoji="📘"
+                            title="Coursework Guidance"
+                            subtitle="What to fill in, what evidence helps, and what happens after you submit."
+                            background="linear-gradient(135deg,#6b2bd9,#9f78ef)"
+                            className="sm:col-span-2"
                         />
                     </div>
 
-                    {entries.length === 0 ? (
+                    {entries.length === 0 && (
                         <div className="mt-4">
                             <EmptyState
                                 emoji="📚"
@@ -173,51 +265,6 @@ function CourseProjectHub() {
                                 actionLabel={creating ? "Creating…" : "+ New coursework report"}
                                 onAction={creating ? undefined : createNew}
                             />
-                        </div>
-                    ) : (
-                        <div className="mt-5 space-y-4">
-                            <p className="text-[8.5px] font-extrabold tracking-[0.14em] text-[#7a919a]">
-                                MY REPORTS · {ownedCount} TOTAL
-                            </p>
-                            {drafts.length > 0 && (
-                                <div className="space-y-3">
-                                    {drafts.map((entry) => (
-                                        <div key={entry.id} className="relative">
-                                            <CardOpenTarget entryId={entry.id!} router={router}>
-                                                <CourseworkCard entry={entry} />
-                                            </CardOpenTarget>
-                                            <button
-                                                type="button"
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    deleteDraft(entry.id!);
-                                                }}
-                                                disabled={deletingId === entry.id}
-                                                aria-label="Delete draft"
-                                                className="ciel-transition absolute -right-2 -top-2 flex h-8 w-8 items-center justify-center rounded-full border border-ciel-border bg-white text-ciel-text-soft shadow-md hover:border-red-200 hover:text-red-600 disabled:opacity-50"
-                                            >
-                                                <Trash2 className="h-4 w-4" />
-                                            </button>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                            {submitted.length > 0 && (
-                                <div className="space-y-3">
-                                    {submitted.map((entry) => (
-                                        <div key={entry.id} className="space-y-1.5">
-                                            {entry.isOwner === false && (
-                                                <p className="px-1 text-[11px] font-bold uppercase tracking-wide text-ciel-indigo">
-                                                    👥 Team project — led by {entry.studentInfo?.studentName || "a teammate"}
-                                                </p>
-                                            )}
-                                            <CardOpenTarget entryId={entry.id!} router={router}>
-                                                <CourseworkCard entry={entry} />
-                                            </CardOpenTarget>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
                         </div>
                     )}
                 </>
