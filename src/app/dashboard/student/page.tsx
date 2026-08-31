@@ -71,14 +71,18 @@ const PATH_CARDS = [
 export default function StudentDashboardPage() {
     const [loading, setLoading] = useState(true);
     const [dashboard, setDashboard] = useState<DashboardData | null>(null);
-    const [summary, setSummary] = useState<CielImpactSummary | null>(() => readImpactSummaryCache());
+    // Starts null/"" (matching the server render) rather than reading localStorage synchronously —
+    // that caused a hydration mismatch (and the thrown error killed interactivity for the whole
+    // page) for any returning visitor who already had cached data. Both are set client-side in the
+    // effect below, which only runs after hydration completes.
+    const [summary, setSummary] = useState<CielImpactSummary | null>(null);
     const [opportunities, setOpportunities] = useState<RecommendedOpportunity[]>([]);
-    const firstName = useMemo(() => {
-        const name = readStoredCurrentUser()?.name;
-        return typeof name === "string" ? name.trim().split(/\s+/)[0] : "";
-    }, []);
+    const [firstName, setFirstName] = useState("");
 
     useEffect(() => {
+        setSummary(readImpactSummaryCache());
+        const name = readStoredCurrentUser()?.name;
+        setFirstName(typeof name === "string" ? name.trim().split(/\s+/)[0] : "");
         Promise.all([
             fetchStudentDashboardData({ redirectToLogin: false }),
             fetchImpactSummary({ redirectToLogin: false }),

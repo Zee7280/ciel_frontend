@@ -328,8 +328,14 @@ export default function Sidebar() {
         };
     }, [collapsed]);
 
-    const [impactSummary, setImpactSummary] = useState<CielImpactSummary | null>(() => readImpactSummaryCache());
+    // Starts null (matching the server render) rather than reading the cache synchronously —
+    // localStorage isn't available during SSR, so seeding this from the lazy-initializer caused a
+    // hydration mismatch (and the resulting thrown error killed interactivity for the whole page)
+    // for any returning visitor who already had a cached summary. Read it in the effect below
+    // instead, which only runs client-side after hydration completes.
+    const [impactSummary, setImpactSummary] = useState<CielImpactSummary | null>(null);
     useEffect(() => {
+        setImpactSummary(readImpactSummaryCache());
         if (!isStudent) return;
         fetchImpactSummary({ redirectToLogin: false }).then((data) => {
             if (data) setImpactSummary(data);

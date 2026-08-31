@@ -44,12 +44,15 @@ export default function FacultyDashboard() {
     const [isLoading, setIsLoading] = useState(true);
     const [viewHydrated, setViewHydrated] = useState(false);
     const [dashboardView, setDashboardView] = useState<FacultyDashboardViewMode>("combined");
-    const firstName = useMemo(() => {
-        const name = readStoredCurrentUser()?.name;
-        return typeof name === "string" ? name.trim().split(/\s+/)[0] : "";
-    }, []);
+    // Starts "" (matching the server render) rather than reading localStorage synchronously in a
+    // useMemo — that caused a hydration mismatch (and the thrown error killed interactivity for
+    // the whole page) for any returning visitor who already had a stored name. Set client-side in
+    // the effect below instead, which only runs after hydration completes.
+    const [firstName, setFirstName] = useState("");
 
     useEffect(() => {
+        const name = readStoredCurrentUser()?.name;
+        setFirstName(typeof name === "string" ? name.trim().split(/\s+/)[0] : "");
         setDashboardView(readFacultyDashboardViewPreference());
         setViewHydrated(true);
     }, []);

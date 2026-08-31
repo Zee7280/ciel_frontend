@@ -78,10 +78,15 @@ export default function StudentImpactAnalytics({
     activities: Activity[];
     hoursThisMonth: number;
 }) {
-    const [summary, setSummary] = useState<CielImpactSummary | null>(() => readImpactSummaryCache());
-    const [dashboard, setDashboard] = useState<DashboardData | null>(() => readStudentDashboardCache());
+    // Starts null (matching the server render) rather than reading localStorage synchronously —
+    // that caused a hydration mismatch (and the thrown error killed interactivity for the whole
+    // page) for any returning visitor who already had cached data. Read client-side in the effect
+    // below instead, which only runs after hydration completes.
+    const [summary, setSummary] = useState<CielImpactSummary | null>(null);
+    const [dashboard, setDashboard] = useState<DashboardData | null>(null);
 
     useEffect(() => {
+        setSummary(readImpactSummaryCache());
         void fetchImpactSummary({ redirectToLogin: false }).then((data) => {
             if (data) setSummary(data);
         });
