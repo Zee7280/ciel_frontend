@@ -6,6 +6,7 @@ import { Badge } from "../report/components/ui/badge";
 import { authenticatedFetch } from "@/utils/api";
 import { Loader2 } from "lucide-react";
 import StudentImpactAnalytics from "./StudentImpactAnalytics";
+import StudentImpactPortfolioTable from "./StudentImpactPortfolioTable";
 
 interface Activity {
     id: string;
@@ -169,12 +170,15 @@ export default function ImpactHistoryPage() {
 
     return (
         <div className="space-y-8">
-            <div>
-                <h1 className="text-2xl font-bold text-slate-900">Impact</h1>
-                <p className="text-slate-500">
-                    Your hours, score, paths, and verified contribution history — in one place.
+            <div className="relative overflow-hidden rounded-[22px] bg-[linear-gradient(115deg,#04252b,#0e5f63_55%,#12a5a0_110%)] px-6 py-5 text-white">
+                <p className="text-[9.5px] font-extrabold tracking-[0.22em] text-[#99f6e4]">MY PORTFOLIO</p>
+                <h1 className="mt-1 text-[21px] font-extrabold">My Impact Portfolio</h1>
+                <p className="mt-1 max-w-[560px] text-xs leading-relaxed text-[#cdf5f0]">
+                    Every approved Community Service, Coursework, FYP and Startup record appears here automatically.
                 </p>
             </div>
+
+            <StudentImpactPortfolioTable />
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <Card>
