@@ -36,6 +36,7 @@ import {
 } from '@/utils/section1ParticipantDossierFields';
 import { isReportReturnedForRevision, reportRevisionStatusLabel } from '@/utils/reportRevisionState';
 import RedFlagsSummaryList from "@/components/RedFlagsSummaryList";
+import { mailtoHref, whatsappShareHref } from '@/utils/reminderLinks';
 
 function normalizeKey(value: unknown): string {
     return String(value ?? "")
@@ -54,12 +55,19 @@ function isReportDecisionFinal(value: unknown): boolean {
     return ["verified", "finalized", "rejected", "revision", "partner_verified"].includes(key);
 }
 
+/** Faculty is the sole final report approver — a partner/NGO/university reviewer only gets a
+ * say once Faculty has signed off (matches the Community Service loop design). */
+function facultyHasApprovedReport(report: ReportDetail): boolean {
+    return normalizeKey(report.faculty_status) === "approved";
+}
+
 /** When to show NGO verify / reject controls. Backend status names vary, so only final decisions should hide the CTA. */
 function partnerCanSubmitDecision(report: ReportDetail): boolean {
     const st = normalizeKey(report.status);
     if (st === "draft") return false;
     if (isReportDecisionFinal(report.status)) return false;
     if (isPartnerDecisionFinal(report.admin_status)) return false;
+    if (!facultyHasApprovedReport(report)) return false;
 
     const ps = normalizeKey(report.partner_status);
     if (isPartnerDecisionFinal(report.partner_status)) return false;
@@ -90,6 +98,7 @@ interface ReportDetail {
     status: string;
     partner_status: string;
     admin_status: string;
+    faculty_status: string;
     section1: ReportData["section1"];
     section2: ReportData["section2"];
     section3: ReportData["section3"];
@@ -362,7 +371,8 @@ export default function ReportDetailPage() {
                 toast.success(`Report ${action === 'approve' ? 'approved' : 'rejected'} successfully!`);
                 setTimeout(() => router.push('/dashboard/partner/reports'), 1500);
             } else {
-                toast.error('Failed to verify report');
+                const errorBody = await response?.json().catch(() => null);
+                toast.error(errorBody?.message || 'Failed to verify report');
             }
         } catch (error) {
             console.error('Verification error:', error);
@@ -422,6 +432,19 @@ export default function ReportDetailPage() {
     }
 
     const canSubmitDecision = partnerCanSubmitDecision(report);
+    const waitingOnFaculty =
+        !canSubmitDecision &&
+        !facultyHasApprovedReport(report) &&
+        normalizeKey(report.status) !== "draft" &&
+        !isReportDecisionFinal(report.status) &&
+        !isPartnerDecisionFinal(report.admin_status);
+    const facultyEmail = section1FacultyEmails.primary || report.section1?.faculty_supervisor_email || "";
+    const facultyReminderText = facultyEmail
+        ? {
+              subject: `Reminder: "${report.opportunity.title}" is awaiting your approval on CIEL PK`,
+              body: `Hi,\n\nA Community Service report from ${report.student.name} for "${report.opportunity.title}" is submitted and waiting for your (Faculty) approval on CIEL PK before ${report.opportunity.organization || "our organization"} can complete our own verification.\n\nThank you,\n${report.opportunity.organization || "CIEL PK Partner"}`,
+          }
+        : null;
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-50 p-0 sm:p-6 lg:p-8">
@@ -618,6 +641,34 @@ export default function ReportDetailPage() {
                                 >
                                     Open full decision panel
                                 </button>
+                            </div>
+                        )}
+
+                        {/* Faculty is the sole final report approver — status-only view + a reminder until they've signed off. */}
+                        {waitingOnFaculty && (
+                            <div className="rounded-3xl bg-amber-50 border border-amber-200 p-6 text-amber-900">
+                                <p className="text-[10px] font-black text-amber-600 uppercase tracking-widest mb-3">Awaiting Faculty Approval</p>
+                                <p className="text-sm font-bold mb-4">
+                                    Faculty has not yet approved this report. Only Faculty can approve or reject a Community Service report — you can view its status here and send a reminder.
+                                </p>
+                                {facultyReminderText && (
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <a
+                                            href={mailtoHref(facultyEmail, facultyReminderText.subject, facultyReminderText.body)}
+                                            className="rounded-xl bg-white border border-amber-300 px-3 py-3 text-center text-xs font-black uppercase tracking-wide text-amber-800 transition hover:bg-amber-100"
+                                        >
+                                            Email Faculty
+                                        </a>
+                                        <a
+                                            href={whatsappShareHref(`${facultyReminderText.subject}\n\n${facultyReminderText.body}`)}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="rounded-xl bg-white border border-amber-300 px-3 py-3 text-center text-xs font-black uppercase tracking-wide text-amber-800 transition hover:bg-amber-100"
+                                        >
+                                            WhatsApp
+                                        </a>
+                                    </div>
+                                )}
                             </div>
                         )}
                     </div>
@@ -1341,6 +1392,12 @@ export default function ReportDetailPage() {
                 {!canSubmitDecision && normalizeKey(report.partner_status) === "approved" && (
                     <div className="bg-emerald-50 border border-emerald-200 rounded-3xl p-6 mt-8 mb-16 text-emerald-900 text-sm font-medium">
                         Your organization has already verified this report. If you need changes, contact CIEL support so the report can be reopened for edits.
+                    </div>
+                )}
+
+                {waitingOnFaculty && (
+                    <div className="bg-amber-50 border border-amber-200 rounded-3xl p-6 mt-8 mb-16 text-amber-900 text-sm font-medium">
+                        This report is awaiting Faculty approval. Only Faculty can approve or reject a Community Service report — use the reminder buttons above to nudge them once you&apos;ve reviewed the dossier.
                     </div>
                 )}
             </div>

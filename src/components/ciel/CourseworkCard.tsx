@@ -18,6 +18,7 @@ import {
     rankMovement,
 } from "@/utils/courseProjectTypes";
 import { courseworkStatusLabel } from "@/utils/courseworkSectionReview";
+import { mailtoHref, whatsappShareHref } from "@/utils/reminderLinks";
 
 const BADGE_EMOJI: Record<string, string> = { Gold: "🥇", Silver: "🥈", Bronze: "🥉", Participant: "🎖️" };
 
@@ -25,14 +26,6 @@ function formatBadgeEmoji(format?: string) {
     if (!format) return "📄";
     const m = format.match(/^[^\s]+/);
     return m ? m[0] : "📄";
-}
-
-function mailtoHref(to: string, subject: string, body: string) {
-    return `mailto:${to}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-}
-
-function whatsappShareHref(text: string) {
-    return `https://wa.me/?text=${encodeURIComponent(text)}`;
 }
 
 /** One flash card per submitted (or draft) coursework report — closed shows a 5-second read, "View all" expands the full story. */
