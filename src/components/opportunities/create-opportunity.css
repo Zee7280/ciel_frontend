@@ -10,9 +10,313 @@
     --co-gold-soft: #fff8ec;
     --co-vio: #6b2bd9;
     color: var(--co-ink);
-    max-width: 1100px;
+    max-width: 1300px;
     margin: 0 auto;
     padding-bottom: 88px;
+}
+
+/* ===== WIZARD SHELL — hero, step rail, per-step navigation ===== */
+.co-form .co-hero {
+    position: relative;
+    overflow: hidden;
+    background: linear-gradient(135deg, #fff, #fbfdfd);
+    border: 1px solid var(--co-line);
+    border-radius: 28px;
+    padding: 24px 27px;
+    box-shadow: 0 18px 50px rgba(17, 46, 58, 0.09);
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 22px;
+    align-items: center;
+    margin-bottom: 18px;
+}
+
+.co-form .co-hero::after {
+    content: "";
+    position: absolute;
+    width: 260px;
+    height: 260px;
+    right: -100px;
+    top: -135px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, rgba(50, 201, 187, 0.15), rgba(160, 119, 235, 0.12));
+}
+
+.co-form .co-hero-copy {
+    position: relative;
+    z-index: 2;
+}
+
+.co-form .co-hero-eyebrow {
+    font-size: 9px;
+    font-weight: 950;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--co-aqua);
+    margin: 0;
+}
+
+.co-form .co-hero h1 {
+    font-size: 26px;
+    margin: 6px 0;
+    color: var(--co-ink);
+    font-weight: 950;
+}
+
+.co-form .co-hero p {
+    font-size: 12.5px;
+    color: var(--co-muted);
+    line-height: 1.6;
+    margin: 0;
+    max-width: 700px;
+}
+
+.co-form .co-hero-chips {
+    display: flex;
+    gap: 7px;
+    flex-wrap: wrap;
+    margin-top: 13px;
+}
+
+.co-form .co-hero-chip {
+    padding: 7px 10px;
+    border-radius: 18px;
+    background: #f3f7f8;
+    border: 1px solid var(--co-line);
+    font-size: 9.5px;
+    font-weight: 850;
+    color: #52636b;
+}
+
+.co-form .co-progress-ring {
+    position: relative;
+    z-index: 2;
+    width: 105px;
+    height: 105px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    flex: none;
+}
+
+.co-form .co-progress-ring::after {
+    content: "";
+    position: absolute;
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    background: #fff;
+}
+
+.co-form .co-progress-ring strong {
+    z-index: 2;
+    font-size: 23px;
+    color: var(--co-ink);
+}
+
+.co-form .co-progress-ring span {
+    z-index: 2;
+    position: absolute;
+    margin-top: 32px;
+    font-size: 8px;
+    color: var(--co-muted);
+    font-weight: 950;
+}
+
+.co-form .co-wizard-layout {
+    display: grid;
+    grid-template-columns: 260px minmax(0, 1fr);
+    gap: 16px;
+    align-items: start;
+}
+
+.co-form .co-wizard-side {
+    position: sticky;
+    top: 88px;
+    display: grid;
+    gap: 12px;
+}
+
+.co-form .co-side-card {
+    background: #fff;
+    border: 1px solid var(--co-line);
+    border-radius: 18px;
+    padding: 14px;
+}
+
+.co-form .co-side-card h3 {
+    font-size: 12px;
+    margin: 0 0 7px;
+    color: var(--co-ink);
+}
+
+.co-form .co-side-card p {
+    font-size: 10px;
+    line-height: 1.55;
+    color: var(--co-muted);
+    margin: 0;
+}
+
+.co-form .co-step-list {
+    display: grid;
+    gap: 7px;
+}
+
+.co-form .co-step-btn {
+    width: 100%;
+    border: 1px solid var(--co-line);
+    background: #fff;
+    border-radius: 12px;
+    padding: 9px 10px;
+    display: grid;
+    grid-template-columns: 31px 1fr auto;
+    gap: 8px;
+    align-items: center;
+    text-align: left;
+    color: #5a6a72;
+    transition: 0.16s;
+    font-family: inherit;
+    cursor: pointer;
+}
+
+.co-form .co-step-btn:hover {
+    transform: translateX(2px);
+}
+
+.co-form .co-step-btn .co-step-ico {
+    width: 31px;
+    height: 31px;
+    border-radius: 10px;
+    background: #f0f4f5;
+    display: grid;
+    place-items: center;
+    font-size: 14px;
+}
+
+.co-form .co-step-btn .co-step-copy b {
+    display: block;
+    font-size: 10.5px;
+    color: var(--co-ink);
+}
+
+.co-form .co-step-btn .co-step-copy span {
+    display: block;
+    font-size: 8px;
+    color: var(--co-muted);
+    margin-top: 2px;
+}
+
+.co-form .co-step-btn .co-step-num {
+    width: 23px;
+    height: 23px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    background: #edf1f2;
+    font-size: 8px;
+    font-weight: 950;
+}
+
+.co-form .co-step-btn.active {
+    background: #eaf7f4;
+    border-color: #badfd8;
+}
+
+.co-form .co-step-btn.active .co-step-ico,
+.co-form .co-step-btn.active .co-step-num {
+    background: var(--co-teal);
+    color: #fff;
+}
+
+.co-form .co-step-btn.done {
+    border-color: #c5e4d6;
+    background: #f7fcfa;
+}
+
+.co-form .co-step-btn.done .co-step-num {
+    background: #14775f;
+    color: #fff;
+}
+
+.co-form .co-fun-tip {
+    background: linear-gradient(135deg, #fff7e6, #fff);
+    border: 1px solid #ead7aa;
+    border-radius: 16px;
+    padding: 13px;
+}
+
+.co-form .co-fun-tip b {
+    font-size: 10.5px;
+}
+
+.co-form .co-fun-tip p {
+    font-size: 9.6px;
+    color: #715b2d;
+    margin: 5px 0 0;
+    line-height: 1.55;
+}
+
+.co-form .co-wizard-main {
+    min-width: 0;
+}
+
+.co-form .co-form-nav {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    margin: 4px 0 16px;
+}
+
+.co-form .co-nav-btn {
+    border: 0;
+    border-radius: 11px;
+    padding: 11px 16px;
+    font-size: 11px;
+    font-weight: 900;
+    font-family: inherit;
+    cursor: pointer;
+}
+
+.co-form .co-nav-btn.back {
+    background: #eef2f3;
+    color: #4c5d65;
+}
+
+.co-form .co-nav-btn.next {
+    background: #133747;
+    color: #fff;
+    margin-left: auto;
+}
+
+.co-form .co-nav-btn.finish {
+    background: linear-gradient(90deg, var(--co-teal), #32c9bb);
+    color: #fff;
+    margin-left: auto;
+}
+
+@media (max-width: 1000px) {
+    .co-form .co-wizard-layout {
+        grid-template-columns: 1fr;
+    }
+    .co-form .co-wizard-side {
+        position: static;
+    }
+    .co-form .co-step-list {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+@media (max-width: 680px) {
+    .co-form .co-hero {
+        grid-template-columns: 1fr;
+        padding: 19px;
+    }
+    .co-form .co-progress-ring {
+        display: none;
+    }
+    .co-form .co-step-list {
+        grid-template-columns: 1fr 1fr;
+    }
 }
 
 .co-form .co-card {

@@ -99,7 +99,8 @@ export function CoSectionHead({
 }) {
     return (
         <div
-            className={`mb-1 flex items-center gap-2.5 ${onToggle ? "cursor-pointer" : ""}`}
+            className={`-mx-5 -mt-5 mb-4 flex items-center gap-2.5 rounded-t-[21px] border-b border-[#eef2f3] px-5 py-3.5 ${onToggle ? "cursor-pointer" : ""}`}
+            style={{ background: `linear-gradient(135deg, ${color}14, #fff)` }}
             onClick={onToggle}
             role={onToggle ? "button" : undefined}
         >

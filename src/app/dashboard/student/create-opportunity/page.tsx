@@ -30,6 +30,7 @@ import {
     VERIFICATION_EMOJI,
 } from "@/components/opportunities/CreateOpportunityChrome";
 import "@/components/opportunities/create-opportunity.css";
+import DraftsLandingView from "./DraftsLandingView";
 
 // Dynamically import LocationPicker to avoid SSR issues with Google Maps.
 const LocationPicker = dynamic(() => import('@/components/ui/LocationPicker'), {
@@ -40,6 +41,18 @@ const LocationPicker = dynamic(() => import('@/components/ui/LocationPicker'), {
 const ACTIVITY_TYPES_MAIN = [
     "Community Service", "Volunteer Activity", "Awareness Campaign", "Training / Teaching",
     "Research", "Technical Support", "Environmental Action",
+] as const;
+
+/** Left-rail wizard steps for the create-opportunity form. Presentational only — does not affect field data. */
+const WIZARD_STEPS = [
+    { key: "A", label: "Student details", sub: "From your profile", icon: "👤", color: "#0d2b33" },
+    { key: "B", label: "Project overview", sub: "Title, type, mode, timing", icon: "📝", color: "#0891b2" },
+    { key: "C", label: "SDG selection", sub: "Link it to the global goals", icon: "🌍", color: "#6d28d9" },
+    { key: "D", label: "Objectives", sub: "What & for whom", icon: "🎯", color: "#0e7d74" },
+    { key: "E", label: "Activity details", sub: "The plan & skills gained", icon: "🛠️", color: "#38bdf8" },
+    { key: "F", label: "Supervision & safety", sub: "Faculty, partner, safety", icon: "🛡️", color: "#b45309" },
+    { key: "G", label: "Evidence & verification", sub: "Set expectations now", icon: "✅", color: "#f472b6" },
+    { key: "SUBMIT", label: "Review & submit", sub: "Confirm & send for approval", icon: "🚀", color: "#0e7d74" },
 ] as const;
 
 /** Timeline modes that collect start/end date + daily from/to time (sent as timeline.* on create). */
@@ -152,8 +165,22 @@ export default function StudentOpportunityCreationPage() {
     const router = useRouter();
     const [isLoadingProfile, setIsLoadingProfile] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isSavingDraft, setIsSavingDraft] = useState(false);
     const [editingOpportunityId, setEditingOpportunityId] = useState<string | null>(null);
     const [isLoadingEdit, setIsLoadingEdit] = useState(false);
+    /** Opened via "Continue Draft" — the record behind editingOpportunityId is still a draft, not a
+     * submitted opportunity, so Save Draft stays enabled and Submit promotes it into a fresh
+     * submission instead of patching the draft row in place. */
+    const [isDraftMode, setIsDraftMode] = useState(false);
+    /** "landing" shows the drafts list (clicking the Community Service hub's Create Opportunity
+     * tile); "wizard" is the actual form, reached via ?new=1 or ?edit=<id>. Computed synchronously
+     * from the URL on first render so a direct `?edit=` link (the existing "Edit" flow from My
+     * Projects) never flashes the drafts list first. */
+    const [mode, setMode] = useState<"landing" | "wizard">(() => {
+        if (typeof window === "undefined") return "landing";
+        const params = new URLSearchParams(window.location.search);
+        return params.get("edit")?.trim() || params.get("new") === "1" ? "wizard" : "landing";
+    });
     const [showSubmittedReviewModal, setShowSubmittedReviewModal] = useState(false);
     const [submittedOpportunityTitle, setSubmittedOpportunityTitle] = useState("");
     /** One lead per project: show notice before the create form (skipped when ?edit= is present). */
@@ -454,21 +481,11 @@ export default function StudentOpportunityCreationPage() {
         return true;
     };
 
-    const handleSubmit = async () => {
-        if (isLoadingEdit) return;
-        if (!validateForm()) return;
-
-        if (!editingOpportunityId && similarMatches.length > 0) {
-            toast.error(
-                "Disclaimer: A similar project already exists at your university. Ask your team lead to add you via Apply Now. Do not create another listing.",
-                { duration: 6000 },
-            );
-            return;
-        }
-
-        setIsSubmitting(true);
-        try {
-            const hasOther = formData.opportunityType.includes("Other");
+    /** Same request-body shape for a real submission and a backend-persisted draft save — the
+     * draft endpoint just merges whatever fields are present, so an incomplete form still maps
+     * onto the right entity columns once the student finishes and submits for real. */
+    const buildOpportunityPayload = () => {
+        const hasOther = formData.opportunityType.includes("Other");
             const typesPayload = hasOther
                 ? [
                     ...formData.opportunityType.filter((t) => t !== "Other"),
@@ -626,8 +643,28 @@ export default function StudentOpportunityCreationPage() {
                 visibility: formData.visibility,
                 restricted_universities: [studentDetails.institution.trim()],
             };
+        return payload;
+    };
 
-            const isEdit = Boolean(editingOpportunityId);
+    const handleSubmit = async () => {
+        if (isLoadingEdit) return;
+        if (!validateForm()) return;
+
+        if (!editingOpportunityId && similarMatches.length > 0) {
+            toast.error(
+                "Disclaimer: A similar project already exists at your university. Ask your team lead to add you via Apply Now. Do not create another listing.",
+                { duration: 6000 },
+            );
+            return;
+        }
+
+        setIsSubmitting(true);
+        try {
+            const payload = buildOpportunityPayload();
+
+            // A draft being submitted for the first time promotes into a brand-new listing (full
+            // faculty-verification side effects) rather than patching the lightweight draft row.
+            const isEdit = Boolean(editingOpportunityId) && !isDraftMode;
             const editId = editingOpportunityId ?? "";
             const res = await authenticatedFetch(
                 isEdit
@@ -666,6 +703,14 @@ export default function StudentOpportunityCreationPage() {
                     toast.success("Opportunity updated successfully!");
                     router.push("/dashboard/student/projects");
                 } else {
+                    if (isDraftMode && editingOpportunityId) {
+                        // Best-effort cleanup of the now-superseded draft row; the real submission above already succeeded.
+                        authenticatedFetch(`/api/v1/opportunities/${encodeURIComponent(editingOpportunityId)}`, {
+                            method: "DELETE",
+                        }, { redirectToLogin: false }).catch(() => {
+                            /* ignore — orphan draft is harmless, just won't be cleaned up */
+                        });
+                    }
                     setSubmittedOpportunityTitle(formData.title.trim());
                     setShowSubmittedReviewModal(true);
                 }
@@ -734,6 +779,21 @@ export default function StudentOpportunityCreationPage() {
 
     const [expandedSections, setExpandedSections] = useState<string[]>(["A", "B", "C", "D", "E", "F", "G"]);
 
+    const [activeStep, setActiveStep] = useState<string>("A");
+    const activeStepIndex = WIZARD_STEPS.findIndex((s) => s.key === activeStep);
+    const goToStep = useCallback((key: string) => {
+        setActiveStep(key);
+        if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
+    }, []);
+    const goNextStep = useCallback(() => {
+        const i = WIZARD_STEPS.findIndex((s) => s.key === activeStep);
+        if (i >= 0 && i < WIZARD_STEPS.length - 1) goToStep(WIZARD_STEPS[i + 1].key);
+    }, [activeStep, goToStep]);
+    const goBackStep = useCallback(() => {
+        const i = WIZARD_STEPS.findIndex((s) => s.key === activeStep);
+        if (i > 0) goToStep(WIZARD_STEPS[i - 1].key);
+    }, [activeStep, goToStep]);
+
     const displayStudentContact = useMemo(
         () => parsePhoneForDisplay(studentDetails.contact),
         [studentDetails.contact],
@@ -748,7 +808,7 @@ export default function StudentOpportunityCreationPage() {
         [formData.dates.end],
     );
 
-    const handleSaveDraft = () => {
+    const handleSaveDraft = async () => {
         try {
             localStorage.setItem(
                 STUDENT_OPPORTUNITY_DRAFT_KEY,
@@ -760,11 +820,43 @@ export default function StudentOpportunityCreationPage() {
                     expandedSections,
                 }),
             );
-            toast.success("Draft saved on this device.");
         } catch (e) {
             console.error("Draft save failed", e);
             toast.error("Could not save draft. Check browser storage.");
+            return;
         }
+
+        // Best-effort sync to the account so the draft also shows up under "Saved Opportunity
+        // Drafts" on another device — the on-device save above already succeeded either way.
+        if (formData.title.trim()) {
+            setIsSavingDraft(true);
+            try {
+                const payload = { ...buildOpportunityPayload(), draft: true };
+                const res = await authenticatedFetch(
+                    editingOpportunityId
+                        ? `/api/v1/student/opportunity/${encodeURIComponent(editingOpportunityId)}`
+                        : `/api/v1/student/opportunity`,
+                    { method: "POST", body: JSON.stringify(payload) },
+                    { redirectToLogin: false },
+                );
+                const data = await res?.json().catch(() => null);
+                const newId = (data as { data?: { id?: string } } | null)?.data?.id;
+                if (res?.ok && newId && !editingOpportunityId) {
+                    setEditingOpportunityId(newId);
+                    setIsDraftMode(true);
+                    const url = new URL(window.location.href);
+                    url.searchParams.set("edit", newId);
+                    url.searchParams.set("draft", "1");
+                    window.history.replaceState(null, "", url.toString());
+                }
+            } catch (e) {
+                console.error("Backend draft sync failed", e);
+            } finally {
+                setIsSavingDraft(false);
+            }
+        }
+
+        toast.success("Draft saved.");
     };
 
     useEffect(() => {
@@ -916,12 +1008,18 @@ export default function StudentOpportunityCreationPage() {
 
     useEffect(() => {
         if (typeof window === "undefined") return;
-        const e = new URLSearchParams(window.location.search).get("edit")?.trim();
+        const params = new URLSearchParams(window.location.search);
+        const e = params.get("edit")?.trim();
         if (e) {
             setEditingOpportunityId(e);
+            setIsDraftMode(params.get("draft") === "1");
             setShowTeamLeadNotice(false);
-        } else {
+            setMode("wizard");
+        } else if (params.get("new") === "1") {
             setShowTeamLeadNotice(true);
+            setMode("wizard");
+        } else {
+            setMode("landing");
         }
     }, []);
 
@@ -1071,6 +1169,10 @@ export default function StudentOpportunityCreationPage() {
     const previewPrimarySdg = formData.sdg ? findSdgById(formData.sdg) : null;
     const previewSecondarySdg = formData.secondarySdg ? findSdgById(formData.secondarySdg) : null;
 
+    if (mode === "landing") {
+        return <DraftsLandingView />;
+    }
+
     return (
         <div className="co-form">
             {showTeamLeadNotice ? (
@@ -1119,29 +1221,78 @@ export default function StudentOpportunityCreationPage() {
                 </Link>
             </div>
 
-            <div className="relative mb-4 overflow-hidden rounded-[24px] bg-[linear-gradient(115deg,#04252b,#0e5f63_55%,#12a5a0_110%)] px-[26px] py-[22px] text-white">
-                <div className="pointer-events-none absolute right-[-8px] top-2 text-[38px] tracking-[10px] opacity-[0.13]" aria-hidden>
-                    🚀 💡 🤝 🌱
-                </div>
-                <p className="text-[9.5px] font-extrabold tracking-[0.22em] text-[#99f6e4]">
-                    {editingOpportunityId ? "EDIT STUDENT OPPORTUNITY · SDG-ALIGNED" : "CREATE STUDENT OPPORTUNITY · SDG-ALIGNED"}
-                </p>
-                <h1 className="mt-1.5 text-[21px] font-extrabold">
-                    {editingOpportunityId ? "Update your listing" : "Your idea, your crew — let’s build it 🚀"}
-                </h1>
-                <p className="mt-1 max-w-[560px] text-xs leading-relaxed text-[#cdf5f0]">
-                    {editingOpportunityId
-                        ? "Update your opportunity and submit again for review."
-                        : "Seven quick sections. Your details are already filled, chips do most of the typing, and your listing preview builds itself at the bottom as you go."}
-                </p>
-                {isLoadingEdit ? (
-                    <p className="mt-2 flex items-center gap-2 text-sm text-[#cdf5f0]">
-                        <Loader2 className="h-4 w-4 animate-spin" /> Loading opportunity…
+            <div className="co-hero">
+                <div className="co-hero-copy">
+                    <p className="co-hero-eyebrow">
+                        {editingOpportunityId ? "EDIT STUDENT OPPORTUNITY · SDG-ALIGNED" : "CIEL PK · COMMUNITY SERVICE"}
                     </p>
-                ) : null}
+                    <h1>
+                        {editingOpportunityId ? "Update your listing" : "Your idea, your crew — let’s build it 🚀"}
+                    </h1>
+                    <p>
+                        {editingOpportunityId
+                            ? "Update your opportunity and submit again for review."
+                            : "Build a clear, safe and SDG-aligned opportunity step by step. Your details are already filled, chips do most of the typing, and your listing preview builds itself as you go."}
+                    </p>
+                    <div className="co-hero-chips">
+                        <span className="co-hero-chip">📍 Location transparency</span>
+                        <span className="co-hero-chip">🌍 SDG aligned</span>
+                        <span className="co-hero-chip">🛡️ Safety acknowledgement</span>
+                        <span className="co-hero-chip">🔄 Auto-saved draft</span>
+                    </div>
+                    {isLoadingEdit ? (
+                        <p className="mt-2 flex items-center gap-2 text-sm text-[#70808a]">
+                            <Loader2 className="h-4 w-4 animate-spin" /> Loading opportunity…
+                        </p>
+                    ) : null}
+                </div>
+                <div
+                    className="co-progress-ring"
+                    style={{
+                        background: `conic-gradient(#15988b ${Math.max(0, Math.min(100, Math.round((activeStepIndex / (WIZARD_STEPS.length - 1)) * 100)))}%, #e8edef 0)`,
+                    }}
+                >
+                    <strong>{Math.max(0, Math.min(100, Math.round((activeStepIndex / (WIZARD_STEPS.length - 1)) * 100)))}%</strong>
+                    <span>COMPLETE</span>
+                </div>
             </div>
 
+            <div className="co-wizard-layout">
+                <aside className="co-wizard-side">
+                    <div className="co-side-card">
+                        <h3>Opportunity Builder</h3>
+                        <div className="co-step-list">
+                            {WIZARD_STEPS.map((step, idx) => (
+                                <button
+                                    key={step.key}
+                                    type="button"
+                                    className={`co-step-btn${activeStep === step.key ? " active" : ""}${idx < activeStepIndex ? " done" : ""}`}
+                                    onClick={() => goToStep(step.key)}
+                                >
+                                    <span className="co-step-ico">{step.icon}</span>
+                                    <span className="co-step-copy">
+                                        <b>{step.label}</b>
+                                        <span>{step.sub}</span>
+                                    </span>
+                                    <span className="co-step-num">{idx < activeStepIndex ? "✓" : idx + 1}</span>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                    <div className="co-fun-tip">
+                        <b>💡 Make it easy to trust</b>
+                        <p>Clear responsibilities, realistic hours, accurate locations and honest safety information help students make better participation decisions.</p>
+                    </div>
+                    <div className="co-side-card">
+                        <h3>Approval path</h3>
+                        <p>You submit → Faculty verification → CIEL Admin review → Opportunity goes live.</p>
+                    </div>
+                </aside>
+
+                <div className="co-wizard-main">
+
             {/* SECTION A: STUDENT DETAILS */}
+            {activeStep === "A" && (
             <div className="co-card">
                 <CoSectionHead letter="A" title="Student details" tag="✅ FROM YOUR PROFILE — NOTHING TO TYPE" tagAuto color="#0d2b33" />
                 {isLoadingProfile ? (
@@ -1170,7 +1321,10 @@ export default function StudentOpportunityCreationPage() {
                 )}
             </div>
 
+            )}
+
             {/* SECTION B: OPPORTUNITY OVERVIEW */}
+            {activeStep === "B" && (
             <div className="co-card co-accent" style={{ borderTopColor: "#0891b2" }}>
                 <CoSectionHead
                     letter="B"
@@ -1488,7 +1642,10 @@ export default function StudentOpportunityCreationPage() {
                 </div>
             </div>
 
+            )}
+
             {/* SECTION C: SDG SELECTION */}
+            {activeStep === "C" && (
             <div className="co-card co-accent" style={{ borderTopColor: "#6d28d9" }}>
                 <CoSectionHead
                     letter="C"
@@ -1646,7 +1803,10 @@ export default function StudentOpportunityCreationPage() {
                 </div>
             </div>
 
+            )}
+
             {/* SECTION D: OBJECTIVES */}
+            {activeStep === "D" && (
             <div className="co-card co-accent" style={{ borderTopColor: "#0e7d74" }}>
                 <CoSectionHead
                     letter="D"
@@ -1788,7 +1948,10 @@ export default function StudentOpportunityCreationPage() {
                 </div>
             </div>
 
+            )}
+
             {/* SECTION E: ACTIVITY DETAILS */}
+            {activeStep === "E" && (
             <div className="co-card co-accent" style={{ borderTopColor: "#38bdf8" }}>
                 <CoSectionHead
                     letter="E"
@@ -1901,7 +2064,10 @@ export default function StudentOpportunityCreationPage() {
                 </div>
             </div>
 
+            )}
+
             {/* SECTION F: STUDENT-CREATED OPPORTUNITY (CONTROLLED) */}
+            {activeStep === "F" && (
             <div className="co-card co-accent" style={{ borderTopColor: "#b45309" }}>
                 <CoSectionHead
                     letter="F"
@@ -2173,7 +2339,10 @@ export default function StudentOpportunityCreationPage() {
                 </div>
             </div>
 
+            )}
+
             {/* SECTION G: VERIFICATION */}
+            {activeStep === "G" && (
             <div className="co-card co-accent" style={{ borderTopColor: "#f472b6" }}>
                 <CoSectionHead
                     letter="G"
@@ -2205,7 +2374,10 @@ export default function StudentOpportunityCreationPage() {
                 </div>
             </div>
 
+            )}
+
             {/* SECTION: F6 REQUIRED CONFIRMATIONS + DECLARATION */}
+            {activeStep === "SUBMIT" && (
             <div className="co-final mb-3 rounded-[20px] bg-[#0d2b33] p-5 text-white">
                 <div className="mb-1 flex items-center gap-2.5">
                     <span className="flex h-[26px] min-w-[28px] items-center justify-center rounded-[9px] bg-[#2dd4bf] px-2 text-[11px] font-extrabold text-[#04252b]">✓</span>
@@ -2277,9 +2449,9 @@ export default function StudentOpportunityCreationPage() {
                         type="button"
                         onClick={handleSaveDraft}
                         className="flex-1 rounded-[13px] border border-white/30 bg-transparent py-3 text-xs font-extrabold text-[#d9f7f2] disabled:opacity-50"
-                        disabled={isSubmitting || isLoadingEdit || Boolean(editingOpportunityId)}
+                        disabled={isSubmitting || isLoadingEdit || isSavingDraft || (Boolean(editingOpportunityId) && !isDraftMode)}
                     >
-                        💾 Save draft
+                        {isSavingDraft ? "Saving…" : "💾 Save draft"}
                     </button>
                     <button
                         type="button"
@@ -2294,6 +2466,24 @@ export default function StudentOpportunityCreationPage() {
                               ? "Save changes"
                               : "🚀 Submit project"}
                     </button>
+                </div>
+            </div>
+            )}
+
+                    <div className="co-form-nav">
+                        {activeStepIndex > 0 ? (
+                            <button type="button" className="co-nav-btn back" onClick={goBackStep}>← Back</button>
+                        ) : <span />}
+                        {activeStep !== "SUBMIT" ? (
+                            <button
+                                type="button"
+                                className={`co-nav-btn ${activeStepIndex === WIZARD_STEPS.length - 2 ? "finish" : "next"}`}
+                                onClick={goNextStep}
+                            >
+                                {WIZARD_STEPS[activeStepIndex + 1]?.label ? `${WIZARD_STEPS[activeStepIndex + 1].label} →` : "Next →"}
+                            </button>
+                        ) : null}
+                    </div>
                 </div>
             </div>
 
