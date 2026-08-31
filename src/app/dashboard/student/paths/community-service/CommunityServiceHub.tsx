@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { authenticatedFetch } from "@/utils/api";
 import { readStoredCurrentUser } from "@/utils/currentUser";
 import { namedTimeGreeting } from "@/utils/timeGreeting";
 import type { ActiveProject } from "@/app/dashboard/student/types";
@@ -11,8 +10,9 @@ const CREATE_HREF = "/dashboard/student/create-opportunity";
 const BROWSE_HREF = "/dashboard/student/browse";
 const PROJECTS_HREF = "/dashboard/student/paths/community-service?tab=engagements";
 const LOG_HOURS_HREF = "/dashboard/student/paths/community-service?tab=log-hours";
-const REPORT_HREF = "/dashboard/student/paths/community-service?tab=reports";
 const WALL_HREF = "/dashboard/student/paths/community-service?view=wall";
+const GUIDE_HREF = "/dashboard/student/paths/community-service?view=guide";
+const PORTFOLIO_HREF = "/dashboard/student/impact";
 
 export default function CommunityServiceHub({
     projects,
@@ -24,26 +24,11 @@ export default function CommunityServiceHub({
     wallCount: number;
 }) {
     const [name, setName] = useState("");
-    const [openCount, setOpenCount] = useState<number | null>(null);
     const [helpOpen, setHelpOpen] = useState(false);
 
     useEffect(() => {
         const user = readStoredCurrentUser();
         setName(typeof user?.name === "string" ? user.name.split(" ")[0] : "");
-
-        let cancelled = false;
-        authenticatedFetch("/api/v1/students/opportunities/recommended", {}, { redirectToLogin: false })
-            .then((res) => (res?.ok ? res.json() : null))
-            .then((result) => {
-                if (cancelled) return;
-                setOpenCount(Array.isArray(result?.data) ? result.data.length : 0);
-            })
-            .catch(() => {
-                if (!cancelled) setOpenCount(0);
-            });
-        return () => {
-            cancelled = true;
-        };
     }, []);
 
     const hoursTarget = projects.reduce((max, p) => {
@@ -52,7 +37,6 @@ export default function CommunityServiceHub({
     }, 0);
     const hoursLabel = hoursTarget > 0 ? `${Math.round(verifiedHours)} / ${hoursTarget}h` : `${Math.round(verifiedHours)}h`;
     const greeting = namedTimeGreeting(name);
-    const browseBadge = openCount === null ? "OPEN NOW" : openCount > 0 ? `${openCount} OPEN NOW` : "BROWSE";
 
     return (
         <div className="mx-auto max-w-[980px] pb-16">
@@ -69,7 +53,8 @@ export default function CommunityServiceHub({
                     {greeting} 🌍
                 </h1>
                 <p className="mt-1 max-w-[560px] text-xs leading-relaxed text-[#cdf5f0]">
-                    Five doors. Everything community service lives behind one of them — pick yours.
+                    Create opportunities, save drafts, follow Faculty → Partner → CIEL PK approvals, complete your
+                    9-section report and build a verified Community Service record.
                 </p>
                 <div className="mt-3.5 flex flex-wrap gap-2.5">
                     <HubStat value={String(projects.length)} label="ACTIVE PROJECT" />
@@ -81,49 +66,49 @@ export default function CommunityServiceHub({
             <div className="mt-4 grid grid-cols-1 gap-3.5 sm:grid-cols-2">
                 <HubTile
                     href={CREATE_HREF}
-                    badge="START SOMETHING"
+                    badge="CREATE / CONTINUE"
                     emoji="🚀"
-                    title="Create an Opportunity"
-                    subtitle="Your idea, your crew — open the form and lead it."
-                    background="linear-gradient(135deg,#0e7d74,#2dd4bf)"
+                    title="Create Opportunity"
+                    subtitle="Start a new Community Service opportunity or continue an unfinished draft."
+                    background="linear-gradient(135deg,#15988b,#2ec8bd)"
                     badgeClass="text-[#0e7d74]"
-                />
-                <HubTile
-                    href={BROWSE_HREF}
-                    badge={browseBadge}
-                    emoji="🔎"
-                    title="Browse Opportunities"
-                    subtitle="Join what's already moving on campus."
-                    background="linear-gradient(135deg,#0e5f63,#38bdf8)"
-                    badgeClass="text-[#0369a1]"
                 />
                 <HubTile
                     href={PROJECTS_HREF}
-                    badge={projects.length > 0 ? `${projects.length} ACTIVE` : "YOUR WORK"}
+                    badge="TRACK YOUR WORK"
                     emoji="🛠️"
-                    title="My Projects"
-                    subtitle="Your live work — log hours right inside each project."
-                    background="linear-gradient(135deg,#b45309,#f59e0b)"
+                    title="Community Service Workspace"
+                    subtitle="Track Faculty → Partner → CIEL PK approvals, report progress, faculty decisions and revisions."
+                    background="linear-gradient(135deg,#c76000,#f59a00)"
                     badgeClass="text-[#b45309]"
                 />
                 <HubTile
-                    href={REPORT_HREF}
-                    badge="GUIDE INSIDE"
-                    emoji="📝"
-                    title="My Report"
-                    subtitle="Nine form sections plus the flash card — decoded with examples & tips."
-                    background="linear-gradient(135deg,#6d28d9,#a78bfa)"
-                    badgeClass="text-[#6d28d9]"
+                    href={WALL_HREF}
+                    badge="VERIFIED IMPACT"
+                    emoji="🏅"
+                    title="My Community Service Impact"
+                    subtitle="Open approved impact flashcards with score, evidence, certificate, QR code, badges and rankings."
+                    background="linear-gradient(135deg,#0e4d4e,#117669)"
+                    badgeClass="text-[#0e7d74]"
                 />
                 <HubTile
-                    href={WALL_HREF}
-                    badge="THE TROPHY ROOM"
-                    emoji="🏅"
-                    title="My Impact Wall"
-                    subtitle="Every approved project hangs here, forever — with every badge others award you."
-                    background="linear-gradient(135deg,#04252b,#0e7d74)"
+                    href={PORTFOLIO_HREF}
+                    badge="MY PORTFOLIO"
+                    emoji="🏆"
+                    title="My Impact Portfolio"
+                    subtitle="View the permanent consolidated portfolio where every approved impact record is transferred automatically."
+                    background="linear-gradient(135deg,#183b56,#286786)"
+                    badgeClass="text-[#183b56]"
+                />
+                <HubTile
+                    href={GUIDE_HREF}
+                    badge="OPEN GUIDANCE"
+                    emoji="📖"
+                    title="Report Guidance — Section by Section"
+                    subtitle="Get detailed guidance, examples, evidence requirements and checks for all 9 report sections."
+                    background="linear-gradient(135deg,#6b2bd9,#9f78ef)"
                     className="sm:col-span-2"
-                    badgeClass="text-[#0e7d74]"
+                    badgeClass="text-[#6d28d9]"
                 />
             </div>
 

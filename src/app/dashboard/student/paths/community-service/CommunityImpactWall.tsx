@@ -10,6 +10,8 @@ import { isCommunityReportOnLiveDeck } from "@/utils/reviewQueue";
 
 type WallRow = {
     id: string;
+    project_id?: string | null;
+    opportunity_id?: string | null;
     project_title?: string;
     organization_name?: string;
     faculty_status?: string;
@@ -18,6 +20,9 @@ type WallRow = {
     cii_score?: number | null;
     level?: CommunityServiceLevel;
     section1?: { metrics?: { total_verified_hours?: number } };
+    sdgs?: (string | number)[];
+    impact_verify_url?: string | null;
+    actions?: { certificate_url?: string | null; pdf_url?: string | null };
 };
 
 export default function CommunityImpactWall() {
@@ -112,6 +117,51 @@ export default function CommunityImpactWall() {
                                     {r.cii_score != null ? (
                                         <span className="rounded-full bg-[#f1ebfd] px-2 py-0.5 text-[7px] font-extrabold text-[#6d28d9]">🧠 CII {r.cii_score}/100</span>
                                     ) : null}
+                                    {(r.sdgs || []).map((sdg) => (
+                                        <span key={String(sdg)} className="rounded-full bg-[#fbf0d7] px-2 py-0.5 text-[7px] font-extrabold text-[#8a5a06]">
+                                            🌍 SDG {sdg}
+                                        </span>
+                                    ))}
+                                </div>
+                                <div className="flex flex-wrap gap-1.5 border-t border-[#eef2f3] px-3 py-2">
+                                    {(r.project_id || r.opportunity_id) && (
+                                        <Link
+                                            href={`/dashboard/student/report?projectId=${encodeURIComponent(String(r.project_id || r.opportunity_id))}`}
+                                            className="rounded-full bg-[#0e7d74] px-2.5 py-1 text-[8px] font-extrabold text-white"
+                                        >
+                                            Open Flashcard
+                                        </Link>
+                                    )}
+                                    {r.actions?.pdf_url && (
+                                        <a
+                                            href={r.actions.pdf_url}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            className="rounded-full border border-[#dcebee] px-2.5 py-1 text-[8px] font-extrabold text-[#4c5f66]"
+                                        >
+                                            PDF Report
+                                        </a>
+                                    )}
+                                    {r.actions?.certificate_url && (
+                                        <a
+                                            href={r.actions.certificate_url}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            className="rounded-full border border-[#dcebee] px-2.5 py-1 text-[8px] font-extrabold text-[#4c5f66]"
+                                        >
+                                            Certificate
+                                        </a>
+                                    )}
+                                    {r.impact_verify_url && (
+                                        <a
+                                            href={r.impact_verify_url}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            className="rounded-full border border-[#dcebee] px-2.5 py-1 text-[8px] font-extrabold text-[#4c5f66]"
+                                        >
+                                            QR Code
+                                        </a>
+                                    )}
                                 </div>
                             </div>
                         ))}
