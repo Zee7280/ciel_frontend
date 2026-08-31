@@ -19,7 +19,7 @@ export default function DashboardLayout({
                 <div className="print:hidden">
                     <DashboardHeader />
                 </div>
-                <main className="mx-auto w-full max-w-[1500px] flex-1 px-[18px] py-7 pb-24 sm:px-[30px] sm:pb-12 lg:ml-[var(--ciel-sidebar-width)] lg:pb-12 print:ml-0 print:max-w-none print:p-0 print:w-full ciel-transition">
+                <main className="mx-auto w-full max-w-[1500px] flex-1 px-[18px] py-7 pb-24 sm:px-[30px] sm:pb-12 lg:ml-[var(--ciel-sidebar-width)] lg:w-[calc(100%-var(--ciel-sidebar-width))] lg:pb-12 print:ml-0 print:max-w-none print:w-full print:p-0 ciel-transition">
                     <ProfileCompletionGate>{children}</ProfileCompletionGate>
                 </main>
             </div>
