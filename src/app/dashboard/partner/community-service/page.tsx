@@ -101,8 +101,9 @@ function PartnerCommunityServiceHub() {
                         .map((item: Record<string, unknown>) => mapCommunityPipelineRow(item))
                         .filter((r: CommunityPipelineRow | null): r is CommunityPipelineRow => Boolean(r?.id)),
                 );
-                const rows = (Array.isArray(list?.data) ? list.data : []).filter(
-                    (item: unknown): item is Record<string, unknown> => Boolean(item && typeof item === "object"),
+                const rawList: unknown[] = Array.isArray(list?.data) ? list.data : [];
+                const rows = rawList.filter(
+                    (item): item is Record<string, unknown> => Boolean(item && typeof item === "object"),
                 );
                 const currentUserId = getStoredCurrentUserId();
                 setLiveOpportunityCount(rows.filter((row) => isOpportunityPubliclyLive(row)).length);
