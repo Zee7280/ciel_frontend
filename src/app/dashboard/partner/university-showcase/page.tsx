@@ -7,7 +7,7 @@ import { authenticatedFetch } from "@/utils/api";
 import { toast } from "sonner";
 import clsx from "clsx";
 import CourseworkCard from "@/components/ciel/CourseworkCard";
-import MeritModelPanel, { type MeritEntry } from "@/components/ciel/MeritModelPanel";
+import MeritModelPanel, { type MeritEntry, entryDepartment, entryFaculty, entryFormat } from "@/components/ciel/MeritModelPanel";
 import ThesisCard from "@/components/ciel/ThesisCard";
 import FypMeritPanel, { type FypMeritEntry } from "@/components/ciel/FypMeritPanel";
 import { ActionKpiGrid, CourseworkCrumb, CourseworkHero, HubBackButton, HubTile, PathSectionHead, WorkflowSteps } from "@/components/ciel/coursework/CourseworkHubChrome";
@@ -16,7 +16,7 @@ import { computeMeritScorecard } from "@/utils/courseworkMeritModel";
 import { isPathEntryApproved, isPathEntryWaiting } from "@/utils/reviewQueue";
 
 type DeckMode = "course-project" | "fyp-thesis";
-type UniView = "home" | "pending" | "deck" | "rank";
+type UniView = "home" | "progress" | "pending" | "deck" | "rank";
 
 export default function UniversityShowcasePage() {
     const [mode, setMode] = useState<DeckMode>("course-project");
@@ -28,6 +28,7 @@ export default function UniversityShowcasePage() {
         }
     }, []);
     const [entries, setEntries] = useState<MeritEntry[]>([]);
+    const [inProgress, setInProgress] = useState<MeritEntry[]>([]);
     const [fypEntries, setFypEntries] = useState<FypMeritEntry[]>([]);
     const [loading, setLoading] = useState(true);
     const [fypLoading, setFypLoading] = useState(true);
@@ -35,8 +36,15 @@ export default function UniversityShowcasePage() {
     const [view, setView] = useState<UniView>("home");
     const [forbidden, setForbidden] = useState(false);
 
+    const [fDept, setFDept] = useState("all");
+    const [fFaculty, setFFaculty] = useState("all");
+    const [fFormat, setFFormat] = useState("all");
+    const [fSemester, setFSemester] = useState("all");
+    const [fYear, setFYear] = useState("all");
+
     useEffect(() => {
         void fetchEntries();
+        void fetchInProgress();
         void fetchFypEntries();
     }, []);
 
@@ -59,6 +67,18 @@ export default function UniversityShowcasePage() {
             setEntries([]);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const fetchInProgress = async () => {
+        try {
+            const response = await authenticatedFetch("/api/v1/paths/course-projects/university?status=draft");
+            if (response?.ok) {
+                const data = await response.json();
+                setInProgress(Array.isArray(data.data) ? data.data : []);
+            }
+        } catch {
+            // Non-fatal — the "Coursework in Progress" tile just shows 0 until the next load.
         }
     };
 
@@ -93,8 +113,25 @@ export default function UniversityShowcasePage() {
     }, [approved]);
 
     const q = searchQuery.toLowerCase();
-    const coursePool = view === "pending" ? waiting : approved;
+    const coursePool = view === "progress" ? inProgress : view === "pending" ? waiting : approved;
+    const courseYear = (e: MeritEntry) => {
+        const d = e.updatedAt || e.createdAt;
+        return d ? String(new Date(d).getFullYear()) : "";
+    };
+    const courseDepartments = useMemo(() => [...new Set(coursePool.map(entryDepartment))].sort(), [coursePool]);
+    const courseFaculties = useMemo(() => [...new Set(coursePool.map(entryFaculty))].sort(), [coursePool]);
+    const courseFormats = useMemo(() => [...new Set(coursePool.map(entryFormat))].sort(), [coursePool]);
+    const courseSemesters = useMemo(
+        () => [...new Set(coursePool.map((e) => e.studentInfo?.semester).filter(Boolean))].sort() as string[],
+        [coursePool],
+    );
+    const courseYears = useMemo(() => [...new Set(coursePool.map(courseYear).filter(Boolean))].sort().reverse(), [coursePool]);
     const filteredCourse = coursePool.filter((entry) => {
+        if (fDept !== "all" && entryDepartment(entry) !== fDept) return false;
+        if (fFaculty !== "all" && entryFaculty(entry) !== fFaculty) return false;
+        if (fFormat !== "all" && entryFormat(entry) !== fFormat) return false;
+        if (fSemester !== "all" && entry.studentInfo?.semester !== fSemester) return false;
+        if (fYear !== "all" && courseYear(entry) !== fYear) return false;
         if (!q) return true;
         return (
             entry.student?.name?.toLowerCase().includes(q) ||
@@ -138,15 +175,15 @@ export default function UniversityShowcasePage() {
         <div>
             <div className="mx-auto max-w-[1240px] space-y-4">
                 <CourseworkCrumb role="University" view={crumbView} pathLabel={mode === "fyp-thesis" ? "FYP / Thesis" : "Coursework"} />
-                {view === "home" && (mode === "course-project" ? (
+                {mode === "course-project" ? (
                     <CourseworkHero
                         kicker="UNIVERSITY IMPACT DASHBOARD"
-                        title="Coursework Project"
-                        subtitle="Review course-linked impact projects after faculty approval and run institutional rankings."
+                        title="Coursework"
+                        subtitle="See approved sustainability-linked coursework from all departments and run AI Rankings."
                         stats={[
-                            { value: String(waiting.length), label: "Awaiting Review" },
+                            { value: String(inProgress.length), label: "In Progress" },
+                            { value: String(waiting.length), label: "Under Review" },
                             { value: String(approved.length), label: "Approved Projects" },
-                            { value: String(approved.length), label: "On Impact Wall" },
                         ]}
                     />
                 ) : (
@@ -160,7 +197,7 @@ export default function UniversityShowcasePage() {
                             { value: String(fypSchools || "—"), label: "Schools" },
                         ]}
                     />
-                ))}
+                )}
 
                 <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="flex gap-2">
@@ -187,6 +224,60 @@ export default function UniversityShowcasePage() {
                     </div>
                 </div>
 
+                {mode === "course-project" && view !== "rank" && (
+                    <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                        <div className="flex items-center justify-between">
+                            <p className="text-xs font-black uppercase tracking-wide text-slate-500">Coursework Filters</p>
+                            <p className="text-[11px] text-slate-400">Use one or more filters to refine the institutional view.</p>
+                        </div>
+                        <div className="mt-2.5 flex flex-wrap gap-2">
+                            <select value={fDept} onChange={(e) => setFDept(e.target.value)} className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700">
+                                <option value="all">All Departments</option>
+                                {courseDepartments.map((d) => (
+                                    <option key={d} value={d}>{d}</option>
+                                ))}
+                            </select>
+                            <select value={fFaculty} onChange={(e) => setFFaculty(e.target.value)} className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700">
+                                <option value="all">All Faculty Members</option>
+                                {courseFaculties.map((f) => (
+                                    <option key={f} value={f}>{f}</option>
+                                ))}
+                            </select>
+                            <select value={fFormat} onChange={(e) => setFFormat(e.target.value)} className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700">
+                                <option value="all">All Project Types</option>
+                                {courseFormats.map((f) => (
+                                    <option key={f} value={f}>{f}</option>
+                                ))}
+                            </select>
+                            <select value={fSemester} onChange={(e) => setFSemester(e.target.value)} className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700">
+                                <option value="all">All Semesters</option>
+                                {courseSemesters.map((s) => (
+                                    <option key={s} value={s}>{s}</option>
+                                ))}
+                            </select>
+                            <select value={fYear} onChange={(e) => setFYear(e.target.value)} className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700">
+                                <option value="all">All Academic Years</option>
+                                {courseYears.map((y) => (
+                                    <option key={y} value={y}>{y}</option>
+                                ))}
+                            </select>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setFDept("all");
+                                    setFFaculty("all");
+                                    setFFormat("all");
+                                    setFSemester("all");
+                                    setFYear("all");
+                                }}
+                                className="ml-auto rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-500 hover:border-slate-300"
+                            >
+                                Reset
+                            </button>
+                        </div>
+                    </div>
+                )}
+
                 {view !== "home" && <HubBackButton onClick={() => setView("home")} label="← Back to showcase" />}
 
                 {view === "home" && (
@@ -197,37 +288,67 @@ export default function UniversityShowcasePage() {
                         pill="UNIVERSITY VIEW"
                     />
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                        {mode === "course-project" && (
+                            <HubTile
+                                onClick={() => setView("progress")}
+                                badge={`${inProgress.length} IN PROGRESS`}
+                                badgeClass="text-[#c76000]"
+                                emoji="🧩"
+                                title="Coursework in Progress"
+                                subtitle="Students still filling the form across departments — completion bar, last activity, Email / WhatsApp reminders."
+                                background="linear-gradient(135deg,#15988b,#2ec8bd)"
+                            />
+                        )}
                         <HubTile
                             onClick={() => setView("pending")}
-                            badge={`${mode === "course-project" ? waiting.length : waitingFyp.length} IN QUEUE`}
+                            badge={`${mode === "course-project" ? waiting.length : waitingFyp.length} ${mode === "course-project" ? "UNDER REVIEW" : "IN QUEUE"}`}
                             badgeClass="text-[#b45309]"
-                            emoji="⏳"
-                            title="Waiting for Approval"
+                            emoji={mode === "course-project" ? "📝" : "⏳"}
+                            title={mode === "course-project" ? "Coursework Under Review" : "Waiting for Approval"}
                             subtitle={
                                 mode === "course-project"
-                                    ? "Submitted coursework still waiting for faculty approval."
+                                    ? "Submitted flashcards waiting for faculty approval, or returned for revision — remind the faculty member or the student."
                                     : "Submitted FYP / thesis records still waiting for supervisor sign-off."
                             }
                             background="linear-gradient(135deg,#b45309,#fbbf24)"
                         />
                         <HubTile
                             onClick={() => setView("deck")}
-                            badge={`${mode === "course-project" ? approved.length : approvedFyp.length} LIVE`}
+                            badge={`${mode === "course-project" ? approved.length : approvedFyp.length} APPROVED`}
                             badgeClass="text-[#0e7d74]"
-                            emoji="⭐"
-                            title="Approved flash cards"
-                            subtitle="Faculty-approved cards only — the live institutional deck."
+                            emoji={mode === "course-project" ? "📚" : "⭐"}
+                            title={mode === "course-project" ? "Coursework Impact Wall" : "Approved flash cards"}
+                            subtitle={
+                                mode === "course-project"
+                                    ? "Faculty-approved coursework flashcards from every department — the same record the student, faculty and CIEL PK see."
+                                    : "Faculty-approved cards only — the live institutional deck."
+                            }
                             background="linear-gradient(135deg,#0e7d74,#2dd4bf)"
                         />
                         <HubTile
                             onClick={() => setView("rank")}
-                            badge="SAME FORMULA"
+                            badge={mode === "course-project" ? "AI RANKINGS" : "SAME FORMULA"}
                             badgeClass="text-[#6d28d9]"
-                            emoji="🧠"
-                            title={mode === "course-project" ? "AI Analyzer — rank this university" : "Merit model — rank this deck"}
-                            subtitle="Approved cards only. Waiting submissions stay out of the live ranking."
+                            emoji="🤖"
+                            title={mode === "course-project" ? "AI Rankings" : "Merit model — rank this deck"}
+                            subtitle={
+                                mode === "course-project"
+                                    ? "Ranking Studio — filter a cohort, preview anytime, publish a final ranking up to 3× a year (3 left) to badge students."
+                                    : "Approved cards only. Waiting submissions stay out of the live ranking."
+                            }
                             background="linear-gradient(135deg,#6d28d9,#a78bfa)"
                         />
+                        {mode === "course-project" && (
+                            <HubTile
+                                href="/dashboard/partner/university-analytics"
+                                badge="LOCKED"
+                                badgeClass="text-[#0f172a]"
+                                emoji="🔒"
+                                title="Coursework Analytics"
+                                subtitle="Department comparisons, rubric trends and downloadable institutional reports — CIEL PK Analytics."
+                                background="linear-gradient(135deg,#334155,#64748b)"
+                            />
+                        )}
                     </div>
                     <ActionKpiGrid
                         items={
@@ -258,7 +379,7 @@ export default function UniversityShowcasePage() {
                     </>
                 )}
 
-                {(view === "pending" || view === "deck") && (
+                {(view === "progress" || view === "pending" || view === "deck") && (
                     <div className="relative max-w-sm">
                         <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                         <input
@@ -289,22 +410,31 @@ export default function UniversityShowcasePage() {
                         <FypMeritPanel entries={approvedFyp} showSchoolFilter meritEndpoint="/api/v1/paths/fyp-thesis/merit-model" />
                     ))}
 
-                {mode === "course-project" && (view === "pending" || view === "deck") &&
+                {mode === "course-project" && (view === "progress" || view === "pending" || view === "deck") &&
                     (loading ? (
                         <SkeletonList />
                     ) : filteredCourse.length === 0 ? (
                         <EmptyUni
                             match={coursePool.length > 0}
                             message={
-                                view === "pending"
-                                    ? "No submitted coursework is waiting for faculty approval."
-                                    : "Approved coursework cards will appear here after faculty review."
+                                view === "progress"
+                                    ? "Students still filling out the coursework form will appear here."
+                                    : view === "pending"
+                                      ? "No submitted coursework is waiting for faculty approval."
+                                      : "Approved coursework cards will appear here after faculty review."
                             }
                         />
                     ) : (
                         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                             {filteredCourse.map((entry) => (
-                                <CourseworkCard key={entry.id} entry={entry} studentName={entry.student?.name} />
+                                <CourseworkCard
+                                    key={entry.id}
+                                    entry={entry}
+                                    studentName={entry.student?.name}
+                                    remindDraftOwner={view === "progress" || entry.facultyApprovalStatus === "revision_requested"}
+                                    studentReminder={view === "pending" && entry.facultyApprovalStatus === "pending" ? "faculty" : undefined}
+                                    studentEmail={entry.student?.email}
+                                />
                             ))}
                         </div>
                     ))}

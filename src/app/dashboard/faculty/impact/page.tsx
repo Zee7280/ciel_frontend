@@ -36,6 +36,14 @@ export default function FacultyImpactWallPage() {
     const [tab, setTab] = useState<WallTab>("all");
 
     useEffect(() => {
+        if (typeof window === "undefined") return;
+        const next = new URLSearchParams(window.location.search).get("tab");
+        if (next === "all" || next === "community" || next === "coursework" || next === "fyp" || next === "startup") {
+            setTab(next);
+        }
+    }, []);
+
+    useEffect(() => {
         let cancelled = false;
         Promise.all([
             authenticatedFetch("/api/v1/faculty/community-service/award-cards", {}, { redirectToLogin: false }).then((r) =>

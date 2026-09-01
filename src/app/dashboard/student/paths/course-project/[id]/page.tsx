@@ -299,10 +299,18 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
 
 /** Live, read-only preview of this section's auto-composed paragraph — updates on every keystroke/tap. */
 function SectionSummaryBox({ text }: { text?: string }) {
+    const filled = Boolean(text?.trim());
     return (
-        <div className="rounded-ciel-sm border border-dashed border-ciel-gold/50 bg-ciel-gold-soft/60 px-4 py-3 text-xs leading-relaxed text-ciel-gold-deep">
-            <span className="mb-1 block text-[9px] font-black uppercase tracking-widest text-ciel-gold">✨ Section summary</span>
-            <span>{text?.trim() ? <RichSummaryText text={text} /> : "Fills as you type…"}</span>
+        <div
+            className="mt-1 rounded-[14px] p-[1.5px]"
+            style={{ background: "linear-gradient(120deg,#e4d5ff,#f3e3b8 60%,#cde8d2)" }}
+        >
+            <div className="rounded-[13px] bg-white px-3.5 py-3">
+                <span className="block text-[8.5px] font-black tracking-[0.14em] text-[#6d3df5]">✨ SECTION SUMMARY</span>
+                <div className={filled ? "mt-1.5 text-[12.5px] leading-[1.7] text-[#2a3350]" : "mt-1.5 text-[12.5px] italic leading-[1.7] text-[#a2a8bb]"}>
+                    {filled ? <RichSummaryText text={text!} /> : "Fills as you type…"}
+                </div>
+            </div>
         </div>
     );
 }
@@ -796,8 +804,8 @@ export default function CourseProjectWizardPage() {
                         {entry.facultyApprovalNote} Fix and resubmit — nothing is penalised.
                     </div>
                 ) : null}
-                <div className="sticky top-16 z-20 -mx-1 mb-4 bg-slate-50/95 py-2 backdrop-blur-md lg:top-20">
-                    <div className="flex gap-1.5 overflow-x-auto pb-1 [scrollbar-width:thin]">
+                <div className="mb-[18px]">
+                    <div className="flex gap-1 overflow-x-auto py-[7px] pl-1 [scrollbar-width:thin]">
                         {STEPS.map((s, i) => {
                             const isCurrent = i === step;
                             const isDone = i < entry.stepCompleted && !isCurrent;
@@ -808,7 +816,7 @@ export default function CourseProjectWizardPage() {
                                     onClick={() => setStep(i)}
                                     title={stepLabels[i]}
                                     className={clsx(
-                                        "min-w-[5.35rem] flex-1 rounded-[11px] border-[1.5px] px-1.5 py-2 text-center ciel-transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ciel-gold",
+                                        "relative min-w-16 flex-1 rounded-[11px] border-[1.5px] px-1 py-[7px] text-center ciel-transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ciel-gold",
                                         isCurrent
                                             ? "border-ciel-gold bg-ciel-gold-soft"
                                             : isDone
@@ -816,11 +824,11 @@ export default function CourseProjectWizardPage() {
                                               : "border-ciel-border bg-white hover:border-ciel-gold/50",
                                     )}
                                 >
-                                    <div className="text-[15px] leading-none">{isDone ? "✓" : s.emoji}</div>
+                                    <div className="text-sm leading-none">{isDone ? "✓" : s.emoji}</div>
                                     <div
                                         className={clsx(
-                                            "mt-1 text-[8.5px] font-extrabold uppercase tracking-wide",
-                                            isCurrent ? "text-ciel-gold-deep" : "text-ciel-text-soft",
+                                            "mt-0.5 text-[9px] font-extrabold uppercase leading-tight tracking-wide",
+                                            isCurrent ? "text-ciel-gold-deep" : "text-[#7a8095]",
                                         )}
                                     >
                                         {stepLabels[i]}
@@ -1436,7 +1444,7 @@ export default function CourseProjectWizardPage() {
 
                 {error && <p className="mt-4 text-xs font-semibold text-red-600">{error}</p>}
 
-                <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
+                <div className="mt-6 flex flex-wrap items-center justify-between gap-3 pb-36">
                     <button
                         type="button"
                         disabled={step === 0}
@@ -1484,7 +1492,10 @@ export default function CourseProjectWizardPage() {
             )}
 
             {!showCard && (
-                <div className="fixed bottom-20 right-4 z-[60] sm:bottom-6 sm:right-6">
+                <div
+                    className="fixed z-[55] print:hidden right-[5.75rem] sm:right-[6.75rem]"
+                    style={{ bottom: "calc(7rem + env(safe-area-inset-bottom, 0px))" }}
+                >
                     {fabOpen && (
                         <div className="ciel-crossfade-enter absolute bottom-14 right-0 w-72 rounded-ciel-lg border border-ciel-border bg-white p-4 shadow-[0_18px_44px_rgba(20,32,43,0.22)]">
                             <p className="text-xs font-black text-ciel-text">📎 Attach your actual assignment</p>

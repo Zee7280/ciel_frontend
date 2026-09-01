@@ -13,10 +13,12 @@ import PathWorkspaceShell from "@/components/ciel/PathWorkspaceShell";
 import EmptyState from "@/components/ciel/EmptyState";
 import StatusPill, { type CielHourStatus } from "@/components/ciel/StatusPill";
 import { WorkspaceSkeleton } from "@/components/ciel/Skeleton";
-import CommunityServiceHub from "./CommunityServiceHub";
-import CommunityImpactWall from "./CommunityImpactWall";
+import CommunityServiceHub, { CommunityCreateOpportunityView } from "./CommunityServiceHub";
+import CommunityServiceWorkspace from "./CommunityServiceWorkspace";
 import { HubBackButton } from "@/components/ciel/community-service/CommunityServiceHubChrome";
 import StudentCommunityGuide from "@/components/report/StudentCommunityGuide";
+import { fetchImpactSummary } from "@/utils/cielImpactSummary";
+import { CIEL_PATHS } from "@/utils/cielPaths";
 
 type ApprovalLineStatus = "pending" | "approved" | "rejected" | null | undefined;
 
@@ -66,20 +68,32 @@ function CommunityServiceContent() {
     const showHub = !rawTab;
     const wallView = searchParams.get("view") === "wall";
     const guideView = searchParams.get("view") === "guide";
+    const createView = searchParams.get("view") === "create";
+    const workspaceView = searchParams.get("view") === "workspace";
     const activeTab = TABS.some((t) => t.key === rawTab) ? rawTab! : "engagements";
 
     const [loading, setLoading] = useState(true);
     const [projects, setProjects] = useState<ActiveProject[]>([]);
     const [verifiedHours, setVerifiedHours] = useState(0);
     const [wallCount, setWallCount] = useState(0);
+    const [completion, setCompletion] = useState(0);
 
     useEffect(() => {
         let cancelled = false;
-        fetchStudentDashboardData({ redirectToLogin: false }).then((data) => {
+        Promise.all([
+            fetchStudentDashboardData({ redirectToLogin: false }),
+            fetchImpactSummary({ redirectToLogin: false }),
+        ]).then(([data, summary]) => {
             if (cancelled) return;
             setProjects(data?.activeProjects ?? []);
             setVerifiedHours(data?.overview?.totalVerifiedHours ?? data?.stats?.hoursVolunteered ?? 0);
             setWallCount(data?.overview?.impactHistoryBadgeCount ?? data?.overview?.completedCount ?? 0);
+            setCompletion(
+                Math.round(
+                    (CIEL_PATHS.reduce((sum, path) => sum + (summary?.pathsStatus[path.key]?.progress ?? 0), 0) /
+                        (CIEL_PATHS.length || 1)) || 0,
+                ),
+            );
             setLoading(false);
         });
         return () => {
@@ -91,7 +105,10 @@ function CommunityServiceContent() {
         if (rawTab === "find") {
             router.replace("/dashboard/student/browse");
         }
-    }, [rawTab, router]);
+        if (wallView) {
+            router.replace("/dashboard/student/impact?area=Community%20Service");
+        }
+    }, [rawTab, wallView, router]);
 
     const setTab = (key: string) => {
         if (key === "find") {
@@ -105,10 +122,7 @@ function CommunityServiceContent() {
 
     if (loading) return <WorkspaceSkeleton />;
     if (rawTab === "find") return <WorkspaceSkeleton />;
-
-    if (showHub && wallView) {
-        return <CommunityImpactWall />;
-    }
+    if (wallView) return <WorkspaceSkeleton />;
 
     if (showHub && guideView) {
         return (
@@ -119,8 +133,37 @@ function CommunityServiceContent() {
         );
     }
 
+    if (showHub && createView) {
+        return (
+            <CommunityCreateOpportunityView
+                projects={projects}
+                verifiedHours={verifiedHours}
+                wallCount={wallCount}
+                completion={completion}
+            />
+        );
+    }
+
+    if (showHub && workspaceView) {
+        return (
+            <CommunityServiceWorkspace
+                projects={projects}
+                verifiedHours={verifiedHours}
+                wallCount={wallCount}
+                completion={completion}
+            />
+        );
+    }
+
     if (showHub) {
-        return <CommunityServiceHub projects={projects} verifiedHours={verifiedHours} wallCount={wallCount} />;
+        return (
+            <CommunityServiceHub
+                projects={projects}
+                verifiedHours={verifiedHours}
+                wallCount={wallCount}
+                completion={completion}
+            />
+        );
     }
 
     return (

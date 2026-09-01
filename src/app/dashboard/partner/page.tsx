@@ -154,7 +154,7 @@ export default function PartnerDashboard() {
                             href="/dashboard/partner/community-service"
                             emoji="🏕️"
                             title="Community Service"
-                            subtitle="Create opportunities, view approved Community Service work, assess impact and unlock analytics."
+                            subtitle="Monitor university-wide Community Service, Faculty representatives, reports and the institutional Impact Wall."
                             badge="OPEN"
                             background={MOCKUP_GRADIENTS.teal}
                         />

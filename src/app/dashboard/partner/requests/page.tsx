@@ -27,12 +27,32 @@ function isOwnedByCurrentPartner(opportunity: Record<string, unknown>, currentUs
     return String(creatorId).trim() === currentUserId;
 }
 
+type StatusTab = "all" | "live" | "review" | "rejected";
+
+function listTab(opportunity: Record<string, unknown>): Exclude<StatusTab, "all"> {
+    const tone = resolvePartnerOpportunityListLabels(opportunity).badgeTone;
+    if (tone === "live" || tone === "review" || tone === "rejected") return tone;
+    return "review";
+}
+
 export default function PartnerRequestsPage() {
     const router = useRouter();
     const [isLoading, setIsLoading] = useState(true);
     const [requests, setRequests] = useState<any[]>([]);
+    const [tab, setTab] = useState<StatusTab>("all");
+    const [institutionScope, setInstitutionScope] = useState(false);
     const [activeMenu, setActiveMenu] = useState<{ id: string | number; top: number; right: number } | null>(null);
     const [hasPendingVerificationLink, setHasPendingVerificationLink] = useState(false);
+
+    useEffect(() => {
+        if (typeof window === "undefined") return;
+        const params = new URLSearchParams(window.location.search);
+        const next = params.get("tab");
+        if (next === "all" || next === "live" || next === "review" || next === "rejected") {
+            setTab(next);
+        }
+        setInstitutionScope(params.get("scope") === "institution");
+    }, []);
 
     const fetchOpportunities = async () => {
         try {
@@ -48,13 +68,14 @@ export default function PartnerRequestsPage() {
                 if (data.success) {
                     const currentUserId = getStoredCurrentUserId();
                     const rows = Array.isArray(data.data) ? data.data : [];
-                    setRequests(
-                        rows.filter((item: unknown) =>
-                            item && typeof item === "object"
-                                ? isOwnedByCurrentPartner(item as Record<string, unknown>, currentUserId)
-                                : false,
-                        ),
-                    );
+                    const scoped = institutionScope
+                        ? rows.filter((item: unknown) => item && typeof item === "object")
+                        : rows.filter((item: unknown) =>
+                              item && typeof item === "object"
+                                  ? isOwnedByCurrentPartner(item as Record<string, unknown>, currentUserId)
+                                  : false,
+                          );
+                    setRequests(scoped);
                 }
             }
         } catch (error) {
@@ -67,7 +88,7 @@ export default function PartnerRequestsPage() {
 
     useEffect(() => {
         fetchOpportunities();
-    }, []);
+    }, [institutionScope]);
 
     useEffect(() => {
         setHasPendingVerificationLink(Boolean(peekPersistedVerificationReturn()));
@@ -101,6 +122,13 @@ export default function PartnerRequestsPage() {
         }
     };
 
+    const visibleRequests = requests.filter((req) => (tab === "all" ? true : listTab(req as Record<string, unknown>) === tab));
+    const tabCounts = {
+        all: requests.length,
+        live: requests.filter((req) => listTab(req as Record<string, unknown>) === "live").length,
+        review: requests.filter((req) => listTab(req as Record<string, unknown>) === "review").length,
+        rejected: requests.filter((req) => listTab(req as Record<string, unknown>) === "rejected").length,
+    };
     const activeRequest = activeMenu ? requests.find(r => r.id === activeMenu.id) : null;
 
     return (
@@ -114,17 +142,43 @@ export default function PartnerRequestsPage() {
                 </Link>
             </div>
 
+            <div className="mb-4 flex flex-wrap items-center gap-1 rounded-full bg-slate-100 p-1 w-fit">
+                {(
+                    [
+                        ["all", "All", tabCounts.all],
+                        ["live", "Live", tabCounts.live],
+                        ["review", "Under review", tabCounts.review],
+                        ["rejected", "Rejected", tabCounts.rejected],
+                    ] as const
+                ).map(([key, label, count]) => (
+                    <button
+                        key={key}
+                        type="button"
+                        onClick={() => setTab(key)}
+                        className={`rounded-full px-3 py-1.5 text-sm font-medium ${
+                            tab === key ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-800"
+                        }`}
+                    >
+                        {label} {count}
+                    </button>
+                ))}
+            </div>
+
             {isLoading ? (
                 <div className="flex justify-center py-20">
                     <Loader2 className="w-8 h-8 animate-spin text-slate-400" />
                 </div>
-            ) : requests.length === 0 ? (
+            ) : visibleRequests.length === 0 ? (
                 <div className="text-center py-12 bg-white rounded-xl border border-slate-200 border-dashed">
                     <div className="w-12 h-12 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-3">
                         <FileText className="w-6 h-6 text-slate-300" />
                     </div>
                     <h3 className="text-sm font-bold text-slate-900 mb-1">No Opportunities</h3>
-                    <p className="text-xs text-slate-500 mb-4">Post your first opportunity to get started.</p>
+                    <p className="text-xs text-slate-500 mb-4">
+                        {requests.length === 0
+                            ? "Post your first opportunity to get started."
+                            : "Nothing in this filter. Try another tab."}
+                    </p>
                     <Link href="/dashboard/partner/requests/new" className="inline-flex items-center gap-2 text-blue-600 font-bold text-sm hover:underline">
                         Create Now
                     </Link>
@@ -143,7 +197,7 @@ export default function PartnerRequestsPage() {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
-                                {requests.map((req) => {
+                                {visibleRequests.map((req) => {
                                     const listLabels = resolvePartnerOpportunityListLabels(req as Record<string, unknown>);
                                     const listToneClass =
                                         listLabels.badgeTone === "live"

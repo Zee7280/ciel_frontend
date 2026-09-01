@@ -1,16 +1,18 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { authenticatedFetch } from "@/utils/api";
 import { toast } from "sonner";
 import { Search } from "lucide-react";
-import { ActionKpiGrid, CourseworkCrumb, CourseworkHero, HubBackButton, HubTile, PathSectionHead, WorkflowSteps } from "@/components/ciel/coursework/CourseworkHubChrome";
+import { ActionKpiGrid, CourseworkCrumb, CourseworkHero, HubBackButton, HubTile, PathSectionHead, WorkflowSteps, useFacultyHubView } from "@/components/ciel/coursework/CourseworkHubChrome";
 import { isPathEntryApproved, isPathEntryWaiting } from "@/utils/reviewQueue";
 import VentureMeritPanel, { type VentureMeritPanelEntry } from "@/components/ciel/VentureMeritPanel";
 import { rankMovement } from "@/utils/courseProjectTypes";
 import type { VentureMeritEntry } from "@/utils/ventureMeritModel";
 
-type FacView = "home" | "pending" | "approved" | "rank";
+const VENTURE_VIEWS = ["home", "pending", "approved", "rank"] as const;
+type FacView = (typeof VENTURE_VIEWS)[number];
+const VENTURE_BASE = "/dashboard/faculty/startup-business";
 
 const BADGE_EMOJI: Record<string, string> = { Gold: "🥇", Silver: "🥈", Bronze: "🥉", Participant: "🎖️" };
 
@@ -34,11 +36,19 @@ type FacultyVenture = VentureMeritEntry & {
 };
 
 export default function FacultyStartupBusinessPage() {
+    return (
+        <Suspense fallback={<div className="mx-auto max-w-[1240px] py-16 text-center text-sm text-[#71828e]">Loading ventures…</div>}>
+            <FacultyStartupBusinessHub />
+        </Suspense>
+    );
+}
+
+function FacultyStartupBusinessHub() {
+    const { view, homeHref } = useFacultyHubView(VENTURE_VIEWS, "home");
     const [entries, setEntries] = useState<FacultyVenture[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState("");
     const [reviewingId, setReviewingId] = useState<string | null>(null);
-    const [view, setView] = useState<FacView>("home");
 
     useEffect(() => {
         void fetchEntries();
@@ -121,7 +131,7 @@ export default function FacultyStartupBusinessPage() {
                     ]}
                 />
 
-                {view !== "home" && <HubBackButton onClick={() => setView("home")} />}
+                {view !== "home" && <HubBackButton href={homeHref} label="← Back to Startup / Business" />}
 
                 {view === "home" && (
                     <>
@@ -132,7 +142,7 @@ export default function FacultyStartupBusinessPage() {
                     />
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                         <HubTile
-                            onClick={() => setView("pending")}
+                            href={`${VENTURE_BASE}?view=pending`}
                             badge={waiting.length ? `${waiting.length} IN QUEUE` : "INBOX"}
                             emoji="⏳"
                             title="Waiting for Approval"
@@ -140,7 +150,7 @@ export default function FacultyStartupBusinessPage() {
                             background="linear-gradient(135deg,#b45309,#fbbf24)"
                         />
                         <HubTile
-                            onClick={() => setView("approved")}
+                            href={`${VENTURE_BASE}?view=approved`}
                             badge={`${approved.length} LIVE`}
                             emoji="✅"
                             title="Approved ventures"
@@ -156,7 +166,7 @@ export default function FacultyStartupBusinessPage() {
                             background="linear-gradient(135deg,#073f47,#0b766d)"
                         />
                         <HubTile
-                            onClick={() => setView("rank")}
+                            href={`${VENTURE_BASE}?view=rank`}
                             badge="STANDARD RUBRIC"
                             emoji="🧮"
                             title="Merit model — my supervisees"

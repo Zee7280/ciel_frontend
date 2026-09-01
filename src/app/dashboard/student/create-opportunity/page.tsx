@@ -30,7 +30,7 @@ import {
     VERIFICATION_EMOJI,
 } from "@/components/opportunities/CreateOpportunityChrome";
 import "@/components/opportunities/create-opportunity.css";
-import DraftsLandingView from "./DraftsLandingView";
+import { WorkspaceSkeleton } from "@/components/ciel/Skeleton";
 
 // Dynamically import LocationPicker to avoid SSR issues with Google Maps.
 const LocationPicker = dynamic(() => import('@/components/ui/LocationPicker'), {
@@ -172,10 +172,9 @@ export default function StudentOpportunityCreationPage() {
      * submitted opportunity, so Save Draft stays enabled and Submit promotes it into a fresh
      * submission instead of patching the draft row in place. */
     const [isDraftMode, setIsDraftMode] = useState(false);
-    /** "landing" shows the drafts list (clicking the Community Service hub's Create Opportunity
-     * tile); "wizard" is the actual form, reached via ?new=1 or ?edit=<id>. Computed synchronously
-     * from the URL on first render so a direct `?edit=` link (the existing "Edit" flow from My
-     * Projects) never flashes the drafts list first. */
+    /** "landing" redirects to Community Service → Create Opportunity; "wizard" is the form
+     * (?new=1 or ?edit=<id>). Computed from the URL on first render so a direct `?edit=` link
+     * never flashes the drafts list first. */
     const [mode, setMode] = useState<"landing" | "wizard">(() => {
         if (typeof window === "undefined") return "landing";
         const params = new URLSearchParams(window.location.search);
@@ -1024,6 +1023,12 @@ export default function StudentOpportunityCreationPage() {
     }, []);
 
     useEffect(() => {
+        if (mode === "landing") {
+            router.replace("/dashboard/student/paths/community-service?view=create");
+        }
+    }, [mode, router]);
+
+    useEffect(() => {
         if (!editingOpportunityId || isLoadingProfile) return;
         let cancelled = false;
         (async () => {
@@ -1170,7 +1175,7 @@ export default function StudentOpportunityCreationPage() {
     const previewSecondarySdg = formData.secondarySdg ? findSdgById(formData.secondarySdg) : null;
 
     if (mode === "landing") {
-        return <DraftsLandingView />;
+        return <WorkspaceSkeleton />;
     }
 
     return (
@@ -1214,7 +1219,7 @@ export default function StudentOpportunityCreationPage() {
                     </p>
                 </div>
                 <Link
-                    href="/dashboard/student/paths/community-service"
+                    href="/dashboard/student/paths/community-service?view=create"
                     className="ml-auto rounded-full border border-[#dcebee] bg-white px-4 py-2 text-[10.5px] font-extrabold text-[#0e7d74]"
                 >
                     ← Back

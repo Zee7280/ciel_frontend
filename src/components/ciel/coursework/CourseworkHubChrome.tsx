@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 const FACULTY_HERO_GRADIENT = "linear-gradient(120deg,#0a4c50 0%,#0e6e6b 56%,#12aaa0 100%)";
 
@@ -43,7 +44,7 @@ export function CourseworkHero({
 }) {
     return (
         <div
-            className="relative mt-4 flex flex-col items-start justify-between gap-6 overflow-hidden rounded-b-[34px] px-[34px] py-[27px] text-white shadow-[0_16px_36px_rgba(18,48,65,.10)] sm:flex-row sm:items-center"
+            className="relative mt-[-8px] flex flex-col items-start justify-between gap-6 overflow-hidden rounded-b-[34px] px-[34px] py-[27px] text-white shadow-[0_16px_36px_rgba(18,48,65,.10)] sm:flex-row sm:items-center"
             style={{ background: gradient }}
         >
             <div className="pointer-events-none absolute -right-20 -top-24 h-[360px] w-[360px] rounded-full bg-[radial-gradient(circle,rgba(255,255,255,.12),rgba(255,255,255,0)_67%)]" />
@@ -98,10 +99,18 @@ export function PathSectionHead({
     );
 }
 
-export function ActionKpiGrid({ items }: { items: { value: string; label: string }[] }) {
+export function ActionKpiGrid({
+    items,
+    title = "Action Required",
+    subtitle = "Items that need attention in this path.",
+}: {
+    items: { value: string; label: string }[];
+    title?: string;
+    subtitle?: string;
+}) {
     return (
         <div className="mt-4 rounded-[20px] border border-[#dce6ea] bg-white px-5 py-[18px] shadow-[0_8px_24px_rgba(18,48,65,.05)]">
-            <PathSectionHead title="Action Required" subtitle="Items that need attention in this path." compact />
+            <PathSectionHead title={title} subtitle={subtitle} compact />
             <div className="mt-1 grid grid-cols-2 gap-3 lg:grid-cols-4">
                 {items.map((item) => (
                     <div key={item.label} className="rounded-[15px] border border-[#e7edf0] bg-[#f7fafb] p-[15px]">
@@ -120,11 +129,13 @@ export function WorkflowSteps({
     title,
     subtitle,
     steps,
+    captions,
     activeIndex = 1,
 }: {
     title: string;
     subtitle?: string;
     steps: string[];
+    captions?: string[];
     activeIndex?: number;
 }) {
     return (
@@ -134,6 +145,8 @@ export function WorkflowSteps({
                 {steps.map((step, i) => {
                     const done = i < activeIndex;
                     const active = i === activeIndex;
+                    const caption =
+                        captions?.[i] || (done || active ? "Current review cycle" : "Next stage after approval");
                     return (
                         <div
                             key={step}
@@ -149,9 +162,7 @@ export function WorkflowSteps({
                             <strong className="block text-[11px] font-semibold text-[#183140]">
                                 {i + 1}. {step}
                             </strong>
-                            <span className="mt-1 block text-[10px] leading-snug text-[#71828e]">
-                                {done || active ? "Current review cycle" : "Next stage after approval"}
-                            </span>
+                            <span className="mt-1 block text-[10px] leading-snug text-[#71828e]">{caption}</span>
                         </div>
                     );
                 })}
@@ -212,7 +223,7 @@ export function HubTile({
     onClick,
     disabled,
     badge,
-    badgeClass = "text-[#0d2b33]",
+    badgeClass = "text-[#0b6f68]",
     emoji,
     title,
     subtitle,
@@ -258,4 +269,17 @@ export function HubTile({
             {inner}
         </button>
     );
+}
+
+/** URL `?view=` so faculty hub tiles are real links and refresh stays on the same screen. */
+export function useFacultyHubView<T extends string>(allowed: readonly T[], home: T) {
+    const router = useRouter();
+    const pathname = usePathname();
+    const searchParams = useSearchParams();
+    const raw = searchParams.get("view");
+    const view = (raw && (allowed as readonly string[]).includes(raw) ? raw : home) as T;
+    const setView = (next: T) => {
+        router.push(next === home ? pathname : `${pathname}?view=${encodeURIComponent(next)}`);
+    };
+    return { view, setView, homeHref: pathname };
 }

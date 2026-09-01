@@ -546,6 +546,7 @@ export default function Sidebar() {
         if (hrefPath === dashboardHref) return pathname === hrefPath;
         if (hrefPath === "/dashboard/student/payments" && pathname === "/dashboard/student/payment") return true;
         if (hrefPath === "/dashboard/student/impact" && pathname.startsWith("/dashboard/student/analytics")) return true;
+        if (hrefPath === "/dashboard/student/paths/community-service" && pathname.startsWith("/dashboard/student/create-opportunity")) return true;
         if (pathname === hrefPath) return true;
         const longerChild = allRoleHrefs.some(
             (other) => other !== hrefPath && other.startsWith(`${hrefPath}/`) && (pathname === other || pathname.startsWith(`${other}/`)),

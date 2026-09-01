@@ -1,20 +1,25 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { authenticatedFetch } from "@/utils/api";
-import { CommunityCrumb, CommunityHero, HubBackButton, HubTile } from "@/components/ciel/community-service/CommunityServiceHubChrome";
-import { ActionKpiGrid, PathSectionHead, WorkflowSteps } from "@/components/ciel/coursework/CourseworkHubChrome";
+import { CommunityCrumb, CommunityHero, HubBackButton } from "@/components/ciel/community-service/CommunityServiceHubChrome";
+import { ActionKpiGrid, PathSectionHead, WorkflowSteps, useFacultyHubView } from "@/components/ciel/coursework/CourseworkHubChrome";
+import { MOCKUP_GRADIENTS, MockupActionCard } from "@/components/ciel/dashboard/MockupChrome";
 import CommunityAwardPanel from "@/components/ciel/community-service/CommunityAwardPanel";
 import CommunityAwardAnalytics from "@/components/ciel/community-service/CommunityAwardAnalytics";
 import CommunityFlashCard from "@/components/ciel/community-service/CommunityFlashCard";
 import CommunityQueueCard from "@/components/ciel/community-service/CommunityQueueCard";
+import StudentCommunityGuide from "@/components/report/StudentCommunityGuide";
 import {
     reportRowToAwardCard,
     type CommunityAwardCard,
 } from "@/utils/communityAwardModel";
 import { isFacultyCommunityLiveCard, isFacultyCommunityWaiting } from "@/utils/reviewQueue";
+import { extractFacultyMineOpportunityRows } from "@/utils/facultyMineOpportunities";
+import { isOpportunityPubliclyLive } from "@/utils/opportunityWorkflow";
 
-type FacView = "home" | "pending" | "approved" | "run" | "analytics";
+const CS_VIEWS = ["home", "pending", "approved", "run", "analytics", "guide"] as const;
+const CS_BASE = "/dashboard/faculty/community-service";
 
 type FacultyReportRow = {
     id: string;
@@ -37,9 +42,18 @@ function pickStr(item: Record<string, unknown>, ...keys: string[]): string | und
 const FACULTY_HERO = "linear-gradient(115deg,#04252b,#0e5f63 55%,#0e7d74 115%)";
 
 export default function FacultyCommunityServicePage() {
-    const [view, setView] = useState<FacView>("home");
+    return (
+        <Suspense fallback={<div className="mx-auto max-w-[1240px] py-16 text-center text-sm text-[#71828e]">Loading community service…</div>}>
+            <FacultyCommunityServiceHub />
+        </Suspense>
+    );
+}
+
+function FacultyCommunityServiceHub() {
+    const { view, homeHref } = useFacultyHubView(CS_VIEWS, "home");
     const [rows, setRows] = useState<FacultyReportRow[]>([]);
     const [cards, setCards] = useState<CommunityAwardCard[]>([]);
+    const [liveOpportunityCount, setLiveOpportunityCount] = useState(0);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -51,9 +65,14 @@ export default function FacultyCommunityServicePage() {
             authenticatedFetch("/api/v1/faculty/community-service/award-cards", {}, { redirectToLogin: false }).then(
                 (r) => (r?.ok ? r.json() : null),
             ),
+            authenticatedFetch("/api/v1/opportunities/faculty/mine", {}, { redirectToLogin: false }).then((r) =>
+                r?.ok ? r.json() : null,
+            ),
         ])
-            .then(([list, award]) => {
+            .then(([list, award, mine]) => {
                 if (cancelled) return;
+                const mineRows = extractFacultyMineOpportunityRows(mine);
+                setLiveOpportunityCount(mineRows.filter((row) => isOpportunityPubliclyLive(row)).length);
                 setRows(
                     (Array.isArray(list?.data) ? list.data : [])
                         .filter((item: unknown) => item && typeof item === "object")
@@ -84,6 +103,7 @@ export default function FacultyCommunityServicePage() {
                 if (cancelled) return;
                 setRows([]);
                 setCards([]);
+                setLiveOpportunityCount(0);
                 setLoading(false);
             });
         return () => {
@@ -112,79 +132,127 @@ export default function FacultyCommunityServicePage() {
     const hours = deckCards.reduce((s, c) => s + (c.hours || 0), 0);
 
     return (
-        <div className="mx-auto max-w-[1240px]">
+        <div className="mx-auto max-w-[1500px]">
             <CommunityCrumb role="Faculty" view={view === "home" ? undefined : view} />
 
             {view === "home" ? (
                 <CommunityHero
-                    kicker="FACULTY IMPACT DASHBOARD"
+                    kicker="CIEL PK · FACULTY"
                     title="Community Service"
-                    subtitle="Monitor service opportunities, participation, reports and verified community impact."
+                    subtitle="Review student opportunities, guide reports and build a verified portfolio of community impact."
                     gradient={FACULTY_HERO}
                     stats={[
-                        { value: String(pending.length), label: "Pending Review" },
-                        { value: String(deckCards.length), label: "Approved" },
-                        { value: `${hours}h`, label: "In Impact Wall" },
+                        { value: String(pending.length), label: "Pending Reviews" },
+                        { value: String(liveOpportunityCount), label: "Approved Opportunities" },
+                        { value: String(deckCards.length), label: "Approved Reports" },
+                        { value: "3", label: "AI Runs / Year" },
                     ]}
                 />
             ) : (
                 <div className="mt-4">
-                    <HubBackButton onClick={() => setView("home")} label="← Back to Community service" />
+                    <HubBackButton href={homeHref} label="← Back to Community Service buttons" />
                 </div>
             )}
+
+            {view === "guide" && <StudentCommunityGuide showHero />}
 
             {view === "home" && (
                 <>
                 <PathSectionHead
-                    title="Community Service Management"
-                    subtitle="Approve student/community service submissions, monitor active reports and review verified evidence."
+                    title="Community Service Workspace"
+                    subtitle="Choose a function below. Each card opens the existing faculty tool for that step."
                     pill="FACULTY VIEW"
                 />
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                    <HubTile
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <MockupActionCard
                         href="/dashboard/faculty/create-opportunity"
-                        badge="FOR YOUR COHORT"
-                        badgeClass="text-[#0e7d74]"
                         emoji="🚀"
-                        title="Create an Opportunity"
-                        subtitle="Publish a supervised opportunity — students enrol with OTP team links."
-                        background="linear-gradient(135deg,#0e7d74,#2dd4bf)"
+                        ghost="🚀"
+                        title="Create Opportunity"
+                        subtitle="Create a Faculty Community Service opportunity or continue a draft."
+                        badge="CREATE"
+                        background={MOCKUP_GRADIENTS.teal}
                     />
-                    <HubTile
-                        onClick={() => setView("pending")}
-                        badge={pending.length ? `${pending.length} IN QUEUE` : "CLEAR"}
-                        badgeClass="text-[#b45309]"
-                        emoji="⏳"
-                        title="Waiting for Your Approval"
-                        subtitle="Completed reports queued for your one-time approval."
-                        background="linear-gradient(135deg,#b45309,#fbbf24)"
+                    <MockupActionCard
+                        href="/dashboard/faculty/my-opportunities"
+                        emoji="🔎"
+                        ghost="🔎"
+                        title="Browse Opportunities"
+                        subtitle="Browse approved/live opportunities associated with you and your students."
+                        badge="BROWSE"
+                        background={MOCKUP_GRADIENTS.blue}
                     />
-                    <HubTile
-                        onClick={() => setView("approved")}
-                        badge={`${deckCards.length} LIVE`}
-                        badgeClass="text-[#04252b]"
+                    <MockupActionCard
+                        href="/dashboard/faculty/approvals"
                         emoji="✅"
-                        title="Approved Community Service"
-                        subtitle="Every card you approved — live on all dashboards."
-                        background="linear-gradient(135deg,#04252b,#0e7d74)"
+                        ghost="✅"
+                        title="Opportunity Reviews"
+                        subtitle="Review submitted opportunity flashcards. Approve, request revision or reject."
+                        badge="REVIEW"
+                        background={MOCKUP_GRADIENTS.orange}
                     />
-                    <HubTile
-                        onClick={() => setView("run")}
-                        badge="BADGE ISSUER"
-                        badgeClass="text-[#6d28d9]"
+                    <MockupActionCard
+                        href="/dashboard/faculty/reports"
+                        emoji="📈"
+                        ghost="📈"
+                        title="Community Service Progress"
+                        subtitle="Monitor approved projects from Start Report through completion and submission."
+                        badge="TRACK"
+                        background="linear-gradient(135deg,#2f6b78,#4aa0a2)"
+                    />
+                    <MockupActionCard
+                        href={`${CS_BASE}?view=pending`}
+                        emoji="📝"
+                        ghost="📝"
+                        title="Report Reviews"
+                        subtitle="Approve, request revision or reject submitted student Community Service reports."
+                        badge={pending.length ? `${pending.length} REVIEW` : "VERIFY"}
+                        background={MOCKUP_GRADIENTS.navy}
+                    />
+                    <MockupActionCard
+                        href="/dashboard/faculty/my-opportunities?tab=live"
+                        emoji="🌿"
+                        ghost="🌿"
+                        title="Approved Opportunities"
+                        subtitle="View fully approved/live opportunities associated with you."
+                        badge="VIEW"
+                        background={MOCKUP_GRADIENTS.green}
+                    />
+                    <MockupActionCard
+                        href={`${CS_BASE}?view=guide`}
+                        emoji="📖"
+                        ghost="📖"
+                        title="Report Guidance"
+                        subtitle="Section-by-section reporting and evidence guidelines."
+                        badge="GUIDANCE"
+                        background={MOCKUP_GRADIENTS.purple}
+                    />
+                    <MockupActionCard
+                        href="/dashboard/faculty/impact?tab=community"
                         emoji="🏆"
-                        title="Run & Grant the Award Model"
-                        subtitle="Rank your cohort on the standard criteria — grant Faculty Choice."
-                        background="linear-gradient(135deg,#6d28d9,#a78bfa)"
+                        ghost="🏆"
+                        title="My Impact Wall"
+                        subtitle="Verified Community Service flashcards, evidence, reports, scores, certificates and rankings."
+                        badge="IMPACT"
+                        background={MOCKUP_GRADIENTS.gold}
                     />
-                    <HubTile
-                        onClick={() => setView("analytics")}
-                        badge="LIVE"
-                        badgeClass="text-[#0369a1]"
+                    <MockupActionCard
+                        href={`${CS_BASE}?view=run`}
+                        emoji="🧠"
+                        ghost="🧠"
+                        title="AI Rankings"
+                        subtitle="Preview freely; run three formal cohort rankings per year."
+                        badge="3 RUNS"
+                        background={MOCKUP_GRADIENTS.pink}
+                    />
+                    <MockupActionCard
+                        href="/dashboard/faculty/analytics"
                         emoji="📊"
+                        ghost="📊"
                         title="Analytics"
-                        subtitle="Your cohort in numbers — hours, dividend, SDGs."
-                        background="linear-gradient(135deg,#0369a1,#38bdf8)"
+                        subtitle="Analyse students, programmes, SDGs, hours, partners, scores and outcomes."
+                        badge="ANALYTICS"
+                        background="linear-gradient(135deg,#3d5966,#6b8995)"
                     />
                 </div>
                 <ActionKpiGrid
@@ -207,13 +275,13 @@ export default function FacultyCommunityServicePage() {
                 <div>
                     <h2 className="text-lg font-semibold text-slate-900">Waiting for your approval</h2>
                     <p className="mt-1 text-sm text-slate-500">
-                        Only reports that still need your sign-off. Live cards are under Approved Community Service.
+                        Only reports that still need your sign-off. Signed-off cards appear on My Impact Wall.
                     </p>
                     {loading ? (
                         <p className="mt-4 text-sm text-slate-500">Loading…</p>
                     ) : pending.length === 0 ? (
                         <p className="mt-4 rounded-2xl border border-emerald-100 bg-emerald-50/70 px-4 py-6 text-sm text-emerald-800">
-                            Nothing waiting — open Approved Community Service to see live cards.
+                            Nothing waiting — open My Impact Wall to see live cards.
                         </p>
                     ) : (
                         <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">

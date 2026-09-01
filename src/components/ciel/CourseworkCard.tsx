@@ -36,6 +36,8 @@ export default function CourseworkCard({
     onFacultyReview,
     reviewing = false,
     studentReminder,
+    remindDraftOwner = false,
+    studentEmail,
 }: {
     entry: CourseProjectEntry;
     defaultOpen?: boolean;
@@ -46,6 +48,10 @@ export default function CourseworkCard({
     reviewing?: boolean;
     /** "team" renders Email/WhatsApp buttons to nudge teammates on a draft; "faculty" renders the same to nudge the reviewing teacher on a submitted record. */
     studentReminder?: "team" | "faculty";
+    /** Opposite direction from studentReminder: renders Email/WhatsApp buttons for a faculty viewer to nudge the student who owns this (still in-progress) draft. Requires studentEmail. */
+    remindDraftOwner?: boolean;
+    /** The draft owner's email — needed for remindDraftOwner (a plain CourseProjectEntry has no joined student record of its own). */
+    studentEmail?: string;
 }) {
     const [open, setOpen] = useState(defaultOpen);
     const [shareOpen, setShareOpen] = useState(false);
@@ -75,6 +81,8 @@ export default function CourseworkCard({
     const canShareBadge = statusLabel.tone === "approved" && !!verifyPath;
 
     const teamEmails = groupMembers.map((m) => m.email).filter((e): e is string => !!e);
+    const sectionsDone = Math.min(entry.stepCompleted ?? 0, 7);
+    const completionPct = Math.round((sectionsDone / 7) * 100);
     const reminder: { to: string; subject: string; body: string } | null =
         studentReminder === "faculty" && si.teacherEmail
             ? {
@@ -88,7 +96,13 @@ export default function CourseworkCard({
                     subject: `Reminder: let's finish "${entry.projectTitle || "our coursework"}" on CIEL PK`,
                     body: `Hi team,\n\nA quick reminder to help finish our coursework record "${entry.projectTitle || "coursework"}" on CIEL PK so we can submit it for faculty review.\n\nThanks,\n${displayName}`,
                 }
-              : null;
+              : remindDraftOwner && studentEmail
+                ? {
+                      to: studentEmail,
+                      subject: `Reminder: continue "${entry.projectTitle || "your coursework"}" on CIEL PK`,
+                      body: `Hi ${displayName},\n\nYour coursework record "${entry.projectTitle || "coursework"}" (${entry.course || "coursework"}) is ${completionPct}% complete on CIEL PK. Please continue and submit it for faculty review when it's ready.\n\nThanks,\n${si.teacherName || "Your instructor"}`,
+                  }
+                : null;
 
     const shareBadge = async () => {
         if (typeof window === "undefined" || !verifyPath) return;
@@ -164,6 +178,18 @@ export default function CourseworkCard({
                         </span>
                     )}
                 </div>
+
+                {entry.status === "draft" && (
+                    <div className="mt-3">
+                        <div className="flex items-center justify-between text-[10px] font-bold text-ciel-text-mid">
+                            <span>{sectionsDone} of 7 sections complete</span>
+                            <span>{completionPct}%</span>
+                        </div>
+                        <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-ciel-page">
+                            <div className="h-full rounded-full bg-ciel-gold" style={{ width: `${completionPct}%` }} />
+                        </div>
+                    </div>
+                )}
 
                 {sdgEntries.length > 0 && (
                     <div className="mt-4 flex min-w-0 items-center gap-1.5 overflow-x-auto">

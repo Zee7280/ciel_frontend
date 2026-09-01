@@ -193,6 +193,18 @@ export default function PartnerReportsPage() {
     const [editingReport, setEditingReport] = useState<Report | null>(null);
 
     useEffect(() => {
+        if (typeof window === "undefined") return;
+        const raw = new URLSearchParams(window.location.search).get("status");
+        if (!raw) return;
+        const next = raw.trim().toLowerCase();
+        if (next === "draft") setStatusFilter("Draft");
+        if (next === "submitted") setStatusFilter("Submitted");
+        if (next === "approved") setStatusFilter("Approved");
+        if (next === "rejected") setStatusFilter("Rejected");
+        if (next === "all") setStatusFilter("All");
+    }, []);
+
+    useEffect(() => {
         fetchReports();
     }, [statusFilter]);
 
@@ -200,8 +212,8 @@ export default function PartnerReportsPage() {
         try {
             const baseUrl = '/api/v1';
             const url = statusFilter === "All"
-                ? `${baseUrl}/partner/reports`
-                : `${baseUrl}/partner/reports?status=${statusFilter.toLowerCase()}`;
+                ? `${baseUrl}/partner/reports?limit=200`
+                : `${baseUrl}/partner/reports?status=${statusFilter.toLowerCase()}&limit=200`;
 
             const res = await authenticatedFetch(url);
             if (res && res.ok) {

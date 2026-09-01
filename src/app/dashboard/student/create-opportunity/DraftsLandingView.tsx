@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Loader2, Trash2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { authenticatedFetch } from "@/utils/api";
 
@@ -13,7 +13,7 @@ type DraftRow = {
     created_at?: string;
 };
 
-/** Rough, honest completion estimate from the same fields `validateForm()` requires — no fabricated numbers. */
+/** Honest completion from the same fields the create form requires — no fabricated numbers. */
 const COMPLETION_CHECKS: Array<(d: Record<string, unknown>) => boolean> = [
     (d) => Boolean(typeof d.title === "string" && d.title.trim()),
     (d) => Array.isArray(d.types) && d.types.length > 0,
@@ -29,9 +29,15 @@ const COMPLETION_CHECKS: Array<(d: Record<string, unknown>) => boolean> = [
     (d) => Array.isArray(d.verification_method) && d.verification_method.length > 0,
 ];
 
+const STEP_COUNT = COMPLETION_CHECKS.length;
+
 function computeCompletionPercent(detail: Record<string, unknown>): number {
     const passed = COMPLETION_CHECKS.filter((check) => check(detail)).length;
-    return Math.round((passed / COMPLETION_CHECKS.length) * 100);
+    return Math.round((passed / STEP_COUNT) * 100);
+}
+
+function stepsDone(pct: number): number {
+    return Math.round((pct / 100) * STEP_COUNT);
 }
 
 function formatSavedAt(iso?: string): string {
@@ -46,7 +52,9 @@ function formatSavedAt(iso?: string): string {
     return d.toLocaleDateString();
 }
 
-export default function DraftsLandingView() {
+const FLOW = ["Draft", "Submit Opportunity", "Faculty", "Partner, if applicable", "CIEL PK Final Approval", "Start Report"];
+
+export default function DraftsLandingView({ embedded = false }: { embedded?: boolean }) {
     const [drafts, setDrafts] = useState<DraftRow[]>([]);
     const [completion, setCompletion] = useState<Record<string, number>>({});
     const [loading, setLoading] = useState(true);
@@ -63,7 +71,6 @@ export default function DraftsLandingView() {
                 if (cancelled) return;
                 setDrafts(rows);
 
-                // Honest per-draft completion % — fetched from the full record, never guessed.
                 const pairs = await Promise.all(
                     rows.map(async (row) => {
                         try {
@@ -106,101 +113,118 @@ export default function DraftsLandingView() {
     };
 
     return (
-        <div className="co-form">
-            <div className="mb-3.5 flex items-center gap-3">
-                <p className="text-[10px] text-[#7a919a]">
-                    Community Service → <b className="text-[#0e7d74]">Create Opportunity</b>
-                </p>
-                <Link
-                    href="/dashboard/student/paths/community-service"
-                    className="ml-auto rounded-full border border-[#dcebee] bg-white px-4 py-2 text-[10.5px] font-extrabold text-[#0e7d74]"
-                >
-                    ← Back to module buttons
-                </Link>
-            </div>
+        <div>
+            {!embedded ? (
+                <div className="mb-3.5 flex flex-wrap items-center gap-3">
+                    <p className="text-[13px] text-[#71828e]">
+                        Student Dashboard / <b className="font-semibold text-[#183140]">Community Service</b>
+                        {" / "}
+                        <b className="font-semibold text-[#183140]">Create Opportunity</b>
+                    </p>
+                    <Link
+                        href="/dashboard/student/paths/community-service"
+                        className="ml-auto border-0 bg-transparent text-xs font-black text-[#087c75] hover:underline"
+                    >
+                        ← Back to module buttons
+                    </Link>
+                </div>
+            ) : null}
 
-            <div className="relative mb-4 overflow-hidden rounded-[22px] bg-[linear-gradient(115deg,#04252b,#0e5f63_55%,#12a5a0_110%)] px-6 py-5 text-white">
+            <div className="flex flex-col items-start justify-between gap-4 rounded-[20px] bg-[linear-gradient(135deg,#0b5c59,#19a18f)] px-5 py-5 text-white sm:flex-row sm:items-center">
                 <div>
-                    <h2 className="text-[18px] font-extrabold">Create Opportunity</h2>
-                    <p className="mt-1 max-w-[560px] text-xs leading-relaxed text-[#cdf5f0]">
-                        Start a new opportunity or return to an unfinished draft. Drafts stay here until you formally submit them for approval.
+                    <h3 className="m-0 text-[21px] font-semibold">Create Opportunity</h3>
+                    <p className="mt-1.5 max-w-[720px] text-[11.5px] leading-[1.5] text-[#d9f4ef]">
+                        Start a new Community Service opportunity or return to an unfinished draft. Drafts stay here until you formally submit them for approval.
                     </p>
                 </div>
                 <Link
                     href="/dashboard/student/create-opportunity?new=1"
-                    className="mt-4 inline-block rounded-[13px] bg-white px-5 py-2.5 text-xs font-extrabold text-[#0e7d74]"
+                    className="shrink-0 rounded-xl bg-white px-[15px] py-[11px] text-[11px] font-[950] text-[#0c665d] shadow-[0_6px_14px_rgba(15,118,110,.16)]"
                 >
                     + Create New Opportunity
                 </Link>
             </div>
 
-            <div className="mb-4 rounded-[17px] border border-[#dcebee] bg-white px-4 py-4">
-                <p className="text-[9px] font-extrabold tracking-[0.12em] text-[#0e7d74]">WHAT HAPPENS AFTER SUBMISSION</p>
-                <div className="mt-2 flex flex-wrap items-center gap-2 text-[10px] font-bold text-[#4c5f66]">
-                    {["Draft", "Submit Opportunity", "Faculty", "Partner, if applicable", "CIEL PK Final Approval", "Start Report"].map((step, i, arr) => (
-                        <span key={step} className="flex items-center gap-2">
-                            <span className="rounded-full bg-[#f3f7f8] px-2.5 py-1">{step}</span>
-                            {i < arr.length - 1 ? <span className="text-[#c3d2d6]">→</span> : null}
+            <div className="mt-3.5 rounded-2xl border border-[#dfe9e7] bg-[linear-gradient(135deg,#f3fbf8,#fff)] p-3.5">
+                <p className="mb-2.5 text-[10px] font-[950] uppercase tracking-[0.07em] text-[#176e64]">What happens after submission</p>
+                <div className="flex flex-wrap items-center gap-[7px]">
+                    {FLOW.map((step, i) => (
+                        <span key={step} className="flex items-center gap-[7px]">
+                            <span className="rounded-[18px] border border-[#dde5ea] bg-white px-2.5 py-[7px] text-[10px] font-[850] text-[#486068]">
+                                {step}
+                            </span>
+                            {i < FLOW.length - 1 ? <span className="font-black text-[#8ba29d]">→</span> : null}
                         </span>
                     ))}
                 </div>
             </div>
 
-            <div>
-                <h3 className="text-[13px] font-extrabold text-[#0d2b33]">Saved Opportunity Drafts</h3>
-                <p className="mb-3 text-[10.5px] text-[#7a919a]">Only opportunities that have not yet been submitted appear here.</p>
-
-                {loading ? (
-                    <div className="py-8 text-center text-[#7a919a]">
-                        <Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" /> Loading drafts…
-                    </div>
-                ) : drafts.length === 0 ? (
-                    <div className="rounded-[17px] border border-dashed border-[#cbe7e3] bg-[#fbfefd] px-5 py-8 text-center text-[11px] text-[#7a919a]">
-                        No saved drafts yet. Start a new opportunity above — it appears here the moment you save.
-                    </div>
-                ) : (
-                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                        {drafts.map((d) => {
-                            const pct = completion[d.id] ?? 0;
-                            return (
-                                <div key={d.id} className="rounded-[16px] border border-[#dcebee] bg-white p-4">
-                                    <div className="flex items-start justify-between gap-2">
-                                        <div className="min-w-0">
-                                            <h4 className="truncate text-[13px] font-extrabold text-[#0d2b33]">{d.title || "Untitled opportunity"}</h4>
-                                            <p className="text-[10px] text-[#7a919a]">Draft · Last saved {formatSavedAt(d.updated_at || d.created_at)}</p>
-                                        </div>
-                                        <span className="shrink-0 text-[17px] font-extrabold text-[#0e7d74]">{pct}%</span>
-                                    </div>
-                                    <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-[#eef2f3]">
-                                        <div
-                                            className="h-full rounded-full bg-[linear-gradient(90deg,#0e7d74,#f59e0b)]"
-                                            style={{ width: `${Math.max(4, pct)}%` }}
-                                        />
-                                    </div>
-                                    <p className="mt-1.5 text-[9.5px] text-[#7a919a]">Auto-saved ✓</p>
-                                    <div className="mt-3 flex gap-2">
-                                        <Link
-                                            href={`/dashboard/student/create-opportunity?edit=${encodeURIComponent(d.id)}&draft=1`}
-                                            className="flex-1 rounded-[11px] bg-[#0e7d74] py-2 text-center text-[11px] font-extrabold text-white"
-                                        >
-                                            Continue Draft
-                                        </Link>
-                                        <button
-                                            type="button"
-                                            onClick={() => handleDelete(d.id, d.title)}
-                                            disabled={deletingId === d.id}
-                                            aria-label="Delete draft"
-                                            className="flex items-center justify-center rounded-[11px] border border-red-200 px-3 text-red-600 disabled:opacity-50"
-                                        >
-                                            <Trash2 className="h-4 w-4" />
-                                        </button>
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
-                )}
+            <div className="mb-2.5 mt-[19px] flex flex-wrap items-end justify-between gap-3">
+                <div>
+                    <h4 className="m-0 text-[15px] font-semibold text-[#16313d]">Saved Opportunity Drafts</h4>
+                    <p className="mt-1 text-[10.5px] text-[#70808a]">Only opportunities that have not yet been submitted appear here.</p>
+                </div>
+                <span className="rounded-[18px] bg-[#edf4fb] px-2 py-1 text-[9.5px] font-black text-[#376d9f]">
+                    {loading ? "…" : `${drafts.length} Draft${drafts.length === 1 ? "" : "s"}`}
+                </span>
             </div>
+
+            {loading ? (
+                <div className="py-10 text-center text-[#7a919a]">
+                    <Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" /> Loading drafts…
+                </div>
+            ) : drafts.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-[#cbe7e3] bg-[#fbfefd] px-5 py-8 text-center text-[11px] text-[#7a919a]">
+                    No saved drafts yet. Start a new opportunity above — it appears here the moment you save.
+                </div>
+            ) : (
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                    {drafts.map((d) => {
+                        const pct = completion[d.id] ?? 0;
+                        const done = stepsDone(pct);
+                        const editHref = `/dashboard/student/create-opportunity?edit=${encodeURIComponent(d.id)}&draft=1`;
+                        return (
+                            <div key={d.id} className="rounded-2xl border border-[#dde5ea] bg-white p-[15px]">
+                                <div className="flex items-start justify-between gap-3">
+                                    <div className="min-w-0">
+                                        <h4 className="m-0 truncate text-[13px] font-semibold text-[#16313d]">{d.title || "Untitled opportunity"}</h4>
+                                        <p className="mt-1 text-[10px] text-[#70808a]">Draft · Last saved {formatSavedAt(d.updated_at || d.created_at)}</p>
+                                    </div>
+                                    <span className="shrink-0 text-lg font-[950] text-[#0f766e]">{pct}%</span>
+                                </div>
+                                <div className="mt-2.5 h-[7px] overflow-hidden rounded-full bg-[#e6eef1]">
+                                    <div
+                                        className="h-full rounded-full bg-[linear-gradient(90deg,#0e7d74,#f59e0b)]"
+                                        style={{ width: `${Math.max(4, pct)}%` }}
+                                    />
+                                </div>
+                                <div className="mt-2 flex justify-between text-[9.5px] text-[#70808a]">
+                                    <span>
+                                        {done} of {STEP_COUNT} opportunity steps completed
+                                    </span>
+                                    <span>Auto-saved ✓</span>
+                                </div>
+                                <div className="mt-[11px] flex flex-wrap gap-2">
+                                    <Link href={editHref} className="rounded-[10px] bg-[#174b43] px-3 py-2 text-[10px] font-black text-white">
+                                        Continue Draft
+                                    </Link>
+                                    <Link href={editHref} className="rounded-[10px] border border-[#dde5ea] bg-[#edf3f6] px-3 py-2 text-[10px] font-black text-[#3c5968]">
+                                        Preview
+                                    </Link>
+                                    <button
+                                        type="button"
+                                        onClick={() => handleDelete(d.id, d.title)}
+                                        disabled={deletingId === d.id}
+                                        className="rounded-[10px] bg-[#ffe8ea] px-3 py-2 text-[10px] font-black text-[#b13e49] disabled:opacity-50"
+                                    >
+                                        {deletingId === d.id ? "Deleting…" : "Delete"}
+                                    </button>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            )}
         </div>
     );
 }

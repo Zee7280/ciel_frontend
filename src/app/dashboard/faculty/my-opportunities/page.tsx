@@ -173,6 +173,14 @@ export default function FacultyMyOpportunitiesPage() {
     const listRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
+        if (typeof window === "undefined") return;
+        const next = new URLSearchParams(window.location.search).get("tab");
+        if (next === "all" || next === "live" || next === "review" || next === "rejected") {
+            setTab(next);
+        }
+    }, []);
+
+    useEffect(() => {
         const load = async () => {
             try {
                 const params = new URLSearchParams({ scope: "authored" });

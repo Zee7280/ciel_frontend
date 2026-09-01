@@ -223,9 +223,9 @@ export default function FacultyDashboard() {
                     href="/dashboard/faculty/coursework-projects"
                     emoji="📚"
                     title="Coursework Project"
-                    subtitle="Review submitted cards, then run the analyzer on approved work."
-                    badge="FLASH CARDS"
-                    background={MOCKUP_GRADIENTS.purple}
+                    subtitle="Review course-linked impact projects, approve completion and run semester rankings after approval."
+                    badge="OPEN"
+                    background={MOCKUP_GRADIENTS.teal}
                 />
                 <MockupActionCard
                     href="/dashboard/faculty/fyp-thesis"
