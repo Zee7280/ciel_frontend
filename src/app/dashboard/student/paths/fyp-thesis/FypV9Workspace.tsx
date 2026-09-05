@@ -8,6 +8,7 @@ import { pakistaniUniversities } from "@/utils/universityData";
 import { WorkspaceSkeleton } from "@/components/ciel/Skeleton";
 import ThesisCard from "@/components/ciel/ThesisCard";
 import { TeamInviteBadge } from "@/components/ciel/TeamInviteBadge";
+import { mailtoHref } from "@/utils/reminderLinks";
 import SearchableSelect from "@/components/ui/SearchableSelect";
 import { CourseworkCrumb, CourseworkHero, HubBackButton } from "@/components/ciel/coursework/CourseworkHubChrome";
 import {
@@ -628,6 +629,32 @@ export default function FypV9Workspace() {
                                         >
                                             ×
                                         </button>
+                                        {(m.email?.trim() || (normalizeCountryCode(m.whatsappCode) && normalizeLocalNumber(m.whatsappNumber))) ? (
+                                            <div className="flex flex-wrap items-end gap-2 sm:col-span-2 lg:col-span-6">
+                                                {m.email?.trim() ? (
+                                                    <a
+                                                        href={mailtoHref(
+                                                            m.email,
+                                                            `A quick note about our FYP "${entry.projectInfo?.title || "record"}" on CIEL PK`,
+                                                            `Hi ${m.name || "there"},\n\nJust checking in on our FYP record "${entry.projectInfo?.title || "record"}" on CIEL PK — could you confirm your invite and add your details when you get a chance?\n\nThanks,\n${entry.projectInfo?.studentName || "Your teammate"}`,
+                                                        )}
+                                                        className="rounded-full border border-[#e7eaf1] px-3 py-1 text-[10px] font-bold text-[#53647f] transition hover:border-[#6d4aff]/40"
+                                                    >
+                                                        ✉️ Email {m.name || `Member ${i + 1}`}
+                                                    </a>
+                                                ) : null}
+                                                {normalizeCountryCode(m.whatsappCode) && normalizeLocalNumber(m.whatsappNumber) ? (
+                                                    <a
+                                                        href={`https://wa.me/${normalizeCountryCode(m.whatsappCode).replace("+", "")}${normalizeLocalNumber(m.whatsappNumber)}?text=${encodeURIComponent(`Hi ${m.name || "there"} — quick check-in on our FYP record "${entry.projectInfo?.title || "our FYP"}" on CIEL PK. Could you confirm your invite and add your details when you get a chance?`)}`}
+                                                        target="_blank"
+                                                        rel="noreferrer"
+                                                        className="rounded-full border border-[#e7eaf1] px-3 py-1 text-[10px] font-bold text-[#53647f] transition hover:border-[#6d4aff]/40"
+                                                    >
+                                                        💬 WhatsApp
+                                                    </a>
+                                                ) : null}
+                                            </div>
+                                        ) : null}
                                     </div>
                                 ))}
                                 <button type="button" onClick={() => setEntry((s) => ({ ...s, projectInfo: { ...s.projectInfo, teamMembers: [...normalizeFypTeamMembers(s.projectInfo?.teamMembers), emptyTeamMember()] } }))} className="mt-1 rounded-lg border border-[#cfc6ff] bg-[#f8f5ff] px-2.5 py-1.5 text-[10.5px] font-black text-[#5d45c8]">＋ Add another member</button>

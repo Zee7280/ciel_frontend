@@ -14,6 +14,7 @@ import SearchableSelect from "@/components/ui/SearchableSelect";
 import CourseworkCard from "@/components/ciel/CourseworkCard";
 import { TeamInviteBadge } from "@/components/ciel/TeamInviteBadge";
 import RichSummaryText from "@/components/ciel/RichSummaryText";
+import { mailtoHref, whatsappShareHref } from "@/utils/reminderLinks";
 import { CourseworkCrumb, CourseworkHero, HubBackButton } from "@/components/ciel/coursework/CourseworkHubChrome";
 import { courseworkStatusLabel } from "@/utils/courseworkSectionReview";
 import {
@@ -901,29 +902,55 @@ export default function CourseProjectWizardPage() {
                                 <Field label="👥 Team members — name everyone" hint="Add each teammate's email — we'll email them a confirmation link. Once they accept, this report appears on their dashboard too.">
                                     <div className="space-y-3">
                                         {(normalizeGroupMembers(entry.studentInfo?.groupMembers).length ? normalizeGroupMembers(entry.studentInfo?.groupMembers) : [{ name: "" }]).map((m, i) => (
-                                            <div key={i} className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
-                                                <input
-                                                    type="text"
-                                                    value={m.name}
-                                                    onChange={(e) => updateGroupMember(i, { name: e.target.value })}
-                                                    placeholder={`Member ${i + 1} — full name`}
-                                                    className={fieldClass}
-                                                />
-                                                <input
-                                                    type="text"
-                                                    value={m.rollNumber ?? ""}
-                                                    onChange={(e) => updateGroupMember(i, { rollNumber: e.target.value })}
-                                                    placeholder={`Member ${i + 1} — roll no.`}
-                                                    className={fieldClass}
-                                                />
-                                                <input
-                                                    type="email"
-                                                    value={m.email ?? ""}
-                                                    onChange={(e) => updateGroupMember(i, { email: e.target.value })}
-                                                    placeholder="Email — confirmation link sent here"
-                                                    className={fieldClass}
-                                                />
-                                                <TeamInviteBadge kind="course_project" entryId={entry.id} email={m.email} inviteStatus={m.inviteStatus} />
+                                            <div key={i} className="space-y-2">
+                                                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                                                    <input
+                                                        type="text"
+                                                        value={m.name}
+                                                        onChange={(e) => updateGroupMember(i, { name: e.target.value })}
+                                                        placeholder={`Member ${i + 1} — full name`}
+                                                        className={fieldClass}
+                                                    />
+                                                    <input
+                                                        type="text"
+                                                        value={m.rollNumber ?? ""}
+                                                        onChange={(e) => updateGroupMember(i, { rollNumber: e.target.value })}
+                                                        placeholder={`Member ${i + 1} — roll no.`}
+                                                        className={fieldClass}
+                                                    />
+                                                    <input
+                                                        type="email"
+                                                        value={m.email ?? ""}
+                                                        onChange={(e) => updateGroupMember(i, { email: e.target.value })}
+                                                        placeholder="Email address"
+                                                        className={fieldClass}
+                                                    />
+                                                    <TeamInviteBadge kind="course_project" entryId={entry.id} email={m.email} inviteStatus={m.inviteStatus} />
+                                                </div>
+                                                {m.email?.trim() ? (
+                                                    <div className="flex flex-wrap gap-2 pl-1">
+                                                        <a
+                                                            href={mailtoHref(
+                                                                m.email,
+                                                                `A quick note about "${entry.projectTitle || "our coursework"}" on CIEL PK`,
+                                                                `Hi ${m.name || "there"},\n\nJust checking in on our coursework record "${entry.projectTitle || "coursework"}" on CIEL PK — could you confirm your invite and add your details when you get a chance?\n\nThanks,\n${entry.studentInfo?.studentName || "Your teammate"}`,
+                                                            )}
+                                                            className="rounded-full border border-ciel-border px-3 py-1 text-[10px] font-bold text-ciel-text-mid ciel-transition hover:border-ciel-gold/40"
+                                                        >
+                                                            ✉️ Email {m.name || `Member ${i + 1}`}
+                                                        </a>
+                                                        <a
+                                                            href={whatsappShareHref(
+                                                                `Hi ${m.name || "there"} — quick check-in on our coursework record "${entry.projectTitle || "our coursework"}" on CIEL PK. Could you confirm your invite and add your details when you get a chance?`,
+                                                            )}
+                                                            target="_blank"
+                                                            rel="noreferrer"
+                                                            className="rounded-full border border-ciel-border px-3 py-1 text-[10px] font-bold text-ciel-text-mid ciel-transition hover:border-ciel-gold/40"
+                                                        >
+                                                            💬 WhatsApp
+                                                        </a>
+                                                    </div>
+                                                ) : null}
                                             </div>
                                         ))}
                                         {(entry.studentInfo?.groupMembers?.length ?? 0) < 20 && (
@@ -936,7 +963,7 @@ export default function CourseProjectWizardPage() {
                                             </button>
                                         )}
                                         <div className="flex flex-wrap items-center gap-1.5 rounded-ciel-sm border border-ciel-teal/30 bg-ciel-teal-soft/60 px-3 py-2.5 text-[10px] font-black text-ciel-teal">
-                                            🔗 <span className="rounded-full bg-white px-2.5 py-1">🃏 Card created</span>→<span className="rounded-full bg-white px-2.5 py-1">👥 On every member&apos;s dashboard (once submitted)</span>→<span className="rounded-full bg-white px-2.5 py-1">🖋️ Teacher&apos;s approval in her dashboard</span>→<span className="rounded-full bg-white px-2.5 py-1">🧑‍🎓 + 🧑‍🏫 + 🏫 profiles</span>
+                                            🔗 <span className="rounded-full bg-white px-2.5 py-1">🃏 Card created</span>→<span className="rounded-full bg-white px-2.5 py-1">👥 On every member&apos;s dashboard (once they accept)</span>→<span className="rounded-full bg-white px-2.5 py-1">🖋️ Teacher&apos;s approval in her dashboard</span>→<span className="rounded-full bg-white px-2.5 py-1">🧑‍🎓 + 🧑‍🏫 + 🏫 profiles</span>
                                         </div>
                                     </div>
                                 </Field>
