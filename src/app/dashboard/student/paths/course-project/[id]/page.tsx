@@ -808,10 +808,17 @@ export default function CourseProjectWizardPage() {
                     </div>
                 ) : null}
                 <div className="mb-[18px]">
-                    <div className="flex gap-1 overflow-x-auto py-[7px] pl-1 [scrollbar-width:thin]">
+                    <div className="mb-2.5 h-[3px] w-full overflow-hidden rounded-full bg-ciel-border/60">
+                        <i
+                            className="block h-full rounded-full bg-gradient-to-r from-ciel-gold via-ciel-gold to-ciel-green transition-all"
+                            style={{ width: `${((step + 1) / STEPS.length) * 100}%` }}
+                        />
+                    </div>
+                    <div className="flex gap-1.5 overflow-x-auto py-[7px] pl-1 [scrollbar-width:thin]">
                         {STEPS.map((s, i) => {
                             const isCurrent = i === step;
                             const isDone = i < entry.stepCompleted && !isCurrent;
+                            const isSubmit = i === STEPS.length - 1;
                             return (
                                 <button
                                     key={s.key}
@@ -819,21 +826,24 @@ export default function CourseProjectWizardPage() {
                                     onClick={() => setStep(i)}
                                     title={stepLabels[i]}
                                     className={clsx(
-                                        "relative min-w-16 flex-1 rounded-[11px] border px-1 py-[7px] text-center ciel-transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black",
+                                        "relative min-w-16 flex-1 rounded-[11px] border-[1.5px] px-1 pb-[7px] pt-2.5 text-center ciel-transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ciel-gold",
                                         isCurrent
-                                            ? "border-[#d5aa46] bg-black text-white shadow-[inset_0_0_0_1px_#d5aa46]"
-                                            : isDone
-                                              ? "border-black bg-black text-white"
-                                              : "border-black bg-black text-white/70 hover:text-white",
+                                            ? "border-ciel-gold bg-ciel-gold-soft text-ciel-gold-deep shadow-[0_2px_8px_rgba(213,170,70,.25)]"
+                                            : isSubmit
+                                              ? "border-ciel-border bg-white text-ciel-text-mid hover:border-ciel-gold/40"
+                                              : "border-ciel-green/40 bg-ciel-green-soft/60 text-ciel-green-deep hover:border-ciel-green",
                                     )}
                                 >
-                                    <div className="text-sm leading-none">{isDone ? "✓" : s.emoji}</div>
-                                    <div
+                                    <span
                                         className={clsx(
-                                            "mt-0.5 text-[9px] font-extrabold uppercase leading-tight tracking-wide",
-                                            isCurrent ? "text-white" : "text-white/75",
+                                            "absolute -top-2 left-1.5 flex h-[18px] w-[18px] items-center justify-center rounded-full text-[9px] font-black text-white ring-2 ring-white",
+                                            isCurrent ? "bg-ciel-gold-deep" : isSubmit ? "bg-ciel-text-mid" : "bg-ciel-green-deep",
                                         )}
                                     >
+                                        {isDone ? "✓" : i + 1}
+                                    </span>
+                                    <div className="text-sm leading-none">{s.emoji}</div>
+                                    <div className="mt-0.5 text-[9px] font-extrabold uppercase leading-tight tracking-wide">
                                         {stepLabels[i]}
                                     </div>
                                 </button>
