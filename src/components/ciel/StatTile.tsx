@@ -28,7 +28,7 @@ export default function StatTile({
                 {Icon && <Icon className="h-4 w-4" aria-hidden />}
                 <span className="text-xs font-semibold uppercase tracking-wide">{label}</span>
             </div>
-            <span className="text-2xl font-black text-ciel-text">{value}</span>
+            <span className="text-2xl font-black leading-tight text-ciel-text">{value}</span>
             {hint && <span className="text-xs text-ciel-text-soft">{hint}</span>}
         </div>
     );

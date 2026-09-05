@@ -19,6 +19,7 @@ import {
 } from "@/utils/courseProjectTypes";
 import { courseworkStatusLabel } from "@/utils/courseworkSectionReview";
 import { mailtoHref, whatsappShareHref } from "@/utils/reminderLinks";
+import { courseworkApprovedFiles, fileNameFromUrl } from "@/utils/courseworkFlashCard";
 
 const BADGE_EMOJI: Record<string, string> = { Gold: "🥇", Silver: "🥈", Bronze: "🥉", Participant: "🎖️" };
 
@@ -158,23 +159,23 @@ export default function CourseworkCard({
                     </div>
                     {statusLabel.tone === "approved" ? (
                         <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-emerald-700">
-                            <CheckCircle2 className="h-3 w-3" /> Approved & live
+                            <CheckCircle2 className="h-3 w-3" /> {statusLabel.label}
                         </span>
                     ) : statusLabel.tone === "rejected" ? (
                         <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-red-200 bg-red-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-red-700">
-                            <ShieldAlert className="h-3 w-3" /> Rejected
+                            <ShieldAlert className="h-3 w-3" /> {statusLabel.label}
                         </span>
                     ) : statusLabel.tone === "revision_requested" ? (
                         <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-amber-300 bg-amber-100 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-amber-800">
-                            <AlertTriangle className="h-3 w-3" /> Revision requested
+                            <AlertTriangle className="h-3 w-3" /> {statusLabel.label}
                         </span>
                     ) : statusLabel.tone === "under_review" ? (
                         <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-amber-700">
-                            <Clock className="h-3 w-3" /> Awaiting faculty approval
+                            <Clock className="h-3 w-3" /> {statusLabel.label}
                         </span>
                     ) : (
                         <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-amber-700">
-                            Draft
+                            {statusLabel.label}
                         </span>
                     )}
                 </div>
@@ -242,15 +243,27 @@ export default function CourseworkCard({
                             {evidenceLabel}
                         </span>
                     ) : null}
-                    {entry.assignmentFileUrl ? (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-ciel-green-soft px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-ciel-green-deep">
-                            <Paperclip className="h-3 w-3" /> Assignment attached — verifiable
-                        </span>
-                    ) : !!entry.evidenceUrls?.length && (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-ciel-green-soft px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-ciel-green-deep">
-                            <CheckCircle2 className="h-3 w-3" /> Evidence attached
+                    {entry.isOwner === false && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-ciel-indigo-soft px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-ciel-indigo">
+                            <Users className="h-3 w-3" /> Team member
                         </span>
                     )}
+                    {courseworkApprovedFiles(entry).map((url, i) => (
+                        <a
+                            key={`${url}-${i}`}
+                            href={url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            title={fileNameFromUrl(url, 80)}
+                            className="inline-flex max-w-[12.5rem] items-center gap-1 rounded-full bg-ciel-green-soft px-2.5 py-1 text-[10px] font-bold text-ciel-green-deep hover:underline"
+                        >
+                            <Paperclip className="h-3 w-3 shrink-0" />
+                            <span className="truncate">
+                                {i === 0 && entry.assignmentFileUrl ? "Assignment file" : fileNameFromUrl(url, 22)}
+                            </span>
+                        </a>
+                    ))}
                     {isTeam && groupSize > 1 && (
                         <span className="inline-flex items-center gap-1 rounded-full bg-ciel-page px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-ciel-text-mid">
                             <Users className="h-3 w-3" /> {si.teamMode} of {groupSize}
@@ -329,80 +342,86 @@ export default function CourseworkCard({
             </div>
 
             {/* Footer */}
-            <div className="flex flex-wrap items-center gap-3 border-t border-ciel-border bg-ciel-page/60 px-5 py-3.5">
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-ciel-navy text-[10px] font-black text-white">
-                    {initials || "?"}
-                </span>
-                <p className="min-w-0 flex-1 text-xs leading-relaxed text-ciel-text-mid">
-                    {statusLabel.tone === "approved" ? (
-                        <>Approved by <b className="text-ciel-text">{si.teacherName || "supervisor"}</b>{si.teacherEmail ? ` · ${si.teacherEmail}` : ""} — live in Merit Model rankings</>
-                    ) : statusLabel.tone === "rejected" ? (
-                        <>Rejected by <b className="text-ciel-text">{si.teacherName || "supervisor"}</b>{entry.facultyApprovalNote ? `: "${entry.facultyApprovalNote}"` : ""}</>
-                    ) : statusLabel.tone === "revision_requested" ? (
-                        <>Revision requested by <b className="text-ciel-text">{si.teacherName || "supervisor"}</b>{entry.facultyApprovalNote ? `: "${entry.facultyApprovalNote}"` : ""}</>
-                    ) : statusLabel.tone === "under_review" ? (
-                        <>Awaiting approval by <b className="text-ciel-text">{si.teacherName || "supervisor"}</b>{si.teacherEmail ? ` · ${si.teacherEmail}` : ""} — not yet ranked</>
-                    ) : (
-                        <>Draft — not yet submitted to <b className="text-ciel-text">{si.teacherName || "supervisor"}</b></>
-                    )}
-                    <br />
-                    Live on: 🧑‍🎓 student portfolio · 🧑‍🏫 faculty deck
-                </p>
-                {reminder && (
-                    <div className="flex shrink-0 gap-2">
-                        <a
-                            href={mailtoHref(reminder.to, reminder.subject, reminder.body)}
-                            onClick={(e) => e.stopPropagation()}
-                            className="ciel-transition flex items-center gap-1.5 rounded-ciel-xs border-2 border-ciel-border bg-white px-3 py-2 text-xs font-bold text-ciel-text-mid hover:border-ciel-gold/40"
-                        >
-                            <Mail className="h-3.5 w-3.5" /> Email
-                        </a>
-                        <a
-                            href={whatsappShareHref(`${reminder.subject}\n\n${reminder.body}`)}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            onClick={(e) => e.stopPropagation()}
-                            className="ciel-transition flex items-center gap-1.5 rounded-ciel-xs border-2 border-ciel-border bg-white px-3 py-2 text-xs font-bold text-ciel-text-mid hover:border-ciel-gold/40"
-                        >
-                            <MessageCircle className="h-3.5 w-3.5" /> WhatsApp
-                        </a>
-                    </div>
-                )}
-                {canShareBadge && (
-                    <button
-                        type="button"
-                        onClick={() => setShareOpen((o) => !o)}
-                        className="ciel-transition flex shrink-0 items-center gap-1.5 rounded-ciel-xs border-2 border-ciel-border bg-white px-3 py-2 text-xs font-bold text-ciel-text-mid hover:border-ciel-gold/40"
-                    >
-                        <Share2 className="h-3.5 w-3.5" /> Share badge
-                    </button>
-                )}
-                {onFacultyReview && entry.status === "submitted" && approval !== "approved" && (
-                    <div className="flex shrink-0 gap-2">
-                        <button
-                            type="button"
-                            onClick={() => onFacultyReview("reject")}
-                            disabled={reviewing}
-                            className="ciel-transition rounded-ciel-xs border-2 border-red-200 bg-white px-3 py-2 text-xs font-bold text-red-700 hover:bg-red-50 disabled:opacity-50"
-                        >
-                            Reject
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => onFacultyReview("revision")}
-                            disabled={reviewing}
-                            className="ciel-transition rounded-ciel-xs border-2 border-amber-300 bg-white px-3 py-2 text-xs font-bold text-amber-800 hover:bg-amber-50 disabled:opacity-50"
-                        >
-                            Request revision
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => onFacultyReview("approve")}
-                            disabled={reviewing}
-                            className="ciel-transition rounded-ciel-xs border-2 border-ciel-green bg-ciel-green px-3 py-2 text-xs font-bold text-white hover:bg-ciel-green-deep disabled:opacity-50"
-                        >
-                            ✓ Approve — make live
-                        </button>
+            <div className="flex flex-col gap-3 border-t border-ciel-border bg-ciel-page/60 px-5 py-3.5 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex min-w-0 flex-1 items-start gap-3">
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-ciel-navy text-[10px] font-black text-white">
+                        {initials || "?"}
+                    </span>
+                    <p className="min-w-0 flex-1 text-xs leading-relaxed text-ciel-text-mid">
+                        {statusLabel.tone === "approved" ? (
+                            <>Approved by <b className="text-ciel-text">{si.teacherName || "supervisor"}</b>{si.teacherEmail ? ` · ${si.teacherEmail}` : ""} — live in Merit Model rankings</>
+                        ) : statusLabel.tone === "rejected" ? (
+                            <>Rejected by <b className="text-ciel-text">{si.teacherName || "supervisor"}</b>{entry.facultyApprovalNote ? `: "${entry.facultyApprovalNote}"` : ""}</>
+                        ) : statusLabel.tone === "revision_requested" ? (
+                            <>Revision requested by <b className="text-ciel-text">{si.teacherName || "supervisor"}</b>{entry.facultyApprovalNote ? `: "${entry.facultyApprovalNote}"` : ""}</>
+                        ) : statusLabel.tone === "under_review" ? (
+                            <>Awaiting approval by <b className="text-ciel-text">{si.teacherName || "supervisor"}</b>{si.teacherEmail ? ` · ${si.teacherEmail}` : ""} — not yet ranked</>
+                        ) : (
+                            <>Draft — not yet submitted to <b className="text-ciel-text">{si.teacherName || "supervisor"}</b></>
+                        )}
+                        <br />
+                        Live on: 🧑‍🎓 student portfolio · 🧑‍🏫 faculty deck
+                    </p>
+                </div>
+                {(reminder || canShareBadge || (onFacultyReview && entry.status === "submitted" && approval !== "approved")) && (
+                    <div className="flex flex-wrap gap-2">
+                        {reminder ? (
+                            <>
+                                <a
+                                    href={mailtoHref(reminder.to, reminder.subject, reminder.body)}
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="ciel-transition flex items-center gap-1.5 rounded-ciel-xs border-2 border-ciel-border bg-white px-3 py-2 text-xs font-bold text-ciel-text-mid hover:border-ciel-gold/40"
+                                >
+                                    <Mail className="h-3.5 w-3.5" /> Email
+                                </a>
+                                <a
+                                    href={whatsappShareHref(`${reminder.subject}\n\n${reminder.body}`)}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="ciel-transition flex items-center gap-1.5 rounded-ciel-xs border-2 border-ciel-border bg-white px-3 py-2 text-xs font-bold text-ciel-text-mid hover:border-ciel-gold/40"
+                                >
+                                    <MessageCircle className="h-3.5 w-3.5" /> WhatsApp
+                                </a>
+                            </>
+                        ) : null}
+                        {canShareBadge ? (
+                            <button
+                                type="button"
+                                onClick={() => setShareOpen((o) => !o)}
+                                className="ciel-transition flex items-center gap-1.5 rounded-ciel-xs border-2 border-ciel-border bg-white px-3 py-2 text-xs font-bold text-ciel-text-mid hover:border-ciel-gold/40"
+                            >
+                                <Share2 className="h-3.5 w-3.5" /> Share badge
+                            </button>
+                        ) : null}
+                        {onFacultyReview && entry.status === "submitted" && approval !== "approved" ? (
+                            <>
+                                <button
+                                    type="button"
+                                    onClick={() => onFacultyReview("reject")}
+                                    disabled={reviewing}
+                                    className="ciel-transition rounded-ciel-xs border-2 border-red-200 bg-white px-3 py-2 text-xs font-bold text-red-700 hover:bg-red-50 disabled:opacity-50"
+                                >
+                                    Reject
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => onFacultyReview("revision")}
+                                    disabled={reviewing}
+                                    className="ciel-transition rounded-ciel-xs border-2 border-amber-300 bg-white px-3 py-2 text-xs font-bold text-amber-800 hover:bg-amber-50 disabled:opacity-50"
+                                >
+                                    Request revision
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => onFacultyReview("approve")}
+                                    disabled={reviewing}
+                                    className="ciel-transition rounded-ciel-xs border-2 border-ciel-green bg-ciel-green px-3 py-2 text-xs font-bold text-white hover:bg-ciel-green-deep disabled:opacity-50"
+                                >
+                                    ✓ Approve — make live
+                                </button>
+                            </>
+                        ) : null}
                     </div>
                 )}
             </div>

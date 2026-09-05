@@ -4,9 +4,17 @@ import { useMemo, useState } from "react";
 import clsx from "clsx";
 import CourseworkCard from "@/components/ciel/CourseworkCard";
 import { type MeritEntry } from "@/components/ciel/MeritModelPanel";
-import { pendingFacultyReview, reviewCourseProjectSections } from "@/utils/courseworkSectionReview";
+import { courseworkStatusLabel, pendingFacultyReview, reviewCourseProjectSections } from "@/utils/courseworkSectionReview";
 import { isReviewApprovedStatus } from "@/utils/reviewQueue";
 import { computeMeritScorecard, rubricBand, RUBRIC_SCALE, type RubricBand } from "@/utils/courseworkMeritModel";
+
+const INBOX_CHIP: Record<ReturnType<typeof courseworkStatusLabel>["tone"], string> = {
+    draft: "DRAFT",
+    under_review: "REVIEW",
+    revision_requested: "REVISION",
+    rejected: "REJECTED",
+    approved: "APPROVED",
+};
 
 const BAND_FILL: Record<RubricBand, string> = { EXEMPLARY: "#0e7d74", SOLID: "#d97706", DEVELOPING: "#e11d48" };
 const BAND_CHIP: Record<RubricBand, string> = {
@@ -44,14 +52,14 @@ export default function CourseworkFacultyReviewInbox({
     const scorecard = current ? computeMeritScorecard(current) : null;
 
     return (
-        <div className="grid grid-cols-1 items-start gap-3 lg:grid-cols-[240px_1fr]">
+        <div className="grid grid-cols-1 items-start gap-3 lg:grid-cols-[260px_1fr]">
             <div className="rounded-[18px] border border-[#dcebee] bg-white p-4">
                 <p className="text-[8.5px] font-extrabold tracking-[0.14em] text-[#7a919a]">REVIEW INBOX</p>
                 <div className="mt-2 space-y-2">
                     {queue.map((q, i) => {
                         const qIssues = reviewCourseProjectSections(q).filter((c) => !c.ok).length;
-                        const rejected = q.facultyApprovalStatus === "rejected";
-                        const revision = q.facultyApprovalStatus === "revision_requested";
+                        const st = courseworkStatusLabel(q);
+                        const fileCount = (q.assignmentFileUrl ? 1 : 0) + (q.evidenceUrls?.length || 0);
                         return (
                             <button
                                 key={q.id}
@@ -60,26 +68,29 @@ export default function CourseworkFacultyReviewInbox({
                                     setSel(i);
                                     setNote("");
                                 }}
-                                className={`relative w-full rounded-[13px] border px-3 py-2.5 text-left transition ${
+                                className={`w-full rounded-[13px] border px-3 py-2.5 text-left transition ${
                                     i === sel ? "border-[#0e7d74] bg-[#e6f6f4]" : "border-[#dcebee] bg-white hover:border-[#0e7d74]"
                                 }`}
                             >
-                                <span
-                                    className={`absolute right-2.5 top-2 rounded-full px-2 py-0.5 text-[7px] font-extrabold ${
-                                        rejected
-                                            ? "bg-[#fdf1f4] text-[#e11d48]"
-                                            : revision
-                                              ? "bg-[#fef3e2] text-[#b45309]"
-                                              : qIssues
+                                <span className="flex items-start justify-between gap-2">
+                                    <b className="min-w-0 truncate text-[11px] text-[#0d2b33]">{q.projectTitle || "Untitled"}</b>
+                                    <span
+                                        className={`shrink-0 rounded-full px-2 py-0.5 text-[7px] font-extrabold ${
+                                            st.tone === "rejected"
                                                 ? "bg-[#fdf1f4] text-[#e11d48]"
-                                                : "bg-[#e3f4fa] text-[#0891b2]"
-                                    }`}
-                                >
-                                    {rejected ? "REJECTED" : revision ? "REVISION" : qIssues ? `⚠️ ${qIssues} ISSUES` : "ALL CLEAR"}
+                                                : st.tone === "revision_requested"
+                                                  ? "bg-[#fef3e2] text-[#b45309]"
+                                                  : st.tone === "approved"
+                                                    ? "bg-[#e6f6f4] text-[#0e7d74]"
+                                                    : "bg-[#e3f4fa] text-[#0891b2]"
+                                        }`}
+                                    >
+                                        {INBOX_CHIP[st.tone]}
+                                    </span>
                                 </span>
-                                <b className="block pr-20 text-[11px] text-[#0d2b33]">{q.projectTitle || "Untitled"}</b>
                                 <span className="mt-0.5 block text-[8.5px] text-[#7a919a]">
-                                    {q.student?.name || q.studentInfo?.studentName || "Student"} · {q.evidenceUrls?.length || 0} files
+                                    {q.student?.name || q.studentInfo?.studentName || "Student"} · {fileCount} file{fileCount === 1 ? "" : "s"}
+                                    {qIssues ? ` · ${qIssues} AI flag${qIssues === 1 ? "" : "s"}` : ""}
                                 </span>
                             </button>
                         );
@@ -205,7 +216,13 @@ export default function CourseworkFacultyReviewInbox({
                             </>
                         )}
                     </div>
-                    <CourseworkCard entry={current} studentName={current.student?.name} defaultOpen />
+                    <CourseworkCard
+                        entry={current}
+                        studentName={current.student?.name}
+                        defaultOpen
+                        remindDraftOwner
+                        studentEmail={current.student?.email || current.studentInfo?.studentEmail}
+                    />
                 </div>
             )}
         </div>

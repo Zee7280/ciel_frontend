@@ -270,7 +270,7 @@ export default function CourseworkFlashCardModal({
 
                 <div className="sticky bottom-0 flex flex-wrap items-center gap-2 border-t border-[#dde5ea] bg-white px-[22px] py-3">
                     <span className="flex-1 text-[11px] text-[#70808a]">
-                        This is your approved coursework file. Scores and rankings stay with your faculty.
+                        This is your approved coursework file. Rank and badge also appear on My Coursework Impact and My Impact Portfolio.
                     </span>
                     <button
                         type="button"

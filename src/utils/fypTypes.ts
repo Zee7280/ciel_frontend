@@ -5,6 +5,9 @@ export interface FypTeamMember {
     name: string;
     email?: string;
     role?: string;
+    rollNumber?: string;
+    whatsappCode?: string;
+    whatsappNumber?: string;
     /** Server-computed — 'accepted' only once this co-author clicked their emailed invite link. */
     inviteStatus?: "pending" | "accepted";
 }
@@ -19,6 +22,18 @@ export interface FypProjectInfo {
     projectTypes?: string[];
     /** Explicit override of which route leads when projectTypes span more than one route — unset means "first pick leads". */
     leadRoute?: string;
+    academicAreaKey?: string;
+    academicArea?: string;
+    discipline?: string;
+    officialProgram?: string;
+    academicLevel?: string;
+    teamType?: string;
+    teamRole?: string;
+    /** V9 form primary route key (research / prototype / …). Merit ranking still uses leadRoute. */
+    v9Route?: string;
+    v9RouteOther?: string;
+    /** Full V9 wizard extras — stored inside projectInfo jsonb so no migration is required. */
+    v9Form?: Record<string, unknown>;
     studentName?: string;
     studentEmail?: string;
     rollNumber?: string;
@@ -26,6 +41,7 @@ export interface FypProjectInfo {
     span?: string;
     /** Typically 6 under HEC policy. */
     creditHours?: string;
+    university?: string;
     /** Older entries may hold plain name strings — read via normalizeFypTeamMembers. */
     teamMembers?: (string | FypTeamMember)[];
     supervisorName?: string;
@@ -97,6 +113,8 @@ export interface FypRouteDetails {
     // scholar route — discussion & conclusion (the HEC thesis chain's closing step)
     discussion?: string;
     conclusion?: string;
+    v9Pathway?: Record<string, string | string[]>;
+    v9Roadmap?: { stage?: string; goal?: string }[];
 }
 export interface FypSdgEntry { goalNumber: number; targets: string[]; how?: string; }
 export interface FypSdgMapping { entries?: FypSdgEntry[]; noSdgApplies?: boolean; }
@@ -358,10 +376,16 @@ export const PROJECT_TYPE_ROUTE: Record<string, FypRoute> = {
  * exactly (same unconditional leadRoute trust) so the route shown while filling the form always
  * matches what the Merit Model actually scores against. Accepts a bare string for backward
  * compatibility with old call sites. */
-export function fypRouteFor(pi?: { projectType?: string; projectTypes?: string[]; leadRoute?: string } | string | null): FypRoute {
+export function fypRouteFor(pi?: { projectType?: string; projectTypes?: string[]; leadRoute?: string; v9Route?: string } | string | null): FypRoute {
     const info = typeof pi === "string" ? { projectType: pi } : pi;
+    const v9 = info?.v9Route;
+    if (v9 === "research" || v9 === "legal" || v9 === "theory" || v9 === "clinical") return "scholar";
+    if (v9 === "prototype" || v9 === "design" || v9 === "creative") return "maker";
+    if (v9 === "software") return "builder";
+    if (v9 === "media") return "storyteller";
+    if (v9 === "business" || v9 === "field") return "consultant";
     const lead = info?.leadRoute as FypRoute | undefined;
-    if (lead) return lead;
+    if (lead === "scholar" || lead === "maker" || lead === "builder" || lead === "storyteller" || lead === "consultant") return lead;
     const types = info?.projectTypes?.length ? info.projectTypes : info?.projectType ? [info.projectType] : [];
     if (!types.length) return "scholar";
     return PROJECT_TYPE_ROUTE[types[0]] || "scholar";

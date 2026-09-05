@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { fetchStudentDashboardData } from "@/utils/student-dashboard-fetch";
 import { fetchImpactSummary, type CielImpactSummary } from "@/utils/cielImpactSummary";
@@ -58,7 +58,9 @@ export default function ImpactHistoryPage() {
                 }
             />
 
-            <StudentImpactPortfolioTable />
+            <Suspense fallback={<div className="py-10 text-center text-sm text-[#7a919a]">Loading your portfolio…</div>}>
+                <StudentImpactPortfolioTable />
+            </Suspense>
         </div>
     );
 }

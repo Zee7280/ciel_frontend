@@ -433,7 +433,7 @@ export default function UniversityShowcasePage() {
                                     studentName={entry.student?.name}
                                     remindDraftOwner={view === "progress" || entry.facultyApprovalStatus === "revision_requested"}
                                     studentReminder={view === "pending" && entry.facultyApprovalStatus === "pending" ? "faculty" : undefined}
-                                    studentEmail={entry.student?.email}
+                                    studentEmail={entry.student?.email || entry.studentInfo?.studentEmail}
                                 />
                             ))}
                         </div>

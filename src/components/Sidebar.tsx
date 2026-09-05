@@ -46,6 +46,7 @@ function NavRow({
     needsAction,
     countPill,
     collapsed,
+    indent,
     impact,
 }: {
     href: string;
@@ -56,6 +57,7 @@ function NavRow({
     needsAction?: boolean;
     countPill?: number;
     collapsed: boolean;
+    indent?: boolean;
     impact?: boolean;
 }) {
     return (
@@ -66,6 +68,7 @@ function NavRow({
                 active ? "bg-[#22515b] text-white shadow-[inset_4px_0_0_#42ddb2]" : "text-[#c8d4da] hover:bg-white/[0.055] hover:text-white",
                 impact && !active && "mt-2 border border-[rgba(62,218,157,.18)] bg-[rgba(43,202,139,.10)]",
                 impact && active && "mt-2",
+                indent && !collapsed && "mb-1 ml-5 w-[calc(100%-40px)] py-2.5 text-[13px] font-bold",
                 collapsed && "justify-center px-0",
             )}
             title={collapsed ? label : undefined}
@@ -537,6 +540,10 @@ export default function Sidebar() {
         const hrefParams = hrefQuery ? new URLSearchParams(hrefQuery) : null;
         const hrefTab = hrefParams?.get("tab");
         const hrefMode = hrefParams?.get("mode");
+        const hrefArea = hrefParams?.get("area");
+        if (hrefArea) {
+            return pathname === hrefPath && searchParams.get("area") === hrefArea;
+        }
         if (hrefTab) {
             return pathname === hrefPath && searchParams.get("tab") === hrefTab;
         }
@@ -644,10 +651,27 @@ export default function Sidebar() {
                             href="/dashboard/student/impact"
                             label="My Impact Portfolio"
                             emoji="🏆"
-                            active={isNavActive("/dashboard/student/impact")}
+                            active={isNavActive("/dashboard/student/impact") && !searchParams.get("area")}
                             countPill={impactHistoryBadge}
                             collapsed={collapsed}
                         />
+                        {!collapsed &&
+                            [
+                                { label: "Community Service", area: "Community Service", emoji: "🏕️" },
+                                { label: "Coursework", area: "Coursework", emoji: "📚" },
+                                { label: "FYP", area: "FYP", emoji: "🎓" },
+                                { label: "Startup", area: "Startup", emoji: "💼" },
+                            ].map((sub) => (
+                                <NavRow
+                                    key={sub.area}
+                                    href={`/dashboard/student/impact?area=${encodeURIComponent(sub.area)}`}
+                                    label={sub.label}
+                                    emoji={sub.emoji}
+                                    active={isNavActive(`/dashboard/student/impact?area=${encodeURIComponent(sub.area)}`)}
+                                    collapsed={collapsed}
+                                    indent
+                                />
+                            ))}
                         <NavSectionLabel collapsed={collapsed}>More</NavSectionLabel>
                         {studentMoreLinks.filter((link) => link.href !== "/dashboard/student/impact").map((link) => (
                             <NavRow

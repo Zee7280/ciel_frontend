@@ -535,7 +535,7 @@ export default function AdminPathSubmissionsPage() {
                                     entry={entry}
                                     studentName={entry.student?.name}
                                     remindDraftOwner
-                                    studentEmail={entry.student?.email}
+                                    studentEmail={entry.student?.email || entry.studentInfo?.studentEmail}
                                 />
                             ))}
                         </div>
@@ -577,7 +577,7 @@ export default function AdminPathSubmissionsPage() {
                                             studentName={entry.student?.name}
                                             studentReminder={entry.facultyApprovalStatus === "pending" ? "faculty" : undefined}
                                             remindDraftOwner={entry.facultyApprovalStatus === "revision_requested"}
-                                            studentEmail={entry.student?.email}
+                                            studentEmail={entry.student?.email || entry.studentInfo?.studentEmail}
                                         />
                                     ))}
                                 </div>

@@ -53,6 +53,11 @@ export default function CourseworkImpactListCard({
                         })}
                     </span>
                 </h4>
+                {entry.isOwner === false ? (
+                    <p className="mt-1 text-[10.5px] font-semibold text-[#4f46e5]">
+                        Team project — led by {entry.studentInfo?.studentName || "a teammate"}
+                    </p>
+                ) : null}
                 <p className="mt-0.5 text-[10.5px] text-[#70808a]">{courseworkApprovedMetaLine(entry)}</p>
                 <div className="mt-3 rounded-xl border border-[#e8edef] bg-[#fafbfb] px-3 py-2.5">
                     <span className="inline-block rounded-[18px] bg-[#e8f5ef] px-2 py-1 text-[9.5px] font-black text-[#1d765d]">

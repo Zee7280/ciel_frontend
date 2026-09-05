@@ -5,8 +5,10 @@ import { CheckCircle2, ChevronDown, Users, ShieldAlert, Clock } from "lucide-rea
 import clsx from "clsx";
 import { sdgData } from "@/utils/sdgData";
 import { rankMovement } from "@/utils/courseProjectTypes";
+import RichSummaryText from "@/components/ciel/RichSummaryText";
 import {
     type FypEntry,
+    type FypSectionSummaries,
     composeFypSummaries,
     normalizeFypTeamMembers,
     fypRouteFor,
@@ -14,6 +16,8 @@ import {
     FYP_SECTION_LABELS,
     FYP_SECTION_KEYS,
 } from "@/utils/fypTypes";
+import { hydrateV9 } from "@/app/dashboard/student/paths/fyp-thesis/FypV9FormUi";
+import { composeFypV9Summaries } from "@/utils/fypV9Catalog";
 
 const ROUTE_EMOJI: Record<string, string> = {
     scholar: "📜",
@@ -24,6 +28,22 @@ const ROUTE_EMOJI: Record<string, string> = {
 };
 
 const BADGE_EMOJI: Record<string, string> = { Gold: "🥇", Silver: "🥈", Bronze: "🥉", Participant: "🎖️" };
+
+/** Same 7-summary → section-key mapping FypV9Workspace's own step-7 preview uses (no "literature"
+ * key — V9's route model covers non-research work too, so there's no literature-review step). */
+function v9PreviewSummaries(entry: FypEntry): FypSectionSummaries {
+    const v9 = hydrateV9(entry);
+    const team = normalizeFypTeamMembers(entry.projectInfo?.teamMembers).filter((m) => m.name?.trim());
+    const [project, background, objectives, methodology, findings, sdg, reflection] = composeFypV9Summaries({
+        title: entry.projectInfo?.title || entry.projectTitle || "",
+        university: entry.projectInfo?.university || "",
+        degree: entry.projectInfo?.degree || "",
+        supervisor: entry.projectInfo?.supervisorName || "",
+        teamNames: team.map((m) => m.name).filter(Boolean),
+        v9,
+    });
+    return { project, background, objectives, methodology, findings, sdg, reflection };
+}
 
 /** One flash card per FYP / thesis record — closed shows a 5-second read, "View all" expands the full story. */
 export default function ThesisCard({
@@ -47,7 +67,16 @@ export default function ThesisCard({
     const pi = entry.projectInfo || {};
     const find = entry.findings || {};
     const sm = entry.sdgMapping || {};
-    const summaries = entry.sectionSummaries && Object.keys(entry.sectionSummaries).length ? entry.sectionSummaries : composeFypSummaries(entry);
+    // A V9-drafted entry has no sectionSummaries until final submit — falling back to the old (V8)
+    // composer here misreads V9's field semantics (e.g. it labels the student's actual problem
+    // statement as "deliberately out of scope"), so an in-progress V9 draft needs the V9 composer
+    // instead, fed by the same hydration `FypV9Workspace` itself uses to resume a saved draft.
+    const summaries =
+        entry.sectionSummaries && Object.keys(entry.sectionSummaries).length
+            ? entry.sectionSummaries
+            : entry.projectInfo?.v9Form
+              ? v9PreviewSummaries(entry)
+              : composeFypSummaries(entry);
     const route = fypRouteFor(pi);
     const teamMembers = normalizeFypTeamMembers(pi.teamMembers).filter((m) => m.name?.trim());
     const isTeam = teamMembers.length > 0;
@@ -138,7 +167,7 @@ export default function ThesisCard({
 
             {/* Ten-second story */}
             <div className="p-5">
-                <p className="text-sm leading-relaxed text-ciel-text">{summaries.project || summaries.background || "No summary yet."}</p>
+                <p className="text-sm leading-relaxed text-ciel-text"><RichSummaryText text={summaries.project || summaries.background || "No summary yet."} /></p>
                 {summaries.findings ? (
                     <p className="mt-2.5 rounded-ciel-xs border border-dashed border-ciel-border bg-ciel-page/60 px-3 py-2 text-xs font-semibold text-ciel-text-mid">
                         📎 {summaries.findings}
@@ -191,7 +220,7 @@ export default function ThesisCard({
                                     <span className="text-base">{meta.emoji}</span>
                                     <div className="min-w-0">
                                         <p className="text-xs font-black uppercase tracking-wide text-ciel-text-soft">{meta.label}</p>
-                                        <p className="mt-0.5 text-sm leading-relaxed text-ciel-text">{text}</p>
+                                        <p className="mt-0.5 text-sm leading-relaxed text-ciel-text"><RichSummaryText text={text} /></p>
                                     </div>
                                 </div>
                             );

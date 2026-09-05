@@ -97,8 +97,8 @@ function CourseProjectHub() {
 
     const drafts = entries.filter((e) => e.status !== "submitted");
     const approved = entries.filter(isFacultyApproved);
-    const inProgress = drafts.filter((e) => e.isOwner !== false).length;
-    const underReview = entries.filter((e) => e.isOwner !== false && isPathEntryWaiting(e));
+    const inProgress = drafts.length;
+    const underReview = entries.filter(isPathEntryWaiting);
     const flashEntry = flashId ? approved.find((e) => e.id === flashId) ?? null : null;
 
     return (
@@ -113,7 +113,7 @@ function CourseProjectHub() {
                 subtitle="Fill the coursework form section by section, submit your flashcard to faculty, and collect your approved coursework here."
                 gradient="linear-gradient(115deg,#04252b,#0e5f63 55%,#12a5a0 110%)"
                 stats={[
-                    { value: String(approved.filter((e) => e.isOwner !== false).length), label: "APPROVED" },
+                    { value: String(approved.length), label: "APPROVED" },
                     { value: String(underReview.length), label: "UNDER REVIEW" },
                     { value: String(inProgress), label: "IN PROGRESS" },
                 ]}
@@ -149,12 +149,6 @@ function CourseProjectHub() {
                                 >
                                     📚 {creating ? "Opening…" : "OPEN THE COURSEWORK FORM"}
                                 </button>
-                                <Link
-                                    href={`${hubHref}?view=in-progress`}
-                                    className="inline-flex items-center gap-1.5 rounded-[9px] bg-[#eef2f3] px-4 py-3 text-xs font-black text-[#29454f]"
-                                >
-                                    🧩 Continue an existing record
-                                </Link>
                             </div>
                             <div className="mt-4 rounded-xl border border-[#d5eee8] bg-[#eef8f6] px-3.5 py-2.5 text-[11px] leading-[1.5] text-[#4b6f68]">
                                 Once you start, the record appears under <b>Coursework → Coursework in Progress</b> with a completion bar. Your faculty, university and CIEL PK can see progress and send reminders — never your unfinished text.
@@ -201,23 +195,17 @@ function CourseProjectHub() {
                                 <div>
                                     <h3 className="m-0 text-lg font-semibold text-[#16313d]">My Coursework Impact</h3>
                                     <p className="mt-1 text-xs text-[#70808a]">
-                                        {approved.length} approved record{approved.length === 1 ? "" : "s"} · You receive the approved file; scores and rankings stay with faculty.
+                                        {approved.length} approved record{approved.length === 1 ? "" : "s"} · Rank, flashcard and file match what faculty, university and CIEL PK see.
                                     </p>
                                 </div>
                             </div>
                             <div className="grid gap-3 p-4">
                                 {approved.map((entry) => (
-                                    <div key={entry.id}>
-                                        {entry.isOwner === false && (
-                                            <p className="mb-1.5 px-1 text-[11px] font-bold uppercase tracking-wide text-ciel-indigo">
-                                                👥 Team project — led by {entry.studentInfo?.studentName || "a teammate"}
-                                            </p>
-                                        )}
-                                        <CourseworkImpactListCard
-                                            entry={entry}
-                                            onOpenFlashcard={() => setFlashId(entry.id || null)}
-                                        />
-                                    </div>
+                                    <CourseworkImpactListCard
+                                        key={entry.id}
+                                        entry={entry}
+                                        onOpenFlashcard={() => setFlashId(entry.id || null)}
+                                    />
                                 ))}
                             </div>
                         </section>
@@ -252,18 +240,20 @@ function CourseProjectHub() {
                                     <CardOpenTarget entryId={entry.id!} router={router}>
                                         <CourseworkCard entry={entry} studentReminder="team" />
                                     </CardOpenTarget>
-                                    <button
-                                        type="button"
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            deleteDraft(entry.id!);
-                                        }}
-                                        disabled={deletingId === entry.id}
-                                        aria-label="Delete draft"
-                                        className="ciel-transition absolute -right-2 -top-2 flex h-8 w-8 items-center justify-center rounded-full border border-ciel-border bg-white text-ciel-text-soft shadow-md hover:border-red-200 hover:text-red-600 disabled:opacity-50"
-                                    >
-                                        <Trash2 className="h-4 w-4" />
-                                    </button>
+                                    {entry.isOwner !== false && (
+                                        <button
+                                            type="button"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                deleteDraft(entry.id!);
+                                            }}
+                                            disabled={deletingId === entry.id}
+                                            aria-label="Delete draft"
+                                            className="ciel-transition absolute -right-2 -top-2 flex h-8 w-8 items-center justify-center rounded-full border border-ciel-border bg-white text-ciel-text-soft shadow-md hover:border-red-200 hover:text-red-600 disabled:opacity-50"
+                                        >
+                                            <Trash2 className="h-4 w-4" />
+                                        </button>
+                                    )}
                                 </div>
                             ))}
                         </div>
@@ -306,16 +296,9 @@ function CourseProjectHub() {
                                         <p className="px-1 text-sm text-ciel-text-mid">Nothing in this tab right now.</p>
                                     ) : (
                                         visible.map((entry) => (
-                                            <div key={entry.id} className="space-y-1.5">
-                                                {entry.isOwner === false && (
-                                                    <p className="px-1 text-[11px] font-bold uppercase tracking-wide text-ciel-indigo">
-                                                        👥 Team project — led by {entry.studentInfo?.studentName || "a teammate"}
-                                                    </p>
-                                                )}
-                                                <CardOpenTarget entryId={entry.id!} router={router}>
-                                                    <CourseworkCard entry={entry} studentReminder="faculty" />
-                                                </CardOpenTarget>
-                                            </div>
+                                            <CardOpenTarget key={entry.id} entryId={entry.id!} router={router}>
+                                                <CourseworkCard entry={entry} studentReminder="faculty" />
+                                            </CardOpenTarget>
                                         ))
                                     )}
                                 </div>
@@ -356,12 +339,12 @@ function CourseProjectHub() {
                             background="linear-gradient(135deg,#16798c,#38b8e6)"
                         />
                         <HubTile
-                            href="/dashboard/student/paths/course-project?view=wall"
+                            href="/dashboard/student/impact?area=Coursework"
                             badge={`${approved.length} APPROVED`}
                             badgeClass="text-[#0e4d4e]"
                             emoji="🏅"
                             title="My Coursework Impact"
-                            subtitle="Your approved coursework files. Approved flashcards also appear on your University's Impact Wall and CIEL PK."
+                            subtitle="Approved flashcards with ranking live under My Impact Portfolio → Coursework. University and CIEL PK see the same cards."
                             background="linear-gradient(135deg,#0e4d4e,#117669)"
                         />
                         <HubTile

@@ -46,10 +46,18 @@ export function courseworkApprovedFiles(entry: CourseProjectEntry): string[] {
     return [...(entry.assignmentFileUrl ? [entry.assignmentFileUrl] : []), ...(entry.evidenceUrls || [])].filter(Boolean);
 }
 
-export function fileNameFromUrl(url: string): string {
+export function fileNameFromUrl(url: string, maxLen = 36): string {
     try {
-        const name = decodeURIComponent(new URL(url, "https://local.invalid").pathname.split("/").pop() || "");
-        return name || "Attached file";
+        const raw = decodeURIComponent(new URL(url, "https://local.invalid").pathname.split("/").pop() || "");
+        const stripped = raw.replace(
+            /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}[_-]?/i,
+            "",
+        );
+        const name = stripped || raw || "Attached file";
+        if (name.length <= maxLen) return name;
+        const ext = name.includes(".") ? name.slice(name.lastIndexOf(".")) : "";
+        const keep = Math.max(10, maxLen - ext.length - 1);
+        return `${name.slice(0, keep)}…${ext}`;
     } catch {
         return "Attached file";
     }

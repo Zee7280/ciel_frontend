@@ -206,7 +206,7 @@ export interface CourseProjectEntry {
     createdAt?: string;
     updatedAt?: string;
     /** False when this entry is showing because the viewer was named as a group member on someone else's
-     * submitted report, not because they own it — gates edit/delete access on the frontend. */
+     * report. Teammates can view and edit the same record; only the owner can delete it. */
     isOwner?: boolean;
 }
 

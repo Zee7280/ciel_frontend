@@ -265,7 +265,7 @@ function FacultyCourseworkHub() {
                                         entry={entry}
                                         studentName={entry.student?.name}
                                         remindDraftOwner
-                                        studentEmail={entry.student?.email}
+                                        studentEmail={entry.student?.email || entry.studentInfo?.studentEmail}
                                     />
                                     <p className="mt-1.5 px-1 text-[10px] text-slate-400">
                                         Last activity {formatDistanceToNow(new Date(entry.updatedAt ?? entry.createdAt ?? Date.now()), { addSuffix: true })}

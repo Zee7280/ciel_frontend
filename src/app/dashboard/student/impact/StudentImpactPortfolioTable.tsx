@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { authenticatedFetch } from "@/utils/api";
 import { isCommunityReportOnLiveDeck, isPathEntryApproved } from "@/utils/reviewQueue";
@@ -10,12 +11,13 @@ import { type CourseProjectEntry } from "@/utils/courseProjectTypes";
 import { readStoredCurrentUser } from "@/utils/currentUser";
 import { sdgData } from "@/utils/sdgData";
 import CourseworkFlashCardModal from "@/components/ciel/coursework/CourseworkFlashCardModal";
-import type { CommunityServiceLevel } from "@/utils/communityAwardModel";
+import CourseworkImpactListCard from "@/components/ciel/coursework/CourseworkImpactListCard";
+import type { CommunityAwardBadge, CommunityServiceLevel } from "@/utils/communityAwardModel";
 
 const AREAS = ["All Impact", "Community Service", "Coursework", "FYP", "Startup"] as const;
 type Area = (typeof AREAS)[number];
 type ScoreKind = "community" | "ai" | "ok";
-type BadgeKind = "level" | "ok";
+type BadgeKind = "level" | "ok" | "rank";
 
 type SimpleFlash = {
     type: string;
@@ -95,14 +97,15 @@ function matchesArea(row: PortfolioRow, filter: Area): boolean {
 }
 
 function scoreClass(kind: ScoreKind): string {
-    if (kind === "community") return "inline-block rounded-2xl bg-[#e8f5ef] px-2 py-1.5 text-[9.5px] font-black text-[#1d765d]";
-    if (kind === "ai") return "inline-block rounded-2xl bg-[#edf4fb] px-2 py-1.5 text-[9.5px] font-black text-[#376d9f]";
-    return "inline-block rounded-[18px] bg-[#e8f5ef] px-2 py-1 text-[9.5px] font-black text-[#1d765d]";
+    if (kind === "community") return "inline-block max-w-full rounded-2xl bg-[#e8f5ef] px-2 py-1.5 text-[9.5px] font-black leading-tight text-[#1d765d]";
+    if (kind === "ai") return "inline-block max-w-full rounded-2xl bg-[#edf4fb] px-2 py-1.5 text-[9.5px] font-black leading-tight text-[#376d9f]";
+    return "inline-block max-w-full rounded-[18px] bg-[#e8f5ef] px-2 py-1 text-[9.5px] font-black leading-tight text-[#1d765d]";
 }
 
 function badgeClass(kind: BadgeKind): string {
-    if (kind === "level") return "inline-block rounded-2xl bg-[#f8f2e7] px-2 py-1.5 text-[9.5px] font-black text-[#765b25]";
-    return "inline-block rounded-[18px] bg-[#e8f5ef] px-2 py-1 text-[9.5px] font-black text-[#1d765d]";
+    if (kind === "level") return "inline-block max-w-full rounded-2xl bg-[#f8f2e7] px-2 py-1.5 text-[9.5px] font-black leading-tight text-[#765b25]";
+    if (kind === "rank") return "inline-block max-w-full rounded-2xl bg-[#f3edff] px-2 py-1.5 text-[9.5px] font-black leading-tight text-[#5a2fd1]";
+    return "inline-block max-w-full rounded-[18px] bg-[#e8f5ef] px-2 py-1 text-[9.5px] font-black leading-tight text-[#1d765d]";
 }
 
 function StudentPortfolioFlashModal({
@@ -191,9 +194,14 @@ function StudentPortfolioFlashModal({
 }
 
 export default function StudentImpactPortfolioTable() {
+    const router = useRouter();
+    const searchParams = useSearchParams();
+    const areaParam = searchParams.get("area");
     const [rows, setRows] = useState<PortfolioRow[]>([]);
     const [loading, setLoading] = useState(true);
-    const [filter, setFilter] = useState<Area>("All Impact");
+    const [filter, setFilter] = useState<Area>(() =>
+        areaParam && (AREAS as readonly string[]).includes(areaParam) ? (areaParam as Area) : "All Impact",
+    );
     const [year, setYear] = useState("all");
     const [sdg, setSdg] = useState("all");
     const [status, setStatus] = useState("all");
@@ -202,12 +210,12 @@ export default function StudentImpactPortfolioTable() {
     const [openId, setOpenId] = useState<string | null>(null);
 
     useEffect(() => {
-        if (typeof window === "undefined") return;
-        const area = new URLSearchParams(window.location.search).get("area");
-        if (area && (AREAS as readonly string[]).includes(area)) {
-            setFilter(area as Area);
+        if (areaParam && (AREAS as readonly string[]).includes(areaParam)) {
+            setFilter(areaParam as Area);
+        } else if (!areaParam) {
+            setFilter("All Impact");
         }
-    }, []);
+    }, [areaParam]);
 
     useEffect(() => {
         let cancelled = false;
@@ -236,6 +244,9 @@ export default function StudentImpactPortfolioTable() {
             for (const r of communityRows) {
                 if (!isCommunityReportOnLiveDeck(r)) continue;
                 const level = r.level as CommunityServiceLevel | undefined;
+                const extraBadge = Array.isArray(r.awardBadges)
+                    ? (r.awardBadges as CommunityAwardBadge[])[0]
+                    : undefined;
                 const hours = Number(r.section1?.metrics?.total_verified_hours || r.hours || 0);
                 const year = yearOf(r.created_at);
                 const sdgs = sdgNumbers(r.sdgs);
@@ -248,8 +259,8 @@ export default function StudentImpactPortfolioTable() {
                     areaLabel: "Community Service",
                     score: r.cii_score != null ? `Composite ${r.cii_score}` : "Approved ✓",
                     scoreKind: r.cii_score != null ? "community" : "ok",
-                    badge: level || "Faculty Approved",
-                    badgeKind: level ? "level" : "ok",
+                    badge: extraBadge?.label || level || "Faculty Approved",
+                    badgeKind: extraBadge ? "rank" : level ? "level" : "ok",
                     year,
                     dateIso: asIso(r.created_at),
                     sdgs,
@@ -260,7 +271,7 @@ export default function StudentImpactPortfolioTable() {
                         subtitle: `${me} • ${uni} • ${year}`,
                         stats: [
                             ["Composite Indicator Score", r.cii_score != null ? String(r.cii_score) : "Approved"],
-                            ["Community Service Level", level || "Faculty Approved"],
+                            ["Community Service Level", extraBadge?.label || level || "Faculty Approved"],
                             ["Verified Hours", hours ? `${Math.round(hours)}h` : "—"],
                         ],
                         summary:
@@ -268,7 +279,9 @@ export default function StudentImpactPortfolioTable() {
                             r.executive_summary ||
                             "Approved Community Service report with verified field activity and measurable beneficiary outcomes.",
                         impact: sdgLine(sdgs),
-                        verify: "Faculty verified • Partner verified • CIEL PK approved.",
+                        verify: extraBadge
+                            ? `${extraBadge.label} · Faculty verified • Partner verified • CIEL PK approved.`
+                            : "Faculty verified • Partner verified • CIEL PK approved.",
                     },
                 });
             }
@@ -277,6 +290,10 @@ export default function StudentImpactPortfolioTable() {
             for (const r of courseworkRows) {
                 if (!isFacultyApproved(r)) continue;
                 const entry = r as CourseProjectEntry;
+                const ribbon = entry.meritRibbon;
+                const rankLabel = ribbon
+                    ? `${ribbon.badgeLevel || "Ranked"} #${ribbon.rank} of ${ribbon.of}`
+                    : "Faculty Approved";
                 const uni = entry.studentInfo?.universityName || entry.course || "Coursework";
                 const year = yearOf(entry.facultyApprovalAt || entry.updatedAt || entry.createdAt);
                 const sdgs = sdgNumbers(entry.sdgMapping?.entries || entry.sdgs);
@@ -286,10 +303,10 @@ export default function StudentImpactPortfolioTable() {
                     meta: uni,
                     area: "Coursework",
                     areaLabel: "Coursework",
-                    score: "Approved ✓",
-                    scoreKind: "ok",
-                    badge: "Faculty Approved",
-                    badgeKind: "ok",
+                    score: ribbon?.total != null ? `AI Ranking ${Math.round(Number(ribbon.total))}` : ribbon ? rankLabel : "Approved ✓",
+                    scoreKind: ribbon ? "ai" : "ok",
+                    badge: rankLabel,
+                    badgeKind: ribbon ? "rank" : "ok",
                     year,
                     dateIso: asIso(entry.facultyApprovalAt || entry.updatedAt || entry.createdAt),
                     sdgs,
@@ -300,13 +317,15 @@ export default function StudentImpactPortfolioTable() {
                         title: entry.projectTitle || entry.course || "Coursework",
                         subtitle: `${me} • ${uni} • ${year}`,
                         stats: [
-                            ["Status", "Verified"],
+                            ["Status", rankLabel],
                             ["Impact Area", "Coursework"],
                             ["Faculty", "Approved"],
                         ],
                         summary: entry.projectDescription || "Faculty-approved sustainability-linked coursework.",
                         impact: sdgLine(sdgs),
-                        verify: "Faculty verified and added to My Impact Portfolio.",
+                        verify: ribbon
+                            ? `Faculty verified · ${rankLabel}${ribbon.scope ? ` · ${ribbon.scope}` : ""}.`
+                            : "Faculty verified and added to My Impact Portfolio.",
                     },
                 });
             }
@@ -325,8 +344,8 @@ export default function StudentImpactPortfolioTable() {
                     areaLabel: "FYP",
                     score: total != null ? `AI Ranking ${Math.round(Number(total))}` : "Approved ✓",
                     scoreKind: total != null ? "ai" : "ok",
-                    badge: "Verified",
-                    badgeKind: "ok",
+                    badge: fypEntry.meritRibbon?.badgeLevel || "Verified",
+                    badgeKind: fypEntry.meritRibbon?.badgeLevel ? "rank" : "ok",
                     year,
                     dateIso: asIso(fypEntry.updatedAt || fypEntry.createdAt),
                     sdgs,
@@ -365,8 +384,8 @@ export default function StudentImpactPortfolioTable() {
                     areaLabel: "Startup / Venture",
                     score: total != null ? `AI Ranking ${Math.round(Number(total))}` : "Approved ✓",
                     scoreKind: total != null ? "ai" : "ok",
-                    badge: investorReady ? "Investor Ready" : "Verified",
-                    badgeKind: "ok",
+                    badge: startupEntry.meritRibbon?.badgeLevel || (investorReady ? "Investor Ready" : "Verified"),
+                    badgeKind: startupEntry.meritRibbon?.badgeLevel ? "rank" : "ok",
                     year,
                     dateIso: asIso(startupEntry.updatedAt || startupEntry.createdAt),
                     sdgs,
@@ -424,7 +443,7 @@ export default function StudentImpactPortfolioTable() {
                 <div>
                     <h3 className="m-0 text-lg font-semibold text-[#16313d]">My Impact Portfolio</h3>
                     <p className="mt-1 text-xs text-[#70808a]">
-                        Your combined verified record across Community Service, Coursework, FYP and Startup / Venture.
+                        Your combined verified record across Community Service, Coursework, FYP and Startup / Venture — the same flashcards and badges as each path wall.
                     </p>
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -432,7 +451,11 @@ export default function StudentImpactPortfolioTable() {
                         <button
                             key={a}
                             type="button"
-                            onClick={() => setFilter(a)}
+                            onClick={() => {
+                                setFilter(a);
+                                if (a === "All Impact") router.replace("/dashboard/student/impact");
+                                else router.replace(`/dashboard/student/impact?area=${encodeURIComponent(a)}`);
+                            }}
                             className={
                                 filter === a
                                     ? "rounded-[18px] border border-[#153f47] bg-[#153f47] px-2.5 py-[7px] text-[11px] font-[850] text-white"
@@ -504,7 +527,24 @@ export default function StudentImpactPortfolioTable() {
                 </div>
             ) : filtered.length === 0 ? (
                 <div className="px-5 py-10 text-center text-[11px] text-[#7a919a]">
-                    Nothing approved here yet — approved work from any impact area lands on this table automatically.
+                    {filter === "Coursework"
+                        ? "No approved coursework flashcards yet — once faculty approves a record, its flashcard and ranking land here."
+                        : "Nothing approved here yet — approved work from any impact area lands on this table automatically."}
+                </div>
+            ) : filter === "Coursework" ? (
+                <div className="grid gap-3 p-4">
+                    <p className="m-0 px-1 text-[11.5px] text-[#70808a]">
+                        Approved coursework flashcards with live ranking — the same cards as My Coursework Impact.
+                    </p>
+                    {filtered.map((r) =>
+                        r.coursework ? (
+                            <CourseworkImpactListCard
+                                key={r.id}
+                                entry={r.coursework}
+                                onOpenFlashcard={() => setOpenId(r.id)}
+                            />
+                        ) : null,
+                    )}
                 </div>
             ) : (
                 <div className="overflow-x-auto">
@@ -530,15 +570,15 @@ export default function StudentImpactPortfolioTable() {
                             }}
                             className="grid min-w-[900px] cursor-pointer grid-cols-[1.6fr_.8fr_1fr_.8fr_.8fr_90px] items-center gap-2.5 border-b border-[#dde5ea] px-3.5 py-3 hover:bg-[#f8fbfb]"
                         >
-                            <div>
-                                <div className="text-xs font-black text-[#16313d]">{r.title}</div>
-                                <div className="mt-0.5 text-[9.5px] text-[#70808a]">{r.meta}</div>
+                            <div className="min-w-0">
+                                <div className="truncate text-xs font-black text-[#16313d]">{r.title}</div>
+                                <div className="mt-0.5 truncate text-[9.5px] text-[#70808a]">{r.meta}</div>
                             </div>
                             <div className="text-[12px] text-[#16313d]">{r.areaLabel}</div>
-                            <div>
+                            <div className="min-w-0">
                                 <span className={scoreClass(r.scoreKind)}>{r.score}</span>
                             </div>
-                            <div>
+                            <div className="min-w-0">
                                 <span className={badgeClass(r.badgeKind)}>{r.badge}</span>
                             </div>
                             <div className="text-[12px] text-[#16313d]">{r.year}</div>

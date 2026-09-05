@@ -3,18 +3,18 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { CheckCircle2, UploadCloud, X, ChevronDown, ArrowLeft, Star } from "lucide-react";
+import { CheckCircle2, UploadCloud, X, ChevronDown, Star } from "lucide-react";
 import clsx from "clsx";
 import { authenticatedFetch } from "@/utils/api";
 import { sdgData } from "@/utils/sdgData";
 import { pakistaniUniversities } from "@/utils/universityData";
 import { hecPrograms } from "@/utils/hecProgramsData";
-import PathWorkspaceShell from "@/components/ciel/PathWorkspaceShell";
 import { WorkspaceSkeleton } from "@/components/ciel/Skeleton";
 import SearchableSelect from "@/components/ui/SearchableSelect";
 import CourseworkCard from "@/components/ciel/CourseworkCard";
 import { TeamInviteBadge } from "@/components/ciel/TeamInviteBadge";
 import RichSummaryText from "@/components/ciel/RichSummaryText";
+import { CourseworkCrumb, CourseworkHero, HubBackButton } from "@/components/ciel/coursework/CourseworkHubChrome";
 import { courseworkStatusLabel } from "@/utils/courseworkSectionReview";
 import {
     type CourseProjectEntry,
@@ -515,7 +515,6 @@ export default function CourseProjectWizardPage() {
     const [saving, setSaving] = useState(false);
     const [uploading, setUploading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [fabOpen, setFabOpen] = useState(false);
 
     useEffect(() => {
         authenticatedFetch(`/api/v1/paths/course-projects/${id}`, {}, { redirectToLogin: false })
@@ -705,7 +704,8 @@ export default function CourseProjectWizardPage() {
     });
 
     const isOwner = entry.isOwner !== false;
-    const showCard = (entry.status === "submitted" && !editing) || !isOwner;
+    const statusChip = courseworkStatusLabel(entry);
+    const showCard = entry.status === "submitted" && !editing;
     const teamMode = entry.studentInfo?.teamMode ?? "";
     // Legacy entries may still say "Solo" instead of "Individual" — treat both as not-a-team.
     const isTeam = !!teamMode && !/^(individual|solo)$/i.test(teamMode);
@@ -757,47 +757,50 @@ export default function CourseProjectWizardPage() {
     ];
 
     return (
-        <PathWorkspaceShell
-            title="Coursework"
-            stats={[
-                { label: "Status", value: entry.status === "submitted" ? "Submitted" : "Draft" },
-                { label: "Steps complete", value: `${entry.stepCompleted}/8`, hint: "Contributes to sections 2, 3 of your impact score" },
-            ]}
-            tabs={[{ key: "build", label: "Build project" }]}
-            activeTab="build"
-            onTabChange={() => {}}
-        >
-            <div className="mb-4">
-                <Link href="/dashboard/student/paths/course-project" className="inline-flex items-center gap-1.5 text-xs font-bold text-ciel-text-mid hover:text-ciel-navy">
-                    <ArrowLeft className="h-3.5 w-3.5" /> Back to my coursework
-                </Link>
+        <div className="mx-auto max-w-[1040px] pb-16">
+            <CourseworkCrumb role="Student" view="Build project" />
+            <CourseworkHero
+                kicker="MY PATHS · COURSEWORK"
+                title="Build project"
+                subtitle="Fill each section. Your draft saves as you go — faculty only sees this after you submit."
+                gradient="linear-gradient(115deg,#04252b,#0e5f63 55%,#12a5a0 110%)"
+                stats={[
+                    { value: statusChip.label, label: "STATUS" },
+                    { value: `${entry.stepCompleted}/8`, label: "STEPS COMPLETE" },
+                ]}
+            />
+            <div className="mt-5">
+                <HubBackButton href="/dashboard/student/paths/course-project" label="← Back to my coursework" />
             </div>
 
             {showCard ? (
                 <div className="space-y-4">
                     {!isOwner && (
-                        <div className="rounded-ciel-sm border border-ciel-indigo-soft bg-ciel-indigo-soft/60 px-4 py-2.5 text-xs font-semibold text-ciel-indigo">
-                            👥 You&apos;re named as a team member on this report — {entry.studentInfo?.studentName || "the lead"} owns it and is the only one who can edit or submit changes.
+                        <div className="rounded-ciel-sm border border-ciel-indigo-soft bg-ciel-indigo-soft/60 px-4 py-2 text-xs font-semibold leading-relaxed text-ciel-indigo">
+                            Team report led by {entry.studentInfo?.studentName || "a teammate"} — you can view and edit the same file.
                         </div>
                     )}
-                    <CourseworkCard entry={entry} defaultOpen />
-                    {isOwner && (
-                        <button
-                            type="button"
-                            onClick={() => {
-                                setStep(0);
-                                setEditing(true);
-                            }}
-                            className="ciel-transition rounded-ciel-sm border border-ciel-border px-4 py-2.5 text-sm font-bold text-ciel-text-mid hover:border-ciel-gold/40"
-                        >
-                            Edit this report
-                        </button>
-                    )}
+                    <CourseworkCard entry={entry} defaultOpen studentReminder={entry.status === "submitted" ? "faculty" : "team"} />
+                    <button
+                        type="button"
+                        onClick={() => {
+                            setStep(0);
+                            setEditing(true);
+                        }}
+                        className="ciel-transition rounded-ciel-sm border border-ciel-border px-4 py-2.5 text-sm font-bold text-ciel-text-mid hover:border-ciel-gold/40"
+                    >
+                        Edit this report
+                    </button>
                 </div>
             ) : null}
 
             {!showCard && (
             <>
+                {!isOwner && (
+                    <div className="mb-4 rounded-ciel-sm border border-ciel-indigo-soft bg-ciel-indigo-soft/60 px-4 py-2 text-xs font-semibold leading-relaxed text-ciel-indigo">
+                        Shared team report — you and {entry.studentInfo?.studentName || "your teammates"} can all edit this same file.
+                    </div>
+                )}
                 {entry.facultyApprovalStatus !== "approved" && entry.facultyApprovalNote ? (
                     <div className="mb-4 rounded-ciel-sm border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-relaxed text-amber-900">
                         <b>{courseworkStatusLabel(entry).label} by {entry.studentInfo?.teacherName || "your supervisor"}.</b>{" "}
@@ -816,19 +819,19 @@ export default function CourseProjectWizardPage() {
                                     onClick={() => setStep(i)}
                                     title={stepLabels[i]}
                                     className={clsx(
-                                        "relative min-w-16 flex-1 rounded-[11px] border-[1.5px] px-1 py-[7px] text-center ciel-transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ciel-gold",
+                                        "relative min-w-16 flex-1 rounded-[11px] border px-1 py-[7px] text-center ciel-transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black",
                                         isCurrent
-                                            ? "border-ciel-gold bg-ciel-gold-soft"
+                                            ? "border-[#d5aa46] bg-black text-white shadow-[inset_0_0_0_1px_#d5aa46]"
                                             : isDone
-                                              ? "border-[#bfe8cc] bg-ciel-green-soft"
-                                              : "border-ciel-border bg-white hover:border-ciel-gold/50",
+                                              ? "border-black bg-black text-white"
+                                              : "border-black bg-black text-white/70 hover:text-white",
                                     )}
                                 >
                                     <div className="text-sm leading-none">{isDone ? "✓" : s.emoji}</div>
                                     <div
                                         className={clsx(
                                             "mt-0.5 text-[9px] font-extrabold uppercase leading-tight tracking-wide",
-                                            isCurrent ? "text-ciel-gold-deep" : "text-[#7a8095]",
+                                            isCurrent ? "text-white" : "text-white/75",
                                         )}
                                     >
                                         {stepLabels[i]}
@@ -1311,7 +1314,7 @@ export default function CourseProjectWizardPage() {
                                 ))}
                             </div>
 
-                            <Field label="📎 Upload your files" hint="Optional — the same uploads as the floating 📎 button; PDF · DOCX · PPTX · images · links.">
+                            <Field label="📎 Upload your files" hint="Optional — PDF · DOCX · PPTX · images · links. Files stay with this record for faculty review.">
                                 <label className={clsx("ciel-transition flex cursor-pointer items-center gap-3 rounded-ciel-sm border-2 border-dashed px-4 py-3 text-sm font-semibold", entry.assignmentFileUrl ? "border-ciel-green bg-ciel-green-soft text-ciel-green-deep" : "border-ciel-gold/50 bg-ciel-gold-soft text-ciel-gold-deep hover:border-ciel-gold", uploading && "opacity-60")}>
                                     <UploadCloud className="h-4 w-4" />
                                     {entry.assignmentFileUrl ? "✅ Assignment uploaded — travels privately with your card" : "📄 Upload your assignment — the essay, deck, design file. Lifts your Verifiability score (+3)."}
@@ -1490,45 +1493,7 @@ export default function CourseProjectWizardPage() {
             </div>
             </>
             )}
-
-            {!showCard && (
-                <div
-                    className="fixed z-[55] print:hidden right-[5.75rem] sm:right-[6.75rem]"
-                    style={{ bottom: "calc(7rem + env(safe-area-inset-bottom, 0px))" }}
-                >
-                    {fabOpen && (
-                        <div className="ciel-crossfade-enter absolute bottom-14 right-0 w-72 rounded-ciel-lg border border-ciel-border bg-white p-4 shadow-[0_18px_44px_rgba(20,32,43,0.22)]">
-                            <p className="text-xs font-black text-ciel-text">📎 Attach your actual assignment</p>
-                            <p className="mt-1 text-[10.5px] leading-relaxed text-ciel-text-soft">Optional, any time, from any step. The essay, deck, design file — the real thing. It travels privately with your flash card and lifts your <b>Verifiability</b> score.</p>
-                            <button
-                                type="button"
-                                onClick={() => document.getElementById("cw-fab-main-input")?.click()}
-                                className={clsx("ciel-transition mt-2.5 flex w-full items-center gap-2 rounded-ciel-sm border-2 border-dashed px-3 py-2.5 text-left text-xs font-bold", entry.assignmentFileUrl ? "border-ciel-green bg-ciel-green-soft text-ciel-green-deep" : "border-ciel-gold/50 bg-ciel-gold-soft text-ciel-gold-deep")}
-                            >
-                                📄 {entry.assignmentFileUrl ? "Assignment attached ✓" : "Attach the assignment — PDF / DOCX / link"}
-                            </button>
-                            <input id="cw-fab-main-input" type="file" accept="image/*,application/pdf,.doc,.docx,.ppt,.pptx" className="hidden" onChange={(e) => e.target.files?.[0] && handleAssignmentFile(e.target.files[0])} />
-                            <button
-                                type="button"
-                                onClick={() => document.getElementById("cw-fab-extra-input")?.click()}
-                                className={clsx("ciel-transition mt-2 flex w-full items-center gap-2 rounded-ciel-sm border-2 border-dashed px-3 py-2.5 text-left text-xs font-bold", entry.evidenceUrls?.length ? "border-ciel-green bg-ciel-green-soft text-ciel-green-deep" : "border-ciel-gold/50 bg-ciel-gold-soft text-ciel-gold-deep")}
-                            >
-                                🖼️ {entry.evidenceUrls?.length ? "Supporting files attached ✓" : "Supporting files — images, data, video"}
-                            </button>
-                            <input id="cw-fab-extra-input" type="file" accept="image/*,application/pdf" className="hidden" onChange={(e) => e.target.files?.[0] && handleEvidenceFile(e.target.files[0])} />
-                            <p className="mt-2.5 text-[9.5px] leading-relaxed text-ciel-text-soft">🔒 Files stay private — visible to your teacher and reviewers only, never on the public card.</p>
-                        </div>
-                    )}
-                    <button
-                        type="button"
-                        onClick={() => setFabOpen((v) => !v)}
-                        className={clsx("ciel-transition flex items-center gap-2 rounded-full px-5 py-3 text-xs font-black text-white shadow-[0_12px_30px_rgba(20,32,43,0.28)]", entry.assignmentFileUrl ? "bg-ciel-green" : "bg-ciel-navy")}
-                    >
-                        📎 {entry.assignmentFileUrl ? "Assignment attached ✓" : "Attach assignment"}
-                    </button>
-                </div>
-            )}
-        </PathWorkspaceShell>
+        </div>
     );
 }
 
